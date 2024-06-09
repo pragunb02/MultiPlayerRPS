@@ -29,34 +29,43 @@ function joinGame() {
 }
 
 socket.on("newGame", (data) => {
-    roomUniqueId = data.roomUniqueId;
-    document.getElementById("initial").style.display = "none";
-    document.getElementById("gamePlay").style.display = "block";
-    let copyBtn = document.createElement("button");
-    copyBtn.innerText = "Copy Code";
-    copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(roomUniqueId).then(
-            function () {
-                console.log("Done Copying Code");
-            },
-            function (err) {
-                console.log("Error in copying");
-            }
-        );
-    });
-    const waitingArea = document.getElementById("waitingArea");
-    if (waitingArea) {
-        waitingArea.innerHTML = `Waiting For Opponent, Please share code ${roomUniqueId}`;
-    }
-    waitingArea.appendChild(copyBtn);
+  roomUniqueId = data.roomUniqueId;
+  document.getElementById("initial").style.display = "none";
+  document.getElementById("gamePlay").style.display = "block";
+  let copyBtn = document.createElement("button");
+  copyBtn.innerText = "Copy Code";
+  copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(roomUniqueId).then(
+          function () {
+              console.log("Done Copying Code");
+              // Notify user about successful copying
+              alert("Code copied successfully!");
+          },
+          function (err) {
+              console.log("Error in copying");
+              // Notify user about error
+              alert("Error in copying code");
+          }
+      );
+  });
+  const waitingArea = document.getElementById("waitingArea");
+  if (waitingArea) {
+      waitingArea.innerHTML = `Waiting For Opponent.., Please share code <span style="font-weight: bold; font-style: italic; color: #ff0000">${roomUniqueId}</span>`;
+  }
+  var br = document.createElement("br");
+  waitingArea.appendChild(br);
+  waitingArea.appendChild(copyBtn); 
 });
+
 
 socket.on("playersConnected", (data) => {
     console.log("Players connected:", data);
+    document.getElementById("initial").style.display = "none";
+    document.getElementById("gamePlay").style.display="block";
     document.getElementById("waitingArea").style.display = "none";
     document.getElementById("gameArea").style.display = "block";
-    document.getElementById("gameOptions").style.display = "block";
-    document.getElementById("initial").style.display = "none";
+    // // document.getElementById("gameOptions").style.display = "block";
+    
 });
 
 socket.on("p1Choice", (data) => {
@@ -80,8 +89,14 @@ socket.on("result", (data) => {
     } else {
         winner = player1 ? "You lose" : "You Win";
     }
+    document.getElementById("initial").style.display = "none";
+    document.getElementById("gamePlay").style.display="block";
+    document.getElementById("waitingArea").style.display = "none";
+    document.getElementById("gameArea").style.display = "block";
+    document.getElementById("winnerArea").style.display="block"
     document.getElementById("opponentState").style.display = "none";
-    document.getElementById("opponentButton").style.display = "block";
+    document.getElementById("opponentButton").style.display = "block"
+    document.getElementById("player1Choice").style.display="block";
     document.getElementById("winnerArea").innerHTML = winner;
 });
 

@@ -1,49 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MultiPlayer TTT</title>
+    <title>Rock Paper Scissors</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <h1>Rock Paper Scissors</h1>
-    <div id="initial">
-      <input
-        type="text"
-        id="playerName"
-        placeholder="Enter your name"
-        required
-      />
-      <button onclick="createGame()">Create Game</button>
-      <div>or</div>
-      <input
-        type="text"
-        id="roomUniqueId"
-        placeholder="Enter room code"
-        required
-      />
-      <button onclick="joinGame()">Join Game</button>
-    </div>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Rock Paper Scissors</h1>
+        </header>
+        <div id="initial" class="card">
+            <input type="text" id="playerName" placeholder="Enter your name" required />
+            <button onclick="createGame()">Create Game</button>
+            <p>or</p>
+            <input type="text" id="roomUniqueId" placeholder="Enter room code" required />
+            <button onclick="joinGame()">Join Game</button>
+        </div>
 
-    <div id="gamePlay">
-      <div id="waitingArea"></div>
-      <div id="gameArea" style="display: none">
-        You:
-        <div id="player1Choice">
-          <button onclick="sendChoice('Rock')">Rock</button>
-          <button onclick="sendChoice('Paper')">Paper</button>
-          <button onclick="sendChoice('Scissor')">Scissor</button>
+        <div id="gamePlay" class="card" style="display:none">
+            <div id="waitingArea"></div>
+            <div id="gameArea" style="display: none">
+                <div class="playerSection">
+                    <h2>You:</h2>
+                    <div id="player1Choice">
+                        <button onclick="sendChoice('Rock')">Rock</button>
+                        <button onclick="sendChoice('Paper')">Paper</button>
+                        <button onclick="sendChoice('Scissor')">Scissor</button>
+                    </div>
+                </div>
+                <div class="playerSection">
+                    <h2>Opponent:</h2>
+                    <div id="player2Choice">
+                        <p id="opponentState">Waiting For Opponent....</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="winnerArea" style="display: none;">
+              <hr />
+            </div>
         </div>
-        Opponent:
-        <div id="player2Choice">
-          <p id="opponentState">Waiting For Opponent....</p>
-        </div>
-      </div>
-      <hr />
-      <div id="winnerArea"></div>
     </div>
     <script src="client.js"></script>
-  </body>
+</body>
 </html>
