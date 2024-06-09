@@ -14,7 +14,7 @@ const rooms = {};
 
 // Connect to MongoDB
 connectDB();
-
+// const rid=1;
 app.use(express.static(path.join(__dirname, "client")));
 
 app.get("/", (req, res) => {
@@ -25,12 +25,18 @@ io.on("connection", (socket) => {
   console.log("A user is connected");
 
   socket.on("disconnect", () => {
+    // if(rid!=1){
+    //   rooms[rid]=NULL;
+    // }
+    // console.log("abcd");
+    // console.log(rooms)
     console.log("User disconnected");
   });
 
   socket.on("createGame", async (data) => {
     try {
       const roomUniqueId = makeId(5);
+      rid=roomUniqueId;
       rooms[roomUniqueId] = { player1: data.playerName };
       socket.join(roomUniqueId);
       socket.emit("newGame", { roomUniqueId: roomUniqueId });
@@ -60,6 +66,7 @@ io.on("connection", (socket) => {
         );
       }
     } catch (error) {
+      alert("Error joining game:");
       console.error("Error joining game:", error);
     }
   });
