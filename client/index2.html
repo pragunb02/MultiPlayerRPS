@@ -3,26 +3,24 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gaming Arena</title>
-    <!-- <script src="/socket.io/socket.io.js"></script> -->
+    <title>Rock Paper Scissors</title>
+    <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Gaming Arena</h1>
+            <h1>Rock Paper Scissors</h1>
         </header>
         <div id="initial" class="card">
-            <!-- <input type="text" id="playerName" placeholder="Enter your name" required /> -->
-            <!-- <button onclick="createGame()">Rock Paper Scissor</button> -->
-            <a href="index2.html"> <button>Rock Paper Scissore</button></a>
+            <input type="text" id="playerName" placeholder="Enter your name" required />
+            <button onclick="createGame()">Create Game</button>
             <p>or</p>
-            <!-- <input type="text" id="roomUniqueId" placeholder="Enter room code" required /> -->
-            <!-- <button onclick="joinGame()">Tic Tac Toe</button> -->
-            <a href="index3.html"> <button>Tic Tac Toe</button></a>
+            <input type="text" id="roomUniqueId" placeholder="Enter room code" required />
+            <button onclick="joinGame()">Join Game</button>
         </div>
 
-        <!-- <div id="gamePlay" class="card" style="display:none">
+        <div id="gamePlay" class="card" style="display:none">
             <div id="waitingArea"></div>
             <div id="gameArea" style="display: none">
                 <div class="playerSection">
@@ -43,9 +41,9 @@
             
             <div id="winnerArea" style="display: none;">
               <hr />
-            </div> -->
+            </div>
         </div>
     </div>
-    <!-- <script src="client.js"></script> -->
+    <script src="client.js"></script>
 </body>
 </html>

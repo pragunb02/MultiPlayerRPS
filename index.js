@@ -5,12 +5,14 @@ const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const connectDB = require("./db");
 const Game = require("./models/Game");
+const GameD = require("./models/GameD");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const PORT = 8080;
 const rooms = {};
+const roomsD= {};
 
 // Connect to MongoDB
 connectDB();
@@ -23,7 +25,7 @@ app.get("/", (req, res) => {
 
 io.on("connection", (socket) => {
   console.log("A user is connected");
-
+  console.log("okji1");
   socket.on("disconnect", () => {
     // if(rid!=1){
     //   rooms[rid]=NULL;
@@ -36,7 +38,7 @@ io.on("connection", (socket) => {
   socket.on("createGame", async (data) => {
     try {
       const roomUniqueId = makeId(5);
-      rid=roomUniqueId;
+      // rid=roomUniqueId;
       rooms[roomUniqueId] = { player1: data.playerName };
       socket.join(roomUniqueId);
       socket.emit("newGame", { roomUniqueId: roomUniqueId });
@@ -46,6 +48,29 @@ io.on("connection", (socket) => {
         player1Name: data.playerName,
       });
       await game.save();
+    } catch (error) {
+      console.error("Error creating game:", error);
+    }
+  });
+
+  console.log("okji2");
+  socket.on("createGameD", async (data) => {
+    
+    try {
+      console.log("arewe");
+      const roomUniqueId = makeId(5);
+      // rid=roomUniqueId;
+      roomsD[roomUniqueId] = { player1: data.playerName };
+      socket.join(roomUniqueId);
+      console.log("happen")
+      console.log(roomUniqueId);
+      socket.emit("newGameD", { roomUniqueId: roomUniqueId });
+      
+      const gameD = new GameD({
+        roomUniqueId: roomUniqueId,
+        player1Name: data.playerName,
+      });
+      await gameD.save();
     } catch (error) {
       console.error("Error creating game:", error);
     }
@@ -69,6 +94,37 @@ io.on("connection", (socket) => {
       alert("Error joining game:");
       console.error("Error joining game:", error);
     }
+  });
+
+
+
+  socket.on("joinGameD", async (data) => {
+    console.log("indised54");
+    // console.log("indised54");
+    console.log("Received data:", data); // Log the received data
+    try {
+      console.log("indised");
+      const room = roomsD[data.roomUniqueId];
+      // console.log()
+      console.log("vghb",room);
+      if (room) {
+        room.player2 = data.playerName;
+        socket.join(data.roomUniqueId);
+        socket.to(data.roomUniqueId).emit("playersConnectedD", { data: "p1" });
+        socket.emit("playersConnectedD", { data: "p2" });
+
+        console.log("yes");
+        await GameD.findOneAndUpdate(
+          { roomUniqueId: data.roomUniqueId },
+          { player2Name: data.playerName }
+        );
+        console.log("indisedw");
+      }
+    } catch (error) {
+      alert("Error joining game:");
+      console.error("Error joining game:", error);
+    }
+    console.log("no on ")
   });
 
   socket.on("p1Choice", async (data) => {
