@@ -1,79 +1,79 @@
 * {
-    margin: 0;
-    padding: 0;
-  }
-  
-  body {
-    /* background-color: #c2aff0; */
-    text-align: center;
-  }
-  
-  .containers {
-    height: 70vh;
-    /* // view port heigth 70% */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  .game {
-    height: 60vmin;
-    width: 60vmin;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 1.5vmin;
-  }
-  
-  .box {
-    height: 18vmin;
-    width: 18vmin;
-    border-radius: 1rem;
-    border: none;
-    box-shadow: 0 0 1rem rgba(0, 0, 0, 0.2);
-    font-size: 8vmin;
-    /* color: #2d5d7b; */
-    background-color: #9191e9;
-  }
-  .box0 {
-    color: #7b2d46;
-  }
-  .box1 {
-    color: #2d5d7b;
-  }
-  
-  #reset-btn {
-    padding: 1rem;
-    font-size: 1.25rem;
-    background-color: #686868;
-    color: whitesmoke;
-    border-radius: 1rem;
-    border: none;
-  }
-  
-  #new-game {
-    padding: 1rem;
-    font-size: 1.25rem;
-    background-color: #686868;
-    color: whitesmoke;
-    border-radius: 1rem;
-    border: none;
-  }
-  
-  #msg {
-    color: whitesmoke;
-    font-size: 5vmin;
-  }
-  
-  .msg-container {
-    height: 100vmin;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-    gap: 4rem;
-  }
-  
-  .hide {
-    display: none;
-  }
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  /* background-color: #c2aff0; */
+  text-align: center;
+}
+
+.containers {
+  height: 70vh;
+  /* // view port heigth 70% */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.game {
+  height: 60vmin;
+  width: 60vmin;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5vmin;
+}
+
+.box {
+  height: 18vmin;
+  width: 18vmin;
+  border-radius: 1rem;
+  border: none;
+  box-shadow: 0 0 1rem rgba(0, 0, 0, 0.2);
+  font-size: 8vmin;
+  /* color: #2d5d7b; */
+  background-color: #9191e9;
+}
+.box0 {
+  color: #7b2d46;
+}
+.box1 {
+  color: #2d5d7b;
+}
+
+#reset-btn {
+  padding: 1rem;
+  font-size: 1.25rem;
+  background-color: #686868;
+  color: whitesmoke;
+  border-radius: 1rem;
+  border: none;
+}
+
+#new-game {
+  padding: 1rem;
+  font-size: 1.25rem;
+  background-color: #686868;
+  color: whitesmoke;
+  border-radius: 1rem;
+  border: none;
+}
+
+#msg {
+  color: whitesmoke;
+  font-size: 5vmin;
+}
+
+.msg-container {
+  height: 100vmin;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 4rem;
+}
+
+.hide {
+  display: none;
+}

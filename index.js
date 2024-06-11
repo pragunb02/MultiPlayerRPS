@@ -12,7 +12,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 const PORT = 8080;
 const rooms = {};
-const roomsD= {};
+const roomsD = {};
 
 // Connect to MongoDB
 connectDB();
@@ -55,17 +55,16 @@ io.on("connection", (socket) => {
 
   console.log("okji2");
   socket.on("createGameD", async (data) => {
-    
     try {
       console.log("arewe");
       const roomUniqueId = makeId(5);
       // rid=roomUniqueId;
       roomsD[roomUniqueId] = { player1: data.playerName };
       socket.join(roomUniqueId);
-      console.log("happen")
+      console.log("happen");
       console.log(roomUniqueId);
       socket.emit("newGameD", { roomUniqueId: roomUniqueId });
-      
+
       const gameD = new GameD({
         roomUniqueId: roomUniqueId,
         player1Name: data.playerName,
@@ -96,8 +95,6 @@ io.on("connection", (socket) => {
     }
   });
 
-
-
   socket.on("joinGameD", async (data) => {
     console.log("indised54");
     // console.log("indised54");
@@ -106,7 +103,7 @@ io.on("connection", (socket) => {
       console.log("indised");
       const room = roomsD[data.roomUniqueId];
       // console.log()
-      console.log("vghb",room);
+      console.log("vghb", room);
       if (room) {
         room.player2 = data.playerName;
         socket.join(data.roomUniqueId);
@@ -124,14 +121,16 @@ io.on("connection", (socket) => {
       alert("Error joining game:");
       console.error("Error joining game:", error);
     }
-    console.log("no on ")
+    console.log("no on ");
   });
 
   socket.on("p1Choice", async (data) => {
     try {
       const room = rooms[data.roomUniqueId];
       room.p1Choice = data.rpsChoice;
-      socket.to(data.roomUniqueId).emit("p1Choice", { rpsChoice: data.rpsChoice });
+      socket
+        .to(data.roomUniqueId)
+        .emit("p1Choice", { rpsChoice: data.rpsChoice });
       if (room.p2Choice) {
         await declareWinner(data.roomUniqueId);
       }
@@ -145,11 +144,31 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("choicep1D", async (data) => {
+    console.log("here1");
+    try {
+      const room = roomsD[data.roomUniqueId];
+      socket.to(data.roomUniqueId).emit("p1ChoiceD", {
+        turn0: data.turn0,
+        boxes: data.boxes,
+      });
+      console.log("here2");
+      await GameD.findOneAndUpdate(
+        { roomUniqueId: data.roomUniqueId }
+        // { player1Choice: data.rpsChoice }
+      );
+    } catch (error) {
+      console.error("Error handling player 1 choiceD:", error);
+    }
+  });
+
   socket.on("p2Choice", async (data) => {
     try {
       const room = rooms[data.roomUniqueId];
       room.p2Choice = data.rpsChoice;
-      socket.to(data.roomUniqueId).emit("p2Choice", { rpsChoice: data.rpsChoice });
+      socket
+        .to(data.roomUniqueId)
+        .emit("p2Choice", { rpsChoice: data.rpsChoice });
       if (room.p1Choice) {
         await declareWinner(data.roomUniqueId);
       }
@@ -160,6 +179,62 @@ io.on("connection", (socket) => {
       );
     } catch (error) {
       console.error("Error handling player 2 choice:", error);
+    }
+  });
+
+  // socket.on("choicep2D", async (data) => {
+  //   console.log("here1");
+  //   try {
+  //     const room = roomsD[data.roomUniqueId];
+  //     socket.to(data.roomUniqueId).emit("p2ChoiceD", {
+  //       turn0: data.turn0,
+  //       boxes: data.boxes,
+  //     });
+  //     console.log("here2");
+  //     await GameD.findOneAndUpdate(
+  //       { roomUniqueId: data.roomUniqueId }
+  //       // { player1Choice: data.rpsChoice }
+  //     );
+  //   } catch (error) {
+  //     console.error("Error handling player 1 choiceD:", error);
+  //   }
+  // });
+
+  socket.on("choicep1D", async (data) => {
+    console.log("here1");
+    try {
+      const room = roomsD[data.roomUniqueId];
+      socket.to(data.roomUniqueId).emit("p1ChoiceD", {
+        turn0: data.turn0,
+        boxes: data.boxes,
+        symbol: data.symbol,
+      });
+      console.log("here2");
+      await GameD.findOneAndUpdate(
+        { roomUniqueId: data.roomUniqueId }
+        // { player1Choice: data.boxes } // Updated with player1Choice
+      );
+    } catch (error) {
+      console.error("Error handling player 1 choiceD:", error);
+    }
+  });
+
+  socket.on("choicep2D", async (data) => {
+    console.log("bccccc");
+    try {
+      const room = roomsD[data.roomUniqueId];
+      socket.to(data.roomUniqueId).emit("p2ChoiceD", {
+        turn0: data.turn0,
+        boxes: data.boxes,
+        symbol: data.symbol,
+      });
+      console.log("here2");
+      await GameD.findOneAndUpdate(
+        { roomUniqueId: data.roomUniqueId }
+        // { player2Choice: data.boxes } // Updated with player2Choice
+      );
+    } catch (error) {
+      console.error("Error handling player 2 choiceD:", error);
     }
   });
 });
@@ -194,7 +269,8 @@ async function declareWinner(roomUniqueId) {
 }
 
 function makeId(length) {
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
   for (let i = 0; i < length; i++) {
     result += characters.charAt(Math.floor(Math.random() * characters.length));
