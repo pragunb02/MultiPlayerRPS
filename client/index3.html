@@ -1,106 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rock Paper Scissors</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <div class="container" id="xyz">
-      <header>
-        <h1 id="mainTitle">Tic Tac Toe</h1>
-      </header>
-      <div id="initial" class="card">
-        <input
-          type="text"
-          id="playerName"
-          placeholder="Enter your name"
-          required
-        />
-        <!-- <button onclick="createGame()">Create Game</button> -->
-        <button onclick="createGame();">Create Game</button>
-        <!-- <button onclick="createGame(); window.location.href='tic.html';">Create Game</button> -->
-        <p>or</p>
-        <input
-          type="text"
-          id="roomUniqueId"
-          placeholder="Enter room code"
-          required
-        />
-        <button onclick="joinGame();">Join Game</button>
-      </div>
 
-      <div id="gamePlay" class="card" style="display: none">
-        <div id="waitingArea"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Paper Scissors</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
 
-        <!-- <div id="gameArea" style="display: none"> -->
-        <!-- <div class="playerSection"> -->
-        <!-- <h2>You:</h2> -->
-        <!-- <div id="player1Choice">
-              <button onclick="sendChoice('Rock')">Rock</button>
-              <button onclick="sendChoice('Paper')">Paper</button>
-              <button onclick="sendChoice('Scissor')">Scissor</button>
-            </div> -->
-        <!-- </div> -->
-        <!-- <div class="playerSection"> -->
-        <!-- <h2>Opponent:</h2>
-            <div id="player2Choice">
-              <p id="opponentState">Waiting For Opponent....</p>
-            </div> -->
-        <!-- </div> -->
-        <!-- </div> -->
+<body>
+  <div class="container" id="xyz">
+    <header>
+      <h1 id="mainTitle">Tic Tac Toe</h1>
+    </header>
+    <div id="initial" class="card">
+      <input type="text" id="playerName" placeholder="Enter your name" required />
+      <button onclick="createGame();">Create Game</button>
+      <p>or</p>
+      <input type="text" id="roomUniqueId" placeholder="Enter room code" required />
+      <button onclick="joinGame();">Join Game</button>
+    </div>
 
-        <!-- <div id="winnerArea" style="display: none"> -->
-        <!-- <hr /> -->
-        <!-- </div> -->
+    <div id="gamePlay" class="card" style="display: none">
+      <div id="waitingArea"></div>
+    </div>
+  </div>
+
+  <div class="msg-container hide">
+    <p id="msg">Winner</p>
+    <!-- <button id="new-game">New Game</button> -->
+  </div>
+  <main style="display: none">
+    <h1>Tic Tac Toe</h1>
+    <div id="gameAreaD" style="display: none">
+      <h2 id="ch1">You:</h2>
+      <p id="opponentStateD1">Waiting For Opponent....</p>
+      <h2 id="ch2">Opponent:</h2>
+      <p id="opponentStateD2">Waiting For Opponent....</p>
+    </div>
+
+    <div class="containers">
+      <div class="game">
+        <button class="box" data-index="0"></button>
+        <button class="box" data-index="1"></button>
+        <button class="box" data-index="2"></button>
+        <button class="box" data-index="3"></button>
+        <button class="box" data-index="4"></button>
+        <button class="box" data-index="5"></button>
+        <button class="box" data-index="6"></button>
+        <button class="box" data-index="7"></button>
+        <button class="box" data-index="8"></button>
       </div>
     </div>
 
-    <div class="msg-container hide">
-      <p id="msg">Winner</p>
-      <button id="new-game">New Game</button>
-    </div>
-    <main style="display: none">
-      <h1>Tic Tac Toe</h1>
-      <div id="gameAreaD" style="display: none">
-        <!-- <div class="playerSectionD"> -->
-        <h2 id="ch1">You:</h2>
-        <!-- <div id="turnP1"> -->
-        <p id="opponentStateD1">Waiting For Opponent....</p>
-        <!-- </div> -->
-        <!-- <div id="player1ChoiceD">
-            <button onclick="sendChoice('Rock')">Rock</button>
-            <button onclick="sendChoice('Paper')">Paper</button>
-            <button onclick="sendChoice('Scissor')">Scissor</button> -->
-        <!-- </div> -->
-        <!-- </div> -->
-        <!-- <div class="playerSectionD"> -->
-        <h2 id="ch2">Opponent:</h2>
-        <!-- <div id="player2ChoiceD"> -->
-        <p id="opponentStateD2">Waiting For Opponent....</p>
-        <!-- </div> -->
-        <!-- </div> -->
-      </div>
+    <!-- <button id="reset-btn">Reset Game</button> -->
+  </main>
+  <script src="script.js"></script>
+</body>
 
-      <div class="containers">
-        <div class="game">
-          <button class="box" data-index="0"></button>
-          <button class="box" data-index="1"></button>
-          <button class="box" data-index="2"></button>
-          <button class="box" data-index="3"></button>
-          <button class="box" data-index="4"></button>
-          <button class="box" data-index="5"></button>
-          <button class="box" data-index="6"></button>
-          <button class="box" data-index="7"></button>
-          <button class="box" data-index="8"></button>
-        </div>
-      </div>
-
-      <button id="reset-btn">Reset Game</button>
-    </main>
-    <script src="script.js"></script>
-  </body>
 </html>
