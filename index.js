@@ -200,7 +200,7 @@ io.on("connection", (socket) => {
   //   }
   // });
 
-  socket.on("choicep1D", async (data) => {
+  socket.on("choicep1D", (data) => {
     console.log("here1");
     try {
       const room = roomsD[data.roomUniqueId];
@@ -210,33 +210,67 @@ io.on("connection", (socket) => {
         symbol: data.symbol,
       });
       console.log("here2");
-      await GameD.findOneAndUpdate(
-        { roomUniqueId: data.roomUniqueId }
-        // { player1Choice: data.boxes } // Updated with player1Choice
-      );
+      // await GameD.findOneAndUpdate(
+      //   { roomUniqueId: data.roomUniqueId }
+      //   // { player1Choice: data.boxes } // Updated with player1Choice
+      // );
     } catch (error) {
       console.error("Error handling player 1 choiceD:", error);
     }
   });
 
-  socket.on("choicep2D", async (data) => {
+  socket.on("choicep2D", (data) => {
     console.log("bccccc");
     try {
       const room = roomsD[data.roomUniqueId];
       socket.to(data.roomUniqueId).emit("p2ChoiceD", {
         turn0: data.turn0,
         boxes: data.boxes,
+
         symbol: data.symbol,
       });
       console.log("here2");
-      await GameD.findOneAndUpdate(
-        { roomUniqueId: data.roomUniqueId }
-        // { player2Choice: data.boxes } // Updated with player2Choice
-      );
+      // await GameD.findOneAndUpdate(
+      //   { roomUniqueId: data.roomUniqueId }
+      //   // { player2Choice: data.boxes } // Updated with player2Choice
+      // );
     } catch (error) {
       console.error("Error handling player 2 choiceD:", error);
     }
   });
+
+  socket.on("winnerAnnouncement", (data) => {
+    console.log("getting now wait for upafdting");
+    const { winner, roomUniqueId } = data;
+    socket.to(roomUniqueId).emit("winnerAnnouncements", { winner });
+  });
+
+  socket.on("drawAnnouncement", (data) => {
+    console.log("getting now wait for upafdting");
+    const { roomUniqueId } = data;
+    socket.to(roomUniqueId).emit("drawAnnouncements", { roomUniqueId });
+  });
+
+  socket.on("updateBoxesState", (data) => {
+    const { roomUniqueId, boxesState } = data;
+    console.log("ppppppp", typeof boxesState);
+    socket.to(roomUniqueId).emit("updateBoxesStates", { boxesState });
+  });
+
+  // socket.on("connection", (socket) => {
+  socket.on("requestRoomData", async ({ roomUniqueId }) => {
+    try {
+      const rid = roomUniqueId;
+      console.log("find data of roomid", rid);
+      const roomData = await GameD.findOne({ roomUniqueId: rid });
+      console.log("usssss iddd", rid);
+      console.log(roomData);
+      socket.emit("roomDataResponse", { roomData });
+    } catch (error) {
+      console.error(error);
+    }
+  });
+  // });
 });
 
 async function declareWinner(roomUniqueId) {

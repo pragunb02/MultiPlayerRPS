@@ -2,9 +2,11 @@ console.log("RUNNING");
 
 const socket = io();
 
-let roomUniqueId;
+let roomUniqueId = 4;
 let player1 = false;
 let playerName;
+
+// Call this function when you need to get the room data
 
 function createGame() {
   player1 = true;
@@ -30,7 +32,24 @@ function joinGame() {
     roomUniqueId: roomUniqueId,
     playerName: playerName,
   });
+  requestRoomData(roomUniqueId);
 }
+
+let p1name = "RAAA";
+let p2name = "UAAA";
+
+socket.on("roomDataResponse", (data) => {
+  const { roomData } = data;
+
+  if (roomData) {
+    p1name = roomData.player1Name;
+    p2name = roomData.player2Name;
+    console.log("Room Data:", roomData);
+    // Update your UI with roomData
+  } else {
+    console.error("Room data not found");
+  }
+});
 
 socket.on("newGameD", (data) => {
   console.log("hnji");
@@ -97,7 +116,7 @@ socket.on("playersConnectedD", (data) => {
 
   document.getElementById("opponentStateD1").innerText = d1;
   document.getElementById("opponentStateD2").innerText = d2;
-
+  requestRoomData(roomUniqueId);
   // document.querySelector('.msg-container').style.display="block";
   // // document.getElementById("gameOptions").style.display = "block";
 });
@@ -125,33 +144,89 @@ const ResetBtn = () => {
   enabledBtn();
   msgContainer.classList.add("hide");
 };
-// every box of boxes got diasbled
+
+const getBoxesState = () => {
+  return Array.from(boxes).map((box) => ({
+    text: box.innerText,
+    disabled: box.disabled,
+  }));
+};
+
 const disabledBtn = () => {
   for (let box of boxes) {
     box.disabled = true;
+    console.log("happening");
   }
+  // socket.emit("updateBoxesState", {
+  //   roomUniqueId: roomUniqueId,
+  //   boxesState: getBoxesState(),
+  // });
+  var c = getBoxesState();
+  console.log(c);
+  console.log("kkkkkkkk", typeof c);
 };
+
 const enabledBtn = () => {
   for (let box of boxes) {
     box.disabled = false;
     box.innerText = "";
   }
+  // socket.emit("updateBoxesState", {
+  //   roomUniqueId: roomUniqueId,
+  //   boxesState: getBoxesState(),
+  // });
 };
+
 const showWinner = (winner) => {
+  console.log("winner Sending");
+
+  socket.emit("winnerAnnouncement", {
+    winner: winner,
+    roomUniqueId: roomUniqueId,
+  });
+
   msg.innerText = `Congratulations, Winner is ${winner}`;
   msgContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
-
   disabledBtn();
 };
+
+socket.on("winnerAnnouncements", (data) => {
+  console.log("yes updated");
+  const { winner } = data;
+
+  msg.innerText = `Congratulations, Winner is ${winner}`;
+  msgContainer.classList.remove("hide");
+  document.getElementById("xyz").style.display = "none";
+  document.getElementById("gameAreaD").style.display = "none";
+  disabledBtn();
+});
+
 const Draw = () => {
+  socket.emit("drawAnnouncement", {
+    // winner: winner,
+    roomUniqueId: roomUniqueId,
+  });
+
   msg.innerText = `OOPS DRAW!!`;
   msgContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
   disabledBtn();
 };
+
+socket.on("drawAnnouncements", (data) => {
+  console.log("yes updated");
+  // const { winner } = data;
+
+  msg.innerText = `OOPS DRAW!!`;
+  msgContainer.classList.remove("hide");
+  document.getElementById("xyz").style.display = "none";
+  document.getElementById("gameAreaD").style.display = "none";
+  disabledBtn();
+});
+
 const checkWinner = () => {
   for (pattern of winningPattern) {
     let pos0 = boxes[pattern[0]].innerText;
@@ -166,7 +241,23 @@ const checkWinner = () => {
       pos0 === pos1
     ) {
       console.log(`Hurrah!! ${pos0}`);
-      showWinner(pos0);
+
+      var winer = "LAAA";
+      console.log("hello", p1name);
+      if (pos0 === "X") {
+        if (player1) {
+          winer = p2name;
+        } else {
+          winer = p1name;
+        }
+      } else {
+        if (player1) {
+          winer = p1name;
+        } else {
+          winer = p2name;
+        }
+      }
+      showWinner(winer);
     }
   }
 };
@@ -416,10 +507,13 @@ socket.on("p2ChoiceD", (data) => {
 
   document.getElementById("opponentStateD1").innerText = d1;
   document.getElementById("opponentStateD2").innerText = d2;
+  console.log("YEAH");
+  // requestRoomData(roomUniqueId);
 });
 
 function updateBoxes(boxesState) {
   boxesState.forEach((symbol, index) => {
+    // boxes[index].innerHTML = "gfbnb";
     let box = boxes[index];
     box.innerText = symbol;
     box.disabled = symbol !== ""; // Disable box if it has a symbol
@@ -428,5 +522,20 @@ function updateBoxes(boxesState) {
   });
 }
 
+socket.on("updateBoxesStates", (data) => {
+  console.log("updates");
+  const { boxesState } = data;
+  console.log(boxesState);
+  updateBoxes(boxesState);
+  console.log("afterrr");
+  console.log(boxesState);
+});
+
 resetBtn.addEventListener("click", ResetBtn);
 newGameBtn.addEventListener("click", ResetBtn);
+
+function requestRoomData(roomUniqueid) {
+  console.log("check kro ............", roomUniqueId);
+  // roomUniqueId
+  socket.emit("requestRoomData", { roomUniqueId: roomUniqueId });
+}

@@ -1,0 +1,11 @@
+result display in ttt
+new game  in ttt
+reset game in ttt
+database in ttt
+room joining allowed or not , room size
+room disabled different test  cases   (user disconnect)
+alert on joining wrong room id
+roo id matching
+new game in rps
+deploy
+
