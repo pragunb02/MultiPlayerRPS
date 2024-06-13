@@ -14,14 +14,6 @@ const GameSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
-  player1Choice: {
-    type: String,
-    default: null,
-  },
-  player2Choice: {
-    type: String,
-    default: null,
-  },
   winner: {
     type: String,
     default: null,

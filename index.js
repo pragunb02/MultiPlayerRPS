@@ -166,14 +166,16 @@ io.on("connection", (socket) => {
   });
 
   // Announce Tic Tac Toe Winner
-  socket.on("announceWinner", (data) => {
+  socket.on("announceWinner", async (data) => {
     const { winner, roomUniqueId } = data;
+    await TicTacToeData.findOneAndUpdate({ roomUniqueId }, { winner });
     socket.to(roomUniqueId).emit("announceWinner", { winner });
   });
 
   // Announce Tic Tac Toe Draw
-  socket.on("announceDraw", (data) => {
+  socket.on("announceDraw", async (data) => {
     const { roomUniqueId } = data;
+    await TicTacToeData.findOneAndUpdate({ roomUniqueId }, { winner: "Draw" });
     socket.to(roomUniqueId).emit("announceDraw");
   });
 
