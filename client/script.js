@@ -1,134 +1,21 @@
-console.log("RUNNING");
+console.log("Running Tic Tac Toe Script");
 
 const socket = io();
 
-let roomUniqueId = 4;
-let player1 = false;
+let roomUniqueId;
+let isPlayer1 = false;
 let playerName;
+let player1Name = "SAMPLE";
+let player2Name = "SAMPLE";
+let isPlayer1Turn = true;
 
-// Call this function when you need to get the room data
+const boxes = document.querySelectorAll(".box");
+const resetButton = document.querySelector("#reset-btn");
+const newGameButton = document.querySelector("#new-game");
+const messageContainer = document.querySelector(".msg-container");
+const message = document.querySelector("#msg");
 
-function createGame() {
-  player1 = true;
-  playerName = document.getElementById("playerName").value;
-  if (!playerName) {
-    alert("Please enter your name");
-    return;
-  }
-  console.log("yess1");
-  socket.emit("createGameD", { playerName: playerName });
-  console.log("yess2");
-}
-
-function joinGame() {
-  roomUniqueId = document.getElementById("roomUniqueId").value;
-  playerName = document.getElementById("playerName").value;
-  if (!roomUniqueId || !playerName) {
-    alert("Please enter both room code and your name");
-    return;
-  }
-  console.log("indised3");
-  socket.emit("joinGameD", {
-    roomUniqueId: roomUniqueId,
-    playerName: playerName,
-  });
-  requestRoomData(roomUniqueId);
-}
-
-let p1name = "RAAA";
-let p2name = "UAAA";
-
-socket.on("roomDataResponse", (data) => {
-  const { roomData } = data;
-
-  if (roomData) {
-    p1name = roomData.player1Name;
-    p2name = roomData.player2Name;
-    console.log("Room Data:", roomData);
-    // Update your UI with roomData
-  } else {
-    console.error("Room data not found");
-  }
-});
-
-socket.on("newGameD", (data) => {
-  console.log("hnji");
-  roomUniqueId = data.roomUniqueId;
-  document.getElementById("initial").style.display = "none";
-  document.getElementById("gamePlay").style.display = "block";
-  let copyBtn = document.createElement("button");
-  copyBtn.innerText = "Copy Code";
-  copyBtn.addEventListener("click", () => {
-    navigator.clipboard.writeText(roomUniqueId).then(
-      function () {
-        console.log("Done Copying Code");
-        // Notify user about successful copying
-        alert("Code copied successfully!");
-      },
-      function (err) {
-        console.log("Error in copying");
-        // Notify user about error
-        alert("Error in copying code");
-      }
-    );
-  });
-  const waitingArea = document.getElementById("waitingArea");
-  if (waitingArea) {
-    console.log("hnj2i");
-    waitingArea.innerHTML = `Waiting For Opponent.., Please share code <span style="font-weight: bold; font-style: italic; color: #ff0000">${roomUniqueId}</span>`;
-  }
-  var br = document.createElement("br");
-  waitingArea.appendChild(br);
-  waitingArea.appendChild(copyBtn);
-  console.log("hnji3");
-});
-
-socket.on("playersConnectedD", (data) => {
-  console.log("Players connected:", data);
-  console.log("hiiiiiiii");
-  document.getElementById("initial").style.display = "none";
-  document.getElementById("gamePlay").style.display = "none";
-  document.getElementById("waitingArea").style.display = "none";
-  // document.getElementById("gameArea").style.display = "none";
-  document.querySelector("main").style.display = "block";
-  document.getElementById("gameAreaD").style.display = "block";
-  document.getElementById("xyz").style.display = "none";
-  document.body.style.background = "#c2aff0";
-  // document.querySelector(".msg-container").style.display = 'block';
-  let c1, c2;
-  let d1, d2;
-  if (player1) {
-    c1 = "You : O";
-    c2 = "Opponent : X";
-    d1 = "Your Turn...";
-    d2 = "";
-  }
-  if (!player1) {
-    c1 = "You : X";
-    c2 = "Opponent : O";
-    d2 = "Waiting For Oppnent Move";
-    d1 = "";
-  }
-  console.log(player1);
-  document.getElementById("ch1").innerText = c1;
-  document.getElementById("ch2").innerText = c2;
-  // document.getElementById("player1ChoiceD").style.display = "none";
-
-  document.getElementById("opponentStateD1").innerText = d1;
-  document.getElementById("opponentStateD2").innerText = d2;
-  requestRoomData(roomUniqueId);
-  // document.querySelector('.msg-container').style.display="block";
-  // // document.getElementById("gameOptions").style.display = "block";
-});
-
-let boxes = document.querySelectorAll(".box");
-let resetBtn = document.querySelector("#reset-btn");
-let newGameBtn = document.querySelector("#new-game");
-let msgContainer = document.querySelector(".msg-container");
-let msg = document.querySelector("#msg");
-
-let turn0 = true;
-const winningPattern = [
+const winningPatterns = [
   [0, 1, 2],
   [0, 3, 6],
   [0, 4, 8],
@@ -139,11 +26,27 @@ const winningPattern = [
   [6, 7, 8],
 ];
 
-const ResetBtn = () => {
-  turn0 = true;
-  enabledBtn();
-  msgContainer.classList.add("hide");
-};
+function updateBoxes(boxesState) {
+  boxesState.forEach((symbol, index) => {
+    let box = boxes[index];
+    box.innerText = symbol;
+    box.disabled = symbol !== ""; // Disable box if it has a symbol
+    box.classList.toggle("box0", symbol === "O");
+    box.classList.toggle("box1", symbol === "X");
+  });
+}
+// const ResetBtn = () => {
+//   turn0 = true;
+//   enabledBtn();
+//   msgContainer.classList.add("hide");
+// };
+
+// const enabledBtn = () => {
+//   for (let box of boxes) {
+//     box.disabled = false;
+//     box.innerText = "";
+//   }
+// };
 
 const getBoxesState = () => {
   return Array.from(boxes).map((box) => ({
@@ -152,390 +55,255 @@ const getBoxesState = () => {
   }));
 };
 
-const disabledBtn = () => {
-  for (let box of boxes) {
-    box.disabled = true;
-    console.log("happening");
-  }
-  // socket.emit("updateBoxesState", {
-  //   roomUniqueId: roomUniqueId,
-  //   boxesState: getBoxesState(),
-  // });
-  var c = getBoxesState();
-  console.log(c);
-  console.log("kkkkkkkk", typeof c);
+const disableBoxes = () => {
+  boxes.forEach((box) => (box.disabled = true));
 };
 
-const enabledBtn = () => {
-  for (let box of boxes) {
-    box.disabled = false;
-    box.innerText = "";
+function createGame() {
+  isPlayer1 = true;
+  isPlayer1Turn = true;
+  playerName = document.getElementById("playerName").value;
+  if (!playerName) {
+    alert("Please enter your name");
+    return;
   }
-  // socket.emit("updateBoxesState", {
-  //   roomUniqueId: roomUniqueId,
-  //   boxesState: getBoxesState(),
-  // });
-};
+  socket.emit("createTicTacToeGame", { playerName });
+}
 
-const showWinner = (winner) => {
-  console.log("winner Sending");
+function joinGame() {
+  roomUniqueId = document.getElementById("roomUniqueId").value;
+  playerName = document.getElementById("playerName").value;
+  if (!roomUniqueId || !playerName) {
+    alert("Please enter both room code and your name");
+    return;
+  }
+  socket.emit("joinTicTacToeGame", { roomUniqueId, playerName });
+  requestRoomData(roomUniqueId); // Request room data for player 2
+}
 
-  socket.emit("winnerAnnouncement", {
-    winner: winner,
-    roomUniqueId: roomUniqueId,
-  });
+function requestRoomData(roomUniqueId) {
+  socket.emit("requestTicTacToeRoomData", { roomUniqueId });
+}
 
-  msg.innerText = `Congratulations, Winner is ${winner}`;
-  msgContainer.classList.remove("hide");
+const displayWinner = (winner) => {
+  socket.emit("announceWinner", { winner, roomUniqueId });
+
+  message.innerText = `Congratulations, Winner is ${winner}`;
+  messageContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
-  disabledBtn();
+  disableBoxes();
 };
 
-socket.on("winnerAnnouncements", (data) => {
-  console.log("yes updated");
-  const { winner } = data;
+const announceDraw = () => {
+  socket.emit("announceDraw", { roomUniqueId });
 
-  msg.innerText = `Congratulations, Winner is ${winner}`;
-  msgContainer.classList.remove("hide");
+  message.innerText = `OOPS DRAW!!`;
+  messageContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
-  disabledBtn();
+  disableBoxes();
+};
+
+socket.on("roomDataResponse", (data) => {
+  const { roomData } = data;
+  if (roomData) {
+    player1Name = roomData.player1Name;
+    player2Name = roomData.player2Name;
+    console.log("Room Data:", roomData);
+  } else {
+    console.error("Room data not found");
+  }
 });
 
-const Draw = () => {
-  socket.emit("drawAnnouncement", {
-    // winner: winner,
-    roomUniqueId: roomUniqueId,
+socket.on("playersConnectingTicTacToe", (data) => {
+  roomUniqueId = data.roomUniqueId;
+  document.getElementById("initial").style.display = "none";
+  document.getElementById("gamePlay").style.display = "block";
+  let copyButton = document.createElement("button");
+  copyButton.innerText = "Copy Code";
+  copyButton.addEventListener("click", () => {
+    navigator.clipboard.writeText(roomUniqueId).then(
+      () => alert("Code copied successfully!"),
+      () => alert("Error in copying code")
+    );
   });
+  const waitingArea = document.getElementById("waitingArea");
+  if (waitingArea) {
+    waitingArea.innerHTML = `Waiting For Opponent.., Please share code <span style="font-weight: bold; font-style: italic; color: #ff0000">${roomUniqueId}</span>`;
+    waitingArea.appendChild(document.createElement("br"));
+    waitingArea.appendChild(copyButton);
+  }
+});
 
-  msg.innerText = `OOPS DRAW!!`;
-  msgContainer.classList.remove("hide");
+socket.on("playersConnectedTicTacToe", (data) => {
+  document.getElementById("initial").style.display = "none";
+  document.getElementById("gamePlay").style.display = "none";
+  document.getElementById("waitingArea").style.display = "none";
+  document.querySelector("main").style.display = "block";
+  document.getElementById("gameAreaD").style.display = "block";
+  document.getElementById("xyz").style.display = "none";
+  document.body.style.background = "#c2aff0";
+
+  if (isPlayer1) {
+    document.getElementById("ch1").innerText = "You: O";
+    document.getElementById("ch2").innerText = "Opponent: X";
+    document.getElementById("opponentStateD1").innerText = "Your Turn...";
+    document.getElementById("opponentStateD2").innerText = "";
+  } else {
+    document.getElementById("ch1").innerText = "You: X";
+    document.getElementById("ch2").innerText = "Opponent: O";
+    document.getElementById("opponentStateD1").innerText = "";
+    document.getElementById("opponentStateD2").innerText =
+      "Waiting For Opponent Move";
+  }
+
+  requestRoomData(roomUniqueId);
+});
+
+socket.on("announceWinner", (data) => {
+  const { winner } = data;
+  message.innerText = `Congratulations, Winner is ${winner}`;
+  messageContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
-  disabledBtn();
-};
+  disableBoxes();
+});
 
-socket.on("drawAnnouncements", (data) => {
-  console.log("yes updated");
-  // const { winner } = data;
-
-  msg.innerText = `OOPS DRAW!!`;
-  msgContainer.classList.remove("hide");
+socket.on("announceDraw", () => {
+  message.innerText = `OOPS DRAW!!`;
+  messageContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
-  disabledBtn();
+  disableBoxes();
 });
 
 const checkWinner = () => {
-  for (pattern of winningPattern) {
+  for (let pattern of winningPatterns) {
     let pos0 = boxes[pattern[0]].innerText;
     let pos1 = boxes[pattern[1]].innerText;
     let pos2 = boxes[pattern[2]].innerText;
-    console.log(pos0, pos1, pos2);
-    if (
-      pos0 != "" &&
-      pos1 != "" &&
-      pos2 != "" &&
-      pos0 === pos2 &&
-      pos0 === pos1
-    ) {
-      console.log(`Hurrah!! ${pos0}`);
 
-      var winer = "LAAA";
-      console.log("hello", p1name);
-      if (pos0 === "X") {
-        if (player1) {
-          winer = p2name;
-        } else {
-          winer = p1name;
-        }
-      } else {
-        if (player1) {
-          winer = p1name;
-        } else {
-          winer = p2name;
-        }
-      }
-      showWinner(winer);
+    if (pos0 && pos0 === pos1 && pos0 === pos2) {
+      let winner =
+        pos0 === "X"
+          ? isPlayer1
+            ? player2Name
+            : player1Name
+          : isPlayer1
+          ? player1Name
+          : player2Name;
+      displayWinner(winner);
+      return;
     }
   }
 };
 
-const DrawCondition = () => {
-  let ok = true;
-  for (box of boxes) {
-    ok &= box.innerText != "";
-  }
-  if (ok) {
-    Draw();
+const checkDraw = () => {
+  if (Array.from(boxes).every((box) => box.innerText !== "")) {
+    announceDraw();
   }
 };
 
-// const funt = () => {
-//   console.log("Clicked");
-// };
-// boxes.forEach((box) => {
-//   box.addEventListener("click", funt);
-// });
+// Function to update turn indicators
+const updateTurnIndicators = () => {
+  let yourTurnMessage, opponentTurnMessage;
 
-// boxes.forEach((box, index) => {
-//   box.addEventListener("click", () => {
-//     // console.log("Clicked");
-//     // box.innerText = "ABCD";
-//     console.log(player1, turn0);
-//     if (turn0 === true) {
-//       if (player1) {
-//         box.innerText = "O";
-//         box.classList.add("box0");
-//         box.classList.remove("box1");
-//         turn0 = false;
-//         box.disabled = true;
-//         socket.emit("choicep1D", {
-//           index: index,
-//           // boxes: boxes,
-//           turn0: turn0,
-//           roomUniqueId: roomUniqueId,
-//         });
-//         checkWinner();
-//         DrawCondition();
-//         console.log(player1, turn0);
-//       } else {
-//         alert("Wait For Oppenent Turns");
-//       }
-//     } else {
-//       if (!player1) {
-//         box.innerText = "X";
-//         box.classList.remove("box0");
-//         box.classList.add("box1");
-//         turn0 = !turn0;
-//         box.disabled = true;
-//         socket.emit("choicep2D", {
-//           boxes: boxes,
-//           turn0: turn0,
-//           roomUniqueId: roomUniqueId,
-//         });
-//         checkWinner();
-//         DrawCondition();
-//       } else {
-//         alert("Wait For Oppenent Turnd");
-//       }
-//     }
-//     // turn0 = !turn0;
-//     // box.disabled = true;
-//     // checkWinner();
-//     // DrawCondition();
-//   });
-// });
+  if (isPlayer1) {
+    // Player 1's perspective
+    if (isPlayer1Turn) {
+      yourTurnMessage = "Your Turn...";
+      opponentTurnMessage = "";
+    } else {
+      yourTurnMessage = "";
+      opponentTurnMessage = "Waiting for Opponent's Move";
+    }
+  } else {
+    // Player 2's perspective
+    if (isPlayer1Turn) {
+      yourTurnMessage = "Waiting for Opponent's Move";
+      opponentTurnMessage = "";
+    } else {
+      yourTurnMessage = "Your Turn...";
+      opponentTurnMessage = "";
+    }
+  }
+
+  document.getElementById("opponentStateD1").innerText = yourTurnMessage;
+  document.getElementById("opponentStateD2").innerText = opponentTurnMessage;
+};
+
+socket.on("player1Move", (data) => {
+  if (!isPlayer1) {
+    updateBoxes(data.boxes);
+    isPlayer1Turn = data.isPlayer1Turn;
+    updateTurnIndicators();
+  }
+  // updateTurnIndicators();
+});
+
+socket.on("player2Move", (data) => {
+  if (isPlayer1) {
+    updateBoxes(data.boxes);
+    isPlayer1Turn = data.isPlayer1Turn;
+    updateTurnIndicators();
+  }
+  // updateTurnIndicators();
+});
+
+socket.on("updateBoxesState", (data) => {
+  updateBoxes(data.boxesState);
+});
 
 // Add click event listeners to each box
 boxes.forEach((box, index) => {
   box.addEventListener("click", () => {
-    console.log(player1, turn0);
-    if (turn0 === true) {
-      if (player1) {
-        box.innerText = "O";
-        box.classList.add("box0");
-        box.classList.remove("box1");
-        turn0 = false;
-        box.disabled = true;
+    if (isPlayer1Turn && isPlayer1) {
+      box.innerText = "O";
+      box.classList.add("box0");
+      box.classList.remove("box1");
+      isPlayer1Turn = false;
+      box.disabled = true;
 
-        // Convert NodeList to Array and get the state of each box
-        let boxesState = Array.from(boxes).map((b) => b.innerText);
+      const boxesState = Array.from(boxes).map((b) => b.innerText);
 
-        // Emit the move event to the server for player 1
-        socket.emit("choicep1D", {
-          index: index,
-          boxes: boxesState,
-          turn0: turn0,
-          roomUniqueId: roomUniqueId,
-          symbol: "O",
-        });
+      socket.emit("player1Move", {
+        index,
+        boxes: boxesState,
+        isPlayer1Turn,
+        roomUniqueId,
+        symbol: "O",
+      });
 
-        checkWinner();
-        DrawCondition();
-        console.log(player1, turn0);
+      checkWinner();
+      checkDraw();
+      updateTurnIndicators();
+    } else if (!isPlayer1Turn && !isPlayer1) {
+      box.innerText = "X";
+      box.classList.remove("box0");
+      box.classList.add("box1");
+      // isPlayer1Turn = true;
+      isPlayer1Turn = !isPlayer1;
+      box.disabled = true;
 
-        if (!player1) {
-          c1 = "You : O";
-          c2 = "Opponent : X";
-          d1 = "Your Turn... dfghj";
-          d2 = "";
-        }
-        if (player1) {
-          c1 = "You : X";
-          c2 = "Opponent : O";
-          d2 = "Waiting For Oppnent Move fghjk";
-          d1 = "";
-        }
-        console.log(player1);
-        // document.getElementById("ch1").innerText = c1;
-        // document.getElementById("ch2").innerText = c2;
-        // document.getElementById("player1ChoiceD").style.display = "none";
+      const boxesState = Array.from(boxes).map((b) => b.innerText);
 
-        document.getElementById("opponentStateD1").innerText = d1;
-        document.getElementById("opponentStateD2").innerText = d2;
-        console.log(document.getElementById("opponentStateD1").innerText);
-        console.log(document.getElementById("opponentStateD2").innerText);
-      } else {
-        alert("Wait For Opponent's Turn");
-      }
+      socket.emit("player2Move", {
+        index,
+        boxes: boxesState,
+        isPlayer1Turn,
+        roomUniqueId,
+        symbol: "X",
+      });
+
+      checkWinner();
+      checkDraw();
+      updateTurnIndicators();
     } else {
-      if (!player1) {
-        box.innerText = "X";
-        box.classList.remove("box0");
-        box.classList.add("box1");
-        turn0 = !turn0;
-        box.disabled = true;
-
-        // Convert NodeList to Array and get the state of each box
-        let boxesState = Array.from(boxes).map((b) => b.innerText);
-
-        // Emit the move event to the server for player 2
-        socket.emit("choicep2D", {
-          index: index,
-          boxes: boxesState,
-          turn0: turn0,
-          roomUniqueId: roomUniqueId,
-          symbol: "X",
-        });
-
-        checkWinner();
-        DrawCondition();
-
-        // if (!player1) {
-        //   c1 = "You : O";
-        //   c2 = "Opponent : X";
-        //   d1 = "Your Turn... dfghj";
-        //   d2 = "";
-        // }
-        if (!player1) {
-          c1 = "You : X";
-          c2 = "Opponent : O";
-          d2 = "Waiting For Oppnent Move fghjk";
-          d1 = "";
-        }
-        console.log(player1);
-        // document.getElementById("ch1").innerText = c1;
-        // document.getElementById("ch2").innerText = c2;
-        // document.getElementById("player1ChoiceD").style.display = "none";
-
-        document.getElementById("opponentStateD1").innerText = d1;
-        document.getElementById("opponentStateD2").innerText = d2;
-        console.log(document.getElementById("opponentStateD1").innerText);
-        console.log(document.getElementById("opponentStateD2").innerText);
-      } else {
-        alert("Wait For Opponent's Turn");
-      }
+      alert("Wait For Opponent's Turn");
     }
   });
 });
 
-// socket.on("p1ChoiceD", (data) => {
-//   console.log("bccccc");
-//   if (!player1) {
-//     turn0 = data.turn0;
-//     boxes = data.boxes;
-//   }
-//   console.log(player1);
-//   console.log(turn0);
-//   console.log(boxes);
-// });
-
-// socket.on("p2ChoiceD", (data) => {
-//   if (player1) {
-//     turn0 = data.turn0;
-//     boxes = data.boxes;
-//   }
-// });
-
-// Listen for move events from the server
-socket.on("p1ChoiceD", (data) => {
-  if (!player1) {
-    console.log("bccccccccccccccccccc");
-    updateBoxes(data.boxes);
-    turn0 = data.turn0;
-  }
-  let c1, c2;
-  let d1, d2;
-  if (!player1) {
-    c1 = "You : O";
-    c2 = "Opponent : X";
-    d1 = "Your Turn... dfghj";
-    d2 = "";
-  }
-  if (player1) {
-    c1 = "You : X";
-    c2 = "Opponent : O";
-    d2 = "Waiting For Oppnent Move fghjk";
-    d1 = "";
-  }
-  console.log(player1);
-  // document.getElementById("ch1").innerText = c1;
-  // document.getElementById("ch2").innerText = c2;
-  // document.getElementById("player1ChoiceD").style.display = "none";
-
-  document.getElementById("opponentStateD1").innerText = d1;
-  document.getElementById("opponentStateD2").innerText = d2;
-  console.log(document.getElementById("opponentStateD1").innerText);
-  console.log(document.getElementById("opponentStateD2").innerText);
-});
-
-socket.on("p2ChoiceD", (data) => {
-  if (player1) {
-    updateBoxes(data.boxes);
-    turn0 = data.turn0;
-  }
-  let c1, c2;
-  let d1, d2;
-  if (player1) {
-    c1 = "You : O";
-    c2 = "Opponent : X";
-    d1 = "Your Turn...  mbnvbc";
-    d2 = "";
-  }
-  if (!player1) {
-    c1 = "You : X";
-    c2 = "Opponent : O";
-    d2 = "Waiting For Oppnent Move iuyt";
-    d1 = "";
-  }
-  console.log(player1);
-  // document.getElementById("ch1").innerText = c1;
-  // document.getElementById("ch2").innerText = c2;
-  // document.getElementById("player1ChoiceD").style.display = "none";
-
-  document.getElementById("opponentStateD1").innerText = d1;
-  document.getElementById("opponentStateD2").innerText = d2;
-  console.log("YEAH");
-  // requestRoomData(roomUniqueId);
-});
-
-function updateBoxes(boxesState) {
-  boxesState.forEach((symbol, index) => {
-    // boxes[index].innerHTML = "gfbnb";
-    let box = boxes[index];
-    box.innerText = symbol;
-    box.disabled = symbol !== ""; // Disable box if it has a symbol
-    box.classList.toggle("box0", symbol === "O");
-    box.classList.toggle("box1", symbol === "X");
-  });
-}
-
-socket.on("updateBoxesStates", (data) => {
-  console.log("updates");
-  const { boxesState } = data;
-  console.log(boxesState);
-  updateBoxes(boxesState);
-  console.log("afterrr");
-  console.log(boxesState);
-});
-
-resetBtn.addEventListener("click", ResetBtn);
-newGameBtn.addEventListener("click", ResetBtn);
-
-function requestRoomData(roomUniqueid) {
-  console.log("check kro ............", roomUniqueId);
-  // roomUniqueId
-  socket.emit("requestRoomData", { roomUniqueId: roomUniqueId });
-}
+// resetBtn.addEventListener("click", ResetBtn);
+// newGameBtn.addEventListener("click", ResetBtn);
