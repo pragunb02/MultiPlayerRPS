@@ -1,120 +1,108 @@
-console.log("RUNNING");
+console.log("Running Rock Paper Scissors Script");
+
 const socket = io();
 let roomUniqueId;
-let player1 = false;
+let isPlayer1 = false;
 let playerName;
 
 function createGame() {
-    player1 = true;
-    playerName = document.getElementById("playerName").value;
-    if (!playerName) {
-        alert("Please enter your name");
-        return;
-    }
-    socket.emit("createGame", { playerName: playerName });
+  isPlayer1 = true;
+  playerName = document.getElementById("playerName").value;
+  if (!playerName) {
+    alert("Please enter your name");
+    return;
+  }
+  socket.emit("createRPSGame", { playerName });
 }
 
 function joinGame() {
-    roomUniqueId = document.getElementById("roomUniqueId").value;
-    playerName = document.getElementById("playerName").value;
-    if (!roomUniqueId || !playerName) {
-        alert("Please enter both room code and your name");
-        return;
-    }
-    socket.emit("joinGame", {
-        roomUniqueId: roomUniqueId,
-        playerName: playerName,
-    });
+  roomUniqueId = document.getElementById("roomUniqueId").value;
+  playerName = document.getElementById("playerName").value;
+  if (!roomUniqueId || !playerName) {
+    alert("Please enter both room code and your name");
+    return;
+  }
+  socket.emit("joinRPSGame", { roomUniqueId, playerName });
 }
 
-socket.on("newGame", (data) => {
-    roomUniqueId = data.roomUniqueId;
-    document.getElementById("initial").style.display = "none";
-    document.getElementById("gamePlay").style.display = "block";
-    let copyBtn = document.createElement("button");
-    copyBtn.innerText = "Copy Code";
-    copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(roomUniqueId).then(
-            function () {
-                console.log("Done Copying Code");
-                // Notify user about successful copying
-                alert("Code copied successfully!");
-            },
-            function (err) {
-                console.log("Error in copying");
-                // Notify user about error
-                alert("Error in copying code");
-            }
-        );
-    });
-    const waitingArea = document.getElementById("waitingArea");
-    if (waitingArea) {
-        waitingArea.innerHTML = `Waiting For Opponent.., Please share code <span style="font-weight: bold; font-style: italic; color: #ff0000">${roomUniqueId}</span>`;
-    }
-    var br = document.createElement("br");
-    waitingArea.appendChild(br);
-    waitingArea.appendChild(copyBtn);
+socket.on("newRPSGame", (data) => {
+  roomUniqueId = data.roomUniqueId;
+  document.getElementById("initial").style.display = "none";
+  document.getElementById("gamePlay").style.display = "block";
+  let copyButton = document.createElement("button");
+  copyButton.innerText = "Copy Code";
+  copyButton.addEventListener("click", () => {
+    navigator.clipboard.writeText(roomUniqueId).then(
+      () => alert("Code copied successfully!"),
+      () => alert("Error in copying code")
+    );
+  });
+  const waitingArea = document.getElementById("waitingArea");
+  if (waitingArea) {
+    waitingArea.innerHTML = `Waiting For Opponent.., Please share code <span style="font-weight: bold; font-style: italic; color: #ff0000">${roomUniqueId}</span>`;
+    waitingArea.appendChild(document.createElement("br"));
+    waitingArea.appendChild(copyButton);
+  }
 });
 
-socket.on("playersConnected", (data) => {
-    console.log("Players connected:", data);
-    document.getElementById("initial").style.display = "none";
-    document.getElementById("gamePlay").style.display = "block";
-    document.getElementById("waitingArea").style.display = "none";
-    document.getElementById("gameArea").style.display = "block";
-    // // document.getElementById("gameOptions").style.display = "block";
+socket.on("playersConnectedRPS", (data) => {
+  document.getElementById("initial").style.display = "none";
+  document.getElementById("gamePlay").style.display = "block";
+  document.getElementById("waitingArea").style.display = "none";
+  document.getElementById("gameArea").style.display = "block";
 });
 
-socket.on("p1Choice", (data) => {
-    if (!player1) {
-        createOpponentChoiceButton(data);
-    }
+socket.on("player1ChoiceRPS", (data) => {
+  if (!isPlayer1) {
+    displayOpponentChoice(data.choice);
+  }
 });
 
-socket.on("p2Choice", (data) => {
-    if (player1) {
-        createOpponentChoiceButton(data);
-    }
+socket.on("player2ChoiceRPS", (data) => {
+  if (isPlayer1) {
+    displayOpponentChoice(data.choice);
+  }
 });
 
-socket.on("result", (data) => {
-    let winner = "";
-    if (data.winner === "d") {
-        winner = "It's a draw";
-    } else if (data.winner === "p1") {
-        winner = player1 ? "You Win" : "You lose";
-    } else {
-        winner = player1 ? "You lose" : "You Win";
-    }
-    document.getElementById("initial").style.display = "none";
-    document.getElementById("gamePlay").style.display = "block";
-    document.getElementById("waitingArea").style.display = "none";
-    document.getElementById("gameArea").style.display = "block";
-    document.getElementById("winnerArea").style.display = "block";
-    document.getElementById("opponentState").style.display = "none";
-    document.getElementById("opponentButton").style.display = "block";
-    document.getElementById("player1Choice").style.display = "block";
-    document.getElementById("winnerArea").innerHTML = winner;
+socket.on("rpsGameResult", (data) => {
+  let winnerMessage;
+  if (data.winner === "draw") {
+    winnerMessage = "It's a draw";
+  } else if (data.winner === "player1") {
+    winnerMessage = isPlayer1 ? "You Win" : "You Lose";
+  } else {
+    winnerMessage = isPlayer1 ? "You Lose" : "You Win";
+  }
+  document.getElementById("winnerArea").innerText = winnerMessage;
+  document.getElementById("initial").style.display = "none";
+  document.getElementById("gamePlay").style.display = "block";
+  document.getElementById("waitingArea").style.display = "none";
+  document.getElementById("gameArea").style.display = "block";
+  document.getElementById("winnerArea").style.display = "block";
+  document.getElementById("opponentState").style.display = "none";
+  document.getElementById("opponentButton").style.display = "block";
+  document.getElementById("player1Choice").style.display = "block";
 });
 
 function sendChoice(rpsChoice) {
-    const choiceEvent = player1 ? "p1Choice" : "p2Choice";
-    socket.emit(choiceEvent, {
-        rpsChoice: rpsChoice,
-        roomUniqueId: roomUniqueId,
-    });
-    const playerChoiceButton = document.createElement("button");
-    playerChoiceButton.style.display = "block";
-    playerChoiceButton.innerText = rpsChoice;
-    document.getElementById("player1Choice").innerHTML = "";
-    document.getElementById("player1Choice").appendChild(playerChoiceButton);
+  const choiceEvent = isPlayer1 ? "player1ChoiceRPS" : "player2ChoiceRPS";
+  socket.emit(choiceEvent, { choice: rpsChoice, roomUniqueId });
+  displayPlayerChoice(rpsChoice);
 }
 
-function createOpponentChoiceButton(data) {
-    document.getElementById("opponentState").innerHTML = "Opponent Made A Choice";
-    const opponentButton = document.createElement("button");
-    opponentButton.id = "opponentButton";
-    opponentButton.style.display = "none";
-    opponentButton.innerText = data.rpsChoice;
-    document.getElementById("player2Choice").appendChild(opponentButton);
+function displayPlayerChoice(choice) {
+  const playerChoiceButton = document.createElement("button");
+  playerChoiceButton.style.display = "block";
+  playerChoiceButton.innerText = choice;
+  document.getElementById("player1Choice").innerHTML = "";
+  document.getElementById("player1Choice").appendChild(playerChoiceButton);
+}
+
+function displayOpponentChoice(choice) {
+  document.getElementById("opponentState").innerText = "Opponent Made A Choice";
+  const opponentButton = document.createElement("button");
+  opponentButton.id = "opponentButton";
+  opponentButton.style.display = "none";
+  opponentButton.innerText = choice;
+  document.getElementById("player2Choice").appendChild(opponentButton);
 }
