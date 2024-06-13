@@ -1,4 +1,4 @@
-// models/Game.js
+// models/TicTacToeData.js
 const mongoose = require("mongoose");
 
 const GameSchema = new mongoose.Schema({
