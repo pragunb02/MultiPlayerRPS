@@ -149,7 +149,7 @@ io.on("connection", (socket) => {
   socket.on("player1Move", (data) => {
     const room = ticTacToeRooms[data.roomUniqueId];
     socket.to(data.roomUniqueId).emit("player1Move", {
-      turn0: data.isPlayer1Turn,
+      isPlayer1Turn: data.isPlayer1Turn,
       boxes: data.boxes,
     });
   });
@@ -158,7 +158,7 @@ io.on("connection", (socket) => {
   socket.on("player2Move", (data) => {
     const room = ticTacToeRooms[data.roomUniqueId];
     socket.to(data.roomUniqueId).emit("player2Move", {
-      turn0: data.isPlayer1Turn,
+      isPlayer1Turn: data.isPlayer1Turn,
       boxes: data.boxes,
     });
   });
