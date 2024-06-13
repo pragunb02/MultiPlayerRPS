@@ -84,10 +84,10 @@ socket.on("rpsGameResult", (data) => {
   document.getElementById("player1Choice").style.display = "block";
 });
 
-function sendChoice(rpsChoice) {
+function sendChoice(choice) {
   const choiceEvent = isPlayer1 ? "player1ChoiceRPS" : "player2ChoiceRPS";
-  socket.emit(choiceEvent, { choice: rpsChoice, roomUniqueId });
-  displayPlayerChoice(rpsChoice);
+  socket.emit(choiceEvent, { choice: choice, roomUniqueId });
+  displayPlayerChoice(choice);
 }
 
 function displayPlayerChoice(choice) {
