@@ -4,7 +4,7 @@ const path = require("path");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const connectDB = require("./db");
-const Game = require("./models/Game");
+const RPSData = require("./models/RPSData");
 const TicTacToeData = require("./models/TicTacToeData");
 
 const app = express();
@@ -39,11 +39,11 @@ io.on("connection", (socket) => {
       socket.join(roomUniqueId);
       socket.emit("newRPSGame", { roomUniqueId });
 
-      const game = new Game({
+      const gameData = new RPSData({
         roomUniqueId,
         player1Name: data.playerName,
       });
-      await game.save();
+      await gameData.save();
     } catch (error) {
       console.error("Error creating RPS game:", error);
     }
@@ -59,7 +59,7 @@ io.on("connection", (socket) => {
         // socket.to(data.roomUniqueId).emit("playersConnectedRPS", { data: "p1" });
         io.to(data.roomUniqueId).emit("playersConnectedRPS");
         socket.emit("playersConnectedRPS");
-        await Game.findOneAndUpdate(
+        await RPSData.findOneAndUpdate(
           { roomUniqueId: data.roomUniqueId },
           { player2Name: data.playerName }
         );
@@ -80,7 +80,7 @@ io.on("connection", (socket) => {
       if (room.player2Choice) {
         await determineRPSWinner(data.roomUniqueId);
       }
-      await Game.findOneAndUpdate(
+      await RPSData.findOneAndUpdate(
         { roomUniqueId: data.roomUniqueId },
         { player1Choice: data.choice }
       );
@@ -100,7 +100,7 @@ io.on("connection", (socket) => {
       if (room.player1Choice) {
         await determineRPSWinner(data.roomUniqueId);
       }
-      await Game.findOneAndUpdate(
+      await RPSData.findOneAndUpdate(
         { roomUniqueId: data.roomUniqueId },
         { player2Choice: data.choice }
       );
@@ -108,6 +108,8 @@ io.on("connection", (socket) => {
       console.error("Error handling player 2 RPS choice:", error);
     }
   });
+
+  // ****
 
   // Create Tic Tac Toe Game
   socket.on("createTicTacToeGame", async (data) => {
@@ -211,7 +213,7 @@ async function determineRPSWinner(roomUniqueId) {
   room.player1Choice = null;
   room.player2Choice = null;
 
-  await Game.findOneAndUpdate({ roomUniqueId }, { winner });
+  await RPSData.findOneAndUpdate({ roomUniqueId }, { winner });
 }
 
 // Generate Room ID
