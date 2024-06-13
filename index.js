@@ -5,18 +5,19 @@ const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const connectDB = require("./db");
 const Game = require("./models/Game");
-const GameD = require("./models/GameD");
+const TicTacToeData = require("./models/TicTacToeData");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const PORT = 8080;
-const rooms = {};
-const roomsD = {};
+
+const rpsRooms = {};
+const ticTacToeRooms = {};
 
 // Connect to MongoDB
 connectDB();
-// const rid=1;
+
 app.use(express.static(path.join(__dirname, "client")));
 
 app.get("/", (req, res) => {
@@ -24,285 +25,197 @@ app.get("/", (req, res) => {
 });
 
 io.on("connection", (socket) => {
-  console.log("A user is connected");
-  console.log("okji1");
+  console.log("A user connected");
+
   socket.on("disconnect", () => {
-    // if(rid!=1){
-    //   rooms[rid]=NULL;
-    // }
-    // console.log("abcd");
-    // console.log(rooms)
     console.log("User disconnected");
   });
 
-  socket.on("createGame", async (data) => {
+  // Create RPS Game
+  socket.on("createRPSGame", async (data) => {
     try {
-      const roomUniqueId = makeId(5);
-      // rid=roomUniqueId;
-      rooms[roomUniqueId] = { player1: data.playerName };
+      const roomUniqueId = generateRoomId(5);
+      rpsRooms[roomUniqueId] = { player1: data.playerName };
       socket.join(roomUniqueId);
-      socket.emit("newGame", { roomUniqueId: roomUniqueId });
+      socket.emit("newRPSGame", { roomUniqueId });
 
       const game = new Game({
-        roomUniqueId: roomUniqueId,
+        roomUniqueId,
         player1Name: data.playerName,
       });
       await game.save();
     } catch (error) {
-      console.error("Error creating game:", error);
+      console.error("Error creating RPS game:", error);
     }
   });
 
-  console.log("okji2");
-  socket.on("createGameD", async (data) => {
+  // Join RPS Game
+  socket.on("joinRPSGame", async (data) => {
     try {
-      console.log("arewe");
-      const roomUniqueId = makeId(5);
-      // rid=roomUniqueId;
-      roomsD[roomUniqueId] = { player1: data.playerName };
-      socket.join(roomUniqueId);
-      console.log("happen");
-      console.log(roomUniqueId);
-      socket.emit("newGameD", { roomUniqueId: roomUniqueId });
-
-      const gameD = new GameD({
-        roomUniqueId: roomUniqueId,
-        player1Name: data.playerName,
-      });
-      await gameD.save();
-    } catch (error) {
-      console.error("Error creating game:", error);
-    }
-  });
-
-  socket.on("joinGame", async (data) => {
-    try {
-      const room = rooms[data.roomUniqueId];
+      const room = rpsRooms[data.roomUniqueId];
       if (room) {
         room.player2 = data.playerName;
         socket.join(data.roomUniqueId);
-        socket.to(data.roomUniqueId).emit("playersConnected", { data: "p1" });
-        socket.emit("playersConnected", { data: "p2" });
-
+        // socket.to(data.roomUniqueId).emit("playersConnectedRPS", { data: "p1" });
+        io.to(data.roomUniqueId).emit("playersConnectedRPS");
+        socket.emit("playersConnectedRPS");
         await Game.findOneAndUpdate(
           { roomUniqueId: data.roomUniqueId },
           { player2Name: data.playerName }
         );
       }
     } catch (error) {
-      alert("Error joining game:");
-      console.error("Error joining game:", error);
+      console.error("Error joining RPS game:", error);
     }
   });
 
-  socket.on("joinGameD", async (data) => {
-    console.log("indised54");
-    // console.log("indised54");
-    console.log("Received data:", data); // Log the received data
+  // Player 1 RPS Choice
+  socket.on("player1ChoiceRPS", async (data) => {
     try {
-      console.log("indised");
-      const room = roomsD[data.roomUniqueId];
-      // console.log()
-      console.log("vghb", room);
+      const room = rpsRooms[data.roomUniqueId];
+      room.player1Choice = data.choice;
+      socket
+        .to(data.roomUniqueId)
+        .emit("player1ChoiceRPS", { choice: data.choice });
+      if (room.player2Choice) {
+        await determineRPSWinner(data.roomUniqueId);
+      }
+      await Game.findOneAndUpdate(
+        { roomUniqueId: data.roomUniqueId },
+        { player1Choice: data.choice }
+      );
+    } catch (error) {
+      console.error("Error handling player 1 RPS choice:", error);
+    }
+  });
+
+  // Player 2 RPS Choice
+  socket.on("player2ChoiceRPS", async (data) => {
+    try {
+      const room = rpsRooms[data.roomUniqueId];
+      room.player2Choice = data.choice;
+      socket
+        .to(data.roomUniqueId)
+        .emit("player2ChoiceRPS", { choice: data.choice });
+      if (room.player1Choice) {
+        await determineRPSWinner(data.roomUniqueId);
+      }
+      await Game.findOneAndUpdate(
+        { roomUniqueId: data.roomUniqueId },
+        { player2Choice: data.choice }
+      );
+    } catch (error) {
+      console.error("Error handling player 2 RPS choice:", error);
+    }
+  });
+
+  // Create Tic Tac Toe Game
+  socket.on("createTicTacToeGame", async (data) => {
+    try {
+      const roomUniqueId = generateRoomId(5);
+      ticTacToeRooms[roomUniqueId] = { player1: data.playerName };
+      socket.join(roomUniqueId);
+      socket.emit("playersConnectingTicTacToe", { roomUniqueId });
+
+      const gameData = new TicTacToeData({
+        roomUniqueId,
+        player1Name: data.playerName,
+      });
+      await gameData.save();
+    } catch (error) {
+      console.error("Error creating Tic Tac Toe game:", error);
+    }
+  });
+
+  // Join Tic Tac Toe Game
+  socket.on("joinTicTacToeGame", async (data) => {
+    try {
+      const room = ticTacToeRooms[data.roomUniqueId];
       if (room) {
         room.player2 = data.playerName;
         socket.join(data.roomUniqueId);
-        socket.to(data.roomUniqueId).emit("playersConnectedD", { data: "p1" });
-        socket.emit("playersConnectedD", { data: "p2" });
-
-        console.log("yes");
-        await GameD.findOneAndUpdate(
+        io.to(data.roomUniqueId).emit("playersConnectedTicTacToe");
+        await TicTacToeData.findOneAndUpdate(
           { roomUniqueId: data.roomUniqueId },
           { player2Name: data.playerName }
         );
-        console.log("indisedw");
       }
     } catch (error) {
-      alert("Error joining game:");
-      console.error("Error joining game:", error);
-    }
-    console.log("no on ");
-  });
-
-  socket.on("p1Choice", async (data) => {
-    try {
-      const room = rooms[data.roomUniqueId];
-      room.p1Choice = data.rpsChoice;
-      socket
-        .to(data.roomUniqueId)
-        .emit("p1Choice", { rpsChoice: data.rpsChoice });
-      if (room.p2Choice) {
-        await declareWinner(data.roomUniqueId);
-      }
-
-      await Game.findOneAndUpdate(
-        { roomUniqueId: data.roomUniqueId },
-        { player1Choice: data.rpsChoice }
-      );
-    } catch (error) {
-      console.error("Error handling player 1 choice:", error);
+      console.error("Error joining Tic Tac Toe game:", error);
     }
   });
 
-  socket.on("choicep1D", async (data) => {
-    console.log("here1");
-    try {
-      const room = roomsD[data.roomUniqueId];
-      socket.to(data.roomUniqueId).emit("p1ChoiceD", {
-        turn0: data.turn0,
-        boxes: data.boxes,
-      });
-      console.log("here2");
-      await GameD.findOneAndUpdate(
-        { roomUniqueId: data.roomUniqueId }
-        // { player1Choice: data.rpsChoice }
-      );
-    } catch (error) {
-      console.error("Error handling player 1 choiceD:", error);
-    }
+  // Player 1 Tic Tac Toe Move
+  socket.on("player1Move", (data) => {
+    const room = ticTacToeRooms[data.roomUniqueId];
+    socket.to(data.roomUniqueId).emit("player1Move", {
+      turn0: data.isPlayer1Turn,
+      boxes: data.boxes,
+    });
   });
 
-  socket.on("p2Choice", async (data) => {
-    try {
-      const room = rooms[data.roomUniqueId];
-      room.p2Choice = data.rpsChoice;
-      socket
-        .to(data.roomUniqueId)
-        .emit("p2Choice", { rpsChoice: data.rpsChoice });
-      if (room.p1Choice) {
-        await declareWinner(data.roomUniqueId);
-      }
-
-      await Game.findOneAndUpdate(
-        { roomUniqueId: data.roomUniqueId },
-        { player2Choice: data.rpsChoice }
-      );
-    } catch (error) {
-      console.error("Error handling player 2 choice:", error);
-    }
+  // Player 2 Tic Tac Toe Move
+  socket.on("player2Move", (data) => {
+    const room = ticTacToeRooms[data.roomUniqueId];
+    socket.to(data.roomUniqueId).emit("player2Move", {
+      turn0: data.isPlayer1Turn,
+      boxes: data.boxes,
+    });
   });
 
-  // socket.on("choicep2D", async (data) => {
-  //   console.log("here1");
-  //   try {
-  //     const room = roomsD[data.roomUniqueId];
-  //     socket.to(data.roomUniqueId).emit("p2ChoiceD", {
-  //       turn0: data.turn0,
-  //       boxes: data.boxes,
-  //     });
-  //     console.log("here2");
-  //     await GameD.findOneAndUpdate(
-  //       { roomUniqueId: data.roomUniqueId }
-  //       // { player1Choice: data.rpsChoice }
-  //     );
-  //   } catch (error) {
-  //     console.error("Error handling player 1 choiceD:", error);
-  //   }
-  // });
-
-  socket.on("choicep1D", (data) => {
-    console.log("here1");
-    try {
-      const room = roomsD[data.roomUniqueId];
-      socket.to(data.roomUniqueId).emit("p1ChoiceD", {
-        turn0: data.turn0,
-        boxes: data.boxes,
-        symbol: data.symbol,
-      });
-      console.log("here2");
-      // await GameD.findOneAndUpdate(
-      //   { roomUniqueId: data.roomUniqueId }
-      //   // { player1Choice: data.boxes } // Updated with player1Choice
-      // );
-    } catch (error) {
-      console.error("Error handling player 1 choiceD:", error);
-    }
-  });
-
-  socket.on("choicep2D", (data) => {
-    console.log("bccccc");
-    try {
-      const room = roomsD[data.roomUniqueId];
-      socket.to(data.roomUniqueId).emit("p2ChoiceD", {
-        turn0: data.turn0,
-        boxes: data.boxes,
-
-        symbol: data.symbol,
-      });
-      console.log("here2");
-      // await GameD.findOneAndUpdate(
-      //   { roomUniqueId: data.roomUniqueId }
-      //   // { player2Choice: data.boxes } // Updated with player2Choice
-      // );
-    } catch (error) {
-      console.error("Error handling player 2 choiceD:", error);
-    }
-  });
-
-  socket.on("winnerAnnouncement", (data) => {
-    console.log("getting now wait for upafdting");
+  // Announce Tic Tac Toe Winner
+  socket.on("announceWinner", (data) => {
     const { winner, roomUniqueId } = data;
-    socket.to(roomUniqueId).emit("winnerAnnouncements", { winner });
+    socket.to(roomUniqueId).emit("announceWinner", { winner });
   });
 
-  socket.on("drawAnnouncement", (data) => {
-    console.log("getting now wait for upafdting");
+  // Announce Tic Tac Toe Draw
+  socket.on("announceDraw", (data) => {
     const { roomUniqueId } = data;
-    socket.to(roomUniqueId).emit("drawAnnouncements", { roomUniqueId });
+    socket.to(roomUniqueId).emit("announceDraw");
   });
 
-  socket.on("updateBoxesState", (data) => {
-    const { roomUniqueId, boxesState } = data;
-    console.log("ppppppp", typeof boxesState);
-    socket.to(roomUniqueId).emit("updateBoxesStates", { boxesState });
-  });
-
-  // socket.on("connection", (socket) => {
-  socket.on("requestRoomData", async ({ roomUniqueId }) => {
+  // Request Room Data for Tic Tac Toe
+  socket.on("requestTicTacToeRoomData", async ({ roomUniqueId }) => {
     try {
-      const rid = roomUniqueId;
-      console.log("find data of roomid", rid);
-      const roomData = await GameD.findOne({ roomUniqueId: rid });
-      console.log("usssss iddd", rid);
-      console.log(roomData);
+      const roomData = await TicTacToeData.findOne({ roomUniqueId });
       socket.emit("roomDataResponse", { roomData });
     } catch (error) {
-      console.error(error);
+      console.error("Error requesting Tic Tac Toe room data:", error);
     }
   });
-  // });
 });
 
-async function declareWinner(roomUniqueId) {
-  const room = rooms[roomUniqueId];
-  const p1 = room.p1Choice;
-  const p2 = room.p2Choice;
+// Determine RPS Winner
+async function determineRPSWinner(roomUniqueId) {
+  const room = rpsRooms[roomUniqueId];
+  const p1 = room.player1Choice;
+  const p2 = room.player2Choice;
   let winner;
 
   if (p1 === p2) {
-    winner = "d";
+    winner = "draw";
   } else if (
     (p1 === "Paper" && p2 === "Rock") ||
-    (p1 === "Rock" && p2 === "Scissor") ||
-    (p1 === "Scissor" && p2 === "Paper")
+    (p1 === "Rock" && p2 === "Scissors") ||
+    (p1 === "Scissors" && p2 === "Paper")
   ) {
-    winner = "p1";
+    winner = "player1";
   } else {
-    winner = "p2";
+    winner = "player2";
   }
 
-  io.to(roomUniqueId).emit("result", { winner: winner });
+  io.to(roomUniqueId).emit("rpsGameResult", { winner });
+  // why io
 
-  room.p1Choice = null;
-  room.p2Choice = null;
+  room.player1Choice = null;
+  room.player2Choice = null;
 
-  await Game.findOneAndUpdate(
-    { roomUniqueId: roomUniqueId },
-    { winner: winner }
-  );
+  await Game.findOneAndUpdate({ roomUniqueId }, { winner });
 }
 
-function makeId(length) {
+// Generate Room ID
+function generateRoomId(length) {
   const characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
