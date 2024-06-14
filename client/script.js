@@ -35,18 +35,69 @@ function updateBoxes(boxesState) {
     box.classList.toggle("box1", symbol === "X");
   });
 }
-// const ResetBtn = () => {
-//   turn0 = true;
-//   enabledBtn();
-//   msgContainer.classList.add("hide");
-// };
 
-// const enabledBtn = () => {
-//   for (let box of boxes) {
-//     box.disabled = false;
-//     box.innerText = "";
-//   }
-// };
+function ResetScreen() {
+  if (isPlayer1) {
+    document.getElementById("ch1").innerText = "You: O";
+    document.getElementById("ch2").innerText = "Opponent: X";
+    document.getElementById("opponentStateD1").innerText = "Your Turn...";
+    document.getElementById("opponentStateD2").innerText = "";
+  } else {
+    document.getElementById("ch1").innerText = "You: X";
+    document.getElementById("ch2").innerText = "Opponent: O";
+    document.getElementById("opponentStateD1").innerText = "";
+    document.getElementById("opponentStateD2").innerText =
+      "Waiting For Opponent Move";
+  }
+}
+
+const ResetBtn = () => {
+  isPlayer1Turn = true;
+  enabledBtn();
+  messageContainer.classList.add("hide");
+  ResetScreen();
+};
+
+const ResetBtnPermission = () => {
+  socket.emit("requestGameTicTacToe", {
+    roomUniqueId,
+    isPlayer1,
+  });
+};
+var RequestedBy = "SAMPLE";
+socket.on("ConfirmResetGameTicTacToe", (data) => {
+  RequestedBy = isPlayer1 === true ? player2Name : player1Name;
+  const response = confirm(
+    `${RequestedBy} requested to reset the game. Do you agree?`
+  );
+  if (response) {
+    ResetBtn();
+  }
+  socket.emit("resetResponseTicTacToe", { response, roomUniqueId });
+});
+
+socket.on("resetingTicTacToe", () => {
+  isPlayer1Turn = true;
+  enabledBtn();
+  messageContainer.classList.add("hide");
+  ResetScreen();
+});
+
+socket.on("cancelRequesting", () => {
+  cancelingResetRequest();
+});
+
+function cancelingResetRequest() {
+  RequestedBy = isPlayer1 === true ? player2Name : player1Name;
+  alert(`${RequestedBy} denied for Reset Game`);
+}
+
+const enabledBtn = () => {
+  for (let box of boxes) {
+    box.disabled = false;
+    box.innerText = "";
+  }
+};
 
 const getBoxesState = () => {
   return Array.from(boxes).map((box) => ({
@@ -78,7 +129,7 @@ function joinGame() {
     return;
   }
   socket.emit("joinTicTacToeGame", { roomUniqueId, playerName });
-  requestRoomData(roomUniqueId); // Request room data for player 2
+  // requestRoomData(roomUniqueId); // Request room data for player 2
 }
 
 function requestRoomData(roomUniqueId) {
@@ -179,22 +230,22 @@ socket.on("announceDraw", () => {
 });
 
 const checkWinner = () => {
-  for (let pattern of winningPatterns) {
+  for (pattern of winningPatterns) {
     let pos0 = boxes[pattern[0]].innerText;
     let pos1 = boxes[pattern[1]].innerText;
     let pos2 = boxes[pattern[2]].innerText;
-
-    if (pos0 && pos0 === pos1 && pos0 === pos2) {
-      let winner =
-        pos0 === "X"
-          ? isPlayer1
-            ? player2Name
-            : player1Name
-          : isPlayer1
-          ? player1Name
-          : player2Name;
-      displayWinner(winner);
-      return;
+    if (
+      pos0 != "" &&
+      pos1 != "" &&
+      pos2 != "" &&
+      pos0 === pos2 &&
+      pos0 === pos1
+    ) {
+      if (pos0 === "X") {
+        displayWinner(player2Name);
+      } else {
+        displayWinner(player1Name);
+      }
     }
   }
 };
@@ -255,6 +306,13 @@ socket.on("updateBoxesState", (data) => {
   updateBoxes(data.boxesState);
 });
 
+function roomCapapcity() {
+  alert("Room is Full");
+}
+socket.on("FullTicTacToe", () => {
+  roomCapapcity();
+});
+
 // Add click event listeners to each box
 boxes.forEach((box, index) => {
   box.addEventListener("click", () => {
@@ -305,5 +363,5 @@ boxes.forEach((box, index) => {
   });
 });
 
-// resetBtn.addEventListener("click", ResetBtn);
-// newGameBtn.addEventListener("click", ResetBtn);
+resetButton.addEventListener("click", ResetBtnPermission);
+newGameButton.addEventListener("click", ResetBtn);
