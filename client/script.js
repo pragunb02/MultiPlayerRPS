@@ -8,12 +8,47 @@ let playerName;
 let player1Name = "SAMPLE";
 let player2Name = "SAMPLE";
 let isPlayer1Turn = true;
+let count = 0;
+let ok = false;
 
 const boxes = document.querySelectorAll(".box");
 const resetButton = document.querySelector("#reset-btn");
 const newGameButton = document.querySelector("#new-game");
 const messageContainer = document.querySelector(".msg-container");
 const message = document.querySelector("#msg");
+
+// Reset Confirmation Modal
+const resetModal = document.getElementById("resetConfirmationModal");
+const resetSpan = resetModal.getElementsByClassName("close")[0];
+const resetConfirmBtn = document.getElementById("resetConfirmBtn");
+const resetCancelBtn = document.getElementById("resetCancelBtn");
+const resetConfirmationText = document.getElementById("resetConfirmationText");
+
+// New Game Confirmation Modal
+const newGameModal = document.getElementById("newGameConfirmationModal");
+const newGameSpan = newGameModal.getElementsByClassName("close")[0];
+const newGameConfirmBtn = document.getElementById("newGameConfirmBtn");
+const newGameCancelBtn = document.getElementById("newGameCancelBtn");
+const newGameConfirmationText = document.getElementById("newGameConfirmationText");
+
+// Close the modals
+resetSpan.onclick = function () {
+  resetModal.style.display = "none";
+}
+
+newGameSpan.onclick = function () {
+  newGameModal.style.display = "none";
+}
+
+
+window.onclick = function (event) {
+  if (event.target == resetModal) {
+    resetModal.style.display = "none";
+  } else if (event.target == newGameModal) {
+    newGameModal.style.display = "none";
+  }
+}
+
 
 const winningPatterns = [
   [0, 1, 2],
@@ -51,6 +86,62 @@ function ResetScreen() {
   }
 }
 
+const NewGamePermission = () => {
+  socket.emit("requestNewGameTicTacToe", {
+    roomUniqueId,
+    isPlayer1,
+  });
+};
+
+const newGameBtn = () => {
+  isPlayer1Turn = true;
+  enabledBtn();
+  messageContainer.classList.add("hide");
+  document.getElementById("gameAreaD").style.display = "block";
+  document.getElementById("btnreset").style.display = "block";
+  ResetScreen();
+};
+
+var NewGameRequestedBy = "SAMPLE";
+socket.on("ConfirmNewGameTicTacToe", (data) => {
+  NewGameRequestedBy = isPlayer1 === true ? player2Name : player1Name;
+  newGameModal.style.display = "block";
+  newGameConfirmationText.innerText = `${NewGameRequestedBy} wants to play again. Yes/No?`;
+  newGameConfirmBtn.onclick = function () {
+    socket.emit("NewGameResponseTicTacToe", { response: true, roomUniqueId: roomUniqueId });
+    newGameModal.style.display = "none";
+    alert("Starting New Game..")
+    newGameBtn();
+  };
+
+  newGameCancelBtn.onclick = function () {
+    socket.emit("NewGameResponseTicTacToe", { response: false, roomUniqueId: roomUniqueId });
+    newGameModal.style.display = "none";
+    setTimeout(() => {
+      window.location.href = "index3.html";
+    }, 3000);
+  };
+
+});
+
+socket.on("NewGameTicTacToe", () => {
+  alert("Starting New Game..")
+  newGameBtn();
+});
+
+function cancelingNewGameRequest() {
+  NewGameRequestedBy = isPlayer1 === true ? player2Name : player1Name;
+  alert(`${NewGameRequestedBy} denied for New Game`);
+  socket.emit("CancelTicTacToe", { roomUniqueId })
+  setTimeout(() => {
+    window.location.href = "index3.html";
+  }, 2000);
+}
+
+socket.on("CancelingRequestNewGameTicTacToc", () => {
+  cancelingNewGameRequest();
+});
+
 const ResetBtn = () => {
   isPlayer1Turn = true;
   enabledBtn();
@@ -59,21 +150,27 @@ const ResetBtn = () => {
 };
 
 const ResetBtnPermission = () => {
-  socket.emit("requestGameTicTacToe", {
+  socket.emit("requestResetGameTicTacToe", {
     roomUniqueId,
     isPlayer1,
   });
 };
-var RequestedBy = "SAMPLE";
+
+var ResetGameRequestedBy = "SAMPLE";
 socket.on("ConfirmResetGameTicTacToe", (data) => {
-  RequestedBy = isPlayer1 === true ? player2Name : player1Name;
-  const response = confirm(
-    `${RequestedBy} requested to reset the game. Do you agree?`
-  );
-  if (response) {
+  ResetGameRequestedBy = isPlayer1 === true ? player2Name : player1Name;
+  resetModal.style.display = "block";
+  resetConfirmationText.innerText = `${ResetGameRequestedBy} want to Reset the game. Yes/NO? `;
+  resetConfirmBtn.onclick = function () {
+    socket.emit("resetResponseTicTacToe", { response: true, roomUniqueId: roomUniqueId });
+    resetModal.style.display = "none";
     ResetBtn();
-  }
-  socket.emit("resetResponseTicTacToe", { response, roomUniqueId });
+  };
+
+  resetCancelBtn.onclick = function () {
+    socket.emit("resetResponseTicTacToe", { response: false, roomUniqueId: roomUniqueId });
+    resetModal.style.display = "none";
+  };
 });
 
 socket.on("resetingTicTacToe", () => {
@@ -83,13 +180,13 @@ socket.on("resetingTicTacToe", () => {
   ResetScreen();
 });
 
-socket.on("cancelRequesting", () => {
+socket.on("CancelingRequestResetGameTicTacToc", () => {
   cancelingResetRequest();
 });
 
 function cancelingResetRequest() {
-  RequestedBy = isPlayer1 === true ? player2Name : player1Name;
-  alert(`${RequestedBy} denied for Reset Game`);
+  ResetGameRequestedBy = isPlayer1 === true ? player2Name : player1Name;
+  alert(`${ResetGameRequestedBy} denied for Reset Game`);
 }
 
 const enabledBtn = () => {
@@ -137,22 +234,29 @@ function requestRoomData(roomUniqueId) {
 }
 
 const displayWinner = (winner) => {
-  socket.emit("announceWinner", { winner, roomUniqueId });
+  count = 0;
+  ok = false;
+  socket.emit("announceWinner", { winner, roomUniqueId, count, ok });
 
   message.innerText = `Congratulations, Winner is ${winner}`;
   messageContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
   disableBoxes();
+  document.getElementById("btnreset").style.display = "none";
 };
 
 const announceDraw = () => {
-  socket.emit("announceDraw", { roomUniqueId });
+  count = 0;
+  ok = false;
+  socket.emit("announceDraw", { roomUniqueId, count, ok });
 
   message.innerText = `OOPS DRAW!!`;
   messageContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
+  document.getElementById("btnreset").style.display = "none";
+
   disableBoxes();
 };
 
@@ -213,19 +317,29 @@ socket.on("playersConnectedTicTacToe", (data) => {
 });
 
 socket.on("announceWinner", (data) => {
-  const { winner } = data;
+
+  // Accessing nested data properties correctly
+  count = data.data.count;
+  ok = data.data.ok;
+  const winner = data.data.winner;
   message.innerText = `Congratulations, Winner is ${winner}`;
   messageContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
+  document.getElementById("btnreset").style.display = "none";
   disableBoxes();
 });
 
-socket.on("announceDraw", () => {
+
+
+socket.on("announceDraw", (data) => {
+  count = data.data.count;
+  ok = data.data.ok;
   message.innerText = `OOPS DRAW!!`;
   messageContainer.classList.remove("hide");
   document.getElementById("xyz").style.display = "none";
   document.getElementById("gameAreaD").style.display = "none";
+  document.getElementById("btnreset").style.display = "none";
   disableBoxes();
 });
 
@@ -241,6 +355,7 @@ const checkWinner = () => {
       pos0 === pos2 &&
       pos0 === pos1
     ) {
+      ok = true;
       if (pos0 === "X") {
         displayWinner(player2Name);
       } else {
@@ -250,11 +365,6 @@ const checkWinner = () => {
   }
 };
 
-const checkDraw = () => {
-  if (Array.from(boxes).every((box) => box.innerText !== "")) {
-    announceDraw();
-  }
-};
 
 // Function to update turn indicators
 const updateTurnIndicators = () => {
@@ -288,6 +398,7 @@ socket.on("player1Move", (data) => {
   if (!isPlayer1) {
     updateBoxes(data.boxes);
     isPlayer1Turn = data.isPlayer1Turn;
+    count = data.count;
     updateTurnIndicators();
   }
   // updateTurnIndicators();
@@ -297,6 +408,7 @@ socket.on("player2Move", (data) => {
   if (isPlayer1) {
     updateBoxes(data.boxes);
     isPlayer1Turn = data.isPlayer1Turn;
+    count = data.count;
     updateTurnIndicators();
   }
   // updateTurnIndicators();
@@ -314,6 +426,7 @@ socket.on("FullTicTacToe", () => {
 });
 
 // Add click event listeners to each box
+
 boxes.forEach((box, index) => {
   box.addEventListener("click", () => {
     if (isPlayer1Turn && isPlayer1) {
@@ -324,6 +437,7 @@ boxes.forEach((box, index) => {
       box.disabled = true;
 
       const boxesState = Array.from(boxes).map((b) => b.innerText);
+      count++;
 
       socket.emit("player1Move", {
         index,
@@ -331,10 +445,13 @@ boxes.forEach((box, index) => {
         isPlayer1Turn,
         roomUniqueId,
         symbol: "O",
+        count: count,
       });
 
       checkWinner();
-      checkDraw();
+      if (count === 9 && ok === false) {
+        announceDraw();
+      }
       updateTurnIndicators();
     } else if (!isPlayer1Turn && !isPlayer1) {
       box.innerText = "X";
@@ -345,6 +462,7 @@ boxes.forEach((box, index) => {
       box.disabled = true;
 
       const boxesState = Array.from(boxes).map((b) => b.innerText);
+      count++;
 
       socket.emit("player2Move", {
         index,
@@ -352,10 +470,13 @@ boxes.forEach((box, index) => {
         isPlayer1Turn,
         roomUniqueId,
         symbol: "X",
+        count: count,
       });
 
       checkWinner();
-      checkDraw();
+      if (count === 9 && ok === false) {
+        announceDraw();
+      }
       updateTurnIndicators();
     } else {
       alert("Wait For Opponent's Turn");
@@ -363,5 +484,7 @@ boxes.forEach((box, index) => {
   });
 });
 
+
+
 resetButton.addEventListener("click", ResetBtnPermission);
-newGameButton.addEventListener("click", ResetBtn);
+newGameButton.addEventListener("click", NewGamePermission);
