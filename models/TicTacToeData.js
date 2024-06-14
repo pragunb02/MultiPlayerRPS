@@ -1,4 +1,3 @@
-// models/TicTacToeData.js
 const mongoose = require("mongoose");
 
 const GameSchema = new mongoose.Schema({
@@ -15,8 +14,8 @@ const GameSchema = new mongoose.Schema({
     default: null,
   },
   winner: {
-    type: String,
-    default: null,
+    type: [String],  // Changed to an array of strings
+    default: [],    // Default empty array
   },
   createdAt: {
     type: Date,
