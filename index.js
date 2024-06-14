@@ -36,6 +36,7 @@ io.on("connection", (socket) => {
     try {
       const roomUniqueId = generateRoomId(5);
       rpsRooms[roomUniqueId] = { player1: data.playerName };
+      rpsRooms[roomUniqueId] = { capacity: true };
       socket.join(roomUniqueId);
       socket.emit("newRPSGame", { roomUniqueId });
 
@@ -54,15 +55,19 @@ io.on("connection", (socket) => {
     try {
       const room = rpsRooms[data.roomUniqueId];
       if (room) {
-        room.player2 = data.playerName;
-        socket.join(data.roomUniqueId);
-        // socket.to(data.roomUniqueId).emit("playersConnectedRPS", { data: "p1" });
-        io.to(data.roomUniqueId).emit("playersConnectedRPS");
-        socket.emit("playersConnectedRPS");
-        await RPSData.findOneAndUpdate(
-          { roomUniqueId: data.roomUniqueId },
-          { player2Name: data.playerName }
-        );
+        if (room.capacity === true) {
+          room.player2 = data.playerName;
+          socket.join(data.roomUniqueId);
+          io.to(data.roomUniqueId).emit("playersConnectedRPS");
+          socket.emit("playersConnectedRPS");
+          await RPSData.findOneAndUpdate(
+            { roomUniqueId: data.roomUniqueId },
+            { player2Name: data.playerName }
+          );
+          room.capacity = false;
+        } else {
+          socket.emit("FullRPS");
+        }
       }
     } catch (error) {
       console.error("Error joining RPS game:", error);
@@ -116,6 +121,7 @@ io.on("connection", (socket) => {
     try {
       const roomUniqueId = generateRoomId(5);
       ticTacToeRooms[roomUniqueId] = { player1: data.playerName };
+      ticTacToeRooms[roomUniqueId] = { capacity: true };
       socket.join(roomUniqueId);
       socket.emit("playersConnectingTicTacToe", { roomUniqueId });
 
@@ -134,13 +140,18 @@ io.on("connection", (socket) => {
     try {
       const room = ticTacToeRooms[data.roomUniqueId];
       if (room) {
-        room.player2 = data.playerName;
-        socket.join(data.roomUniqueId);
-        io.to(data.roomUniqueId).emit("playersConnectedTicTacToe");
-        await TicTacToeData.findOneAndUpdate(
-          { roomUniqueId: data.roomUniqueId },
-          { player2Name: data.playerName }
-        );
+        if (room.capacity === true) {
+          room.player2 = data.playerName;
+          socket.join(data.roomUniqueId);
+          io.to(data.roomUniqueId).emit("playersConnectedTicTacToe");
+          await TicTacToeData.findOneAndUpdate(
+            { roomUniqueId: data.roomUniqueId },
+            { player2Name: data.playerName }
+          );
+          room.capacity = false;
+        } else {
+          socket.emit("FullTicTacToe");
+        }
       }
     } catch (error) {
       console.error("Error joining Tic Tac Toe game:", error);
@@ -153,6 +164,7 @@ io.on("connection", (socket) => {
     socket.to(data.roomUniqueId).emit("player1Move", {
       isPlayer1Turn: data.isPlayer1Turn,
       boxes: data.boxes,
+      count: data.count,
     });
   });
 
@@ -162,21 +174,22 @@ io.on("connection", (socket) => {
     socket.to(data.roomUniqueId).emit("player2Move", {
       isPlayer1Turn: data.isPlayer1Turn,
       boxes: data.boxes,
+      count: data.count,
     });
   });
 
   // Announce Tic Tac Toe Winner
   socket.on("announceWinner", async (data) => {
-    const { winner, roomUniqueId } = data;
-    await TicTacToeData.findOneAndUpdate({ roomUniqueId }, { winner });
-    socket.to(roomUniqueId).emit("announceWinner", { winner });
+    const { winner, roomUniqueId, count, ok } = data;
+    await TicTacToeData.findOneAndUpdate({ roomUniqueId }, { $push: { winner: winner } }, { new: true });
+    socket.to(roomUniqueId).emit("announceWinner", { data });
   });
 
   // Announce Tic Tac Toe Draw
   socket.on("announceDraw", async (data) => {
-    const { roomUniqueId } = data;
-    await TicTacToeData.findOneAndUpdate({ roomUniqueId }, { winner: "Draw" });
-    socket.to(roomUniqueId).emit("announceDraw");
+    const { roomUniqueId, count, ok } = data;
+    await TicTacToeData.findOneAndUpdate({ roomUniqueId }, { $push: { winner: "Draw" } }, { new: true });
+    socket.to(roomUniqueId).emit("announceDraw", { data });
   });
 
   // Request Room Data for Tic Tac Toe
@@ -188,6 +201,38 @@ io.on("connection", (socket) => {
       console.error("Error requesting Tic Tac Toe room data:", error);
     }
   });
+
+  socket.on("requestResetGameTicTacToe", (data) => {
+    socket.to(data.roomUniqueId).emit("ConfirmResetGameTicTacToe", {
+      isplayer1: data.isplayer1,
+    });
+  });
+  // Request of Reseting the game Board
+
+  socket.on("resetResponseTicTacToe", ({ response, roomUniqueId }) => {
+    if (response === true) {
+      socket.to(roomUniqueId).emit("resetingTicTacToe");
+    } else {
+      socket.to(roomUniqueId).emit("CancelingRequestResetGameTicTacToc");
+    }
+  });
+
+  socket.on("requestNewGameTicTacToe", (data) => {
+    socket.to(data.roomUniqueId).emit("ConfirmNewGameTicTacToe", {
+      isplayer1: data.isplayer1,
+    });
+  });
+  socket.on("NewGameResponseTicTacToe", ({ response, roomUniqueId }) => {
+    if (response === true) {
+      socket.to(roomUniqueId).emit("NewGameTicTacToe");
+    } else {
+      socket.to(roomUniqueId).emit("CancelingRequestNewGameTicTacToc");
+    }
+  });
+
+  socket.on("", () => {
+
+  })
 });
 
 // Determine RPS Winner
