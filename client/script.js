@@ -29,17 +29,18 @@ const newGameModal = document.getElementById("newGameConfirmationModal");
 const newGameSpan = newGameModal.getElementsByClassName("close")[0];
 const newGameConfirmBtn = document.getElementById("newGameConfirmBtn");
 const newGameCancelBtn = document.getElementById("newGameCancelBtn");
-const newGameConfirmationText = document.getElementById("newGameConfirmationText");
+const newGameConfirmationText = document.getElementById(
+  "newGameConfirmationText"
+);
 
 // Close the modals
 resetSpan.onclick = function () {
   resetModal.style.display = "none";
-}
+};
 
 newGameSpan.onclick = function () {
   newGameModal.style.display = "none";
-}
-
+};
 
 window.onclick = function (event) {
   if (event.target == resetModal) {
@@ -47,8 +48,7 @@ window.onclick = function (event) {
   } else if (event.target == newGameModal) {
     newGameModal.style.display = "none";
   }
-}
-
+};
 
 const winningPatterns = [
   [0, 1, 2],
@@ -108,31 +108,36 @@ socket.on("ConfirmNewGameTicTacToe", (data) => {
   newGameModal.style.display = "block";
   newGameConfirmationText.innerText = `${NewGameRequestedBy} wants to play again. Yes/No?`;
   newGameConfirmBtn.onclick = function () {
-    socket.emit("NewGameResponseTicTacToe", { response: true, roomUniqueId: roomUniqueId });
+    socket.emit("NewGameResponseTicTacToe", {
+      response: true,
+      roomUniqueId: roomUniqueId,
+    });
     newGameModal.style.display = "none";
-    alert("Starting New Game..")
+    alert("Starting New Game..");
     newGameBtn();
   };
 
   newGameCancelBtn.onclick = function () {
-    socket.emit("NewGameResponseTicTacToe", { response: false, roomUniqueId: roomUniqueId });
+    socket.emit("NewGameResponseTicTacToe", {
+      response: false,
+      roomUniqueId: roomUniqueId,
+    });
     newGameModal.style.display = "none";
     setTimeout(() => {
       window.location.href = "index3.html";
     }, 3000);
   };
-
 });
 
 socket.on("NewGameTicTacToe", () => {
-  alert("Starting New Game..")
+  alert("Starting New Game..");
   newGameBtn();
 });
 
 function cancelingNewGameRequest() {
   NewGameRequestedBy = isPlayer1 === true ? player2Name : player1Name;
   alert(`${NewGameRequestedBy} denied for New Game`);
-  socket.emit("CancelTicTacToe", { roomUniqueId })
+  socket.emit("CancelTicTacToe", { roomUniqueId });
   setTimeout(() => {
     window.location.href = "index3.html";
   }, 2000);
@@ -162,13 +167,19 @@ socket.on("ConfirmResetGameTicTacToe", (data) => {
   resetModal.style.display = "block";
   resetConfirmationText.innerText = `${ResetGameRequestedBy} want to Reset the game. Yes/NO? `;
   resetConfirmBtn.onclick = function () {
-    socket.emit("resetResponseTicTacToe", { response: true, roomUniqueId: roomUniqueId });
+    socket.emit("resetResponseTicTacToe", {
+      response: true,
+      roomUniqueId: roomUniqueId,
+    });
     resetModal.style.display = "none";
     ResetBtn();
   };
 
   resetCancelBtn.onclick = function () {
-    socket.emit("resetResponseTicTacToe", { response: false, roomUniqueId: roomUniqueId });
+    socket.emit("resetResponseTicTacToe", {
+      response: false,
+      roomUniqueId: roomUniqueId,
+    });
     resetModal.style.display = "none";
   };
 });
@@ -317,7 +328,6 @@ socket.on("playersConnectedTicTacToe", (data) => {
 });
 
 socket.on("announceWinner", (data) => {
-
   // Accessing nested data properties correctly
   count = data.data.count;
   ok = data.data.ok;
@@ -329,8 +339,6 @@ socket.on("announceWinner", (data) => {
   document.getElementById("btnreset").style.display = "none";
   disableBoxes();
 });
-
-
 
 socket.on("announceDraw", (data) => {
   count = data.data.count;
@@ -364,7 +372,6 @@ const checkWinner = () => {
     }
   }
 };
-
 
 // Function to update turn indicators
 const updateTurnIndicators = () => {
@@ -483,8 +490,6 @@ boxes.forEach((box, index) => {
     }
   });
 });
-
-
 
 resetButton.addEventListener("click", ResetBtnPermission);
 newGameButton.addEventListener("click", NewGamePermission);

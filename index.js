@@ -181,14 +181,22 @@ io.on("connection", (socket) => {
   // Announce Tic Tac Toe Winner
   socket.on("announceWinner", async (data) => {
     const { winner, roomUniqueId, count, ok } = data;
-    await TicTacToeData.findOneAndUpdate({ roomUniqueId }, { $push: { winner: winner } }, { new: true });
+    await TicTacToeData.findOneAndUpdate(
+      { roomUniqueId },
+      { $push: { winner: winner } },
+      { new: true }
+    );
     socket.to(roomUniqueId).emit("announceWinner", { data });
   });
 
   // Announce Tic Tac Toe Draw
   socket.on("announceDraw", async (data) => {
     const { roomUniqueId, count, ok } = data;
-    await TicTacToeData.findOneAndUpdate({ roomUniqueId }, { $push: { winner: "Draw" } }, { new: true });
+    await TicTacToeData.findOneAndUpdate(
+      { roomUniqueId },
+      { $push: { winner: "Draw" } },
+      { new: true }
+    );
     socket.to(roomUniqueId).emit("announceDraw", { data });
   });
 
@@ -230,9 +238,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("", () => {
-
-  })
+  socket.on("", () => {});
 });
 
 // Determine RPS Winner
