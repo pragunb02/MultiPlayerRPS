@@ -1,4 +1,4 @@
-result display in ttt
+result display in ttt  Done
 new game  in ttt
 reset game in ttt
 database in ttt
@@ -9,3 +9,29 @@ roo id matching
 new game in rps
 deploy
 
+function on generating unique id
+
+in rps for tyhe player1 how create game chnmage its inner text to your turn
+
+database name in index.js
+
+
+app.use(express.static(path.join(__dirname, "client")));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "client", "index.html"));
+});
+
+
+where index2,3.html
+script.js
+
+
+
+
+1)reset game in Tic Tac Toe ask permission
+2)new game in Tic Tac Toe after game result 
+
+
+roms empty 
+rooims unique

@@ -3,9 +3,11 @@ const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
+// const handlebars = require("express-handlebars");
 const connectDB = require("./db");
 const RPSData = require("./models/RPSData");
 const TicTacToeData = require("./models/TicTacToeData");
+const ChessData = require("./models/ChessData");
 
 const app = express();
 const server = http.createServer(app);
@@ -14,11 +16,18 @@ const PORT = 8080;
 
 const rpsRooms = {};
 const ticTacToeRooms = {};
+const chessRooms = {};
 
 // Connect to MongoDB
 connectDB();
 
+// Set EJS as the view engine
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "client")); // Assuming your views are in a 'views' folder
+
 app.use(express.static(path.join(__dirname, "client")));
+
+app.use("/public", express.static(path.join(__dirname, "front", "public")));
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "client", "index.html"));
@@ -111,6 +120,16 @@ io.on("connection", (socket) => {
       );
     } catch (error) {
       console.error("Error handling player 2 RPS choice:", error);
+    }
+  });
+
+  // Request Room Data for Tic Tac Toe
+  socket.on("requestRPSRoomData", async ({ roomUniqueId }) => {
+    try {
+      const roomData = await RPSData.findOne({ roomUniqueId });
+      socket.emit("roomDataResponse", { roomData });
+    } catch (error) {
+      console.error("Error requesting Tic Tac Toe room data:", error);
     }
   });
 
@@ -238,7 +257,76 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("", () => {});
+  // Create Chess Game
+  socket.on("createChessGame", async (data) => {
+    try {
+      const roomUniqueId = generateRoomId(5);
+      chessRooms[roomUniqueId] = {
+        player1: data.playerName,
+        capacity: true,
+        player1Color: "white",
+        player2Color: "black",
+      };
+      console.log("rooms");
+      console.log(chessRooms[roomUniqueId]);
+      socket.join(roomUniqueId);
+      socket.emit("playersConnectingChess", { roomUniqueId });
+
+      const gameData = new ChessData({
+        roomUniqueId,
+        player1Name: data.playerName,
+        player1Color: "white",
+        player2Color: "black",
+      });
+      await gameData.save();
+    } catch (error) {
+      console.error("Error creating Chess game:", error);
+    }
+  });
+
+  // Join Chess Game
+  socket.on("joinChessGame", async (data) => {
+    console.log("Joining Button2");
+    try {
+      const room = chessRooms[data.roomUniqueId];
+      console.log(room);
+      if (room) {
+        if (room.capacity === true) {
+          room.player2 = data.playerName;
+          socket.join(data.roomUniqueId);
+          io.to(data.roomUniqueId).emit("playersConnectedChess");
+          await ChessData.findOneAndUpdate(
+            { roomUniqueId: data.roomUniqueId },
+            { player2Name: data.playerName }
+          );
+          room.capacity = false;
+        } else {
+          socket.emit("FullChess");
+        }
+      }
+    } catch (error) {
+      console.error("Error joining Tic Tac Toe game:", error);
+    }
+  });
+
+  let currentCode = null;
+
+  socket.on("move", function (move) {
+    console.log("move detected");
+
+    io.to(currentCode).emit("newMove", move);
+  });
+
+  socket.on("joinGame", function (data) {
+    currentCode = data.code;
+    socket.join(currentCode);
+    if (!chessRooms[currentCode]) {
+      chessRooms[currentCode] = true;
+      return;
+    }
+
+    io.to(currentCode).emit("startGame");
+  });
 });
 
 // Determine RPS Winner
@@ -279,6 +367,28 @@ function generateRoomId(length) {
   }
   return result;
 }
+
+// Route for serving Chess game with white color
+app.get("/white", async (req, res) => {
+  const roomUniqueId = req.query.code;
+  if (!chessRooms[roomUniqueId]) {
+    return res.redirect("/?error=invalidCode");
+  }
+  res.render("game", {
+    color: "white",
+  });
+});
+
+// Route for serving Chess game with black color
+app.get("/black", async (req, res) => {
+  const roomUniqueId = req.query.code;
+  if (!chessRooms[roomUniqueId]) {
+    return res.redirect("/?error=invalidCode");
+  }
+  res.render("game", {
+    color: "black",
+  });
+});
 
 server.listen(PORT, () => {
   console.log(`Listening on PORT ${PORT}`);
