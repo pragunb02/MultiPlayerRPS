@@ -51,9 +51,11 @@ input[type="text"] {
 }
 
 button {
+  width: 200px; /* Set a fixed width */
+  height: 50px; /* Set a fixed height */
   padding: 10px 20px;
   margin: 10px 0;
-  font-size: 1em;
+  font-size: 16px; /* Set font size */
   border: none;
   border-radius: 5px;
   cursor: pointer;

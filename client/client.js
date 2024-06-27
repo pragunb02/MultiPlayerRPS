@@ -1,12 +1,16 @@
 console.log("Running Rock Paper Scissors Script");
 
 const socket = io();
+
 let roomUniqueId;
 let isPlayer1 = false;
+let player1Name = "SAMPLE";
+let player2Name = "SAMPLE";
+let isPlayer1Turn = false;
 let playerName;
 
 function createGame() {
-  isPlayer1 = true;
+  isPlayer1Turn = true;
   playerName = document.getElementById("playerName").value;
   if (!playerName) {
     alert("Please enter your name");
@@ -23,6 +27,7 @@ function joinGame() {
     return;
   }
   socket.emit("joinRPSGame", { roomUniqueId, playerName });
+  requestRoomData(roomUniqueId);
 }
 
 socket.on("newRPSGame", (data) => {
@@ -45,21 +50,33 @@ socket.on("newRPSGame", (data) => {
   }
 });
 
+function requestRoomData(roomUniqueId) {
+  socket.emit("requestRPSRoomData", { roomUniqueId });
+}
+
 socket.on("playersConnectedRPS", (data) => {
+  requestRoomData(roomUniqueId);
   document.getElementById("initial").style.display = "none";
   document.getElementById("gamePlay").style.display = "block";
   document.getElementById("waitingArea").style.display = "none";
   document.getElementById("gameArea").style.display = "block";
+  if (isPlayer1Turn) {
+    document.getElementById("ch1").innerText = "You";
+    document.getElementById("ch2").innerText = "Opponent";
+  } else {
+    document.getElementById("ch1").innerText = "You";
+    document.getElementById("ch2").innerText = "Opponent";
+  }
 });
 
 socket.on("player1ChoiceRPS", (data) => {
-  if (!isPlayer1) {
+  if (!isPlayer1Turn) {
     displayOpponentChoice(data.choice);
   }
 });
 
 socket.on("player2ChoiceRPS", (data) => {
-  if (isPlayer1) {
+  if (isPlayer1Turn) {
     displayOpponentChoice(data.choice);
   }
 });
@@ -69,9 +86,9 @@ socket.on("rpsGameResult", (data) => {
   if (data.winner === "draw") {
     winnerMessage = "It's a draw";
   } else if (data.winner === "player1") {
-    winnerMessage = isPlayer1 ? "You Win" : "You Lose";
+    winnerMessage = isPlayer1Turn ? "You Win" : "You Lose";
   } else {
-    winnerMessage = isPlayer1 ? "You Lose" : "You Win";
+    winnerMessage = isPlayer1Turn ? "You Lose" : "You Win";
   }
   document.getElementById("winnerArea").innerText = winnerMessage;
   document.getElementById("initial").style.display = "none";
@@ -84,6 +101,17 @@ socket.on("rpsGameResult", (data) => {
   document.getElementById("player1Choice").style.display = "block";
 });
 
+socket.on("roomDataResponse", (data) => {
+  const { roomData } = data;
+  if (roomData) {
+    player1Name = roomData.player1Name;
+    player2Name = roomData.player2Name;
+    console.log("Room Data:", roomData);
+  } else {
+    console.error("Room data not found");
+  }
+});
+
 function roomCapapcity() {
   alert("Room is Full");
 }
@@ -92,7 +120,7 @@ socket.on("FullRPS", () => {
 });
 
 function sendChoice(choice) {
-  const choiceEvent = isPlayer1 ? "player1ChoiceRPS" : "player2ChoiceRPS";
+  const choiceEvent = isPlayer1Turn ? "player1ChoiceRPS" : "player2ChoiceRPS";
   socket.emit(choiceEvent, { choice: choice, roomUniqueId });
   displayPlayerChoice(choice);
 }

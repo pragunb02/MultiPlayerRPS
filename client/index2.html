@@ -26,7 +26,7 @@
             <div id="waitingArea"></div>
             <div id="gameArea" style="display: none">
                 <div class="playerSection">
-                    <h2>You:</h2>
+                    <h2 id="ch1">You:</h2>
                     <div id="player1Choice">
                         <button onclick="sendChoice('Rock')">Rock</button>
                         <button onclick="sendChoice('Paper')">Paper</button>
@@ -34,7 +34,7 @@
                     </div>
                 </div>
                 <div class="playerSection">
-                    <h2>Opponent:</h2>
+                    <h2 id="ch2">Opponent:</h2>
                     <div id="player2Choice">
                         <p id="opponentState">Waiting For Opponent....</p>
                     </div>
@@ -46,6 +46,7 @@
             </div>
         </div>
     </div>
+
     <script src="client.js"></script>
 </body>
 
