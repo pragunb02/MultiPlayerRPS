@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chess</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="style.css" />
+    <!-- <link rel="stylesheet" href="styles.css" /> -->
+</head>
+
+<body>
+    <div class="container" id="xyz">
+        <header>
+            <h1 id="mainTitle">Chess</h1>
+        </header>
+        <div id="initial" class="card">
+            <input type="text" id="playerName" placeholder="Enter your name" required />
+            <button onclick="createGame();">Create Game</button>
+            <p>or</p>
+            <input type="text" id="roomUniqueId" placeholder="Enter room code" required />
+            <button onclick="joinGame();">Join Game</button>
+        </div>
+
+        <div id="gamePlay" class="card" style="display: none">
+            <div id="waitingArea"></div>
+        </div>
+    </div>
+
+
+    <script src="chessJs.js"></script>
+</body>
+
+</html>
