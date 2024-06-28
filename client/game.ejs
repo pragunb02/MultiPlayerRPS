@@ -1,31 +1,39 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-    <title>Game Page</title>
-    <!-- Include any stylesheets or scripts as needed -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Chess Game</title>
+    <link rel="stylesheet" href="/public/css/chessboard-1.0.0.min.css">
+    <link rel="stylesheet" href="/public/css/custom.css">
     <script src="/public/js/jquery-3.7.0.min.js"></script>
-    <link rel="stylesheet" href="/public/css/chessboard-1.0.0.min.css" />
     <script src="/public/js/chessboard-1.0.0.min.js"></script>
     <script src="/public/js/chess-0.10.3.min.js"></script>
-
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-
     <script src="/socket.io/socket.io.js"></script>
-    <script>let socket = io();</script>
-</head>
-
-<body>
-
-    <label>Status:</label>
-    <div id="status"></div>
-    <div id="myBoard" style="width: 700px"></div>
-    <label>PGN:</label>
-    <div id="pgn"></div>
-
     <script>
+        let socket = io();
         let playerColor = '<%= color %>';
         console.log('Playing as ' + playerColor);
     </script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="timer">
+            <div id="timerWhite">5:00</div>
+            <h2>Timer</h2>
+            <div id="timerBlack">5:00</div>
+        </div>
+        <div id="myBoard" class="chessboard"></div>
+        <div class="status-pgn">
+            <label class="a">Status:</label>
+            <div id="status"></div>
+            <label class="b">PGN:</label>
+            <div class="pgns" id="pgn"></div>
+        </div>
+    </div>
+
     <script src="/public/js/index.js"></script>
 </body>
 

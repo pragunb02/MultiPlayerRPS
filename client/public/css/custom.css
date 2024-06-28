@@ -1,0 +1,141 @@
+body {
+  background-color: #2e2e2e;
+  color: #f0f0f0;
+  font-family: "Arial", sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+}
+.timer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timer h2 {
+  /* flex: 1; */
+  text-align: center;
+}
+
+#timerWhite {
+  position: relative;
+  top: -200px; /* Adjust the value as needed */
+}
+.status-pgn label.a,
+#status {
+  position: relative;
+  top: -170px; /* Adjust the value as needed */
+}
+
+.status-pgn label.b,
+#pgn {
+  position: relative;
+  top: -50px; /* Adjust the value as needed */
+}
+
+#timerBlack {
+  position: relative;
+  top: 200px; /* Adjust the value as needed */
+}
+
+.container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px;
+}
+
+.timer,
+.status-pgn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 15%;
+  box-sizing: border-box;
+  border-radius: 10px;
+}
+.timer {
+  margin-right: 50px;
+}
+.status-pgn {
+  margin-left: 50px;
+}
+
+.chessboard {
+  width: 70%; /* Adjust width percentage to fit your design */
+  max-width: 600px; /* Limit chessboard width for smaller screens */
+  height: auto; /* Ensures the chessboard scales proportionally */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+}
+.game-info {
+  text-align: left;
+  margin-top: 20px;
+  width: 100%;
+  max-width: 500px;
+  box-sizing: border-box;
+}
+
+.game-info {
+  text-align: left;
+  margin-top: 20px;
+  width: 100%;
+  max-width: 500px;
+  box-sizing: border-box;
+}
+
+label {
+  display: block;
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+.timer div,
+#status,
+#pgn {
+  background-color: #404040;
+  padding: 10px;
+  border-radius: 5px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  overflow-y: auto;
+  color: #fff;
+  text-align: center;
+}
+
+.timer div {
+  max-height: 40px;
+}
+
+#pgn {
+  height: 150px;
+}
+
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .chessboard,
+  .status-pgn,
+  .timer {
+    max-width: 90%;
+    width: 100%;
+  }
+
+  .timer,
+  .status-pgn {
+    margin-top: 10px;
+  }
+}
