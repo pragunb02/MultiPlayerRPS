@@ -44,8 +44,8 @@ io.on("connection", (socket) => {
   socket.on("createRPSGame", async (data) => {
     try {
       const roomUniqueId = generateRoomId(5);
-      rpsRooms[roomUniqueId] = { player1: data.playerName };
-      rpsRooms[roomUniqueId] = { capacity: true };
+      rpsRooms[roomUniqueId] = { player1: data.playerName, capacity: true };
+
       socket.join(roomUniqueId);
       socket.emit("newRPSGame", { roomUniqueId });
 
