@@ -258,7 +258,10 @@ io.on("connection", (socket) => {
   });
 
   // Create Chess Game
+  var isplayer12 = false;
   socket.on("createChessGame", async (data) => {
+    console.log("Hi");
+    isplayer12 = data.isPlayer1Turn;
     try {
       const roomUniqueId = generateRoomId(5);
       chessRooms[roomUniqueId] = {
@@ -266,6 +269,7 @@ io.on("connection", (socket) => {
         capacity: true,
         player1Color: "white",
         player2Color: "black",
+        roomUniqueId,
       };
       console.log("rooms");
       console.log(chessRooms[roomUniqueId]);
@@ -287,12 +291,15 @@ io.on("connection", (socket) => {
   // Join Chess Game
   socket.on("joinChessGame", async (data) => {
     console.log("Joining Button2");
+    console.log("data", data);
     try {
       const room = chessRooms[data.roomUniqueId];
       console.log(room);
       if (room) {
         if (room.capacity === true) {
           room.player2 = data.playerName;
+          console.log("roooooms");
+          console.log(room);
           socket.join(data.roomUniqueId);
           io.to(data.roomUniqueId).emit("playersConnectedChess");
           await ChessData.findOneAndUpdate(
@@ -313,19 +320,35 @@ io.on("connection", (socket) => {
 
   socket.on("move", function (move) {
     console.log("move detected");
+    console.log(move);
 
     io.to(currentCode).emit("newMove", move);
   });
 
+  // Socket.io event handler for 'notify'
+  socket.on("notify", (data) => {
+    console.log(data); // Ensure data is received correctly
+    const roomId = data.data; // Assuming 'roomUniqueId' is correctly sent from client
+    console.log(data.data);
+    console.log("Received roomUniqueId:", roomId);
+
+    // Emit 'notifyChess' event to the specified room
+    io.to(roomId).emit("notifyChess");
+
+    // Example: Broadcast to all clients in the room
+    // io.in(roomId).emit("notifyChess");
+  });
+
   socket.on("joinGame", function (data) {
+    const roomId = data.code;
     currentCode = data.code;
-    socket.join(currentCode);
+    socket.join(roomId);
     if (!chessRooms[currentCode]) {
       chessRooms[currentCode] = true;
       return;
     }
-
-    io.to(currentCode).emit("startGame");
+    // io.to(roomId).emit("notify");
+    io.to(roomId).emit("startGame", { isplayer12 });
   });
 });
 

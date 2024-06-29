@@ -1,7 +1,7 @@
 $(document).ready(function () {
   var gameHasStarted = false;
   var board = null;
-  var game = new Chess();
+  var game = new Chess(); // To use Chess.js, you typically create a new instance of the Chess class
   var $status = $("#status");
   var $pgn = $("#pgn");
   var gameOver = false;
@@ -144,15 +144,38 @@ $(document).ready(function () {
   updateStatus();
 
   var urlParams = new URLSearchParams(window.location.search);
+  const roomuniqueID = urlParams.get("code");
   if (urlParams.get("code")) {
     socket.emit("joinGame", {
       code: urlParams.get("code"),
     });
   }
+  var isplayer12 = true;
+  if (isplayer12 === true) {
+    socket.on("notifyChess", () => {
+      console.log("Heyyyyyyyyyyyyyy");
+      if (isplayer12 === true) {
+        alert("Game starting, timer will also get started.");
 
-  socket.on("startGame", function () {
+        // // Automatically dismiss the alert after 3 seconds
+        setTimeout(() => {
+          // Code to dismiss the alert if necessary (not always needed)
+          // alert.close(); // This would be ideal, but alerts don't have a close method
+        }, 3000);
+      }
+      isplayer12 = false;
+    });
+  }
+
+  console.log(roomuniqueID);
+  socket.on("startGame", (isplayer12) => {
+    isplayer12 = isplayer12.isplayer12;
+    // io.to(roomuniqueID).emit("Notifiy");
+    console.log("heoolo");
+
     gameHasStarted = true;
     updateStatus();
+    socket.emit("notify", { data: roomuniqueID });
     startTimer();
   });
 

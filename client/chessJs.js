@@ -238,7 +238,7 @@ socket.on("playersConnectingChess", (data) => {
 });
 
 socket.on("playersConnectedChess", (data) => {
-  console.log("Hello");
+  console.log("Hell0000000000000000000000o");
   if (isPlayer1) {
     window.location.replace("/white?code=" + roomUniqueId);
   } else {
@@ -254,7 +254,7 @@ function createGame() {
     alert("Please enter your name");
     return;
   }
-  socket.emit("createChessGame", { playerName });
+  socket.emit("createChessGame", { playerName, isPlayer1Turn });
 }
 
 function joinGame() {
