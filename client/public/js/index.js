@@ -41,8 +41,10 @@ $(document).ready(function () {
     var seconds = seconds % 60;
     return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
   }
-
+   // inbuilt
   function onDragStart(source, piece, position, orientation) {
+    console.log("hellooooooooooooooooooooooooooooo");
+    console.log(piece);
     if (game.game_over() || !gameHasStarted || gameOver) return false;
 
     if (
@@ -122,7 +124,15 @@ $(document).ready(function () {
 
     console.log("Setting status: " + status);
     $status.html(status);
+    // console.log("yo", game.pgn());
     $pgn.html(game.pgn());
+    // Get the PGN string
+    var pgn = game.pgn();
+    // Split the PGN moves into an array
+    var moves = pgn.split(/\d+\./); /////  extra tell them
+    // Get the last move (trimming spaces)
+    var lastMove = moves[moves.length - 1].trim();
+    console.log("lastmove", lastMove);
   }
 
   var config = {
@@ -135,9 +145,12 @@ $(document).ready(function () {
     responsive: true, // Make the chessboard responsive
   };
 
+  // borad is of chessboard.js
+  // game is of chess.js
   board = Chessboard("myBoard", config);
 
   if (playerColor == "black") {
+    // count ??
     board.flip();
   }
 
