@@ -310,6 +310,10 @@ io.on("connection", (socket) => {
         } else {
           socket.emit("FullChess");
         }
+      } else {
+         // WILL MAkE SOCKET For alert
+
+        console.log("MUHHH");
       }
     } catch (error) {
       console.error("Error joining Tic Tac Toe game:", error);
