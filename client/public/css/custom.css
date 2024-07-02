@@ -10,6 +10,7 @@ body {
   height: 100vh;
   overflow: hidden;
 }
+
 .timer {
   display: flex;
   justify-content: space-between;
@@ -25,6 +26,7 @@ body {
   position: relative;
   top: -200px; /* Adjust the value as needed */
 }
+
 .status-pgn label.a,
 #status {
   position: relative;
@@ -64,9 +66,11 @@ body {
   box-sizing: border-box;
   border-radius: 10px;
 }
+
 .timer {
   margin-right: 50px;
 }
+
 .status-pgn {
   margin-left: 50px;
 }
@@ -78,13 +82,6 @@ body {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   border-radius: 10px;
 }
-.game-info {
-  text-align: left;
-  margin-top: 20px;
-  width: 100%;
-  max-width: 500px;
-  box-sizing: border-box;
-}
 
 .game-info {
   text-align: left;
@@ -94,7 +91,7 @@ body {
   box-sizing: border-box;
 }
 
-label {
+.label {
   display: block;
   font-weight: bold;
   margin: 5px 0;
@@ -120,6 +117,42 @@ label {
 
 #pgn {
   height: 150px;
+}
+
+.notation-navbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  top: -50px; /* Adjust this value to move upwards */
+}
+
+.notation-controls {
+  cursor: pointer;
+  font-size: 24px;
+  color: #fff;
+  margin: 0 10px;
+  padding: 10px;
+  background-color: #444;
+  border: 1px solid #555;
+  border-radius: 4px;
+}
+
+.notation-controls:hover {
+  background-color: #555;
+}
+
+.btn-dark {
+  color: #fff;
+  background-color: #343a40;
+  border: none;
+  padding: 10px 20px;
+  margin: 0 10px;
+  border-radius: 4px;
+}
+
+.btn-dark:hover {
+  background-color: #23272b;
 }
 
 @media (max-width: 768px) {

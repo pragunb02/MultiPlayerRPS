@@ -1,3 +1,6 @@
+let timer = 1;
+let moveObj = {};
+
 document.addEventListener("DOMContentLoaded", function () {
   let gameHasStarted = false;
   let board = null;
@@ -24,6 +27,10 @@ document.addEventListener("DOMContentLoaded", function () {
   if (roomuniqueID) {
     socket.emit("joinGame", { code: roomuniqueID });
   }
+
+  // let timer = 1;
+  if (playerColor == "Black") timer = 2;
+  moveObj = {};
 
   function startTimer() {
     console.log("func");
@@ -119,11 +126,22 @@ document.addEventListener("DOMContentLoaded", function () {
     };
     const move = game.move(theMove);
     if (move === null) return "snapback";
-    socket.emit("move", theMove);
-    console.log(theMove);
+    moveObj[timer] = theMove;
+    timer++;
+    // console.log("object");
+    // console.log(moveObj);
+    const data = { theMove, timer, moveObj };
+    socket.emit("move", data);
+    // console.log(theMove);
+    // console.log(timer);
+    // console.log("objec2t");
+    // console.log(moveObj);
   }
 
-  socket.on("newMove", function (move) {
+  socket.on("newMove", function (data) {
+    const move = data.theMove;
+    timer = data.timer;
+    moveObj = data.moveObj;
     game.move(move);
     board.position(game.fen());
     updateStatus();

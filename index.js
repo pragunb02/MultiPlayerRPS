@@ -320,11 +320,14 @@ io.on("connection", (socket) => {
 
   let currentCode = null;
 
-  socket.on("move", function (move) {
+  socket.on("move", function (data) {
+    const move = data.theMove;
+    const timer = data.timer;
+    const moveObj = data.moveObj;
     console.log("move detected");
-    console.log(move);
+    console.log(data);
 
-    io.to(currentCode).emit("newMove", move);
+    io.to(currentCode).emit("newMove", data);
   });
   socket.on("joinGame", function (data) {
     const roomId = data.code;
