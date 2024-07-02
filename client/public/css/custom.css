@@ -10,21 +10,10 @@ body {
   height: 100vh;
   overflow: hidden;
 }
-
-.timer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.timer h2 {
-  /* flex: 1; */
-  text-align: center;
-}
-
 #timerWhite {
   position: relative;
-  top: -200px; /* Adjust the value as needed */
+  top: -287px; /* Adjust the value as needed */
+  margin-left: 1400px;
 }
 
 .status-pgn label.a,
@@ -41,14 +30,15 @@ body {
 
 #timerBlack {
   position: relative;
-  top: 200px; /* Adjust the value as needed */
+  top: 250px;
+  margin-left: 1400px;
 }
 
 .container {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: center;
+  justify-content: left;
   height: 100%;
   width: 100%;
   box-sizing: border-box;
@@ -81,6 +71,33 @@ body {
   height: auto; /* Ensures the chessboard scales proportionally */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   border-radius: 10px;
+}
+#nameWhite {
+  position: relative;
+  top: -234px; /* Adjust the value as needed */
+  margin-left: 440px;
+  background-color: #404040;
+  padding: 10px;
+  border-radius: 5px;
+  width: 50%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  color: #fff;
+  text-align: center;
+}
+
+#nameBlack {
+  position: relative;
+  top: 297px; /* Adjust the value as needed */
+  margin-left: 440px;
+  background-color: #404040;
+  padding: 10px;
+  border-radius: 5px;
+  width: 50%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  color: #fff;
+  text-align: center;
 }
 
 .game-info {
