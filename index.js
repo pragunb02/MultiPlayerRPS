@@ -311,9 +311,7 @@ io.on("connection", (socket) => {
           socket.emit("FullChess");
         }
       } else {
-         // WILL MAkE SOCKET For alert
-
-        console.log("MUHHH");
+        // WILL MAkE SOCKET For alert
       }
     } catch (error) {
       console.error("Error joining Tic Tac Toe game:", error);
@@ -328,21 +326,6 @@ io.on("connection", (socket) => {
 
     io.to(currentCode).emit("newMove", move);
   });
-
-  // Socket.io event handler for 'notify'
-  socket.on("notify", (data) => {
-    console.log(data); // Ensure data is received correctly
-    const roomId = data.data; // Assuming 'roomUniqueId' is correctly sent from client
-    console.log(data.data);
-    console.log("Received roomUniqueId:", roomId);
-
-    // Emit 'notifyChess' event to the specified room
-    io.to(roomId).emit("notifyChess");
-
-    // Example: Broadcast to all clients in the room
-    // io.in(roomId).emit("notifyChess");
-  });
-
   socket.on("joinGame", function (data) {
     const roomId = data.code;
     currentCode = data.code;
@@ -351,8 +334,7 @@ io.on("connection", (socket) => {
       chessRooms[currentCode] = true;
       return;
     }
-    // io.to(roomId).emit("notify");
-    io.to(roomId).emit("startGame", { isplayer12 });
+    socket.emit("startGame");
   });
 });
 

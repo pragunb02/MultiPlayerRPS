@@ -1,52 +1,101 @@
-$(document).ready(function () {
-  var gameHasStarted = false;
-  var board = null;
-  var game = new Chess(); // To use Chess.js, you typically create a new instance of the Chess class
-  var $status = $("#status");
-  var $pgn = $("#pgn");
-  var gameOver = false;
-  var timerWhite, timerBlack;
-  var initialTime = 300; // 5 minutes for each player
-  var timeRemainingWhite = initialTime;
-  var timeRemainingBlack = initialTime;
+document.addEventListener("DOMContentLoaded", function () {
+  let gameHasStarted = false;
+  let board = null;
+  const game = new Chess(); // To use Chess.js, create a new instance of the Chess class
+  console.log(game.fen());
+  const statusElement = document.getElementById("status");
+  const pgnElement = document.getElementById("pgn");
+  let gameOver = false;
+  let timerWhite, timerBlack;
+  const initialTime = 300; // 5 minutes for each player
+  let timeRemainingWhite = initialTime;
+  let timeRemainingBlack = initialTime;
+
+  let playerColor = "";
+  const urlParams = new URLSearchParams(window.location.search);
+  const pathName = window.location.pathname;
+  if (pathName.includes("black")) {
+    playerColor = "black";
+  } else {
+    playerColor = "white";
+  }
+
+  const roomuniqueID = urlParams.get("code");
+  if (roomuniqueID) {
+    socket.emit("joinGame", { code: roomuniqueID });
+  }
 
   function startTimer() {
-    if (game.turn() === "w") {
-      clearInterval(timerBlack);
-      timerWhite = setInterval(function () {
-        timeRemainingWhite--;
-        $("#timerWhite").text(formatTime(timeRemainingWhite));
-        if (timeRemainingWhite <= 0) {
-          clearInterval(timerWhite);
-          gameOver = true;
-          updateStatus("Time out, Black wins!");
-        }
-      }, 1000);
+    console.log("func");
+    console.log(game.turn());
+    if (playerColor == "black") {
+      if (game.turn() === "w") {
+        clearInterval(timerBlack);
+        timerWhite = setInterval(function () {
+          timeRemainingWhite--;
+          document.getElementById("timerWhite").textContent =
+            formatTime(timeRemainingWhite);
+          if (timeRemainingWhite <= 0) {
+            clearInterval(timerWhite);
+            clearInterval(timerBlack);
+            gameOver = true;
+            updateStatus("Time out, Black wins!");
+          }
+        }, 1000);
+      } else {
+        clearInterval(timerWhite);
+        timerBlack = setInterval(function () {
+          timeRemainingBlack--;
+          document.getElementById("timerBlack").textContent =
+            formatTime(timeRemainingBlack);
+          if (timeRemainingBlack <= 0) {
+            clearInterval(timerBlack);
+            clearInterval(timerWhite);
+            gameOver = true;
+            updateStatus("Time out, White wins!");
+          }
+        }, 1000);
+      }
     } else {
-      clearInterval(timerWhite);
-      timerBlack = setInterval(function () {
-        timeRemainingBlack--;
-        $("#timerBlack").text(formatTime(timeRemainingBlack));
-        if (timeRemainingBlack <= 0) {
-          clearInterval(timerBlack);
-          gameOver = true;
-          updateStatus("Time out, White wins!");
-        }
-      }, 1000);
+      if (game.turn() === "w") {
+        clearInterval(timerBlack);
+        timerWhite = setInterval(function () {
+          timeRemainingWhite--;
+          document.getElementById("timerBlack").textContent =
+            formatTime(timeRemainingWhite);
+          if (timeRemainingWhite <= 0) {
+            clearInterval(timerWhite);
+            clearInterval(timerBlack);
+            gameOver = true;
+            updateStatus("Time out, Black wins!");
+          }
+        }, 1000);
+      } else {
+        clearInterval(timerWhite);
+        timerBlack = setInterval(function () {
+          timeRemainingBlack--;
+          document.getElementById("timerWhite").textContent =
+            formatTime(timeRemainingBlack);
+          if (timeRemainingBlack <= 0) {
+            clearInterval(timerBlack);
+            clearInterval(timerWhite);
+            gameOver = true;
+            updateStatus("Time out, White wins!");
+          }
+        }, 1000);
+      }
     }
   }
 
   function formatTime(seconds) {
-    var minutes = Math.floor(seconds / 60);
-    var seconds = seconds % 60;
-    return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds < 10 ? "0" : ""}${remainingSeconds}`;
   }
-   // inbuilt
+  // inbuilt
   function onDragStart(source, piece, position, orientation) {
-    console.log("hellooooooooooooooooooooooooooooo");
-    console.log(piece);
     if (game.game_over() || !gameHasStarted || gameOver) return false;
-
+    const playerColor = game.turn() === "w" ? "white" : "black";
     if (
       (playerColor === "black" && piece.search(/^w/) !== -1) ||
       (playerColor === "white" && piece.search(/^b/) !== -1)
@@ -63,19 +112,15 @@ $(document).ready(function () {
   }
 
   function onDrop(source, target) {
-    var theMove = {
+    const theMove = {
       from: source,
       to: target,
       promotion: "q", // always promote to a queen for simplicity
     };
-
-    var move = game.move(theMove);
-
+    const move = game.move(theMove);
     if (move === null) return "snapback";
-
     socket.emit("move", theMove);
-    updateStatus();
-    startTimer();
+    console.log(theMove);
   }
 
   socket.on("newMove", function (move) {
@@ -90,106 +135,71 @@ $(document).ready(function () {
   }
 
   function updateStatus(customStatus) {
-    var status = customStatus || "";
-
-    var moveColor = "White";
-    if (game.turn() === "b") {
-      moveColor = "Black";
-    }
-
+    let status = customStatus || "";
+    const moveColor = game.turn() === "w" ? "White" : "Black";
     if (game.in_checkmate()) {
-      status = "Game over, " + moveColor + " is in checkmate.";
+      status = `Game over, ${moveColor} is in checkmate.`;
       gameOver = true;
       clearInterval(timerWhite);
       clearInterval(timerBlack);
-      console.log("Checkmate detected: " + status);
+      console.log(`Checkmate detected: ${status}`);
     } else if (game.in_draw()) {
       status = "Game over, drawn position";
       gameOver = true;
       clearInterval(timerWhite);
       clearInterval(timerBlack);
-      console.log("Draw detected: " + status);
+      console.log(`Draw detected: ${status}`);
     } else if (gameOver) {
-      console.log("Game over detected: " + status);
+      console.log(`Game over detected: ${status}`);
     } else if (!gameHasStarted) {
       status = "Waiting for black to join";
-      console.log("Waiting for game to start: " + status);
+      console.log(`Waiting for game to start: ${status}`);
     } else {
-      status = moveColor + " to move";
+      status = `${moveColor} to move`;
       if (game.in_check()) {
-        status += ", " + moveColor + " is in check";
-        console.log("Check detected: " + status);
+        status += `, ${moveColor} is in check`;
+        console.log(`Check detected: ${status}`);
       }
     }
-
-    console.log("Setting status: " + status);
-    $status.html(status);
-    // console.log("yo", game.pgn());
-    $pgn.html(game.pgn());
-    // Get the PGN string
-    var pgn = game.pgn();
-    // Split the PGN moves into an array
-    var moves = pgn.split(/\d+\./); /////  extra tell them
-    // Get the last move (trimming spaces)
-    var lastMove = moves[moves.length - 1].trim();
+    console.log(`Setting status: ${status}`);
+    statusElement.textContent = status;
+    pgnElement.textContent = game.pgn();
+    const pgn = game.pgn();
+    const moves = pgn.split(/\d+\./);
+    const lastMove = moves[moves.length - 1].trim();
     console.log("lastmove", lastMove);
   }
 
-  var config = {
+  const config = {
     draggable: true,
     position: "start",
     onDragStart: onDragStart,
     onDrop: onDrop,
     onSnapEnd: onSnapEnd,
     pieceTheme: "/public/img/chesspieces/wikipedia/{piece}.png",
-    responsive: true, // Make the chessboard responsive
+    responsive: true,
   };
 
   // borad is of chessboard.js
   // game is of chess.js
-  board = Chessboard("myBoard", config);
 
-  if (playerColor == "black") {
-    // count ??
+  board = Chessboard("myBoard", config);
+  if (playerColor === "black") {
     board.flip();
+
+    timeRemainingBlack = timeRemainingBlack ^ timeRemainingWhite;
+    timeRemainingWhite = timeRemainingBlack ^ timeRemainingWhite;
+    timeRemainingBlack = timeRemainingBlack ^ timeRemainingWhite;
   }
 
+  console.log("Open to all");
   updateStatus();
 
-  var urlParams = new URLSearchParams(window.location.search);
-  const roomuniqueID = urlParams.get("code");
-  if (urlParams.get("code")) {
-    socket.emit("joinGame", {
-      code: urlParams.get("code"),
-    });
-  }
-  var isplayer12 = true;
-  if (isplayer12 === true) {
-    socket.on("notifyChess", () => {
-      console.log("Heyyyyyyyyyyyyyy");
-      if (isplayer12 === true) {
-        alert("Game starting, timer will also get started.");
-
-        // // Automatically dismiss the alert after 3 seconds
-        setTimeout(() => {
-          // Code to dismiss the alert if necessary (not always needed)
-          // alert.close(); // This would be ideal, but alerts don't have a close method
-        }, 3000);
-      }
-      isplayer12 = false;
-    });
-  }
-
   console.log(roomuniqueID);
-  socket.on("startGame", (isplayer12) => {
-    isplayer12 = isplayer12.isplayer12;
-    // io.to(roomuniqueID).emit("Notifiy");
-    console.log("heoolo");
-
+  socket.on("startGame", () => {
     gameHasStarted = true;
+    alert("Game starting, timer will also get started.");
     updateStatus();
-    socket.emit("notify", { data: roomuniqueID });
-    startTimer();
   });
 
   socket.on("gameOverDisconnect", function () {
@@ -197,11 +207,12 @@ $(document).ready(function () {
     updateStatus("Opponent disconnected, you win!");
   });
 
-  $(window).resize(function () {
+  window.addEventListener("resize", function () {
     board.resize();
   });
 
-  // Initialize timers display
-  $("#timerWhite").text(formatTime(timeRemainingWhite));
-  $("#timerBlack").text(formatTime(timeRemainingBlack));
+  document.getElementById("timerWhite").textContent =
+    formatTime(timeRemainingWhite);
+  document.getElementById("timerBlack").textContent =
+    formatTime(timeRemainingBlack);
 });
