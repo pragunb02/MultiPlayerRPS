@@ -102,7 +102,6 @@ document.addEventListener("DOMContentLoaded", function () {
   // inbuilt
   function onDragStart(source, piece, position, orientation) {
     if (game.game_over() || !gameHasStarted || gameOver) return false;
-    const playerColor = game.turn() === "w" ? "white" : "black";
     if (
       (playerColor === "black" && piece.search(/^w/) !== -1) ||
       (playerColor === "white" && piece.search(/^b/) !== -1)

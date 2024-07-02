@@ -97,13 +97,24 @@ body {
   margin: 5px 0;
 }
 
-.timer div,
+/* .timer div, */
 #status,
 #pgn {
   background-color: #404040;
   padding: 10px;
   border-radius: 5px;
-  width: 100%;
+  width: 120%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  overflow-y: auto;
+  color: #fff;
+  text-align: center;
+}
+.timer div {
+  background-color: #404040;
+  padding: 10px;
+  border-radius: 5px;
+  width: 50%;
   box-sizing: border-box;
   margin-bottom: 10px;
   overflow-y: auto;
@@ -149,6 +160,8 @@ body {
   padding: 10px 20px;
   margin: 0 10px;
   border-radius: 4px;
+  width: 150px;
+  height: 50px;
 }
 
 .btn-dark:hover {

@@ -11,6 +11,8 @@
     <script src="/public/js/chessboard-1.0.0.min.js"></script>
     <script src="/public/js/chess-0.10.3.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
     <script>
         let socket = io();
         let playerColor = '<%= color %>';
@@ -34,11 +36,11 @@
             <!-- Navigation Buttons Section -->
             <div class="notation-navbar">
                 <div id="click-left" class="notation-controls">
-                    <i class="fas fa-chevron-left"></i>
+                    <i class="fa fa-chevron-left"></i>
                 </div>
                 <button id="reset-board" class="btn btn-dark">Reset</button>
                 <div id="click-right" class="notation-controls">
-                    <i class="fas fa-chevron-right"></i>
+                    <i class="fa fa-chevron-right"></i>
                 </div>
             </div>
         </div>
