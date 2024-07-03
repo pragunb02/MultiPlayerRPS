@@ -33,6 +33,9 @@ body {
   top: 250px;
   margin-left: 1400px;
 }
+#white-moves {
+  margin-left: 10px;
+}
 
 .container {
   display: flex;
@@ -115,6 +118,53 @@ body {
 }
 
 /* .timer div, */
+#pgn {
+  /* margin: auto;
+  width: 90%;
+  height: 135px;
+  overflow-x: hidden; */
+  /* overflow-y: auto; */
+  border: 1px solid grey;
+  border-radius: 7px;
+  /* height: 50% !important; */
+  /* width: 100% !important;  */
+  overflow-x: hidden;
+  width: 90%;
+}
+.row {
+  display: flex;
+}
+.font-weight-bold {
+  font-weight: bold;
+}
+.fadein {
+  animation: fadein 1s;
+}
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.col {
+  margin-right: 20px; /* Adjust the space between the two lists */
+  list-style-type: none; /* Remove default list styling */
+}
+
+.col li {
+  margin-bottom: 10px; /* Adjust the space between the items in each list */
+}
+
+#white-moves,
+#black-moves {
+  display: block; /* Make sure the lists are displayed */
+  width: auto; /* Adjust width as needed */
+  height: auto; /* Adjust height as needed */
+}
+
 #status,
 #pgn {
   background-color: #404040;
@@ -126,6 +176,10 @@ body {
   overflow-y: auto;
   color: #fff;
   text-align: center;
+  /* border: 1px solid grey;
+  border-radius: 7px;
+  height: 50% !important;
+  width: 100% !important; */
 }
 .timer div {
   background-color: #404040;
