@@ -14,7 +14,7 @@ const GameSchema = new mongoose.Schema({
     default: null,
   },
   winner: {
-    type: [String], // Changed to an array of strings
+    type: [String], //array of strings
     default: [], // Default empty array
   },
   createdAt: {
