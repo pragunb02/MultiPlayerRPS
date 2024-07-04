@@ -1,89 +1,260 @@
-body {
-  font-family: Arial, sans-serif;
-  background-color: #f0f0f0;
-  color: #333;
+/* Reset and base styles */
+* {
   margin: 0;
   padding: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  text-align: center;
-}
-
-.container {
-  max-width: 800px;
-  width: 100%;
-  padding: 20px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  background-color: #fff;
-  border-radius: 10px;
-}
-
-header {
-  background-color: #4caf50;
-  color: white;
-  padding: 20px;
-  border-radius: 10px 10px 0 0;
-}
-
-h1 {
-  margin: 0;
-  font-size: 2.5em;
-}
-
-.card {
-  padding: 20px;
-  background: #ffffff;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
-  margin-top: 20px;
-}
-
-input[type="text"] {
-  padding: 10px;
-  font-size: 1em;
-  border: 2px solid #ccc;
-  border-radius: 5px;
-  margin: 10px 0;
-  width: calc(100% - 24px);
   box-sizing: border-box;
 }
 
-button {
-  width: 200px; /* Set a fixed width */
-  height: 50px; /* Set a fixed height */
-  padding: 10px 20px;
-  margin: 10px 0;
-  font-size: 16px; /* Set font size */
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #1a1a1a; /* Dark background */
+  color: #fff; /* Light text */
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.container,
+.exp {
+  max-width: 1200px;
+  width: 90%;
+  margin: 0 auto;
+  padding: 20px;
+  text-align: center;
+}
+
+.header {
+  background-color: #333; /* Dark header background */
+  padding: 20px 0;
+  text-align: center;
+  border-bottom: 2px solid #4caf50; /* Green border */
+}
+
+.header h1 {
+  font-size: 2.5em;
+  margin-bottom: 10px;
+  color: #fff;
+}
+
+.navbar {
+  background-color: #333; /* Dark background */
+  padding: 10px 0;
+  text-align: center;
+}
+
+.navbar ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.navbar ul li {
+  display: inline-block;
+  margin-right: 20px;
+}
+
+.navbar ul li a {
+  text-decoration: none;
+  color: #fff;
+  font-size: 1.2em;
+  transition: color 0.3s ease;
+}
+
+.navbar ul li a:hover {
+  color: #4caf50; /* Green hover color */
+}
+
+.carousel-container {
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+}
+
+.carousel-track {
+  display: flex;
+  transition: transform 0.5s ease;
+}
+
+.game-card {
+  min-width: 30%; /* Adjust to fit three cards in the container */
+  margin-right: 20px; /* Space between cards */
+  /* background-color: rgba(51, 51, 51, 0.9); Semi-transparent background */
+  background-color: #372549;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.game-card:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+}
+
+.game-card a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.game-img {
+  height: 150px;
+  overflow: hidden;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.game-img img {
+  width: 100%;
+  height: auto;
+  transition: transform 0.3s ease;
+}
+
+.game-img img:hover {
+  transform: scale(1.1);
+}
+
+.game-title {
+  font-size: 1.5em;
+  text-align: center;
+  text-shadow: 1px 1px 2px #000;
+  color: #e1e5f2;
+}
+
+.carousel-controls {
+  position: absolute;
+  top: 50%;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.carousel-button {
+  background-color: rgba(0, 0, 0, 0.5);
   border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  background-color: #4caf50;
   color: white;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 1.5em;
+  pointer-events: all;
   transition: background-color 0.3s ease;
 }
-
-button:hover {
-  background-color: #0bf217;
+.carousel-button:hover {
+  background-color: #754966;
+}
+.game-icon {
+  font-size: 1.5em; /* Adjust icon size as needed */
+  margin-bottom: 10px;
+  text-align: center;
 }
 
-#gameArea {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 20px;
+.game-icon i {
+  color: whitesmoke; /* Icon color */
 }
 
-.playerSection {
-  width: 45%;
+.carousel-button i {
+  color: white; /* Icon color */
+  /* position: absolute; Position the icon absolutely */
+  /* left: 10px; Adjust as needed */
+  /* top: 50%; Center vertically */
+  /* transform: translateY(-50%); Center vertically */
 }
-
-hr {
-  margin: 20px 0;
-}
-
-#winnerArea {
+#nextBtn {
+  background-color: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  padding: 10px;
+  cursor: pointer;
   font-size: 1.5em;
-  color: #ff4500;
-  margin-top: 20px;
+  pointer-events: all;
+  position: absolute;
+  right: 27px; /* Adjust the right spacing */
+  /* top: 50%;
+  transform: translateY(-50%); */
+  transition: background-color 0.3s ease;
+}
+#nextBtn:hover {
+  background-color: #754966;
+}
+
+.footer {
+  background-color: #333; /* Dark footer background */
+  color: #fff;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.social-icons {
+  list-style-type: none;
+  padding: 0;
+  margin-top: 10px;
+}
+
+.social-icons li {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.social-icons li a img {
+  width: 40px; /* Adjust icon size */
+  height: auto;
+}
+
+.announcement {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #ffee32;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  animation: blink-animation 2s infinite alternate; /* Adjusted animation duration */
+}
+
+@keyframes blink-animation {
+  0% {
+    opacity: 1.5;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+.announcement-content {
+  text-align: center;
+}
+
+.announcement h2 {
+  font-size: 2em;
+  margin-bottom: 10px;
+}
+
+.announcement p {
+  font-size: 1.2em;
+}
+
+/* Example of dark mode styling */
+.social-icons {
+  list-style-type: none;
+  padding: 0;
+  margin-top: 10px;
+}
+
+.social-icons li {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.social-icons li a {
+  text-decoration: none;
+  color: #fff; /* White color for dark mode */
+  font-size: 1.2em;
+  transition: color 0.3s ease;
+}
+
+.social-icons li a:hover {
+  color: #4caf50; /* Green hover color */
 }

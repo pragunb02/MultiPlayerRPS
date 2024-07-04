@@ -2,26 +2,111 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gaming Arena</title>
-    <link rel="stylesheet" href="style.css" />
+    <!-- Link to Font Awesome CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <div class="container">
-        <header>
-            <h1>Gaming Arena</h1>
-        </header>
-        <div id="initial" class="card">
-            <a href="index2.html"> <button>Rock Paper Scissor</button></a>
-            <p>or</p>
-            <a href="index3.html"> <button>Tic Tac Toe</button></a>
-            <p>or</p>
-            <a href="index4.html"><button>Chess</button></a>
+    <header class="header">
+        <div class="container">
+            <h1>Welcome to the Gaming Arena</h1>
+            <div class="announcement-content">
+                <h2 class="blink">Trending Game Live Now!</h2>
+            </div>
+        </div>
+    </header>
+
+    <div class="container carousel-container">
+        <div class="carousel-track">
+            <div id="rockpaperscissors" class="game-card">
+                <a href="index2.html">
+                    <div class="game-img"><img src="5241629.jpg" alt="Rock Paper Scissors"></div>
+                    <div class="game-icon"><i class="fas fa-gamepad"></i></div> <!-- Font Awesome icon -->
+                    <div class="game-title">Rock Paper Scissors</div>
+                </a>
+            </div>
+            <div id="tictactoe" class="game-card">
+                <a href="index3.html">
+                    <div class="game-img"><img src="5241629.jpg" alt="Tic Tac Toe"></div>
+                    <div class="game-icon"><i class="fas fa-hand-peace"></i></div> <!-- Font Awesome icon -->
+                    <div class="game-title">Tic Tac Toe</div>
+                </a>
+            </div>
+            <div id="chess" class="game-card">
+                <a href="index4.html">
+                    <div class="game-img"><img src="5241629.jpg" alt="Chess"></div>
+                    <div class="game-icon"><i class="fas fa-chess"></i></div> <!-- Font Awesome icon -->
+                    <div class="game-title">Chess</div>
+                </a>
+            </div>
+            <div id="coming-soon" class="game-card coming-soon">
+                <div class="game-img">
+                    <img src="5241629.jpg" alt="Coming Soon">
+                </div>
+                <div class="game-icon"><i class="fas fa-hourglass-half"></i></div> <!-- Font Awesome icon -->
+                <div class="game-title">More Games Coming Soon!</div>
+            </div>
+        </div>
+        <div class="carousel-controls">
+            <!-- Font Awesome icons for carousel navigation -->
+            <button class="carousel-button" id="prevBtn"><i class="fas fa-chevron-left"></i></button>
+            <button class="carousel-button" id="nextBtn"><i class="fas fa-chevron-right"></i></button>
         </div>
     </div>
-    </div>
+
+    <section class="announcement coming-soon">
+        <div class="announcement-content">
+            <h2 class="blink">Coming Soon!</h2>
+            <p>Exciting new games arriving soon.</p>
+        </div>
+    </section>
+    <h2 class="exp">Experience the Action Live with Your Friends!</h2>
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Gaming Arena. All rights reserved.</p>
+            <ul class="social-icons">
+                <li><a href="#"><i class="fab fa-facebook"></i></a></li>
+                <li><a href="#"><i class="fab fa-twitter"></i></a></li>
+                <li><a href="#"><i class="fab fa-instagram"></i></a></li>
+            </ul>
+        </div>
+    </footer>
+
+    <script>
+        const track = document.querySelector('.carousel-track');
+        const prevButton = document.getElementById('prevBtn');
+        const nextButton = document.getElementById('nextBtn');
+
+        const cardCount = track.children.length;
+        const cardWidth = track.children[0].offsetWidth + 20; // Width of game card + margin
+        let currentIndex = 1;
+
+        function updateTrackPosition() {
+            track.style.transform = `translateX(-${(currentIndex) * cardWidth}px)`;
+        }
+
+        nextButton.addEventListener('click', () => {
+            currentIndex = (currentIndex + 1) % cardCount;
+            updateTrackPosition();
+        });
+
+        prevButton.addEventListener('click', () => {
+            currentIndex = (currentIndex - 1 + cardCount) % cardCount;
+            updateTrackPosition();
+        });
+
+        // Clone the first and last cards to create an infinite loop effect
+        const firstCardClone = track.children[0].cloneNode(true);
+        const lastCardClone = track.children[cardCount - 1].cloneNode(true);
+        track.appendChild(firstCardClone);
+        track.insertBefore(lastCardClone, track.children[0]);
+
+        updateTrackPosition();
+    </script>
 </body>
 
 </html>
