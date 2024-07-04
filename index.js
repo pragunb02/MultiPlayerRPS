@@ -20,17 +20,42 @@ const chessRooms = {};
 
 // Connect to MongoDB
 connectDB();
-
-// Set EJS as the view engine
 app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "client")); // Assuming your views are in a 'views' folder
-
+app.set("views", path.join(__dirname, "client"));
 app.use(express.static(path.join(__dirname, "client")));
 
-app.use("/public", express.static(path.join(__dirname, "front", "public")));
-
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "client", "index.html"));
+  res.render("index", {
+    title: "Gaming Arena",
+    user: { name: "John Doe", isLoggedIn: true },
+    showDropdown: false,
+    games: [
+      {
+        id: "rockpaperscissors",
+        title: "Rock Paper Scissors",
+        link: "index2.html",
+        image: "5241629.jpg",
+        icon: "fas fa-hand-peace",
+        iconImage: "", // No local image, using Font Awesome icon
+      },
+      {
+        id: "tictactoe",
+        title: "Tic Tac Toe",
+        link: "index3.html",
+        image: "5241629.jpg",
+        icon: "", // No Font Awesome icon
+        iconImage: "strategic-plan.png", // Local image for icon
+      },
+      {
+        id: "chess",
+        title: "Chess",
+        link: "index4.html",
+        image: "5241629.jpg",
+        icon: "fas fa-chess",
+        iconImage: "", // No local image, using Font Awesome icon
+      },
+    ],
+  });
 });
 
 io.on("connection", (socket) => {

@@ -1,68 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gaming Arena - Login or Sign Up</title>
-    <link rel="stylesheet" href="mainstyle.css">
-</head>
+    <link rel="stylesheet" href="mainstyle.css" />
+  </head>
 
-<body>
+  <body>
     <div class="login-container">
-        <div class="background-animation"></div>
-        <div class="login-card">
-            <h2>Login to Gaming Arena</h2>
-            <form action="index.html">
-                <div class="input-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required>
-                </div>
-                <div class="input-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <button type="submit" class="btn">Login</button>
-            </form>
-            <p>Don't have an account? <a href="#" id="signup-link">Sign Up</a></p>
-        </div>
-        <div class="signup-card">
-            <h2>Create an Account</h2>
-            <form action="index.html">
-                <div class="input-group">
-                    <label for="new-username">Username</label>
-                    <input type="text" id="new-username" name="new-username" required>
-                </div>
-                <div class="input-group">
-                    <label for="new-password">Password</label>
-                    <input type="password" id="new-password" name="new-password" required>
-                </div>
-                <div class="input-group">
-                    <label for="confirm-password">Confirm Password</label>
-                    <input type="password" id="confirm-password" name="confirm-password" required>
-                </div>
-                <button type="submit" class="btn">Sign Up</button>
-            </form>
-            <p>Already have an account? <a href="#" id="login-link">Login</a></p>
-        </div>
+      <div class="background-animation"></div>
+      <div class="login-card">
+        <h2>Login to Gaming Arena</h2>
+        <form action="index.html">
+          <div class="input-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required />
+          </div>
+          <div class="input-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required />
+          </div>
+          <button type="submit" class="btn">Login</button>
+        </form>
+        <p>Don't have an account? <a href="#" id="signup-link">Sign Up</a></p>
+      </div>
+      <div class="signup-card">
+        <h2>Create an Account</h2>
+        <form action="index.html">
+          <div class="input-group">
+            <label for="new-username">Username</label>
+            <input type="text" id="new-username" name="new-username" required />
+          </div>
+          <div class="input-group">
+            <label for="new-password">Password</label>
+            <input
+              type="password"
+              id="new-password"
+              name="new-password"
+              required
+            />
+          </div>
+          <div class="input-group">
+            <label for="confirm-password">Confirm Password</label>
+            <input
+              type="password"
+              id="confirm-password"
+              name="confirm-password"
+              required
+            />
+          </div>
+          <button type="submit" class="btn">Sign Up</button>
+        </form>
+        <p>Already have an account? <a href="#" id="login-link">Login</a></p>
+      </div>
     </div>
 
     <script>
-        const signupLink = document.getElementById('signup-link');
-        const loginLink = document.getElementById('login-link');
-        const loginCard = document.querySelector('.login-card');
-        const signupCard = document.querySelector('.signup-card');
+      const signupLink = document.getElementById("signup-link");
+      const loginLink = document.getElementById("login-link");
+      const loginCard = document.querySelector(".login-card");
+      const signupCard = document.querySelector(".signup-card");
 
-        signupLink.addEventListener('click', () => {
-            loginCard.style.display = 'none';
-            signupCard.style.display = 'block';
+      signupLink.addEventListener("click", (event) => {
+        event.preventDefault();
+        loginCard.style.display = "none";
+        signupCard.style.display = "block";
+      });
+
+      loginLink.addEventListener("click", (event) => {
+        event.preventDefault();
+        signupCard.style.display = "none";
+        loginCard.style.display = "block";
+      });
+      function getQueryParams() {
+        const params = {};
+        const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+
+        urlParams.forEach((value, key) => {
+          params[key] = value;
         });
 
-        loginLink.addEventListener('click', () => {
-            signupCard.style.display = 'none';
-            loginCard.style.display = 'block';
-        });
+        return params;
+      }
+
+      function handleDisplay() {
+        const params = getQueryParams();
+        console.log(params);
+        if (params.a === "1") {
+          // Display signup card
+          loginCard.style.display = "none";
+          signupCard.style.display = "block";
+        } else {
+          // Display login card
+          signupCard.style.display = "none";
+          loginCard.style.display = "block";
+        }
+      }
+      window.onload = handleDisplay;
     </script>
-</body>
-
+  </body>
 </html>
