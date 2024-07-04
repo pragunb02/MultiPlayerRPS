@@ -21,7 +21,7 @@ body {
   max-width: 1200px;
   width: 90%;
   margin: 0 auto;
-  padding: 20px;
+  padding: 12.2px;
   text-align: center;
 }
 
@@ -81,7 +81,7 @@ body {
   margin-right: 20px; /* Space between cards */
   /* background-color: rgba(51, 51, 51, 0.9); Semi-transparent background */
   background-color: #372549;
-  padding: 20px;
+  padding: 22px;
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -257,4 +257,12 @@ body {
 
 .social-icons li a:hover {
   color: #4caf50; /* Green hover color */
+}
+
+#yo {
+  width: 50px; /* sets the width of the image */
+  height: auto; /* maintains the aspect ratio */
+  border-radius: 5px; /* rounds the corners of the image */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* adds a shadow effect */
+  margin: 10px; /* adds space around the image */
 }

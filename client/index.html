@@ -7,6 +7,8 @@
     <title>Gaming Arena</title>
     <!-- Link to Font Awesome CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -25,21 +27,24 @@
             <div id="rockpaperscissors" class="game-card">
                 <a href="index2.html">
                     <div class="game-img"><img src="5241629.jpg" alt="Rock Paper Scissors"></div>
-                    <div class="game-icon"><i class="fas fa-gamepad"></i></div> <!-- Font Awesome icon -->
+                    <div class="game-icon"><i class="fas fa-hand-peace"></i></div>
                     <div class="game-title">Rock Paper Scissors</div>
                 </a>
             </div>
             <div id="tictactoe" class="game-card">
                 <a href="index3.html">
                     <div class="game-img"><img src="5241629.jpg" alt="Tic Tac Toe"></div>
-                    <div class="game-icon"><i class="fas fa-hand-peace"></i></div> <!-- Font Awesome icon -->
+                    <!-- <div class="game-icon"><i class="as fa-hand-peace"></i></div>  here add img  -->
+                    <div class="game-icon" id="yoyo">
+                        <img src="strategic-plan.png" alt="Tic Tac Toe Icon" id="yo">
+                    </div>
                     <div class="game-title">Tic Tac Toe</div>
                 </a>
             </div>
             <div id="chess" class="game-card">
                 <a href="index4.html">
                     <div class="game-img"><img src="5241629.jpg" alt="Chess"></div>
-                    <div class="game-icon"><i class="fas fa-chess"></i></div> <!-- Font Awesome icon -->
+                    <div class="game-icon"><i class="fas fa-chess"></i></div>
                     <div class="game-title">Chess</div>
                 </a>
             </div>
@@ -47,12 +52,11 @@
                 <div class="game-img">
                     <img src="5241629.jpg" alt="Coming Soon">
                 </div>
-                <div class="game-icon"><i class="fas fa-hourglass-half"></i></div> <!-- Font Awesome icon -->
+                <div class="game-icon"><i class="fas fa-hourglass-half"></i></div>
                 <div class="game-title">More Games Coming Soon!</div>
             </div>
         </div>
         <div class="carousel-controls">
-            <!-- Font Awesome icons for carousel navigation -->
             <button class="carousel-button" id="prevBtn"><i class="fas fa-chevron-left"></i></button>
             <button class="carousel-button" id="nextBtn"><i class="fas fa-chevron-right"></i></button>
         </div>
@@ -65,6 +69,7 @@
         </div>
     </section>
     <h2 class="exp">Experience the Action Live with Your Friends!</h2>
+    <div class="game-icon"><i class="fas fa-gamepad"></i></div>
     <footer class="footer">
         <div class="container">
             <p>&copy; 2024 Gaming Arena. All rights reserved.</p>
