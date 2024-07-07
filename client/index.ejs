@@ -43,10 +43,14 @@
         <% } %>
         <h1>EpicPixel Pandemonium</h1>
         <div class="announcement-content">
-          <h2 class="blink" style="color: #0081f2;">Trending Game Live Now!</h2>
+          <h2 class="blink" style="color: #0081f2">Trending Game Live Now!</h2>
         </div>
       </div>
     </header>
+
+    <!-- Add Canvas Element for Animation -->
+    <canvas id="bouncingBallCanvas" width="100%" height="100%"></canvas>
+
     <!-- Hero Section -->
     <section class="hero">
       <div class="container">
@@ -56,8 +60,188 @@
       </div>
     </section>
 
+    <div class="containers">
+      <div class="tree">
+        <div class="branch" style="--x: 0">
+          <span style="--i: 0"></span>
+          <span style="--i: 1"></span>
+          <span style="--i: 2"></span>
+          <span style="--i: 3"></span>
+        </div>
+        <div class="branch" style="--x: 1">
+          <span style="--i: 0"></span>
+          <span style="--i: 1"></span>
+          <span style="--i: 2"></span>
+          <span style="--i: 3"></span>
+        </div>
+        <div class="branch" style="--x: 2">
+          <span style="--i: 0"></span>
+          <span style="--i: 1"></span>
+          <span style="--i: 2"></span>
+          <span style="--i: 3"></span>
+        </div>
+        <div class="branch" style="--x: 3">
+          <span style="--i: 0"></span>
+          <span style="--i: 1"></span>
+          <span style="--i: 2"></span>
+          <span style="--i: 3"></span>
+        </div>
+        <div class="stem">
+          <span style="--i: 0"></span>
+          <span style="--i: 1"></span>
+          <span style="--i: 2"></span>
+          <span style="--i: 3"></span>
+        </div>
+        <span class="shadow"></span>
+      </div>
+    </div>
+
+    <div class="box-of-star1">
+      <div class="star star-position1"></div>
+      <div class="star star-position2"></div>
+      <div class="star star-position3"></div>
+      <div class="star star-position4"></div>
+      <div class="star star-position5"></div>
+      <div class="star star-position6"></div>
+      <div class="star star-position7"></div>
+    </div>
+    <div class="box-of-star2">
+      <div class="star star-position1"></div>
+      <div class="star star-position2"></div>
+      <div class="star star-position3"></div>
+      <div class="star star-position4"></div>
+      <div class="star star-position5"></div>
+      <div class="star star-position6"></div>
+      <div class="star star-position7"></div>
+    </div>
+    <div class="box-of-star3">
+      <div class="star star-position1"></div>
+      <div class="star star-position2"></div>
+      <div class="star star-position3"></div>
+      <div class="star star-position4"></div>
+      <div class="star star-position5"></div>
+      <div class="star star-position6"></div>
+      <div class="star star-position7"></div>
+    </div>
+    <div class="box-of-star4">
+      <div class="star star-position1"></div>
+      <div class="star star-position2"></div>
+      <div class="star star-position3"></div>
+      <div class="star star-position4"></div>
+      <div class="star star-position5"></div>
+      <div class="star star-position6"></div>
+      <div class="star star-position7"></div>
+    </div>
+    <div data-js="astro" class="astronaut">
+      <div class="head"></div>
+      <div class="arm arm-left"></div>
+      <div class="arm arm-right"></div>
+      <div class="body">
+        <div class="panel"></div>
+      </div>
+      <div class="leg leg-left"></div>
+      <div class="leg leg-right"></div>
+      <div class="schoolbag"></div>
+    </div>
+    <div class="my-loader">
+      <div class="rubiks-cube">
+        <div class="face front">
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ffffff" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+        </div>
+
+        <div class="face back">
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ffffff" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+        </div>
+        <div class="face left">
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #ffffff" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+        </div>
+        <div class="face right">
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ffffff" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+        </div>
+        <div class="face top">
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #ffffff" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+        </div>
+        <div class="face bottom">
+          <div style="background: #ffffff" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+          <div style="background: #ffeb3b" class="cube"></div>
+          <div style="background: #4caf50" class="cube"></div>
+          <div style="background: #2196f3" class="cube"></div>
+          <div style="background: #ffffff" class="cube"></div>
+          <div style="background: #ff3d00" class="cube"></div>
+        </div>
+      </div>
+    </div>
+    <div class="loader"></div>
+    <div class="loading-screen">
+      <div class="solid">
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+        <div class="side"></div>
+      </div>
+    </div>
+
     <div class="container carousel-container">
-      <h1>Games Section</h1>
+      <h1 style="margin-top: 50px">Games Section</h1>
       <br />
       <div class="carousel-track">
         <% games.forEach(game=> { %>
@@ -102,19 +286,15 @@
     <section class="announcement coming-soon">
       <div class="announcement-content">
         <h2 class="blink">Lodu Coming Soon!</h2>
-        <p style="color: black;">Exciting new games arriving soon.</p>
+        <p style="color: black">Exciting new games arriving soon.</p>
       </div>
     </section>
     <br />
-    <!-- <br /> -->
-    <!-- <h2 class="exp">
-      Experience the Action Live with Your Friends!<i
-        class="fas fa-gamepad"
-      ></i>
-    </h2> -->
-    <div class="game-icon"><i style="color: aliceblue;"fas fa-gamepad"></i></div>
+    <div class="game-icon">
+      <i style="color: aliceblue" class="fas fa-gamepad"></i>
+    </div>
     <footer class="footer">
-      <div class="container">
+      
         <p>&copy; 2024 Gaming Arena. All rights reserved.</p>
         <ul class="social-icons">
           <li>
@@ -129,7 +309,20 @@
         </ul>
       </div>
     </footer>
+    <style>
+      .hero {
+        position: relative;
+      }
 
+      #bouncingBallCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%; /* Cover entire hero section */
+        height: 100%; /* Cover entire hero section */
+        z-index: -1; /* Ensure canvas is behind other content */
+      }
+    </style>
     <script>
       const track = document.querySelector(".carousel-track");
       const prevButton = document.getElementById("prevBtn");
@@ -177,22 +370,90 @@
       };
       updateTrackPosition();
 
-      document
-        .getElementById("logoutButton")
-        .addEventListener("click", function () {
-          fetch("./auth/logout", {
-            method: "POST",
-          })
-            .then((response) => response.json())
-            .then((data) => {
-              if (data.success) {
-                window.location.href = ".index.ejs";
-              }
-            })
-            .catch((error) => {
-              console.error("Error:", error);
-            });
-        });
+      // document
+      //   .getElementById("logoutButton")
+      //   .addEventListener("click", function () {
+      //     fetch("./auth/logout", {
+      //       method: "POST",
+      //     })
+      //       .then((response) => response.json())
+      //       .then((data) => {
+      //         if (data.success) {
+      //           window.location.href = ".index.ejs";
+      //         }
+      //       })
+      //       .catch((error) => {
+      //         console.error("Error:", error);
+      //       });
+      //   });
+      const canvas = document.getElementById("bouncingBallCanvas");
+      const ctx = canvas.getContext("2d");
+      const circles = [];
+
+      function createCircle(x, y, dx, dy, radius, color) {
+        return { x, y, dx, dy, radius, color };
+      }
+
+      function drawCircle(circle) {
+        ctx.beginPath();
+        ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+        ctx.fillStyle = circle.color;
+        ctx.shadowColor = circle.color; // Add shadow color same as circle color
+        ctx.shadowBlur = 10; // Blur effect to make it brighter
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      function updateCircle(circle) {
+        if (
+          circle.x + circle.dx > canvas.width - circle.radius ||
+          circle.x + circle.dx < circle.radius
+        ) {
+          circle.dx = -circle.dx;
+        }
+        if (
+          circle.y + circle.dy > canvas.height - circle.radius ||
+          circle.y + circle.dy < circle.radius
+        ) {
+          circle.dy = -circle.dy;
+        }
+        circle.x += circle.dx;
+        circle.y += circle.dy;
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (const circle of circles) {
+          drawCircle(circle);
+          updateCircle(circle);
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      function initCircles(count) {
+        for (let i = 0; i < count; i++) {
+          const radius = Math.random() * 20 + 10;
+          const x = Math.random() * (canvas.width - 2 * radius) + radius;
+          const y = Math.random() * (canvas.height - 2 * radius) + radius;
+          const dx = (Math.random() - 0.5) * 4;
+          const dy = (Math.random() - 0.5) * 4;
+          const color = `rgba(${Math.floor(Math.random() * 256)}, ${Math.floor(
+            Math.random() * 256
+          )}, ${Math.floor(Math.random() * 256)}, 0.5)`;
+          // x = y;
+          circles.push(createCircle(x, y, dx, dy, radius, color));
+        }
+      }
+
+      // Set canvas dimensions to match hero section
+      const heroSection = document.querySelector(".hero");
+      canvas.width = heroSection.offsetWidth;
+      canvas.height = heroSection.offsetHeight;
+
+      initCircles(10);
+      animate();
     </script>
   </body>
 </html>
