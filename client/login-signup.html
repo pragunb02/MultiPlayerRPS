@@ -13,12 +13,12 @@
         <h2>Login to Gaming Arena</h2>
         <form id="login-form" action="/auth/login" method="POST">
           <div class="input-group">
-            <label for="username">Username/Email</label>
+            <label for="email">Email</label>
             <input
               type="text"
-              id="username"
-              name="username"
-              placeholder="Enter your username or email"
+              id="email"
+              name="email"
+              placeholder="Enter your email"
               required
             />
           </div>
@@ -45,6 +45,10 @@
           <div class="input-group">
             <label for="new-username">Username</label>
             <input type="text" id="new-username" name="new-username" required />
+          </div>
+          <div class="input-group">
+            <label for="new-email">Email</label>
+            <input type="email" id="new-email" name="new-email" required />
           </div>
           <div class="input-group">
             <label for="new-password">Password</label>

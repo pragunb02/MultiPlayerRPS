@@ -1,97 +1,124 @@
 const express = require("express");
 const router = express.Router();
-const passport = require("./passport"); // Adjust the path as necessary
+const passport = require("./passport");
 const User = require("../../models/User");
-const nodemailer = require("nodemailer");
-const bcrypt = require("bcrypt");
-
-// JSON body parsing middleware
-
-console.log("ji");
+const bcrypt = require("bcrypt"); // Import bcrypt
+// console.log(passport);
 router.use(express.json());
+// router.use(flash());
+router.use(passport.initialize());
 
-// Function to send email
-function sendEmail(receiverEmail, subject, text) {
-  const transporter = nodemailer.createTransport({
-    service: "Gmail",
-    auth: {
-      user: "bookbazaar959@gmail.com",
-      pass: "konr fuuw tfla pmoj",
-    },
-  });
+router.use(passport.session());
 
-  const mailOptions = {
-    from: "bookbazaar959@gmail.com",
-    to: receiverEmail,
-    subject: subject,
-    text: text,
-  };
-
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      console.error("Error sending email:", error);
-    } else {
-      console.log("Email sent:", info.response);
-    }
-  });
-}
-router.post("/login", async (req, res) => {
-  // Login logic
-  try {
-    const { email, password } = req.body;
-
-    // Check if it's an admin login
-    if (email === "admin@gmail.com" && password === "admin") {
-      req.session.admin = true;
+// // This is the login route
+// router.post("/login", (req, res) => {
+//   const { email, password } = req.body;
+//   // console.log(res.body);
+//   console.log(req.body);
+//   console.log("ok");
+//   // Add your authentication logic here
+//   // If authentication is successful
+//   res.json({ success: true });
+//   // If authentication fails
+//   // res.json({ success: false, message: 'Invalid credentials' });
+// });
+router.post("/login", (req, res, next) => {
+  console.log("Received login request with data:", req.body);
+  passport.authenticate("local", (err, user, info) => {
+    if (err) {
+      console.error("Authentication error:", err);
       return res
-        .status(200)
-        .json({ success: true, isAdmin: true, message: "Login successful!" });
+        .status(500)
+        .json({ success: false, message: "Authentication error." });
     }
+    if (!user) {
+      console.log("Failed login attempt:", info.message);
+      return res.status(400).json({ success: false, message: info.message });
+    }
+    req.login(user, (loginErr) => {
+      if (loginErr) {
+        console.error("Login error:", loginErr);
+        return res
+          .status(500)
+          .json({ success: false, message: "Login error." });
+      }
+      // Set user information in the session
+      req.session.user = {
+        id: user.id,
+        username: user.username,
+      };
+      console.log("User logged in successfully:", user);
+      return res.json({ success: true, message: "Logged in successfully." });
+    });
+  })(req, res, next);
+});
 
-    // Validate the input (you can add more validation here)
-    if (!email || !password) {
+// Signup Route
+router.post("/signup", async (req, res) => {
+  const { username, email, password } = req.body;
+
+  try {
+    // Check if the user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
       return res
         .status(400)
-        .json({ success: false, message: "Email and password are required." });
+        .json({ success: false, message: "User already exists." });
     }
-    console.log(email, password);
-    // Find the user by their email in the database
-    const user = await User.findOne({ email });
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication failed. User not found.",
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create a new user
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword,
+    });
+
+    // Save the user to the database
+    await newUser.save();
+
+    // Automatically log the user in after successful signup
+    req.login(newUser, (loginErr) => {
+      if (loginErr) {
+        console.error("Login error after signup:", loginErr);
+        return res
+          .status(500)
+          .json({ success: false, message: "Login error after signup." });
+      }
+      // Set user information in the session
+      req.session.user = {
+        id: newUser.id,
+        username: newUser.username,
+      };
+      console.log("User signed up and logged in successfully:", newUser);
+      return res.json({
+        success: true,
+        message: "Signed up and logged in successfully.",
       });
-    }
+    });
+  } catch (error) {
+    console.error("Signup error:", error);
+    res.status(500).json({ success: false, message: "Signup error." });
+  }
+});
 
-    // Check if the user is blocked
-    if (user.blocked) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication failed. User is blocked.",
-      });
-    }
+// Logout route
+router.post("/logout", (req, res) => {
+  // Logout logic
+  try {
+    // Clear the user's session to log them out
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Error destroying session:", err);
+        return res
+          .status(500)
+          .json({ success: false, message: "Error logging out" });
+      }
 
-    // Compare the provided password with the hashed password in the database
-    // const passwordMatch = await bcrypt.compare(password, user.password);
-    const passwordMatch = password === user.password;
-
-    if (!passwordMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication failed. Incorrect password.",
-      });
-    }
-
-    // If authentication is successful, you can generate a JWT token here
-    // and send it to the client for future authenticated requests
-    req.session.user = user;
-    console.log(req.session.user);
-
-    res.status(200).json({ success: true, message: "Login successful!" });
-
-    // res.redirect('/dashboard');
+      res.status(200).json({ success: true, message: "Logout successful" });
+    });
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ success: false, message: "Internal server error" });

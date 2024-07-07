@@ -7,7 +7,7 @@
 
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #1a1a1a; /* Dark background */
+  background-color: #dee2ff; /* Dark background */
   color: #fff; /* Light text */
   margin: 0;
   padding: 0;
@@ -23,13 +23,19 @@ body {
   margin: 0 auto;
   padding: 12.2px;
   text-align: center;
+  color: black;
 }
 
 .header {
-  background-color: #333; /* Dark header background */
+  background: linear-gradient(
+    to right,
+    #141e30,
+    #243b55
+  ); /* Gradient background */
   padding: 20px 0;
   text-align: center;
-  border-bottom: 2px solid #4caf50; /* Green border */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .header h1 {
@@ -80,18 +86,16 @@ body {
   min-width: 30%; /* Adjust to fit three cards in the container */
   margin-right: 20px; /* Space between cards */
   /* background-color: rgba(51, 51, 51, 0.9); Semi-transparent background */
-  background-color: #372549;
+  background-color: #000814;
   padding: 22px;
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
-
-.game-card:hover {
+game-card:hover {
   transform: scale(1.1);
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
 }
-
 .game-card a {
   text-decoration: none;
   color: inherit;
@@ -120,111 +124,163 @@ body {
   text-shadow: 1px 1px 2px #000;
   color: #e1e5f2;
 }
+.coming-soon .game-card {
+  background-color: #444; /* Slightly lighter background */
+}
 
 .carousel-controls {
-  position: absolute;
-  top: 50%;
-  width: 100%;
   display: flex;
   justify-content: space-between;
+  width: 100%;
+  position: absolute;
+  top: 50%;
   transform: translateY(-50%);
-  pointer-events: none;
+  z-index: 10;
 }
 
 .carousel-button {
-  background-color: rgba(0, 0, 0, 0.5);
+  background: transparent;
   border: none;
-  color: white;
-  padding: 10px;
+  color: #fff; /* Light text */
+  font-size: 2em;
   cursor: pointer;
-  font-size: 1.5em;
-  pointer-events: all;
-  transition: background-color 0.3s ease;
+  padding: 0 20px;
+  transition: color 0.3s ease;
 }
+
 .carousel-button:hover {
-  background-color: #754966;
+  color: blue; /* Green hover color */
 }
-.game-icon {
-  font-size: 1.5em; /* Adjust icon size as needed */
-  margin-bottom: 10px;
+
+.hero {
+  background: url("https://www.desktopbackground.org/download/1920x1080/2015/03/29/931040_cs-go-global-offensive-wallpapers-hd-wallpaper-backgrounds_1920x1080_h.jpg")
+    no-repeat center center/cover;
+  color: #fff; /* Light text */
+  padding: 80px 0;
   text-align: center;
 }
 
-.game-icon i {
-  color: whitesmoke; /* Icon color */
+.hero h1 {
+  font-size: 2.5em;
+  margin-bottom: 20px;
 }
 
-.carousel-button i {
-  color: white; /* Icon color */
-  /* position: absolute; Position the icon absolutely */
-  /* left: 10px; Adjust as needed */
-  /* top: 50%; Center vertically */
-  /* transform: translateY(-50%); Center vertically */
+.hero p {
+  font-size: 1.2em;
+  margin-bottom: 30px;
 }
-#nextBtn {
-  background-color: rgba(0, 0, 0, 0.5);
-  border: none;
-  color: white;
-  padding: 10px;
-  cursor: pointer;
-  font-size: 1.5em;
-  pointer-events: all;
-  position: absolute;
-  right: 27px; /* Adjust the right spacing */
-  /* top: 50%;
-  transform: translateY(-50%); */
+
+.hero .btn {
+  background-color: #4caf50; /* Green background */
+  color: #fff; /* Light text */
+  padding: 10px 20px;
+  border-radius: 5px;
+  text-decoration: none;
   transition: background-color 0.3s ease;
 }
-#nextBtn:hover {
-  background-color: #754966;
+
+.hero .btn:hover {
+  background-color: #45a049; /* Darker green hover color */
 }
 
 .footer {
-  background-color: #333; /* Dark footer background */
-  color: #fff;
+  background-color: #333; /* Dark background */
   padding: 20px 0;
   text-align: center;
+  margin-top: auto;
+}
+
+.footer p {
+  color: #fff; /* Light text */
 }
 
 .social-icons {
   list-style-type: none;
   padding: 0;
+  display: flex;
+  justify-content: center;
   margin-top: 10px;
 }
 
 .social-icons li {
-  display: inline-block;
-  margin-right: 10px;
+  margin: 0 10px;
 }
 
-.social-icons li a img {
-  width: 40px; /* Adjust icon size */
-  height: auto;
+.social-icons a {
+  text-decoration: none;
+  color: #fff; /* Light text */
+  font-size: 1.5em;
+  transition: color 0.3s ease;
+}
+
+.social-icons a:hover {
+  color: #4caf50; /* Green hover color */
+}
+
+#profile-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: #fff; /* Light text */
+}
+
+.dropdown {
+  display: none;
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  background-color: #333; /* Dark background */
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: left;
+  color: #fff; /* Light text */
+  z-index: 1000;
+}
+
+.dropdown a {
+  text-decoration: none;
+  color: #fff; /* Light text */
+  display: block;
+  margin: 5px 0;
+  padding: 5px 10px;
+  transition: background-color 0.3s ease;
+}
+
+.dropdown a:hover {
+  background-color: #4caf50; /* Green hover color */
+}
+
+.dropdown button {
+  background-color: transparent;
+  border: none;
+  color: #fff; /* Light text */
+  cursor: pointer;
+  padding: 5px 10px;
+  transition: background-color 0.3s ease;
+}
+
+.dropdown button:hover {
+  background-color: #4caf50; /* Green hover color */
+}
+
+.announcement-content {
+  text-align: center;
+  color: red;
 }
 
 .announcement {
   position: absolute;
   top: 20px;
-  right: 20px;
-  background-color: rgba(0, 0, 0, 0.8);
-  color: #ffee32;
+  left: 20px;
+  color: #1e96fc;
+  background-color: #fcf300;
   padding: 20px;
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  animation: blink-animation 2s infinite alternate; /* Adjusted animation duration */
-}
-
-@keyframes blink-animation {
-  0% {
-    opacity: 1.5;
-  }
-  100% {
-    opacity: 0.4;
-  }
-}
-
-.announcement-content {
-  text-align: center;
+  animation: blink-animation 1s infinite alternate;
 }
 
 .announcement h2 {
@@ -235,97 +291,16 @@ body {
 .announcement p {
   font-size: 1.2em;
 }
-
-/* Example of dark mode styling */
-.social-icons {
-  list-style-type: none;
-  padding: 0;
-  margin-top: 10px;
-}
-
-.social-icons li {
-  display: inline-block;
-  margin-right: 10px;
-}
-
-.social-icons li a {
-  text-decoration: none;
-  color: #fff; /* White color for dark mode */
-  font-size: 1.2em;
-  transition: color 0.3s ease;
-}
-
-.social-icons li a:hover {
-  color: #4caf50; /* Green hover color */
-}
-
-#yo {
-  width: 50px; /* sets the width of the image */
-  height: auto; /* maintains the aspect ratio */
-  border-radius: 5px; /* rounds the corners of the image */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* adds a shadow effect */
-  margin: 10px; /* adds space around the image */
-}
-
-.header {
-  position: relative; /* Ensure the header is a positioned element */
-}
-
-#profile-button {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  cursor: pointer;
-  font-size: 24px;
-  z-index: 1000;
-}
-
-#account-options {
-  display: none;
-  position: absolute;
-  background-color: #f9f9f9;
-  border-radius: 10px;
-  top: 40px;
-  left: 10px;
-  background: white;
-  border: 1px solid #ccc;
-  padding: 10px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  z-index: 999;
-  min-width: 140px;
-  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-  padding: 11px 15px;
-}
-.user-profile {
-  color: #333;
+.announcement-content .blink {
   font-weight: bold;
-  font-size: 16px;
-}
-#account-options a {
-  color: black;
-  text-decoration: none;
-  display: block;
-  padding: 8px 0;
-  font-size: 16px;
-}
-#account-options a:hover {
-  background-color: #f1f1f1;
-}
-#logoutButton {
-  background-color: #f44336;
-  border: none;
-  color: white;
-  padding: 8px 20px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 14px;
-  margin: 4px 2px;
-  transition-duration: 0.4s;
-  cursor: pointer;
+  font-size: 1.5em;
 }
 
-#logoutButton:hover {
-  background-color: #da190b;
-  color: white;
+@keyframes blink-animation {
+  0% {
+    opacity: 1.5;
+  }
+  100% {
+    opacity: 0.6;
+  }
 }

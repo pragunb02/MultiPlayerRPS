@@ -3,60 +3,99 @@ const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
-// const handlebars = require("express-handlebars");
 const connectDB = require("./db");
-const RPSData = require("./models/RPSData");
-const TicTacToeData = require("./models/TicTacToeData");
-const ChessData = require("./models/ChessData");
+const flash = require("connect-flash");
+const bodyParser = require("body-parser");
+const session = require("express-session");
+const MongoDBStore = require("connect-mongodb-session")(session);
+const authRouter = require("./client/routes/auth");
+const passport = require("./client/routes/passport");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
 const PORT = 8080;
+const SESSION_SECRET = "konr fuuw tfla pmoj"; // Change this to a secure key
 
-const rpsRooms = {};
-const ticTacToeRooms = {};
-const chessRooms = {};
+// MongoDB session store
+const store = new MongoDBStore({
+  uri: "mongodb://127.0.0.1:27017/SessionStore",
+  collection: "sessions",
+});
 
-// Connect to MongoDB
-connectDB();
+// Catch session store errors
+store.on("error", (error) => console.error("Session store error:", error));
+
+// Middleware setup
+// app.use(express.static("public"));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+
+// Session configuration
+app.use(
+  session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: true,
+    store,
+    cookie: { maxAge: 1800000 }, // 30 minutes
+  })
+);
+
+app.use(express.static(path.join(__dirname, "client")));
+// Set up view engine and static files
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "client"));
-app.use(express.static(path.join(__dirname, "client")));
+
+// Route handling
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session()); // This is essential for persistent login sessions
+app.use("/auth", authRouter);
 
 app.get("/", (req, res) => {
+  const user = req.session.user || { username: "Guest" };
+  const showDropdown = req.session.passport ? req.session.passport.user : null;
+
   res.render("index", {
     title: "Gaming Arena",
-    user: { name: "John Doe", isLoggedIn: true },
-    showDropdown: false,
+    user: {
+      name: user.username,
+      isLoggedIn: !!req.session.user,
+    },
+    showDropdown,
     games: [
       {
         id: "rockpaperscissors",
         title: "Rock Paper Scissors",
         link: "index2.html",
-        image: "5241629.jpg",
+        image:
+          "space-game-background-neon-night-alien-landscape-free-vector.jpg",
         icon: "fas fa-hand-peace",
-        iconImage: "", // No local image, using Font Awesome icon
       },
       {
         id: "tictactoe",
         title: "Tic Tac Toe",
         link: "index3.html",
-        image: "5241629.jpg",
-        icon: "", // No Font Awesome icon
-        iconImage: "strategic-plan.png", // Local image for icon
+        image:
+          "space-game-background-neon-night-alien-landscape-free-vector.jpg",
+        // iconImage: "strategic-plan.png",
+        icon: "fas fa-hand-peace",
       },
       {
         id: "chess",
         title: "Chess",
         link: "index4.html",
-        image: "5241629.jpg",
+        image:
+          "space-game-background-neon-night-alien-landscape-free-vector.jpg",
         icon: "fas fa-chess",
-        iconImage: "", // No local image, using Font Awesome icon
       },
     ],
   });
 });
+// Connect to MongoDB
+connectDB();
 
 io.on("connection", (socket) => {
   console.log("A user connected");

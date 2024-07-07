@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gaming Arena</title>
+    <title>EpicPixel Pandemonium</title>
     <!-- Link to Font Awesome CSS -->
     <link
       rel="stylesheet"
@@ -41,14 +41,24 @@
           </ul>
         </div>
         <% } %>
-        <h1>Welcome to the Gaming Arena</h1>
+        <h1>EpicPixel Pandemonium</h1>
         <div class="announcement-content">
-          <h2 class="blink">Trending Game Live Now!</h2>
+          <h2 class="blink" style="color: #0081f2;">Trending Game Live Now!</h2>
         </div>
       </div>
     </header>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="container">
+        <h1>Welcome to the Ultimate Gaming Nexus</h1>
+        <p>Experience the Action Live with Your Friends!.</p>
+        <a href="#" class="btn">Explore Now</a>
+      </div>
+    </section>
 
     <div class="container carousel-container">
+      <h1>Games Section</h1>
+      <br />
       <div class="carousel-track">
         <% games.forEach(game=> { %>
         <div id="<%= game.id %>" class="game-card">
@@ -91,14 +101,18 @@
 
     <section class="announcement coming-soon">
       <div class="announcement-content">
-        <h2 class="blink">Coming Soon!</h2>
-        <p>Exciting new games arriving soon.</p>
+        <h2 class="blink">Lodu Coming Soon!</h2>
+        <p style="color: black;">Exciting new games arriving soon.</p>
       </div>
     </section>
     <br />
-    <br />
-    <h2 class="exp">Experience the Action Live with Your Friends!</h2>
-    <div class="game-icon"><i class="fas fa-gamepad"></i></div>
+    <!-- <br /> -->
+    <!-- <h2 class="exp">
+      Experience the Action Live with Your Friends!<i
+        class="fas fa-gamepad"
+      ></i>
+    </h2> -->
+    <div class="game-icon"><i style="color: aliceblue;"fas fa-gamepad"></i></div>
     <footer class="footer">
       <div class="container">
         <p>&copy; 2024 Gaming Arena. All rights reserved.</p>

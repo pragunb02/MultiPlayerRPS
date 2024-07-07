@@ -1,49 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chess</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="newstyle.css" />
     <script src="chessJs.js"></script>
-    <link rel="stylesheet" href="/public/css/chessboard-1.0.0.min.css">
+    <link rel="stylesheet" href="/public/css/chessboard-1.0.0.min.css" />
     <!-- <link rel="stylesheet" href="/public/css/custom.css"> -->
     <script src="/public/js/jquery-3.7.0.min.js"></script>
     <script src="/public/js/chessboard-1.0.0.min.js"></script>
     <script src="/public/js/chess-0.10.3.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-</head>
-<style>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+  </head>
+  <style>
     body {
-        background-image: url('space-game-background-neon-night-alien-landscape-free-vector.jpg');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
+      background-image: url("space-game-background-neon-night-alien-landscape-free-vector.jpg");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
     }
-</style>
+  </style>
 
-<body>
+  <body>
     <div class="container" id="xyz">
-        <header>
-            <h1 id="mainTitle">Chess</h1>
-        </header>
-        <div id="initial" class="card">
-            <input type="text" id="playerName" placeholder="Enter your name" required />
-            <button onclick="createGame();">Create Game</button>
-            <p>or</p>
-            <input type="text" id="roomUniqueId" placeholder="Enter room code" required />
-            <button onclick="joinGame();">Join Game</button>
-        </div>
+      <header>
+        <h1 id="mainTitle">Chess</h1>
+      </header>
+      <div id="initial" class="card">
+        <input
+          type="text"
+          id="playerName"
+          placeholder="Enter your name"
+          required
+        />
+        <button onclick="createGame();">Create Game</button>
+        <p>or</p>
+        <input
+          type="text"
+          id="roomUniqueId"
+          placeholder="Enter room code"
+          required
+        />
+        <button onclick="joinGame();">Join Game</button>
+      </div>
 
-        <div id="gamePlay" class="card" style="display: none">
-            <div id="waitingArea"></div>
-        </div>
+      <div id="gamePlay" class="card" style="display: none">
+        <div id="waitingArea"></div>
+      </div>
     </div>
 
-
     <script src="chessJs.js"></script>
-</body>
-
+  </body>
 </html>
