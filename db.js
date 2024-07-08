@@ -5,7 +5,7 @@ const s1 =
 const s2 = "mongodb://127.0.0.1:27017/Bookstore1";
 const connectDB = async () => {
   try {
-    await mongoose.connect(s2, {
+    await mongoose.connect(s1, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
