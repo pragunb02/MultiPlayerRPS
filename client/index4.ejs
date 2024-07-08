@@ -16,15 +16,22 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
     />
+    <script>
+      // Define user object as a global variable accessible in client-side JavaScript
+      var user = {
+        name: "<%= user.name %>",
+        isLoggedIn: "<%= user.isLoggedIn %>", // Boolean value, no need for quotes
+      };
+    </script>
+    <style>
+      body {
+        background-image: url("space-game-background-neon-night-alien-landscape-free-vector.jpg");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+    </style>
   </head>
-  <style>
-    body {
-      background-image: url("space-game-background-neon-night-alien-landscape-free-vector.jpg");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-    }
-  </style>
 
   <body>
     <div class="container" id="xyz">
@@ -35,9 +42,11 @@
         <input
           type="text"
           id="playerName"
-          placeholder="Enter your name"
+          placeholder="Enter your username"
+          value="<%= user.name !== 'Guest' ? user.name : '' %>"
           required
         />
+
         <button onclick="createGame();">Create Game</button>
         <p>or</p>
         <input

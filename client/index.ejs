@@ -21,7 +21,7 @@
           </div>
           <ul>
             <a href="/userprofile">Profile</a>
-            <a href="#">Orders</a>
+            <!-- <a href="#">Orders</a> -->
             <button id="logoutButton">Logout</button>
           </ul>
         </div>
@@ -31,8 +31,8 @@
               <span>Welcome Gamer</span>
             </div>
             <ul>
-              <a href="/login-signup.html?a=0">Go to Login</a>
-              <a href="/login-signup.html?a=1">Go to Signup</a>
+              <a href="/login-signup.html?a=0">Login</a>
+              <a href="/login-signup.html?a=1">Signup</a>
             </ul>
           </div>
           <% } %>
@@ -50,7 +50,12 @@
   <section class="hero">
     <div class="container">
       <h1>Welcome to the Ultimate Gaming Nexus</h1>
-      <p>Experience the Action Live with Your Friends!.</p>
+      <p>
+      <h3>Experience the Action Live with Your <span style="color: red;">F</span><span
+          style="color: blue;">r</span><span style="color: green;">i</span><span style="color: orange;">e</span><span
+          style="color: purple;">n</span><span style="color: yellow;">d</span><span style="color: brown;">s</span>!</h3>
+      </p>
+
       <a href="#" class="btn">Explore Now</a>
     </div>
   </section>
@@ -234,56 +239,55 @@
       <div class="side"></div>
     </div>
   </div>
-<br>
+  <br>
   <div class="rules">
-        <h1 style="color: #3423a6;">Guidelines</h1>
-        <p style="color: black;">1. All players are advised to register before joining a game.</p>
-        <p style="color: black;">2. If a player wants to play as a guest, their progress will not be stored.</p>
-        <p style="color: black;">3. Respect other players in chat and follow the game rules.</p>
-        <p style="color: black;">4. Cheating or exploiting bugs will result in a ban.</p>
-    </div>
- <div class="container carousel-container">
-      <h1>Games Section</h1>
-      <br />
-      <div class="carousel-track">
-        <% games.forEach(game=> { %>
-        <div id="<%= game.id %>" class="game-card">
-          <a href="<%= game.link %>">
-            <div class="game-img">
-              <img src="<%= game.image %>" alt="<%= game.title %>" />
-            </div>
-            <div class="game-icon">
-              <% if (game.iconImage) { %>
-              <img
-                src="<%= game.iconImage %>"
-                alt="<%= game.title %> Icon"
-                id="yo"
-              />
-              <% } else { %>
-              <i class="<%= game.icon %>"></i>
-              <% } %>
-            </div>
-            <div class="game-title"><%= game.title %></div>
-          </a>
+    <h1 style="color: #3423a6;">Guidelines</h1>
+    <p style="color: black;">1. All players are advised to register before joining a game.</p>
+    <p style="color: black;">2. If a player wants to play as a guest, their progress will not be stored.</p>
+    <p style="color: black;">3. Respect other players in chat and follow the game rules.</p>
+    <p style="color: black;">4. Cheating or exploiting bugs will result in a ban.</p>
+  </div>
+  <div class="container carousel-container">
+    <h1 style="color: #00a6fb;">Explore the Games Section</h1>
+    <br />
+   <div class="carousel-track">
+  <% games.forEach(game => { %>
+    <div id="<%= game.id %>" class="game-card">
+      <a href="<%= game.link %>">
+        <div class="game-img">
+          <img src="<%= game.image %>" alt="<%= game.title %>" />
         </div>
-        <% }); %>
-        <div id="coming-soon" class="game-card coming-soon">
-          <div class="game-img">
-            <img src="5241629.jpg" alt="Coming Soon" />
-          </div>
-          <div class="game-icon"><i class="fas fa-hourglass-half"></i></div>
-          <div class="game-title">More Games Coming Soon!</div>
+        <div class="game-icon">
+          <% if (game.iconImage) { %>
+            <img src="<%= game.iconImage %>" alt="<%= game.title %> Icon" id="yo" />
+          <% } else { %>
+            <i class="<%= game.icon %>"></i>
+          <% } %>
         </div>
-      </div>
-      <div class="carousel-controls">
-        <button class="carousel-button" id="prevBtn">
-          <i class="fas fa-chevron-left"></i>
-        </button>
-        <button class="carousel-button" id="nextBtn">
-          <i class="fas fa-chevron-right"></i>
-        </button>
-      </div>
+        <div class="game-title">
+          <%= game.title %>
+        </div>
+      </a>
     </div>
+  <% }); %>
+  <div id="coming-soon" class="game-card coming-soon">
+    <div class="game-img">
+      <img src="5241629.jpg" alt="Coming Soon" />
+    </div>
+    <div class="game-icon"><i class="fas fa-hourglass-half"></i></div>
+    <div class="game-title">More Games Coming Soon!</div>
+  </div>
+</div>
+
+    <div class="carousel-controls">
+      <button class="carousel-button" id="prevBtn">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <button class="carousel-button" id="nextBtn">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+  </div>
 
 
   <section class="announcement coming-soon">
@@ -322,23 +326,20 @@
       top: 0;
       left: 0;
       width: 100%;
-      /* Cover entire hero section */
       height: 100%;
-      /* Cover entire hero section */
       z-index: -1;
-      /* Ensure canvas is behind other content */
     }
   </style>
-      <style>
-        .rules {
-            position: absolute;
-            right: 0;
-            top: 700px;
-            padding: 10px;
-            background-color: #7180B9; /* Optional: Adds a background color for better visibility */
-            border: 1px solid #ccc; /* Optional: Adds a border for better visibility */
-        }
-    </style>
+  <style>
+    .rules {
+      position: absolute;
+      right: 0;
+      top: 700px;
+      padding: 10px;
+      background-color: #7180B9;
+      border: 1px solid #ccc;
+    }
+  </style>
   <script>
     const track = document.querySelector(".carousel-track");
     const prevButton = document.getElementById("prevBtn");
@@ -471,12 +472,6 @@
     initCircles(10);
     animate();
   </script>
-  <!-- <script>document.addEventListener("DOMContentLoaded", function() {
-  setTimeout(function() {
-    document.querySelector('.loading-screen').style.display = 'none';
-  }, 2000); // Adjust the delay as needed
-}); -->
-<!-- </script> -->
 </body>
 
 </html>

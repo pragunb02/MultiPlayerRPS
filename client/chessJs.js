@@ -1,7 +1,6 @@
 console.log("Running Chess Script");
 
 const socket = io();
-
 let roomUniqueId;
 let isPlayer1 = false;
 let playerName;
@@ -268,3 +267,8 @@ function joinGame() {
   socket.emit("joinChessGame", { roomUniqueId, playerName });
   //   requestRoomData(roomUniqueId); // Request room data for player 2
 }
+
+// document.addEventListener("DOMContentLoaded", function () {
+//   // Check if user is logged in
+//   console.log(user); // Access the global user object defined in index3.ejs
+// });

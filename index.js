@@ -10,6 +10,9 @@ const session = require("express-session");
 const MongoDBStore = require("connect-mongodb-session")(session);
 const authRouter = require("./client/routes/auth");
 const passport = require("./client/routes/passport");
+const RPSData = require("./models/RPSDATA");
+const ChessData = require("./models/ChessData");
+const TicTacToeData = require("./models/TicTacToeData");
 
 const app = express();
 const server = http.createServer(app);
@@ -17,6 +20,9 @@ const io = new Server(server);
 
 const PORT = 8080;
 const SESSION_SECRET = "konr fuuw tfla pmoj"; // Change this to a secure key
+const chessRooms = {};
+const ticTacToeRooms = {};
+const rpsRooms = {};
 
 // MongoDB session store
 const store = new MongoDBStore({
@@ -58,6 +64,31 @@ app.get("/", (req, res) => {
   const user = req.session.user || { username: "Guest" };
   const showDropdown = req.session.passport ? req.session.passport.user : null;
 
+  // Define your games array with updated links
+  const games = [
+    {
+      id: "rockpaperscissors",
+      title: "Rock Paper Scissors",
+      link: "/rockpaperscissors", // Example URL path
+      image: "space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      icon: "fas fa-hand-peace",
+    },
+    {
+      id: "tictactoe",
+      title: "Tic Tac Toe",
+      link: "/tictactoe", // Updated to match your route
+      image: "space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      icon: "fas fa-hand-peace",
+    },
+    {
+      id: "chess",
+      title: "Chess",
+      link: "/chess", // Example URL path
+      image: "space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      icon: "fas fa-chess",
+    },
+  ];
+
   res.render("index", {
     title: "Gaming Arena",
     user: {
@@ -65,33 +96,38 @@ app.get("/", (req, res) => {
       isLoggedIn: !!req.session.user,
     },
     showDropdown,
-    games: [
-      {
-        id: "rockpaperscissors",
-        title: "Rock Paper Scissors",
-        link: "index2.html",
-        image:
-          "space-game-background-neon-night-alien-landscape-free-vector.jpg",
-        icon: "fas fa-hand-peace",
-      },
-      {
-        id: "tictactoe",
-        title: "Tic Tac Toe",
-        link: "index3.html",
-        image:
-          "space-game-background-neon-night-alien-landscape-free-vector.jpg",
-        // iconImage: "strategic-plan.png",
-        icon: "fas fa-hand-peace",
-      },
-      {
-        id: "chess",
-        title: "Chess",
-        link: "index4.html",
-        image:
-          "space-game-background-neon-night-alien-landscape-free-vector.jpg",
-        icon: "fas fa-chess",
-      },
-    ],
+    games: games, // Pass the updated games array
+  });
+});
+
+app.get("/chess", (req, res) => {
+  const user = req.session.user || { username: "Guest" };
+  console.log(user);
+  res.render("index4", {
+    user: {
+      name: user.username,
+      isLoggedIn: !!req.session.user,
+    },
+  });
+});
+app.get("/tictactoe", (req, res) => {
+  const user = req.session.user || { username: "Guest" };
+
+  res.render("index3", {
+    user: {
+      name: user.username,
+      isLoggedIn: !!req.session.user,
+    },
+  });
+});
+app.get("/rockpaperscissors", (req, res) => {
+  const user = req.session.user || { username: "Guest" };
+
+  res.render("index2", {
+    user: {
+      name: user.username,
+      isLoggedIn: !!req.session.user,
+    },
   });
 });
 // Connect to MongoDB
