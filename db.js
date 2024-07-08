@@ -21,8 +21,8 @@ store.on("error", function (error) {
 const connectDB = async () => {
   try {
     await mongoose.connect(s1, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      // useNewUrlParser: true,
+      // useUnifiedTopology: true,
     });
     console.log("MongoDB connected");
   } catch (error) {

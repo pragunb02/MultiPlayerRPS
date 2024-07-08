@@ -1,73 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Multiplayer Chess Game</title>
-    <link rel="stylesheet" href="/public/css/chessboard-1.0.0.min.css">
-    <link rel="stylesheet" href="/public/css/custom.css">
+    <link rel="stylesheet" href="/public/css/chessboard-1.0.0.min.css" />
+    <link rel="stylesheet" href="/public/css/custom.css" />
     <script src="/public/js/jquery-3.7.0.min.js"></script>
     <script src="/public/js/chessboard-1.0.0.min.js"></script>
     <script src="/public/js/chess-0.10.3.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+    />
 
     <script>
-        let socket = io();
-        let playerColor = '<%= color %>';
-        console.log('Playing as ' + playerColor);
+      let socket = io();
+      let playerColor = "<%= color %>";
+      console.log("Playing as " + playerColor);
     </script>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="container">
-        <div class="timer">
-            <div id="nameWhite">name</div>
-            <div id="timerWhite">5:00</div>
-            <div id="nameBlack">name</div>
-            <div id="timerBlack">5:00</div>
+      <div class="timer">
+        <div id="nameWhite">name</div>
+        <div id="timerWhite">5:00</div>
+        <div id="nameBlack">name</div>
+        <div id="timerBlack">5:00</div>
+      </div>
+      <div id="myBoard" class="chessboard"></div>
+      <div class="status-pgn">
+        <label class="a">Status:</label>
+        <div id="status"></div>
+        <label class="b">PGN:</label>
+        <div class="pgns" id="pgn">
+          <div class="row">
+            <!-- style="display: none; width: 5px; height: 16;" -->
+            <ol id="white-moves" class="col"></ol>
+            <ol id="black-moves" class="col"></ol>
+          </div>
         </div>
-        <div id="myBoard" class="chessboard"></div>
-        <div class="status-pgn">
-            <label class="a">Status:</label>
-            <div id="status"></div>
-            <label class="b">PGN:</label>
-            <div class="pgns" id="pgn">
-                <div class="row">
-                    <!-- style="display: none; width: 5px; height: 16;" -->
-                    <ol id="white-moves" class="col">
 
-                    </ol>
-                    <ol id="black-moves" class="col">
-
-                    </ol>
-                </div>
-            </div>
-
-            <!-- Navigation Buttons Section -->
-            <div class="notation-navbar">
-                <div id="click-left" class="notation-controls">
-                    <i class="fa fa-chevron-left"></i>
-
-                </div>
-                <button id="reset-board" class="btn btn-dark">Reset</button>
-                <div id="click-right" class="notation-controls">
-                    <i class="fa fa-chevron-right"></i>
-                </div>
-                <!-- <div class="winnerarea">
+        <!-- Navigation Buttons Section -->
+        <div class="notation-navbar">
+          <div id="click-left" class="notation-controls">
+            <i class="fa fa-chevron-left"></i>
+          </div>
+          <button id="reset-board" class="btn btn-dark">Reset</button>
+          <div id="click-right" class="notation-controls">
+            <i class="fa fa-chevron-right"></i>
+          </div>
+          <!-- <div class="winnerarea">
                     <h1>Winner is Player1</h1>
                     <button>Challenge Game</button>
                 </div> -->
-            </div>
         </div>
-        <div class="winnerarea">
-            <h1>Congratulaions Winner is Player1</h1>
-            <button>Challenge Game</button>
-        </div>
+      </div>
+      <div class="winnerarea">
+        <h1>Congratulaions Winner is Player1</h1>
+        <button>Challenge Game</button>
+      </div>
     </div>
 
     <script src="/public/js/index.js"></script>
-</body>
-
+  </body>
 </html>
