@@ -3,7 +3,7 @@ const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
-const connectDB = require("./db");
+const { connectDB, store } = require("./db");
 const flash = require("connect-flash");
 const bodyParser = require("body-parser");
 const session = require("express-session");
@@ -28,7 +28,7 @@ const rpsRooms = {};
 connectDB();
 
 // Catch session store errors
-store.on("error", (error) => console.error("Session store error:", error));
+// store.on("error", (error) => console.error("Session store error:", error));
 
 // Middleware setup
 // app.use(express.static("public"));
