@@ -10,7 +10,7 @@ const session = require("express-session");
 const MongoDBStore = require("connect-mongodb-session")(session);
 const authRouter = require("./client/routes/auth");
 const passport = require("./client/routes/passport");
-const RPSData = require("./models/RPSDATA");
+const RPSData = require("./models/RPSData");
 const ChessData = require("./models/ChessData");
 const TicTacToeData = require("./models/TicTacToeData");
 
