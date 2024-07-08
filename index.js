@@ -24,11 +24,8 @@ const chessRooms = {};
 const ticTacToeRooms = {};
 const rpsRooms = {};
 
-// MongoDB session store
-const store = new MongoDBStore({
-  uri: "mongodb://127.0.0.1:27017/SessionStore",
-  collection: "sessions",
-});
+// Connect to MongoDB
+connectDB();
 
 // Catch session store errors
 store.on("error", (error) => console.error("Session store error:", error));
@@ -41,11 +38,13 @@ app.use(bodyParser.json());
 // Session configuration
 app.use(
   session({
-    secret: SESSION_SECRET,
+    secret: "yourSecretKey", // Replace with your actual secret
     resave: false,
-    saveUninitialized: true,
-    store,
-    cookie: { maxAge: 1800000 }, // 30 minutes
+    saveUninitialized: false,
+    store: store,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
+    },
   })
 );
 
@@ -130,8 +129,6 @@ app.get("/rockpaperscissors", (req, res) => {
     },
   });
 });
-// Connect to MongoDB
-connectDB();
 
 io.on("connection", (socket) => {
   console.log("A user connected");
