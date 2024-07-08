@@ -1,25 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EpicPixel Pandemonium</title>
-    <!-- Link to Font Awesome CSS -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
-    />
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body>
-    <header class="header">
-      <div class="container">
-        <div
-          id="profile-button"
-          class="fas fa-user"
-          onclick="toggleDropdown()"
-        ></div>
-        <% if (showDropdown) { %>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EpicPixel Pandemonium</title>
+  <!-- Link to Font Awesome CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+  <header class="header">
+    <div class="container">
+      <div id="profile-button" class="fas fa-user" onclick="toggleDropdown()"></div>
+      <% if (showDropdown) { %>
         <div id="account-options" class="dropdown">
           <div class="user-profile">
             <span>Welcome, <%= user.name %></span>
@@ -31,217 +26,224 @@
           </ul>
         </div>
         <% } else { %>
-        <div id="account-options" class="dropdown">
-          <div class="user-profile">
-            <span>Welcome Gamer</span>
+          <div id="account-options" class="dropdown">
+            <div class="user-profile">
+              <span>Welcome Gamer</span>
+            </div>
+            <ul>
+              <a href="/login-signup.html?a=0">Go to Login</a>
+              <a href="/login-signup.html?a=1">Go to Signup</a>
+            </ul>
           </div>
-          <ul>
-            <a href="/login-signup.html?a=0">Go to Login</a>
-            <a href="/login-signup.html?a=1">Go to Signup</a>
-          </ul>
-        </div>
-        <% } %>
-        <h1>EpicPixel Pandemonium</h1>
-        <div class="announcement-content">
-          <h2 class="blink" style="color: #0081f2">Trending Game Live Now!</h2>
-        </div>
+          <% } %>
+            <h1>EpicPixel Pandemonium</h1>
+            <div class="announcement-content">
+              <h2 class="blink" style="color: #0081f2">Trending Game Live Now!</h2>
+            </div>
+    </div>
+  </header>
+
+  <!-- Add Canvas Element for Animation -->
+  <canvas id="bouncingBallCanvas" width="100%" height="100%"></canvas>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <h1>Welcome to the Ultimate Gaming Nexus</h1>
+      <p>Experience the Action Live with Your Friends!.</p>
+      <a href="#" class="btn">Explore Now</a>
+    </div>
+  </section>
+
+  <div class="containers">
+    <div class="tree">
+      <div class="branch" style="--x: 0">
+        <span style="--i: 0"></span>
+        <span style="--i: 1"></span>
+        <span style="--i: 2"></span>
+        <span style="--i: 3"></span>
       </div>
-    </header>
-
-    <!-- Add Canvas Element for Animation -->
-    <canvas id="bouncingBallCanvas" width="100%" height="100%"></canvas>
-
-    <!-- Hero Section -->
-    <section class="hero">
-      <div class="container">
-        <h1>Welcome to the Ultimate Gaming Nexus</h1>
-        <p>Experience the Action Live with Your Friends!.</p>
-        <a href="#" class="btn">Explore Now</a>
+      <div class="branch" style="--x: 1">
+        <span style="--i: 0"></span>
+        <span style="--i: 1"></span>
+        <span style="--i: 2"></span>
+        <span style="--i: 3"></span>
       </div>
-    </section>
-
-    <div class="containers">
-      <div class="tree">
-        <div class="branch" style="--x: 0">
-          <span style="--i: 0"></span>
-          <span style="--i: 1"></span>
-          <span style="--i: 2"></span>
-          <span style="--i: 3"></span>
-        </div>
-        <div class="branch" style="--x: 1">
-          <span style="--i: 0"></span>
-          <span style="--i: 1"></span>
-          <span style="--i: 2"></span>
-          <span style="--i: 3"></span>
-        </div>
-        <div class="branch" style="--x: 2">
-          <span style="--i: 0"></span>
-          <span style="--i: 1"></span>
-          <span style="--i: 2"></span>
-          <span style="--i: 3"></span>
-        </div>
-        <div class="branch" style="--x: 3">
-          <span style="--i: 0"></span>
-          <span style="--i: 1"></span>
-          <span style="--i: 2"></span>
-          <span style="--i: 3"></span>
-        </div>
-        <div class="stem">
-          <span style="--i: 0"></span>
-          <span style="--i: 1"></span>
-          <span style="--i: 2"></span>
-          <span style="--i: 3"></span>
-        </div>
-        <span class="shadow"></span>
+      <div class="branch" style="--x: 2">
+        <span style="--i: 0"></span>
+        <span style="--i: 1"></span>
+        <span style="--i: 2"></span>
+        <span style="--i: 3"></span>
       </div>
-    </div>
-
-    <div class="box-of-star1">
-      <div class="star star-position1"></div>
-      <div class="star star-position2"></div>
-      <div class="star star-position3"></div>
-      <div class="star star-position4"></div>
-      <div class="star star-position5"></div>
-      <div class="star star-position6"></div>
-      <div class="star star-position7"></div>
-    </div>
-    <div class="box-of-star2">
-      <div class="star star-position1"></div>
-      <div class="star star-position2"></div>
-      <div class="star star-position3"></div>
-      <div class="star star-position4"></div>
-      <div class="star star-position5"></div>
-      <div class="star star-position6"></div>
-      <div class="star star-position7"></div>
-    </div>
-    <div class="box-of-star3">
-      <div class="star star-position1"></div>
-      <div class="star star-position2"></div>
-      <div class="star star-position3"></div>
-      <div class="star star-position4"></div>
-      <div class="star star-position5"></div>
-      <div class="star star-position6"></div>
-      <div class="star star-position7"></div>
-    </div>
-    <div class="box-of-star4">
-      <div class="star star-position1"></div>
-      <div class="star star-position2"></div>
-      <div class="star star-position3"></div>
-      <div class="star star-position4"></div>
-      <div class="star star-position5"></div>
-      <div class="star star-position6"></div>
-      <div class="star star-position7"></div>
-    </div>
-    <div data-js="astro" class="astronaut">
-      <div class="head"></div>
-      <div class="arm arm-left"></div>
-      <div class="arm arm-right"></div>
-      <div class="body">
-        <div class="panel"></div>
+      <div class="branch" style="--x: 3">
+        <span style="--i: 0"></span>
+        <span style="--i: 1"></span>
+        <span style="--i: 2"></span>
+        <span style="--i: 3"></span>
       </div>
-      <div class="leg leg-left"></div>
-      <div class="leg leg-right"></div>
-      <div class="schoolbag"></div>
+      <div class="stem">
+        <span style="--i: 0"></span>
+        <span style="--i: 1"></span>
+        <span style="--i: 2"></span>
+        <span style="--i: 3"></span>
+      </div>
+      <span class="shadow"></span>
     </div>
-    <div class="my-loader">
-      <div class="rubiks-cube">
-        <div class="face front">
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ffffff" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-        </div>
+  </div>
 
-        <div class="face back">
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ffffff" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-        </div>
-        <div class="face left">
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #ffffff" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-        </div>
-        <div class="face right">
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ffffff" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-        </div>
-        <div class="face top">
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #ffffff" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-        </div>
-        <div class="face bottom">
-          <div style="background: #ffffff" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-          <div style="background: #ffeb3b" class="cube"></div>
-          <div style="background: #4caf50" class="cube"></div>
-          <div style="background: #2196f3" class="cube"></div>
-          <div style="background: #ffffff" class="cube"></div>
-          <div style="background: #ff3d00" class="cube"></div>
-        </div>
+  <div class="box-of-star1">
+    <div class="star star-position1"></div>
+    <div class="star star-position2"></div>
+    <div class="star star-position3"></div>
+    <div class="star star-position4"></div>
+    <div class="star star-position5"></div>
+    <div class="star star-position6"></div>
+    <div class="star star-position7"></div>
+  </div>
+  <div class="box-of-star2">
+    <div class="star star-position1"></div>
+    <div class="star star-position2"></div>
+    <div class="star star-position3"></div>
+    <div class="star star-position4"></div>
+    <div class="star star-position5"></div>
+    <div class="star star-position6"></div>
+    <div class="star star-position7"></div>
+  </div>
+  <div class="box-of-star3">
+    <div class="star star-position1"></div>
+    <div class="star star-position2"></div>
+    <div class="star star-position3"></div>
+    <div class="star star-position4"></div>
+    <div class="star star-position5"></div>
+    <div class="star star-position6"></div>
+    <div class="star star-position7"></div>
+  </div>
+  <div class="box-of-star4">
+    <div class="star star-position1"></div>
+    <div class="star star-position2"></div>
+    <div class="star star-position3"></div>
+    <div class="star star-position4"></div>
+    <div class="star star-position5"></div>
+    <div class="star star-position6"></div>
+    <div class="star star-position7"></div>
+  </div>
+  <div data-js="astro" class="astronaut">
+    <div class="head"></div>
+    <div class="arm arm-left"></div>
+    <div class="arm arm-right"></div>
+    <div class="body">
+      <div class="panel"></div>
+    </div>
+    <div class="leg leg-left"></div>
+    <div class="leg leg-right"></div>
+    <div class="schoolbag"></div>
+  </div>
+  <div class="my-loader">
+    <div class="rubiks-cube">
+      <div class="face front">
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ffffff" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+      </div>
+
+      <div class="face back">
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ffffff" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+      </div>
+      <div class="face left">
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #ffffff" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+      </div>
+      <div class="face right">
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ffffff" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+      </div>
+      <div class="face top">
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #ffffff" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+      </div>
+      <div class="face bottom">
+        <div style="background: #ffffff" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
+        <div style="background: #ffeb3b" class="cube"></div>
+        <div style="background: #4caf50" class="cube"></div>
+        <div style="background: #2196f3" class="cube"></div>
+        <div style="background: #ffffff" class="cube"></div>
+        <div style="background: #ff3d00" class="cube"></div>
       </div>
     </div>
-    <div class="loader"></div>
-    <div class="loading-screen">
-      <div class="solid">
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-        <div class="side"></div>
-      </div>
+  </div>
+  <!-- <div class="loader"></div> -->
+  <div class="loading-screen">
+    <div class="solid">
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
+      <div class="side"></div>
     </div>
-
-    <div class="container carousel-container">
-      <h1 style="margin-top: 50px">Games Section</h1>
+  </div>
+<br>
+  <div class="rules">
+        <h1 style="color: #3423a6;">Guidelines</h1>
+        <p style="color: black;">1. All players are advised to register before joining a game.</p>
+        <p style="color: black;">2. If a player wants to play as a guest, their progress will not be stored.</p>
+        <p style="color: black;">3. Respect other players in chat and follow the game rules.</p>
+        <p style="color: black;">4. Cheating or exploiting bugs will result in a ban.</p>
+    </div>
+ <div class="container carousel-container">
+      <h1>Games Section</h1>
       <br />
       <div class="carousel-track">
         <% games.forEach(game=> { %>
@@ -283,177 +285,198 @@
       </div>
     </div>
 
-    <section class="announcement coming-soon">
-      <div class="announcement-content">
-        <h2 class="blink">Lodu Coming Soon!</h2>
-        <p style="color: black">Exciting new games arriving soon.</p>
-      </div>
-    </section>
-    <br />
-    <div class="game-icon">
-      <i style="color: aliceblue" class="fas fa-gamepad"></i>
+
+  <section class="announcement coming-soon">
+    <div class="announcement-content">
+      <h2 class="blink">Lodu Coming Soon!</h2>
+      <p style="color: black">Exciting new games arriving soon.</p>
     </div>
-    <footer class="footer">
-      
-        <p>&copy; 2024 Gaming Arena. All rights reserved.</p>
-        <ul class="social-icons">
-          <li>
-            <a href="#"><i class="fab fa-facebook"></i></a>
-          </li>
-          <li>
-            <a href="#"><i class="fab fa-twitter"></i></a>
-          </li>
-          <li>
-            <a href="#"><i class="fab fa-instagram"></i></a>
-          </li>
-        </ul>
-      </div>
-    </footer>
-    <style>
-      .hero {
-        position: relative;
-      }
+  </section>
+  <br />
+  <div class="game-icon">
+    <i style="color: aliceblue" class="fas fa-gamepad"></i>
+  </div>
+  <footer class="footer">
 
-      #bouncingBallCanvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%; /* Cover entire hero section */
-        height: 100%; /* Cover entire hero section */
-        z-index: -1; /* Ensure canvas is behind other content */
-      }
+    <p>&copy; 2024 Gaming Arena. All rights reserved.</p>
+    <ul class="social-icons">
+      <li>
+        <a href="#"><i class="fab fa-facebook"></i></a>
+      </li>
+      <li>
+        <a href="#"><i class="fab fa-twitter"></i></a>
+      </li>
+      <li>
+        <a href="#"><i class="fab fa-instagram"></i></a>
+      </li>
+    </ul>
+    </div>
+  </footer>
+  <style>
+    .hero {
+      position: relative;
+    }
+
+    #bouncingBallCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      /* Cover entire hero section */
+      height: 100%;
+      /* Cover entire hero section */
+      z-index: -1;
+      /* Ensure canvas is behind other content */
+    }
+  </style>
+      <style>
+        .rules {
+            position: absolute;
+            right: 0;
+            top: 700px;
+            padding: 10px;
+            background-color: #7180B9; /* Optional: Adds a background color for better visibility */
+            border: 1px solid #ccc; /* Optional: Adds a border for better visibility */
+        }
     </style>
-    <script>
-      const track = document.querySelector(".carousel-track");
-      const prevButton = document.getElementById("prevBtn");
-      const nextButton = document.getElementById("nextBtn");
+  <script>
+    const track = document.querySelector(".carousel-track");
+    const prevButton = document.getElementById("prevBtn");
+    const nextButton = document.getElementById("nextBtn");
 
-      const cardCount = track.children.length;
-      const cardWidth = track.children[0].offsetWidth + 20; // Width of game card + margin
-      let currentIndex = 1;
+    const cardCount = track.children.length;
+    const cardWidth = track.children[0].offsetWidth + 20; // Width of game card + margin
+    let currentIndex = 1;
 
-      function updateTrackPosition() {
-        track.style.transform = `translateX(-${currentIndex * cardWidth}px)`;
+    function updateTrackPosition() {
+      track.style.transform = `translateX(-${currentIndex * cardWidth}px)`;
+    }
+
+    nextButton.addEventListener("click", () => {
+      currentIndex = (currentIndex + 1) % cardCount;
+      updateTrackPosition();
+    });
+
+    prevButton.addEventListener("click", () => {
+      currentIndex = (currentIndex - 1 + cardCount) % cardCount;
+      updateTrackPosition();
+    });
+
+    // Clone the first and last cards to create an infinite loop effect
+    const firstCardClone = track.children[0].cloneNode(true);
+    const lastCardClone = track.children[cardCount - 1].cloneNode(true);
+    track.appendChild(firstCardClone);
+    track.insertBefore(lastCardClone, track.children[0]);
+
+    function toggleDropdown() {
+      var dropdown = document.getElementById("account-options");
+      if (dropdown.style.display === "none") {
+        dropdown.style.display = "block";
+      } else {
+        dropdown.style.display = "none";
       }
-
-      nextButton.addEventListener("click", () => {
-        currentIndex = (currentIndex + 1) % cardCount;
-        updateTrackPosition();
-      });
-
-      prevButton.addEventListener("click", () => {
-        currentIndex = (currentIndex - 1 + cardCount) % cardCount;
-        updateTrackPosition();
-      });
-
-      // Clone the first and last cards to create an infinite loop effect
-      const firstCardClone = track.children[0].cloneNode(true);
-      const lastCardClone = track.children[cardCount - 1].cloneNode(true);
-      track.appendChild(firstCardClone);
-      track.insertBefore(lastCardClone, track.children[0]);
-
-      function toggleDropdown() {
+    }
+    window.onclick = function (event) {
+      if (!event.target.matches("#profile-button")) {
         var dropdown = document.getElementById("account-options");
-        if (dropdown.style.display === "none") {
-          dropdown.style.display = "block";
-        } else {
+        if (dropdown.style.display === "block") {
           dropdown.style.display = "none";
         }
       }
-      window.onclick = function (event) {
-        if (!event.target.matches("#profile-button")) {
-          var dropdown = document.getElementById("account-options");
-          if (dropdown.style.display === "block") {
-            dropdown.style.display = "none";
-          }
-        }
-      };
-      updateTrackPosition();
+    };
+    updateTrackPosition();
 
-      // document
-      //   .getElementById("logoutButton")
-      //   .addEventListener("click", function () {
-      //     fetch("./auth/logout", {
-      //       method: "POST",
-      //     })
-      //       .then((response) => response.json())
-      //       .then((data) => {
-      //         if (data.success) {
-      //           window.location.href = ".index.ejs";
-      //         }
-      //       })
-      //       .catch((error) => {
-      //         console.error("Error:", error);
-      //       });
-      //   });
-      const canvas = document.getElementById("bouncingBallCanvas");
-      const ctx = canvas.getContext("2d");
-      const circles = [];
+    // document
+    //   .getElementById("logoutButton")
+    //   .addEventListener("click", function () {
+    //     fetch("./auth/logout", {
+    //       method: "POST",
+    //     })
+    //       .then((response) => response.json())
+    //       .then((data) => {
+    //         if (data.success) {
+    //           window.location.href = ".index.ejs";
+    //         }
+    //       })
+    //       .catch((error) => {
+    //         console.error("Error:", error);
+    //       });
+    //   });
+    const canvas = document.getElementById("bouncingBallCanvas");
+    const ctx = canvas.getContext("2d");
+    const circles = [];
 
-      function createCircle(x, y, dx, dy, radius, color) {
-        return { x, y, dx, dy, radius, color };
+    function createCircle(x, y, dx, dy, radius, color) {
+      return { x, y, dx, dy, radius, color };
+    }
+
+    function drawCircle(circle) {
+      ctx.beginPath();
+      ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+      ctx.fillStyle = circle.color;
+      ctx.shadowColor = circle.color; // Add shadow color same as circle color
+      ctx.shadowBlur = 10; // Blur effect to make it brighter
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function updateCircle(circle) {
+      if (
+        circle.x + circle.dx > canvas.width - circle.radius ||
+        circle.x + circle.dx < circle.radius
+      ) {
+        circle.dx = -circle.dx;
+      }
+      if (
+        circle.y + circle.dy > canvas.height - circle.radius ||
+        circle.y + circle.dy < circle.radius
+      ) {
+        circle.dy = -circle.dy;
+      }
+      circle.x += circle.dx;
+      circle.y += circle.dy;
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const circle of circles) {
+        drawCircle(circle);
+        updateCircle(circle);
       }
 
-      function drawCircle(circle) {
-        ctx.beginPath();
-        ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
-        ctx.fillStyle = circle.color;
-        ctx.shadowColor = circle.color; // Add shadow color same as circle color
-        ctx.shadowBlur = 10; // Blur effect to make it brighter
-        ctx.fill();
-        ctx.closePath();
+      requestAnimationFrame(animate);
+    }
+
+    function initCircles(count) {
+      for (let i = 0; i < count; i++) {
+        const radius = Math.random() * 20 + 10;
+        const x = Math.random() * (canvas.width - 2 * radius) + radius;
+        const y = Math.random() * (canvas.height - 2 * radius) + radius;
+        const dx = (Math.random() - 0.5) * 4;
+        const dy = (Math.random() - 0.5) * 4;
+        const color = `rgba(${Math.floor(Math.random() * 256)}, ${Math.floor(
+          Math.random() * 256
+        )}, ${Math.floor(Math.random() * 256)}, 0.5)`;
+        // x = y;
+        circles.push(createCircle(x, y, dx, dy, radius, color));
       }
+    }
 
-      function updateCircle(circle) {
-        if (
-          circle.x + circle.dx > canvas.width - circle.radius ||
-          circle.x + circle.dx < circle.radius
-        ) {
-          circle.dx = -circle.dx;
-        }
-        if (
-          circle.y + circle.dy > canvas.height - circle.radius ||
-          circle.y + circle.dy < circle.radius
-        ) {
-          circle.dy = -circle.dy;
-        }
-        circle.x += circle.dx;
-        circle.y += circle.dy;
-      }
+    // Set canvas dimensions to match hero section
+    const heroSection = document.querySelector(".hero");
+    canvas.width = heroSection.offsetWidth;
+    canvas.height = heroSection.offsetHeight;
 
-      function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    initCircles(10);
+    animate();
+  </script>
+  <!-- <script>document.addEventListener("DOMContentLoaded", function() {
+  setTimeout(function() {
+    document.querySelector('.loading-screen').style.display = 'none';
+  }, 2000); // Adjust the delay as needed
+}); -->
+<!-- </script> -->
+</body>
 
-        for (const circle of circles) {
-          drawCircle(circle);
-          updateCircle(circle);
-        }
-
-        requestAnimationFrame(animate);
-      }
-
-      function initCircles(count) {
-        for (let i = 0; i < count; i++) {
-          const radius = Math.random() * 20 + 10;
-          const x = Math.random() * (canvas.width - 2 * radius) + radius;
-          const y = Math.random() * (canvas.height - 2 * radius) + radius;
-          const dx = (Math.random() - 0.5) * 4;
-          const dy = (Math.random() - 0.5) * 4;
-          const color = `rgba(${Math.floor(Math.random() * 256)}, ${Math.floor(
-            Math.random() * 256
-          )}, ${Math.floor(Math.random() * 256)}, 0.5)`;
-          // x = y;
-          circles.push(createCircle(x, y, dx, dy, radius, color));
-        }
-      }
-
-      // Set canvas dimensions to match hero section
-      const heroSection = document.querySelector(".hero");
-      canvas.width = heroSection.offsetWidth;
-      canvas.height = heroSection.offsetHeight;
-
-      initCircles(10);
-      animate();
-    </script>
-  </body>
 </html>

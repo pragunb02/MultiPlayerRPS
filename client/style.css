@@ -9,7 +9,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  /* overflow: hidden; */
+  overflow-y: auto;
 }
 
 body {
@@ -316,26 +316,16 @@ game-card:hover {
     opacity: 0.6;
   }
 }
-/* canvas {
-  display: block;
-  margin: 0 auto;
-  border: 1px solid #000; 
-}
-#bouncingBallCanvas {
-  border: 2px solid #000; 
-} */
 canvas {
   position: fixed;
   top: 0;
   left: 0;
-  /* width: 100vw;
-  height: 100vh; */
+  width: 100vw;
+  height: 100vh;
   z-index: -1;
-  /* display: block; */
+  display: block;
 }
-body {
-  overflow-y: auto; /* or overflow-y: scroll; */
-}
+
 .containers {
   width: 100%;
   display: flex;
@@ -409,6 +399,8 @@ body {
   transform-style: preserve-3d;
   transform: rotateX(90deg) translateZ(-65px);
 }
+
+/* // snow start*/
 @keyframes snow {
   0% {
     opacity: 0;
@@ -441,11 +433,23 @@ body {
 .box-of-star4 {
   width: 100%;
   position: absolute;
-  z-index: 10;
+  z-index: 1;
   left: 0;
-  top: 0;
+  top: 10;
   transform: translateY(0px);
-  height: 700px;
+  height: 300px;
+  overflow: hidden;
+}
+
+.astronaut {
+  width: 250px;
+  height: 300px;
+  position: absolute;
+  z-index: 11;
+  top: calc(50% - 150px);
+  right: 50px; /* Reset the right property */
+  left: 90px; /* Adjust this value to position the astronaut on the left */
+  animation: astronaut 5s linear infinite;
 }
 
 .box-of-star1 {
@@ -474,27 +478,25 @@ body {
   opacity: 0.7;
 }
 
-.star:before {
+.star:before,
+.star:after {
   content: "";
+  position: absolute;
+  background-color: #fff;
+  border-radius: 50%;
+}
+
+.star:before {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background-color: #fff;
-  position: absolute;
-  z-index: 10;
   top: 80px;
   left: 70px;
   opacity: 0.7;
 }
 
 .star:after {
-  content: "";
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background-color: #fff;
-  position: absolute;
-  z-index: 10;
   top: 8px;
   left: 170px;
   opacity: 0.9;
@@ -534,8 +536,7 @@ body {
   top: 30px;
   left: 1480px;
 }
-
-.astronaut {
+/* .astronaut {
   width: 250px;
   height: 300px;
   position: absolute;
@@ -543,8 +544,7 @@ body {
   top: calc(50% - 150px);
   left: calc(50% - 125px);
   animation: astronaut 5s linear infinite;
-  margin: 0px 0px 0px 500px;
-}
+} */
 
 .schoolbag {
   width: 100px;
@@ -602,6 +602,15 @@ body {
   border-radius: 5px;
   box-shadow: 92px 0px 0px #618095;
 }
+body {
+  overflow-x: hidden;
+}
+
+/* .container {
+  position: relative;
+  width: 100%;
+  height: 700px;
+} */
 
 .body {
   width: 85px;
@@ -755,6 +764,8 @@ body {
   border-radius: 0 30px 0 0;
   border-bottom: 10px solid #b0cfe4;
 }
+
+/* // snow end*/
 .loader,
 .loader::before,
 .loader::after {
@@ -1178,14 +1189,14 @@ body {
 .loading-screen {
   position: absolute;
   right: 0;
-  bottom: -20%; /* Move up from the bottom */
+  bottom: 0%; /* Move up from the bottom */
   width: 50%;
   height: 50%; /* Adjust height */
   display: flex;
   justify-content: center;
   align-items: center;
   /* background-color: rgba(255, 255, 255, 0.8); */
-  z-index: 1000;
+  z-index: 10;
 }
 .solid {
   width: 50px;
@@ -1193,4 +1204,60 @@ body {
   display: flex;
   flex-wrap: wrap;
   transform: rotate(45deg);
+}
+.spinner {
+  width: 44px;
+  height: 44px;
+  animation: spinner-y0fdc1 2s infinite ease;
+  transform-style: preserve-3d;
+}
+
+.spinner > div {
+  background-color: rgba(0, 77, 255, 0.2);
+  height: 100%;
+  position: absolute;
+  width: 100%;
+  border: 2px solid #004dff;
+}
+
+.spinner div:nth-of-type(1) {
+  transform: translateZ(-22px) rotateY(180deg);
+}
+
+.spinner div:nth-of-type(2) {
+  transform: rotateY(-270deg) translateX(50%);
+  transform-origin: top right;
+}
+
+.spinner div:nth-of-type(3) {
+  transform: rotateY(270deg) translateX(-50%);
+  transform-origin: center left;
+}
+
+.spinner div:nth-of-type(4) {
+  transform: rotateX(90deg) translateY(-50%);
+  transform-origin: top center;
+}
+
+.spinner div:nth-of-type(5) {
+  transform: rotateX(-90deg) translateY(50%);
+  transform-origin: bottom center;
+}
+
+.spinner div:nth-of-type(6) {
+  transform: translateZ(22px);
+}
+
+@keyframes spinner-y0fdc1 {
+  0% {
+    transform: rotate(45deg) rotateX(-25deg) rotateY(25deg);
+  }
+
+  50% {
+    transform: rotate(45deg) rotateX(-385deg) rotateY(25deg);
+  }
+
+  100% {
+    transform: rotate(45deg) rotateX(-385deg) rotateY(385deg);
+  }
 }
