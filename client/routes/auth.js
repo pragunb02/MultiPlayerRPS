@@ -104,10 +104,16 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// Logout route
 router.post("/logout", (req, res) => {
   // Logout logic
   try {
+    if (!req.session) {
+      // If there's no session, respond as if the logout was successful
+      return res
+        .status(200)
+        .json({ success: true, message: "Logout successful" });
+    }
+
     // Clear the user's session to log them out
     req.session.destroy((err) => {
       if (err) {

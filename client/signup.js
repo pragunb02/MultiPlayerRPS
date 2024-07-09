@@ -1,8 +1,26 @@
 document.addEventListener("DOMContentLoaded", function () {
+  document
+    .getElementById("logoutButton")
+    .addEventListener("click", function () {
+      fetch("./auth/logout", {
+        method: "POST",
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.success) {
+            window.location.href = ".";
+          }
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+        });
+    });
+
   const signupLink = document.getElementById("signup-link");
   const loginLink = document.getElementById("login-link");
   const loginCard = document.querySelector(".login-card");
   const signupCard = document.querySelector(".signup-card");
+  const msg = document.querySelector("i");
 
   signupLink.addEventListener("click", (event) => {
     event.preventDefault();
@@ -71,18 +89,30 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (data.success) {
           // Redirect or perform actions upon successful login
-          // window.location.href = "/";
+          msg.innerText = "Login successful! Redirecting...";
+          msg.style.color = "green";
+          setTimeout(() => {
+            window.location.href = ".";
+          }, 1500);
+          // window.location.href = ".";
         } else {
           // Handle unsuccessful login (display error message, etc.)
           // alert("Authentication failed. Please check your credentials.");
+          msg.innerText =
+            "Authentication failed. Please check your credentials.";
+          msg.style.color = "red";
         }
       } else {
         console.error("Failed to login:", response.statusText);
         // Handle non-200 HTTP status (e.g., 400 Bad Request)
+        msg.innerText = "Login failed. Please try again.";
+        msg.style.color = "red";
       }
     } catch (error) {
       console.error("Error:", error);
       // Handle network errors or other exceptions
+      msg.innerText = "An error occurred while trying to sign in.";
+      msg.style.color = "red";
       // alert("An error occurred while trying to sign in.");
     }
   });
@@ -103,7 +133,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const confirmPassword = confirmPasswordInput.value;
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      msg.innerText = "Passwords do not match!";
+      msg.style.color = "red";
       return;
     }
 
@@ -123,20 +154,29 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("Data:", data);
 
         if (data.success) {
+          msg.innerText = "Signup successful! Redirecting...";
+          msg.style.color = "green";
+          setTimeout(() => {
+            window.location.href = ".";
+          }, 1500); // Wait for 1.5 seconds before redirecting
           // Redirect or perform actions upon successful signup
-          // window.location.href = "/";
+          // window.location.href = ".";
         } else {
           // Handle unsuccessful signup (display error message, etc.)
           // alert("Signup failed. Please try again.");
+          msg.innerText = "Signup failed. Please try again.";
+          msg.style.color = "red";
         }
       } else {
         console.error("Failed to signup:", response.statusText);
+        msg.innerText = "Signup failed. Please try again.";
+        msg.style.color = "red";
         // Handle non-200 HTTP status (e.g., 400 Bad Request)
       }
     } catch (error) {
       console.error("Error:", error);
-      // Handle network errors or other exceptions
-      // alert("An error occurred while trying to sign up.");
+      msg.innerText = "An error occurred while trying to sign up.";
+      msg.style.color = "red";
     }
   });
 });
