@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profile Analytics</title>
+    <!-- Link to Font Awesome CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #dee2ff; /* Dark background */
+        color: #fff; /* Light text */
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      header {
+        /* background-color: #0081f2; */
+        /* color: white; */
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      header {
+        background: linear-gradient(
+          to right,
+          #141e30,
+          #4b0082
+        ); /* Gradient background */
+        /* padding: 20px 0; */
+        text-align: center;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        position: relative;
+      }
+
+      header nav ul {
+        list-style: none;
+        display: flex;
+        gap: 20px;
+      }
+      header nav ul li {
+        display: inline;
+      }
+      header nav ul li a {
+        color: white;
+        text-decoration: none;
+      }
+      .navbar {
+        display: flex;
+        flex-direction: column;
+        width: 200px;
+        background-color: #f4f4f4;
+        padding: 10px;
+        height: 180px;
+        /* change height */
+      }
+      .navbar .nav-btn {
+        background-color: #ddd;
+        border: none;
+        padding: 10px;
+        margin: 5px 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      .navbar .nav-btn.active {
+        background-color: #bbb;
+      }
+      main {
+        display: flex;
+      }
+      .section {
+        display: none;
+        padding: 20px;
+        flex-grow: 1;
+      }
+      .section.active {
+        display: block;
+      }
+      .card {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+      .no-data {
+        color: #666;
+        font-style: italic;
+      }
+      h1.ok {
+        font-family: "Orbitron", sans-serif; /* Update to the desired font */
+        font-size: 2.5em;
+        background: linear-gradient(90deg, #ff7f50, #1e90ff);
+        -webkit-background-clip: text;
+        color: transparent;
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+        text-align: center;
+        margin: 0;
+        padding: 0.5em 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">
+        <h1 class="ok">EpicPixel Pandemonium</h1>
+      </div>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/profile">Profile</a></li>
+          <!-- Add more navigation links as needed -->
+        </ul>
+      </nav>
+      <div class="profile">
+        <a href="/profile"><i class="fas fa-user-circle"></i> Profile</a>
+      </div>
+    </header>
+    <main>
+      <!-- Navbar for account and games -->
+      <div class="navbar">
+        <button class="nav-btn active" onclick="toggleSection('account')">
+          Account
+        </button>
+        <button class="nav-btn" onclick="toggleSection('chess')">Chess</button>
+        <button class="nav-btn" onclick="toggleSection('rockpaperscissors')">
+          Rock Paper Scissors
+        </button>
+        <button class="nav-btn" onclick="toggleSection('tictactoe')">
+          Tic Tac Toe
+        </button>
+      </div>
+
+      <!-- Account Section -->
+      <section id="account" class="section active">
+        <h1 style="margin-top: 0px; color: #0081f2">
+          Welcome, <%= username %>
+        </h1>
+      </section>
+      <!-- Chess Statistics Section -->
+      <section id="chess" class="section">
+        <h1 style="margin-top: 0px; color: #0081f2">Chess Statistics</h1>
+        <div id="chess-stats">
+          <% if (chessStats.length > 0) { %> <%
+          chessStats.forEach(function(game) { %>
+          <div class="card">
+            <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
+            <p><strong>Winner:</strong> <%= game.winner %></p>
+            <p><strong>Own User:</strong> <%= username %></p>
+            <p>
+              <strong>Opponent:</strong> <%= game.player1Name === username ?
+              game.player2Name : game.player1Name %>
+            </p>
+            <p><strong>Created by:</strong> <%= game.player1Name %></p>
+          </div>
+          <% }); %> <% } else { %>
+          <p class="no-data">No chess games found.</p>
+          <% } %>
+        </div>
+        <% if (chessStats.length > 0) { %>
+        <div style="height: 500px">
+          <canvas id="chess-chart"></canvas>
+        </div>
+        <% } %>
+      </section>
+
+      <!-- Rock Paper Scissors Statistics Section -->
+      <section id="rockpaperscissors" class="section">
+        <h1 style="margin-top: 0px; color: #0081f2">
+          Rock Paper Scissors Statistics
+        </h1>
+        <div id="rps-stats">
+          <% if (rpsStats.length > 0) { %> <% rpsStats.forEach(function(game) {
+          %>
+          <div class="card">
+            <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
+            <p><strong>Winner:</strong> <%= game.winner %></p>
+            <p><strong>Own User:</strong> <%= username %></p>
+            <p>
+              <strong>Opponent:</strong> <%= game.player1Name === username ?
+              game.player2Name : game.player1Name %>
+            </p>
+            <p><strong>Created by:</strong> <%= game.player1Name %></p>
+          </div>
+          <% }); %> <% } else { %>
+          <p class="no-data">No rock paper scissors games found.</p>
+          <% } %>
+        </div>
+        <% if (rpsStats.length > 0) { %>
+        <div style="height: 300px">
+          <canvas id="rps-chart"></canvas>
+        </div>
+        <% } %>
+      </section>
+
+      <!-- Tic Tac Toe Statistics Section -->
+      <section id="tictactoe" class="section">
+        <h1 style="margin-top: 0px; color: #0081f2">Tic Tac Toe Statistics</h1>
+        <div id="tictactoe-stats">
+          <% if (ticTacToeStats.length > 0) { %> <%
+          ticTacToeStats.forEach(function(game) { %>
+          <div class="card">
+            <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
+            <p><strong>Winner:</strong> <%= game.winner %></p>
+            <p><strong>Own User:</strong> <%= username %></p>
+            <p>
+              <strong>Opponent:</strong> <%= game.player1Name === username ?
+              game.player2Name : game.player1Name %>
+            </p>
+            <p><strong>Created by:</strong> <%= game.player1Name %></p>
+          </div>
+          <% }); %> <% } else { %>
+          <p class="no-data">No tic tac toe games found.</p>
+          <% } %>
+        </div>
+        <% if (ticTacToeStats.length > 0) { %>
+        <div style="height: 300px">
+          <canvas id="tictactoe-chart"></canvas>
+        </div>
+        <% } %>
+      </section>
+    </main>
+
+    <!-- Script to handle section toggling and Chart.js -->
+    <script>
+              function toggleSection(sectionId) {
+                // Hide all sections
+                const sections = document.querySelectorAll(".section");
+                sections.forEach(function (section) {
+                  section.classList.remove("active");
+                });
+
+                // Show the selected section
+                const selectedSection = document.getElementById(sectionId);
+                if (selectedSection) {
+                  selectedSection.classList.add("active");
+                }
+
+                // Update button active state
+                const buttons = document.querySelectorAll(".nav-btn");
+                buttons.forEach(function (btn) {
+                  btn.classList.remove("active");
+                });
+
+                document
+                  .querySelector(`.nav-btn[onclick="toggleSection('${sectionId}')"]`)
+                  .classList.add("active");
+              }
+             document.addEventListener("DOMContentLoaded", function () {
+        // Pass the statistics data from the server to the client-side script
+        const chessStats = <%- JSON.stringify(chessStats) %>;
+        const rpsStats = <%- JSON.stringify(rpsStats) %>;
+        const ticTacToeStats = <%- JSON.stringify(ticTacToeStats) %>;
+        const username = "<%= username %>";
+
+        console.log(chessStats);
+        console.log(rpsStats);
+        console.log(ticTacToeStats);
+        console.log(username);
+
+        // Function to calculate wins for a given username
+        function calculateWins(stats, username) {
+          if (!Array.isArray(stats)) {
+            console.error("Stats is not an array:", stats);
+            return 0; // Handle cases where stats is not an array
+          }
+          return stats.filter((game) => game.winner && game.winner.includes(username)).length;
+        }
+
+        // Generate charts
+        if (chessStats.length > 0) {
+          const chessWins = calculateWins(chessStats, username);
+          generateChart(
+            "chess-chart",
+            ["Wins", "Total Games"],
+            [chessWins, chessStats.length]
+          );
+        }
+
+        if (rpsStats.length > 0) {
+          const rpsWins = calculateWins(rpsStats, username);
+          generateChart(
+            "rps-chart",
+            ["Wins", "Total Games"],
+            [rpsWins, rpsStats.length]
+          );
+        }
+
+        if (ticTacToeStats.length > 0) {
+          const ticTacToeWins = calculateWins(ticTacToeStats, username);
+          generateChart(
+            "tictactoe-chart",
+            ["Wins", "Total Games"],
+            [ticTacToeWins, ticTacToeStats.length]
+          );
+        }
+
+        function generateChart(chartId, labels, data) {
+          const canvas = document.getElementById(chartId);
+          if (!canvas) return; // Ensure the canvas element exists
+          console.log(data);
+          const ctx = canvas.getContext("2d");
+          new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: "Count",
+                  data: data,
+                  backgroundColor: [
+                    "rgba(75, 192, 192, 0.2)",
+                    "rgba(255, 99, 132, 0.2)",
+                  ],
+                  borderColor: [
+                    "rgba(75, 192, 192, 1)",
+                    "rgba(255, 99, 132, 1)",
+                  ],
+                  borderWidth: 1,
+                },
+              ],
+            },
+            options: {
+              scales: {
+                y: {
+                  beginAtZero: true,
+                },
+              },
+              responsive: true,
+              maintainAspectRatio: false,
+            },
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
