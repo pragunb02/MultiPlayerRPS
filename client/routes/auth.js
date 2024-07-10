@@ -62,7 +62,7 @@ router.post("/signup", async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res
-        .status(400)
+        .status(299)
         .json({ success: false, message: "User already exists." });
     }
 
@@ -106,6 +106,7 @@ router.post("/signup", async (req, res) => {
 
 router.post("/logout", (req, res) => {
   // Logout logic
+  console.log("hehe");
   try {
     if (!req.session) {
       // If there's no session, respond as if the logout was successful

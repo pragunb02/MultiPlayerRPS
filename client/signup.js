@@ -1,21 +1,4 @@
 document.addEventListener("DOMContentLoaded", function () {
-  document
-    .getElementById("logoutButton")
-    .addEventListener("click", function () {
-      fetch("./auth/logout", {
-        method: "POST",
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          if (data.success) {
-            window.location.href = ".";
-          }
-        })
-        .catch((error) => {
-          console.error("Error:", error);
-        });
-    });
-
   const signupLink = document.getElementById("signup-link");
   const loginLink = document.getElementById("login-link");
   const loginCard = document.querySelector(".login-card");
@@ -126,6 +109,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const signupBtn = document.querySelector(".signup-card .btn");
 
   signupForm.addEventListener("submit", async (e) => {
+    const msg = document.querySelector("i.sg");
     e.preventDefault();
     const username = usernameInput.value;
     const email = signupEmailInput.value;
@@ -164,7 +148,8 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           // Handle unsuccessful signup (display error message, etc.)
           // alert("Signup failed. Please try again.");
-          msg.innerText = "Signup failed. Please try again.";
+          msg.innerText =
+            "User already exists. Please try again. (Email should be Unique)";
           msg.style.color = "red";
         }
       } else {

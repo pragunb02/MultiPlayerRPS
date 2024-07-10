@@ -55,6 +55,12 @@ app.set("views", path.join(__dirname, "client"));
 
 // Route handling
 // Passport middleware
+function isAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.redirect("login-signup.html?a=0"); // Redirect to the login page if not authenticated
+}
 app.use(passport.initialize());
 app.use(passport.session()); // This is essential for persistent login sessions
 app.use("/auth", authRouter);
@@ -128,6 +134,31 @@ app.get("/rockpaperscissors", (req, res) => {
       isLoggedIn: !!req.session.user,
     },
   });
+});
+
+// GET profile page
+app.get("/userprofile", isAuthenticated, async (req, res) => {
+  try {
+    // Assuming you have authentication middleware setting req.user
+    const username = req.user.username;
+
+    // Fetch game statistics from MongoDB
+    const chessStats = await ChessData.find({
+      $or: [{ player1Name: username }, { player2Name: username }],
+    });
+    const rpsStats = await RPSData.find({
+      $or: [{ player1Name: username }, { player2Name: username }],
+    });
+    const ticTacToeStats = await TicTacToeData.find({
+      $or: [{ player1Name: username }, { player2Name: username }],
+    });
+
+    // Render profile page with statistics
+    res.render("profile", { username, chessStats, rpsStats, ticTacToeStats });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 io.on("connection", (socket) => {

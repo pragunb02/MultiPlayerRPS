@@ -15,9 +15,14 @@
     <div class="container">
       <div id="profile-button" class="fas fa-user" onclick="toggleDropdown()"></div>
       <% if (showDropdown) { %>
+        <!-- Loggned user -->
         <div id="account-options" class="dropdown">
           <div class="user-profile">
-            <span>Welcome, <%= user.name %></span>
+            <span>Welcome, <span style="color: red; font-weight: bold;">
+                <%= user.name %>
+              </span></span>
+
+
           </div>
           <ul>
             <a href="/userprofile">Profile</a>
@@ -250,34 +255,34 @@
   <div class="container carousel-container">
     <h1 style="color: #00a6fb;">Explore the Games Section</h1>
     <br />
-   <div class="carousel-track">
-  <% games.forEach(game => { %>
-    <div id="<%= game.id %>" class="game-card">
-      <a href="<%= game.link %>">
-        <div class="game-img">
-          <img src="<%= game.image %>" alt="<%= game.title %>" />
+    <div class="carousel-track">
+      <% games.forEach(game=> { %>
+        <div id="<%= game.id %>" class="game-card">
+          <a href="<%= game.link %>">
+            <div class="game-img">
+              <img src="<%= game.image %>" alt="<%= game.title %>" />
+            </div>
+            <div class="game-icon">
+              <% if (game.iconImage) { %>
+                <img src="<%= game.iconImage %>" alt="<%= game.title %> Icon" id="yo" />
+                <% } else { %>
+                  <i class="<%= game.icon %>"></i>
+                  <% } %>
+            </div>
+            <div class="game-title">
+              <%= game.title %>
+            </div>
+          </a>
         </div>
-        <div class="game-icon">
-          <% if (game.iconImage) { %>
-            <img src="<%= game.iconImage %>" alt="<%= game.title %> Icon" id="yo" />
-          <% } else { %>
-            <i class="<%= game.icon %>"></i>
-          <% } %>
-        </div>
-        <div class="game-title">
-          <%= game.title %>
-        </div>
-      </a>
+        <% }); %>
+          <div id="coming-soon" class="game-card coming-soon">
+            <div class="game-img">
+              <img src="5241629.jpg" alt="Coming Soon" />
+            </div>
+            <div class="game-icon"><i class="fas fa-hourglass-half"></i></div>
+            <div class="game-title">More Games Coming Soon!</div>
+          </div>
     </div>
-  <% }); %>
-  <div id="coming-soon" class="game-card coming-soon">
-    <div class="game-img">
-      <img src="5241629.jpg" alt="Coming Soon" />
-    </div>
-    <div class="game-icon"><i class="fas fa-hourglass-half"></i></div>
-    <div class="game-title">More Games Coming Soon!</div>
-  </div>
-</div>
 
     <div class="carousel-controls">
       <button class="carousel-button" id="prevBtn">
@@ -456,6 +461,27 @@
 
     initCircles(10);
     animate();
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document
+        .getElementById("logoutButton")
+        .addEventListener("click", function () {
+          console.log("dwewe");
+          fetch("./auth/logout", {
+            method: "POST",
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.success) {
+                window.location.href = ".";
+              }
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+            });
+        });
+    })
   </script>
 </body>
 
