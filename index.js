@@ -2,13 +2,15 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
-const mongoose = require("mongoose");
+// const mongoose = require("mongoose");
 const { connectDB, store } = require("./db");
-const flash = require("connect-flash");
+// const flash = require("connect-flash");
 const bodyParser = require("body-parser");
 const session = require("express-session");
-const MongoDBStore = require("connect-mongodb-session")(session);
+// const MongoDBStore = require("connect-mongodb-session")(session);
 const authRouter = require("./client/routes/auth");
+const gamesRoutes = require("./client/routes/gamesRoutes");
+const userRoutes = require("./client/routes/userRoutes");
 const passport = require("./client/routes/passport");
 const RPSData = require("./models/RPSData");
 const ChessData = require("./models/ChessData");
@@ -19,16 +21,13 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = 8080;
-const SESSION_SECRET = "konr fuuw tfla pmoj"; // Change this to a secure key
+const SESSION_SECRET = "konr fuuw tfla pmoj";
 const chessRooms = {};
 const ticTacToeRooms = {};
 const rpsRooms = {};
 
 // Connect to MongoDB
 connectDB();
-
-// Catch session store errors
-// store.on("error", (error) => console.error("Session store error:", error));
 
 // Middleware setup
 // app.use(express.static("public"));
@@ -38,7 +37,7 @@ app.use(bodyParser.json());
 // Session configuration
 app.use(
   session({
-    secret: "yourSecretKey", // Replace with your actual secret
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: store,
@@ -53,43 +52,45 @@ app.use(express.static(path.join(__dirname, "client")));
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "client"));
 
-// Route handling
-// Passport middleware
 function isAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
     return next();
   }
-  res.redirect("login-signup.html?a=0"); // Redirect to the login page if not authenticated
+  res.redirect("../login-signup.html?a=0");
 }
 app.use(passport.initialize());
 app.use(passport.session()); // This is essential for persistent login sessions
 app.use("/auth", authRouter);
+app.use("/games", gamesRoutes);
+app.use("/u/:username", isAuthenticated, userRoutes);
 
 app.get("/", (req, res) => {
   const user = req.session.user || { username: "Guest" };
   const showDropdown = req.session.passport ? req.session.passport.user : null;
 
-  // Define your games array with updated links
   const games = [
     {
       id: "rockpaperscissors",
       title: "Rock Paper Scissors",
-      link: "/rockpaperscissors", // Example URL path
-      image: "space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      link: "/games/rockpaperscissors",
+      image:
+        "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
       icon: "fas fa-hand-peace",
     },
     {
       id: "tictactoe",
       title: "Tic Tac Toe",
-      link: "/tictactoe", // Updated to match your route
-      image: "space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      link: "/games/tictactoe",
+      image:
+        "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
       icon: "fas fa-hand-peace",
     },
     {
       id: "chess",
       title: "Chess",
-      link: "/chess", // Example URL path
-      image: "space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      link: "/games/chess",
+      image:
+        "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
       icon: "fas fa-chess",
     },
   ];
@@ -101,64 +102,8 @@ app.get("/", (req, res) => {
       isLoggedIn: !!req.session.user,
     },
     showDropdown,
-    games: games, // Pass the updated games array
+    games: games,
   });
-});
-
-app.get("/chess", (req, res) => {
-  const user = req.session.user || { username: "Guest" };
-  console.log(user);
-  res.render("index4", {
-    user: {
-      name: user.username,
-      isLoggedIn: !!req.session.user,
-    },
-  });
-});
-app.get("/tictactoe", (req, res) => {
-  const user = req.session.user || { username: "Guest" };
-
-  res.render("index3", {
-    user: {
-      name: user.username,
-      isLoggedIn: !!req.session.user,
-    },
-  });
-});
-app.get("/rockpaperscissors", (req, res) => {
-  const user = req.session.user || { username: "Guest" };
-
-  res.render("index2", {
-    user: {
-      name: user.username,
-      isLoggedIn: !!req.session.user,
-    },
-  });
-});
-
-// GET profile page
-app.get("/userprofile", isAuthenticated, async (req, res) => {
-  try {
-    // Assuming you have authentication middleware setting req.user
-    const username = req.user.username;
-
-    // Fetch game statistics from MongoDB
-    const chessStats = await ChessData.find({
-      $or: [{ player1Name: username }, { player2Name: username }],
-    });
-    const rpsStats = await RPSData.find({
-      $or: [{ player1Name: username }, { player2Name: username }],
-    });
-    const ticTacToeStats = await TicTacToeData.find({
-      $or: [{ player1Name: username }, { player2Name: username }],
-    });
-
-    // Render profile page with statistics
-    res.render("profile", { username, chessStats, rpsStats, ticTacToeStats });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Internal Server Error");
-  }
 });
 
 io.on("connection", (socket) => {

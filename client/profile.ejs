@@ -23,14 +23,6 @@
       }
 
       header {
-        /* background-color: #0081f2; */
-        /* color: white; */
-        padding: 10px 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      header {
         background: linear-gradient(
           to right,
           #141e30,
@@ -40,29 +32,58 @@
         text-align: center;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         position: relative;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 20px;
       }
 
       header nav ul {
         list-style: none;
         display: flex;
+        justify-content: flex-end; /* Align items to the right */
         gap: 20px;
       }
+
       header nav ul li {
         display: inline;
       }
+
       header nav ul li a {
         color: white;
         text-decoration: none;
       }
+
+      .logo {
+        flex: 1; /* Ensure logo takes up remaining space */
+        display: flex;
+        justify-content: center; /* Center align */
+        margin-left: 150px;
+      }
+
+      .logo h1.ok {
+        font-family: "Orbitron", sans-serif; /* Update to the desired font */
+        font-size: 2.5em;
+        background: linear-gradient(90deg, #ff7f50, #1e90ff);
+        -webkit-background-clip: text;
+        color: transparent;
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+        text-align: center;
+        margin: 0;
+        padding: 0.5em 0;
+      }
+
       .navbar {
         display: flex;
         flex-direction: column;
         width: 200px;
-        background-color: #f4f4f4;
+        background-color: #cdb4db;
         padding: 10px;
         height: 180px;
+        /* border-radius: ; */
         /* change height */
       }
+
       .navbar .nav-btn {
         background-color: #ddd;
         border: none;
@@ -70,32 +91,41 @@
         margin: 5px 0;
         cursor: pointer;
         text-align: left;
+        border-radius: 10px;
       }
+
       .navbar .nav-btn.active {
-        background-color: #bbb;
+        background-color: #bde0fe;
       }
+
       main {
         display: flex;
       }
+
       .section {
         display: none;
         padding: 20px;
         flex-grow: 1;
       }
+
       .section.active {
         display: block;
       }
+
       .card {
-        background-color: #f9f9f9;
+        background-color: #444;
         border: 1px solid #ddd;
         border-radius: 5px;
         padding: 20px;
         margin: 20px 0;
+        width: 600px;
       }
+
       .no-data {
         color: #666;
         font-style: italic;
       }
+
       h1.ok {
         font-family: "Orbitron", sans-serif; /* Update to the desired font */
         font-size: 2.5em;
@@ -107,6 +137,11 @@
         margin: 0;
         padding: 0.5em 0;
       }
+      header nav ul li:first-child a {
+        color: #ff5733; /* Bright color */
+        font-weight: bold; /* Bold text */
+        font-size: 1.2em; /* Increased font size */
+      }
     </style>
   </head>
   <body>
@@ -117,13 +152,9 @@
       <nav>
         <ul>
           <li><a href="/">Home</a></li>
-          <li><a href="/profile">Profile</a></li>
           <!-- Add more navigation links as needed -->
         </ul>
       </nav>
-      <div class="profile">
-        <a href="/profile"><i class="fas fa-user-circle"></i> Profile</a>
-      </div>
     </header>
     <main>
       <!-- Navbar for account and games -->
@@ -151,8 +182,9 @@
         <h1 style="margin-top: 0px; color: #0081f2">Chess Statistics</h1>
         <div id="chess-stats">
           <% if (chessStats.length > 0) { %> <%
-          chessStats.forEach(function(game) { %>
+          chessStats.forEach(function(game, index) { %>
           <div class="card">
+            <p><strong>Game <%= index + 1 %>:</strong></p>
             <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
             <p><strong>Winner:</strong> <%= game.winner %></p>
             <p><strong>Own User:</strong> <%= username %></p>
@@ -179,9 +211,10 @@
           Rock Paper Scissors Statistics
         </h1>
         <div id="rps-stats">
-          <% if (rpsStats.length > 0) { %> <% rpsStats.forEach(function(game) {
-          %>
+          <% if (rpsStats.length > 0) { %> <% rpsStats.forEach(function(game,
+          index) { %>
           <div class="card">
+            <p><strong>Game <%= index + 1 %>:</strong></p>
             <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
             <p><strong>Winner:</strong> <%= game.winner %></p>
             <p><strong>Own User:</strong> <%= username %></p>
@@ -196,7 +229,7 @@
           <% } %>
         </div>
         <% if (rpsStats.length > 0) { %>
-        <div style="height: 300px">
+        <div style="height: 500px">
           <canvas id="rps-chart"></canvas>
         </div>
         <% } %>
@@ -207,8 +240,9 @@
         <h1 style="margin-top: 0px; color: #0081f2">Tic Tac Toe Statistics</h1>
         <div id="tictactoe-stats">
           <% if (ticTacToeStats.length > 0) { %> <%
-          ticTacToeStats.forEach(function(game) { %>
+          ticTacToeStats.forEach(function(game, index) { %>
           <div class="card">
+            <p><strong>Game <%= index + 1 %>:</strong></p>
             <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
             <p><strong>Winner:</strong> <%= game.winner %></p>
             <p><strong>Own User:</strong> <%= username %></p>
@@ -223,7 +257,7 @@
           <% } %>
         </div>
         <% if (ticTacToeStats.length > 0) { %>
-        <div style="height: 300px">
+        <div style="height: 500px">
           <canvas id="tictactoe-chart"></canvas>
         </div>
         <% } %>
