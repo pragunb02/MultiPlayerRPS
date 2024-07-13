@@ -312,7 +312,6 @@
       </section>
     </main>
 
-    <!-- Script to handle section toggling and Chart.js -->
     <script>
       function toggleSection(sectionId) {
         // Hide all sections
@@ -337,18 +336,12 @@
           .querySelector(`.nav-btn[onclick="toggleSection('${sectionId}')"]`)
           .classList.add("active");
       }
+
       document.addEventListener("DOMContentLoaded", function () {
         // Pass the statistics data from the server to the client-side script
-
-
-        // eslint-disable-next-line
-        const chessStats = <% - JSON.stringify(chessStats) %>;
-        // eslint-disable-next-line
-        const rpsStats = <% - JSON.stringify(rpsStats) %>;
-        // eslint-disable-next-line
-        const ticTacToeStats = <% - JSON.stringify(ticTacToeStats) %>;
-
-
+        const chessStats = <%- JSON.stringify(chessStats) %>;
+        const rpsStats = <%- JSON.stringify(rpsStats) %>;
+        const ticTacToeStats = <%- JSON.stringify(ticTacToeStats) %>;
         const username = "<%= username %>";
 
         console.log(chessStats);
