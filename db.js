@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const MongoDBStore = require("connect-mongodb-session")(
   require("express-session")
 );
-
 const dotenv = require("dotenv");
 
 // Load environment variables from .env file
