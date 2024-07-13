@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
+require("dotenv").config();
 // const mongoose = require("mongoose");
 const { connectDB, store } = require("./db");
 // const flash = require("connect-flash");
@@ -15,8 +16,8 @@ const passport = require("./client/routes/passport");
 const RPSData = require("./models/RPSData");
 const ChessData = require("./models/ChessData");
 const TicTacToeData = require("./models/TicTacToeData");
-const dotenv = require("dotenv");
-dotenv.config();
+// const dotenv = require("dotenv");
+// dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -26,6 +27,11 @@ const SESSION_SECRET = process.env.SESSION_SECRET;
 const chessRooms = {};
 const ticTacToeRooms = {};
 const rpsRooms = {};
+
+// Logging to check if environment variables are loaded
+console.log("MONGO_URI_PRODUCTION:", process.env.MONGO_URI_PRODUCTION);
+console.log("MONGO_URI_LOCAL:", process.env.MONGO_URI_LOCAL);
+console.log("SESSION_SECRET:", process.env.SESSION_SECRET);
 
 // Connect to MongoDB
 connectDB();
