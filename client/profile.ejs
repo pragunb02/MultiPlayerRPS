@@ -13,8 +13,10 @@
     <style>
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #dee2ff; /* Dark background */
-        color: #fff; /* Light text */
+        background-color: #dee2ff;
+        /* Dark background */
+        color: #fff;
+        /* Light text */
         margin: 0;
         padding: 0;
         display: flex;
@@ -23,11 +25,8 @@
       }
 
       header {
-        background: linear-gradient(
-          to right,
-          #141e30,
-          #4b0082
-        ); /* Gradient background */
+        background: linear-gradient(to right, #141e30, #4b0082);
+        /* Gradient background */
         /* padding: 20px 0; */
         text-align: center;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -41,7 +40,8 @@
       header nav ul {
         list-style: none;
         display: flex;
-        justify-content: flex-end; /* Align items to the right */
+        justify-content: flex-end;
+        /* Align items to the right */
         gap: 20px;
       }
 
@@ -55,14 +55,17 @@
       }
 
       .logo {
-        flex: 1; /* Ensure logo takes up remaining space */
+        flex: 1;
+        /* Ensure logo takes up remaining space */
         display: flex;
-        justify-content: center; /* Center align */
+        justify-content: center;
+        /* Center align */
         margin-left: 150px;
       }
 
       .logo h1.ok {
-        font-family: "Orbitron", sans-serif; /* Update to the desired font */
+        font-family: "Orbitron", sans-serif;
+        /* Update to the desired font */
         font-size: 2.5em;
         background: linear-gradient(90deg, #ff7f50, #1e90ff);
         -webkit-background-clip: text;
@@ -127,7 +130,8 @@
       }
 
       h1.ok {
-        font-family: "Orbitron", sans-serif; /* Update to the desired font */
+        font-family: "Orbitron", sans-serif;
+        /* Update to the desired font */
         font-size: 2.5em;
         background: linear-gradient(90deg, #ff7f50, #1e90ff);
         -webkit-background-clip: text;
@@ -137,13 +141,18 @@
         margin: 0;
         padding: 0.5em 0;
       }
+
       header nav ul li:first-child a {
-        color: #ff5733; /* Bright color */
-        font-weight: bold; /* Bold text */
-        font-size: 1.2em; /* Increased font size */
+        color: #ff5733;
+        /* Bright color */
+        font-weight: bold;
+        /* Bold text */
+        font-size: 1.2em;
+        /* Increased font size */
       }
     </style>
   </head>
+
   <body>
     <header>
       <div class="logo">
@@ -181,24 +190,37 @@
       <section id="chess" class="section">
         <h1 style="margin-top: 0px; color: #0081f2">Chess Statistics</h1>
         <div id="chess-stats">
-          <% if (chessStats.length > 0) { %> <%
-          chessStats.forEach(function(game, index) { %>
+          <% if (chessStats.length> 0) { %> <% chessStats.forEach(function(game,
+          index) { %>
           <div class="card">
             <p><strong>Game <%= index + 1 %>:</strong></p>
-            <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
-            <p><strong>Winner:</strong> <%= game.winner %></p>
-            <p><strong>Own User:</strong> <%= username %></p>
             <p>
-              <strong>Opponent:</strong> <%= game.player1Name === username ?
-              game.player2Name : game.player1Name %>
+              <strong>Room ID:</strong>
+              <%= game.roomUniqueId %>
             </p>
-            <p><strong>Created by:</strong> <%= game.player1Name %></p>
+            <p>
+              <strong>Winner:</strong>
+              <%= game.winner %>
+            </p>
+            <p>
+              <strong>Own User:</strong>
+              <%= username %>
+            </p>
+            <p>
+              <strong>Opponent:</strong>
+              <%= game.player1Name===username ? game.player2Name :
+              game.player1Name %>
+            </p>
+            <p>
+              <strong>Created by:</strong>
+              <%= game.player1Name %>
+            </p>
           </div>
           <% }); %> <% } else { %>
           <p class="no-data">No chess games found.</p>
           <% } %>
         </div>
-        <% if (chessStats.length > 0) { %>
+        <% if (chessStats.length> 0) { %>
         <div style="height: 500px">
           <canvas id="chess-chart"></canvas>
         </div>
@@ -211,24 +233,37 @@
           Rock Paper Scissors Statistics
         </h1>
         <div id="rps-stats">
-          <% if (rpsStats.length > 0) { %> <% rpsStats.forEach(function(game,
+          <% if (rpsStats.length> 0) { %> <% rpsStats.forEach(function(game,
           index) { %>
           <div class="card">
             <p><strong>Game <%= index + 1 %>:</strong></p>
-            <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
-            <p><strong>Winner:</strong> <%= game.winner %></p>
-            <p><strong>Own User:</strong> <%= username %></p>
             <p>
-              <strong>Opponent:</strong> <%= game.player1Name === username ?
-              game.player2Name : game.player1Name %>
+              <strong>Room ID:</strong>
+              <%= game.roomUniqueId %>
             </p>
-            <p><strong>Created by:</strong> <%= game.player1Name %></p>
+            <p>
+              <strong>Winner:</strong>
+              <%= game.winner %>
+            </p>
+            <p>
+              <strong>Own User:</strong>
+              <%= username %>
+            </p>
+            <p>
+              <strong>Opponent:</strong>
+              <%= game.player1Name===username ? game.player2Name :
+              game.player1Name %>
+            </p>
+            <p>
+              <strong>Created by:</strong>
+              <%= game.player1Name %>
+            </p>
           </div>
           <% }); %> <% } else { %>
           <p class="no-data">No rock paper scissors games found.</p>
           <% } %>
         </div>
-        <% if (rpsStats.length > 0) { %>
+        <% if (rpsStats.length> 0) { %>
         <div style="height: 500px">
           <canvas id="rps-chart"></canvas>
         </div>
@@ -239,24 +274,37 @@
       <section id="tictactoe" class="section">
         <h1 style="margin-top: 0px; color: #0081f2">Tic Tac Toe Statistics</h1>
         <div id="tictactoe-stats">
-          <% if (ticTacToeStats.length > 0) { %> <%
+          <% if (ticTacToeStats.length> 0) { %> <%
           ticTacToeStats.forEach(function(game, index) { %>
           <div class="card">
             <p><strong>Game <%= index + 1 %>:</strong></p>
-            <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
-            <p><strong>Winner:</strong> <%= game.winner %></p>
-            <p><strong>Own User:</strong> <%= username %></p>
             <p>
-              <strong>Opponent:</strong> <%= game.player1Name === username ?
-              game.player2Name : game.player1Name %>
+              <strong>Room ID:</strong>
+              <%= game.roomUniqueId %>
             </p>
-            <p><strong>Created by:</strong> <%= game.player1Name %></p>
+            <p>
+              <strong>Winner:</strong>
+              <%= game.winner %>
+            </p>
+            <p>
+              <strong>Own User:</strong>
+              <%= username %>
+            </p>
+            <p>
+              <strong>Opponent:</strong>
+              <%= game.player1Name===username ? game.player2Name :
+              game.player1Name %>
+            </p>
+            <p>
+              <strong>Created by:</strong>
+              <%= game.player1Name %>
+            </p>
           </div>
           <% }); %> <% } else { %>
           <p class="no-data">No tic tac toe games found.</p>
           <% } %>
         </div>
-        <% if (ticTacToeStats.length > 0) { %>
+        <% if (ticTacToeStats.length> 0) { %>
         <div style="height: 500px">
           <canvas id="tictactoe-chart"></canvas>
         </div>
@@ -266,34 +314,41 @@
 
     <!-- Script to handle section toggling and Chart.js -->
     <script>
-              function toggleSection(sectionId) {
-                // Hide all sections
-                const sections = document.querySelectorAll(".section");
-                sections.forEach(function (section) {
-                  section.classList.remove("active");
-                });
+      function toggleSection(sectionId) {
+        // Hide all sections
+        const sections = document.querySelectorAll(".section");
+        sections.forEach(function (section) {
+          section.classList.remove("active");
+        });
 
-                // Show the selected section
-                const selectedSection = document.getElementById(sectionId);
-                if (selectedSection) {
-                  selectedSection.classList.add("active");
-                }
+        // Show the selected section
+        const selectedSection = document.getElementById(sectionId);
+        if (selectedSection) {
+          selectedSection.classList.add("active");
+        }
 
-                // Update button active state
-                const buttons = document.querySelectorAll(".nav-btn");
-                buttons.forEach(function (btn) {
-                  btn.classList.remove("active");
-                });
+        // Update button active state
+        const buttons = document.querySelectorAll(".nav-btn");
+        buttons.forEach(function (btn) {
+          btn.classList.remove("active");
+        });
 
-                document
-                  .querySelector(`.nav-btn[onclick="toggleSection('${sectionId}')"]`)
-                  .classList.add("active");
-              }
-             document.addEventListener("DOMContentLoaded", function () {
+        document
+          .querySelector(`.nav-btn[onclick="toggleSection('${sectionId}')"]`)
+          .classList.add("active");
+      }
+      document.addEventListener("DOMContentLoaded", function () {
         // Pass the statistics data from the server to the client-side script
-        const chessStats = <%- JSON.stringify(chessStats) %>;
-        const rpsStats = <%- JSON.stringify(rpsStats) %>;
-        const ticTacToeStats = <%- JSON.stringify(ticTacToeStats) %>;
+
+
+        // eslint-disable-next-line
+        const chessStats = <% - JSON.stringify(chessStats) %>;
+        // eslint-disable-next-line
+        const rpsStats = <% - JSON.stringify(rpsStats) %>;
+        // eslint-disable-next-line
+        const ticTacToeStats = <% - JSON.stringify(ticTacToeStats) %>;
+
+
         const username = "<%= username %>";
 
         console.log(chessStats);

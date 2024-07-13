@@ -28,10 +28,10 @@ const chessRooms = {};
 const ticTacToeRooms = {};
 const rpsRooms = {};
 
-// Logging to check if environment variables are loaded
-console.log("MONGO_URI_PRODUCTION:", process.env.MONGO_URI_PRODUCTION);
-console.log("MONGO_URI_LOCAL:", process.env.MONGO_URI_LOCAL);
-console.log("SESSION_SECRET:", process.env.SESSION_SECRET);
+// // Logging to check if environment variables are loaded
+// console.log("MONGO_URI_PRODUCTION:", process.env.MONGO_URI_PRODUCTION);
+// console.log("MONGO_URI_LOCAL:", process.env.MONGO_URI_LOCAL);
+// console.log("SESSION_SECRET:", process.env.SESSION_SECRET);
 
 // Connect to MongoDB
 connectDB();

@@ -9,9 +9,9 @@ mongoose.set("strictQuery", true); // Suppress deprecation warning
 const s1 = process.env.MONGO_URI_PRODUCTION;
 const s2 = process.env.MONGO_URI_LOCAL;
 
-// Logging to check if environment variables are loaded
-console.log("MONGO_URI_PRODUCTION:", s1);
-console.log("MONGO_URI_LOCAL:", s2);
+// // Logging to check if environment variables are loaded
+// console.log("MONGO_URI_PRODUCTION:", s1);
+// console.log("MONGO_URI_LOCAL:", s2);
 
 const store = new MongoDBStore({
   uri: s1,
