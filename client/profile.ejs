@@ -274,37 +274,24 @@
       <section id="tictactoe" class="section">
         <h1 style="margin-top: 0px; color: #0081f2">Tic Tac Toe Statistics</h1>
         <div id="tictactoe-stats">
-          <% if (ticTacToeStats.length> 0) { %> <%
+          <% if (ticTacToeStats.length > 0) { %> <%
           ticTacToeStats.forEach(function(game, index) { %>
           <div class="card">
             <p><strong>Game <%= index + 1 %>:</strong></p>
+            <p><strong>Room ID:</strong> <%= game.roomUniqueId %></p>
+            <p><strong>Winner:</strong> <%= game.winner %></p>
+            <p><strong>Own User:</strong> <%= username %></p>
             <p>
-              <strong>Room ID:</strong>
-              <%= game.roomUniqueId %>
+              <strong>Opponent:</strong> <%= game.player1Name === username ?
+              game.player2Name : game.player1Name %>
             </p>
-            <p>
-              <strong>Winner:</strong>
-              <%= game.winner %>
-            </p>
-            <p>
-              <strong>Own User:</strong>
-              <%= username %>
-            </p>
-            <p>
-              <strong>Opponent:</strong>
-              <%= game.player1Name===username ? game.player2Name :
-              game.player1Name %>
-            </p>
-            <p>
-              <strong>Created by:</strong>
-              <%= game.player1Name %>
-            </p>
+            <p><strong>Created by:</strong> <%= game.player1Name %></p>
           </div>
           <% }); %> <% } else { %>
           <p class="no-data">No tic tac toe games found.</p>
           <% } %>
         </div>
-        <% if (ticTacToeStats.length> 0) { %>
+        <% if (ticTacToeStats.length > 0) { %>
         <div style="height: 500px">
           <canvas id="tictactoe-chart"></canvas>
         </div>
