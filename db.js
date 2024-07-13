@@ -3,9 +3,14 @@ const MongoDBStore = require("connect-mongodb-session")(
   require("express-session")
 );
 
-const s1 =
-  "mongodb+srv://pragunb02:pragunb02@cluster0.ch62m.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-const s2 = "mongodb://127.0.0.1:27017/Bookstore1";
+const dotenv = require("dotenv");
+
+// Load environment variables from .env file
+dotenv.config();
+
+// Get the MongoDB URIs from environment variables
+const s1 = process.env.MONGO_URI_PRODUCTION;
+const s2 = process.env.MONGO_URI_LOCAL;
 
 // Define the MongoDB session store
 const store = new MongoDBStore({

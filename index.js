@@ -15,13 +15,14 @@ const passport = require("./client/routes/passport");
 const RPSData = require("./models/RPSData");
 const ChessData = require("./models/ChessData");
 const TicTacToeData = require("./models/TicTacToeData");
-
+const dotenv = require("dotenv");
+dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = 8080;
-const SESSION_SECRET = "konr fuuw tfla pmoj";
+const PORT = process.env.PORT || 8080;
+const SESSION_SECRET = process.env.SESSION_SECRET;
 const chessRooms = {};
 const ticTacToeRooms = {};
 const rpsRooms = {};
