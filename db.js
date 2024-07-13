@@ -4,14 +4,14 @@ const MongoDBStore = require("connect-mongodb-session")(
 );
 const dotenv = require("dotenv");
 
-// Load environment variables from .env file
 dotenv.config();
 
-// Get the MongoDB URIs from environment variables
 const s1 = process.env.MONGO_URI_PRODUCTION;
 const s2 = process.env.MONGO_URI_LOCAL;
 
-// Define the MongoDB session store
+console.log("MONGO_URI_PRODUCTION:", s1);
+console.log("MONGO_URI_LOCAL:", s2);
+
 const store = new MongoDBStore({
   uri: s1,
   collection: "sessions",
@@ -21,7 +21,6 @@ store.on("error", function (error) {
   console.error("Session store error", error);
 });
 
-// Function to connect to MongoDB
 const connectDB = async () => {
   try {
     await mongoose.connect(s1, {
@@ -35,7 +34,6 @@ const connectDB = async () => {
   }
 };
 
-// Export both connectDB and store
 module.exports = {
   connectDB,
   store,
