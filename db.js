@@ -6,8 +6,8 @@ require("dotenv").config();
 
 mongoose.set("strictQuery", true); // Suppress deprecation warning
 
-const s1 = process.env.MONGO_URI_PRODUCTION;
-const s2 = process.env.MONGO_URI_LOCAL;
+// const s1 = process.env.MONGO_URI_PRODUCTION;
+const s1 = process.env.MONGO_URI_LOCAL;
 
 // // Logging to check if environment variables are loaded
 // console.log("MONGO_URI_PRODUCTION:", s1);
