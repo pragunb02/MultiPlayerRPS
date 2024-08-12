@@ -124,7 +124,7 @@ socket.on("ConfirmNewGameTicTacToe", (data) => {
     });
     newGameModal.style.display = "none";
     setTimeout(() => {
-      window.location.href = "index3.html";
+      window.location.href = "/";
     }, 3000);
   };
 });
@@ -139,7 +139,7 @@ function cancelingNewGameRequest() {
   alert(`${NewGameRequestedBy} denied for New Game`);
   socket.emit("CancelTicTacToe", { roomUniqueId });
   setTimeout(() => {
-    window.location.href = "index3.html";
+    window.location.href = "/";
   }, 2000);
 }
 
