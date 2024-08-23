@@ -11,7 +11,7 @@ const s1 = process.env.MONGO_URI_PRODUCTION;
 
 // // Logging to check if environment variables are loaded
 // console.log("MONGO_URI_PRODUCTION:", s1);
-// console.log("MONGO_URI_LOCAL:", s2);
+// console.log("MONGO_URI_LOCAL:", s1);
 
 const store = new MongoDBStore({
   uri: s1,
