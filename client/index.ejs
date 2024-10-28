@@ -1,576 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
+  <% if (title) { %>
+    <title><%= title %></title>
+  <% } else { %>
+    <title>ClassiCade Gaming - Home</title>
+  <% } %>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ClassiCadesssssss Gaming</title>
-  <!-- Link to Font Awesome CSS -->
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <link rel="stylesheet" href="./style.css" />
-  <!-- Add Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <!-- External CSS -->
+  <link rel="stylesheet" href="/style.css" />
 </head>
-<!-- <style>
-#account-options {
-    display: none;
-  }
-  .tagline-container {
-    text-align: center;
-    margin-top: 10px;
-    margin-bottom: 15px;
-  }
-  .tagline {
-    font-family: 'Poppins', sans-serif;
-    font-size: 1.4em;
-    font-weight: 300;
-    color: #f0f0f0;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    padding: 5px 15px;
-    border-radius: 20px;
-    display: inline-block;
-    position: relative;
-    overflow: hidden;
-  }
-  .tagline::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: 0.5s;
-  }
-  .tagline:hover::before {
-    left: 100%;
-  }
-</style> -->
-
-<style>
-  #account-options {
-    display: none;
-  }
-  .tagline-container {
-    text-align: center;
-    margin-top: 10px;
-    margin-bottom: 15px;
-  }
-  .tagline {
-    font-family: 'Poppins', sans-serif;
-    font-size: 1.4em;
-    font-weight: 300;
-    color: #f0f0f0;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    padding: 5px 15px;
-    border-radius: 20px;
-    display: inline-block;
-    position: relative;
-    overflow: hidden;
-  }
-  .tagline::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-    animation: slide 1.5s ease-in-out infinite;
-  }
-  @keyframes slide {
-    0% {
-      left: -100%;
-    }
-    100% {
-      left: 100%;
-    }
-  }
-</style>
-
 <body>
-  <header class="header">
+  <!-- Ludo Coming Soon Banner -->
+  <div class="coming-soon-banner">
+    <p><i class="fas fa-gamepad"></i> Ludo Game is Coming Soon! Stay Tuned! <i class="fas fa-gamepad"></i></p>
+  </div>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
     <div class="container">
-      <div id="profile-button" class="fas fa-user"></div>
-      <% if (showDropdown) { %>
-        <!-- Loggned user -->
-        <div id="account-options" class="dropdown">
-          <div class="user-profile">
-            <span>Welcome, <span style="color: red; font-weight: bold;">
-                <%= user.name %>
-              </span></span>
-
-
-          </div>
-          <ul>
-             <a href="/u/<%= user.name %>/userprofile">Profile</a>
-            <!-- <a href="./userRoutes/u/<%= user.name %>/userprofile">Profile</a> -->
-
-            <!-- <a href="#">Orders</a> -->
-            <button id="logoutButton">Logout</button>
-          </ul>
-        </div>
+      <a href="/" class="logo">ClassiCade</a>
+      <ul class="nav-links">
+        <li><a href="#explore">Games</a></li>
+        <li><a href="#about">About</a></li>
+        <% if (user && user.isLoggedIn) { %>
+          <li><a href="/u/<%= user.name %>/userprofile">Profile</a></li>
+          <li><a href="#" id="logoutButton">Logout</a></li>
         <% } else { %>
-          <div id="account-options" class="dropdown">
-            <div class="user-profile">
-              <span>Welcome Gamer</span>
-            </div>
-            <ul>
-              <a href="/login-signup.html?a=0">Login</a>
-              <a href="/login-signup.html?a=1">Signup</a>
-            </ul>
-          </div>
-          <% } %>
-            <!-- <h1>ClassiCade Gaming</h1>
-            <div class="announcement-content">
-              <h2 class="blink" style="color: #0081f2">Trending Game Live Now!</h2>
-            </div> -->
-             <h1>ClassiCade Gaming</h1>
-            <div class="tagline-container">
-              <span class="tagline">Old school games, new school vibes</span>
-            </div>
-            <div class="announcement-content">
-              <h2 class="blink" style="color: #0081f2">Trending Game Live Now!</h2>
-            </div>
+          <li><a href="/login-signup.html?a=0">Login</a></li>
+          <li><a href="/login-signup.html?a=1">Signup</a></li>
+        <% } %>
+      </ul>
+      <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="overlay"></div>
+    <div class="container">
+      <h1>Welcome to ClassiCade</h1>
+      <p>Where Classic Games Come Alive</p>
+      <a href="#explore" class="btn">Start Playing</a>
+    </div>
+    <!-- Parallax Scrolling Stars -->
+    <div class="parallax-stars">
+      <% for (let i = 1; i <= 20; i++) { %>
+        <div class="star" style="--i:<%= i %>;"></div>
+      <% } %>
+      <!-- Gaming Element with Custom GIF -->
+      <div class="gaming-element">
+        <!-- New 3F3F.gif Image -->
+        <div class="custom-gif">
+          <img src="./3F3F.gif" alt="Custom Animation" />
+        </div>
+        <div class="custom-gif">
+          <img src="./fysm.gif" alt="Custom Animation" />
+        </div>
+        <div class="custom-gif">
+          <img src="./6oa.gif" alt="Custom Animation" />
+        </div>
+        <div class="custom-gif">
+          <img src="./Fpry.gif" alt="Custom Animation" />
+        </div>
+      </div>
     </div>
   </header>
 
-  <!-- Add Canvas Element for Animation -->
-  <canvas id="bouncingBallCanvas" width="100%" height="100%"></canvas>
-
-  <!-- Hero Section -->
-  <section class="hero">
+  <!-- Gamification Progress Bar -->
+  <section class="gamification">
     <div class="container">
-      <h1>Welcome to the Ultimate Gaming Nexus</h1>
-      <p>
-      <h3>Experience the Action Live with Your <span style="color: red;">F</span><span
-          style="color: blue;">r</span><span style="color: green;">i</span><span style="color: orange;">e</span><span
-          style="color: purple;">n</span><span style="color: yellow;">d</span><span style="color: brown;">s</span>!</h3>
-      </p>
-
-      <a href="#explore" class="btn">Explore Now</a>
+      <h2>Your Gaming Progress</h2>
+      <div class="progress-bar">
+        <div class="progress" style="width: 50%;"></div>
+      </div>
+      <p>Level 5 - Keep Playing to Reach the Next Level!</p>
     </div>
   </section>
 
-  <div class="containers">
-    <div class="tree">
-      <div class="branch" style="--x: 0">
-        <span style="--i: 0"></span>
-        <span style="--i: 1"></span>
-        <span style="--i: 2"></span>
-        <span style="--i: 3"></span>
-      </div>
-      <div class="branch" style="--x: 1">
-        <span style="--i: 0"></span>
-        <span style="--i: 1"></span>
-        <span style="--i: 2"></span>
-        <span style="--i: 3"></span>
-      </div>
-      <div class="branch" style="--x: 2">
-        <span style="--i: 0"></span>
-        <span style="--i: 1"></span>
-        <span style="--i: 2"></span>
-        <span style="--i: 3"></span>
-      </div>
-      <div class="branch" style="--x: 3">
-        <span style="--i: 0"></span>
-        <span style="--i: 1"></span>
-        <span style="--i: 2"></span>
-        <span style="--i: 3"></span>
-      </div>
-      <div class="stem">
-        <span style="--i: 0"></span>
-        <span style="--i: 1"></span>
-        <span style="--i: 2"></span>
-        <span style="--i: 3"></span>
-      </div>
-      <span class="shadow"></span>
-    </div>
-  </div>
-
-   <div class="box-of-star1">
-    <div class="star star-position1"></div>
-    <div class="star star-position2"></div>
-    <div class="star star-position3"></div>
-    <div class="star star-position4"></div>
-    <div class="star star-position5"></div>
-    <div class="star star-position6"></div>
-    <div class="star star-position7"></div>
-  </div> 
-  <div class="box-of-star2">
-    <div class="star star-position1"></div>
-    <div class="star star-position2"></div>
-    <div class="star star-position3"></div>
-    <div class="star star-position4"></div>
-    <div class="star star-position5"></div>
-    <div class="star star-position6"></div>
-    <div class="star star-position7"></div>
-  </div>
-  <!--<div class="box-of-star3">
-    <div class="star star-position1"></div>
-    <div class="star star-position2"></div>
-    <div class="star star-position3"></div>
-    <div class="star star-position4"></div>
-    <div class="star star-position5"></div>
-    <div class="star star-position6"></div>
-    <div class="star star-position7"></div>
-  </div>
-  <div class="box-of-star4">
-    <div class="star star-position1"></div>
-    <div class="star star-position2"></div>
-    <div class="star star-position3"></div>
-    <div class="star star-position4"></div>
-    <div class="star star-position5"></div>
-    <div class="star star-position6"></div>
-    <div class="star star-position7"></div>
-  </div> -->
-  <div data-js="astro" class="astronaut">
-    <div class="head"></div>
-    <div class="arm arm-left"></div>
-    <div class="arm arm-right"></div>
-    <div class="body">
-      <div class="panel"></div>
-    </div>
-    <div class="leg leg-left"></div>
-    <div class="leg leg-right"></div>
-    <div class="schoolbag"></div>
-  </div>
-  <div class="my-loader">
-    <div class="rubiks-cube">
-      <div class="face front">
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ffffff" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-      </div>
-
-      <div class="face back">
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ffffff" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-      </div>
-      <div class="face left">
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #ffffff" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-      </div>
-      <div class="face right">
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ffffff" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-      </div>
-      <div class="face top">
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #ffffff" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-      </div>
-      <div class="face bottom">
-        <div style="background: #ffffff" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-        <div style="background: #ffeb3b" class="cube"></div>
-        <div style="background: #4caf50" class="cube"></div>
-        <div style="background: #2196f3" class="cube"></div>
-        <div style="background: #ffffff" class="cube"></div>
-        <div style="background: #ff3d00" class="cube"></div>
-      </div>
-    </div>
-  </div>
-  <!-- <div class="loader"></div> -->
-  <div class="loading-screen">
-    <div class="solid">
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-      <div class="side"></div>
-    </div>
-  </div>
-  <br>
-  <div class="rules">
-    <h1 style="color: #3423a6;">Guidelines</h1>
-    <p style="color: black;">1. All players are advised to register before joining a game.</p>
-    <p style="color: black;">2. If a player wants to play as a guest, their progress will not be stored.</p>
-    <p style="color: black;">3. Respect other players in chat and follow the game rules.</p>
-    <p style="color: black;">4. Cheating or exploiting bugs will result in a ban.</p>
-  </div>
-  <div id="explore" class="container carousel-container">
-    <h1 style="color: #00a6fb;">Explore the Games Section</h1>
-    <br />
-    <div class="carousel-track">
-      <% games.forEach(game=> { %>
-        <div id="<%= game.id %>" class="game-card">
-          <a href="<%= game.link %>">
-            <div class="game-img">
-              <img src="<%= game.image %>" alt="<%= game.title %>" />
+  <!-- Featured Games Section -->
+  <section id="explore" class="featured-games">
+    <div class="container">
+      <h2>Featured Games</h2>
+      <div class="carousel-container">
+        <button class="carousel-button" id="prevBtn" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+        <div class="carousel-track-container">
+          <div class="carousel-track">
+            <% games.forEach(game => { %>
+              <div class="game-card">
+                <a href="<%= game.link %>">
+                  <div class="game-card-image">
+                    <img src="<%= game.image %>" alt="<%= game.title %>">
+                  </div>
+                  <div class="game-card-content">
+                    <h3><%= game.title %></h3>
+                    <p>Play <%= game.title %> now!</p>
+                  </div>
+                </a>
+              </div>
+            <% }); %>
+            <!-- Coming Soon Card -->
+            <div class="game-card coming-soon">
+              <div class="game-card-image">
+                <img src="/space-game-background-neon-night-alien-landscape-free-vector.jpg" alt="Coming Soon">
+              </div>
+              <div class="game-card-content">
+                <h3>New Game Coming Soon!</h3>
+                <p>Stay tuned for more exciting games.</p>
+              </div>
             </div>
-            <div class="game-icon">
-              <% if (game.iconImage) { %>
-                <img src="<%= game.iconImage %>" alt="<%= game.title %> Icon" id="yo" />
-                <% } else { %>
-                  <i class="<%= game.icon %>"></i>
-                  <% } %>
-            </div>
-            <div class="game-title">
-              <%= game.title %>
-            </div>
-          </a>
-        </div>
-        <% }); %>
-          <div id="coming-soon" class="game-card coming-soon">
-            <div class="game-img">
-              <img src="5241629.jpg" alt="Coming Soon" />
-            </div>
-            <div class="game-icon"><i class="fas fa-hourglass-half"></i></div>
-            <div class="game-title">More Games Coming Soon!</div>
           </div>
-    </div>
-
-    <div class="carousel-controls">
-      <button class="carousel-button" id="prevBtn">
-        <i class="fas fa-chevron-left"></i>
-      </button>
-      <button class="carousel-button" id="nextBtn">
-        <i class="fas fa-chevron-right"></i>
-      </button>
-    </div>
-  </div>
-
-
-  <section class="announcement coming-soon">
-    <div class="announcement-content">
-      <h2 class="blink">Ludo Coming Soon!</h2>
-      <p style="color: black">Exciting new games arriving soon.</p>
+        </div>
+        <button class="carousel-button" id="nextBtn" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+      </div>
     </div>
   </section>
-  <br />
-  <div class="game-icon">
-    <i style="color: aliceblue" class="fas fa-gamepad"></i>
-  </div>
-  <footer class="footer">
 
-    <p>&copy; 2024 Gaming Arena. All rights reserved.</p>
-    <ul class="social-icons">
-      <li>
-        <a href="#"><i class="fab fa-facebook"></i></a>
-      </li>
-      <li>
-        <a href="#"><i class="fab fa-twitter"></i></a>
-      </li>
-      <li>
-        <a href="#"><i class="fab fa-instagram"></i></a>
-      </li>
-    </ul>
+  <!-- Testimonials Section -->
+  <section class="testimonials">
+    <div class="container">
+      <h2>What Players Say</h2>
+      <div class="testimonials-grid">
+        <div class="testimonial">
+          <p>"ClassiCade brings back the nostalgia! Love playing the classics with friends."</p>
+          <h4>- Gamer123</h4>
+        </div>
+        <div class="testimonial">
+          <p>"The best place for retro gaming. The UI is awesome!"</p>
+          <h4>- ArcadeFan</h4>
+        </div>
+        <div class="testimonial">
+          <p>"A fantastic collection of games with a modern touch. Highly recommended!"</p>
+          <h4>- RetroKing</h4>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- About Section -->
+  <section id="about" class="about">
+    <div class="container">
+      <h2>About ClassiCade</h2>
+      <p>ClassiCade brings you the nostalgia of classic arcade games with a modern twist. Play your favorite games online with friends and relive the golden age of gaming.</p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2024 ClassiCade Gaming. All rights reserved.</p>
+      <ul class="social-icons">
+        <li><a href="#"><i class="fab fa-facebook-f"></i></a></li>
+        <li><a href="#"><i class="fab fa-twitter"></i></a></li>
+        <li><a href="#"><i class="fab fa-twitch"></i></a></li>
+      </ul>
     </div>
   </footer>
-  <style>
-    .hero {
-      position: relative;
-    }
 
-    #bouncingBallCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: -1;
-    }
-  </style>
-  <style>
-    .rules {
-      position: absolute;
-      right: 0;
-      top: 700px;
-      padding: 10px;
-      background-color: #7180B9;
-      border: 1px solid #ccc;
-    }
-  </style>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const track = document.querySelector(".carousel-track");
-  const prevButton = document.getElementById("prevBtn");
-  const nextButton = document.getElementById("nextBtn");
-  const profileButton = document.getElementById("profile-button");
-  const dropdown = document.getElementById("account-options");
-
-  const originalCardCount = track.children.length;
-  const cardWidth = track.children[0].offsetWidth + 20; // Width of game card + margin
-
-  // Clone the first and last cards to create an infinite loop effect
-  const firstCardClone = track.children[0].cloneNode(true);
-  const lastCardClone = track.children[originalCardCount - 1].cloneNode(true);
-  track.appendChild(firstCardClone);
-  track.insertBefore(lastCardClone, track.children[0]);
-
-  const totalCardCount = track.children.length;
-  let currentIndex = 1;
-
-  function updateTrackPosition() {
-    track.style.transform = `translateX(-${currentIndex * cardWidth}px)`;
-  }
-
-  nextButton.addEventListener("click", () => {
-    currentIndex = (currentIndex + 1) % totalCardCount;
-    updateTrackPosition();
-  });
-
-  prevButton.addEventListener("click", () => {
-    currentIndex = (currentIndex - 1 + totalCardCount) % totalCardCount;
-    updateTrackPosition();
-  });
-
-  function toggleDropdown() {
-    if (dropdown.style.display === "none" || dropdown.style.display === "") {
-      dropdown.style.display = "block";
-    } else {
-      dropdown.style.display = "none";
-    }
-  }
-
-  profileButton.addEventListener("click", toggleDropdown);
-
-  window.addEventListener("click", function(event) {  
-    if (!event.target.matches("#profile-button") && dropdown.style.display === "block") {
-      dropdown.style.display = "none";
-    }
-  });
-
-  updateTrackPosition();
-
-  const canvas = document.getElementById("bouncingBallCanvas");
-  const ctx = canvas.getContext("2d");
-  const circles = [];
-
-  function createCircle(x, y, dx, dy, radius, color) {
-    return { x, y, dx, dy, radius, color };
-  }
-
-  function drawCircle(circle) {
-    ctx.beginPath();
-    ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
-    ctx.fillStyle = circle.color;
-    ctx.shadowColor = circle.color;
-    ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.closePath();
-  }
-
-  function updateCircle(circle) {
-    if (circle.x + circle.dx > canvas.width - circle.radius || circle.x + circle.dx < circle.radius) {
-      circle.dx = -circle.dx;
-    }
-    if (circle.y + circle.dy > canvas.height - circle.radius || circle.y + circle.dy < circle.radius) {
-      circle.dy = -circle.dy;
-    }
-    circle.x += circle.dx;
-    circle.y += circle.dy;
-  }
-
-  function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (const circle of circles) {
-      drawCircle(circle);
-      updateCircle(circle);
-    }
-
-    requestAnimationFrame(animate);
-  }
-
-  function initCircles(count) {
-    for (let i = 0; i < count; i++) {
-      const radius = Math.random() * 20 + 10;
-      const x = Math.random() * (canvas.width - 2 * radius) + radius;
-      const y = Math.random() * (canvas.height - 2 * radius) + radius;
-      const dx = (Math.random() - 0.5) * 4;
-      const dy = (Math.random() - 0.5) * 4;
-      const color = `rgba(${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, 0.5)`;
-      circles.push(createCircle(x, y, dx, dy, radius, color));
-    }
-  }
-
-  // Set canvas dimensions to match hero section
-  const heroSection = document.querySelector(".hero");
-  canvas.width = heroSection.offsetWidth;
-  canvas.height = heroSection.offsetHeight;
-
-  initCircles(10);
-  animate();
-
-  // Logout button event listener
-  const logoutButton = document.getElementById("logoutButton");
-  if (logoutButton) {
-    logoutButton.addEventListener("click", function() {
-      console.log("Logout clicked");
-      fetch("./auth/logout", {
-        method: "POST",
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          if (data.success) {
-            window.location.href = ".";
-          }
-        })
-        .catch((error) => {
-          console.error("Error:", error);
-        });
-    });
-  }
-});
-</script>
+  <!-- External JavaScript -->
+  <script src="/scriptindex.js"></script>
 </body>
-
 </html>

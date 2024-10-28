@@ -1,5 +1,6 @@
 console.log("Running Tic Tac Toe Script");
 
+
 const socket = io();
 
 let roomUniqueId;
@@ -758,3 +759,6 @@ boxes.forEach((box, index) => {
 
 resetButton.addEventListener("click", ResetBtnPermission);
 newGameButton.addEventListener("click", NewGamePermission);
+
+
+
