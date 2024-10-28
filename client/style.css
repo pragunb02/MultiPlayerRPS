@@ -216,6 +216,38 @@ body {
   height: auto;
   /* You can add additional styling as needed */
 }
+/* Gamification Progress Bar Styling */
+.gamification .progress-bar {
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 25px;
+  overflow: hidden;
+  height: 20px;
+  margin-bottom: 10px;
+}
+
+.gamification .progress-bar .progress {
+  height: 100%;
+  background-color: #4caf50; /* Green color */
+  width: 0%;
+  transition: width 0.5s ease-in-out;
+}
+
+/* User Level Styling */
+.user-level {
+  margin-left: 15px;
+  font-weight: bold;
+  color: #FFD700; /* Gold color for visibility */
+}
+
+/* Responsive Design for Progress Bar Text */
+.gamification p {
+  font-size: 1rem;
+  color: #333;
+}
+
+/* Additional Styling as per your design needs */
+
 
 
 /* Gamification Progress Bar */

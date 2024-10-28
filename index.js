@@ -3,12 +3,9 @@ const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
 require("dotenv").config();
-// const mongoose = require("mongoose");
 const { connectDB, store } = require("./db");
-// const flash = require("connect-flash");
 const bodyParser = require("body-parser");
 const session = require("express-session");
-// const MongoDBStore = require("connect-mongodb-session")(session);
 const authRouter = require("./client/routes/auth");
 const gamesRoutes = require("./client/routes/gamesRoutes");
 const userRoutes = require("./client/routes/userRoutes");
@@ -16,35 +13,25 @@ const passport = require("./client/routes/passport");
 const RPSData = require("./models/RPSData");
 const ChessData = require("./models/ChessData");
 const TicTacToeData = require("./models/TicTacToeData");
-// const dotenv = require("dotenv");
-// dotenv.config();
+const User = require("./models/User"); // Import User model
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-// const io = new Server(server, {
-//   cors: {
-//     origin: "*",
-//     methods: ["GET", "POST"],
-//   },
-//   transports: ["websocket", "polling"],
-// });
 
 const PORT = process.env.PORT || 8080;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const chessRooms = {};
 const ticTacToeRooms = {};
 const rpsRooms = {};
+const LEVEL_UP_THRESHOLD = 10; // Number of games to level up
 
-// // Logging to check if environment variables are loaded
-// console.log("MONGO_URI_PRODUCTION:", process.env.MONGO_URI_PRODUCTION);
-// console.log("MONGO_URI_LOCAL:", process.env.MONGO_URI_LOCAL);
-// console.log("SESSION_SECRET:", process.env.SESSION_SECRET);
+const userSocketMap = {}; // Map to track user IDs and socket IDs
 
 // Connect to MongoDB
 connectDB();
 
 // Middleware setup
-// app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
@@ -66,45 +53,45 @@ app.use(express.static(path.join(__dirname, "client")));
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "client"));
 
-function isAuthenticated(req, res, next) {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.redirect("../login-signup.html?a=0");
-}
 app.use(passport.initialize());
 app.use(passport.session()); // This is essential for persistent login sessions
 app.use("/auth", authRouter);
 app.use("/games", gamesRoutes);
 app.use("/u/:username", isAuthenticated, userRoutes);
 
-app.get("/", (req, res) => {
-  const user = req.session.user || { username: "Guest" };
-  const showDropdown = req.session.passport ? req.session.passport.user : null;
+// Authentication middleware
+function isAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.redirect("/login-signup.html?a=0");
+}
+
+// Root Route
+app.get("/", async (req, res) => {
+  const user = req.user ? await User.findById(req.user._id) : { username: "Guest", gamesPlayed: 0, level: 1 };
+  const showDropdown = req.user ? req.user : null;
 
   const games = [
     {
       id: "rockpaperscissors",
       title: "Rock Paper Scissors",
       link: "/games/rockpaperscissors",
-      image:
-        "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      image: "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
       icon: "fas fa-hand-peace",
     },
     {
       id: "tictactoe",
       title: "Tic Tac Toe",
       link: "/games/tictactoe",
-      image:
-        "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      image: "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
       icon: "fas fa-hand-peace",
     },
     {
       id: "chess",
       title: "Chess",
       link: "/games/chess",
-      image:
-        "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
+      image: "/space-game-background-neon-night-alien-landscape-free-vector.jpg",
       icon: "fas fa-chess",
     },
   ];
@@ -112,20 +99,67 @@ app.get("/", (req, res) => {
   res.render("index", {
     title: "Gaming Arena",
     user: {
-      name: user.username,
-      isLoggedIn: !!req.session.user,
+      id: req.user ? req.user._id : null,
+      name: req.user ? req.user.username : "Guest",
+      isLoggedIn: !!req.user,
+      gamesPlayed: user.gamesPlayed,
+      level: user.level,
     },
     showDropdown,
     games: games,
   });
 });
 
+
+// CHECK THIS ***********
+// Middleware to update games played and level
+async function updateUserGameCount(userId) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return;
+
+    user.gamesPlayed += 1;
+
+    // Calculate new level
+    const newLevel = Math.floor(user.gamesPlayed / LEVEL_UP_THRESHOLD) + 1;
+    if (newLevel > user.level) {
+      user.level = newLevel;
+      // Emit levelUp event to the user's socket
+      const socketId = userSocketMap[userId];
+      if (socketId) {
+        io.to(socketId).emit("levelUp", { level: newLevel });
+      }
+      console.log(`User ${user.username} leveled up to Level ${newLevel}!`);
+    }
+
+    await user.save();
+  } catch (error) {
+    console.error("Error updating user game count:", error);
+  }
+}
+
 io.on("connection", (socket) => {
   console.log("A user connected");
 
+  // CHECK THIS ***********
+  // Register user ID to socket
+  socket.on("registerUser", (userId) => {
+    userSocketMap[userId] = socket.id;
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected");
+    // CHECK THIS ***********
+    // Remove user from the map upon disconnection
+    for (const [userId, sockId] of Object.entries(userSocketMap)) {
+      if (sockId === socket.id) {
+        delete userSocketMap[userId];
+        break;
+      }
+    }
   });
+
+  // === Rock Paper Scissors (RPS) Events ===
 
   // Create RPS Game
   socket.on("createRPSGame", async (data) => {
@@ -210,17 +244,17 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Request Room Data for Tic Tac Toe
+  // Request Room Data for RPS
   socket.on("requestRPSRoomData", async ({ roomUniqueId }) => {
     try {
       const roomData = await RPSData.findOne({ roomUniqueId });
       socket.emit("roomDataResponse", { roomData });
     } catch (error) {
-      console.error("Error requesting Tic Tac Toe room data:", error);
+      console.error("Error requesting RPS room data:", error);
     }
   });
 
-  // ****
+  // === Tic Tac Toe Events ===
 
   // Create Tic Tac Toe Game
   socket.on("createTicTacToeGame", async (data) => {
@@ -292,7 +326,23 @@ io.on("connection", (socket) => {
       { $push: { winner: winner } },
       { new: true }
     );
-    socket.to(roomUniqueId).emit("announceWinner", { data });
+    socket.to(roomUniqueId).emit("announceWinner", { data })
+
+
+    // CHECK THIS ***********
+    // Update games played and level for both players
+    const gameData = await TicTacToeData.findOne({ roomUniqueId });
+    if (gameData) {
+      const player1 = await User.findOne({ username: gameData.player1Name });
+      const player2 = await User.findOne({ username: gameData.player2Name });
+
+      if (player1) {
+        updateUserGameCount(player1._id);
+      }
+      if (player2) {
+        updateUserGameCount(player2._id);
+      }
+    }
   });
 
   // Announce Tic Tac Toe Draw
@@ -304,6 +354,22 @@ io.on("connection", (socket) => {
       { new: true }
     );
     socket.to(roomUniqueId).emit("announceDraw", { data });
+
+
+    // CHECK THIS ***********
+    // Update games played and level for both players
+    const gameData = await TicTacToeData.findOne({ roomUniqueId });
+    if (gameData) {
+      const player1 = await User.findOne({ username: gameData.player1Name });
+      const player2 = await User.findOne({ username: gameData.player2Name });
+
+      if (player1) {
+        updateUserGameCount(player1._id);
+      }
+      if (player2) {
+        updateUserGameCount(player2._id);
+      }
+    }
   });
 
   // Request Room Data for Tic Tac Toe
@@ -344,7 +410,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Create Chess Game
+  // === Chess Events ===
+
   var isplayer12 = false;
   socket.on("createChessGame", async (data) => {
     console.log("Hi");
@@ -394,17 +461,35 @@ io.on("connection", (socket) => {
             { player2Name: data.playerName }
           );
           room.capacity = false;
+
+          // CHECK THIS ***********
+          // Update games played and level for both players
+          const gameData = await ChessData.findOne({ roomUniqueId: data.roomUniqueId });
+          if (gameData) {
+            const player1 = await User.findOne({ username: gameData.player1Name });
+            const player2 = await User.findOne({ username: gameData.player2Name });
+
+            if (player1) {
+              updateUserGameCount(player1._id);
+            }
+            if (player2) {
+              updateUserGameCount(player2._id);
+            }
+          }
         } else {
           socket.emit("FullChess");
         }
       } else {
-        // WILL MAkE SOCKET For alert
+        // Handle invalid room
+        // CHECK THIS ***********
+        socket.emit("InvalidChessRoom");
       }
     } catch (error) {
-      console.error("Error joining Tic Tac Toe game:", error);
+      console.error("Error joining Chess game:", error);
     }
   });
 
+  // Chess Moves (Assuming you have existing logic)
   let currentCode = null;
 
   socket.on("move", function (data) {
@@ -448,12 +533,28 @@ async function determineRPSWinner(roomUniqueId) {
   }
 
   io.to(roomUniqueId).emit("rpsGameResult", { winner });
-  // why io
 
+  // Reset choices
   room.player1Choice = null;
   room.player2Choice = null;
 
+  // Update game data in DB
   await RPSData.findOneAndUpdate({ roomUniqueId }, { winner });
+
+  // CHECK THIS ***********
+  // Update games played and level for both players
+  const gameData = await RPSData.findOne({ roomUniqueId });
+  if (gameData) {
+    const player1 = await User.findOne({ username: gameData.player1Name });
+    const player2 = await User.findOne({ username: gameData.player2Name });
+
+    if (player1) {
+      updateUserGameCount(player1._id);
+    }
+    if (player2) {
+      updateUserGameCount(player2._id);
+    }
+  }
 }
 
 // Generate Room ID

@@ -15,6 +15,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  gamesPlayed: {
+    type: Number,
+    default: 0,
+  },
+  level: {
+    type: Number,
+    default: 1,
+  },
 });
 
 const User = mongoose.model("User", userSchema);

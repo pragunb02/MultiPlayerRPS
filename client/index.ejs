@@ -12,6 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <!-- SweetAlert2 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <!-- External CSS -->
   <link rel="stylesheet" href="/style.css" />
 </head>
@@ -30,6 +32,9 @@
         <li><a href="#about">About</a></li>
         <% if (user && user.isLoggedIn) { %>
           <li><a href="/u/<%= user.name %>/userprofile">Profile</a></li>
+          <li>
+            <span class="user-level">Level <%= user.level %></span>
+          </li>
           <li><a href="#" id="logoutButton">Logout</a></li>
         <% } else { %>
           <li><a href="/login-signup.html?a=0">Login</a></li>
@@ -51,7 +56,8 @@
     <!-- Parallax Scrolling Stars -->
     <div class="parallax-stars">
       <% for (let i = 1; i <= 20; i++) { %>
-        <div class="star" style="--i:<%= i %>;"></div>
+        <!-- Fallback value added for CSS property -->
+        <div class="star" style="--i:<%= i || 1 %>;"></div>
       <% } %>
       <!-- Gaming Element with Custom GIF -->
       <div class="gaming-element">
@@ -77,9 +83,15 @@
     <div class="container">
       <h2>Your Gaming Progress</h2>
       <div class="progress-bar">
-        <div class="progress" style="width: 50%;"></div>
+        <% 
+          const threshold = 10; // LEVEL_UP_THRESHOLD
+          const gamesPlayed = user.gamesPlayed || 0;
+          let progressPercentage = Math.min((gamesPlayed % threshold) / threshold * 100, 100)*10;
+        %>
+        <div class="progress" style="width: <%= progressPercentage %>%;"></div>
       </div>
-      <p>Level 5 - Keep Playing to Reach the Next Level!</p>
+      <p>Level <%= user.level %> - <%= threshold - (gamesPlayed % threshold) %> games to reach the next level!</p>
+      <p>Total Games Played: <%= gamesPlayed %></p>
     </div>
   </section>
 
@@ -162,7 +174,12 @@
     </div>
   </footer>
 
+  <!-- SweetAlert2 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <!-- External JavaScript -->
+  <script>
+    const USER_ID = "<%= user.isLoggedIn ? user.id : '' %>";
+  </script>
   <script src="/scriptindex.js"></script>
 </body>
 </html>
