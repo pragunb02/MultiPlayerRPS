@@ -13,6 +13,15 @@ module.exports = [
     languageOptions: { sourceType: "commonjs", globals: globals.node },
   },
   {
+    files: ["apps/server/**/*.js", "packages/**/*.js"],
+    languageOptions: { sourceType: "module", globals: globals.node },
+    rules: {
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      eqeqeq: "error",
+      "no-console": "off",
+    },
+  },
+  {
     // Legacy browser scripts: loaded as plain <script> tags sharing globals, so cross-file
     // references and inline onclick handlers look "unused"/"undefined" to ESLint.
     // Kept as warnings until these files are replaced by the React app (CC-029).

@@ -59,15 +59,20 @@ npm-workspaces monorepo, JavaScript ES modules with JSDoc types, React + Vite fr
 `apps/server`, `apps/web`, `packages/games` (pure engines), `packages/shared` (event names, constants).
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+Built so far: `apps/server` (app factory, config, health/games routes) and `packages/shared` (game catalog).
+New code: ES modules, JSDoc types, Express 5, pure functions where possible, a `*.test.js` beside every module,
+dependencies passed in (e.g. `createApp({ config })`) rather than imported globals.
+
 ## Commands
 
 ```bash
 nvm use && npm install
 cp .env.example .env   # MONGO_URI (non-production DB!), SESSION_SECRET
-npm run dev            # nodemon index.js on :8080
+npm run dev            # legacy app (nodemon index.js) on :8080
+npm run dev:server     # new server (apps/server) on :4000 — own env file apps/server/.env
 npm run lint           # must have 0 errors
 npm run format:check
-npm test
+npm test               # Vitest across all workspaces (*.test.js next to the code)
 ```
 
 No local MongoDB? A throwaway `mongodb-memory-server` instance in a temp dir works for smoke tests.

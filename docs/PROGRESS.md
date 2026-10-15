@@ -2,20 +2,20 @@
 
 ## Status
 
-|               |                                                                                                            |
-| ------------- | ---------------------------------------------------------------------------------------------------------- |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-073`                                             |
-| Current stage | **Stage 0 — Foundation**                                                                                   |
-| Stage health  | 🟢 On track                                                                                                |
-| In progress   | —                                                                                                          |
-| Blocked on    | —                                                                                                          |
-| Next up       | CC-011 scaffold monorepo (`apps/server`, `apps/web`, `packages/games`, `packages/shared`) → CC-012..CC-017 |
+|               |                                                                               |
+| ------------- | ----------------------------------------------------------------------------- |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-073`                |
+| Current stage | **Stage 0 — Foundation**                                                      |
+| Stage health  | 🟢 On track                                                                   |
+| In progress   | —                                                                             |
+| Blocked on    | —                                                                             |
+| Next up       | CC-012 logger + error handling → CC-013 socket auth → CC-014 engine interface |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 9 / 30       |
+| S0 Foundation   | 🟡 In progress | 10 / 30      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -27,12 +27,13 @@
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 5    | 1           | 5     |
 | Bugs (BUG)       | 11   | 1           | 2     |
-| Tech debt (DEBT) | 6    | 2           | 2     |
+| Tech debt (DEBT) | 4    | 4           | 2     |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-011 — Monorepo scaffold: npm workspaces; `apps/server` (ESM, Express 5, validated config, `createApp()` factory, `startServer()` + graceful SIGINT/SIGTERM, `/api/health`, `/api/games`, JSON 404/500) and `packages/shared` (game catalog). 16 tests. Verified by running: endpoints respond, bad config exits 1, SIGTERM frees the port, legacy app still runs alongside on Express 4. `packages/games` → CC-014, `apps/web` → CC-022.
 - 2026-10-16 — CC-072 — Introduced `CC-###` ticket IDs: BACKLOG.md is now a ticket board (type, priority, status, links), `docs/tickets/TEMPLATE.md` added, every KNOWN_ISSUES finding linked to a ticket, old `S#-##` IDs replaced everywhere. New tickets CC-030 (CSP + CSRF) and CC-031 (dependency upgrades). Next free ID: CC-073.
 
 - 2026-10-16 — CC-003..CC-010 — Setup and legacy quick fixes:

@@ -7,6 +7,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 - **SEC-05** 🟡 Helmet headers + auth rate limiting (20 req / 15 min / IP) done. CSRF mitigated by `SameSite=Lax` cookies; CSRF tokens and CSP come with the React app (CSP is off because legacy pages use inline scripts/handlers).
 - **SEC-06** ✅ `config.js` validates env at boot; `MONGO_URI` replaces `MONGO_URI_PRODUCTION` (old name still accepted as fallback).
 - **BUG-13** 🟡 RPS choice handlers now ignore unknown rooms/choices; other handlers still pending (RoomManager, CC-015).
+- **DEBT-01, DEBT-02** 🟡 New structure exists (`apps/server`, `packages/shared`, CC-011); legacy code moves out ticket by ticket and is deleted in CC-029.
 - **DEBT-08** 🟡 Dead server code removed; debug logs in legacy client and `hw.txt` remain until CC-029.
 - **DEBT-09** 🟡 README, `.env.example`, ESLint/Prettier/Vitest added; tests and CI pending.
 - `bcrypt` replaced with `bcryptjs` (no native build; existing hashes stay valid).
@@ -50,8 +51,8 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 | ID      | Status | Issue                                                                                                                                                                                                 | Ticket                         |
 | ------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| DEBT-01 | 🔴     | `index.js` monolith (595 lines): routes + sockets + rules + DB + leveling                                                                                                                             | CC-011                         |
-| DEBT-02 | 🔴     | Server routes live under `client/routes/`; `client/` served statically (templates & server files exposed as static)                                                                                   | CC-011                         |
+| DEBT-01 | 🟡     | `index.js` monolith (595 lines): routes + sockets + rules + DB + leveling                                                                                                                             | CC-011                         |
+| DEBT-02 | 🟡     | Server routes live under `client/routes/`; `client/` served statically (templates & server files exposed as static)                                                                                   | CC-011                         |
 | DEBT-03 | 🔴     | Share-menu code (~150 lines) copy-pasted in 3 files; tooltip CSS injected via JS                                                                                                                      | CC-023                         |
 | DEBT-04 | 🔴     | Three near-identical models (`ChessData` copied from `RPSData` incl. unused `choice` fields)                                                                                                          | CC-016                         |
 | DEBT-05 | 🔴     | 5 overlapping CSS files; inline styles; magic IDs (`xyz`, `index2/3/4.ejs`)                                                                                                                           | CC-023, CC-029                 |

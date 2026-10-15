@@ -31,6 +31,8 @@ web/  (SPA, mobile-first)  ──HTTP──►  API (REST)        ─┐
 
 ### Layout (ADR-001 JavaScript/ESM, ADR-002 React, ADR-006 monorepo)
 
+Status: `apps/server` skeleton and `packages/shared` exist (CC-011); the rest is added by its ticket.
+
 ```
 apps/
   server/src/
