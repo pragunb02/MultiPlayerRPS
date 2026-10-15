@@ -1,15 +1,9 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ERROR_CODES, GAMES } from "@classicade/shared";
-import { loadConfig } from "../../config/index.js";
-import { captureLogger } from "../../testing/captureLogger.js";
-import { createHttpApp } from "./app.js";
+import { createTestApp } from "../../testing/testApp.js";
 
-function setup(env = { NODE_ENV: "test" }) {
-  const capture = captureLogger();
-  const app = createHttpApp({ config: loadConfig(env), logger: capture.logger });
-  return { app, ...capture };
-}
+const setup = (env) => createTestApp({ env });
 
 describe("HTTP app", () => {
   it("GET /api/health returns ok", async () => {
@@ -41,7 +35,9 @@ describe("HTTP app", () => {
   });
 
   it("trusts the first proxy only in production (for secure cookies behind TLS termination)", () => {
-    expect(setup({ NODE_ENV: "production" }).app.get("trust proxy")).toBe(1);
+    expect(
+      setup({ NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app" }).app.get("trust proxy"),
+    ).toBe(1);
     expect(setup().app.get("trust proxy")).toBe(false);
   });
 
