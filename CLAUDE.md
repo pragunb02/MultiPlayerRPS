@@ -10,16 +10,17 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 
 ## Where things are tracked
 
-| File                                         | Purpose                                                                | Update when                     |
-| -------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------- |
-| [docs/BRD.md](docs/BRD.md)                   | Business requirements: vision, users, business model, KPIs             | Business direction changes      |
-| [docs/PRD.md](docs/PRD.md)                   | Product requirements per stage, with requirement IDs (`FR-*`, `NFR-*`) | Scope of a feature changes      |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Current vs. target architecture                                        | Structure changes               |
-| [docs/BACKLOG.md](docs/BACKLOG.md)           | **Ticket board** — every task as `CC-###` with type, priority, status  | Tickets added/started/completed |
-| [docs/tickets/](docs/tickets/)               | One file per non-trivial ticket (`CC-###.md`) from `TEMPLATE.md`       | Ticket started / progressed     |
-| [docs/PROGRESS.md](docs/PROGRESS.md)         | Current phase, in-flight work, dated changelog                         | **Every working session**       |
-| [docs/DECISIONS.md](docs/DECISIONS.md)       | Architecture/product decision records (ADRs)                           | A decision is made or reversed  |
-| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | Audit findings (`BUG-*`, `SEC-*`, `DEBT-*`)                            | Issue found or fixed            |
+| File                                         | Purpose                                                                                          | Update when                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------- |
+| [docs/BRD.md](docs/BRD.md)                   | Business requirements: vision, users, business model, KPIs                                       | Business direction changes      |
+| [docs/PRD.md](docs/PRD.md)                   | Product requirements per stage, with requirement IDs (`FR-*`, `NFR-*`)                           | Scope of a feature changes      |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Current vs. target architecture                                                                  | Structure changes               |
+| [docs/BACKLOG.md](docs/BACKLOG.md)           | **Ticket board** — every task as `CC-###` with type, priority, status                            | Tickets added/started/completed |
+| [docs/tickets/](docs/tickets/)               | One file per non-trivial ticket (`CC-###.md`) from `TEMPLATE.md`                                 | Ticket started / progressed     |
+| [docs/PROGRESS.md](docs/PROGRESS.md)         | Current phase, in-flight work, dated changelog                                                   | **Every working session**       |
+| [docs/DECISIONS.md](docs/DECISIONS.md)       | Architecture/product decision records (ADRs)                                                     | A decision is made or reversed  |
+| [docs/ENGINEERING.md](docs/ENGINEERING.md)   | **How to write code**: layers, principles, patterns, coding/testing standards, dependency policy | Standards change                |
+| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | Audit findings (`BUG-*`, `SEC-*`, `DEBT-*`)                                                      | Issue found or fixed            |
 
 ### ID scheme
 
@@ -68,21 +69,27 @@ dependencies passed in (e.g. `createApp({ config })`) rather than imported globa
 ```bash
 nvm use && npm install
 cp .env.example .env   # MONGO_URI (non-production DB!), SESSION_SECRET
-npm run dev            # legacy app (nodemon index.js) on :8080
+npm run dev            # legacy app (node --watch index.js) on :8080
 npm run dev:server     # new server (apps/server) on :4000 — own env file apps/server/.env
 npm run lint           # must have 0 errors
 npm run format:check
 npm test               # Vitest across all workspaces (*.test.js next to the code)
+npm run test:coverage  # with coverage gates (ENGINEERING.md §4)
+npm audit              # must be 0 high/critical
 ```
 
 No local MongoDB? A throwaway `mongodb-memory-server` instance in a temp dir works for smoke tests.
 
-## Engineering principles (target)
+## Engineering principles
 
-- **Server-authoritative games.** Clients send intents; the server validates, applies, decides results. Never trust the client for moves, winners, or identity.
-- **Identity comes from the session**, never from a name typed in a form.
-- **Games are pure modules** behind a common engine interface (`init / validateMove / applyMove / getResult / viewFor`), unit tested, no I/O.
-- **One room/match system** shared by all games; bots are just players driven by the server.
-- Escape all user-controlled output; no `<%-` with user data.
-- No dead code, no commented-out blocks, no debug `console.log` — use a logger.
+**Read [docs/ENGINEERING.md](docs/ENGINEERING.md) before writing code.** It is binding for `apps/` and `packages/`. Key points:
+
+- **Five layers** in the server (service → domain → data → persistence | dependency), adjacent and top-down only — `npm run lint` fails on violations.
+- **Server-authoritative games.** Clients send intents; the server validates, applies, decides results. Identity comes from the session.
+- **Pure core**: game engines and rule maths are pure functions; time, randomness and I/O are injected.
+- **Composition root** (`apps/server/src/server.js`) wires everything; factories receive dependencies; no globals.
+- **Extensible by addition**: new games/bots/storage plug in via registries and contracts (open/closed).
+- **Typed errors**, no `null` results, value objects for ids, named parameters, no silent fallbacks, immutable data.
+- **Tests**: behaviour-focused unit tests beside code, fakes over mocks, deterministic; coverage gates via `npm run test:coverage`.
+- **Dependencies**: latest stable only, minimal, `npm audit` 0 high/critical.
 - Inclusive language (allowlist/denylist, primary/replica).

@@ -16,4 +16,4 @@ try {
 
 const { port, close } = await startServer({ config });
 console.log(`ClassiCade server listening on port ${port} (${config.env})`);
-handleShutdownSignals(close);
+handleShutdownSignals({ close });

@@ -33,12 +33,13 @@ npm run dev            # http://localhost:8080
 
 ## Project docs
 
-| Doc                                  | Contents                            |
-| ------------------------------------ | ----------------------------------- |
-| [BRD](docs/BRD.md)                   | Vision, users, business model, KPIs |
-| [PRD](docs/PRD.md)                   | Product requirements by stage       |
-| [Architecture](docs/ARCHITECTURE.md) | Current and target architecture     |
-| [Backlog](docs/BACKLOG.md)           | Stage-by-stage tasks                |
-| [Progress](docs/PROGRESS.md)         | Current status and changelog        |
-| [Decisions](docs/DECISIONS.md)       | Architecture decision records       |
-| [Known issues](docs/KNOWN_ISSUES.md) | Audit findings and their status     |
+| Doc                                  | Contents                              |
+| ------------------------------------ | ------------------------------------- |
+| [BRD](docs/BRD.md)                   | Vision, users, business model, KPIs   |
+| [PRD](docs/PRD.md)                   | Product requirements by stage         |
+| [Architecture](docs/ARCHITECTURE.md) | Current and target architecture       |
+| [Backlog](docs/BACKLOG.md)           | Stage-by-stage tasks                  |
+| [Progress](docs/PROGRESS.md)         | Current status and changelog          |
+| [Engineering](docs/ENGINEERING.md)   | Architecture rules and code standards |
+| [Decisions](docs/DECISIONS.md)       | Architecture decision records         |
+| [Known issues](docs/KNOWN_ISSUES.md) | Audit findings and their status       |

@@ -1,16 +1,17 @@
 import http from "node:http";
-import { createApp } from "./app.js";
+import { createHttpApp } from "./service/http/app.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 /**
- * Starts the HTTP server and resolves once it is listening.
+ * Composition root: builds every layer bottom-up, wires dependencies, and starts listening.
+ * The only module allowed to know about all layers.
  *
  * @param {{ config: Readonly<import("./config/index.js").Config> }} deps
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
 export function startServer({ config }) {
-  const server = http.createServer(createApp({ config }));
+  const server = http.createServer(createHttpApp({ config }));
 
   const close = () =>
     new Promise((resolve, reject) => {
@@ -30,22 +31,37 @@ export function startServer({ config }) {
 
 /**
  * Closes the server on SIGINT/SIGTERM, forcing exit if open connections don't drain in time.
+ * `proc` and `logger` are injectable so the behaviour can be unit tested without real signals.
  *
- * @param {() => Promise<void>} close
+ * @param {{
+ *   close: () => Promise<void>,
+ *   proc?: Pick<NodeJS.Process, "once" | "exit">,
+ *   logger?: Pick<Console, "log" | "error">,
+ *   timeoutMs?: number,
+ * }} options
  */
-export function handleShutdownSignals(close) {
+export function handleShutdownSignals({
+  close,
+  proc = process,
+  logger = console,
+  timeoutMs = SHUTDOWN_TIMEOUT_MS,
+}) {
   const shutdown = (signal) => {
-    console.log(`${signal} received, shutting down`);
-    const forceExit = setTimeout(() => process.exit(1), SHUTDOWN_TIMEOUT_MS);
+    logger.log(`${signal} received, shutting down`);
+    const forceExit = setTimeout(() => proc.exit(1), timeoutMs);
     forceExit.unref();
     close().then(
-      () => process.exit(0),
+      () => {
+        clearTimeout(forceExit);
+        proc.exit(0);
+      },
       (err) => {
-        console.error("Error during shutdown", err);
-        process.exit(1);
+        clearTimeout(forceExit);
+        logger.error("Error during shutdown", err);
+        proc.exit(1);
       },
     );
   };
-  process.once("SIGINT", shutdown);
-  process.once("SIGTERM", shutdown);
+  proc.once("SIGINT", shutdown);
+  proc.once("SIGTERM", shutdown);
 }

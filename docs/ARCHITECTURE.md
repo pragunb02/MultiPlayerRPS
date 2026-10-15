@@ -29,35 +29,33 @@ web/  (SPA, mobile-first)  ──HTTP──►  API (REST)        ─┐
                                      Game engines (pure)  ◄── Bots (server-side players)
 ```
 
-### Layout (ADR-001 JavaScript/ESM, ADR-002 React, ADR-006 monorepo)
+### Layout (ADR-001 JavaScript/ESM, ADR-002 React, ADR-006 monorepo, ADR-007 layers)
 
-Status: `apps/server` skeleton and `packages/shared` exist (CC-011); the rest is added by its ticket.
+Layer rules, patterns and extension points: [ENGINEERING.md](ENGINEERING.md).
 
 ```
 apps/
   server/src/
-    index.js            # bootstrap: config → db → http + socket → listen
-    app.js              # express app factory (no listen) — used by tests
-    config/             # env schema, validated at boot
-    http/
-      routes/           # auth, users, matches
-      middleware/       # auth, rate-limit, error handler
-    realtime/
-      gateway.js        # socket auth (session), event routing
-    rooms/
-      RoomManager.js    # create/join/leave, lifecycle, timeouts, reconnect, server clocks
-    bots/               # Bot implementations (server-side players)
-    domain/
-      users/ matches/ ratings/ progression/   # service + repository per module
-    lib/                # logger, errors, ids
-  web/src/              # React + Vite
-    app/ pages/ components/ games/<game>/ hooks/ lib/socket.js
+    index.js              # process entry: load env → config → startServer
+    server.js             # composition root: builds layers bottom-up, starts HTTP/socket servers
+    config/               # env schema, validated at boot (injected, never imported by layers)
+    service/              # 1. service layer
+      http/               #    express app, routes, controllers, validators, transformers, error middleware
+      realtime/           #    socket gateway + socket handlers
+    domain/               # 2. domain logic: *Component (rooms, matches, progression, bots)
+    data/                 # 3. domain data: *Accessor — returns domain models
+    persistence/          # 4a. *Dao — MongoDB CRUD for data we own
+    dependency/           # 4b. *Client — external services
+    models/               # immutable domain models & value objects
+    utils/                # logger, typed errors, assertions, ids
+  web/src/                # React + Vite (CC-022)
 packages/
-  games/src/            # pure engines: rps/ tictactoe/ chess/ (ludo/) + engine.js typedefs
-  shared/src/           # socket event names, constants, validators
-tests live next to code: *.test.js (Vitest)
-docs/
+  games/src/              # pure engines + registry (CC-014)
+  shared/src/             # catalog, event names, constants
+tests live next to code: *.test.js (unit), *.integration.test.js
 ```
+
+Status: `index.js`, `server.js`, `config/`, `service/http/` exist (CC-011, CC-073); other folders arrive with their tickets.
 
 ### Game engine contract (draft, JSDoc)
 

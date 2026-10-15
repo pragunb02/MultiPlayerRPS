@@ -1,14 +1,15 @@
 import express from "express";
 import helmet from "helmet";
-import { apiRouter } from "./http/routes/index.js";
-import { errorHandler, notFoundHandler } from "./http/middleware/errors.js";
+import { apiRouter } from "./routes.js";
+import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
 
 /**
- * Creates the Express app without binding a port, so tests can drive it in-process.
+ * Service layer entry point for HTTP: creates the Express app without binding a port,
+ * so tests can drive it in-process.
  *
- * @param {{ config: Readonly<import("./config/index.js").Config> }} deps
+ * @param {{ config: Readonly<import("../../config/index.js").Config> }} deps
  */
-export function createApp({ config }) {
+export function createHttpApp({ config }) {
   const app = express();
 
   app.disable("x-powered-by");

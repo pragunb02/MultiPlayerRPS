@@ -3,7 +3,7 @@
 Every unit of work is a ticket with a permanent ID **`CC-###`** (ClassiCade). IDs are sequential, never reused,
 and don't encode the stage — a ticket can move between stages without changing its ID.
 
-**Next free ID: `CC-073`** — bump this when you add a ticket.
+**Next free ID: `CC-075`** — bump this when you add a ticket.
 
 | Field  | Values                                                                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -21,10 +21,11 @@ and don't encode the stage — a ticket can move between stages without changing
 
 ### Project setup & process
 
-| ID     | Title                                                                                     | Type | Pri | Status  | Links   |
-| ------ | ----------------------------------------------------------------------------------------- | ---- | --- | ------- | ------- |
-| CC-001 | Codebase audit; BRD, PRD, architecture, decisions, known issues, progress docs, CLAUDE.md | docs | P1  | ✅ Done | ADR-000 |
-| CC-072 | Ticket ID system: `CC-###` board, ticket template, findings ↔ tickets mapping             | docs | P1  | ✅ Done |         |
+| ID                          | Title                                                                                                                                                                | Type | Pri | Status  | Links                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | --- | ------- | ------------------------------------------- |
+| CC-001                      | Codebase audit; BRD, PRD, architecture, decisions, known issues, progress docs, CLAUDE.md                                                                            | docs | P1  | ✅ Done | ADR-000                                     |
+| CC-072                      | Ticket ID system: `CC-###` board, ticket template, findings ↔ tickets mapping                                                                                        | docs | P1  | ✅ Done |                                             |
+| [CC-073](tickets/CC-073.md) | Engineering guidelines: layered architecture, design principles & patterns, coding/testing standards, dependency policy — enforced by lint, coverage gates and audit | docs | P0  | ✅ Done | ADR-007, ADR-008, DEBT-06, DEBT-10, DEBT-11 |
 
 ---
 
@@ -93,10 +94,11 @@ and don't encode the stage — a ticket can move between stages without changing
 
 ### 0.G Follow-ups found during Stage 0
 
-| ID     | Title                                                 | Type     | Pri | Status  | Links         |
-| ------ | ----------------------------------------------------- | -------- | --- | ------- | ------------- |
-| CC-030 | CSP and CSRF tokens for the new app (finishes SEC-05) | security | P0  | ⬜ Todo | SEC-05, NFR-1 |
-| CC-031 | Upgrade Express 5, Mongoose 8, chess.js 1.x           | debt     | P2  | ⬜ Todo | DEBT-10       |
+| ID     | Title                                                                                                                                            | Type     | Pri | Status  | Links           |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --- | ------- | --------------- |
+| CC-030 | CSP and CSRF tokens for the new app (finishes SEC-05)                                                                                            | security | P0  | ⬜ Todo | SEC-05, NFR-1   |
+| CC-031 | Automated dependency updates (Dependabot) + `npm audit` gate in CI; new code adopts latest stable majors (Mongoose 9, chess.js) as it is written | debt     | P2  | ⬜ Todo | DEBT-10         |
+| CC-074 | Rename `MONGO_URI_PRODUCTION` → `MONGO_URI` in the deployment, then remove the fallback in `config.js` (needs owner access to hosting)           | debt     | P2  | ⬜ Todo | DEBT-12, SEC-06 |
 
 ---
 

@@ -4,7 +4,7 @@
 
 |               |                                                                               |
 | ------------- | ----------------------------------------------------------------------------- |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-073`                |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-075`                |
 | Current stage | **Stage 0 — Foundation**                                                      |
 | Stage health  | 🟢 On track                                                                   |
 | In progress   | —                                                                             |
@@ -15,7 +15,7 @@
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 10 / 30      |
+| S0 Foundation   | 🟡 In progress | 10 / 31      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -27,12 +27,13 @@
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 5    | 1           | 5     |
 | Bugs (BUG)       | 11   | 1           | 2     |
-| Tech debt (DEBT) | 4    | 4           | 2     |
+| Tech debt (DEBT) | 4    | 6           | 3     |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-073 — Engineering guidelines ([ENGINEERING.md](ENGINEERING.md)): five-layer server architecture, design principles, patterns + where they apply, extension points, coding/testing standards, dependency policy (ADR-007, ADR-008). Enforced: ESLint layer + engine-purity rules (proved by `architecture.test.js`), coverage gates (80 %, games 90 %). HTTP code moved to `service/http/`; shutdown handler made injectable and tested. Dependencies: same-major legacy updates, `connect-mongodb-session` 2 → 5, nodemon → `node --watch`; `npm audit` 31 → 0. Legacy flows re-verified on in-memory MongoDB. New: CC-074 (remove env fallback), CC-031 redefined (Dependabot + audit gate). 42 tests, 100 % lines.
 - 2026-10-16 — CC-011 — Monorepo scaffold: npm workspaces; `apps/server` (ESM, Express 5, validated config, `createApp()` factory, `startServer()` + graceful SIGINT/SIGTERM, `/api/health`, `/api/games`, JSON 404/500) and `packages/shared` (game catalog). 16 tests. Verified by running: endpoints respond, bad config exits 1, SIGTERM frees the port, legacy app still runs alongside on Express 4. `packages/games` → CC-014, `apps/web` → CC-022.
 - 2026-10-16 — CC-072 — Introduced `CC-###` ticket IDs: BACKLOG.md is now a ticket board (type, priority, status, links), `docs/tickets/TEMPLATE.md` added, every KNOWN_ISSUES finding linked to a ticket, old `S#-##` IDs replaced everywhere. New tickets CC-030 (CSP + CSRF) and CC-031 (dependency upgrades). Next free ID: CC-073.
 

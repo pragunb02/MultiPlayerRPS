@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { GAMES } from "@classicade/shared";
-import { createApp } from "./app.js";
-import { loadConfig } from "./config/index.js";
-import { errorHandler } from "./http/middleware/errors.js";
+import { loadConfig } from "../../config/index.js";
+import { createHttpApp } from "./app.js";
+import { errorHandler } from "./errorMiddleware.js";
 
-const app = createApp({ config: loadConfig({ NODE_ENV: "test" }) });
+const app = createHttpApp({ config: loadConfig({ NODE_ENV: "test" }) });
 
 describe("HTTP app", () => {
   it("GET /api/health returns ok", async () => {
@@ -25,6 +25,12 @@ describe("HTTP app", () => {
     expect(res.headers["x-content-type-options"]).toBe("nosniff");
     expect(res.headers["content-security-policy"]).toBeDefined();
     expect(res.headers["x-powered-by"]).toBeUndefined();
+  });
+
+  it("trusts the first proxy only in production (for secure cookies behind TLS termination)", () => {
+    const production = createHttpApp({ config: loadConfig({ NODE_ENV: "production" }) });
+    expect(production.get("trust proxy")).toBe(1);
+    expect(app.get("trust proxy")).toBe(false);
   });
 
   it("returns JSON 404 for unknown routes", async () => {

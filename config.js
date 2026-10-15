@@ -1,6 +1,10 @@
 require("dotenv").config();
 
 // Legacy deployments set MONGO_URI_PRODUCTION; MONGO_URI is the name going forward.
+// Compatibility fallback, removed in CC-074 once the deployment uses MONGO_URI.
+if (!process.env.MONGO_URI && process.env.MONGO_URI_PRODUCTION) {
+  console.warn("MONGO_URI_PRODUCTION is deprecated; set MONGO_URI instead (CC-074).");
+}
 const mongoUri = process.env.MONGO_URI || process.env.MONGO_URI_PRODUCTION;
 const sessionSecret = process.env.SESSION_SECRET;
 
