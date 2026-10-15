@@ -1,5 +1,6 @@
 import express from "express";
 import helmet from "helmet";
+import { assertDefined } from "../../utils/assert.js";
 import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
 import { createRequestLogger } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
@@ -11,9 +12,24 @@ import { apiRouter } from "./routes.js";
  * @param {{
  *   config: Readonly<import("../../config/index.js").Config>,
  *   logger: import("../../utils/logger.js").Logger,
+ *   sessionMiddleware: import("express").RequestHandler,
+ *   identityComponent: ReturnType<typeof import("../../domain/identity/identityComponent.js").createIdentityComponent>,
+ *   onSessionEnded: (sessionId: string) => void,
+ *   guestLimit?: { windowMs: number, limit: number },
  * }} deps
  */
-export function createHttpApp({ config, logger }) {
+export function createHttpApp({
+  config,
+  logger,
+  sessionMiddleware,
+  identityComponent,
+  onSessionEnded,
+  guestLimit,
+}) {
+  assertDefined(config, "config");
+  assertDefined(logger, "logger");
+  assertDefined(sessionMiddleware, "sessionMiddleware");
+
   const app = express();
 
   app.disable("x-powered-by");
@@ -23,8 +39,9 @@ export function createHttpApp({ config, logger }) {
   app.use(createRequestLogger({ logger }));
   app.use(helmet());
   app.use(express.json({ limit: "100kb" }));
+  app.use("/api", sessionMiddleware);
 
-  app.use("/api", apiRouter());
+  app.use("/api", apiRouter({ identityComponent, onSessionEnded, guestLimit }));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

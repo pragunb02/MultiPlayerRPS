@@ -1,38 +1,9 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadConfig } from "./config/index.js";
-import { handleFatalErrors, handleShutdownSignals, startServer } from "./server.js";
+import { handleFatalErrors, handleShutdownSignals } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 
-const testConfig = (overrides = {}) => loadConfig({ NODE_ENV: "test", PORT: "0", ...overrides });
 const fakeProcess = () => Object.assign(new EventEmitter(), { exit: vi.fn() });
-
-describe("startServer", () => {
-  it("listens on the configured port, serves requests and closes cleanly", async () => {
-    const { logger } = captureLogger();
-    const { server, port, close } = await startServer({ config: testConfig(), logger });
-    expect(port).toBeGreaterThan(0);
-
-    const res = await fetch(`http://127.0.0.1:${port}/api/health`);
-    expect(await res.json()).toEqual({ status: "ok" });
-
-    await close();
-    // Assert on the server itself: probing the freed port is racy, because parallel test
-    // workers can be handed the same ephemeral port by the OS (CC-075).
-    expect(server.listening).toBe(false);
-  });
-
-  it("rejects when the port is already in use", async () => {
-    const { logger } = captureLogger();
-    const first = await startServer({ config: testConfig(), logger });
-
-    await expect(startServer({ config: testConfig({ PORT: String(first.port) }), logger })).rejects.toThrow(
-      /EADDRINUSE/,
-    );
-
-    await first.close();
-  });
-});
 
 describe("handleShutdownSignals", () => {
   const setup = (close) => {

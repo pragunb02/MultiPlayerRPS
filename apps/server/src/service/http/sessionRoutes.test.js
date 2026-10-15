@@ -1,0 +1,162 @@
+import request from "supertest";
+import { describe, expect, it } from "vitest";
+import { ERROR_CODES } from "@classicade/shared";
+import { createTestApp } from "../../testing/testApp.js";
+import { SESSION_COOKIE_NAME } from "./session.js";
+
+const FIRST_GUEST = {
+  kind: "guest",
+  id: "guest_00000000-0000-4000-8000-000000000001",
+  displayName: "Guest-T001",
+};
+
+const sessionCookie = (res) =>
+  res.headers["set-cookie"]?.find((c) => c.startsWith(`${SESSION_COOKIE_NAME}=`));
+
+describe("session routes", () => {
+  describe("GET /api/session", () => {
+    it("is 401 without a session", async () => {
+      const { app } = createTestApp();
+
+      const res = await request(app).get("/api/session");
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe(ERROR_CODES.UNAUTHORIZED);
+    });
+
+    it("does not create a session or cookie for anonymous reads", async () => {
+      const { app, store } = createTestApp();
+
+      const res = await request(app).get("/api/session");
+
+      expect(sessionCookie(res)).toBeUndefined();
+      expect(Object.keys(await allSessions(store))).toHaveLength(0);
+    });
+  });
+
+  describe("POST /api/session/guest", () => {
+    it("creates a guest identity and a hardened session cookie", async () => {
+      const { app } = createTestApp();
+
+      const res = await request(app).post("/api/session/guest");
+
+      expect(res.status).toBe(201);
+      expect(res.body).toEqual({ identity: FIRST_GUEST });
+      const cookie = sessionCookie(res);
+      expect(cookie).toMatch(/HttpOnly/i);
+      expect(cookie).toMatch(/SameSite=Lax/i);
+      expect(cookie).not.toMatch(/Secure/i);
+    });
+
+    it("remembers the identity for later requests", async () => {
+      const { app } = createTestApp();
+      const agent = request.agent(app);
+
+      await agent.post("/api/session/guest");
+      const res = await agent.get("/api/session");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ identity: FIRST_GUEST });
+    });
+
+    it("returns the existing identity instead of creating a second one", async () => {
+      const { app } = createTestApp();
+      const agent = request.agent(app);
+
+      await agent.post("/api/session/guest");
+      const res = await agent.post("/api/session/guest");
+
+      expect(res.status).toBe(200);
+      expect(res.body.identity).toEqual(FIRST_GUEST);
+    });
+
+    it("ignores any identity the client tries to supply", async () => {
+      const { app } = createTestApp();
+
+      const res = await request(app)
+        .post("/api/session/guest")
+        .send({ identity: { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "admin" } });
+
+      expect(res.body.identity).toEqual(FIRST_GUEST);
+    });
+
+    it("marks the cookie Secure in production behind a TLS proxy", async () => {
+      const { app } = createTestApp({
+        env: { NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app" },
+      });
+
+      const res = await request(app).post("/api/session/guest").set("X-Forwarded-Proto", "https");
+
+      expect(sessionCookie(res)).toMatch(/Secure/i);
+    });
+
+    it("rate-limits guest creation per client", async () => {
+      const { app } = createTestApp({ guestLimit: { windowMs: 60_000, limit: 2 } });
+
+      await request(app).post("/api/session/guest");
+      await request(app).post("/api/session/guest");
+      const res = await request(app).post("/api/session/guest");
+
+      expect(res.status).toBe(429);
+      expect(res.body.error.code).toBe(ERROR_CODES.RATE_LIMITED);
+      expect(res.body.error.requestId).toBe(res.headers["x-request-id"]);
+    });
+  });
+
+  describe("DELETE /api/session", () => {
+    it("ends the session, clears the cookie and announces it", async () => {
+      const { app, endedSessions, store } = createTestApp();
+      const agent = request.agent(app);
+      await agent.post("/api/session/guest");
+      const [sessionId] = Object.keys(await allSessions(store));
+
+      const res = await agent.delete("/api/session");
+
+      expect(res.status).toBe(204);
+      expect(sessionCookie(res)).toMatch(/Expires=Thu, 01 Jan 1970/);
+      expect(endedSessions).toEqual([sessionId]);
+      expect((await agent.get("/api/session")).status).toBe(401);
+    });
+
+    it("is a no-op without a session", async () => {
+      const { app, endedSessions } = createTestApp();
+
+      const res = await request(app).delete("/api/session");
+
+      expect(res.status).toBe(204);
+      expect(endedSessions).toEqual([]);
+    });
+
+    it("gives a new guest a new session id after logging out (no fixation)", async () => {
+      const { app } = createTestApp();
+      const agent = request.agent(app);
+      const first = sessionCookie(await agent.post("/api/session/guest"));
+      await agent.delete("/api/session");
+
+      const second = sessionCookie(await agent.post("/api/session/guest"));
+
+      expect(second.split(";")[0]).not.toBe(first.split(";")[0]);
+    });
+  });
+
+  it("rejects a session whose stored identity was tampered with", async () => {
+    const { app, store } = createTestApp();
+    const agent = request.agent(app);
+    await agent.post("/api/session/guest");
+    const [sessionId, data] = Object.entries(await allSessions(store))[0];
+    await new Promise((resolve) =>
+      store.set(sessionId, { ...data, identity: { ...data.identity, kind: "admin" } }, resolve),
+    );
+
+    const res = await agent.get("/api/session");
+
+    expect(res.status).toBe(401);
+  });
+});
+
+/** @param {import("express-session").MemoryStore} store */
+function allSessions(store) {
+  return new Promise((resolve, reject) =>
+    store.all((err, sessions) => (err ? reject(err) : resolve(sessions ?? {}))),
+  );
+}

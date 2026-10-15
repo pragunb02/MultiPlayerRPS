@@ -4,6 +4,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 ## Resolution notes
 
+- **SEC-01, SEC-03** 🟡 Fixed in the new stack (CC-013): identity comes only from the server-side session; sockets need a valid session and an allowed origin. Closes fully when the games move to the new server and legacy is deleted (CC-029).
 - **SEC-05** 🟡 Helmet headers + auth rate limiting (20 req / 15 min / IP) done. CSRF mitigated by `SameSite=Lax` cookies; CSRF tokens and CSP come with the React app (CSP is off because legacy pages use inline scripts/handlers).
 - **SEC-06** ✅ `config.js` validates env at boot; `MONGO_URI` replaces `MONGO_URI_PRODUCTION` (old name still accepted as fallback).
 - **BUG-13** 🟡 RPS choice handlers now ignore unknown rooms/choices; other handlers still pending (RoomManager, CC-015).
@@ -18,9 +19,9 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 | ID     | Status | Issue                                                                                                                                 | Location                                                             | Ticket         |
 | ------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | -------------- |
-| SEC-01 | 🔴     | Identity spoofing: matches/stats keyed on free-text `playerName`; anyone can type another user's name and inflate their level/history | `index.js` create/join handlers, `updateUserGameCount` callers       | CC-013         |
+| SEC-01 | 🟡     | Identity spoofing: matches/stats keyed on free-text `playerName`; anyone can type another user's name and inflate their level/history | `index.js` create/join handlers, `updateUserGameCount` callers       | CC-013         |
 | SEC-02 | ✅     | Stored XSS: unescaped `<%- JSON.stringify(...) %>` of player-controlled names inside `<script>`                                       | `client/profile.ejs:329-331`                                         | CC-008         |
-| SEC-03 | 🔴     | Socket.IO connections are unauthenticated; `express-socket.io-session` installed but unused                                           | `index.js`                                                           | CC-013         |
+| SEC-03 | 🟡     | Socket.IO connections are unauthenticated; `express-socket.io-session` installed but unused                                           | `index.js`                                                           | CC-013         |
 | SEC-04 | 🔴     | Client-authoritative results: TTT/chess winners and moves trusted from client                                                         | `index.js` `announceWinner`, `move`                                  | CC-019, CC-020 |
 | SEC-05 | 🟡     | No rate limiting on login/signup; no CSRF; no security headers (Helmet/CSP)                                                           | `index.js`, `client/routes/auth.js`                                  | CC-010, CC-030 |
 | SEC-06 | ✅     | `SESSION_SECRET` / DB URI not validated at boot; dev always uses production DB                                                        | `index.js:25`, `db.js:9`                                             | CC-006         |

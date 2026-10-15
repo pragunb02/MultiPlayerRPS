@@ -10,13 +10,13 @@
 | Stage health  | 🟢 On track                                                                                     |
 | In progress   | —                                                                                               |
 | Blocked on    | —                                                                                               |
-| Next up       | CC-013 socket auth / session identity → CC-014 engine interface → CC-015 RoomManager            |
+| Next up       | CC-014 game engine interface → CC-015 RoomManager → CC-076 auth API                             |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 13 / 34      |
+| S0 Foundation   | 🟡 In progress | 14 / 34      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -26,7 +26,7 @@
 
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
-| Security (SEC)   | 5    | 1           | 5     |
+| Security (SEC)   | 3    | 3           | 5     |
 | Bugs (BUG)       | 11   | 1           | 2     |
 | Tech debt (DEBT) | 4    | 6           | 3     |
 
@@ -34,6 +34,7 @@
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-013 — Session identity for HTTP and sockets: MongoDB (Mongoose 9, per-instance connection), sessions in MongoDB (connect-mongo 6, TTL), identity model + guest creation, hardened session cookie with fixation protection, `/api/session` routes (guest creation rate-limited), Socket.IO gateway with origin allow-list, session-only identity, standard acknowledgements, logout disconnects that session's sockets. Found and fixed a shutdown race (session-store index creation → unhandled rejection). 165 tests incl. MongoDB integration, 98.9 % lines. Verified live end to end. SEC-01/SEC-03 fixed in the new stack.
 - 2026-10-16 — CC-077 — **Incident:** deploys of `main` failed — Render start command was `nodemon index.js` (removed in PR #1) and the Atlas cluster was paused. Previous deploy stayed live. Fixed with owner: Build `npm ci`, Start `npm start`, cluster resumed; verified live (200, new code, DB lookups, security headers). Follow-ups: `docs/DEPLOYMENT.md`, DB-aware `/health` (200 up / 503 down, verified both), PR template with deployment-impact checklist. Added CC-076 (auth API).
 - 2026-10-16 — CC-012 — Structured logging and typed errors: shared `ERROR_CODES`; `AppError` (abstract) + Validation/Unauthorized/Forbidden/NotFound/Conflict errors with `code`, frozen `details`, `cause`; pino 10 logger with redaction of passwords/tokens/emails/cookies/auth headers; request-id + access-log middleware; single error→HTTP translation (`{ error: { code, message, requestId, details? } }`, 400/401/403/404/409/413, generic 500); `LOG_LEVEL` config; fatal-error handlers; `no-console` lint. Tests caught a real bug (access log recorded router-relative paths). 96 tests, 100 % lines. Verified live: request ids propagate, secrets absent from logs, bad config → fatal log + exit 1.
 - 2026-10-16 — CC-075 — One test run failed once and could not be reproduced in 45 runs (30 under parallel load). Likely cause: `server.test.js` asserted a fetch to a freed port fails, but parallel workers (supertest) can be assigned the same ephemeral port. Now asserts `server.listening === false`.

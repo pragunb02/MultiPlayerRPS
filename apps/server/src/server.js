@@ -1,7 +1,14 @@
+import { EventEmitter } from "node:events";
 import http from "node:http";
+import { createIdentityComponent } from "./domain/identity/identityComponent.js";
+import { connectDatabase } from "./persistence/database.js";
+import { createSessionStore } from "./persistence/sessionStore.js";
 import { createHttpApp } from "./service/http/app.js";
+import { createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
+import { createRealtimeGateway } from "./service/realtime/gateway.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
+const SESSION_ENDED = "sessionEnded";
 
 /**
  * @typedef {import("./utils/logger.js").Logger} Logger
@@ -15,21 +22,62 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
  * @param {{ config: Readonly<import("./config/index.js").Config>, logger: Logger }} deps
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
-export function startServer({ config, logger }) {
-  const server = http.createServer(createHttpApp({ config, logger }));
+export async function startServer({ config, logger }) {
+  // 4. persistence
+  const database = await connectDatabase({ uri: config.mongoUri, logger });
+  const sessionStore = await createSessionStore({ client: database.client, ttlSeconds: SESSION_TTL_SECONDS });
 
-  const close = () =>
-    new Promise((resolve, reject) => {
-      server.close((err) => (err ? reject(err) : resolve()));
-      server.closeIdleConnections();
-    });
+  // 2. domain
+  const identityComponent = createIdentityComponent();
 
+  // 1. service — HTTP and realtime share one session middleware, so both see the same identity
+  const sessionMiddleware = createSessionMiddleware({
+    store: sessionStore,
+    secret: config.sessionSecret,
+    secureCookies: config.isProduction,
+  });
+  const sessionEvents = new EventEmitter();
+  const app = createHttpApp({
+    config,
+    logger,
+    sessionMiddleware,
+    identityComponent,
+    onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
+  });
+  const server = http.createServer(app);
+  const gateway = createRealtimeGateway({
+    httpServer: server,
+    sessionMiddleware,
+    allowedOrigins: config.allowedOrigins,
+    logger,
+  });
+  sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
+
+  const close = async () => {
+    await gateway.close();
+    await database.close();
+  };
+
+  try {
+    const port = await listen(server, config.port);
+    return { server, port, close };
+  } catch (err) {
+    await database.close();
+    throw err;
+  }
+}
+
+/**
+ * @param {http.Server} server
+ * @param {number} port
+ * @returns {Promise<number>} the bound port (useful when `port` is 0)
+ */
+function listen(server, port) {
   return new Promise((resolve, reject) => {
     server.once("error", reject);
-    server.listen(config.port, () => {
+    server.listen(port, () => {
       server.off("error", reject);
-      const address = /** @type {import("node:net").AddressInfo} */ (server.address());
-      resolve({ server, port: address.port, close });
+      resolve(/** @type {import("node:net").AddressInfo} */ (server.address()).port);
     });
   });
 }
