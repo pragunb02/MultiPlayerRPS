@@ -68,6 +68,7 @@ module.exports = [
       eqeqeq: "error",
       "no-var": "error",
       "prefer-const": "error",
+      "no-console": "error",
     },
   },
   ...layerRules,

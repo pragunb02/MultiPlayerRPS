@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { loadConfig } from "./config/index.js";
-import { handleShutdownSignals, startServer } from "./server.js";
+import { createLogger } from "./utils/logger.js";
+import { handleFatalErrors, handleShutdownSignals, startServer } from "./server.js";
 
 if (existsSync(".env")) {
   process.loadEnvFile(".env");
@@ -10,10 +11,14 @@ let config;
 try {
   config = loadConfig(process.env);
 } catch (err) {
-  console.error(err.message);
+  // No validated log level yet: report the config problem with a default logger, then stop.
+  createLogger({ level: "info" }).fatal({ err }, "invalid configuration");
   process.exit(1);
 }
 
-const { port, close } = await startServer({ config });
-console.log(`ClassiCade server listening on port ${port} (${config.env})`);
-handleShutdownSignals({ close });
+const logger = createLogger({ level: config.logLevel });
+handleFatalErrors({ logger });
+
+const { port, close } = await startServer({ config, logger });
+logger.info({ port, env: config.env }, "server listening");
+handleShutdownSignals({ close, logger });

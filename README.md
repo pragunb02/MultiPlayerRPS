@@ -21,15 +21,15 @@ npm run dev            # http://localhost:8080
 
 ## Scripts
 
-| Command                | What it does                        |
-| ---------------------- | ----------------------------------- |
-| `npm run dev`          | Legacy app with auto-reload (:8080) |
-| `npm run dev:server`   | New server with auto-reload (:4000) |
-| `npm start`            | Start (production)                  |
-| `npm run lint`         | ESLint                              |
-| `npm run format`       | Prettier (write)                    |
-| `npm run format:check` | Prettier (check only)               |
-| `npm test`             | Vitest                              |
+| Command                | What it does                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `npm run dev`          | Legacy app with auto-reload (:8080)                                                            |
+| `npm run dev:server`   | New server with auto-reload (:4000); JSON logs — pipe to `npx pino-pretty` for readable output |
+| `npm start`            | Start (production)                                                                             |
+| `npm run lint`         | ESLint                                                                                         |
+| `npm run format`       | Prettier (write)                                                                               |
+| `npm run format:check` | Prettier (check only)                                                                          |
+| `npm test`             | Vitest                                                                                         |
 
 ## Project docs
 

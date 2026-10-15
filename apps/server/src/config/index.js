@@ -1,3 +1,5 @@
+import { LOG_LEVELS } from "../utils/logger.js";
+
 const NODE_ENVS = ["development", "test", "production"];
 
 /**
@@ -5,11 +7,14 @@ const NODE_ENVS = ["development", "test", "production"];
  * @property {"development" | "test" | "production"} env
  * @property {boolean} isProduction
  * @property {number} port
+ * @property {string} logLevel
  */
 
 /**
  * Builds and validates the server config from environment variables.
  * Throws with every problem listed, so a misconfigured deploy fails at boot instead of at first request.
+ *
+ * Documented defaults: NODE_ENV=development, PORT=4000, LOG_LEVEL=info (silent when NODE_ENV=test).
  *
  * @param {Record<string, string | undefined>} env
  * @returns {Readonly<Config>}
@@ -27,6 +32,11 @@ export function loadConfig(env) {
     errors.push(`PORT must be an integer between 0 and 65535 (got "${env.PORT}")`);
   }
 
+  const logLevel = env.LOG_LEVEL ?? (nodeEnv === "test" ? "silent" : "info");
+  if (!LOG_LEVELS.includes(logLevel)) {
+    errors.push(`LOG_LEVEL must be one of ${LOG_LEVELS.join(", ")} (got "${logLevel}")`);
+  }
+
   if (errors.length > 0) {
     throw new Error(`Invalid configuration:\n  - ${errors.join("\n  - ")}`);
   }
@@ -35,5 +45,6 @@ export function loadConfig(env) {
     env: /** @type {Config["env"]} */ (nodeEnv),
     isProduction: nodeEnv === "production",
     port,
+    logLevel,
   });
 }

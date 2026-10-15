@@ -127,8 +127,9 @@ Data objects are **plain and frozen** — no methods that do work, so logic can'
    - Throw typed errors from `utils/errors.js` (`ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`, …), each with a stable `code`.
    - When re-throwing, wrap with `cause`: `throw new ConflictError("Room is full", { cause: err })`.
    - No broad `try/catch` in business code. Catch only what you can handle. Translation to HTTP status / socket error happens **once**, in the service layer.
-   - Never send stack traces or internal messages to clients.
-8. **Logging.** Use the structured logger (CC-012), not `console`. Log the error object, not `err.message`. Log at layer boundaries and on state changes that matter. **Never log secrets or personal data** — passwords, tokens, session ids, emails.
+   - Never send stack traces or internal messages to clients. Every error response has the shape
+     `{ error: { code, message, requestId, details? } }`; clients switch on `code` (`ERROR_CODES` in `@classicade/shared`).
+8. **Logging.** Use the injected structured logger (`utils/logger.js`; `req.log` inside HTTP handlers, already bound to the request id), never `console` — enforced by lint. Log the error object, not `err.message`. Log at layer boundaries and on state changes that matter. **Never log secrets or personal data** — passwords, tokens, session ids, emails.
 9. **Validate input at the edge, strictly.** Types, lengths, patterns, list sizes; reject unknown fields. Once inside the domain, data is trusted.
 10. **No abstraction without a second use.** No base classes or "interfaces" with one implementation. Dependency injection already gives us testability. (Contracts like `GameEngine` are fine — they have several implementations by design.)
 11. **Constants over string literals** for event names, game ids, error codes — defined once (usually `@classicade/shared`).

@@ -60,7 +60,7 @@ npm-workspaces monorepo, JavaScript ES modules with JSDoc types, React + Vite fr
 `apps/server`, `apps/web`, `packages/games` (pure engines), `packages/shared` (event names, constants).
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Built so far: `apps/server` (app factory, config, health/games routes) and `packages/shared` (game catalog).
+Built so far: `apps/server` (composition root, config, HTTP app with request logging + error translation, typed errors, pino logger) and `packages/shared` (game catalog, error codes).
 New code: ES modules, JSDoc types, Express 5, pure functions where possible, a `*.test.js` beside every module,
 dependencies passed in (e.g. `createApp({ config })`) rather than imported globals.
 
