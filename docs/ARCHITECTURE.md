@@ -57,26 +57,30 @@ tests live next to code: *.test.js (unit), *.integration.test.js
 
 Status: `index.js`, `server.js`, `config/`, `service/http/`, `service/realtime/`, `domain/identity/`, `persistence/` (database, session store), `models/identity`, `utils/` exist (CC-011…CC-013); other folders arrive with their tickets.
 
-### Game engine contract (draft, JSDoc)
+### Game engine contract (implemented — `packages/games/src/engine.js`, CC-014)
 
 ```js
 /**
- * @template State, Move, View
+ * @typedef {{ status: "ongoing" } | { status: "finished", result: "win" | "draw", winners: PlayerId[], reason: string }} Outcome
+ * @typedef {{ ok: true, value: T } | { ok: false, reason: MOVE_REJECTIONS, message: string }} Result
+ *
  * @typedef {Object} GameEngine
- * @property {string} id                         "rps" | "tictactoe" | "chess"
- * @property {number} minPlayers
- * @property {number} maxPlayers
- * @property {(players: string[], options: object) => State} init
- * @property {(state: State, playerId: string, move: unknown) => {ok: true, move: Move} | {ok: false, error: string}} validateMove
- * @property {(state: State, playerId: string, move: Move) => State} applyMove
- * @property {(state: State) => GameResult | null} getResult      null = ongoing
- * @property {(state: State, playerId: string | "spectator") => View} viewFor   hides secret info (e.g. RPS choice)
- * @property {(state: State) => string[]} currentPlayers            who may act now
+ * @property {string} id                                   matches a GAME_IDS value
+ * @property {{ min: number, max: number }} players
+ * @property {(raw) => Result<Options>} validateOptions
+ * @property {({ players, options, rng }) => State} init     randomness only via the injected seeded rng
+ * @property {(state, playerId, raw, { now }) => Result<Move>} validateMove   never throws
+ * @property {(state, playerId, move, { now }) => State} applyMove           returns new state, never mutates
+ * @property {(state) => Outcome} getOutcome                                  never null
+ * @property {(state, viewer | "spectator") => View} viewFor                 hides secret info (e.g. RPS choice)
+ * @property {(state) => PlayerId[]} activePlayers                           who may act now (empty when finished)
  */
 ```
 
-Rules: engines are pure (no I/O, no timers, no randomness except via injected RNG) → trivially unit-testable.
-RoomManager owns timers, persistence, broadcasting. Bots call the same `validateMove/applyMove` path as humans.
+Engines are registered with `defineEngine()` (shape check) in `createEngineRegistry()`. Every engine's test file calls
+`describeEngineContract(engine, scenario, { describe, it })` from `@classicade/games/testing`, which runs 10 checks:
+options, determinism from a seed, JSON-safe state/views, robustness against garbage input, outsiders, scenario
+rejections, full playthrough without mutation, game-over refusal, and identical replay.
 
 ### Data model (target, draft)
 
