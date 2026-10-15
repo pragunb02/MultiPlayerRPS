@@ -2,20 +2,21 @@
 
 ## Status
 
-|               |                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------ |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-076`                       |
-| Current stage | **Stage 0 — Foundation**                                                             |
-| Stage health  | 🟢 On track                                                                          |
-| In progress   | —                                                                                    |
-| Blocked on    | —                                                                                    |
-| Next up       | CC-013 socket auth / session identity → CC-014 engine interface → CC-015 RoomManager |
+|               |                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md) |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-078`                                  |
+| Current stage | **Stage 0 — Foundation**                                                                        |
+| Stage health  | 🟢 On track                                                                                     |
+| In progress   | —                                                                                               |
+| Blocked on    | —                                                                                               |
+| Next up       | CC-013 socket auth / session identity → CC-014 engine interface → CC-015 RoomManager            |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 12 / 32      |
+| S0 Foundation   | 🟡 In progress | 13 / 34      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -33,6 +34,7 @@
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-077 — **Incident:** deploys of `main` failed — Render start command was `nodemon index.js` (removed in PR #1) and the Atlas cluster was paused. Previous deploy stayed live. Fixed with owner: Build `npm ci`, Start `npm start`, cluster resumed; verified live (200, new code, DB lookups, security headers). Follow-ups: `docs/DEPLOYMENT.md`, DB-aware `/health` (200 up / 503 down, verified both), PR template with deployment-impact checklist. Added CC-076 (auth API).
 - 2026-10-16 — CC-012 — Structured logging and typed errors: shared `ERROR_CODES`; `AppError` (abstract) + Validation/Unauthorized/Forbidden/NotFound/Conflict errors with `code`, frozen `details`, `cause`; pino 10 logger with redaction of passwords/tokens/emails/cookies/auth headers; request-id + access-log middleware; single error→HTTP translation (`{ error: { code, message, requestId, details? } }`, 400/401/403/404/409/413, generic 500); `LOG_LEVEL` config; fatal-error handlers; `no-console` lint. Tests caught a real bug (access log recorded router-relative paths). 96 tests, 100 % lines. Verified live: request ids propagate, secrets absent from logs, bad config → fatal log + exit 1.
 - 2026-10-16 — CC-075 — One test run failed once and could not be reproduced in 45 runs (30 under parallel load). Likely cause: `server.test.js` asserted a fetch to a freed port fails, but parallel workers (supertest) can be assigned the same ephemeral port. Now asserts `server.listening === false`.
 - 2026-10-16 — CC-073 — Engineering guidelines ([ENGINEERING.md](ENGINEERING.md)): five-layer server architecture, design principles, patterns + where they apply, extension points, coding/testing standards, dependency policy (ADR-007, ADR-008). Enforced: ESLint layer + engine-purity rules (proved by `architecture.test.js`), coverage gates (80 %, games 90 %). HTTP code moved to `service/http/`; shutdown handler made injectable and tested. Dependencies: same-major legacy updates, `connect-mongodb-session` 2 → 5, nodemon → `node --watch`; `npm audit` 31 → 0. Legacy flows re-verified on in-memory MongoDB. New: CC-074 (remove env fallback), CC-031 redefined (Dependabot + audit gate). 42 tests, 100 % lines.

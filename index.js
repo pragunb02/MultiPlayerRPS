@@ -6,6 +6,7 @@ const helmet = require("helmet");
 const config = require("./config");
 const { connectDB, store } = require("./db");
 const session = require("express-session");
+const mongoose = require("mongoose");
 const authRouter = require("./client/routes/auth");
 const gamesRoutes = require("./client/routes/gamesRoutes");
 const userRoutes = require("./client/routes/userRoutes");
@@ -73,6 +74,13 @@ function isAuthenticated(req, res, next) {
   }
   res.redirect("/login-signup.html?a=0");
 }
+
+// Health check for the hosting platform (Render "Health Check Path": /health).
+// 200 only when the database is connected, so a broken deploy is never promoted to live.
+app.get("/health", (req, res) => {
+  const databaseUp = mongoose.connection.readyState === mongoose.ConnectionStates.connected;
+  res.status(databaseUp ? 200 : 503).json({ status: databaseUp ? "ok" : "unavailable", database: databaseUp ? "up" : "down" });
+});
 
 // Root Route
 app.get("/", async (req, res) => {

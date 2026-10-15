@@ -19,6 +19,7 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 | [docs/tickets/](docs/tickets/)               | One file per non-trivial ticket (`CC-###.md`) from `TEMPLATE.md`                                 | Ticket started / progressed     |
 | [docs/PROGRESS.md](docs/PROGRESS.md)         | Current phase, in-flight work, dated changelog                                                   | **Every working session**       |
 | [docs/DECISIONS.md](docs/DECISIONS.md)       | Architecture/product decision records (ADRs)                                                     | A decision is made or reversed  |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)     | **Production**: Render settings, env vars, pre/post-merge checks, rollback, incidents            | Deploy setup changes            |
 | [docs/ENGINEERING.md](docs/ENGINEERING.md)   | **How to write code**: layers, principles, patterns, coding/testing standards, dependency policy | Standards change                |
 | [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | Audit findings (`BUG-*`, `SEC-*`, `DEBT-*`)                                                      | Issue found or fixed            |
 
@@ -38,7 +39,9 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 5. Finishing: ✅ on the board, update linked findings in `KNOWN_ISSUES.md`, add a dated changelog line in `PROGRESS.md`
    using ticket IDs, update the stage counters.
 6. Non-trivial decisions (library, pattern, data model) get an ADR in `DECISIONS.md` first.
-7. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
+7. **Merging to `main` deploys to production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
+   dependencies or env vars change, verify `NODE_ENV=production npm ci && npm start` from a fresh clone before merging.
+8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
 
 ## Current state (legacy code — being replaced)
 
