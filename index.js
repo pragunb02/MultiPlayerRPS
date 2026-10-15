@@ -2,9 +2,9 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
-require("dotenv").config();
+const helmet = require("helmet");
+const config = require("./config");
 const { connectDB, store } = require("./db");
-const bodyParser = require("body-parser");
 const session = require("express-session");
 const authRouter = require("./client/routes/auth");
 const gamesRoutes = require("./client/routes/gamesRoutes");
@@ -19,12 +19,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 8080;
-const SESSION_SECRET = process.env.SESSION_SECRET;
 const chessRooms = {};
 const ticTacToeRooms = {};
 const rpsRooms = {};
 const LEVEL_UP_THRESHOLD = 10; // Number of games to level up
+const RPS_CHOICES = ["Rock", "Paper", "Scissors"];
 
 const userSocketMap = {}; // Map to track user IDs and socket IDs
 
@@ -32,18 +31,26 @@ const userSocketMap = {}; // Map to track user IDs and socket IDs
 connectDB();
 
 // Middleware setup
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+if (config.isProduction) {
+  app.set("trust proxy", 1); // needed for secure cookies behind a TLS-terminating proxy
+}
+// CSP stays off until the React app replaces the legacy inline scripts/handlers (ADR-002).
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 // Session configuration
 app.use(
   session({
-    secret: SESSION_SECRET,
+    secret: config.sessionSecret,
     resave: false,
     saveUninitialized: false,
     store: store,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24, // 1 day
+      httpOnly: true,
+      sameSite: "lax",
+      secure: config.isProduction,
     },
   })
 );
@@ -208,6 +215,7 @@ io.on("connection", (socket) => {
   socket.on("player1ChoiceRPS", async (data) => {
     try {
       const room = rpsRooms[data.roomUniqueId];
+      if (!room || !RPS_CHOICES.includes(data.choice)) return;
       room.player1Choice = data.choice;
       socket
         .to(data.roomUniqueId)
@@ -228,6 +236,7 @@ io.on("connection", (socket) => {
   socket.on("player2ChoiceRPS", async (data) => {
     try {
       const room = rpsRooms[data.roomUniqueId];
+      if (!room || !RPS_CHOICES.includes(data.choice)) return;
       room.player2Choice = data.choice;
       socket
         .to(data.roomUniqueId)
@@ -300,7 +309,6 @@ io.on("connection", (socket) => {
 
   // Player 1 Tic Tac Toe Move
   socket.on("player1Move", (data) => {
-    const room = ticTacToeRooms[data.roomUniqueId];
     socket.to(data.roomUniqueId).emit("player1Move", {
       isPlayer1Turn: data.isPlayer1Turn,
       boxes: data.boxes,
@@ -310,7 +318,6 @@ io.on("connection", (socket) => {
 
   // Player 2 Tic Tac Toe Move
   socket.on("player2Move", (data) => {
-    const room = ticTacToeRooms[data.roomUniqueId];
     socket.to(data.roomUniqueId).emit("player2Move", {
       isPlayer1Turn: data.isPlayer1Turn,
       boxes: data.boxes,
@@ -320,7 +327,7 @@ io.on("connection", (socket) => {
 
   // Announce Tic Tac Toe Winner
   socket.on("announceWinner", async (data) => {
-    const { winner, roomUniqueId, count, ok } = data;
+    const { winner, roomUniqueId } = data;
     await TicTacToeData.findOneAndUpdate(
       { roomUniqueId },
       { $push: { winner: winner } },
@@ -347,7 +354,7 @@ io.on("connection", (socket) => {
 
   // Announce Tic Tac Toe Draw
   socket.on("announceDraw", async (data) => {
-    const { roomUniqueId, count, ok } = data;
+    const { roomUniqueId } = data;
     await TicTacToeData.findOneAndUpdate(
       { roomUniqueId },
       { $push: { winner: "Draw" } },
@@ -412,10 +419,7 @@ io.on("connection", (socket) => {
 
   // === Chess Events ===
 
-  var isplayer12 = false;
   socket.on("createChessGame", async (data) => {
-    console.log("Hi");
-    isplayer12 = data.isPlayer1Turn;
     try {
       const roomUniqueId = generateRoomId(5);
       chessRooms[roomUniqueId] = {
@@ -493,12 +497,6 @@ io.on("connection", (socket) => {
   let currentCode = null;
 
   socket.on("move", function (data) {
-    const move = data.theMove;
-    const timer = data.timer;
-    const moveObj = data.moveObj;
-    console.log("move detected");
-    console.log(data);
-
     io.to(currentCode).emit("newMove", data);
   });
   socket.on("joinGame", function (data) {
@@ -590,6 +588,6 @@ app.get("/black", async (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Listening on PORT ${PORT}`);
+server.listen(config.port, () => {
+  console.log(`Listening on PORT ${config.port}`);
 });

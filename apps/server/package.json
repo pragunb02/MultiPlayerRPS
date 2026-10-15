@@ -1,0 +1,20 @@
+{
+  "name": "@classicade/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ClassiCade API and realtime server",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@classicade/shared": "*",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  }
+}
