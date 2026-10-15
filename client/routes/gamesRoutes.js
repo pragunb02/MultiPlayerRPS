@@ -1,9 +1,5 @@
 const express = require("express");
 const router = express.Router();
-// const isAuthenticated = require("./middleware/isAuthenticated"); // Assuming you have isAuthenticated middleware configured
-const RPSData = require("../../models/RPSData");
-const ChessData = require("../../models/ChessData");
-const TicTacToeData = require("../../models/TicTacToeData");
 router.get("/chess", (req, res) => {
   const user = req.session.user || { username: "Guest" };
   console.log(user);

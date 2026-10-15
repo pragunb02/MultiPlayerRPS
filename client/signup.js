@@ -63,32 +63,15 @@ document.addEventListener("DOMContentLoaded", function () {
         body: JSON.stringify({ email, password }),
       });
 
-      // Log the entire response for debugging
-      console.log("Response:", response);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Data:", data); // Log the parsed JSON data
-
-        if (data.success) {
-          // Redirect or perform actions upon successful login
-          msg.innerText = "Login successful! Redirecting...";
-          msg.style.color = "green";
-          setTimeout(() => {
-            window.location.href = ".";
-          }, 1500);
-          // window.location.href = ".";
-        } else {
-          // Handle unsuccessful login (display error message, etc.)
-          // alert("Authentication failed. Please check your credentials.");
-          msg.innerText =
-            "Authentication failed. Please check your credentials.";
-          msg.style.color = "red";
-        }
+      const data = await response.json();
+      if (response.ok && data.success) {
+        msg.innerText = "Login successful! Redirecting...";
+        msg.style.color = "green";
+        setTimeout(() => {
+          window.location.href = ".";
+        }, 1500);
       } else {
-        console.error("Failed to login:", response.statusText);
-        // Handle non-200 HTTP status (e.g., 400 Bad Request)
-        msg.innerText = "Login failed. Please try again.";
+        msg.innerText = data.message || "Login failed. Please try again.";
         msg.style.color = "red";
       }
     } catch (error) {
@@ -131,32 +114,16 @@ document.addEventListener("DOMContentLoaded", function () {
         body: JSON.stringify({ username, email, password }),
       });
 
-      console.log("Response:", response);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Data:", data);
-
-        if (data.success) {
-          msg.innerText = "Signup successful! Redirecting...";
-          msg.style.color = "green";
-          setTimeout(() => {
-            window.location.href = ".";
-          }, 1500); // Wait for 1.5 seconds before redirecting
-          // Redirect or perform actions upon successful signup
-          // window.location.href = ".";
-        } else {
-          // Handle unsuccessful signup (display error message, etc.)
-          // alert("Signup failed. Please try again.");
-          msg.innerText =
-            "User already exists. Please try again. (Email should be Unique)";
-          msg.style.color = "red";
-        }
+      const data = await response.json();
+      if (response.ok && data.success) {
+        msg.innerText = "Signup successful! Redirecting...";
+        msg.style.color = "green";
+        setTimeout(() => {
+          window.location.href = ".";
+        }, 1500);
       } else {
-        console.error("Failed to signup:", response.statusText);
-        msg.innerText = "Signup failed. Please try again.";
+        msg.innerText = data.message || "Signup failed. Please try again.";
         msg.style.color = "red";
-        // Handle non-200 HTTP status (e.g., 400 Bad Request)
       }
     } catch (error) {
       console.error("Error:", error);

@@ -326,9 +326,9 @@
 
       document.addEventListener("DOMContentLoaded", function () {
         // Pass the statistics data from the server to the client-side script
-        const chessStats = <%- JSON.stringify(chessStats) %>;
-        const rpsStats = <%- JSON.stringify(rpsStats) %>;
-        const ticTacToeStats = <%- JSON.stringify(ticTacToeStats) %>;
+        const chessStats = <%- JSON.stringify(chessStats).replace(/</g, "\\u003c") %>;
+        const rpsStats = <%- JSON.stringify(rpsStats).replace(/</g, "\\u003c") %>;
+        const ticTacToeStats = <%- JSON.stringify(ticTacToeStats).replace(/</g, "\\u003c") %>;
         const username = "<%= username %>";
 
         console.log(chessStats);

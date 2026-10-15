@@ -1,28 +1,21 @@
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
-const bcrypt = require("bcrypt"); // Import bcrypt
-const User = require("../../models/User"); // Adjust the path as necessary
+const bcrypt = require("bcryptjs");
+const User = require("../../models/User");
 
-// if (process.env.NODE_ENV === "development") {
-//   console.log("koo");
-// }
+const INVALID_CREDENTIALS = { message: "Invalid email or password." };
 
 passport.use(
   new LocalStrategy(
     { usernameField: "email", passwordField: "password" },
     async (email, password, done) => {
       try {
-        const user = await User.findOne({ email });
-        if (!user) {
-          return done(null, false, { message: "Incorrect email." });
+        // Accounts created before signup normalized emails may be stored mixed-case.
+        const user = await User.findOne({ email: { $in: [email, email.toLowerCase()] } });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+          return done(null, false, INVALID_CREDENTIALS);
         }
-        const isPasswordMatch = await bcrypt.compare(password, user.password);
-        // const isPasswordMatch = password === user.password;
-        if (isPasswordMatch) {
-          return done(null, user);
-        } else {
-          return done(null, false, { message: "Incorrect password." });
-        }
+        return done(null, user);
       } catch (error) {
         return done(error);
       }
@@ -42,9 +35,5 @@ passport.deserializeUser(async (id, done) => {
     done(error, null);
   }
 });
-
-if (process.env.NODE_ENV === "development") {
-  console.log("ko");
-}
 
 module.exports = passport;

@@ -1,135 +1,111 @@
 const express = require("express");
-const router = express.Router();
+const rateLimit = require("express-rate-limit");
+const bcrypt = require("bcryptjs");
 const passport = require("./passport");
 const User = require("../../models/User");
-const bcrypt = require("bcrypt"); // Import bcrypt
-// console.log(passport);
-router.use(express.json());
-// router.use(flash());
-router.use(passport.initialize());
 
-router.use(passport.session());
+const router = express.Router();
 
-// // This is the login route
-// router.post("/login", (req, res) => {
-//   const { email, password } = req.body;
-//   // console.log(res.body);
-//   console.log(req.body);
-//   console.log("ok");
-//   // Add your authentication logic here
-//   // If authentication is successful
-//   res.json({ success: true });
-//   // If authentication fails
-//   // res.json({ success: false, message: 'Invalid credentials' });
-// });
-router.post("/login", (req, res, next) => {
-  console.log("Received login request with data:", req.body);
+const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,20}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 72; // bcrypt ignores bytes beyond 72
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { success: false, message: "Too many attempts. Please try again later." },
+});
+
+function validateSignup({ username, email, password }) {
+  if (typeof username !== "string" || !USERNAME_PATTERN.test(username)) {
+    return "Username must be 3-20 characters: letters, numbers or underscores.";
+  }
+  if (typeof email !== "string" || !EMAIL_PATTERN.test(email)) {
+    return "Please enter a valid email address.";
+  }
+  if (
+    typeof password !== "string" ||
+    password.length < MIN_PASSWORD_LENGTH ||
+    password.length > MAX_PASSWORD_LENGTH
+  ) {
+    return `Password must be ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} characters.`;
+  }
+  return null;
+}
+
+function logIn(req, res, user, message) {
+  req.login(user, (loginErr) => {
+    if (loginErr) {
+      console.error("Login error:", loginErr);
+      return res.status(500).json({ success: false, message: "Login error." });
+    }
+    req.session.user = { id: user.id, username: user.username };
+    return res.json({ success: true, message });
+  });
+}
+
+router.post("/login", authLimiter, (req, res, next) => {
   passport.authenticate("local", (err, user, info) => {
     if (err) {
       console.error("Authentication error:", err);
-      return res
-        .status(500)
-        .json({ success: false, message: "Authentication error." });
+      return res.status(500).json({ success: false, message: "Authentication error." });
     }
     if (!user) {
-      console.log("Failed login attempt:", info.message);
-      return res.status(400).json({ success: false, message: info.message });
+      return res.status(401).json({ success: false, message: info.message });
     }
-    req.login(user, (loginErr) => {
-      if (loginErr) {
-        console.error("Login error:", loginErr);
-        return res
-          .status(500)
-          .json({ success: false, message: "Login error." });
-      }
-      // Set user information in the session
-      req.session.user = {
-        id: user.id,
-        username: user.username,
-      };
-      console.log("User logged in successfully:", user);
-      return res.json({ success: true, message: "Logged in successfully." });
-    });
+    return logIn(req, res, user, "Logged in successfully.");
   })(req, res, next);
 });
 
-// Signup Route
-router.post("/signup", async (req, res) => {
-  const { username, email, password } = req.body;
+router.post("/signup", authLimiter, async (req, res) => {
+  const validationError = validateSignup(req.body);
+  if (validationError) {
+    return res.status(400).json({ success: false, message: validationError });
+  }
+
+  const username = req.body.username;
+  const email = req.body.email.toLowerCase();
 
   try {
-    // Check if the user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      return res
-        .status(299)
-        .json({ success: false, message: "User already exists." });
+      const field = existingUser.email === email ? "Email" : "Username";
+      return res.status(409).json({ success: false, message: `${field} is already taken.` });
     }
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create a new user
-    const newUser = new User({
+    const newUser = await User.create({
       username,
       email,
-      password: hashedPassword,
+      password: await bcrypt.hash(req.body.password, 10),
     });
-
-    // Save the user to the database
-    await newUser.save();
-
-    // Automatically log the user in after successful signup
-    req.login(newUser, (loginErr) => {
-      if (loginErr) {
-        console.error("Login error after signup:", loginErr);
-        return res
-          .status(500)
-          .json({ success: false, message: "Login error after signup." });
-      }
-      // Set user information in the session
-      req.session.user = {
-        id: newUser.id,
-        username: newUser.username,
-      };
-      console.log("User signed up and logged in successfully:", newUser);
-      return res.json({
-        success: true,
-        message: "Signed up and logged in successfully.",
-      });
-    });
+    return logIn(req, res, newUser, "Signed up and logged in successfully.");
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: "Username or email is already taken." });
+    }
     console.error("Signup error:", error);
-    res.status(500).json({ success: false, message: "Signup error." });
+    return res.status(500).json({ success: false, message: "Signup error." });
   }
 });
 
 router.post("/logout", (req, res) => {
-  // Logout logic
-  console.log("hehe");
-  try {
-    if (!req.session) {
-      // If there's no session, respond as if the logout was successful
-      return res
-        .status(200)
-        .json({ success: true, message: "Logout successful" });
+  req.logout((logoutErr) => {
+    if (logoutErr) {
+      console.error("Error logging out:", logoutErr);
+      return res.status(500).json({ success: false, message: "Error logging out" });
     }
-
-    // Clear the user's session to log them out
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("Error destroying session:", err);
-        return res
-          .status(500)
-          .json({ success: false, message: "Error logging out" });
+    req.session.destroy((destroyErr) => {
+      if (destroyErr) {
+        console.error("Error destroying session:", destroyErr);
+        return res.status(500).json({ success: false, message: "Error logging out" });
       }
-
-      res.status(200).json({ success: true, message: "Logout successful" });
+      res.clearCookie("connect.sid");
+      return res.json({ success: true, message: "Logout successful" });
     });
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
+  });
 });
 
 module.exports = router;
