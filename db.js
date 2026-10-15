@@ -2,19 +2,12 @@ const mongoose = require("mongoose");
 const MongoDBStore = require("connect-mongodb-session")(
   require("express-session")
 );
-require("dotenv").config();
+const { mongoUri } = require("./config");
 
 mongoose.set("strictQuery", true); // Suppress deprecation warning
 
-const s1 = process.env.MONGO_URI_PRODUCTION;
-// const s1 = process.env.MONGO_URI_LOCAL;
-
-// // Logging to check if environment variables are loaded
-// console.log("MONGO_URI_PRODUCTION:", s1);
-// console.log("MONGO_URI_LOCAL:", s1);
-
 const store = new MongoDBStore({
-  uri: s1,
+  uri: mongoUri,
   collection: "sessions",
 });
 
@@ -24,10 +17,7 @@ store.on("error", function (error) {
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(s1, {
-      // useNewUrlParser: true,
-      // useUnifiedTopology: true,
-    });
+    await mongoose.connect(mongoUri);
     console.log("MongoDB connected");
   } catch (error) {
     console.error("Error connecting to MongoDB", error);
