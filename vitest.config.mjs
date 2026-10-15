@@ -7,7 +7,7 @@ export default defineConfig({
       provider: "v8",
       include: ["apps/*/src/**/*.js", "packages/*/src/**/*.js"],
       // Process entry point: only reads env and calls startServer (covered by server.test.js).
-      exclude: ["**/*.test.js", "apps/server/src/index.js"],
+      exclude: ["**/*.test.js", "**/testing/**", "apps/server/src/index.js"],
       reporter: ["text", "html"],
       thresholds: {
         lines: 80,

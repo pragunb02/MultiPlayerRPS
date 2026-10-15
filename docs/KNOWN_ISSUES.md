@@ -10,7 +10,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 - **DEBT-01, DEBT-02** 🟡 New structure exists (`apps/server`, `packages/shared`, CC-011); legacy code moves out ticket by ticket and is deleted in CC-029.
 - **DEBT-10** 🟡 Legacy deps on latest same-major versions; new code uses latest stable majors (Express 5). Legacy majors not upgraded — the code is deleted in CC-029.
 - **DEBT-11** ✅ `npm audit fix`, `connect-mongodb-session` 2 → 5, nodemon replaced by `node --watch`; audit now 0. Legacy auth/session/RPS flows re-verified against a real (in-memory) MongoDB.
-- **DEBT-08** 🟡 Dead server code removed; debug logs in legacy client and `hw.txt` remain until CC-029.
+- **DEBT-08** 🟡 Dead server code removed; new server uses the structured logger with `no-console` enforced (CC-012). Debug logs in legacy code and `hw.txt` remain until CC-029.
 - **DEBT-09** 🟡 README, `.env.example`, ESLint/Prettier/Vitest added; tests and CI pending.
 - `bcrypt` replaced with `bcryptjs` (no native build; existing hashes stay valid).
 
