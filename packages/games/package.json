@@ -1,0 +1,14 @@
+{
+  "name": "@classicade/games",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure, server-authoritative game engines for ClassiCade",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./testing": "./src/testing/index.js"
+  },
+  "dependencies": {
+    "@classicade/shared": "*"
+  }
+}

@@ -28,3 +28,20 @@ export const GAMES = Object.freeze(
 export function getGame(id) {
   return GAMES.find((game) => game.id === id);
 }
+
+/**
+ * Why an engine refused a move. Clients switch on these to explain the refusal.
+ */
+export const MOVE_REJECTIONS = Object.freeze({
+  NOT_A_PLAYER: "NOT_A_PLAYER",
+  NOT_YOUR_TURN: "NOT_YOUR_TURN",
+  INVALID_MOVE: "INVALID_MOVE",
+  ILLEGAL_MOVE: "ILLEGAL_MOVE",
+  GAME_OVER: "GAME_OVER",
+});
+
+/** Lifecycle of a single game, as reported by an engine. */
+export const GAME_STATUS = Object.freeze({
+  ONGOING: "ongoing",
+  FINISHED: "finished",
+});

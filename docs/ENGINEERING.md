@@ -105,13 +105,13 @@ Data objects are **plain and frozen** — no methods that do work, so logic can'
 
 ### Extension points (how the system grows)
 
-| To add…                                       | You create                                                                                                        | You register it in               | You do **not** touch                 |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------ |
-| A new game                                    | `packages/games/src/<game>/` engine + tests (shared contract tests apply automatically) and a web board component | engine registry, `GAMES` catalog | rooms, matches, sockets, progression |
-| A new bot                                     | `apps/server/src/domain/bots/<name>.js` implementing `Bot`                                                        | bot registry                     | engines, rooms                       |
-| A new storage backend                         | new `*Dao` with the same contract                                                                                 | composition root                 | domain, service                      |
-| A new transport/API (e.g. REST v2, admin API) | new controllers in `service/`                                                                                     | router / composition root        | domain and below                     |
-| A reaction to something that happened         | a domain-event subscriber                                                                                         | composition root                 | the code that emits the event        |
+| To add…                                       | You create                                                                                                                                           | You register it in               | You do **not** touch                 |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------ |
+| A new game                                    | `packages/games/src/<game>/` engine via `defineEngine()` + a test file calling `describeEngineContract()` with a scenario, and a web board component | engine registry, `GAMES` catalog | rooms, matches, sockets, progression |
+| A new bot                                     | `apps/server/src/domain/bots/<name>.js` implementing `Bot`                                                                                           | bot registry                     | engines, rooms                       |
+| A new storage backend                         | new `*Dao` with the same contract                                                                                                                    | composition root                 | domain, service                      |
+| A new transport/API (e.g. REST v2, admin API) | new controllers in `service/`                                                                                                                        | router / composition root        | domain and below                     |
+| A reaction to something that happened         | a domain-event subscriber                                                                                                                            | composition root                 | the code that emits the event        |
 
 ---
 
