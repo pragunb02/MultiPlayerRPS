@@ -7,14 +7,16 @@ const testConfig = (overrides = {}) => loadConfig({ NODE_ENV: "test", PORT: "0",
 
 describe("startServer", () => {
   it("listens on the configured port and closes cleanly", async () => {
-    const { port, close } = await startServer({ config: testConfig() });
+    const { server, port, close } = await startServer({ config: testConfig() });
     expect(port).toBeGreaterThan(0);
 
     const res = await fetch(`http://127.0.0.1:${port}/api/health`);
     expect(await res.json()).toEqual({ status: "ok" });
 
     await close();
-    await expect(fetch(`http://127.0.0.1:${port}/api/health`)).rejects.toThrow();
+    // Assert on the server itself: probing the freed port is racy, because parallel test
+    // workers can be handed the same ephemeral port by the OS (CC-075).
+    expect(server.listening).toBe(false);
   });
 
   it("rejects when the port is already in use", async () => {
