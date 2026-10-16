@@ -4,6 +4,7 @@ import session from "express-session";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
+import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
 import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
@@ -21,6 +22,7 @@ import { createBackgroundTasks } from "../utils/backgroundTasks.js";
 import { createPasswordHasher } from "../utils/passwordHasher.js";
 import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
+import { createInMemoryLegacyUserDao } from "./inMemoryLegacyUserDao.js";
 import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
 import { createInMemoryProgressDao } from "./inMemoryProgressDao.js";
 import { testConfig } from "./testConfig.js";
@@ -34,9 +36,16 @@ import { testConfig } from "./testConfig.js";
  *   guestLimit?: { windowMs: number, limit: number },
  *   engines?: ReadonlyArray<any>,
  *   authLimits?: object,
+ *   legacyUsers?: ReadonlyArray<object>,
  * }} [options]
  */
-export function createTestApp({ env = {}, guestLimit, authLimits, engines = [raceEngine] } = {}) {
+export function createTestApp({
+  env = {},
+  guestLimit,
+  authLimits,
+  engines = [raceEngine],
+  legacyUsers = [],
+} = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
   const store = new session.MemoryStore();
@@ -50,8 +59,10 @@ export function createTestApp({ env = {}, guestLimit, authLimits, engines = [rac
     generateId: () => `00000000-0000-4000-8000-${String(++guestNumber).padStart(12, "0")}`,
     generateGuestSuffix: () => `T${String(guestNumber).padStart(3, "0")}`,
   });
+  const accountDao = createInMemoryAccountDao();
   const accountComponent = createAccountComponent({
-    accountAccessor: createAccountAccessor({ accountDao: createInMemoryAccountDao() }),
+    accountAccessor: createAccountAccessor({ accountDao }),
+    legacyUserAccessor: createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao(legacyUsers) }),
     passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }), // fast for tests
   });
   const domainEvents = new EventEmitter();
@@ -93,6 +104,7 @@ export function createTestApp({ env = {}, guestLimit, authLimits, engines = [rac
     app,
     config,
     store,
+    accountDao,
     sessionMiddleware,
     domainEvents,
     roomComponent,
