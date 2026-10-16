@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, Navigate, useSearchParams } from "react-router";
+import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
+import { PageTitle } from "../../components/PageTitle.jsx";
 import { useSession } from "../../hooks/useSession.js";
-import { nextPath } from "../authNavigation.js";
 import styles from "../authForms.module.css";
 
 export function LoginPage() {
   const session = useSession();
-  const navigate = useNavigate();
   const [params] = useSearchParams();
+  const next = safeNext(params.get("next"));
   const [form, setForm] = useState({ email: "", password: "" });
   const [state, setState] = useState({ busy: false, error: "" });
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -19,14 +20,20 @@ export function LoginPage() {
     setState({ busy: true, error: "" });
     try {
       await session.login(form);
-      navigate(nextPath(params), { replace: true });
+      // Signed in: the redirect below takes over on the next render.
     } catch (err) {
       setState({ busy: false, error: err.message });
     }
   }
 
+  // Already signed in (or just signed in): this page has nothing to offer, go where the player was heading.
+  if (session.identity?.kind === "user") {
+    return <Navigate to={next} replace />;
+  }
+
   return (
     <section className={styles.page}>
+      <PageTitle>Log in</PageTitle>
       <h1>Log in</h1>
       <form className={styles.form} onSubmit={submit} noValidate>
         <Field
@@ -55,7 +62,7 @@ export function LoginPage() {
         </Button>
       </form>
       <p className={styles.switch}>
-        New here? <Link to={`/signup?${params}`}>Create an account</Link>
+        New here? <Link to={paths.signup(next)}>Create an account</Link>
       </p>
     </section>
   );

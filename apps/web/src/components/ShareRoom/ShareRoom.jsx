@@ -1,4 +1,5 @@
 import { getGame } from "@classicade/shared";
+import { paths } from "../../app/paths.js";
 import { Button } from "../Button/Button.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import styles from "./ShareRoom.module.css";
@@ -11,7 +12,7 @@ import styles from "./ShareRoom.module.css";
  */
 export function ShareRoom({ code, gameId, origin = window.location.origin }) {
   const toast = useToast();
-  const url = `${origin}/room/${code}`;
+  const url = `${origin}${paths.room(gameId, code)}`;
   const gameName = getGame(gameId)?.name ?? "a game";
   const text = `Play ${gameName} with me on ClassiCade — room ${code}`;
   const canShare = typeof navigator.share === "function";

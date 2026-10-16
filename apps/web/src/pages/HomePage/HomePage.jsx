@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { PageTitle } from "../../components/PageTitle.jsx";
 import { useGames } from "../../hooks/useGames.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./HomePage.module.css";
@@ -26,6 +28,7 @@ export function HomePage() {
 
   return (
     <>
+      <PageTitle />
       <section className={styles.hero}>
         <h1>Play the classics with anyone, in one click.</h1>
         <p className={styles.lead}>No downloads, no signup required. Pick a game, share a link, play.</p>
@@ -52,7 +55,7 @@ export function HomePage() {
             {games.games.map((game) => (
               <li key={game.id} className={styles.card}>
                 <h3>
-                  <Link to={`/play/${game.id}`} className={styles.cardLink}>
+                  <Link to={paths.game(game.id)} className={styles.cardLink}>
                     {game.name}
                   </Link>
                 </h3>

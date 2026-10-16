@@ -107,10 +107,7 @@ describe("header", () => {
     renderApp({ api: fakeApi({ getSession: async () => GUEST }) });
 
     const banner = screen.getByRole("banner");
-    expect(await within(banner).findByRole("link", { name: "Sign up" })).toHaveAttribute(
-      "href",
-      "/signup?next=%2F",
-    );
+    expect(await within(banner).findByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/signup");
     expect(within(banner).getByRole("link", { name: "Profile" })).toBeInTheDocument();
   });
 
@@ -201,7 +198,7 @@ describe("ProfilePage", () => {
 
     expect(await screen.findByRole("link", { name: "log in" })).toHaveAttribute(
       "href",
-      "/login?next=/profile",
+      "/login?next=%2Fprofile",
     );
   });
 

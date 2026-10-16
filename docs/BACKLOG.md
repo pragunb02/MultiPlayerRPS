@@ -3,7 +3,7 @@
 Every unit of work is a ticket with a permanent ID **`CC-###`** (ClassiCade). IDs are sequential, never reused,
 and don't encode the stage — a ticket can move between stages without changing its ID.
 
-**Next free ID: `CC-080`** — bump this when you add a ticket.
+**Next free ID: `CC-082`** — bump this when you add a ticket.
 
 | Field  | Values                                                                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -104,6 +104,8 @@ and don't encode the stage — a ticket can move between stages without changing
 | CC-077                      | Deployment safety: DEPLOYMENT.md, `/health` + Render health check, PR template with deployment impact, incident note                                                                                                                 | infra    | P0  | ✅ Done |                          |
 | [CC-078](tickets/CC-078.md) | Migrate legacy `users` to `accounts`: verify legacy bcrypt hashes at first login and rehash to scrypt; keep usernames/emails                                                                                                         | debt     | P1  | ✅ Done | CC-076, CC-029           |
 | CC-079                      | Rare flake (1 of 13 full-suite runs): integration test "authenticates sockets with the database-backed session" failed in 238 ms (refused connection, not a timeout). Diagnostics added; reproduce under load and fix the root cause | test     | P2  | ⬜ Todo | CC-013, CC-027           |
+| [CC-080](tickets/CC-080.md) | URL scheme (ADR-011): readable slugs, one canonical URL per screen, old URLs redirect, safe `next` without loops, page titles                                                                                                        | feature  | P1  | ✅ Done | ADR-011                  |
+| CC-081                      | End-to-end persona tests (Playwright): visitor, guest, user, legacy player, attacker — URLs, back button, no console errors, nothing leaked in DOM/network/URL                                                                       | test     | P1  | ⬜ Todo | CC-080, CC-027           |
 
 ---
 
