@@ -1,14 +1,40 @@
 import { RPS_CHOICES } from "@classicade/shared";
+import { HandPaper } from "../../art/rps/HandPaper.jsx";
+import { HandRock } from "../../art/rps/HandRock.jsx";
+import { HandScissors } from "../../art/rps/HandScissors.jsx";
 import { TurnBanner } from "../../components/TurnBanner/TurnBanner.jsx";
 import { useMove } from "../useMove.js";
 import styles from "./RpsBoard.module.css";
 
 const CHOICES = Object.freeze([
-  { id: RPS_CHOICES.ROCK, label: "Rock", icon: "✊" },
-  { id: RPS_CHOICES.PAPER, label: "Paper", icon: "✋" },
-  { id: RPS_CHOICES.SCISSORS, label: "Scissors", icon: "✌️" },
+  { id: RPS_CHOICES.ROCK, label: "Rock", Hand: HandRock },
+  { id: RPS_CHOICES.PAPER, label: "Paper", Hand: HandPaper },
+  { id: RPS_CHOICES.SCISSORS, label: "Scissors", Hand: HandScissors },
 ]);
-const iconOf = (choice) => CHOICES.find((c) => c.id === choice)?.icon ?? "?";
+
+/** A choice's hand, or "?" for a choice this version of the app doesn't know. */
+function ChoiceIcon({ choice, className }) {
+  const known = CHOICES.find((c) => c.id === choice);
+  return known ? <known.Hand className={className} /> : "?";
+}
+
+/**
+ * The last round, played out: both fists shake three times, then open into the chosen hands. Decoration only —
+ * the Rounds list says the same in words. Keyed by round, so each new round plays it once.
+ */
+function Reveal({ room, round }) {
+  return (
+    <div className={styles.reveal} aria-hidden="true">
+      {room.seats.map((seat, index) => (
+        <div key={seat.playerId} className={`${styles.side} ${index === 1 ? styles.mirrored : ""}`}>
+          <HandRock className={`${styles.hand} ${styles.shaker}`} />
+          <ChoiceIcon choice={round.choices[seat.playerId]} className={`${styles.hand} ${styles.shown}`} />
+          <span className={styles.who}>{nameOf(room, seat.playerId)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 const nameOf = (room, playerId) =>
   playerId === room.you
     ? "You"
@@ -37,6 +63,10 @@ export function RpsBoard({ room, onMove }) {
         <span className={styles.bestOf}>Best of {view.bestOf}</span>
       </p>
 
+      {view.rounds.length > 0 && (
+        <Reveal key={view.rounds.length} room={room} round={view.rounds[view.rounds.length - 1]} />
+      )}
+
       {playing && (
         <>
           <h2 className={styles.round}>Round {view.round}</h2>
@@ -50,9 +80,7 @@ export function RpsBoard({ room, onMove }) {
                 disabled={!canChoose}
                 onClick={() => move.send({ choice: choice.id })}
               >
-                <span aria-hidden="true" className={styles.icon}>
-                  {choice.icon}
-                </span>
+                <choice.Hand className={styles.icon} />
                 {choice.label}
               </button>
             ))}
@@ -81,7 +109,7 @@ export function RpsBoard({ room, onMove }) {
                   key={seat.playerId}
                   title={`${nameOf(room, seat.playerId)}: ${round.choices[seat.playerId]}`}
                 >
-                  {iconOf(round.choices[seat.playerId])}
+                  <ChoiceIcon choice={round.choices[seat.playerId]} className={styles.mini} />
                 </span>
               ))}
               <span className={styles.result}>

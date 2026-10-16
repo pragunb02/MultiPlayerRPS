@@ -1,23 +1,43 @@
-/* Plain token-based styles; the arcade look comes with CC-087's tokens. */
+/* Daily quests in the arcade look (CC-087): a quest board with XP-gradient meters and gold rewards. */
 .card {
+  position: relative;
+  overflow: hidden;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
   padding: var(--space-6);
   display: grid;
   gap: var(--space-3);
 }
+/* The home page's quest card: a hero-gradient top edge marks it as today's thing to do. */
 .compact {
   margin-bottom: var(--space-8);
   max-width: 40rem;
+  box-shadow: var(--shadow-md);
+}
+.compact::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: var(--gradient-hero);
 }
 .heading {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 800;
 }
 .summary {
   margin: 0;
-  font-weight: 700;
+  justify-self: start;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 .muted {
   margin: 0;
@@ -41,22 +61,33 @@
 }
 .quest {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface-raised);
-  border-radius: var(--radius-sm);
-  border-left: 4px solid var(--color-border);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
 }
 .quest.done {
-  border-left-color: var(--color-success);
+  border-color: var(--color-success);
+}
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.scroll {
+  width: 2.25rem;
+  height: 2.25rem;
 }
 .text {
   display: grid;
 }
 .name {
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 800;
 }
 .meter {
   display: flex;
@@ -65,17 +96,17 @@
 }
 .count {
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 800;
 }
 .reward {
   color: var(--color-success);
-  font-weight: 700;
+  font-weight: 800;
 }
 /* Native <progress>: accessible, and styled without inline styles (strict CSP). */
 .bar {
   appearance: none;
   width: 6rem;
-  height: 0.5rem;
+  height: 0.6rem;
   border: none;
   border-radius: var(--radius-full);
   background: var(--color-surface);
@@ -85,17 +116,24 @@
   background: var(--color-surface);
 }
 .bar::-webkit-progress-value {
-  background: var(--color-primary);
+  background: var(--gradient-xp);
+  border-radius: var(--radius-full);
 }
 .bar::-moz-progress-bar {
-  background: var(--color-primary);
+  background: var(--gradient-xp);
+  border-radius: var(--radius-full);
 }
 .sweep {
   margin: 0;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-3);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  color: var(--color-gold);
 }
 .sweep.done {
+  border-style: solid;
+  border-color: var(--color-success);
   color: var(--color-success);
 }
 .chips {
@@ -109,15 +147,26 @@
 .chip {
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
-  background: var(--color-primary-soft);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface-raised);
   color: var(--color-text);
   font-size: var(--text-sm);
+  font-weight: 700;
 }
 .chip.done {
-  outline: 2px solid var(--color-success);
+  border-color: var(--color-success);
+}
+.chip .count {
+  color: var(--color-xp);
+}
+.chip.done .count {
+  color: var(--color-success);
 }
 @media (max-width: 30rem) {
   .quest {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto 1fr;
+  }
+  .quest > :last-child {
+    grid-column: 1 / -1;
   }
 }

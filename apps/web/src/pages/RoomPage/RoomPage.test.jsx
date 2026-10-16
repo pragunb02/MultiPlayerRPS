@@ -100,6 +100,30 @@ describe("RoomPage", () => {
     expect(screen.getByRole("link", { name: "Play again" })).toHaveAttribute("href", "/games/ludo");
   });
 
+  it.each([
+    [{ result: "win", winners: [GUEST.id], reason: "three-in-a-row" }, "Victory!", true],
+    [{ result: "win", winners: ["guest_b"], reason: "three-in-a-row" }, "Defeat", false],
+  ])("celebrates the result: banner, and confetti for a win (%o)", async (outcome, banner, confetti) => {
+    openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
+
+    expect(await screen.findByText(banner)).toBeInTheDocument();
+    expect(Boolean(document.querySelector("[data-effect='confetti']"))).toBe(confetti);
+    // The status region still says the result in words; the banner is decoration.
+    const result = screen.getByRole("heading", { name: confetti ? "You won!" : "You lost" });
+    // The result panel takes the outcome's colour.
+    expect(result.parentElement).toHaveClass(confetti ? "win" : "loss");
+  });
+
+  it("shows the game's icon in the room title and invite art while waiting", async () => {
+    openRoom();
+
+    const title = await screen.findByRole("heading", { level: 1, name: "Tic Tac Toe" });
+    expect(title.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("heading", { name: "Invite a friend" }).previousElementSibling.tagName).toBe(
+      "svg",
+    );
+  });
+
   it("explains a closed room", async () => {
     const { socket } = openRoom();
     await screen.findByRole("heading", { name: "Invite a friend" });
@@ -337,6 +361,10 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
 
     expect(heading).toHaveFocus();
     expect(screen.getByText("AB2CD3")).toBeInTheDocument();
+    // Arcade art (CC-087): the invite envelope above the heading, the game's glyph by the code — decoration.
+    expect(heading.previousElementSibling.tagName).toBe("svg");
+    expect(heading.previousElementSibling).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("AB2CD3").parentElement.querySelector("svg")).toHaveClass("tictactoe");
     expect(screen.getByRole("button", { name: "Play as guest" })).toBeEnabled();
     expect(within(screen.getByRole("main")).getByRole("link", { name: "Log in" })).toHaveAttribute(
       "href",
@@ -384,6 +412,7 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     openInvite({ path: "/room/AB2CD3" });
 
     expect(await screen.findByRole("heading", { name: "You're invited to play" })).toBeInTheDocument();
+    expect(screen.getByText("AB2CD3").parentElement.querySelector("svg")).toBeNull();
     expect(within(screen.getByRole("main")).getByRole("link", { name: "Log in" })).toHaveAttribute(
       "href",
       "/login?next=%2Froom%2FAB2CD3",

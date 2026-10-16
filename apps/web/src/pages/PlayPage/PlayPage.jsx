@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ROOM_CODE_LENGTH } from "@classicade/shared";
 import { gameForSlug, paths } from "../../app/paths.js";
+import { GameArt } from "../../art/games/GameArt.jsx";
+import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { gameView } from "../../games/registry.js";
@@ -42,7 +44,10 @@ export function PlayPage() {
   return (
     <section className={styles.page}>
       <PageTitle>{game.name}</PageTitle>
-      <h1>{game.name}</h1>
+      <div className={`${styles.banner} ${styles[gameArtFor(game.id).tone]}`}>
+        <h1>{game.name}</h1>
+        <GameArt gameId={game.id} className={styles.art} />
+      </div>
       <div className={styles.panels}>
         <div className={styles.panel}>
           <h2>Start a room</h2>

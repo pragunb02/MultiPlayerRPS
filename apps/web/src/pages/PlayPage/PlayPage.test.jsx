@@ -21,6 +21,14 @@ describe("PlayPage", () => {
     expect(await screen.findByText(/Joining room AB2CD3/)).toBeInTheDocument();
   });
 
+  it("shows the game's banner with its art and accent", () => {
+    renderApp({ path: "/games/tic-tac-toe" });
+
+    const banner = screen.getByRole("heading", { level: 1, name: "Tic Tac Toe" }).parentElement;
+    expect(banner).toHaveClass("tictactoe");
+    expect(banner.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
   it("offers chess time controls", () => {
     renderApp({ path: "/games/chess" });
 

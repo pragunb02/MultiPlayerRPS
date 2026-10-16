@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
 import { useAchievements } from "../../hooks/useAchievements.js";
 import { Button } from "../Button/Button.jsx";
 import styles from "./AchievementGrid.module.css";
@@ -13,17 +14,14 @@ const TIER_CLASS = Object.freeze({
 const formatDate = (ms) => new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
 
 /**
- * A placeholder badge: the first letter of the name in a tier-coloured ring. `data-icon` names the icon the
- * arcade art (CC-087) draws in its place.
+ * The achievement's medal (CC-087 art): its icon on a disc in the tier colour, or a grey padlocked silhouette while
+ * locked. Decoration — the name, tier and "Locked." are text. An unknown tier is drawn bronze, an unknown icon a star.
  */
 function Badge({ achievement, locked }) {
+  const tier = achievement.tier in TIER_LABEL ? achievement.tier : "bronze";
   return (
-    <span
-      className={`${styles.badge} ${TIER_CLASS[achievement.tier] ?? ""} ${locked ? styles.lockedBadge : ""}`}
-      data-icon={achievement.icon}
-      aria-hidden="true"
-    >
-      {achievement.name.slice(0, 1)}
+    <span className={styles.badge} data-icon={achievement.icon} aria-hidden="true">
+      <AchievementIcon name={achievement.icon} tier={tier} locked={locked} className={styles.icon} />
     </span>
   );
 }
@@ -32,7 +30,7 @@ function AchievementItem({ achievement }) {
   const locked = achievement.unlockedAt === null;
   const { current, target } = achievement.progress;
   return (
-    <li className={`${styles.item} ${locked ? styles.locked : ""}`}>
+    <li className={`${styles.item} ${TIER_CLASS[achievement.tier] ?? ""} ${locked ? styles.locked : ""}`}>
       <Badge achievement={achievement} locked={locked} />
       <span className={styles.text}>
         <span className={styles.name}>{achievement.name}</span>

@@ -1,6 +1,10 @@
 import { Link } from "react-router";
 import { getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
+import { LevelBadge } from "../../art/badges/LevelBadge.jsx";
+import { rankForLevel } from "../../art/badges/ranks.js";
+import { GameIcon } from "../../art/games/GameIcon.jsx";
+import { EmptyMatches } from "../../art/illustrations/EmptyMatches.jsx";
 import { AchievementGrid } from "../../components/Achievements/AchievementGrid.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { YourRank } from "../../components/Leaderboard/YourRank.jsx";
@@ -22,7 +26,13 @@ function ProgressCard() {
   if (status === "error") return <p role="alert">Couldn't load progress. {error.message}</p>;
   return (
     <div className={styles.card}>
-      <p className={styles.level}>Level {progress.level}</p>
+      <div className={styles.levelRow}>
+        <LevelBadge level={progress.level} size="lg" decorative />
+        <div>
+          <p className={styles.level}>Level {progress.level}</p>
+          <p className={styles.rank}>{rankForLevel(progress.level).name} rank</p>
+        </div>
+      </div>
       <progress
         className={styles.bar}
         aria-label="Progress to next level"
@@ -61,9 +71,12 @@ function MatchHistory({ you }) {
   if (history.status === "error") return <p role="alert">Couldn't load matches. {history.error.message}</p>;
   if (history.matches.length === 0) {
     return (
-      <p>
-        No games yet. <Link to={paths.home()}>Play one</Link>
-      </p>
+      <div className={styles.empty}>
+        <EmptyMatches />
+        <p>
+          No games yet. <Link to={paths.home()}>Play one</Link>
+        </p>
+      </div>
     );
   }
   return (
@@ -76,8 +89,11 @@ function MatchHistory({ you }) {
               <span className={`${styles.badge} ${styles[match.outcomeForYou]}`}>
                 {OUTCOME_LABEL[match.outcomeForYou]}
               </span>
-              <span>
-                {getGame(match.gameId)?.name ?? match.gameId} vs {opponents.join(", ") || "—"}
+              <span className={styles.game}>
+                <GameIcon gameId={match.gameId} />
+                <span>
+                  {getGame(match.gameId)?.name ?? match.gameId} vs {opponents.join(", ") || "—"}
+                </span>
               </span>
               <time className={styles.muted} dateTime={new Date(match.endedAt).toISOString()}>
                 {formatDate(match.endedAt)}

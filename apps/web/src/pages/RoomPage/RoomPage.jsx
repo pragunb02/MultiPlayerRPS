@@ -2,7 +2,11 @@ import { Suspense, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ERROR_CODES, getGame, ROOM_STATUS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
+import { GameIcon } from "../../art/games/GameIcon.jsx";
+import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { outcomeFor } from "../../components/Celebrations/outcome.js";
+import { ResultCelebration } from "../../components/Celebrations/ResultCelebration.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { RematchPanel } from "../../components/Rematch/RematchPanel.jsx";
@@ -139,7 +143,10 @@ export function RoomPage() {
     <section className={styles.room}>
       <PageTitle>{`${game?.name ?? view.gameId} · Room ${view.code}`}</PageTitle>
       <header className={styles.header}>
-        <h1>{game?.name ?? view.gameId}</h1>
+        <h1 className={styles.title}>
+          <GameIcon gameId={view.gameId} size={32} />
+          {game?.name ?? view.gameId}
+        </h1>
         <Button variant="ghost" onClick={() => (playing ? setConfirmingLeave(true) : leave())}>
           Leave room
         </Button>
@@ -148,7 +155,8 @@ export function RoomPage() {
       <div className={styles.layout}>
         <div className={styles.stage}>
           {view.status === ROOM_STATUS.WAITING && (
-            <div className={styles.card}>
+            <div className={`${styles.card} ${styles.invite}`}>
+              <InviteArt className={styles.inviteArt} />
               <h2>Invite a friend</h2>
               <ShareRoom code={view.code} gameId={view.gameId} />
             </div>
@@ -163,9 +171,12 @@ export function RoomPage() {
               <p className={styles.card}>The {game?.name ?? "game"} board is not available yet.</p>
             ))}
           {view.status === ROOM_STATUS.FINISHED && (
-            <div className={styles.outcome} role="status">
+            <div className={`${styles.outcome} ${styles[outcomeFor(view)]}`} role="status">
+              <ResultCelebration room={view} />
               <h2>{outcomeText(view)}</h2>
-              <Link to={paths.game(view.gameId)}>Play again</Link>
+              <Link to={paths.game(view.gameId)} className={styles.again}>
+                Play again
+              </Link>
             </div>
           )}
           {view.status === ROOM_STATUS.FINISHED && (

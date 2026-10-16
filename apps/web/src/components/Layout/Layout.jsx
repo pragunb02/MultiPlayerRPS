@@ -1,7 +1,9 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { paths, returnPathFor } from "../../app/paths.js";
+import { Logo, LogoMark } from "../../art/Logo.jsx";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
+import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import styles from "./Layout.module.css";
 
@@ -32,7 +34,7 @@ export function Layout() {
       </a>
       <header className={styles.header}>
         <Link to={paths.home()} className={styles.brand} aria-label="ClassiCade home">
-          ClassiCade
+          <Logo />
         </Link>
         <nav aria-label="Main" className={styles.nav}>
           <Link to={paths.home()} aria-current={inGames ? "page" : undefined}>
@@ -41,29 +43,37 @@ export function Layout() {
           <NavLink to={paths.leaderboards()}>Leaderboards</NavLink>
           {identity && <NavLink to={paths.profile()}>Profile</NavLink>}
         </nav>
-        <div className={styles.identity} aria-live="polite">
-          {identity && (
-            <span title={identity.kind === "guest" ? "Guest" : "Account"}>{identity.displayName}</span>
-          )}
-          {session.status !== "loading" && identity?.kind !== "user" && (
-            <>
-              <Link to={paths.login(next)}>Log in</Link>
-              <Link to={paths.signup(next)} className={styles.cta}>
-                Sign up
-              </Link>
-            </>
-          )}
-          {identity?.kind === "user" && (
-            <Button variant="ghost" onClick={logout}>
-              Log out
-            </Button>
-          )}
+        <div className={styles.player}>
+          {identity && <LevelChip key={identity.id} />}
+          <div className={styles.identity} aria-live="polite">
+            {identity && (
+              <span className={styles.name} title={identity.kind === "guest" ? "Guest" : "Account"}>
+                {identity.displayName}
+              </span>
+            )}
+            {session.status !== "loading" && identity?.kind !== "user" && (
+              <>
+                <Link to={paths.login(next)}>Log in</Link>
+                <Link to={paths.signup(next)} className={styles.cta}>
+                  Sign up
+                </Link>
+              </>
+            )}
+            {identity?.kind === "user" && (
+              <Button variant="ghost" onClick={logout}>
+                Log out
+              </Button>
+            )}
+          </div>
         </div>
       </header>
       <main id="main" className={styles.main}>
         <Outlet />
       </main>
-      <footer className={styles.footer}>Play the classics with anyone, anywhere.</footer>
+      <footer className={styles.footer}>
+        <LogoMark className={styles.footerMark} />
+        <span>Play the classics with anyone, anywhere.</span>
+      </footer>
     </div>
   );
 }

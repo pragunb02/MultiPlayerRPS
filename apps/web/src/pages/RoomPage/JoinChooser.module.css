@@ -1,22 +1,38 @@
+/* The invite chooser (CC-086) in the arcade look (CC-087): an envelope, the room code as a ticket, chunky choices. */
 .chooser {
   display: grid;
   place-items: center;
   padding-block: var(--space-8);
 }
 .card {
+  position: relative;
+  overflow: hidden;
   width: min(100%, 30rem);
   display: grid;
   gap: var(--space-4);
   text-align: center;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
   padding: var(--space-8) var(--space-6);
 }
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: var(--gradient-hero);
+}
+.art {
+  justify-self: center;
+  width: 9rem;
+}
 .heading {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-xl);
+  font-weight: 800;
 }
 .heading:focus {
   outline: none;
@@ -28,12 +44,21 @@
 }
 .room {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   color: var(--color-text-muted);
 }
+.gameIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+/* The code reads like an arcade ticket: dashed edge, monospace, spaced out. */
 .code {
   display: inline-block;
-  margin-inline-start: var(--space-2);
   padding: var(--space-1) var(--space-3);
+  border: 2px dashed var(--color-primary);
   border-radius: var(--radius-sm);
   background: var(--color-primary-soft);
   color: var(--color-text);
@@ -43,7 +68,8 @@
 }
 .lead {
   margin: 0;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 800;
 }
 .actions {
   display: grid;
@@ -55,16 +81,23 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-3) var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
-  font-weight: 600;
+  box-shadow: var(--shadow-press-neutral);
+  font-family: var(--font-display);
+  font-weight: 800;
   text-decoration: none;
-  transition: background var(--duration-fast);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 .link:hover {
-  background: var(--color-surface-raised);
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+}
+.link:active {
+  transform: translateY(2px);
+  box-shadow: var(--shadow-press-neutral-small);
 }
 .link:focus-visible {
   outline: 3px solid var(--color-focus);

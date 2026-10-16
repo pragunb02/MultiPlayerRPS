@@ -1,0 +1,190 @@
+/*
+ * Paint for the hand-drawn art: SVG elements get their colours from these classes (tokens only), so the art
+ * follows the light and dark themes and needs no style attribute. f* = fill, s* = stroke.
+ */
+.fCurrent {
+  fill: currentColor;
+}
+.fPrimary {
+  fill: var(--color-primary);
+}
+.fPrimarySoft {
+  fill: var(--color-primary-soft);
+}
+.fAccent {
+  fill: var(--color-accent);
+}
+.fXp {
+  fill: var(--color-xp);
+}
+.fGold {
+  fill: var(--color-gold);
+}
+.fStreak {
+  fill: var(--color-streak);
+}
+.fRps {
+  fill: var(--color-game-rps);
+}
+.fTicTacToe {
+  fill: var(--color-game-tictactoe);
+}
+.fChess {
+  fill: var(--color-game-chess);
+}
+.fInk {
+  fill: var(--color-art-ink);
+}
+.fWhite {
+  fill: var(--color-art-white);
+}
+.fSurface {
+  fill: var(--color-surface);
+}
+.fRaised {
+  fill: var(--color-surface-raised);
+}
+.fBorder {
+  fill: var(--color-border);
+}
+.fMuted {
+  fill: var(--color-text-muted);
+}
+.fLocked {
+  fill: var(--color-locked);
+}
+.fOnTier {
+  fill: var(--color-on-tier);
+}
+.fBoardLight {
+  fill: var(--color-board-light);
+}
+.fBoardDark {
+  fill: var(--color-board-dark);
+}
+.fNone {
+  fill: none;
+}
+
+.sCurrent {
+  stroke: currentColor;
+}
+.sPrimary {
+  stroke: var(--color-primary);
+}
+.sAccent {
+  stroke: var(--color-accent);
+}
+.sXp {
+  stroke: var(--color-xp);
+}
+.sGold {
+  stroke: var(--color-gold);
+}
+.sRps {
+  stroke: var(--color-game-rps);
+}
+.sTicTacToe {
+  stroke: var(--color-game-tictactoe);
+}
+.sChess {
+  stroke: var(--color-game-chess);
+}
+.sInk {
+  stroke: var(--color-art-ink);
+}
+.sWhite {
+  stroke: var(--color-art-white);
+}
+.sMuted {
+  stroke: var(--color-text-muted);
+}
+.sBorder {
+  stroke: var(--color-border);
+}
+.sOnTier {
+  stroke: var(--color-on-tier);
+}
+.sPlatinum {
+  stroke: var(--color-tier-platinum);
+}
+
+.faint {
+  opacity: 0.35;
+}
+.half {
+  opacity: 0.6;
+}
+.text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tier medals and rank badges. */
+.bronze {
+  fill: var(--color-tier-bronze);
+}
+.silver {
+  fill: var(--color-tier-silver);
+}
+.gold {
+  fill: var(--color-tier-gold);
+}
+.platinum {
+  fill: var(--color-tier-platinum);
+}
+.locked {
+  fill: var(--color-locked);
+}
+
+/* One-off entrance motion (never looping): art drifts in and settles. Reduced motion removes it (global.css). */
+.floatIn {
+  animation: float-in var(--duration-celebrate) var(--ease-spring) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.delay1 {
+  animation-delay: 120ms;
+}
+.delay2 {
+  animation-delay: 240ms;
+}
+.delay3 {
+  animation-delay: 360ms;
+}
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Sparkles twinkle three times, then rest. */
+.twinkle {
+  animation: twinkle var(--duration-celebrate) var(--ease-in-out) 3 both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes twinkle {
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
+/* Tic-Tac-Toe marks draw themselves in (pathLength="1"). */
+.draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: draw-in var(--duration-base) var(--ease-out) both;
+}
+@keyframes draw-in {
+  from {
+    stroke-dashoffset: 1;
+  }
+}

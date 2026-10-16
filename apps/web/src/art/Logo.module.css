@@ -1,0 +1,10 @@
+.logo {
+  display: block;
+  height: 2rem;
+  width: auto;
+  color: var(--color-text);
+  overflow: visible;
+}
+.word {
+  fill: none;
+}

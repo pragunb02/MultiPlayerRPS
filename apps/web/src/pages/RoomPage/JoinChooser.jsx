@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
+import { GameIcon } from "../../art/games/GameIcon.jsx";
+import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import styles from "./JoinChooser.module.css";
@@ -40,10 +42,12 @@ export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
     <section className={styles.chooser} aria-labelledby="join-chooser-heading">
       <PageTitle>{`${game ? `${game.name} · ` : ""}Room ${code}`}</PageTitle>
       <div className={styles.card}>
+        <InviteArt className={styles.art} />
         <h1 id="join-chooser-heading" ref={heading} tabIndex={-1} className={styles.heading}>
           {invitedTo}
         </h1>
         <p className={styles.room}>
+          {game && <GameIcon gameId={game.id} className={styles.gameIcon} />}
           Room code <strong className={styles.code}>{code}</strong>
         </p>
         <p className={styles.lead}>How do you want to join?</p>

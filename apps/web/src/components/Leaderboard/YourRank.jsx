@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { getLeaderboard } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
+import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
 import { useLeaderboard } from "../../hooks/useLeaderboard.js";
 import styles from "./YourRank.module.css";
 
@@ -28,7 +29,10 @@ function Standing({ boardId }) {
 export function YourRank({ identity }) {
   return (
     <section className={styles.card} aria-labelledby="your-rank">
-      <h2 id="your-rank">Your rank</h2>
+      <h2 id="your-rank" className={styles.heading}>
+        <AchievementIcon name="trophy" tier="gold" className={styles.trophy} />
+        Your rank
+      </h2>
       {identity.kind === "guest" ? (
         <p className={styles.muted}>
           Guests aren't ranked. <Link to={paths.signup(paths.profile())}>Sign up</Link> to get on the

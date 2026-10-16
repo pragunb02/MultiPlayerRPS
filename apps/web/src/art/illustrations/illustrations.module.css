@@ -1,0 +1,12 @@
+.illustration {
+  display: block;
+  width: min(100%, 18rem);
+  height: auto;
+  overflow: visible;
+}
+.small {
+  width: min(100%, 10rem);
+}
+.gold {
+  color: var(--color-gold);
+}

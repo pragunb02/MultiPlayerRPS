@@ -1,0 +1,45 @@
+.badge {
+  display: inline-block;
+  flex: none;
+  overflow: visible;
+  vertical-align: middle;
+}
+.sm {
+  width: 1.75rem;
+  height: 1.9rem;
+}
+.md {
+  width: 3rem;
+  height: 3.25rem;
+}
+.lg {
+  width: 5.5rem;
+  height: 6rem;
+}
+.number {
+  font-size: 20px;
+}
+.small {
+  font-size: 15px;
+}
+.glow {
+  filter: drop-shadow(0 0 6px var(--color-tier-platinum));
+}
+/* Level-up: the badge pops in, overshoots and settles (scale 0 → 1.15 → 1), once. */
+.pop {
+  animation: badge-pop var(--duration-celebrate) var(--ease-spring) both;
+  transform-origin: center;
+}
+@keyframes badge-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

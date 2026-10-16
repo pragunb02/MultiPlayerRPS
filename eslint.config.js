@@ -100,6 +100,14 @@ module.exports = [
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
+      // The CSP is `style-src 'self'` (CC-030): a style attribute would be blocked in production (ADR-012).
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXAttribute[name.name='style']",
+          message: "inline styles violate CSP; use a CSS module",
+        },
+      ],
       "no-unused-vars": ["error", { argsIgnorePattern: "^_", ignoreRestSiblings: true }],
       eqeqeq: "error",
       "no-var": "error",

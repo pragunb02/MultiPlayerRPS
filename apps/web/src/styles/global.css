@@ -13,7 +13,11 @@ body {
 }
 
 body {
-  background: var(--color-bg);
+  /* The arcade floor: a faint 32px grid drawn with gradients, so no image is downloaded. */
+  background-color: var(--color-bg);
+  background-image:
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 32px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 32px);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--text-md);
@@ -33,6 +37,9 @@ a {
 h1,
 h2,
 h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.01em;
   line-height: 1.2;
   margin: 0 0 var(--space-4);
 }
@@ -44,4 +51,15 @@ h3 {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Motion is decoration: with reduced motion nothing moves, and every message is still there as text. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }
