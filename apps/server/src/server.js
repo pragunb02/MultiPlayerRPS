@@ -15,6 +15,7 @@ import { createRealtimeGateway } from "./service/realtime/gateway.js";
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_ENDED = "sessionEnded";
 const ROOM_SWEEP_INTERVAL_MS = 60_000;
+const CLOCK_TICK_INTERVAL_MS = 1_000;
 
 /**
  * Every playable engine must be listed in the public game catalog (and vice versa once all games exist).
@@ -95,8 +96,19 @@ export async function startServer({ config, logger }) {
   }, ROOM_SWEEP_INTERVAL_MS);
   sweeper.unref();
 
+  // Game clocks: apply any engine deadline that has passed (a flag falling while nobody moves).
+  const clockTicker = setInterval(() => {
+    try {
+      roomComponent.expireDue({ now: Date.now() });
+    } catch (err) {
+      logger.error({ err }, "applying game deadlines failed");
+    }
+  }, CLOCK_TICK_INTERVAL_MS);
+  clockTicker.unref();
+
   const close = async () => {
     clearInterval(sweeper);
+    clearInterval(clockTicker);
     await gateway.close();
     await database.close();
   };

@@ -6,7 +6,7 @@ import { createTokenBucket } from "../../utils/tokenBucket.js";
 import { toClientError } from "../errorTranslation.js";
 import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
-import { createRoomHandlers, handleSocketGone, roomChannel } from "./roomHandlers.js";
+import { broadcastRoom, createRoomHandlers, handleSocketGone, roomChannel } from "./roomHandlers.js";
 
 // Per-socket event budget: short bursts are fine, sustained flooding is refused.
 const DEFAULT_RATE_LIMIT = Object.freeze({ capacity: 20, refillPerSecond: 10 });
@@ -109,6 +109,13 @@ export function createRealtimeGateway({
     io.to(roomChannel(code)).emit(SOCKET_EVENTS.ROOM_CLOSED, { code, reason });
     io.in(roomChannel(code)).socketsLeave(roomChannel(code));
     logger.info({ roomCode: code, reason }, "room closed");
+  });
+
+  // Domain → transport: a room changed on its own (e.g. a clock ran out) — push everyone their new view.
+  domainEvents.on(ROOM_EVENTS.UPDATED, ({ room }) => {
+    broadcastRoom({ io, roomComponent, room }).catch((err) =>
+      logger.error({ err, roomCode: room.code }, "failed to broadcast room update"),
+    );
   });
 
   return Object.freeze({

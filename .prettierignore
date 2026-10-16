@@ -11,3 +11,6 @@ index.js
 db.js
 models/
 client/
+
+# Local tool settings (not project code)
+.claude/

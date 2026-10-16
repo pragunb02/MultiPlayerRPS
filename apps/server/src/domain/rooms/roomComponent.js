@@ -10,6 +10,8 @@ export const ROOM_EVENTS = Object.freeze({
   CLOSED: "room.closed",
   /** { room, outcome } — a game ended (played to the end or forfeited); consumed by matches/progression */
   GAME_FINISHED: "room.gameFinished",
+  /** { room } — a room changed without a player request (e.g. a clock ran out); clients need the new view */
+  UPDATED: "room.updated",
 });
 
 /** How long rooms may sit idle before the sweeper closes them. */
@@ -210,6 +212,36 @@ export function createRoomComponent({
       const room = roomAccessor.getByCode(code);
       requireSeat(room, playerId);
       return roomAccessor.save(setConnected(room, playerId, false, now));
+    },
+
+    /**
+     * Applies time-based events whose deadline has passed (e.g. a chess flag falling while nobody moves),
+     * for any engine that exposes `deadline`/`expire`. Called every second by the composition root.
+     *
+     * @param {{ now: number }} input
+     * @returns {string[]} codes of rooms that changed
+     */
+    expireDue({ now }) {
+      const changed = [];
+      for (const room of roomAccessor.listAll()) {
+        const engine = engineFor(room);
+        if (room.status !== ROOM_STATUS.PLAYING || engine.deadline === undefined) {
+          continue;
+        }
+        const due = engine.deadline(room.game.state);
+        if (due === 0 || now < due) {
+          continue;
+        }
+        const state = engine.expire(room.game.state, { now });
+        const expired = { ...room, game: { ...room.game, state }, lastActivityAt: now };
+        const outcome = engine.getOutcome(state);
+        const saved = roomAccessor.save(
+          outcome.status === GAME_STATUS.FINISHED ? finish(expired, outcome) : expired,
+        );
+        events.emit(ROOM_EVENTS.UPDATED, { room: saved });
+        changed.push(room.code);
+      }
+      return changed;
     },
 
     /**

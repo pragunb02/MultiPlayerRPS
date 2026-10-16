@@ -6,3 +6,4 @@ coverage
 dist
 *.log
 .idea/
+.claude/settings.local.json

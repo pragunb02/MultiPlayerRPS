@@ -135,6 +135,44 @@ describe("checkEngineContract catches broken engines", () => {
     );
   });
 
+  describe("time hooks", () => {
+    // A timed variant: every turn has a deadline one second after the last move.
+    const timed = (overrides) =>
+      broken({
+        deadline: (state) => (state.winner === "" ? 1_700_000_001_000 : 0),
+        expire: (state) => ({ ...state, winner: state.players[0] }),
+        ...overrides,
+      });
+    const TIME_CHECK = "keeps time hooks pure: integer deadlines, no mutation, none after the end";
+
+    it("accepts well-behaved hooks", () => {
+      expect(violatedChecks(timed({}))).toEqual([]);
+    });
+
+    it("catches an expire that mutates state", () => {
+      const mutating = timed({
+        expire: (state) => {
+          state.winner = state.players[0];
+          return state;
+        },
+      });
+
+      expect(violatedChecks(mutating)).toContain(TIME_CHECK);
+    });
+
+    it("catches a deadline that is not an integer", () => {
+      expect(violatedChecks(timed({ deadline: () => 1.5 }))).toContain(TIME_CHECK);
+    });
+
+    it("catches a deadline that survives the end of the game", () => {
+      expect(violatedChecks(timed({ deadline: () => 1_700_000_001_000 }))).toContain(TIME_CHECK);
+    });
+
+    it("catches an expire that changes nothing at the deadline", () => {
+      expect(violatedChecks(timed({ expire: (state) => state }))).toContain(TIME_CHECK);
+    });
+  });
+
   it("collects every violation instead of stopping at the first", () => {
     const veryBroken = broken({ validateMove: () => ok({ add: 1 }) });
 
@@ -142,6 +180,6 @@ describe("checkEngineContract catches broken engines", () => {
   });
 
   it("exposes the list of checks", () => {
-    expect(CONTRACT_CHECK_NAMES).toHaveLength(10);
+    expect(CONTRACT_CHECK_NAMES).toHaveLength(11);
   });
 });

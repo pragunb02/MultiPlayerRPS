@@ -71,7 +71,7 @@ and don't encode the stage — a ticket can move between stages without changing
 | --------------------------- | --------------------------------------------------------------- | ------- | --- | ------- | --------------------------------- |
 | [CC-018](tickets/CC-018.md) | RPS engine (hidden choices, best-of-N) + tests                  | feature | P1  | ✅ Done | FR-GAME-2, SEC-09, BUG-02         |
 | [CC-019](tickets/CC-019.md) | Tic-Tac-Toe engine + tests                                      | feature | P1  | ✅ Done | FR-GAME-3, SEC-04, BUG-03, BUG-04 |
-| CC-020                      | Chess engine (chess.js latest) + server clocks + resign + tests | feature | P1  | ⬜ Todo | FR-GAME-4, SEC-04, BUG-06, BUG-07 |
+| [CC-020](tickets/CC-020.md) | Chess engine (chess.js latest) + server clocks + resign + tests | feature | P1  | ✅ Done | FR-GAME-4, SEC-04, BUG-06, BUG-07 |
 | CC-021                      | Integration tests: create → join → play → result → persisted    | test    | P1  | ⬜ Todo | DEBT-09                           |
 
 ### 0.E Frontend parity

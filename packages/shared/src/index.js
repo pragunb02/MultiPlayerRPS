@@ -5,3 +5,10 @@ export { IDENTITY_KINDS } from "./identity.js";
 export { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, ROOM_STATUS } from "./rooms.js";
 export { RPS_BEST_OF, RPS_CHOICES } from "./rps.js";
 export { TTT_CELLS, TTT_MARKS } from "./tictactoe.js";
+export {
+  CHESS_ACTIONS,
+  CHESS_END_REASONS,
+  CHESS_PROMOTIONS,
+  CHESS_TIME_CONTROLS,
+  DEFAULT_CHESS_TIME_CONTROL,
+} from "./chess.js";

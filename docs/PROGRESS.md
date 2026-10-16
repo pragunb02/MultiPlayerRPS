@@ -2,21 +2,21 @@
 
 ## Status
 
-|               |                                                                                                 |
-| ------------- | ----------------------------------------------------------------------------------------------- |
-| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md) |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-078`                                  |
-| Current stage | **Stage 0 — Foundation**                                                                        |
-| Stage health  | 🟢 On track                                                                                     |
-| In progress   | —                                                                                               |
-| Blocked on    | —                                                                                               |
-| Next up       | CC-020 Chess (server clocks) → CC-016 matches → CC-017 progression → CC-076 auth API            |
+|               |                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)   |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-078`                                    |
+| Current stage | **Stage 0 — Foundation**                                                                          |
+| Stage health  | 🟢 On track                                                                                       |
+| In progress   | —                                                                                                 |
+| Blocked on    | —                                                                                                 |
+| Next up       | CC-016 matches → CC-017 progression → CC-076 auth API → CC-021 integration tests → CC-022 web app |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 18 / 34      |
+| S0 Foundation   | 🟡 In progress | 19 / 34      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -29,13 +29,14 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 0    | 6           | 5     |
-| Bugs (BUG)       | 5    | 7           | 2     |
+| Bugs (BUG)       | 3    | 9           | 2     |
 | Tech debt (DEBT) | 3    | 6           | 3     |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-020 — Chess with server clocks: generic engine time hooks (`deadline`/`expire`, contract check 11, room manager `expireDue` + `room.updated` broadcast, 1 s ticker); chess.js 1.4.0 engine with seeded White, 5 time controls, increments, promotion choice, resign, draw offers, every ending incl. FIDE timeout-vs-insufficient-material; exact timeouts on late moves. All three games now server-authoritative. 454 tests; live scholar's mate with hand-checked clocks.
 - 2026-10-16 — CC-019 — Tic-Tac-Toe engine: seeded starter as X, strict cell moves, server-decided wins/draws with exactly one result (BUG-04 regression: 9th move completing two lines), registered and playable over sockets; clients cannot claim results. Extracted shared socket test helpers. 400 tests; engine 100 % covered. Live game verified.
 - 2026-10-16 — CC-018 — Rock Paper Scissors engine: best of 1/3/5/7, secret simultaneous choices (opponent sees only "has chosen"), draws replayed, round history; registered — first game playable end to end on the new server. Contract kit + full rules matrix + BUG-01 regression + socket-level proof that pending choices never reach the opponent (SEC-09). 369 tests; engine 100 % covered. Live best-of-3 verified.
 - 2026-10-16 — CC-015 — Room manager across all layers: shared room/move socket contracts; room-code model; in-memory room DAO with copies + optimistic versioning; room accessor; room state machine (crypto codes, auto-start, engine-validated moves, forfeit, host hand-over, disconnect/rejoin, expiry sweep, per-viewer views, domain events); socket handlers with strict payload validation, per-socket rate limit, personalised broadcasts, multi-tab disconnects; boot check that engines are in the catalog; sweeper. 331 tests incl. 15 end-to-end socket tests (full game, forfeit, rejoin, multi-tab, rate limit). SEC-08, BUG-09/10/13/14 fixed in the new stack.
