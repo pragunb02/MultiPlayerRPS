@@ -26,6 +26,11 @@ export function createInMemoryMatchDao() {
       return copy(matches.get(matchId));
     },
 
+    async countWins({ playerId, gameId }) {
+      return [...matches.values()].filter((m) => m.gameId === gameId && m.result.winners.includes(playerId))
+        .length;
+    },
+
     async listByPlayer(playerId, { limit, before }) {
       return [...matches.values()]
         .filter((m) => m.players.some((p) => p.playerId === playerId))

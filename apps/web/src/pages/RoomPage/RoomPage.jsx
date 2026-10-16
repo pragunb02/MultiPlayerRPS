@@ -5,6 +5,7 @@ import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { RematchPanel } from "../../components/Rematch/RematchPanel.jsx";
 import { Seats } from "../../components/Seats/Seats.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
@@ -31,6 +32,12 @@ function outcomeText(room) {
     return `${winner?.displayName ?? "Someone"} won`;
   }
   return outcome.winners.includes(room.you) ? "You won!" : "You lost";
+}
+
+/** Which game of the room this is (0 = the first; each rematch adds one), the same while playing and finished. */
+function gameNumber(room) {
+  if (room.series === undefined) return 0;
+  return room.series.games - (room.status === ROOM_STATUS.FINISHED ? 1 : 0);
 }
 
 /**
@@ -149,7 +156,8 @@ export function RoomPage() {
           {view.status !== ROOM_STATUS.WAITING &&
             (Board ? (
               <Suspense fallback={<p aria-busy="true">Loading the board…</p>}>
-                <Board room={view} onMove={room.move} />
+                {/* A rematch is a new game in this room: a fresh board, not the last game's leftovers. */}
+                <Board key={gameNumber(view)} room={view} onMove={room.move} />
               </Suspense>
             ) : (
               <p className={styles.card}>The {game?.name ?? "game"} board is not available yet.</p>
@@ -159,6 +167,13 @@ export function RoomPage() {
               <h2>{outcomeText(view)}</h2>
               <Link to={paths.game(view.gameId)}>Play again</Link>
             </div>
+          )}
+          {view.status === ROOM_STATUS.FINISHED && (
+            <RematchPanel
+              room={view}
+              onRematch={room.rematch}
+              onError={(error) => toast.show(error.message, { tone: "danger" })}
+            />
           )}
         </div>
         <aside className={styles.side}>

@@ -6,6 +6,7 @@ import { createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createGamificationAccessor } from "./data/gamificationAccessor.js";
+import { createLeaderboardAccessor } from "./data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "./data/legacyUserAccessor.js";
 import { createMatchAccessor } from "./data/matchAccessor.js";
 import { createPlayerTransferAccessor } from "./data/playerTransferAccessor.js";
@@ -15,13 +16,19 @@ import { createAccountComponent } from "./domain/accounts/accountComponent.js";
 import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
+import { createLeaderboardComponent } from "./domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
-import { createProgressionComponent } from "./domain/progression/progressionComponent.js";
+import {
+  createProgressionComponent,
+  PROGRESSION_EVENTS,
+  XP_SOURCES,
+} from "./domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
 import { createAccountDao } from "./persistence/accountDao.js";
 import { createAchievementDao } from "./persistence/achievementDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createInMemoryRoomDao } from "./persistence/inMemoryRoomDao.js";
+import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
 import { createPlayerTransferDao } from "./persistence/playerTransferDao.js";
@@ -61,10 +68,11 @@ export function assertEnginesInCatalog(engines) {
 
 /**
  * After a game ends: record the match, award progression from the recorded match (so XP only ever comes from a
- * persisted match), then count it for achievements, streaks and quests (CC-054, CC-089). Each step runs as a
- * background task — a slow database never delays a game — and shutdown drains them. Before progression, a match
- * recorded for a guest who has just signed in moves to their account (CC-032), so the account gets the XP, the
- * streak and the quest progress.
+ * persisted match), then count it for achievements, streaks and quests (CC-054, CC-089), then move its accounts up
+ * the leaderboards (CC-053). Each step runs as a background task — a slow database never delays a game — and
+ * shutdown drains them. Before progression, a match recorded for a guest who has just signed in moves to their
+ * account (CC-032), so the account gets the XP, the streak, the quest progress and the board entries. The
+ * leaderboard step runs even when the gamification step failed.
  *
  * @param {{
  *   domainEvents: import("node:events").EventEmitter,
@@ -72,6 +80,7 @@ export function assertEnginesInCatalog(engines) {
  *   playerTransferComponent: { follow: Function },
  *   progressionComponent: { applyMatch: Function },
  *   gamificationComponent: { applyMatch: Function },
+ *   leaderboardComponent: { applyMatch: Function },
  *   tasks: ReturnType<typeof createBackgroundTasks>,
  *   logger: Logger,
  *   now?: () => number,
@@ -83,6 +92,7 @@ export function connectMatchPipeline({
   playerTransferComponent,
   progressionComponent,
   gamificationComponent,
+  leaderboardComponent,
   tasks,
   logger,
   now = Date.now,
@@ -105,8 +115,19 @@ export function connectMatchPipeline({
             tasks.run(
               "apply gamification",
               async () => {
-                await gamificationComponent.applyMatch({ match: followed, updates, now: now() });
-                logger.info({ matchId: match.matchId }, "gamification applied");
+                try {
+                  await gamificationComponent.applyMatch({ match: followed, updates, now: now() });
+                  logger.info({ matchId: match.matchId }, "gamification applied");
+                } finally {
+                  tasks.run(
+                    "apply leaderboards",
+                    async () => {
+                      await leaderboardComponent.applyMatch({ match: followed, updates });
+                      logger.info({ matchId: match.matchId }, "leaderboards applied");
+                    },
+                    { matchId: match.matchId },
+                  );
+                }
               },
               { matchId: match.matchId },
             );
@@ -115,6 +136,32 @@ export function connectMatchPipeline({
         );
       },
       { roomCode: event.room.code },
+    );
+  });
+}
+
+/**
+ * Bonus XP outside matches (daily quests, CC-089) also counts for the XP leaderboards (CC-053). Progression
+ * announces every award; match awards already reach the boards through the match pipeline.
+ *
+ * @param {{
+ *   domainEvents: import("node:events").EventEmitter,
+ *   leaderboardComponent: { applyBonus: Function },
+ *   tasks: ReturnType<typeof createBackgroundTasks>,
+ *   now?: () => number,
+ * }} deps
+ */
+export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks, now = Date.now }) {
+  domainEvents.on(PROGRESSION_EVENTS.UPDATED, (update) => {
+    if (update.source !== XP_SOURCES.QUEST) {
+      return;
+    }
+    tasks.run(
+      "apply bonus to leaderboards",
+      () => leaderboardComponent.applyBonus({ ...update, at: now() }),
+      {
+        key: update.key,
+      },
     );
   });
 }
@@ -202,7 +249,8 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number } },  rate limits; production uses the
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number } },
+ *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  * }} deps
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
@@ -225,10 +273,18 @@ export async function startServer({ config, logger, limits = {} }) {
   const achievementDao = createAchievementDao({ connection: database.connection });
   const legacyUserDao = createLegacyUserDao({ connection: database.connection }); // read-only, CC-078
   const playerTransferDao = createPlayerTransferDao({ connection: database.connection });
+  const leaderboardDao = createLeaderboardDao({ connection: database.connection });
   await Promise.all(
-    [matchDao, progressDao, accountDao, playerTransferDao, statsDao, questDao, achievementDao].map((dao) =>
-      dao.ensureIndexes(),
-    ),
+    [
+      matchDao,
+      progressDao,
+      accountDao,
+      playerTransferDao,
+      statsDao,
+      questDao,
+      achievementDao,
+      leaderboardDao,
+    ].map((dao) => dao.ensureIndexes()),
   );
 
   // 3. data
@@ -239,6 +295,7 @@ export async function startServer({ config, logger, limits = {} }) {
   const legacyUserAccessor = createLegacyUserAccessor({ legacyUserDao });
   const playerTransferAccessor = createPlayerTransferAccessor({ playerTransferDao });
   const gamificationAccessor = createGamificationAccessor({ statsDao, questDao, achievementDao });
+  const leaderboardAccessor = createLeaderboardAccessor({ leaderboardDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -262,13 +319,20 @@ export async function startServer({ config, logger, limits = {} }) {
     progressionComponent,
     events: domainEvents,
   });
-  // Everything stored by player id moves with a guest who signs in (ADR-014), in this order.
+  const leaderboardComponent = createLeaderboardComponent({
+    leaderboardAccessor,
+    matchAccessor,
+    progressAccessor,
+  });
+  // Everything stored by player id moves with a guest who signs in (ADR-014), in this order. Leaderboards go
+  // last: they are recomputed from the progress and matches that have moved by then.
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,
     participants: [
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
+      { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ],
     matches: matchComponent,
   });
@@ -279,9 +343,11 @@ export async function startServer({ config, logger, limits = {} }) {
     playerTransferComponent,
     progressionComponent,
     gamificationComponent,
+    leaderboardComponent,
     tasks,
     logger,
   });
+  connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks });
 
   // 1. service — HTTP and realtime share one session middleware, so both see the same identity
   const sessionMiddleware = createSessionMiddleware({
@@ -296,6 +362,8 @@ export async function startServer({ config, logger, limits = {} }) {
     isDatabaseUp: database.isConnected,
     authLimits: limits.auth,
     guestLimit: limits.guest,
+    leaderboardLimit: limits.leaderboard,
+    leaderboardComponent,
     sessionMiddleware,
     identityComponent,
     matchComponent,

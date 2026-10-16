@@ -131,6 +131,22 @@ describe("api client", () => {
     expect(fetchImpl.mock.calls[0][0]).toBe(path);
   });
 
+  it("reads the leaderboard catalog and one board, with its limit", async () => {
+    const boards = respond(200, { boards: [{ id: "overall" }] });
+    const board = respond(200, { board: { id: "chess" }, entries: [] });
+    const all = respond(200, { board: { id: "weekly" }, entries: [] });
+
+    expect(await createApiClient({ fetchImpl: boards }).getLeaderboards()).toEqual([{ id: "overall" }]);
+    expect(await createApiClient({ fetchImpl: board }).getLeaderboard("chess", { limit: 1 })).toEqual({
+      board: { id: "chess" },
+      entries: [],
+    });
+    await createApiClient({ fetchImpl: all }).getLeaderboard("weekly");
+    expect(boards.mock.calls[0][0]).toBe("/api/leaderboards");
+    expect(board.mock.calls[0][0]).toBe("/api/leaderboards/chess?limit=1");
+    expect(all.mock.calls[0][0]).toBe("/api/leaderboards/weekly");
+  });
+
   it("asks for match history without a query string when there are no filters", async () => {
     const fetchImpl = respond(200, { matches: [] });
 

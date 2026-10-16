@@ -5,6 +5,7 @@ import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { HomePage } from "../pages/HomePage/HomePage.jsx";
+import { LeaderboardPage } from "../pages/LeaderboardPage/LeaderboardPage.jsx";
 import { LoginPage } from "../pages/LoginPage/LoginPage.jsx";
 import { NotFoundPage } from "../pages/NotFoundPage/NotFoundPage.jsx";
 import { PlayPage } from "../pages/PlayPage/PlayPage.jsx";
@@ -37,6 +38,8 @@ export function App({ services }) {
                 <Route path={ROUTES.LOGIN} element={<LoginPage />} />
                 <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
                 <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                <Route path={ROUTES.LEADERBOARD} element={<LeaderboardPage />} />
+                <Route path={ROUTES.LEADERBOARDS} element={<Navigate to={paths.leaderboards()} replace />} />
                 {/* Old URLs stay valid: each page replaces them with its canonical URL. */}
                 <Route path={LEGACY_ROUTES.GAME} element={<PlayPage />} />
                 <Route path={LEGACY_ROUTES.ROOM} element={<RoomPage />} />

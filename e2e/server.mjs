@@ -40,6 +40,7 @@ const limits = {
     failedLoginsPerEmail: { windowMs: 15 * 60 * 1000, limit: 5 },
   },
   guest: { windowMs: 60_000, limit: 10_000 },
+  leaderboard: { windowMs: 60_000, limit: 10_000 },
 };
 const { close } = await startServer({ config, logger, limits });
 handleShutdownSignals({

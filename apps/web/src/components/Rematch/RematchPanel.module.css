@@ -1,0 +1,42 @@
+.panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+}
+.message {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-lg);
+}
+.hint,
+.series {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.link {
+  font-weight: 600;
+}
+/* The opponent is waiting: the accept button pulses a few times to draw the eye, then rests. */
+.invited {
+  animation: pulse var(--duration-slow, 360ms) var(--ease-in-out, ease-in-out) 3 alternate;
+  box-shadow: var(--glow-primary, var(--shadow-md));
+}
+@keyframes pulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .invited {
+    animation: none;
+  }
+}

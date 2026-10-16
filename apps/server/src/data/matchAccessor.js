@@ -81,6 +81,12 @@ export function createMatchAccessor({ matchDao }) {
      * @param {{ limit: number, before?: number }} page  `before` is an endedAt in ms (exclusive)
      * @returns {Promise<ReadonlyArray<Readonly<Match>>>}
      */
+    /**
+     * @param {{ playerId: string, gameId: string }} query
+     * @returns {Promise<number>} matches of that game the player won
+     */
+    countWins: ({ playerId, gameId }) => matchDao.countWins({ playerId, gameId }),
+
     async listForPlayer(playerId, { limit, before }) {
       const docs = await matchDao.listByPlayer(playerId, {
         limit,

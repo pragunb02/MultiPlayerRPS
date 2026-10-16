@@ -24,6 +24,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   onSessionEnded: (sessionId: string) => void,
  *   onIdentityChanged: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["onIdentityChanged"],
  *   guestLimit?: { windowMs: number, limit: number },
+ *   leaderboardComponent: ReturnType<typeof import("../../domain/leaderboards/leaderboardComponent.js").createLeaderboardComponent>,
+ *   leaderboardLimit?: { windowMs: number, limit: number },
  *   isDatabaseUp: () => boolean,
  *   now?: () => number,   the clock for date-dependent answers (daily quests); tests pick a day
  * }} deps
@@ -41,6 +43,8 @@ export function createHttpApp({
   onSessionEnded,
   onIdentityChanged,
   guestLimit,
+  leaderboardComponent,
+  leaderboardLimit,
   isDatabaseUp,
   now = Date.now,
 }) {
@@ -86,6 +90,8 @@ export function createHttpApp({
       onIdentityChanged,
       guestLimit,
       now,
+      leaderboardComponent,
+      leaderboardLimit,
     }),
   );
 

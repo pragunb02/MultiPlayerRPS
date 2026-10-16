@@ -52,6 +52,15 @@ describe("matchAccessor", () => {
     expect(page.map((m) => m.endedAt)).toEqual([T0 + 1]);
   });
 
+  it("counts a player's wins of one game", async () => {
+    const matches = setup();
+    await matches.record(match());
+    await matches.record(match({ matchId: "00000000-0000-4000-8000-000000000002", gameId: "chess" }));
+
+    expect(await matches.countWins({ playerId: "guest_a", gameId: "rps" })).toBe(1);
+    expect(await matches.countWins({ playerId: "guest_b", gameId: "rps" })).toBe(0);
+  });
+
   it("passes unexpected storage failures through unchanged", async () => {
     const failure = new Error("disk on fire");
     const matches = createMatchAccessor({

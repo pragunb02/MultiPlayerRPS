@@ -86,6 +86,11 @@ export function fakeApi(overrides = {}) {
     getAchievements: vi.fn().mockResolvedValue([]),
     getStreaks: vi.fn().mockResolvedValue(NO_STREAKS),
     getQuests: vi.fn().mockResolvedValue(QUESTS),
+    getLeaderboards: vi.fn(),
+    getLeaderboard: vi.fn().mockResolvedValue({
+      board: { id: "overall", name: "Overall XP", metric: "xp", period: "all", periodId: "all" },
+      entries: [],
+    }),
     ...overrides,
   };
 }

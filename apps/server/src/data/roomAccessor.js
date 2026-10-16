@@ -22,6 +22,10 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @property {{ matchId: string, seed: number, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry> }} [game]
  *   present once the game has started; `seed` + `log` reproduce the game exactly (see replayGame)
  * @property {Readonly<{ status: string, result: string, winners: string[], reason: string }>} [result]  final outcome once finished (played out or forfeited)
+ * @property {Readonly<{ requestedBy: ReadonlyArray<string>, available: boolean }>} [rematch]  once finished: who asked
+ *   to play again, and whether that is still possible (CC-037)
+ * @property {Readonly<{ games: number, wins: Readonly<Record<string, number>> }>} [series]  games finished in this room
+ *   and wins per player, across rematches
  * @property {number} createdAt
  * @property {number} lastActivityAt
  * @property {number} version            optimistic-concurrency token owned by the store

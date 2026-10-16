@@ -65,5 +65,12 @@ export function useRoom(code, { enabled }) {
 
   const leave = useCallback(() => socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code }), [socket, code]);
 
-  return { ...state, move, leave };
+  /** Asks for — or withdraws — a rematch in a finished room; once everyone asked, the new game starts here. */
+  const rematch = useCallback(async () => {
+    const room = await socket.request(SOCKET_EVENTS.ROOM_REMATCH, { code });
+    setState((s) => ({ ...s, room }));
+    return room;
+  }, [socket, code]);
+
+  return { ...state, move, leave, rematch };
 }

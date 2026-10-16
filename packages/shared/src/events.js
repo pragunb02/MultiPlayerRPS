@@ -17,6 +17,10 @@
  * @property {string} you             the viewer's player id ("" for spectators)
  * @property {{ view: unknown, activePlayers: string[], outcome: object } | undefined} game   present once started
  * @property {number} serverTime      server clock (ms) when the view was produced — for drift-free timers
+ * @property {{ requestedBy: string[], available: boolean } | undefined} rematch   present once finished (CC-037):
+ *   who asked to play again, and whether a rematch can still happen (false once a player left)
+ * @property {{ games: number, wins: Record<string, number> } | undefined} series   games finished in this room
+ *   and wins per player id, across rematches
  */
 export const SOCKET_EVENTS = Object.freeze({
   /** client → server: returns the identity bound to this connection's session */
@@ -27,6 +31,11 @@ export const SOCKET_EVENTS = Object.freeze({
   ROOM_JOIN: "room:join",
   /** client → server, RoomCodePayload → { left: true } (forfeits a game in progress) */
   ROOM_LEAVE: "room:leave",
+  /**
+   * client → server, RoomCodePayload → RoomView: toggles your rematch request in a finished room; once every
+   * seated player asked, a new game starts in the same room with the seats reversed (CC-037)
+   */
+  ROOM_REMATCH: "room:rematch",
   /** client → server, GameMovePayload → RoomView */
   GAME_MOVE: "game:move",
   /** server → client: RoomView after any change in a room you are in */

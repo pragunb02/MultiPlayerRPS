@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../utils/errors.js";
-import { createIdentity } from "./identity.js";
+import { createIdentity, isAccountId } from "./identity.js";
+
+describe("isAccountId", () => {
+  it.each([
+    ["user_652f1c2e9b1e8a3d4c5b6a79", true],
+    ["guest_123e4567-e89b-12d3-a456-426614174000", false],
+    ["user_", false],
+    ["user_652f1c2e9b1e8a3d4c5b6a79x", false],
+  ])("%s → %s", (id, expected) => {
+    expect(isAccountId(id)).toBe(expected);
+  });
+});
 
 const GUEST = { kind: "guest", id: "guest_123e4567-e89b-12d3-a456-426614174000", displayName: "Guest-7K2Q" };
 const USER = { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "riya_42" };

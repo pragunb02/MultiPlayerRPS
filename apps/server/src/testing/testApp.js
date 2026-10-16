@@ -5,6 +5,7 @@ import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
+import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
 import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js";
@@ -14,11 +15,12 @@ import { createAccountComponent } from "../domain/accounts/accountComponent.js";
 import { createGamificationComponent } from "../domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
+import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "../persistence/inMemoryRoomDao.js";
-import { connectMatchPipeline, identityFollowers } from "../server.js";
+import { connectLeaderboardBonuses, connectMatchPipeline, identityFollowers } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
@@ -31,6 +33,7 @@ import {
   createInMemoryQuestDao,
   createInMemoryStatsDao,
 } from "./inMemoryGamificationDaos.js";
+import { createInMemoryLeaderboardDao } from "./inMemoryLeaderboardDao.js";
 import { createInMemoryLegacyUserDao } from "./inMemoryLegacyUserDao.js";
 import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
 import { createInMemoryPlayerTransferDao } from "./inMemoryPlayerTransferDao.js";
@@ -50,6 +53,7 @@ import { testConfig } from "./testConfig.js";
  *   isDatabaseUp?: () => boolean,
  *   transferParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who
  *     takes part in moving a guest's data (e.g. one that fails)
+ *   leaderboardLimit?: { windowMs: number, limit: number },
  *   now?: () => number,
  * }} [options]
  */
@@ -61,6 +65,7 @@ export function createTestApp({
   legacyUsers = [],
   isDatabaseUp = () => true,
   transferParticipants = (participants) => participants,
+  leaderboardLimit,
   now = Date.now,
 } = {}) {
   const config = testConfig(env);
@@ -90,10 +95,13 @@ export function createTestApp({
     generateSeed: () => 42,
   });
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
+  const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const matchComponent = createMatchComponent({ matchAccessor });
-  const progressionComponent = createProgressionComponent({
-    progressAccessor: createProgressAccessor({ progressDao: createInMemoryProgressDao() }),
-    events: domainEvents,
+  const progressionComponent = createProgressionComponent({ progressAccessor, events: domainEvents });
+  const leaderboardComponent = createLeaderboardComponent({
+    leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
+    matchAccessor,
+    progressAccessor,
   });
   const gamificationComponent = createGamificationComponent({
     gamificationAccessor: createGamificationAccessor({
@@ -113,6 +121,7 @@ export function createTestApp({
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
+      { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ]),
     matches: matchComponent,
   });
@@ -123,10 +132,12 @@ export function createTestApp({
     playerTransferComponent,
     progressionComponent,
     gamificationComponent,
+    leaderboardComponent,
     tasks,
     logger: capture.logger,
     now,
   });
+  connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks, now });
   const endedSessions = [];
   const endedListeners = [];
 
@@ -143,6 +154,8 @@ export function createTestApp({
     authLimits,
     guestLimit,
     now,
+    leaderboardComponent,
+    leaderboardLimit,
     onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);
@@ -162,6 +175,7 @@ export function createTestApp({
     progressionComponent,
     playerTransferComponent,
     gamificationComponent,
+    leaderboardComponent,
     tasks,
     endedSessions,
     onSessionEnded: (listener) => endedListeners.push(listener),
