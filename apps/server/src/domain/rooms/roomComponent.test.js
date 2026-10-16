@@ -41,6 +41,13 @@ function startedGame() {
 
 describe("roomComponent", () => {
   describe("createRoom", () => {
+    it("lets the game judge missing options as no options at all", () => {
+      const { rooms } = setup();
+
+      // "race" has no defaults, so it refuses; a game with defaults would apply them.
+      expect(() => rooms.createRoom({ host: ALICE, gameId: "race", now: T0 })).toThrow(ValidationError);
+    });
+
     it("creates a waiting room with the host seated", () => {
       const { rooms } = setup();
 
@@ -221,6 +228,17 @@ describe("roomComponent", () => {
       expect(room.status).toBe("waiting");
     });
 
+    it("keeps the host when another player leaves a waiting room", () => {
+      const { rooms } = setup({ engines: [partyEngine] });
+      const { code } = rooms.createRoom({ host: ALICE, gameId: "party", options: { target: 3 }, now: T0 });
+      rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
+
+      const { room } = rooms.leaveRoom({ code, playerId: BOB.id, now: T0 + 2 });
+
+      expect(room.hostId).toBe(ALICE.id);
+      expect(room.seats.map((s) => s.playerId)).toEqual([ALICE.id]);
+    });
+
     it("closes and announces a room when the last player leaves", () => {
       const { rooms, published } = setup();
       const { code } = createRace(rooms);
@@ -236,6 +254,36 @@ describe("roomComponent", () => {
       const { rooms, code } = startedGame();
 
       expect(() => rooms.leaveRoom({ code, playerId: CAROL.id, now: T0 })).toThrow(ForbiddenError);
+    });
+  });
+
+  describe("giveUpWaitingSeats (a player signs out, CC-085)", () => {
+    it("closes a waiting room they were alone in", () => {
+      const { rooms, published } = setup();
+      const { code } = createRace(rooms);
+
+      expect(rooms.giveUpWaitingSeats({ playerId: ALICE.id, now: T0 + 1 })).toEqual([]);
+      expect(published).toContainEqual({ event: ROOM_EVENTS.CLOSED, payload: { code, reason: "empty" } });
+    });
+
+    it("frees their seat in a shared waiting room and passes the host role on", () => {
+      const { rooms } = setup({ engines: [partyEngine] });
+      const { code } = rooms.createRoom({ host: ALICE, gameId: "party", options: { target: 3 }, now: T0 });
+      rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
+
+      const [room] = rooms.giveUpWaitingSeats({ playerId: ALICE.id, now: T0 + 2 });
+
+      expect(room.seats.map((seat) => seat.playerId)).toEqual([BOB.id]);
+      expect(room.hostId).toBe(BOB.id);
+    });
+
+    it("keeps their seat in a running game, and touches no one else's rooms", () => {
+      const { rooms, code } = startedGame();
+      const other = createRace(rooms, CAROL);
+
+      expect(rooms.giveUpWaitingSeats({ playerId: ALICE.id, now: T0 + 2 })).toEqual([]);
+      expect(rooms.getRoom(code).seats.map((seat) => seat.playerId)).toContain(ALICE.id);
+      expect(rooms.getRoom(other.code).seats).toHaveLength(1);
     });
   });
 
@@ -276,6 +324,26 @@ describe("roomComponent", () => {
       const [room] = rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 2 });
 
       expect(room.seats.map((seat) => seat.playerId)).toEqual([RIYA.id]);
+    });
+
+    it("keeps the host role where it was when the guest was not the host", () => {
+      const { rooms } = setup({ engines: [partyEngine] });
+      const { code } = rooms.createRoom({ host: ALICE, gameId: "party", options: { target: 3 }, now: T0 });
+      rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
+
+      const [room] = rooms.transferPlayer({ from: BOB.id, to: RIYA, now: T0 + 2 });
+
+      expect(room.hostId).toBe(ALICE.id);
+      expect(room.seats.map((s) => s.playerId)).toEqual([ALICE.id, RIYA.id]);
+    });
+
+    it("leaves a running game alone when the account already plays in it", () => {
+      const { rooms } = setup();
+      const { code } = createRace(rooms);
+      rooms.joinRoom({ code, player: RIYA, now: T0 + 1 }); // Alice (guest) vs Riya (account): playing
+
+      expect(rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 2 })).toEqual([]);
+      expect(rooms.getRoom(code).seats.map((s) => s.playerId)).toEqual([ALICE.id, RIYA.id]);
     });
 
     it("leaves finished games and other players' rooms alone", () => {
@@ -465,6 +533,31 @@ describe("roomComponent", () => {
       const race = createRace(rooms, CAROL);
 
       expect(rooms.expireDue({ now: T0 + 1_000_000 })).not.toContain(race.code);
+    });
+
+    it("applies a deadline that does not end the game, and publishes the change", () => {
+      // Each deadline skips the turn of the player to move and sets a new one; the game goes on.
+      const turnTimerEngine = defineEngine({
+        ...timedEngine,
+        id: "turn-timer",
+        deadline: (state) => state.deadline,
+        expire: (state, { now }) => ({ ...state, turn: 1 - state.turn, deadline: now + 1_000 }),
+      });
+      const { rooms, published } = setup({ engines: [turnTimerEngine] });
+      const { code } = rooms.createRoom({
+        host: ALICE,
+        gameId: "turn-timer",
+        options: { target: 3 },
+        now: T0,
+      });
+      rooms.joinRoom({ code, player: BOB, now: T0 });
+
+      expect(rooms.expireDue({ now: T0 + 1_000 })).toEqual([code]);
+
+      const room = rooms.getRoom(code);
+      expect(room.status).toBe("playing");
+      expect(room.game.log).toEqual([{ kind: "expire", at: T0 + 1_000 }]);
+      expect(published.map((p) => p.event)).toEqual([ROOM_EVENTS.UPDATED]);
     });
 
     it("applies a deadline only once", () => {

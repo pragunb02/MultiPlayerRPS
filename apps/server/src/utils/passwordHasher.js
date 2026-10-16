@@ -1,4 +1,5 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 
 /**
  * Password hashing with Node's built-in scrypt (no native dependency). Each hash records its own
@@ -11,12 +12,19 @@ export const DEFAULT_SCRYPT_PARAMS = Object.freeze({ N: 2 ** 15, r: 8, p: 1 });
 const KEY_LENGTH = 64;
 const SALT_BYTES = 16;
 
+// Stored parameters are trusted only within these bounds, so a corrupt hash can't demand gigabytes of memory.
+const MAX_STORED_N = 2 ** 20;
+const MAX_STORED_R_P = 16;
+
+const scryptAsync = promisify(scrypt);
 const derive = (password, salt, { N, r, p }) =>
-  new Promise((resolve, reject) => {
-    scrypt(password, salt, KEY_LENGTH, { N, r, p, maxmem: 256 * N * r + 1024 * 1024 }, (err, key) =>
-      err ? reject(err) : resolve(key),
-    );
-  });
+  scryptAsync(password, salt, KEY_LENGTH, { N, r, p, maxmem: 256 * N * r + 1024 * 1024 });
+
+const isPowerOfTwo = (n) => Number.isInteger(n) && n > 1 && (n & (n - 1)) === 0;
+const plausible = ({ N, r, p }) =>
+  isPowerOfTwo(N) &&
+  N <= MAX_STORED_N &&
+  [r, p].every((v) => Number.isInteger(v) && v >= 1 && v <= MAX_STORED_R_P);
 
 function parse(encoded) {
   const [scheme, N, r, p, salt, hash] = String(encoded).split("$");
@@ -57,7 +65,7 @@ export function createPasswordHasher({ params = DEFAULT_SCRYPT_PARAMS } = {}) {
      */
     async verify(password, encoded) {
       const parsed = parse(encoded);
-      if (parsed === undefined) {
+      if (parsed === undefined || !plausible(parsed.params)) {
         return false;
       }
       const key = await derive(password, parsed.salt, parsed.params);

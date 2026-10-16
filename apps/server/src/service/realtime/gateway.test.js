@@ -1,6 +1,7 @@
 import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
+import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
 import { startTestServer } from "../../testing/testApp.js";
 
 const ALLOWED_ORIGIN = "http://localhost:5173"; // from TEST_ENV.ALLOWED_ORIGINS
@@ -118,5 +119,30 @@ describe("realtime gateway", () => {
 
     expect(bobSocket.connected).toBe(true);
     expect((await emitWithAck(bobSocket, SOCKET_EVENTS.IDENTITY_GET)).data).toEqual(bob.identity);
+  });
+
+  it("logs, instead of crashing, when a room update cannot be sent", async () => {
+    server = await startTestServer();
+    const guest = await createGuest();
+    const socket = openSocket({ cookie: guest.cookie });
+    await connected(socket);
+    const created = await emitWithAck(socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "race",
+      options: { target: 3 },
+    });
+    const room = server.roomComponent.getRoom(created.data.code);
+
+    // A room whose game the server can't render a view for.
+    server.domainEvents.emit(ROOM_EVENTS.UPDATED, { room: { ...room, gameId: "no-such-game" } });
+
+    await expect.poll(() => server.find("failed to broadcast room update")).toHaveLength(1);
+  });
+
+  it("reports closing an already closed gateway", async () => {
+    const own = await startTestServer(); // closed here, not by afterEach
+    await own.gateway.close();
+
+    await expect(own.gateway.close()).rejects.toThrow("Server is not running");
+    await own.tasks.drain();
   });
 });

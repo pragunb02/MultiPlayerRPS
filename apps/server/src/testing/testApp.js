@@ -14,7 +14,7 @@ import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "../persistence/inMemoryRoomDao.js";
-import { connectMatchPipeline, seatHandoverOnSignIn } from "../server.js";
+import { connectMatchPipeline, seatsFollowIdentity } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
@@ -97,7 +97,7 @@ export function createTestApp({
     accountComponent,
     authLimits,
     guestLimit,
-    onSignedIn: seatHandoverOnSignIn({ roomComponent, domainEvents }),
+    onIdentityChanged: seatsFollowIdentity({ roomComponent, domainEvents }),
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);
       endedListeners.forEach((listener) => listener(sessionId));

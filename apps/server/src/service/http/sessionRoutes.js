@@ -19,12 +19,19 @@ const DEFAULT_GUEST_LIMIT = Object.freeze({ windowMs: 15 * 60 * 1000, limit: 30 
  * @param {{
  *   identityComponent: ReturnType<typeof import("../../domain/identity/identityComponent.js").createIdentityComponent>,
  *   onSessionEnded: (sessionId: string) => void,
+ *   onIdentityChanged: (change: { previous: object | undefined, identity: object | undefined }) => void,  told about logouts
  *   guestLimit?: { windowMs: number, limit: number },
  * }} deps
  */
-export function createSessionRoutes({ identityComponent, onSessionEnded, guestLimit = DEFAULT_GUEST_LIMIT }) {
+export function createSessionRoutes({
+  identityComponent,
+  onSessionEnded,
+  onIdentityChanged,
+  guestLimit = DEFAULT_GUEST_LIMIT,
+}) {
   assertDefined(identityComponent, "identityComponent");
   assertFunction(onSessionEnded, "onSessionEnded");
+  assertFunction(onIdentityChanged, "onIdentityChanged");
 
   const router = Router();
   const guestRateLimit = rateLimit({
@@ -62,10 +69,11 @@ export function createSessionRoutes({ identityComponent, onSessionEnded, guestLi
 
   router.delete("/session", async (req, res) => {
     const sessionId = req.sessionID;
-    const hadIdentity = req.session.identity !== undefined;
+    const previous = req.session.identity;
     await destroySession(req);
     res.clearCookie(SESSION_COOKIE_NAME);
-    if (hadIdentity) {
+    if (previous !== undefined) {
+      onIdentityChanged({ previous, identity: undefined });
       onSessionEnded(sessionId);
     }
     res.status(204).end();

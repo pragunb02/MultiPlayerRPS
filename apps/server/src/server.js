@@ -88,19 +88,57 @@ export function connectMatchPipeline({ domainEvents, matchComponent, progression
 }
 
 /**
- * A guest who signs in keeps their seats: rooms hand them to the account, and everyone in them sees the change
- * (CC-083).
+ * Periodic room work: close idle rooms, and apply game deadlines that have passed (a chess flag falling while
+ * nobody moves). A failing run is logged and the next one still happens. Timers don't keep the process alive.
+ *
+ * @param {{
+ *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "sweepExpired" | "expireDue">,
+ *   logger: Logger,
+ *   now?: () => number,
+ * }} deps
+ * @returns {{ stop: () => void }}
+ */
+export function startHousekeeping({ roomComponent, logger, now = Date.now }) {
+  const every = (intervalMs, work, failure) => {
+    const timer = setInterval(() => {
+      try {
+        work();
+      } catch (err) {
+        logger.error({ err }, failure);
+      }
+    }, intervalMs);
+    timer.unref();
+    return timer;
+  };
+  const timers = [
+    every(ROOM_SWEEP_INTERVAL_MS, () => roomComponent.sweepExpired({ now: now() }), "room sweep failed"),
+    every(
+      CLOCK_TICK_INTERVAL_MS,
+      () => roomComponent.expireDue({ now: now() }),
+      "applying game deadlines failed",
+    ),
+  ];
+  return { stop: () => timers.forEach((timer) => clearInterval(timer)) };
+}
+
+/**
+ * Seats follow who the player is, and everyone in the rooms concerned sees the change:
+ * - a guest who signs in keeps their seats — rooms hand them to the account (CC-083);
+ * - someone who signs out gives up their seats in rooms that haven't started (CC-085).
  *
  * @param {{ roomComponent: ReturnType<typeof createRoomComponent>, domainEvents: import("node:events").EventEmitter, now?: () => number }} deps
- * @returns {Parameters<typeof createHttpApp>[0]["onSignedIn"]}
+ * @returns {Parameters<typeof createHttpApp>[0]["onIdentityChanged"]}
  */
-export function seatHandoverOnSignIn({ roomComponent, domainEvents, now = Date.now }) {
+export function seatsFollowIdentity({ roomComponent, domainEvents, now = Date.now }) {
+  const announce = (rooms) => rooms.forEach((room) => domainEvents.emit(ROOM_EVENTS.UPDATED, { room }));
   return ({ previous, identity }) => {
-    if (previous?.kind !== IDENTITY_KINDS.GUEST || previous.id === identity.id) {
+    if (previous === undefined) {
       return;
     }
-    for (const room of roomComponent.transferPlayer({ from: previous.id, to: identity, now: now() })) {
-      domainEvents.emit(ROOM_EVENTS.UPDATED, { room });
+    if (identity === undefined) {
+      announce(roomComponent.giveUpWaitingSeats({ playerId: previous.id, now: now() }));
+    } else if (previous.kind === IDENTITY_KINDS.GUEST && previous.id !== identity.id) {
+      announce(roomComponent.transferPlayer({ from: previous.id, to: identity, now: now() }));
     }
   };
 }
@@ -178,7 +216,7 @@ export async function startServer({ config, logger, limits = {} }) {
     progressionComponent,
     accountComponent,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
-    onSignedIn: seatHandoverOnSignIn({ roomComponent, domainEvents }),
+    onIdentityChanged: seatsFollowIdentity({ roomComponent, domainEvents }),
   });
   const server = http.createServer(app);
   const gateway = createRealtimeGateway({
@@ -191,28 +229,10 @@ export async function startServer({ config, logger, limits = {} }) {
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
 
-  const sweeper = setInterval(() => {
-    try {
-      roomComponent.sweepExpired({ now: Date.now() });
-    } catch (err) {
-      logger.error({ err }, "room sweep failed");
-    }
-  }, ROOM_SWEEP_INTERVAL_MS);
-  sweeper.unref();
-
-  // Game clocks: apply any engine deadline that has passed (a flag falling while nobody moves).
-  const clockTicker = setInterval(() => {
-    try {
-      roomComponent.expireDue({ now: Date.now() });
-    } catch (err) {
-      logger.error({ err }, "applying game deadlines failed");
-    }
-  }, CLOCK_TICK_INTERVAL_MS);
-  clockTicker.unref();
+  const housekeeping = startHousekeeping({ roomComponent, logger });
 
   const close = async () => {
-    clearInterval(sweeper);
-    clearInterval(clockTicker);
+    housekeeping.stop();
     await gateway.close();
     await tasks.drain();
     await database.close();

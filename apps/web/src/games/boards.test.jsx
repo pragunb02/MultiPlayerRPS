@@ -1,8 +1,10 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ChessBoard } from "./chess/ChessBoard.jsx";
 import { formatClock, useChessClocks } from "./chess/useChessClocks.js";
+import { gameView } from "./registry.js";
 import { RpsBoard } from "./rps/RpsBoard.jsx";
 import { TicTacToeBoard } from "./tictactoe/TicTacToeBoard.jsx";
 
@@ -68,6 +70,36 @@ describe("RpsBoard", () => {
     expect(screen.getByText("Waiting for Riya")).toBeInTheDocument();
   });
 
+  it("shows a drawn round, a missing score as 0, and someone no longer seated as 'Opponent'", () => {
+    const view = rpsView({
+      score: { [ME]: 1 },
+      rounds: [
+        { choices: { [ME]: "rock", [THEM]: "rock" }, winner: "" },
+        { choices: { [ME]: "rock", [THEM]: "paper" }, winner: "guest_gone" },
+      ],
+    });
+    render(<RpsBoard room={room(view)} onMove={vi.fn()} />);
+
+    expect(screen.getByLabelText("Score")).toHaveTextContent("You 1 — Riya 0");
+    const rounds = within(screen.getByRole("list", { name: "Rounds" }));
+    expect(rounds.getByText("Draw")).toBeInTheDocument();
+    expect(rounds.getByText("Opponent won")).toBeInTheDocument();
+  });
+
+  it("shows '?' for a choice this version of the app doesn't know", () => {
+    const view = rpsView({ rounds: [{ choices: { [ME]: "rock", [THEM]: "lizard" }, winner: THEM }] });
+    render(<RpsBoard room={room(view)} onMove={vi.fn()} />);
+
+    expect(screen.getByTitle("Riya: lizard")).toHaveTextContent("?");
+  });
+
+  it("hides the choices once the match is over, keeping the history", () => {
+    render(<RpsBoard room={room(rpsView(), { status: "finished" })} onMove={vi.fn()} />);
+
+    expect(screen.queryByRole("group", { name: "Your choice" })).toBeNull();
+    expect(screen.getByRole("list", { name: "Rounds" })).toBeInTheDocument();
+  });
+
   it("shows the server's reason when a move is refused", async () => {
     const user = userEvent.setup();
     render(
@@ -112,6 +144,20 @@ describe("TicTacToeBoard", () => {
 
     screen.getAllByRole("gridcell").forEach((cell) => expect(cell).toBeDisabled());
     expect(screen.getByText("Waiting for Riya")).toBeInTheDocument();
+  });
+
+  it("shows the server's reason when a move is refused", async () => {
+    const user = userEvent.setup();
+    render(
+      <TicTacToeBoard
+        room={room(tttView())}
+        onMove={vi.fn().mockRejectedValue(new Error("That cell is taken"))}
+      />,
+    );
+
+    await user.click(screen.getByRole("gridcell", { name: "top right: empty" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("That cell is taken");
   });
 
   it("highlights the winning line", () => {
@@ -213,6 +259,149 @@ describe("ChessBoard", () => {
     expect(onMove).toHaveBeenLastCalledWith({ type: "accept-draw" });
   });
 
+  it("deselects a piece when it is clicked again or an unreachable square is clicked", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
+    const pawn = screen.getByRole("gridcell", { name: "e2, white pawn" });
+
+    await user.click(pawn);
+    expect(pawn).toHaveAttribute("aria-pressed", "true");
+    await user.click(pawn);
+    expect(pawn).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(pawn);
+    await user.click(screen.getByRole("gridcell", { name: "a5" }));
+    expect(pawn).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("gridcell", { name: /legal move/ })).toBeNull();
+  });
+
+  it("switches the selection to another of your pieces", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
+
+    await user.click(screen.getByRole("gridcell", { name: "e2, white pawn" }));
+    await user.click(screen.getByRole("gridcell", { name: "g1, white knight" }));
+
+    expect(screen.getByRole("gridcell", { name: "f3, legal move" })).toBeInTheDocument();
+    expect(screen.queryByRole("gridcell", { name: "e4, legal move" })).toBeNull();
+  });
+
+  it("marks captures differently from quiet moves", async () => {
+    const user = userEvent.setup();
+    // 1. e4 d5: the e4 pawn can take on d5 or advance to e5.
+    const fen = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2";
+    render(<ChessBoard room={room(chessView({ fen }))} onMove={vi.fn()} />);
+
+    await user.click(screen.getByRole("gridcell", { name: "e4, white pawn" }));
+
+    expect(screen.getByRole("gridcell", { name: "d5, black pawn, legal move" })).toHaveClass("capture");
+    expect(screen.getByRole("gridcell", { name: "e5, legal move" })).toHaveClass("target");
+  });
+
+  it("highlights the last move and a king in check", () => {
+    // 1. f3 e5 2. g4 Qh4+ — White is in check.
+    const fen = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3";
+    render(
+      <ChessBoard
+        room={room(chessView({ fen, inCheck: true, lastMove: { from: "d8", to: "h4" } }))}
+        onMove={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("gridcell", { name: "e1, white king" })).toHaveClass("check");
+    expect(screen.getByRole("gridcell", { name: "d8" })).toHaveClass("last");
+    expect(screen.getByRole("gridcell", { name: "h4, black queen" })).toHaveClass("last");
+  });
+
+  it("runs the clock of the side to move once the first move is made", () => {
+    render(<ChessBoard room={room(chessView({ lastMoveAt: 999_000 }))} onMove={vi.fn()} />);
+
+    const white = screen.getByRole("timer", { name: "white clock" }).parentElement;
+    const black = screen.getByRole("timer", { name: "black clock" }).parentElement;
+    expect(white).toHaveClass("running");
+    expect(black).not.toHaveClass("running");
+  });
+
+  it("keeps both clocks still before the first move", () => {
+    render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
+
+    expect(screen.getByRole("timer", { name: "white clock" }).parentElement).not.toHaveClass("running");
+  });
+
+  it("shows the server's reason when a move is refused", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChessBoard room={room(chessView())} onMove={vi.fn().mockRejectedValue(new Error("Not your turn"))} />,
+    );
+
+    await user.click(screen.getByRole("gridcell", { name: "e2, white pawn" }));
+    await user.click(screen.getByRole("gridcell", { name: "e4, legal move" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Not your turn");
+  });
+
+  it("shows your own draw offer as pending", () => {
+    render(<ChessBoard room={room(chessView({ drawOfferBy: ME }))} onMove={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Draw offered" })).toBeDisabled();
+  });
+
+  it("closing the promotion dialog cancels the move", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn().mockResolvedValue({});
+    render(<ChessBoard room={room(chessView({ fen: "7k/1P6/8/8/8/8/8/K7 w - - 0 1" }))} onMove={onMove} />);
+
+    await user.click(screen.getByRole("gridcell", { name: "b7, white pawn" }));
+    await user.click(screen.getByRole("gridcell", { name: "b8, legal move" }));
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Keep playing", async (user) => user.click(screen.getByRole("button", { name: "Keep playing" }))],
+    ["Escape", async (user) => user.keyboard("{Escape}")],
+  ])("resigning can be called off (%s)", async (_how, callOff) => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    render(<ChessBoard room={room(chessView())} onMove={onMove} />);
+
+    await user.click(screen.getByRole("button", { name: "Resign" }));
+    await callOff(user);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it("shows a spectator the board from White's side, names both players, and offers no actions", () => {
+    const view = chessView({ colors: { [THEM]: "w", guest_x: "b" }, toMove: THEM });
+    render(
+      <ChessBoard
+        room={room(view, {
+          you: "",
+          seats: [seats[1], { playerId: "guest_x", displayName: "Xu", connected: true }],
+          status: "finished",
+        })}
+        onMove={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("gridcell")[0]).toHaveAccessibleName("a8, black rook");
+    expect(screen.getByText("Riya")).toBeInTheDocument();
+    expect(screen.getByText("Xu")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resign" })).toBeNull();
+  });
+
+  it("calls a player it can't find among the seats 'Opponent', and offers no draw to accept", () => {
+    const view = chessView({ colors: { [ME]: "w", guest_gone: "b" }, drawOfferBy: "guest_gone" });
+    render(<ChessBoard room={room(view, { seats: [seats[0]] })} onMove={vi.fn()} />);
+
+    expect(screen.getByText("Opponent")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept draw" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Offer draw" })).toBeEnabled();
+  });
+
   it("shows the move list in pairs", () => {
     render(<ChessBoard room={room(chessView({ moves: ["e4", "e5", "Nf3"] }))} onMove={vi.fn()} />);
 
@@ -262,5 +451,51 @@ describe("chess clocks", () => {
     [-5, "0:00.0"],
   ])("formats %i ms as %s", (ms, text) => {
     expect(formatClock(ms)).toBe(text);
+  });
+});
+
+describe("game registry", () => {
+  it.each([
+    [
+      "rps",
+      "group",
+      "Your choice",
+      { bestOf: 3, score: {}, round: 1, rounds: [], hasChosen: {}, yourChoice: "" },
+    ],
+    [
+      "tictactoe",
+      "grid",
+      "Tic-Tac-Toe board",
+      { board: Array(9).fill(""), marks: { [ME]: "X" }, turn: ME, winningLine: [] },
+    ],
+    [
+      "chess",
+      "grid",
+      "Chess board",
+      {
+        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        moves: [],
+        lastMove: {},
+        colors: { [ME]: "w" },
+        toMove: ME,
+        inCheck: false,
+        clocks: { w: 1, b: 1 },
+        lastMoveAt: 0,
+        drawOfferBy: "",
+      },
+    ],
+  ])("loads the %s board on demand", async (gameId, role, name, view) => {
+    const { Board } = gameView(gameId);
+    render(
+      <Suspense fallback={<p>Loading the board…</p>}>
+        <Board room={room(view)} onMove={vi.fn()} />
+      </Suspense>,
+    );
+
+    expect(await screen.findByRole(role, { name })).toBeInTheDocument();
+  });
+
+  it("has nothing for a game this build doesn't know", () => {
+    expect(gameView("ludo")).toEqual({});
   });
 });

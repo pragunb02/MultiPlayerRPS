@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
+import { AppRequestError } from "../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST } from "../testing/fakes.js";
 import { SessionProvider } from "./SessionProvider.jsx";
 import { useSession } from "./useSession.js";
@@ -76,6 +77,20 @@ describe("SessionProvider", () => {
     expect(socket.disconnect).toHaveBeenCalledOnce(); // only before the first connect, never a connecting socket
   });
 
+  it("ignores a slow first session answer once a guest session started meanwhile (CC-084)", async () => {
+    let answerSession;
+    const api = fakeApi({ getSession: vi.fn(() => new Promise((resolve) => (answerSession = resolve))) });
+    const { socket } = setup(api);
+    await act(() => session.ensurePlayer());
+
+    await act(async () => answerSession(undefined)); // "no session" — true when asked, stale now
+
+    expect(session.identity).toEqual(GUEST);
+    expect(screen.getByText("ready")).toBeInTheDocument();
+    expect(socket.connect).toHaveBeenCalledOnce();
+    expect(socket.disconnect).toHaveBeenCalledOnce();
+  });
+
   it("reconnects the socket when the identity changes (the socket authenticates at connect time)", async () => {
     const user = { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "Riya" };
     const { socket } = setup(fakeApi({ getSession: async () => GUEST, login: async () => user }));
@@ -97,6 +112,45 @@ describe("SessionProvider", () => {
     expect(api.endSession).toHaveBeenCalledOnce();
     expect(screen.getByText("anonymous")).toBeInTheDocument();
     expect(socket.isConnected()).toBe(false);
+  });
+
+  it("treats a session the server rejects (e.g. corrupt) as no session", async () => {
+    const { socket } = setup(
+      fakeApi({
+        getSession: async () =>
+          Promise.reject(new AppRequestError({ code: "UNAUTHORIZED", message: "No", status: 401 })),
+      }),
+    );
+
+    expect(await screen.findByText("anonymous")).toBeInTheDocument();
+    expect(socket.connect).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["an answer", () => Promise.resolve(GUEST)],
+    [
+      "a failure",
+      () => Promise.reject(new AppRequestError({ code: "UNAUTHORIZED", message: "No", status: 401 })),
+    ],
+  ])("ignores %s that arrives after the app is gone", async (_case, settle) => {
+    let finish;
+    const api = fakeApi({ getSession: () => new Promise((resolve) => (finish = resolve)) });
+    const socket = fakeSocket();
+    const { unmount } = render(
+      <ServicesProvider services={{ api, socket }}>
+        <SessionProvider>
+          <Probe />
+        </SessionProvider>
+      </ServicesProvider>,
+    );
+
+    unmount();
+    await act(async () => {
+      finish(settle().catch((err) => Promise.reject(err)));
+      await Promise.resolve();
+    });
+
+    expect(socket.connect).not.toHaveBeenCalled();
   });
 
   it("reports unexpected failures loading the session", async () => {

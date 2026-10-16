@@ -86,4 +86,41 @@ describe("api client", () => {
 
     expect(fetchImpl.mock.calls[0][0]).toBe("/api/matches?limit=5");
   });
+
+  it("starts a guest session and unwraps the identity", async () => {
+    const fetchImpl = respond(201, { identity: { kind: "guest", id: "guest_x" } });
+
+    expect(await createApiClient({ fetchImpl }).startGuest()).toEqual({ kind: "guest", id: "guest_x" });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/guest", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("reads progress and one match, encoding the match id into the path", async () => {
+    const progress = respond(200, { progress: { xp: 30 } });
+    const match = respond(200, { match: { matchId: "a/b c" } });
+
+    expect(await createApiClient({ fetchImpl: progress }).getProgress()).toEqual({ xp: 30 });
+    expect(await createApiClient({ fetchImpl: match }).getMatch("a/b c")).toEqual({ matchId: "a/b c" });
+    expect(progress.mock.calls[0][0]).toBe("/api/progress");
+    expect(match.mock.calls[0][0]).toBe("/api/matches/a%2Fb%20c");
+  });
+
+  it("asks for match history without a query string when there are no filters", async () => {
+    const fetchImpl = respond(200, { matches: [] });
+
+    await createApiClient({ fetchImpl }).getMatches();
+
+    expect(fetchImpl.mock.calls[0][0]).toBe("/api/matches");
+  });
+
+  it("uses the browser's fetch by default", async () => {
+    const fetchImpl = respond(200, { games: [] });
+    vi.stubGlobal("fetch", fetchImpl);
+    try {
+      await createApiClient().getGames();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(fetchImpl).toHaveBeenCalledWith("/api/games", expect.objectContaining({ method: "GET" }));
+  });
 });

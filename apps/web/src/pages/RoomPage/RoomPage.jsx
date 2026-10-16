@@ -66,6 +66,11 @@ export function RoomPage() {
         <PageTitle>{notFound ? "Room not found" : "Can't join this room"}</PageTitle>
         <h1>{notFound ? "Room not found" : "Can't join this room"}</h1>
         <p>{notFound ? `There is no room with the code ${code}.` : room.error.message}</p>
+        {urlGame && (
+          <p>
+            <Link to={paths.game(urlGame.id)}>Start a new {urlGame.name} game</Link>
+          </p>
+        )}
         <Link to={paths.home()}>Back to the games</Link>
       </section>
     );
@@ -90,7 +95,8 @@ export function RoomPage() {
     setConfirmingLeave(false);
     try {
       await room.leave();
-      navigate(paths.game(view.gameId));
+      // Replace, not push: Back must not lead into the room you just left (and re-seat you in it).
+      navigate(paths.game(view.gameId), { replace: true });
     } catch (error) {
       toast.show(error.message, { tone: "danger" });
     }

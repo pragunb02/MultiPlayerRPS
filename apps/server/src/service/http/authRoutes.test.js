@@ -139,6 +139,26 @@ describe("auth routes", () => {
     expect(joined.data.seats.map((seat) => seat.displayName)).toEqual(["Riya", friend.identity.displayName]);
   });
 
+  it("signing out gives up the seat in a waiting room, so the next person on that browser isn't seated against it (CC-085)", async () => {
+    server = await startTestServer();
+    const guest = await clients.player();
+    const { data } = await send(guest.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "race",
+      options: { target: 3 },
+    });
+
+    const res = await fetch(`${server.baseUrl}/api/session`, {
+      method: "DELETE",
+      headers: { cookie: guest.cookie },
+    });
+    const next = await clients.player();
+    const rejoin = await send(next.socket, SOCKET_EVENTS.ROOM_JOIN, { code: data.code });
+
+    expect(res.status).toBe(204);
+    expect(rejoin.ok).toBe(false);
+    expect(rejoin.error.code).toBe(ERROR_CODES.NOT_FOUND); // the room closed when its only player left
+  });
+
   it("rate-limits failed logins per email, even across different IPs", async () => {
     server = await startTestServer({
       authLimits: {
@@ -157,6 +177,31 @@ describe("auth routes", () => {
 
     expect(statuses).toEqual([401, 401, 429]);
     expect(otherAccount.status).toBe(401); // the limit is per email, not global
+  });
+
+  it("still limits failed logins whose email isn't text, by IP instead", async () => {
+    server = await startTestServer({
+      authLimits: {
+        perIp: { windowMs: 60_000, limit: 100 },
+        failedLoginsPerEmail: { windowMs: 60_000, limit: 2 },
+      },
+    });
+    const attempt = () => post("/api/auth/login", { email: 12345, password: "guessing123" });
+
+    const statuses = [(await attempt()).status, (await attempt()).status, (await attempt()).status];
+
+    expect(statuses).toEqual([401, 401, 429]);
+  });
+
+  it("refuses a JSON body that is an array, not an object", async () => {
+    server = await startTestServer();
+
+    const res = await post("/api/auth/login", []);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toEqual(
+      expect.objectContaining({ code: ERROR_CODES.VALIDATION_FAILED, message: "Send a JSON object" }),
+    );
   });
 
   it("does not count successful logins against the per-email limit", async () => {

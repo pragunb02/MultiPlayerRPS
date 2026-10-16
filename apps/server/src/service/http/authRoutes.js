@@ -44,12 +44,12 @@ const tooMany = (req, res) =>
  *   POST /auth/login   { email, password }           → 200 { identity }
  *
  * Signing in replaces the current session (new id — no fixation) and disconnects sockets of the old one;
- * `onSignedIn` hears who the player was before (e.g. a guest whose seats should follow them, CC-083).
+ * `onIdentityChanged` hears who the player was before (e.g. a guest whose seats should follow them, CC-083).
  *
  * @param {{
  *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
  *   onSessionEnded: (sessionId: string) => void,
- *   onSignedIn: (change: { previous: import("../../models/identity.js").Identity | undefined, identity: import("../../models/identity.js").Identity }) => void,
+ *   onIdentityChanged: (change: { previous: import("../../models/identity.js").Identity | undefined, identity: import("../../models/identity.js").Identity }) => void,
  *   now?: () => number,
  *   limits?: typeof DEFAULT_LIMITS,
  * }} deps
@@ -57,13 +57,13 @@ const tooMany = (req, res) =>
 export function createAuthRoutes({
   accountComponent,
   onSessionEnded,
-  onSignedIn,
+  onIdentityChanged,
   now = Date.now,
   limits = DEFAULT_LIMITS,
 }) {
   assertDefined(accountComponent, "accountComponent");
   assertFunction(onSessionEnded, "onSessionEnded");
-  assertFunction(onSignedIn, "onSignedIn");
+  assertFunction(onIdentityChanged, "onIdentityChanged");
   const router = Router();
 
   const perIp = rateLimit({
@@ -89,7 +89,7 @@ export function createAuthRoutes({
     const previous = req.session.identity;
     const previousSessionId = previous === undefined ? "" : req.sessionID;
     await establishSession(req, identity);
-    onSignedIn({ previous, identity });
+    onIdentityChanged({ previous, identity });
     if (previousSessionId !== "") {
       onSessionEnded(previousSessionId);
     }

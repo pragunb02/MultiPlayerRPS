@@ -186,6 +186,264 @@ describe("chessEngine promotion", () => {
 
     expect(chessEngine.viewFor(state, A).moves.at(-1)).toBe(san);
   });
+
+  it("keeps the promoted piece for the rest of the game", () => {
+    const promoted = act(readyToPromote(), B, { type: "move", from: "b7", to: "b8", promotion: "q" });
+
+    // The new queen on b8 can capture the rook on a8 — only possible if the promotion was replayed.
+    const state = playSan(promoted, ["Nf6", "Qxa8"]);
+
+    expect(chessEngine.viewFor(state, A).moves.slice(-3)).toEqual(["b8=Q", "Nf6", "Qxa8"]);
+  });
+});
+
+describe("chessEngine draws by rule", () => {
+  it("draws by threefold repetition", () => {
+    const shuffle = ["Nf3", "Nf6", "Ng1", "Ng8"];
+
+    const state = playSan(newGame(), [...shuffle, ...shuffle]);
+
+    expect(chessEngine.getOutcome(state)).toEqual({
+      status: "finished",
+      result: "draw",
+      winners: [],
+      reason: "threefold-repetition",
+    });
+  });
+
+  it("draws when only the two kings are left", () => {
+    // A full game that trades everything down to king against king (generated once, kept as a fixture).
+    const game = [
+      "f3",
+      "Nf6",
+      "a4",
+      "a6",
+      "c4",
+      "Ne4",
+      "fxe4",
+      "Rg8",
+      "b4",
+      "c6",
+      "Qc2",
+      "d6",
+      "g4",
+      "Rh8",
+      "Qb3",
+      "Bxg4",
+      "Qc2",
+      "Bxe2",
+      "Nxe2",
+      "e5",
+      "Ba3",
+      "b6",
+      "a5",
+      "bxa5",
+      "bxa5",
+      "Qxa5",
+      "Bxd6",
+      "Qxd2+",
+      "Nxd2",
+      "Bxd6",
+      "Rxa6",
+      "Nxa6",
+      "Nf3",
+      "Rd8",
+      "Nxe5",
+      "Bxe5",
+      "Ng1",
+      "Bc7",
+      "Qa4",
+      "Bxh2",
+      "Qxc6+",
+      "Ke7",
+      "Qxa6",
+      "Bxg1",
+      "Rxh7",
+      "Rxh7",
+      "c5",
+      "Bxc5",
+      "Qc6",
+      "Rh1",
+      "Qxc5+",
+      "Ke8",
+      "Qe3",
+      "Rxf1+",
+      "Kxf1",
+      "Rd3",
+      "Qxd3",
+      "Ke7",
+      "Qg3",
+      "Kd8",
+      "Qxg7",
+      "f6",
+      "Qxf6+",
+      "Kc8",
+      "Qg5",
+      "Kb8",
+      "Qg6",
+      "Kc7",
+      "Qf5",
+      "Kd8",
+      "Qf4",
+      "Kc8",
+      "Qb8+",
+      "Kd7",
+      "Qe8+",
+      "Kxe8",
+      "Ke2",
+      "Kd7",
+      "Kd3",
+      "Ke7",
+      "Kc4",
+      "Kd8",
+      "Kb4",
+      "Kc7",
+      "Ka3",
+      "Kb6",
+      "Ka2",
+      "Kb7",
+      "Kb3",
+      "Ka7",
+      "Kb2",
+      "Kb8",
+      "Kc1",
+      "Kc7",
+      "e5",
+      "Kc6",
+      "e6",
+      "Kd5",
+      "Kc2",
+      "Kxe6",
+    ];
+
+    const beforeLast = playSan(newGame(), game.slice(0, -1));
+    const state = playSan(beforeLast, game.slice(-1));
+
+    expect(chessEngine.getOutcome(beforeLast).status).toBe("ongoing");
+    expect(chessEngine.getOutcome(state)).toEqual({
+      status: "finished",
+      result: "draw",
+      winners: [],
+      reason: "insufficient-material",
+    });
+  });
+
+  it("draws by the fifty-move rule (100 moves without a capture or pawn move)", () => {
+    // Knight and rook moves only, never repeating a position three times (generated once, kept as a fixture).
+    const quiet = [
+      "Nf3",
+      "Nf6",
+      "Nc3",
+      "Nc6",
+      "Na4",
+      "Rb8",
+      "Nb6",
+      "Ra8",
+      "Nd5",
+      "Rb8",
+      "Nb6",
+      "Ra8",
+      "Nd5",
+      "Rb8",
+      "Nf4",
+      "Ra8",
+      "Ne6",
+      "Rb8",
+      "Neg5",
+      "Ra8",
+      "Ne6",
+      "Rb8",
+      "Neg5",
+      "Ra8",
+      "Nh3",
+      "Rb8",
+      "Nd4",
+      "Ra8",
+      "Nb5",
+      "Rb8",
+      "Nd4",
+      "Ra8",
+      "Nb5",
+      "Rb8",
+      "Nc3",
+      "Ra8",
+      "Na4",
+      "Rb8",
+      "Nb6",
+      "Ra8",
+      "Nd5",
+      "Rb8",
+      "Nb6",
+      "Ra8",
+      "Nd5",
+      "Rb8",
+      "Ndf4",
+      "Ra8",
+      "Ne6",
+      "Rb8",
+      "Neg5",
+      "Ra8",
+      "Ne6",
+      "Rb8",
+      "Neg5",
+      "Ra8",
+      "Nf3",
+      "Rb8",
+      "Ne5",
+      "Ra8",
+      "Ng6",
+      "Rb8",
+      "Nh4",
+      "Ra8",
+      "Nf5",
+      "Rb8",
+      "Nh6",
+      "Ra8",
+      "Ng8",
+      "Rb8",
+      "Nh6",
+      "Ra8",
+      "Ng8",
+      "Rb8",
+      "Nf4",
+      "Ra8",
+      "Nh6",
+      "Rb8",
+      "Ng8",
+      "Ra8",
+      "Nh6",
+      "Rb8",
+      "Ng4",
+      "Ra8",
+      "Nd5",
+      "Rb8",
+      "Nb6",
+      "Ra8",
+      "Nd5",
+      "Rb8",
+      "Nb6",
+      "Ra8",
+      "Nc4",
+      "Rb8",
+      "Na5",
+      "Ra8",
+      "Nc4",
+      "Rb8",
+      "Na5",
+      "Ra8",
+    ];
+
+    const beforeLast = playSan(newGame(), quiet.slice(0, -1));
+    const state = playSan(beforeLast, quiet.slice(-1));
+
+    expect(chessEngine.getOutcome(beforeLast).status).toBe("ongoing");
+    expect(chessEngine.getOutcome(state)).toEqual({
+      status: "finished",
+      result: "draw",
+      winners: [],
+      reason: "fifty-move-rule",
+    });
+  });
 });
 
 describe("chessEngine draw offers", () => {
@@ -291,6 +549,23 @@ describe("chessEngine clocks", () => {
       result: "draw",
       winners: [],
       reason: "timeout-vs-insufficient-material",
+    });
+  });
+
+  it("still loses on time when the opponent has two minor pieces (enough to mate)", () => {
+    // White (bob) has king, bishop and knight; Black (alice) to move with no time left.
+    const bishopAndKnight = {
+      ...playSan(newGame(), ["e4"], T0),
+      fen: "4k3/8/8/8/8/8/8/2BNK3 b - - 0 40",
+    };
+
+    const expired = chessEngine.expire(bishopAndKnight, { now: T0 + 300_000 });
+
+    expect(chessEngine.getOutcome(expired)).toEqual({
+      status: "finished",
+      result: "win",
+      winners: [B],
+      reason: "timeout",
     });
   });
 });

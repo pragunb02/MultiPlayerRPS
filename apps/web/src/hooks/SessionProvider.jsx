@@ -16,9 +16,12 @@ export function SessionProvider({ children }) {
 
   const connectedAs = useRef(undefined);
   const pendingGuest = useRef(undefined);
+  // Counts identity changes, so a slow first "who am I?" answer can't undo one that happened meanwhile.
+  const changes = useRef(0);
 
   const adopt = useCallback(
     (identity) => {
+      changes.current += 1;
       if (identity?.id !== connectedAs.current) {
         connectedAs.current = identity?.id;
         socket.disconnect();
@@ -34,10 +37,13 @@ export function SessionProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false;
+    const before = changes.current;
+    // Stale when the page already became someone meanwhile (e.g. a room link started a guest session first).
+    const stale = () => cancelled || changes.current !== before;
     api.getSession().then(
-      (identity) => !cancelled && adopt(identity),
+      (identity) => !stale() && adopt(identity),
       (err) => {
-        if (cancelled) return;
+        if (stale()) return;
         if (isUnauthorized(err)) {
           adopt(undefined);
         } else {

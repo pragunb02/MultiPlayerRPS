@@ -24,7 +24,8 @@ function requireObject(raw, allowed) {
 }
 
 function requireSmall(value, maxBytes, field) {
-  if (Buffer.byteLength(JSON.stringify(value) ?? "", "utf8") > maxBytes) {
+  // Values here come from parsed JSON (never undefined or functions), so they always stringify.
+  if (Buffer.byteLength(JSON.stringify(value), "utf8") > maxBytes) {
     throw new ValidationError(`${field} is too large`, { details: { field } });
   }
 }

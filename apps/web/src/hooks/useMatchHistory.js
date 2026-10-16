@@ -3,7 +3,10 @@ import { useServices } from "../app/servicesContext.js";
 
 const PAGE_SIZE = 10;
 
-/** Match history, newest first, with "load more" paging. status: "loading" | "ready" | "error" */
+/**
+ * Match history, newest first, with "load more" paging. status: "loading" | "ready" | "error" (first page).
+ * A failed "load more" keeps the list and reports `moreError`, so the player can try again.
+ */
 export function useMatchHistory() {
   const { api } = useServices();
   const [state, setState] = useState({
@@ -11,6 +14,7 @@ export function useMatchHistory() {
     matches: [],
     nextBefore: undefined,
     error: undefined,
+    moreError: undefined,
   });
 
   const apply = useCallback(
@@ -20,6 +24,7 @@ export function useMatchHistory() {
         matches: [...previous, ...page.matches],
         nextBefore: page.nextBefore,
         error: undefined,
+        moreError: undefined,
       }),
     [],
   );
@@ -36,8 +41,12 @@ export function useMatchHistory() {
   }, [api, apply]);
 
   const loadMore = useCallback(async () => {
-    const page = await api.getMatches({ limit: PAGE_SIZE, before: state.nextBefore });
-    apply(page, state.matches);
+    try {
+      const page = await api.getMatches({ limit: PAGE_SIZE, before: state.nextBefore });
+      apply(page, state.matches);
+    } catch (moreError) {
+      setState((s) => ({ ...s, moreError }));
+    }
   }, [api, apply, state.matches, state.nextBefore]);
 
   return { ...state, hasMore: state.nextBefore !== undefined, loadMore };

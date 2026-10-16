@@ -82,6 +82,31 @@ describe("SignupPage", () => {
     expect(screen.getByLabelText("Username")).toHaveAttribute("aria-invalid", "true");
   });
 
+  it.each([
+    ["no field", new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" })],
+    [
+      "a field the form doesn't have",
+      new AppRequestError({
+        code: "VALIDATION_FAILED",
+        message: "Unknown fields in payload",
+        details: { field: "age" },
+      }),
+    ],
+  ])("shows a server error about %s above the button, with every field valid", async (_case, error) => {
+    const user = userEvent.setup();
+    renderApp({ path: "/signup", api: fakeApi({ signup: async () => Promise.reject(error) }) });
+
+    await user.type(screen.getByLabelText("Username"), "Riya");
+    await user.type(screen.getByLabelText("Email"), "riya@example.com");
+    await user.type(screen.getByLabelText("Password"), "correct horse battery");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(error.message);
+    for (const label of ["Username", "Email", "Password"]) {
+      expect(screen.getByLabelText(label)).not.toHaveAttribute("aria-invalid", "true");
+    }
+  });
+
   it("creates the account and goes home by default", async () => {
     const user = userEvent.setup();
     const api = fakeApi({ signup: async () => USER });
@@ -121,6 +146,40 @@ describe("header", () => {
     expect(
       await within(screen.getByRole("banner")).findByRole("link", { name: "Log in" }),
     ).toBeInTheDocument();
+  });
+
+  it("logging out from any page lands on home", async () => {
+    const user = userEvent.setup();
+    const { url } = renderApp({
+      path: "/profile",
+      api: fakeApi({
+        getSession: async () => USER,
+        getProgress: async () => ({}),
+        getMatches: async () => ({ matches: [] }),
+      }),
+    });
+
+    await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Log out" }));
+
+    await within(screen.getByRole("banner")).findByRole("link", { name: "Log in" });
+    expect(url()).toBe("/");
+  });
+
+  it("keeps the player signed in and says why when logging out fails", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      getSession: async () => USER,
+      endSession: async () => {
+        throw new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" });
+      },
+    });
+    const { url } = renderApp({ path: "/games/chess", api });
+
+    await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Log out" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Can't reach ClassiCade");
+    expect(within(screen.getByRole("banner")).getByText("Riya")).toBeInTheDocument();
+    expect(url()).toBe("/games/chess");
   });
 });
 
@@ -191,6 +250,81 @@ describe("ProfilePage", () => {
     expect(await within(list).findByText("Draw")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
     expect(api.getMatches).toHaveBeenLastCalledWith({ limit: 10, before: 123 });
+  });
+
+  it("says so when the next page of matches can't be loaded, keeping the list and the button", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      getSession: async () => USER,
+      getProgress: async () => progress,
+      getMatches: vi.fn(async (query) => {
+        if (query.before === undefined) return { matches: [match(3, "win")], nextBefore: 123 };
+        throw new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" });
+      }),
+    });
+    renderApp({ path: "/profile", api });
+    const list = await screen.findByRole("list", { name: "Match history" });
+
+    await user.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't load more matches. Can't reach ClassiCade",
+    );
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled();
+  });
+
+  it.each([
+    [
+      "progress",
+      {
+        getProgress: async () => Promise.reject(new Error("boom")),
+        getMatches: async () => ({ matches: [] }),
+      },
+      "Couldn't load progress. boom",
+    ],
+    [
+      "matches",
+      { getProgress: async () => progress, getMatches: async () => Promise.reject(new Error("down")) },
+      "Couldn't load matches. down",
+    ],
+  ])("explains when %s can't be loaded", async (_what, overrides, text) => {
+    renderApp({ path: "/profile", api: fakeApi({ getSession: async () => USER, ...overrides }) });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(text);
+  });
+
+  it("shows a full bar at the highest level, where there is no next level", async () => {
+    renderApp({
+      path: "/profile",
+      api: fakeApi({
+        getSession: async () => USER,
+        getProgress: async () => ({ ...progress, level: 50, xpIntoLevel: 0, xpForNextLevel: 0 }),
+        getMatches: async () => ({ matches: [] }),
+      }),
+    });
+
+    const bar = await screen.findByRole("progressbar", { name: "Progress to next level" });
+    expect(bar).toHaveAttribute("max", "1");
+    expect(bar).toHaveAttribute("value", "1");
+  });
+
+  it("names unknown games by id and shows '—' when there was no opponent", async () => {
+    const solo = {
+      ...match(1, "win"),
+      gameId: "ludo",
+      players: [{ playerId: USER.id, displayName: "Riya" }],
+    };
+    renderApp({
+      path: "/profile",
+      api: fakeApi({
+        getSession: async () => USER,
+        getProgress: async () => progress,
+        getMatches: async () => ({ matches: [solo] }),
+      }),
+    });
+
+    expect(await screen.findByText("ludo vs —")).toBeInTheDocument();
   });
 
   it("invites visitors without a session to play or log in", async () => {

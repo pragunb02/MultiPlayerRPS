@@ -82,6 +82,7 @@ function MatchHistory({ you }) {
           );
         })}
       </ul>
+      {history.moreError && <p role="alert">Couldn't load more matches. {history.moreError.message}</p>}
       {history.hasMore && (
         <Button variant="secondary" onClick={history.loadMore}>
           Load more

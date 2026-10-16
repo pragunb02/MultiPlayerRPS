@@ -262,6 +262,39 @@ describe("accounts through the real composition root (integration)", () => {
   });
 });
 
+describe("signing in from a guest session (integration)", () => {
+  it("disconnects the guest's sockets: the old session is over", async () => {
+    const app = await start();
+    let socket;
+    try {
+      const guest = await fetch(`${app.url}/api/session/guest`, { method: "POST" });
+      const cookie = guest.headers.get("set-cookie").split(";")[0];
+      socket = connect(app.url, { transports: ["websocket"], extraHeaders: { cookie }, reconnection: false });
+      await new Promise((resolve, reject) => {
+        socket.once("connect", resolve);
+        socket.once("connect_error", (err) => reject(describeConnectError(err)));
+      });
+      const disconnected = new Promise((resolve) => socket.once("disconnect", resolve));
+
+      const signup = await fetch(`${app.url}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({
+          username: "Riya",
+          email: "riya@example.com",
+          password: "correct horse battery",
+        }),
+      });
+
+      expect(signup.status).toBe(201);
+      expect(await disconnected).toBe("io server disconnect");
+    } finally {
+      socket?.disconnect();
+      await app.close();
+    }
+  });
+});
+
 describe("legacy player migration through the real composition root (integration, CC-078)", () => {
   it("logs a legacy player in with their old password and leaves the legacy document untouched", async () => {
     const config = freshConfig();

@@ -41,6 +41,20 @@ describe("App", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests, try again later");
   });
 
+  it("tells how many can play: an exact number, or a range", async () => {
+    renderApp({
+      api: fakeApi({
+        getGames: async () => [
+          { id: "chess", slug: "chess", name: "Chess", minPlayers: 2, maxPlayers: 2 },
+          { id: "ludo", slug: "ludo", name: "Ludo", minPlayers: 2, maxPlayers: 4 },
+        ],
+      }),
+    });
+
+    expect(await screen.findByText("2 players")).toBeInTheDocument();
+    expect(screen.getByText("2–4 players")).toBeInTheDocument();
+  });
+
   it("explains when the catalog cannot load", async () => {
     renderApp({
       api: fakeApi({ getGames: async () => Promise.reject(new Error("Can't reach ClassiCade")) }),

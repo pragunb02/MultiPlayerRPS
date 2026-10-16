@@ -69,4 +69,30 @@ describe("socket client", () => {
     expect(io.socket.on).toHaveBeenCalledWith("room:updated", handler);
     expect(io.socket.off).toHaveBeenCalledWith("room:updated", handler);
   });
+
+  it("connects and disconnects only when asked, and reports the connection state", () => {
+    const io = fakeIo();
+    const client = createSocketClient({ connect: io.connect });
+
+    client.connect();
+    io.socket.connected = true;
+    const whileConnected = client.isConnected();
+    client.disconnect();
+
+    expect(io.socket.connect).toHaveBeenCalledOnce();
+    expect(whileConnected).toBe(true);
+    expect(io.socket.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["a refusal without an error body", { ok: false }],
+    ["no acknowledgement at all", undefined],
+  ])("rejects with UNKNOWN for %s", async (_case, ack) => {
+    const io = fakeIo(vi.fn().mockResolvedValue(ack));
+
+    await expect(createSocketClient({ connect: io.connect }).request("room:join", {})).rejects.toMatchObject({
+      code: "UNKNOWN",
+      message: "Something went wrong",
+    });
+  });
 });

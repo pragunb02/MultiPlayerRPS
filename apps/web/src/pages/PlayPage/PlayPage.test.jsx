@@ -27,6 +27,23 @@ describe("PlayPage", () => {
     expect(screen.getByRole("combobox", { name: /time control/i })).toHaveDisplayValue("Blitz 5 min");
   });
 
+  it("creates a chess room with the chosen time control", async () => {
+    const user = userEvent.setup();
+    const socket = fakeSocket();
+    socket.request.mockImplementation(async (event) =>
+      event === "room:create" ? { code: "AB2CD3" } : new Promise(() => {}),
+    );
+    renderApp({ path: "/games/chess", socket });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /time control/i }), "Rapid 15 min + 10 s");
+    await user.click(screen.getByRole("button", { name: "Create room" }));
+
+    expect(socket.request).toHaveBeenCalledWith("room:create", {
+      gameId: "chess",
+      options: { timeControl: "rapid-15+10" },
+    });
+  });
+
   it("shows an error when the room cannot be created", async () => {
     const user = userEvent.setup();
     const socket = fakeSocket();

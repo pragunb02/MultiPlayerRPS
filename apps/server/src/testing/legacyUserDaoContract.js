@@ -39,6 +39,12 @@ export function runLegacyUserDaoContract(createDao) {
     await expect(dao.getByEmail("broken@example.com")).rejects.toThrow(RangeError);
   });
 
+  it("reads a legacy row without a username as an empty one (the migration picks a name)", async () => {
+    const dao = await createDao([{ email: "nameless@example.com", password: LEGACY_USERS[0].password }]);
+
+    expect((await dao.getByEmail("nameless@example.com")).username).toBe("");
+  });
+
   it("treats regex characters in the email literally", async () => {
     const dao = await createDao(LEGACY_USERS);
 

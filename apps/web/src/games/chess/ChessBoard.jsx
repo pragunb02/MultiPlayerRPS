@@ -49,8 +49,8 @@ export function ChessBoard({ room, onMove }) {
       .flat()
       .find((piece) => piece?.type === "k" && piece.color === chess.turn())?.square;
 
+  // Squares are disabled unless it is your turn, so a click always comes from the player to move.
   function clickSquare(square) {
-    if (!yourTurn) return;
     const piece = chess.get(square);
     if (piece && piece.color === yourColour) {
       setSelected(square === selected ? "" : square);

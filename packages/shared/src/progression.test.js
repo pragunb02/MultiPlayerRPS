@@ -23,6 +23,14 @@ describe("progression rules", () => {
     expect(levelForXp(xp)).toBe(level);
   });
 
+  it.each([0, -1, 1.5, Number.NaN, "2", MAX_LEVEL + 1])("refuses level %s", (level) => {
+    expect(() => xpForLevel(level)).toThrow(RangeError);
+  });
+
+  it.each([-1, 0.5, Number.NaN, "50", undefined])("refuses %s XP", (xp) => {
+    expect(() => levelForXp(xp)).toThrow(RangeError);
+  });
+
   it("is consistent in both directions for every level", () => {
     for (let level = 1; level <= MAX_LEVEL; level++) {
       expect(levelForXp(xpForLevel(level))).toBe(level);
