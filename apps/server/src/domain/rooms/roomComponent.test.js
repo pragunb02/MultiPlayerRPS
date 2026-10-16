@@ -392,14 +392,36 @@ describe("roomComponent", () => {
       expect((await rooms.getRoom(code)).seats.map((s) => s.playerId)).toEqual([ALICE.id, RIYA.id]);
     });
 
-    it("leaves finished games and other players' rooms alone", async () => {
+    it("hands a finished game's seat, result and rematch to the account, and leaves other rooms alone (CC-097)", async () => {
       const { rooms, code } = await startedGame();
       await rooms.makeMove({ code, playerId: BOB.id, move: { add: 1 }, now: T0 + 2 });
       await rooms.makeMove({ code, playerId: ALICE.id, move: { add: 2 }, now: T0 + 3 }); // Alice reaches 3: finished
+      await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 4 });
       const other = await createRace(rooms, CAROL);
 
-      expect(await rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 3 })).toEqual([]);
+      const [room] = await rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 5 });
+
+      expect(room.code).toBe(code);
+      expect(room.seats.map((seat) => seat.playerId)).toContain(RIYA.id);
+      expect(room.result.winners).toEqual([RIYA.id]);
+      expect(room.series.wins).toEqual({ [RIYA.id]: 1 });
+      expect(room.rematch.requestedBy).toEqual([RIYA.id]);
+      // The account sees the result as its own win, and can play again with the same opponent.
+      expect(rooms.viewFor(room, RIYA.id).game.outcome.winners).toEqual([RIYA.id]);
+      const again = await rooms.requestRematch({ code, playerId: BOB.id, now: T0 + 6 });
+      expect(again.status).toBe("playing");
       expect((await rooms.getRoom(other.code)).seats[0].playerId).toBe(CAROL.id);
+    });
+
+    it("leaves a finished game alone when the account already played in it", async () => {
+      const { rooms } = setup();
+      const { code } = await createRace(rooms);
+      await rooms.joinRoom({ code, player: RIYA, now: T0 + 1 });
+      await rooms.makeMove({ code, playerId: RIYA.id, move: { add: 1 }, now: T0 + 2 });
+      await rooms.makeMove({ code, playerId: ALICE.id, move: { add: 2 }, now: T0 + 2 }); // 3 reached: finished
+
+      expect((await rooms.getRoom(code)).status).toBe("finished");
+      expect(await rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 3 })).toEqual([]);
     });
   });
 

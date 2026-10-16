@@ -4,10 +4,9 @@ import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
-import { useToast } from "../../components/Toast/toastContext.js";
+import { useSaveProgress } from "../../components/SaveProgress/saveProgressContext.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "../authForms.module.css";
-import { carriedOverMessage } from "../carriedOver.js";
 
 // Mirrors the server's rules (models/credentials.js) for instant feedback; the server still decides.
 const RULES = {
@@ -18,7 +17,7 @@ const RULES = {
 
 export function SignupPage() {
   const session = useSession();
-  const toast = useToast();
+  const saveProgress = useSaveProgress();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
   const [form, setForm] = useState({ username: "", email: "", password: "" });
@@ -37,8 +36,8 @@ export function SignupPage() {
     setState({ busy: true, error: "", fieldErrors: {} });
     try {
       const { carriedOver } = await session.signup(form);
-      const welcome = carriedOverMessage(carriedOver);
-      if (welcome !== "") toast.show(welcome, { tone: "success" });
+      // One confirmation, with the account's numbers, when guest games came along (CC-097).
+      saveProgress.confirmSaved(carriedOver);
       // Signed in: the redirect below takes over on the next render.
     } catch (err) {
       const field = err.details?.field;

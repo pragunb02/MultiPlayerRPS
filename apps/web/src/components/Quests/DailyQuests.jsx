@@ -6,6 +6,7 @@ import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { useCountdown } from "../../hooks/useCountdown.js";
 import { useQuests } from "../../hooks/useQuests.js";
 import { Button } from "../Button/Button.jsx";
+import { StreakAtRisk } from "../SaveProgress/StreakAtRisk.jsx";
 import styles from "./DailyQuests.module.css";
 import { resetsIn } from "./resetsIn.js";
 
@@ -139,6 +140,8 @@ export function DailyQuests({ compact = false }) {
         Daily quests
       </Heading>
       {body}
+      {/* Home: a guest's streak at risk is today's other thing to do (CC-097); the profile shows it itself. */}
+      {compact && <StreakAtRisk />}
     </section>
   );
 }

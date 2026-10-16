@@ -1,6 +1,9 @@
 // E2E_PORT lets several checkouts run the browser tests at the same time without sharing a server.
 export const E2E_PORT = Number(process.env.E2E_PORT ?? 4997);
 export const BASE_URL = `http://localhost:${E2E_PORT}`;
+/** The test server's throwaway MongoDB (server.mjs), for the few tests that seed state directly. */
+export const E2E_MONGO_PORT = E2E_PORT + 20_000;
+export const E2E_MONGO_URI = `mongodb://127.0.0.1:${E2E_MONGO_PORT}/e2e`;
 
 /** Seeded into the legacy `users` collection by server.mjs (bcrypt hash, legacy-style name). */
 export const LEGACY_PLAYER = Object.freeze({

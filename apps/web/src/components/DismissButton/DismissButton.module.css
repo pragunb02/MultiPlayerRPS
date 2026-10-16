@@ -1,0 +1,35 @@
+/* A round "×": quiet until hovered or focused, and big enough to hit on a touch screen. */
+.dismiss {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  /* Toasts don't take clicks (they must never cover a button); their × does. */
+  pointer-events: auto;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.dismiss:hover {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.dismiss:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .dismiss {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}

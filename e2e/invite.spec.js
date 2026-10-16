@@ -214,8 +214,10 @@ test.describe("guest progress carries over to the account (CC-032)", () => {
     await fillSignup(alice.page, account);
 
     await expect(alice.page).toHaveURL("/profile");
+    const { progress } = await (await alice.page.request.get("/api/progress")).json();
+    expect(progress.xp).toBe(xp);
     await expect(
-      alice.page.getByText(`Welcome! We moved ${xp} XP and 1 match from your guest games.`),
+      alice.page.getByText(`Your progress is now saved: Level ${progress.level} · ${xp} XP · 1 match`),
     ).toBeVisible();
     await expect(alice.page.getByRole("heading", { level: 1 })).toHaveText(account.username);
     await expect(main(alice.page)).toContainText(`${xp} XP`);
@@ -243,6 +245,6 @@ test.describe("guest progress carries over to the account (CC-032)", () => {
 
     await expect(guest.page).toHaveURL("/");
     await expect(guest.page.getByRole("banner")).toContainText(account.username);
-    await expect(guest.page.getByText(/We moved/)).toHaveCount(0); // nothing played as a guest, nothing to say
+    await expect(guest.page.getByText(/now saved/)).toHaveCount(0); // nothing played as a guest, nothing to say
   });
 });

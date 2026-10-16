@@ -10,6 +10,8 @@ import { Button } from "../../components/Button/Button.jsx";
 import { YourRank } from "../../components/Leaderboard/YourRank.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
+import { useStreakAtRisk } from "../../components/SaveProgress/saveProgressContext.js";
+import { StreakAtRisk } from "../../components/SaveProgress/StreakAtRisk.jsx";
 import { StreakCard } from "../../components/Streaks/StreakCard.jsx";
 import { useMatchHistory } from "../../hooks/useMatchHistory.js";
 import { useProgress } from "../../hooks/useProgress.js";
@@ -112,12 +114,17 @@ function MatchHistory({ you }) {
   );
 }
 
-/** Streaks, today's quests and achievements (CC-054, CC-089). Guests earn them too; signing up keeps them. */
+/**
+ * Streaks, today's quests and achievements (CC-054, CC-089). Guests earn them too; signing up keeps them. A guest
+ * whose streak is at risk gets that reminder instead of the general one (CC-097) — one sign-up line, not two.
+ */
 function PlayerConsole({ guest }) {
+  const streakAtRisk = useStreakAtRisk();
   return (
     <section className={styles.console} aria-labelledby="player-console">
       <h2 id="player-console">Player console</h2>
-      {guest && (
+      <StreakAtRisk />
+      {guest && streakAtRisk === undefined && (
         <p className={styles.muted}>
           <Link to={paths.signup(paths.profile())}>Sign up to keep your streak and achievements</Link>
         </p>

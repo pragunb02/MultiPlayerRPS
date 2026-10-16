@@ -4,12 +4,14 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
+import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { AppRequestError } from "../lib/errors.js";
 import { achievement, fakeApi, fakeSocket, NO_STREAKS, QUESTS } from "../testing/fakes.js";
 import { installMatchMedia } from "../testing/matchMedia.js";
 import { AchievementGrid } from "./Achievements/AchievementGrid.jsx";
 import { CELEBRATION_MS, GamificationToasts } from "./GamificationToasts.jsx";
 import { ProgressToasts } from "./ProgressToasts.jsx";
+import { SaveProgressProvider } from "./SaveProgress/SaveProgressProvider.jsx";
 import { DailyQuests } from "./Quests/DailyQuests.jsx";
 import { resetsIn } from "./Quests/resetsIn.js";
 import { StreakCard } from "./Streaks/StreakCard.jsx";
@@ -21,7 +23,11 @@ function renderWith(ui, { api = fakeApi(), socket = fakeSocket() } = {}) {
   render(
     <MemoryRouter>
       <ServicesProvider services={{ api, socket }}>
-        <ToastProvider>{ui}</ToastProvider>
+        <SessionProvider>
+          <ToastProvider>
+            <SaveProgressProvider>{ui}</SaveProgressProvider>
+          </ToastProvider>
+        </SessionProvider>
       </ServicesProvider>
     </MemoryRouter>,
   );

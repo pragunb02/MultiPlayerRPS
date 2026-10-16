@@ -4,7 +4,9 @@ import { createContext, useContext } from "react";
 export const ToastContext = createContext(null);
 
 /**
- * @returns {{ show: (message: string, options?: { tone?: "info" | "success" | "danger", art?: import("react").ReactNode }) => void }}
+ * @typedef {{ label: string, to: string, dismissLabel: string, onDismiss: () => void }} ToastAction
+ *   a link shown in the toast, and a close button named `dismissLabel` that calls `onDismiss`
+ * @returns {{ show: (message: string, options?: { tone?: "info" | "success" | "danger", art?: import("react").ReactNode, action?: ToastAction }) => void }}
  */
 export function useToast() {
   const toast = useContext(ToastContext);
