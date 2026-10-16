@@ -2,7 +2,7 @@
 # runs and checked in CI; portable to any container host (ADR-005, CC-028).
 
 # ---- build: install everything, build the web app, then drop dev dependencies -----------------------------------
-FROM node:24-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 # Manifests first, so dependency layers are cached until a package.json or the lockfile changes.
 COPY package.json package-lock.json ./
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build:web && npm prune --omit=dev --no-audit --no-fund
 
 # ---- runtime: only what the server needs, as an unprivileged user -------------------------------------------------
-FROM node:24-alpine AS runtime
+FROM node:25-alpine AS runtime
 ENV NODE_ENV=production \
     PORT=4000 \
     WEB_DIST_DIR=/app/apps/web/dist
