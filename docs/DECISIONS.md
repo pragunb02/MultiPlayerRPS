@@ -19,6 +19,23 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 
 ## Accepted decisions
 
+### ADR-009 — Web app conventions: CSS Modules + tokens, injected clients, same-origin dev proxy
+
+- **Status:** Accepted · 2026-10-16
+- **Decision:**
+  - **Styling:** CSS Modules (built into Vite, zero dependencies, styles scoped per component) over a single design-token
+    file (`styles/tokens.css`, CSS custom properties) with light/dark themes from `prefers-color-scheme`. No raw colours
+    or sizes in components.
+  - **Data access:** only `src/lib` talks to the server (`createApiClient`, `createSocketClient`); both turn failures into
+    `AppRequestError` carrying the server's `code`. Clients are created once in `main.jsx` and injected through a services
+    context; components/pages may not call `fetch` or import `socket.io-client` (lint-enforced).
+  - **State:** small hooks/providers (`SessionProvider`, `useGames`) instead of a state library until a second use appears.
+  - **Development:** Vite proxies `/api` and `/socket.io` to the API server, so the app is same-origin in development as in
+    production (one deploy, ADR-002) — cookies and origin checks behave identically.
+  - **Tests:** Vitest project `web` (jsdom) with Testing Library; fakes for the injected clients.
+- **Consequences:** No CSS framework to learn or upgrade; tests never touch the network; swapping transport or adding
+  caching happens in `src/lib` only.
+
 ### ADR-007 — Layered server architecture, design patterns and engineering standards
 
 - **Status:** Accepted · 2026-10-16

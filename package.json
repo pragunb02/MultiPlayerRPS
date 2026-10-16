@@ -21,7 +21,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "dev:web": "npm run dev -w @classicade/web",
+    "build:web": "npm run build -w @classicade/web"
   },
   "license": "ISC",
   "dependencies": {

@@ -25,6 +25,7 @@ npm run dev            # http://localhost:8080
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
 | `npm run dev`          | Legacy app with auto-reload (:8080)                                                            |
 | `npm run dev:server`   | New server with auto-reload (:4000); JSON logs — pipe to `npx pino-pretty` for readable output |
+| `npm run dev:web`      | Web app on :5173 (run the server too)                                                          |
 | `npm start`            | Start (production)                                                                             |
 | `npm run lint`         | ESLint                                                                                         |
 | `npm run format`       | Prettier (write)                                                                               |

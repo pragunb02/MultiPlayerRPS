@@ -1,0 +1,73 @@
+/*
+ * Design tokens: the only place raw colours, sizes and fonts appear. Components use these variables.
+ * Light and dark themes follow the operating system preference.
+ */
+:root {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  --color-bg: #f6f6fb;
+  --color-surface: #ffffff;
+  --color-surface-raised: #eef0fb;
+  --color-border: #dcdff0;
+  --color-text: #161827;
+  --color-text-muted: #5c6077;
+  --color-primary: #5b4cf0;
+  --color-primary-contrast: #ffffff;
+  --color-primary-soft: #e6e3ff;
+  --color-success: #13795b;
+  --color-danger: #c4314b;
+  --color-warning: #a35b00;
+  --color-focus: #f0a400;
+
+  --shadow-sm: 0 1px 2px rgb(20 20 50 / 8%);
+  --shadow-md: 0 6px 24px rgb(20 20 50 / 10%);
+
+  --duration-fast: 120ms;
+  --content-width: 72rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1020;
+    --color-surface: #181a2e;
+    --color-surface-raised: #22253d;
+    --color-border: #31354f;
+    --color-text: #eceefa;
+    --color-text-muted: #a3a7c2;
+    --color-primary: #8a7dff;
+    --color-primary-contrast: #0f1020;
+    --color-primary-soft: #2b2752;
+    --color-success: #4fd1a5;
+    --color-danger: #ff7a90;
+    --color-warning: #ffb547;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-md: 0 6px 24px rgb(0 0 0 / 45%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+  }
+}

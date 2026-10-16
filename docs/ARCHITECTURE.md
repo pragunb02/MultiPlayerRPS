@@ -48,7 +48,7 @@ apps/
     dependency/           # 4b. *Client — external services
     models/               # immutable domain models & value objects
     utils/                # logger, typed errors, assertions, ids
-  web/src/                # React + Vite (CC-022)
+  web/src/                # React + Vite (CC-022, ADR-009): app/ (App, providers), lib/ (api, socket), hooks/, components/, pages/, styles/
 packages/
   games/src/              # pure engines + registry (CC-014)
   shared/src/             # catalog, event names, constants
