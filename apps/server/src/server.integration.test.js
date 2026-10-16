@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -256,6 +257,45 @@ describe("accounts through the real composition root (integration)", () => {
       expect(JSON.stringify(stored)).not.toContain("correct horse battery");
     } finally {
       socket?.disconnect();
+      await app.close();
+    }
+  });
+});
+
+describe("legacy player migration through the real composition root (integration, CC-078)", () => {
+  it("logs a legacy player in with their old password and leaves the legacy document untouched", async () => {
+    const config = freshConfig();
+    const legacyDoc = {
+      username: "Sam Lee",
+      email: "Sam@Example.com",
+      password: bcrypt.hashSync("old password 1", 4),
+      level: 7,
+    };
+    const seeding = await mongoose.createConnection(config.mongoUri).asPromise();
+    await seeding.db.collection("users").insertOne(legacyDoc);
+    await seeding.close();
+    const app = await start(config);
+    try {
+      const login = await fetch(`${app.url}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "sam@example.com", password: "old password 1" }),
+      });
+      const { identity } = await login.json();
+      const [account] = await readCollection(config.mongoUri, "accounts");
+
+      expect(login.status).toBe(200);
+      expect(identity).toEqual({
+        kind: "user",
+        id: `user_${account._id.toHexString()}`,
+        displayName: "Sam_Lee",
+      });
+      expect(account).toMatchObject({
+        email: "sam@example.com",
+        passwordHash: expect.stringMatching(/^scrypt\$/),
+      });
+      expect(await readCollection(config.mongoUri, "users")).toEqual([legacyDoc]);
+    } finally {
       await app.close();
     }
   });

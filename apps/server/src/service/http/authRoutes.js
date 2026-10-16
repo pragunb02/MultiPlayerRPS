@@ -99,7 +99,7 @@ export function createAuthRoutes({
 
   router.post("/auth/login", perIp, failedLoginsPerEmail, async (req, res) => {
     const { email, password } = requireFields(req.body, ["email", "password"]);
-    const identity = await accountComponent.login({ email, password });
+    const identity = await accountComponent.login({ email, password, now: now() });
     req.log.info({ playerId: identity.id }, "logged in");
     await signIn(req, res, identity, 200);
   });

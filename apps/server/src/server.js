@@ -5,6 +5,7 @@ import http from "node:http";
 import { createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
+import { createLegacyUserAccessor } from "./data/legacyUserAccessor.js";
 import { createMatchAccessor } from "./data/matchAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
@@ -16,6 +17,7 @@ import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.j
 import { createAccountDao } from "./persistence/accountDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createInMemoryRoomDao } from "./persistence/inMemoryRoomDao.js";
+import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
 import { createProgressDao } from "./persistence/progressDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
@@ -105,6 +107,7 @@ export async function startServer({ config, logger }) {
   const matchDao = createMatchDao({ connection: database.connection });
   const progressDao = createProgressDao({ connection: database.connection });
   const accountDao = createAccountDao({ connection: database.connection });
+  const legacyUserDao = createLegacyUserDao({ connection: database.connection }); // read-only, CC-078
   await Promise.all([matchDao.ensureIndexes(), progressDao.ensureIndexes(), accountDao.ensureIndexes()]);
 
   // 3. data
@@ -112,6 +115,7 @@ export async function startServer({ config, logger }) {
   const matchAccessor = createMatchAccessor({ matchDao });
   const progressAccessor = createProgressAccessor({ progressDao });
   const accountAccessor = createAccountAccessor({ accountDao });
+  const legacyUserAccessor = createLegacyUserAccessor({ legacyUserDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -119,6 +123,7 @@ export async function startServer({ config, logger }) {
   const identityComponent = createIdentityComponent();
   const accountComponent = createAccountComponent({
     accountAccessor,
+    legacyUserAccessor,
     passwordHasher: createPasswordHasher(),
   });
   const roomComponent = createRoomComponent({
