@@ -69,6 +69,9 @@
   --color-board-selected: rgb(91 76 240 / 45%);
   --color-board-check: rgb(220 30 60 / 55%);
   --color-board-hint: rgb(20 20 50 / 35%);
+  --color-board-drop: rgb(255 255 255 / 75%);
+  --color-board-dim: rgb(10 10 25 / 45%);
+  --color-board-lift-shadow: rgb(0 0 0 / 45%);
   --color-backdrop: rgb(10 10 25 / 55%);
   /* Art (apps/web/src/art): fixed inks that read on every background, and the glyph colour on tier medals. */
   --color-art-ink: #0b0c1d;
