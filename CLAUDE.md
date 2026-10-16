@@ -78,7 +78,8 @@ npm audit              # must be 0 high/critical
 ./scripts/issue-counts.sh  # issue counts for PROGRESS.md (never hand-edit them)
 ```
 
-No local MongoDB? A throwaway `mongodb-memory-server` instance in a temp dir works for smoke tests.
+No local MongoDB? `docker compose up mongo` (or the whole app: `docker compose up --build`, http://localhost:4000).
+A throwaway `mongodb-memory-server` instance in a temp dir also works for smoke tests.
 
 ## Engineering principles
 
