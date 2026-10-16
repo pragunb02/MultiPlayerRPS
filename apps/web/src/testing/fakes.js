@@ -42,7 +42,8 @@ export function fakeSocket() {
       connected = false;
     }),
     isConnected: () => connected,
-    request: vi.fn(),
+    // Like a real request the server has not answered yet; tests override with mockResolvedValue etc.
+    request: vi.fn(() => new Promise(() => {})),
     on: vi.fn((event, handler) => {
       handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       return () =>

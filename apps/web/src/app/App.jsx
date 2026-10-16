@@ -1,8 +1,12 @@
 import { Route, Routes } from "react-router";
 import { Layout } from "../components/Layout/Layout.jsx";
+import { ProgressToasts } from "../components/ProgressToasts.jsx";
+import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { HomePage } from "../pages/HomePage/HomePage.jsx";
 import { NotFoundPage } from "../pages/NotFoundPage/NotFoundPage.jsx";
+import { PlayPage } from "../pages/PlayPage/PlayPage.jsx";
+import { RoomPage } from "../pages/RoomPage/RoomPage.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { ServicesProvider } from "./ServicesProvider.jsx";
 
@@ -17,12 +21,17 @@ export function App({ services }) {
     <ErrorBoundary>
       <ServicesProvider services={services}>
         <SessionProvider>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route index element={<HomePage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Route>
-          </Routes>
+          <ToastProvider>
+            <ProgressToasts />
+            <Routes>
+              <Route element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="play/:gameId" element={<PlayPage />} />
+                <Route path="room/:code" element={<RoomPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Routes>
+          </ToastProvider>
         </SessionProvider>
       </ServicesProvider>
     </ErrorBoundary>

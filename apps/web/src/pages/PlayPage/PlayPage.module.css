@@ -1,0 +1,40 @@
+.page h1 {
+  font-size: var(--text-xl);
+}
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-4);
+}
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+}
+.panel label {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 600;
+}
+.panel input,
+.panel select {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.panel input {
+  font-family: var(--font-mono);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.error {
+  color: var(--color-danger);
+  margin: 0;
+}

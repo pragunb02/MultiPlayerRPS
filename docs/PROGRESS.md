@@ -2,21 +2,21 @@
 
 ## Status
 
-|               |                                                                                                                 |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)                 |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-079`                                                  |
-| Current stage | **Stage 0 — Foundation**                                                                                        |
-| Stage health  | 🟢 On track                                                                                                     |
-| In progress   | —                                                                                                               |
-| Blocked on    | —                                                                                                               |
-| Next up       | CC-023 lobby & shared components → CC-024 game screens → CC-025 auth/profile → CC-030 → CC-078 → CC-029 cutover |
+|               |                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md) |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-079`                                  |
+| Current stage | **Stage 0 — Foundation**                                                                        |
+| Stage health  | 🟢 On track                                                                                     |
+| In progress   | —                                                                                               |
+| Blocked on    | —                                                                                               |
+| Next up       | CC-024 game boards → CC-025 auth/profile → CC-030 → CC-078 → CC-029 cutover                     |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 23 / 35      |
+| S0 Foundation   | 🟡 In progress | 24 / 35      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -29,13 +29,14 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 0    | 6           | 5     |
-| Bugs (BUG)       | 1    | 11          | 2     |
-| Tech debt (DEBT) | 2    | 7           | 3     |
+| Bugs (BUG)       | 0    | 12          | 2     |
+| Tech debt (DEBT) | 0    | 9           | 3     |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-023 — Lobby and room UI: `/play/:gameId` (options, create, join by code) and `/room/:code` (full lifecycle); client game registry; `useRoom` (reconnect rejoin, no accidental forfeit); ShareRoom (BUG-12), Seats, accessible Modal, toasts + XP/level-up toasts. 681 tests. Visual check with Playwright (two players, light/dark, desktop/mobile) — fixed two mobile layout issues found in screenshots.
 - 2026-10-16 — CC-022 — Web app scaffold: React 19.3 / Vite 8.3 / React Router 8.4; design tokens (light/dark); API + socket clients in `lib/`; DI services context; SessionProvider (guest on demand, socket reconnect on identity change); layout, home, not-found, error boundary; same-origin Vite dev proxy; React lint rules; jsdom test project (ADR-009). 654 tests. Live: app + API + WebSocket through the dev proxy.
 - 2026-10-16 — CC-076 — Accounts on the new server: built-in scrypt hashing (self-describing, rehash on login, constant-time, dummy verify), credential models, `accounts` DAO + double with shared contract, account component returning the shared Identity model, `POST /api/auth/signup` / `login` with per-IP and per-email failed-login limits, session rotation and old-socket cut-off. 627 tests incl. MongoDB integration. Live: equal 44 ms timing for real vs unknown emails; no secrets in logs. New: CC-078 legacy user migration.
 - 2026-10-16 — CC-017 — Progression: shared XP rules (win 30 / draw 15 / loss 10 / forfeit 0) and level curve; `player_progress` with atomic exactly-once application (+ explicit retry for concurrent first inserts) and shared DAO contract; progression component; match pipeline (record → progress) on background tasks drained at shutdown; `GET /api/progress`; `progress:updated` pushed to every tab (BUG-08). 5-run check caught and fixed a flaky push test. 553 tests. Live: 30 → 60 XP with a level-up push; forfeit gave 0 XP.
