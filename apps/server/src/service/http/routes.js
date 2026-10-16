@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { GAMES } from "@classicade/shared";
+import { createMatchRoutes } from "./matchRoutes.js";
 import { createSessionRoutes } from "./sessionRoutes.js";
 
 /**
- * @param {Parameters<typeof createSessionRoutes>[0]} sessionDeps
+ * @param {Parameters<typeof createSessionRoutes>[0] & Parameters<typeof createMatchRoutes>[0]} deps
  */
-export function apiRouter(sessionDeps) {
+export function apiRouter({ matchComponent, ...sessionDeps }) {
   const router = Router();
 
   router.get("/health", (req, res) => {
@@ -17,6 +18,7 @@ export function apiRouter(sessionDeps) {
   });
 
   router.use(createSessionRoutes(sessionDeps));
+  router.use(createMatchRoutes({ matchComponent }));
 
   return router;
 }

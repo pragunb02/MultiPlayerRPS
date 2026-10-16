@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
+import { ENGINES, replayGame } from "@classicade/games";
 import { connectDatabase } from "./persistence/database.js";
 import { SESSION_COLLECTION } from "./persistence/sessionStore.js";
 import { startServer } from "./server.js";
@@ -28,6 +29,21 @@ async function readCollection(uri, name) {
     return await connection.db.collection(name).find().toArray();
   } finally {
     await connection.close();
+  }
+}
+
+/** Polls until `probe` returns a value (the match is written in the background), failing after 5 s. */
+async function eventually(probe, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await probe();
+    if (value !== undefined) {
+      return value;
+    }
+    if (Date.now() > deadline) {
+      throw new Error("timed out waiting for condition");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }
 
@@ -133,7 +149,7 @@ describe("games through the real composition root (integration)", () => {
       socket.once("connect", resolve);
       socket.once("connect_error", reject);
     });
-    return { socket, identity: (await res.json()).identity };
+    return { socket, cookie, identity: (await res.json()).identity };
   }
 
   it("plays Rock Paper Scissors end to end", async () => {
@@ -158,6 +174,26 @@ describe("games through the real composition root (integration)", () => {
 
       expect(final.data.status).toBe("finished");
       expect(final.data.game.outcome.winners).toEqual([alice.identity.id]);
+
+      // The match is stored in MongoDB and replays to exactly the same result.
+      const summary = await eventually(async () => {
+        const res = await fetch(`${app.url}/api/matches`, { headers: { cookie: alice.cookie } });
+        return (await res.json()).matches[0];
+      });
+      const detail = await fetch(`${app.url}/api/matches/${summary.matchId}`, {
+        headers: { cookie: alice.cookie },
+      });
+      const { match } = await detail.json();
+      const rps = ENGINES.find((engine) => engine.id === "rps");
+      const replayed = replayGame(rps, {
+        players: match.players.map((p) => p.playerId),
+        options: match.options,
+        seed: match.seed,
+        log: match.log,
+      });
+
+      expect(summary.outcomeForYou).toBe("win");
+      expect(rps.getOutcome(replayed)).toEqual({ status: "finished", ...match.result });
     } finally {
       players.forEach((p) => p.socket.disconnect());
       await app.close();

@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { GAME_STATUS, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, ROOM_STATUS } from "@classicade/shared";
 import { createSeededRng } from "@classicade/games";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
@@ -40,6 +40,7 @@ const randomSeed = () => randomInt(2 ** 31);
  *   events: { emit: (event: string, payload: unknown) => void },
  *   generateCode?: () => string,
  *   generateSeed?: () => number,
+ *   generateMatchId?: () => string,
  * }} deps  generators are injectable for deterministic tests
  */
 export function createRoomComponent({
@@ -48,12 +49,14 @@ export function createRoomComponent({
   events,
   generateCode = randomRoomCode,
   generateSeed = randomSeed,
+  generateMatchId = randomUUID,
 }) {
   assertDefined(roomAccessor, "roomAccessor");
   assertDefined(engines, "engines");
   assertFunction(events?.emit, "events.emit");
   assertFunction(generateCode, "generateCode");
   assertFunction(generateSeed, "generateSeed");
+  assertFunction(generateMatchId, "generateMatchId");
 
   const engineFor = (room) => engines.get(room.gameId);
   const seatOf = (room, playerId) => room.seats.find((seat) => seat.playerId === playerId);
@@ -91,7 +94,12 @@ export function createRoomComponent({
       options: room.options,
       rng: createSeededRng(seed),
     });
-    return { ...room, status: ROOM_STATUS.PLAYING, game: { seed, state }, lastActivityAt: now };
+    return {
+      ...room,
+      status: ROOM_STATUS.PLAYING,
+      game: { matchId: generateMatchId(), seed, startedAt: now, state, log: [] },
+      lastActivityAt: now,
+    };
   }
 
   /** Outcome of a forfeit: everyone except the leaver wins. */
@@ -180,7 +188,12 @@ export function createRoomComponent({
         throw new ValidationError(validated.message, { details: { reason: validated.reason } });
       }
       const state = engine.applyMove(room.game.state, playerId, validated.value, ctx);
-      const played = { ...room, game: { ...room.game, state }, lastActivityAt: now };
+      const entry = { kind: "move", playerId, move: validated.value, at: now };
+      const played = {
+        ...room,
+        game: { ...room.game, state, log: [...room.game.log, entry] },
+        lastActivityAt: now,
+      };
       const outcome = engine.getOutcome(state);
       return roomAccessor.save(outcome.status === GAME_STATUS.FINISHED ? finish(played, outcome) : played);
     },
@@ -195,7 +208,12 @@ export function createRoomComponent({
       const room = roomAccessor.getByCode(code);
       requireSeat(room, playerId);
       if (room.status === ROOM_STATUS.PLAYING) {
-        const forfeited = finish(setConnected(room, playerId, false, now), forfeitOutcome(room, playerId));
+        const left = setConnected(room, playerId, false, now);
+        const logged = {
+          ...left,
+          game: { ...left.game, log: [...left.game.log, { kind: "forfeit", playerId, at: now }] },
+        };
+        const forfeited = finish(logged, forfeitOutcome(room, playerId));
         return { closed: false, room: roomAccessor.save(forfeited) };
       }
       const seats = room.seats.filter((seat) => seat.playerId !== playerId);
@@ -233,7 +251,8 @@ export function createRoomComponent({
           continue;
         }
         const state = engine.expire(room.game.state, { now });
-        const expired = { ...room, game: { ...room.game, state }, lastActivityAt: now };
+        const log = [...room.game.log, { kind: "expire", at: now }];
+        const expired = { ...room, game: { ...room.game, state, log }, lastActivityAt: now };
         const outcome = engine.getOutcome(state);
         const saved = roomAccessor.save(
           outcome.status === GAME_STATUS.FINISHED ? finish(expired, outcome) : expired,

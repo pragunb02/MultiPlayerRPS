@@ -3,23 +3,31 @@ import http from "node:http";
 import session from "express-session";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
+import { createMatchAccessor } from "../data/matchAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
+import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createRoomComponent } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "../persistence/inMemoryRoomDao.js";
+import { recordFinishedMatches } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
 import { captureLogger } from "./captureLogger.js";
+import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
 import { testConfig } from "./testConfig.js";
 
 /**
- * Wires the service layer the same way the composition root does, but with an in-memory session
- * store and deterministic guests — fast tests without a database.
+ * Wires the app the same way the composition root does, but with in-memory stores (sessions, rooms,
+ * matches), deterministic guests and seed 42 — fast tests without a database.
  *
- * @param {{ env?: Record<string, string>, guestLimit?: { windowMs: number, limit: number } }} [options]
+ * @param {{
+ *   env?: Record<string, string>,
+ *   guestLimit?: { windowMs: number, limit: number },
+ *   engines?: ReadonlyArray<any>,
+ * }} [options]
  */
-export function createTestApp({ env = {}, guestLimit } = {}) {
+export function createTestApp({ env = {}, guestLimit, engines = [raceEngine] } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
   const store = new session.MemoryStore();
@@ -33,6 +41,17 @@ export function createTestApp({ env = {}, guestLimit } = {}) {
     generateId: () => `00000000-0000-4000-8000-${String(++guestNumber).padStart(12, "0")}`,
     generateGuestSuffix: () => `T${String(guestNumber).padStart(3, "0")}`,
   });
+  const domainEvents = new EventEmitter();
+  const roomComponent = createRoomComponent({
+    roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
+    engines: createEngineRegistry(engines),
+    events: domainEvents,
+    generateSeed: () => 42,
+  });
+  const matchComponent = createMatchComponent({
+    matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }),
+  });
+  const matchRecorder = recordFinishedMatches({ domainEvents, matchComponent, logger: capture.logger });
   const endedSessions = [];
   const endedListeners = [];
 
@@ -41,6 +60,7 @@ export function createTestApp({ env = {}, guestLimit } = {}) {
     logger: capture.logger,
     sessionMiddleware,
     identityComponent,
+    matchComponent,
     guestLimit,
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);
@@ -53,6 +73,10 @@ export function createTestApp({ env = {}, guestLimit } = {}) {
     config,
     store,
     sessionMiddleware,
+    domainEvents,
+    roomComponent,
+    matchComponent,
+    matchRecorder,
     endedSessions,
     onSessionEnded: (listener) => endedListeners.push(listener),
     ...capture,
@@ -61,36 +85,23 @@ export function createTestApp({ env = {}, guestLimit } = {}) {
 
 /**
  * Starts the HTTP app plus the realtime gateway on a random local port, with rooms running the
- * reference "race" engine (seed 42: the second seat moves first).
+ * reference "race" engine by default (seed 42: the second seat moves first).
  *
  * @param {Parameters<typeof createTestApp>[0] & {
  *   rateLimit?: { capacity: number, refillPerSecond: number },
  *   now?: () => number,
- *   engines?: ReadonlyArray<any>,
  * }} [options]
  */
-export async function startTestServer({
-  rateLimit,
-  now = Date.now,
-  engines = [raceEngine],
-  ...options
-} = {}) {
+export async function startTestServer({ rateLimit, now = Date.now, ...options } = {}) {
   const testApp = createTestApp(options);
-  const domainEvents = new EventEmitter();
-  const roomComponent = createRoomComponent({
-    roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
-    engines: createEngineRegistry(engines),
-    events: domainEvents,
-    generateSeed: () => 42,
-  });
   const server = http.createServer(testApp.app);
   const gateway = createRealtimeGateway({
     httpServer: server,
     sessionMiddleware: testApp.sessionMiddleware,
     allowedOrigins: testApp.config.allowedOrigins,
     logger: testApp.logger,
-    roomComponent,
-    domainEvents,
+    roomComponent: testApp.roomComponent,
+    domainEvents: testApp.domainEvents,
     now,
     ...(rateLimit && { rateLimit }),
   });
@@ -100,8 +111,10 @@ export async function startTestServer({
   return {
     ...testApp,
     gateway,
-    roomComponent,
     baseUrl: `http://127.0.0.1:${port}`,
-    close: () => gateway.close(),
+    close: async () => {
+      await gateway.close();
+      await testApp.matchRecorder.drain();
+    },
   };
 }

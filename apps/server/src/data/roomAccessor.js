@@ -1,12 +1,16 @@
 import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { assertDefined } from "../utils/assert.js";
-import { DuplicateKey, VersionConflict } from "../persistence/inMemoryRoomDao.js";
+import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
 
 /**
  * @typedef {Object} Seat
  * @property {string} playerId
  * @property {string} displayName
  * @property {boolean} connected
+ *
+ * @typedef {{ kind: "move", playerId: string, move: unknown, at: number }
+ *   | { kind: "forfeit", playerId: string, at: number }
+ *   | { kind: "expire", at: number }} LogEntry   every state change, in order, with server time
  *
  * @typedef {Object} Room              a domain model: deeply frozen, changed only by producing a new room
  * @property {string} code
@@ -15,7 +19,8 @@ import { DuplicateKey, VersionConflict } from "../persistence/inMemoryRoomDao.js
  * @property {"waiting" | "playing" | "finished"} status
  * @property {string} hostId
  * @property {ReadonlyArray<Readonly<Seat>>} seats
- * @property {{ seed: number, state: unknown }} [game]   present once the game has started
+ * @property {{ matchId: string, seed: number, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry> }} [game]
+ *   present once the game has started; `seed` + `log` reproduce the game exactly (see replayGame)
  * @property {Readonly<{ status: string, result: string, winners: string[], reason: string }>} [result]  final outcome once finished (played out or forfeited)
  * @property {number} createdAt
  * @property {number} lastActivityAt

@@ -424,4 +424,51 @@ describe("roomComponent", () => {
       expect(rooms.expireDue({ now: T0 + 2_000 })).toEqual([]);
     });
   });
+
+  describe("action log (for match history and replays)", () => {
+    it("starts a game with a match id, start time, seed and empty log", () => {
+      const { rooms, code } = startedGame();
+
+      expect(rooms.getRoom(code).game).toEqual(
+        expect.objectContaining({
+          seed: 42,
+          startedAt: T0 + 1,
+          log: [],
+          matchId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        }),
+      );
+    });
+
+    it("logs every accepted move with the server time and the validated move", () => {
+      const { rooms, code } = startedGame();
+
+      rooms.makeMove({ code, playerId: BOB.id, move: { add: 1, extra: "ignored" }, now: T0 + 5 });
+
+      expect(rooms.getRoom(code).game.log).toEqual([
+        { kind: "move", playerId: BOB.id, move: { add: 1 }, at: T0 + 5 },
+      ]);
+    });
+
+    it("does not log rejected moves", () => {
+      const { rooms, code } = startedGame();
+
+      expect(() => rooms.makeMove({ code, playerId: ALICE.id, move: { add: 1 }, now: T0 + 5 })).toThrow();
+      expect(rooms.getRoom(code).game.log).toEqual([]);
+    });
+
+    it("logs a forfeit", () => {
+      const { rooms, code } = startedGame();
+
+      const { room } = rooms.leaveRoom({ code, playerId: BOB.id, now: T0 + 6 });
+
+      expect(room.game.log).toEqual([{ kind: "forfeit", playerId: BOB.id, at: T0 + 6 }]);
+    });
+
+    it("never exposes the log in a player's view", () => {
+      const { rooms, code } = startedGame();
+      rooms.makeMove({ code, playerId: BOB.id, move: { add: 1 }, now: T0 + 5 });
+
+      expect(JSON.stringify(rooms.viewFor(rooms.getRoom(code), ALICE.id))).not.toContain('"log"');
+    });
+  });
 });
