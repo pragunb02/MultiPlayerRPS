@@ -55,7 +55,8 @@ between two browsers with no CSP errors, and a legacy login through the UI. Loca
 
 ## Before merging any PR
 
-Every PR fills in the **Deployment impact** section of the PR template. If anything below changes, verify it first:
+CI (lint, format, audit, unit + integration tests with coverage gates, browser tests) must be green. Every PR fills in
+the **Deployment impact** section of the PR template. If anything below changes, verify it first:
 
 1. **Start/build behaviour** — `package.json` scripts, dependencies, Node version, entry file.
    Verify from a fresh clone: `NODE_ENV=production npm ci --include=dev && npm run build:web && npm start` (with the

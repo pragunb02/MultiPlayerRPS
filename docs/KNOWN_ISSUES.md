@@ -17,7 +17,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
   - DEBT-08 (CC-012): structured logger, `no-console` enforced; `hw.txt` deleted.
   - DEBT-10 (CC-031): only latest stable majors remain (Express 5, Mongoose 9, chess.js 1.4).
   - DEBT-12 (CC-074): the `MONGO_URI_PRODUCTION` fallback is gone with `config.js`; production sets `MONGO_URI`.
-- **DEBT-09** 🟡 README, `.env.example` files, ESLint/Prettier/Vitest and 770 tests exist; CI is still missing (CC-027).
+- **DEBT-09** ✅ README, `.env.example`, ESLint/Prettier, 967 unit/integration tests (100 % lines), 84 browser tests, and CI on every PR (CC-027).
 - Earlier: SEC-02 (CC-008), SEC-06 (CC-006), SEC-07/SEC-11/BUG-11 (CC-009), SEC-10/DEBT-07 (CC-010), BUG-01 (CC-007),
   DEBT-06 (CC-005), DEBT-11 (CC-073).
 
@@ -68,7 +68,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | DEBT-06 | ✅     | Unused deps: `archetype`, `ws`, `engine.io`, `nodemailer`, `connect-flash`, `ejs-lint`, `@chrisoakman/chessboardjs` (vendored copy used); `nodemon` in prod deps; `body-parser` used but not declared | CC-005                         |
 | DEBT-07 | ✅     | Passport initialized twice (app + auth router)                                                                                                                                                        | CC-010                         |
 | DEBT-08 | ✅     | Debug `console.log` everywhere, commented-out code blocks, `hw.txt` TODO file                                                                                                                         | CC-012, CC-029                 |
-| DEBT-09 | 🟡     | No tests, no README, no `.env.example`, no CI                                                                                                                                                         | CC-003, CC-004, CC-021, CC-027 |
+| DEBT-09 | ✅     | No tests, no README, no `.env.example`, no CI                                                                                                                                                         | CC-003, CC-004, CC-021, CC-027 |
 | DEBT-10 | ✅     | Outdated libs: chess.js 0.10, Mongoose 6, Font Awesome 4 & 6 beta mixed                                                                                                                               | CC-031                         |
 | DEBT-11 | ✅     | 31 known vulnerabilities in dependencies (1 critical, 11 high), via Mongoose 6 driver deps, `ws`, `connect-mongodb-session@2`, nodemon                                                                | CC-073                         |
 | DEBT-12 | ✅     | `MONGO_URI_PRODUCTION` compatibility fallback (now logs a deprecation warning)                                                                                                                        | CC-074                         |
