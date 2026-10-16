@@ -10,13 +10,13 @@
 | Stage health  | 🟢 On track                                                                                     |
 | In progress   | —                                                                                               |
 | Blocked on    | —                                                                                               |
-| Next up       | CC-019 Tic-Tac-Toe → CC-020 Chess → CC-016 matches → CC-017 progression → CC-076 auth API       |
+| Next up       | CC-020 Chess (server clocks) → CC-016 matches → CC-017 progression → CC-076 auth API            |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 17 / 34      |
+| S0 Foundation   | 🟡 In progress | 18 / 34      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -28,14 +28,15 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
-| Security (SEC)   | 1    | 5           | 5     |
-| Bugs (BUG)       | 7    | 5           | 2     |
+| Security (SEC)   | 0    | 6           | 5     |
+| Bugs (BUG)       | 5    | 7           | 2     |
 | Tech debt (DEBT) | 3    | 6           | 3     |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-019 — Tic-Tac-Toe engine: seeded starter as X, strict cell moves, server-decided wins/draws with exactly one result (BUG-04 regression: 9th move completing two lines), registered and playable over sockets; clients cannot claim results. Extracted shared socket test helpers. 400 tests; engine 100 % covered. Live game verified.
 - 2026-10-16 — CC-018 — Rock Paper Scissors engine: best of 1/3/5/7, secret simultaneous choices (opponent sees only "has chosen"), draws replayed, round history; registered — first game playable end to end on the new server. Contract kit + full rules matrix + BUG-01 regression + socket-level proof that pending choices never reach the opponent (SEC-09). 369 tests; engine 100 % covered. Live best-of-3 verified.
 - 2026-10-16 — CC-015 — Room manager across all layers: shared room/move socket contracts; room-code model; in-memory room DAO with copies + optimistic versioning; room accessor; room state machine (crypto codes, auto-start, engine-validated moves, forfeit, host hand-over, disconnect/rejoin, expiry sweep, per-viewer views, domain events); socket handlers with strict payload validation, per-socket rate limit, personalised broadcasts, multi-tab disconnects; boot check that engines are in the catalog; sweeper. 331 tests incl. 15 end-to-end socket tests (full game, forfeit, rejoin, multi-tab, rate limit). SEC-08, BUG-09/10/13/14 fixed in the new stack.
 - 2026-10-16 — CC-014 — `@classicade/games`: GameEngine contract, `defineEngine` (fail-fast shape check), engine registry (plug-in point), `ok`/`reject` results, seeded RNG; contract test kit with 10 checks that every engine runs, proved against 12 deliberately broken engines (caught a weakness in the kit's own JSON-safety check — fixed). 218 tests; games package 100 % covered.
