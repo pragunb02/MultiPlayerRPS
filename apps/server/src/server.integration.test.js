@@ -32,6 +32,10 @@ async function readCollection(uri, name) {
   }
 }
 
+/** Makes a refused socket connection explain itself in test output (CC-079: rare refusal under full-suite load). */
+const describeConnectError = (err) =>
+  new Error(`socket connection refused: ${err.message} ${JSON.stringify(err.data ?? {})}`, { cause: err });
+
 /** Polls until `probe` returns a value (the match is written in the background), failing after 5 s. */
 async function eventually(probe, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
@@ -119,7 +123,7 @@ describe("startServer (integration)", () => {
     });
     await new Promise((resolve, reject) => {
       socket.once("connect", resolve);
-      socket.once("connect_error", reject);
+      socket.once("connect_error", (err) => reject(describeConnectError(err)));
     });
     const ack = await socket.timeout(2_000).emitWithAck(SOCKET_EVENTS.IDENTITY_GET);
     socket.disconnect();
@@ -147,7 +151,7 @@ describe("games through the real composition root (integration)", () => {
     const socket = connect(url, { transports: ["websocket"], extraHeaders: { cookie }, reconnection: false });
     await new Promise((resolve, reject) => {
       socket.once("connect", resolve);
-      socket.once("connect_error", reject);
+      socket.once("connect_error", (err) => reject(describeConnectError(err)));
     });
     return { socket, cookie, identity: (await res.json()).identity };
   }
@@ -232,7 +236,7 @@ describe("accounts through the real composition root (integration)", () => {
       socket = connect(app.url, { transports: ["websocket"], extraHeaders: { cookie }, reconnection: false });
       await new Promise((resolve, reject) => {
         socket.once("connect", resolve);
-        socket.once("connect_error", reject);
+        socket.once("connect_error", (err) => reject(describeConnectError(err)));
       });
       const ack = await socket.timeout(2_000).emitWithAck(SOCKET_EVENTS.IDENTITY_GET);
       const [stored] = await readCollection(app.config.mongoUri, "accounts");

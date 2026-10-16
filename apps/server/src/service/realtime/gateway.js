@@ -126,7 +126,7 @@ export function createRealtimeGateway({
 
   // Domain → transport: a room changed on its own (e.g. a clock ran out) — push everyone their new view.
   domainEvents.on(ROOM_EVENTS.UPDATED, ({ room }) => {
-    broadcastRoom({ io, roomComponent, room }).catch((err) =>
+    broadcastRoom({ io, roomComponent, room, now }).catch((err) =>
       logger.error({ err, roomCode: room.code }, "failed to broadcast room update"),
     );
   });

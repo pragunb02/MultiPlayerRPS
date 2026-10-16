@@ -3,7 +3,7 @@
 Every unit of work is a ticket with a permanent ID **`CC-###`** (ClassiCade). IDs are sequential, never reused,
 and don't encode the stage — a ticket can move between stages without changing its ID.
 
-**Next free ID: `CC-079`** — bump this when you add a ticket.
+**Next free ID: `CC-080`** — bump this when you add a ticket.
 
 | Field  | Values                                                                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -80,7 +80,7 @@ and don't encode the stage — a ticket can move between stages without changing
 | --------------------------- | ----------------------------------------------------------------------------- | ------- | --- | ------- | ------------------------ |
 | [CC-022](tickets/CC-022.md) | Frontend scaffold per ADR-002; shared layout, design tokens                   | feature | P1  | ✅ Done |                          |
 | [CC-023](tickets/CC-023.md) | Shared components: room lobby, share menu (correct game name), modals, toasts | feature | P1  | ✅ Done | DEBT-03, DEBT-05, BUG-12 |
-| CC-024                      | Game screens: RPS, TTT, Chess rendering server state                          | feature | P1  | ⬜ Todo |                          |
+| [CC-024](tickets/CC-024.md) | Game screens: RPS, TTT, Chess rendering server state                          | feature | P1  | ✅ Done |                          |
 | CC-025                      | Auth, home, profile pages rebuilt                                             | feature | P1  | ⬜ Todo |                          |
 
 ### 0.F Delivery
@@ -94,15 +94,16 @@ and don't encode the stage — a ticket can move between stages without changing
 
 ### 0.G Follow-ups found during Stage 0
 
-| ID                          | Title                                                                                                                                            | Type     | Pri | Status  | Links                    |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --- | ------- | ------------------------ |
-| CC-030                      | CSP and CSRF tokens for the new app (finishes SEC-05)                                                                                            | security | P0  | ⬜ Todo | SEC-05, NFR-1            |
-| CC-031                      | Automated dependency updates (Dependabot) + `npm audit` gate in CI; new code adopts latest stable majors (Mongoose 9, chess.js) as it is written | debt     | P2  | ⬜ Todo | DEBT-10                  |
-| CC-074                      | Rename `MONGO_URI_PRODUCTION` → `MONGO_URI` in the deployment, then remove the fallback in `config.js` (needs owner access to hosting)           | debt     | P2  | ⬜ Todo | DEBT-12, SEC-06          |
-| CC-075                      | Flaky test: `startServer` close check probed a freed port that parallel workers can reuse                                                        | test     | P1  | ✅ Done |                          |
-| [CC-076](tickets/CC-076.md) | Auth API on the new server: signup / login / logout / me with users persistence, password hashing, rate limits (user identities for CC-013)      | security | P0  | ✅ Done | FR-ACC-1, SEC-01, SEC-07 |
-| CC-077                      | Deployment safety: DEPLOYMENT.md, `/health` + Render health check, PR template with deployment impact, incident note                             | infra    | P0  | ✅ Done |                          |
-| CC-078                      | Migrate legacy `users` to `accounts`: verify legacy bcrypt hashes at first login and rehash to scrypt; keep usernames/emails                     | debt     | P1  | ⬜ Todo | CC-076, CC-029           |
+| ID                          | Title                                                                                                                                                                                                                                | Type     | Pri | Status  | Links                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --- | ------- | ------------------------ |
+| CC-030                      | CSP and CSRF tokens for the new app (finishes SEC-05)                                                                                                                                                                                | security | P0  | ⬜ Todo | SEC-05, NFR-1            |
+| CC-031                      | Automated dependency updates (Dependabot) + `npm audit` gate in CI; new code adopts latest stable majors (Mongoose 9, chess.js) as it is written                                                                                     | debt     | P2  | ⬜ Todo | DEBT-10                  |
+| CC-074                      | Rename `MONGO_URI_PRODUCTION` → `MONGO_URI` in the deployment, then remove the fallback in `config.js` (needs owner access to hosting)                                                                                               | debt     | P2  | ⬜ Todo | DEBT-12, SEC-06          |
+| CC-075                      | Flaky test: `startServer` close check probed a freed port that parallel workers can reuse                                                                                                                                            | test     | P1  | ✅ Done |                          |
+| [CC-076](tickets/CC-076.md) | Auth API on the new server: signup / login / logout / me with users persistence, password hashing, rate limits (user identities for CC-013)                                                                                          | security | P0  | ✅ Done | FR-ACC-1, SEC-01, SEC-07 |
+| CC-077                      | Deployment safety: DEPLOYMENT.md, `/health` + Render health check, PR template with deployment impact, incident note                                                                                                                 | infra    | P0  | ✅ Done |                          |
+| CC-078                      | Migrate legacy `users` to `accounts`: verify legacy bcrypt hashes at first login and rehash to scrypt; keep usernames/emails                                                                                                         | debt     | P1  | ⬜ Todo | CC-076, CC-029           |
+| CC-079                      | Rare flake (1 of 13 full-suite runs): integration test "authenticates sockets with the database-backed session" failed in 238 ms (refused connection, not a timeout). Diagnostics added; reproduce under load and fix the root cause | test     | P2  | ⬜ Todo | CC-013, CC-027           |
 
 ---
 

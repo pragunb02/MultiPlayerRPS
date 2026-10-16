@@ -6,15 +6,27 @@ export const roomChannel = (code) => `room:${code}`;
 const codeFromChannel = (channel) => channel.slice("room:".length);
 
 /**
+ * A viewer's room view, stamped with the server's clock so clients can show timers (e.g. chess clocks) in
+ * server time regardless of their own clock's drift.
+ */
+export const stampedView = ({ roomComponent, room, viewerId, now }) => ({
+  ...roomComponent.viewFor(room, viewerId),
+  serverTime: now(),
+});
+
+/**
  * Sends every socket in the room its own view (hidden information stays hidden per viewer).
  *
- * @param {{ io: import("socket.io").Server, roomComponent: any, room: any, exceptSocketId?: string }} args
+ * @param {{ io: import("socket.io").Server, roomComponent: any, room: any, now: () => number, exceptSocketId?: string }} args
  */
-export async function broadcastRoom({ io, roomComponent, room, exceptSocketId }) {
+export async function broadcastRoom({ io, roomComponent, room, now, exceptSocketId }) {
   const sockets = await io.in(roomChannel(room.code)).fetchSockets();
   for (const socket of sockets) {
     if (socket.id !== exceptSocketId) {
-      socket.emit(SOCKET_EVENTS.ROOM_UPDATED, roomComponent.viewFor(room, socket.data.identity.id));
+      socket.emit(
+        SOCKET_EVENTS.ROOM_UPDATED,
+        stampedView({ roomComponent, room, viewerId: socket.data.identity.id, now }),
+      );
     }
   }
 }
@@ -46,7 +58,7 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
       const room = roomComponent.createRoom({ host: identity, gameId, options, now: now() });
       socket.join(roomChannel(room.code));
       logger.info({ roomCode: room.code, gameId }, "room created");
-      return roomComponent.viewFor(room, identity.id);
+      return stampedView({ roomComponent, room, viewerId: identity.id, now });
     },
 
     async [SOCKET_EVENTS.ROOM_JOIN](payload) {
@@ -54,8 +66,8 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
       const room = roomComponent.joinRoom({ code, player: identity, now: now() });
       socket.join(roomChannel(code));
       logger.info({ roomCode: code, status: room.status }, "joined room");
-      await broadcastRoom({ io, roomComponent, room, exceptSocketId: socket.id });
-      return roomComponent.viewFor(room, identity.id);
+      await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
+      return stampedView({ roomComponent, room, viewerId: identity.id, now });
     },
 
     async [SOCKET_EVENTS.ROOM_LEAVE](payload) {
@@ -66,7 +78,7 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
       }
       logger.info({ roomCode: code, closed: result.closed }, "left room");
       if (!result.closed) {
-        await broadcastRoom({ io, roomComponent, room: result.room });
+        await broadcastRoom({ io, roomComponent, room: result.room, now });
       }
       return { left: true };
     },
@@ -74,8 +86,8 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
     async [SOCKET_EVENTS.GAME_MOVE](payload) {
       const { code, move } = parseGameMove(payload);
       const room = roomComponent.makeMove({ code, playerId: identity.id, move, now: now() });
-      await broadcastRoom({ io, roomComponent, room, exceptSocketId: socket.id });
-      return roomComponent.viewFor(room, identity.id);
+      await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
+      return stampedView({ roomComponent, room, viewerId: identity.id, now });
     },
   };
 }
@@ -94,7 +106,7 @@ export async function handleSocketGone({ io, roomComponent, playerId, channels, 
     }
     try {
       const room = roomComponent.playerDisconnected({ code, playerId, now: now() });
-      await broadcastRoom({ io, roomComponent, room });
+      await broadcastRoom({ io, roomComponent, room, now });
     } catch (err) {
       // The room may have closed or the seat been given up meanwhile — nothing left to record.
       if (!(err instanceof NotFoundError || err instanceof ForbiddenError)) {

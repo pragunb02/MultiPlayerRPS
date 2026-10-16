@@ -91,5 +91,6 @@ describe("Chess over sockets", () => {
     });
 
     expect(ack.data.game.view.clocks).toEqual({ w: 180_000, b: 175_000 }); // 180 − 7 + 2
+    expect(ack.data.serverTime).toBe(now); // views carry server time, so clients can show drift-free clocks
   });
 });

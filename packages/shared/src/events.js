@@ -16,6 +16,7 @@
  * @property {Array<{ playerId: string, displayName: string, connected: boolean }>} seats
  * @property {string} you             the viewer's player id ("" for spectators)
  * @property {{ view: unknown, activePlayers: string[], outcome: object } | undefined} game   present once started
+ * @property {number} serverTime      server clock (ms) when the view was produced — for drift-free timers
  */
 export const SOCKET_EVENTS = Object.freeze({
   /** client → server: returns the identity bound to this connection's session */
