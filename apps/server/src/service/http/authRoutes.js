@@ -40,16 +40,18 @@ const tooMany = (req, res) =>
 /**
  * Accounts over HTTP. Logout is `DELETE /api/session`, "who am I" is `GET /api/session`.
  *
- *   POST /auth/signup  { username, email, password } → 201 { identity }
- *   POST /auth/login   { email, password }           → 200 { identity }
+ *   POST /auth/signup  { username, email, password } → 201 { identity, carriedOver? }
+ *   POST /auth/login   { email, password }           → 200 { identity, carriedOver? }
  *
  * Signing in replaces the current session (new id — no fixation) and disconnects sockets of the old one;
- * `onIdentityChanged` hears who the player was before (e.g. a guest whose seats should follow them, CC-083).
+ * `onIdentityChanged` hears who the player was before (e.g. a guest whose seats and progress follow them, CC-083,
+ * CC-032). `carriedOver` ({ xp, matchesPlayed, matches }) says what a guest's games brought to the account in
+ * this request. Moving them never fails a sign-in: a failure is logged and finished later by housekeeping.
  *
  * @param {{
  *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
  *   onSessionEnded: (sessionId: string) => void,
- *   onIdentityChanged: (change: { previous: import("../../models/identity.js").Identity | undefined, identity: import("../../models/identity.js").Identity }) => void,
+ *   onIdentityChanged: (change: { previous: import("../../models/identity.js").Identity | undefined, identity: import("../../models/identity.js").Identity }) => Promise<{ carriedOver?: { xp: number, matchesPlayed: number, matches: number } }>,
  *   now?: () => number,
  *   limits?: typeof DEFAULT_LIMITS,
  * }} deps
@@ -89,11 +91,24 @@ export function createAuthRoutes({
     const previous = req.session.identity;
     const previousSessionId = previous === undefined ? "" : req.sessionID;
     await establishSession(req, identity);
-    onIdentityChanged({ previous, identity });
+    const { carriedOver } = await followIdentity(req, { previous, identity });
     if (previousSessionId !== "") {
       onSessionEnded(previousSessionId);
     }
-    res.status(status).json({ identity });
+    res.status(status).json({ identity, ...(carriedOver !== undefined && { carriedOver }) });
+  }
+
+  /** The player is signed in either way: what follows them (seats, progress) is best effort here. */
+  async function followIdentity(req, change) {
+    try {
+      return await onIdentityChanged(change);
+    } catch (err) {
+      req.log.error(
+        { err, playerId: change.identity.id, previousPlayerId: change.previous?.id },
+        "moving the previous identity's data failed",
+      );
+      return {};
+    }
   }
 
   router.post("/auth/signup", perIp, async (req, res) => {

@@ -123,3 +123,37 @@ describe("progressionComponent", () => {
     );
   });
 });
+
+describe("progressionComponent: a guest's progress moving to their account (CC-032)", () => {
+  const ACCOUNT = Object.freeze({ kind: "user", id: "user_0123456789abcdef01234567", displayName: "Riya" });
+
+  it("adds the guest's XP to the account once; the level follows from the XP", async () => {
+    const { progression, progressDao } = setup();
+    await progressDao.applyMatchOnce({
+      playerId: "guest_a",
+      matchId: "m0",
+      inc: { xp: 60, matchesPlayed: 2, wins: 2 },
+      at: new Date(T0),
+    });
+
+    const first = await progression.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 + 5 });
+    const again = await progression.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 + 6 });
+
+    expect(first.moved).toEqual(expect.objectContaining({ xp: 60, matchesPlayed: 2 }));
+    expect(again.moved).toEqual(expect.objectContaining({ xp: 0, matchesPlayed: 0 }));
+    expect(await progression.getProgress(ACCOUNT.id)).toEqual(
+      expect.objectContaining({ xp: 60, matchesPlayed: 2, wins: 2, level: 2 }),
+    );
+  });
+
+  it("awards a match that finished during the move to the account, once", async () => {
+    const { progression, published } = setup();
+    await progression.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 });
+
+    await progression.applyMatch(match());
+    await progression.applyMatch(match());
+
+    expect(await progression.getProgress(ACCOUNT.id)).toEqual(expect.objectContaining({ xp: 30, wins: 1 }));
+    expect(published.filter((p) => p.payload.progress.playerId === ACCOUNT.id)).toHaveLength(1);
+  });
+});

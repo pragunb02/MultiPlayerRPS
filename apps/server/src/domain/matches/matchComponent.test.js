@@ -92,3 +92,77 @@ describe("matchComponent", () => {
     expect(() => createMatchComponent({})).toThrow(TypeError);
   });
 });
+
+describe("matchComponent: a guest's history moving to their account (CC-032)", () => {
+  const ACCOUNT = Object.freeze({ kind: "user", id: "user_0123456789abcdef01234567", displayName: "Riya" });
+  const withMatch = (matchId, seats, endedAt = T0 + 9_000) =>
+    room({ seats, lastActivityAt: endedAt, game: { ...room().game, matchId } });
+  const ALICE = { playerId: "guest_a", displayName: "Alice", connected: true };
+  const BOB = { playerId: "guest_b", displayName: "Bob", connected: true };
+
+  it("rewrites the guest's matches as the account's: seats, moves and winners", async () => {
+    const matches = setup();
+    await matches.recordFinished({ room: withMatch("m1", [ALICE, BOB]), outcome: WIN_A });
+
+    const result = await matches.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 });
+    const moved = await matches.getForPlayer({ matchId: "m1", playerId: ACCOUNT.id });
+
+    expect(result).toEqual({ moved: { matches: 1 } });
+    expect(moved.players).toEqual([
+      { playerId: ACCOUNT.id, displayName: "Riya" },
+      { playerId: "guest_b", displayName: "Bob" },
+    ]);
+    expect(moved.log[0].playerId).toBe(ACCOUNT.id);
+    expect(moved.result.winners).toEqual([ACCOUNT.id]);
+    expect(moved.outcomeForYou).toBe("win");
+    expect(await matches.listForPlayer({ playerId: "guest_a", limit: 10 })).toEqual([]);
+  });
+
+  it("leaves a match the guest played against the same account as it is", async () => {
+    const matches = setup();
+    const accountSeat = { playerId: ACCOUNT.id, displayName: "Riya", connected: true };
+    await matches.recordFinished({ room: withMatch("m-self", [ALICE, accountSeat]), outcome: WIN_A });
+
+    const result = await matches.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 });
+
+    expect(result).toEqual({ moved: { matches: 0 } });
+    expect((await matches.getById("m-self")).players[0].playerId).toBe("guest_a");
+  });
+
+  it("moves nothing the second time", async () => {
+    const matches = setup();
+    await matches.recordFinished({ room: withMatch("m1", [ALICE, BOB]), outcome: WIN_A });
+    await matches.recordFinished({ room: withMatch("m2", [BOB, ALICE], T0 + 20_000), outcome: WIN_A });
+    await matches.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 });
+
+    const again = await matches.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 });
+
+    expect(again).toEqual({ moved: { matches: 0 } });
+    expect(await matches.listForPlayer({ playerId: ACCOUNT.id, limit: 10 })).toHaveLength(2);
+  });
+
+  it("counts only the matches it renamed itself when another move got there first", async () => {
+    const dao = createInMemoryMatchDao();
+    const accessor = createMatchAccessor({ matchDao: dao });
+    const racing = createMatchComponent({
+      matchAccessor: {
+        ...accessor,
+        // Another run renames the match between the listing and the write.
+        listExcluding: async (...args) => {
+          const listed = await accessor.listExcluding(...args);
+          await createMatchComponent({ matchAccessor: accessor }).transferPlayer({
+            from: "guest_a",
+            to: ACCOUNT,
+            now: T0,
+          });
+          return listed;
+        },
+      },
+    });
+    await racing.recordFinished({ room: withMatch("m1", [ALICE, BOB]), outcome: WIN_A });
+
+    expect(await racing.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 })).toEqual({
+      moved: { matches: 0 },
+    });
+  });
+});

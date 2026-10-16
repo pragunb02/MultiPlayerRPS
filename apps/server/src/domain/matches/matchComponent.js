@@ -1,3 +1,4 @@
+import { renamePlayer } from "@classicade/games";
 import { assertDefined } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
 
@@ -70,6 +71,37 @@ export function createMatchComponent({ matchAccessor }) {
         throw new NotFoundError("Match not found");
       }
       return { ...match, outcomeForYou: outcomeFor(match, playerId) };
+    },
+
+    /**
+     * The full record, for the server's own pipeline (never for a client: see `getForPlayer`).
+     *
+     * @param {string} matchId
+     */
+    getById(matchId) {
+      return matchAccessor.getById(matchId);
+    },
+
+    /**
+     * A guest's match history becomes their account's (CC-032): every match the guest played is rewritten with
+     * the account's id and name (seats, moves, winners), so history, details and replays work as before. A match
+     * the guest played against that same account stays as it is — one player can't hold both seats.
+     * Idempotent: a match is only rewritten while the guest is still in it.
+     *
+     * @param {{ from: string, to: Readonly<import("../../models/identity.js").Identity>, now: number }} transfer
+     * @returns {Promise<{ moved: { matches: number } }>}
+     */
+    async transferPlayer({ from, to }) {
+      const matches = await matchAccessor.listExcluding(from, { excluding: to.id });
+      const renamedNow = [];
+      for (const match of matches) {
+        const renamed = renamePlayer(match, from, to.id);
+        const players = renamed.players.map((p) =>
+          p.playerId === to.id ? { ...p, displayName: to.displayName } : p,
+        );
+        renamedNow.push(await matchAccessor.replaceRenamed({ from, match: { ...renamed, players } }));
+      }
+      return { moved: { matches: renamedNow.filter(Boolean).length } };
     },
   });
 }
