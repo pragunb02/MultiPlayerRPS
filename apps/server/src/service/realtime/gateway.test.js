@@ -55,6 +55,16 @@ describe("realtime gateway", () => {
     expect(error.data).toEqual({ code: ERROR_CODES.UNAUTHORIZED });
   });
 
+  it("logs why it refused a connection, without the session id (CC-079)", async () => {
+    server = await startTestServer();
+
+    await connected(openSocket({ cookie: "cc.sid=s%3Aforged.signature" })).catch(() => {});
+
+    const [refused] = server.find("socket refused");
+    expect(refused).toMatchObject({ level: 40, code: ERROR_CODES.UNAUTHORIZED, sentCookie: true });
+    expect(JSON.stringify(refused)).not.toContain("forged");
+  });
+
   it("binds the connection to the identity from the session", async () => {
     server = await startTestServer();
     const { cookie, identity } = await createGuest();
