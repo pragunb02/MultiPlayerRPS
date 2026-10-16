@@ -1,37 +1,32 @@
 import { useCallback, useEffect, useState } from "react";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { useServices } from "../app/servicesContext.js";
-import { useSession } from "./useSession.js";
 
 /**
- * One room, kept in sync with the server. Joins on mount (starting a guest session if needed), applies every
- * pushed update for this room, and rejoins after the connection drops and comes back. Leaving the page does
- * not leave the room — only `leave()` does (it forfeits a game in progress).
+ * One room, kept in sync with the server. Once `enabled` — there is someone to join as — it joins, applies every
+ * pushed update for this room, and rejoins after the connection drops and comes back. It never starts a session
+ * itself: whoever arrives without one chooses how to join first (CC-086). Leaving the page does not leave the
+ * room — only `leave()` does (it forfeits a game in progress).
  *
  * status: "joining" | "ready" | "closed" | "error"
  *
  * @param {string} code
+ * @param {{ enabled: boolean }} options
  */
-export function useRoom(code) {
+export function useRoom(code, { enabled }) {
   const { socket } = useServices();
-  const session = useSession();
   const [state, setState] = useState({
     status: "joining",
     room: undefined,
     error: undefined,
     closedReason: "",
   });
-  const { ensurePlayer } = session;
-  const hasIdentity = session.identity !== undefined;
 
   useEffect(() => {
-    let active = true;
-    if (!hasIdentity) {
-      ensurePlayer().catch((error) => active && setState((s) => ({ ...s, status: "error", error })));
-      return () => {
-        active = false;
-      };
+    if (!enabled) {
+      return undefined;
     }
+    let active = true;
     // State changes only in the request's callbacks, after the server answered.
     const join = () =>
       socket.request(SOCKET_EVENTS.ROOM_JOIN, { code }).then(
@@ -57,7 +52,7 @@ export function useRoom(code) {
       active = false;
       unsubscribers.forEach((off) => off());
     };
-  }, [socket, code, hasIdentity, ensurePlayer]);
+  }, [socket, code, enabled]);
 
   const move = useCallback(
     async (payload) => {

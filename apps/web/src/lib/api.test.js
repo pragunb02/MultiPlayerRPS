@@ -28,6 +28,22 @@ describe("api client", () => {
     expect(await createApiClient({ fetchImpl: respond(200, body) }).getSession()).toEqual(expected);
   });
 
+  it.each([
+    [{ identity: { id: "user_x" } }, { identity: { id: "user_x" } }],
+    [
+      { identity: { id: "user_x" }, carriedOver: { xp: 30, matchesPlayed: 1, matches: 1 } },
+      { identity: { id: "user_x" }, carriedOver: { xp: 30, matchesPlayed: 1, matches: 1 } },
+    ],
+  ])(
+    "answers sign-up and login with the identity and what a guest brought along (%o)",
+    async (body, expected) => {
+      const api = createApiClient({ fetchImpl: respond(200, body) });
+
+      expect(await api.signup({})).toEqual(expected);
+      expect(await api.login({})).toEqual(expected);
+    },
+  );
+
   it("sends JSON bodies", async () => {
     const fetchImpl = respond(200, { identity: { id: "user_x" } });
 

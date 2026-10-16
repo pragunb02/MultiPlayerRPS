@@ -1,4 +1,4 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
@@ -56,17 +56,6 @@ describe("RoomPage", () => {
       `${window.location.origin}/games/tic-tac-toe/rooms/AB2CD3`,
     );
     expect(screen.getByRole("list", { name: "Players" })).toHaveTextContent("Waiting for a player…");
-  });
-
-  it("starts a guest session first when opened from a shared link", async () => {
-    const socket = fakeSocket();
-    socket.request.mockResolvedValue(roomView());
-    const { api } = renderApp({ path: "/games/tic-tac-toe/rooms/AB2CD3", socket });
-
-    await vi.waitFor(() => expect(api.startGuest).toHaveBeenCalledOnce());
-    act(() => socket.push("connect"));
-
-    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
   });
 
   it("follows pushed updates for this room only", async () => {
@@ -264,21 +253,6 @@ describe("RoomPage: every other state and path", () => {
     expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
   });
 
-  it("explains when no guest session can be started for a shared link", async () => {
-    renderApp({
-      path: "/games/tic-tac-toe/rooms/AB2CD3",
-      api: fakeApi({
-        startGuest: async () => {
-          throw new AppRequestError({ code: "RATE_LIMITED", message: "Too many requests, try again later" });
-        },
-      }),
-    });
-
-    expect(await screen.findByRole("heading", { name: "Can't join this room" })).toBeInTheDocument();
-    expect(screen.getByText("Too many requests, try again later")).toBeInTheDocument();
-    expect(document.title).toBe("Can't join this room · ClassiCade");
-  });
-
   it("sends a move and shows the board the server answers with", async () => {
     const user = userEvent.setup();
     const ttt = (board, turn) => ({
@@ -343,5 +317,121 @@ describe("progress toasts", () => {
     const link = screen.queryByRole("link", { name: "Start a new Tic Tac Toe game" });
     if (offered) expect(link).toHaveAttribute("href", "/games/tic-tac-toe");
     else expect(link).toBeNull();
+  });
+});
+
+describe("RoomPage: someone arriving without a session chooses how to join (CC-086)", () => {
+  const INVITE = "/games/tic-tac-toe/rooms/AB2CD3";
+
+  /** A visitor with no session opens the invite; the socket answers room:join with the waiting room. */
+  function openInvite({ path = INVITE, api = fakeApi(), history = [] } = {}) {
+    const socket = fakeSocket();
+    socket.request.mockResolvedValue(roomView());
+    return renderApp({ path, history, api, socket });
+  }
+
+  it("asks how to join, without creating anything on the server", async () => {
+    const { api, socket } = openInvite();
+
+    const heading = await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" });
+
+    expect(heading).toHaveFocus();
+    expect(screen.getByText("AB2CD3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play as guest" })).toBeEnabled();
+    expect(within(screen.getByRole("main")).getByRole("link", { name: "Log in" })).toHaveAttribute(
+      "href",
+      `/login?next=${encodeURIComponent(INVITE)}`,
+    );
+    expect(within(screen.getByRole("main")).getByRole("link", { name: "Sign up" })).toHaveAttribute(
+      "href",
+      `/signup?next=${encodeURIComponent(INVITE)}`,
+    );
+    expect(document.title).toBe("Tic Tac Toe · Room AB2CD3 · ClassiCade");
+    expect(api.startGuest).not.toHaveBeenCalled();
+    expect(socket.request).not.toHaveBeenCalled();
+  });
+
+  it("joins as a guest after choosing to", async () => {
+    const user = userEvent.setup();
+    const { api, socket } = openInvite();
+
+    await user.click(await screen.findByRole("button", { name: "Play as guest" }));
+
+    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(api.startGuest).toHaveBeenCalledOnce();
+    expect(socket.request).toHaveBeenCalledWith("room:join", { code: "AB2CD3" });
+  });
+
+  it("says why when no guest session can be started, and lets you try again", async () => {
+    const user = userEvent.setup();
+    const startGuest = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new AppRequestError({ code: "RATE_LIMITED", message: "Too many requests, try again later" }),
+      )
+      .mockResolvedValue(GUEST);
+    openInvite({ api: fakeApi({ startGuest }) });
+
+    await user.click(await screen.findByRole("button", { name: "Play as guest" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests, try again later");
+    expect(screen.getByRole("button", { name: "Play as guest" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Play as guest" }));
+    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+  });
+
+  it("names no game for an old link, and logging in returns to that link", async () => {
+    openInvite({ path: "/room/AB2CD3" });
+
+    expect(await screen.findByRole("heading", { name: "You're invited to play" })).toBeInTheDocument();
+    expect(within(screen.getByRole("main")).getByRole("link", { name: "Log in" })).toHaveAttribute(
+      "href",
+      "/login?next=%2Froom%2FAB2CD3",
+    );
+    expect(document.title).toBe("Room AB2CD3 · ClassiCade");
+  });
+
+  it("shows neither the choice nor a join while the session is still loading", async () => {
+    const socket = fakeSocket();
+    renderApp({ path: INVITE, socket, api: fakeApi({ getSession: () => new Promise(() => {}) }) });
+
+    expect(await screen.findByText(/Joining room AB2CD3/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Play as guest" })).toBeNull();
+    expect(socket.request).not.toHaveBeenCalled();
+  });
+
+  it("explains when the session can't be loaded", async () => {
+    const { api } = openInvite({
+      api: fakeApi({
+        getSession: async () => {
+          throw new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" });
+        },
+      }),
+    });
+
+    expect(await screen.findByRole("heading", { name: "Can't join this room" })).toBeInTheDocument();
+    expect(screen.getByText("Can't reach ClassiCade")).toBeInTheDocument();
+    expect(api.startGuest).not.toHaveBeenCalled();
+  });
+
+  it("goes to log in, and Back from there shows the choice again", async () => {
+    const user = userEvent.setup();
+    const { url, back } = openInvite({ history: ["/"] });
+
+    await user.click(within(await screen.findByRole("main")).getByRole("link", { name: "Log in" }));
+    expect(url()).toBe(`/login?next=${encodeURIComponent(INVITE)}`);
+    back();
+
+    expect(url()).toBe(INVITE);
+    expect(
+      await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" }),
+    ).toBeInTheDocument();
+  });
+
+  it("someone who already has a session skips the choice", async () => {
+    openRoom();
+
+    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Play as guest" })).toBeNull();
   });
 });

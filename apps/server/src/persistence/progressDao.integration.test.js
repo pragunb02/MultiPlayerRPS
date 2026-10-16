@@ -80,6 +80,39 @@ describe("MongoDB progress DAO honours the progress DAO contract (integration)",
     ).rejects.toThrow();
   });
 
+  it("merges into an account whose progress was stored before guests could move (no mergedFrom yet)", async () => {
+    const dao = await createDao();
+    await databases
+      .at(-1)
+      .connection.db.collection("player_progress")
+      .insertOne({
+        playerId: "user_old",
+        xp: 100,
+        matchesPlayed: 3,
+        recentMatchIds: ["m0"],
+        updatedAt: new Date(),
+      });
+    const totals = { xp: 30, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 };
+
+    const first = await dao.addMerged({
+      to: "user_old",
+      from: "guest_a",
+      totals,
+      recentMatchIds: ["m1"],
+      at: new Date(),
+    });
+    const again = await dao.addMerged({
+      to: "user_old",
+      from: "guest_a",
+      totals,
+      recentMatchIds: ["m1"],
+      at: new Date(),
+    });
+
+    expect([first, again]).toEqual([{ applied: true }, { applied: false }]);
+    expect((await dao.getByPlayer("user_old")).xp).toBe(130);
+  });
+
   it("marks a brand-new guest once when the move runs twice at the same moment", async () => {
     const dao = await createDao();
     const at = new Date();

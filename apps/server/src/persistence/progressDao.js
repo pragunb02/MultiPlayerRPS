@@ -100,7 +100,7 @@ export function createProgressDao({ connection }) {
       const marked = (doc) => ({ totals: totalsOf(doc), recentMatchIds: doc.recentMatchIds });
       try {
         const doc = await Progress.findOneAndUpdate(
-          { playerId: from, $or: [{ mergedInto: { $exists: false } }, { mergedInto: to }] },
+          { playerId: from, mergedInto: { $exists: false } },
           { $set: { mergedInto: to }, $setOnInsert: { updatedAt: at } },
           { upsert: true, returnDocument: "after", lean: true },
         );
@@ -109,9 +109,10 @@ export function createProgressDao({ connection }) {
         if (err.code !== DUPLICATE_KEY_CODE) {
           throw err;
         }
-        // Either the guest moved to someone else, or a concurrent mark created the document a moment earlier.
+        // The guest is marked already (documents are never deleted): by this move — run again, or concurrently —
+        // or by a move to someone else.
         const current = await Progress.findOne({ playerId: from }).lean();
-        if (current?.mergedInto === to) {
+        if (current.mergedInto === to) {
           return marked(current);
         }
         throw new DuplicateKey(`Progress of ${from} already moved to another player`, { cause: err });
@@ -145,10 +146,11 @@ export function createProgressDao({ connection }) {
           if (err.code !== DUPLICATE_KEY_CODE) {
             throw err;
           }
-          // Already merged — or the account's document was created at the same moment; then a retry adds to it.
+          // Already merged — or the account's document was created at the same moment (with an empty
+          // `mergedFrom`); then a retry adds to it. Documents from before CC-032 lack `mergedFrom` but never collide:
+          // `$ne` matches them.
           const current = await Progress.findOne({ playerId: to }).lean();
-          // Documents written before CC-032 have no `mergedFrom` yet.
-          if (current?.mergedFrom?.includes(from) || attempt >= MAX_ATTEMPTS) {
+          if (current.mergedFrom.includes(from) || attempt >= MAX_ATTEMPTS) {
             return { applied: false };
           }
         }

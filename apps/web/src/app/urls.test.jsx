@@ -117,7 +117,7 @@ describe("account pages and `next`", () => {
 
   it("a `next` to another site or back to an account page goes home after login", async () => {
     const user = userEvent.setup();
-    const api = fakeApi({ login: async () => USER, getGames: asVisitor().getGames });
+    const api = fakeApi({ login: async () => ({ identity: USER }), getGames: asVisitor().getGames });
     const { url } = renderApp({ path: "/login?next=%2Flogin%3Fnext%3D%252Fprofile", api });
 
     await user.type(screen.getByLabelText("Email"), "riya@example.com");
@@ -129,7 +129,7 @@ describe("account pages and `next`", () => {
 
   it("logging in from a room returns to the room", async () => {
     const user = userEvent.setup();
-    const api = fakeApi({ login: async () => USER });
+    const api = fakeApi({ login: async () => ({ identity: USER }) });
     const { url } = renderApp({
       path: "/login?next=%2Fgames%2Ftic-tac-toe%2Frooms%2FAB2CD3",
       api,

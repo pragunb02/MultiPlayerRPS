@@ -4,13 +4,18 @@ import { createContext, useContext } from "react";
 export const SessionContext = createContext(null);
 
 /**
+ * @typedef {{ identity: object, carriedOver?: { xp: number, matchesPlayed: number, matches: number } }} SignedIn
+ *   `carriedOver`: what a guest's games brought to the account (CC-032)
+ */
+
+/**
  * @returns {{
  *   status: "loading" | "anonymous" | "ready" | "error",
  *   identity: { kind: string, id: string, displayName: string } | undefined,
  *   error: Error | undefined,
  *   ensurePlayer: () => Promise<object>,
- *   signup: (credentials: object) => Promise<object>,
- *   login: (credentials: object) => Promise<object>,
+ *   signup: (credentials: object) => Promise<SignedIn>,
+ *   login: (credentials: object) => Promise<SignedIn>,
  *   logout: () => Promise<void>,
  * }}
  */
