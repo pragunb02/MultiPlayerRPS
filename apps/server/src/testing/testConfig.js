@@ -1,4 +1,8 @@
+import { fileURLToPath } from "node:url";
 import { loadConfig } from "../config/index.js";
+
+/** A built web app with just an index.html, shaped like the real build (apps/web/index.html). */
+export const TEST_WEB_BUILD = fileURLToPath(new URL("./webBuild", import.meta.url));
 
 /** Minimal valid environment for tests; override any variable per test. */
 export const TEST_ENV = Object.freeze({
@@ -9,11 +13,11 @@ export const TEST_ENV = Object.freeze({
   ALLOWED_ORIGINS: "http://localhost:5173",
 });
 
-/** Overrides that make a valid production environment (the web build path is never read by these tests). */
+/** Overrides that make a valid production environment. */
 export const PRODUCTION_ENV = Object.freeze({
   NODE_ENV: "production",
   ALLOWED_ORIGINS: "https://classicade.app",
-  WEB_DIST_DIR: "/srv/classicade/web",
+  WEB_DIST_DIR: TEST_WEB_BUILD,
 });
 
 /** @param {Record<string, string>} [overrides] */

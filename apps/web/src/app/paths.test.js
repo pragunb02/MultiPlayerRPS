@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { describePage, GAMES, LEADERBOARDS, PUBLIC_PAGE_PATHS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths, returnPathFor, safeNext } from "./paths.js";
 
 describe("paths", () => {
@@ -10,6 +11,8 @@ describe("paths", () => {
     expect(paths.profile()).toBe("/profile");
     expect(paths.leaderboards()).toBe("/leaderboards/overall");
     expect(paths.leaderboards("tic-tac-toe")).toBe("/leaderboards/tic-tac-toe");
+    expect(paths.privacy()).toBe("/privacy");
+    expect(paths.terms()).toBe("/terms");
   });
 
   it("keeps an unknown game's id, so the link leads to a clear not-found", () => {
@@ -84,5 +87,33 @@ describe("returnPathFor", () => {
 describe("normaliseRoomCode", () => {
   it("upper-cases and trims", () => {
     expect(normaliseRoomCode(" ab2Cd3 ")).toBe("AB2CD3");
+  });
+});
+
+// The server describes pages to crawlers from the shared page list (CC-047). These tests keep that list and the
+// links the app builds the same.
+describe("the shared page list", () => {
+  it("lists exactly the public pages the app links to", () => {
+    const linked = [
+      paths.home(),
+      ...GAMES.map((game) => paths.game(game.id)),
+      ...LEADERBOARDS.map((board) => paths.leaderboards(board.id)),
+      paths.privacy(),
+      paths.terms(),
+    ];
+
+    expect([...PUBLIC_PAGE_PATHS].sort()).toEqual(linked.sort());
+  });
+
+  it("gives an invite link the URL the app builds for the room", () => {
+    for (const game of GAMES) {
+      expect(describePage(paths.room(game.id, "ab2cd3")).path).toBe(paths.room(game.id, "AB2CD3"));
+    }
+  });
+
+  it("knows the account pages the app links to", () => {
+    for (const path of [paths.login(), paths.signup(), paths.profile()]) {
+      expect(describePage(path)).toMatchObject({ found: true, path });
+    }
   });
 });

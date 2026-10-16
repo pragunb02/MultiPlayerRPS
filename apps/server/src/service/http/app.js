@@ -96,7 +96,8 @@ export function createHttpApp({
   );
 
   if (config.webDistDir !== "") {
-    app.use(createWebAppRouter({ distDir: config.webDistDir }));
+    // The first allowed origin is the site's own public address (docs/DEPLOYMENT.md).
+    app.use(createWebAppRouter({ distDir: config.webDistDir, siteOrigin: config.allowedOrigins[0] }));
   }
 
   app.use(notFoundHandler);

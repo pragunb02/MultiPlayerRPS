@@ -70,6 +70,7 @@ module.exports = [
       "packages/**/*.js",
       "*.mjs",
       "apps/web/vite.config.js",
+      "apps/web/og/*.mjs",
       "e2e/**/*.{js,mjs}",
     ],
     languageOptions: { sourceType: "module", globals: globals.node },
@@ -90,7 +91,7 @@ module.exports = [
   {
     // Web app (React + Vite): browser globals, JSX, hooks rules. Components never call fetch/sockets directly —
     // only lib/ does (docs/ENGINEERING.md §1, "Frontend").
-    files: ["apps/web/src/**/*.{js,jsx}"],
+    files: ["apps/web/src/**/*.{js,jsx}", "apps/web/og/**/*.{js,jsx}"],
     languageOptions: {
       sourceType: "module",
       globals: { ...globals.browser },

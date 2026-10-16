@@ -46,6 +46,7 @@ test.describe("history: browsing", () => {
 
   test("every screen survives a reload as the same screen", async ({ players }) => {
     const host = await players.open("host");
+    host.expect(404, "/no/such/page"); // a real 404 from the server, with the app (CC-047)
     const room = await createRoom(host, "tic-tac-toe");
     const screens = [
       HOME,
@@ -85,7 +86,9 @@ test.describe("history: browsing", () => {
   });
 
   test("not found → Back to the games", async ({ players }) => {
-    const { page } = await players.open("visitor");
+    const visitor = await players.open("visitor");
+    const { page } = visitor;
+    visitor.expect(404, "/games/ludo");
     await page.goto("/games/ludo");
     await at(page, "/games/ludo", "Page not found · ClassiCade", "Page not found");
 

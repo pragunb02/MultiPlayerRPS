@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import express from "express";
+import { describePage } from "@classicade/shared";
+import { createPageTemplate, renderPageHead, renderRobots, renderSitemap } from "./pageHead.js";
 
 const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
+const ONE_HOUR_SECONDS = 60 * 60;
 const NOT_APP_ROUTES = /^\/(api|socket\.io)(\/|$)/;
 
 /**
@@ -10,11 +14,28 @@ const NOT_APP_ROUTES = /^\/(api|socket\.io)(\/|$)/;
  * - everything else, and especially index.html, is revalidated on every load so a deploy takes effect at once;
  * - any other GET that is not an API route returns index.html, so deep links like /room/AB2CD3 work.
  *
- * @param {{ distDir: string }} options
+ * Each page's index.html carries that page's title, description and link preview tags (CC-047), because crawlers
+ * and chat apps read the HTML without running the app. A URL where the app has no page answers 404, still with
+ * the app, which then shows its own "not found" page.
+ *
+ * @param {{ distDir: string, siteOrigin: string }} options
+ *   siteOrigin: the site's public address, for the absolute URLs in previews, the sitemap and robots.txt
  * @returns {import("express").Router}
  */
-export function createWebAppRouter({ distDir }) {
+export function createWebAppRouter({ distDir, siteOrigin }) {
   const router = express.Router();
+  const page = createPageTemplate(readFileSync(path.join(distDir, "index.html"), "utf8"));
+  const robots = renderRobots({ origin: siteOrigin });
+  const sitemap = renderSitemap({ origin: siteOrigin });
+
+  router.get("/robots.txt", (req, res) => {
+    res.setHeader("Cache-Control", `public, max-age=${ONE_HOUR_SECONDS}`);
+    res.type("text/plain").send(robots);
+  });
+  router.get("/sitemap.xml", (req, res) => {
+    res.setHeader("Cache-Control", `public, max-age=${ONE_HOUR_SECONDS}`);
+    res.type("application/xml").send(sitemap);
+  });
 
   router.use(
     express.static(distDir, {
@@ -34,10 +55,12 @@ export function createWebAppRouter({ distDir }) {
       next();
       return;
     }
+    const info = describePage(req.path);
     res.setHeader("Cache-Control", "no-cache");
-    // Relative to `root`: `send` refuses absolute paths with a dot-folder anywhere in them (a checkout under
-    // `~/.something/` answered 500 for every page).
-    res.sendFile("index.html", { root: distDir });
+    res
+      .status(info.found ? 200 : 404)
+      .type("html")
+      .send(page(renderPageHead({ page: info, origin: siteOrigin })));
   });
 
   return router;

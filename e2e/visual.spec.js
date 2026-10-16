@@ -108,6 +108,7 @@ for (const colorScheme of SCHEMES) {
     const tabs = page.getByRole("navigation", { name: "Leaderboards" }).getByRole("link");
     await expect(tabs.locator("svg")).toHaveCount(await tabs.count());
 
+    visitor.expect(404, "/no/such/page"); // a real 404 from the server (CC-047)
     await page.goto("/no/such/page");
     await expect(page.getByRole("img", { name: /game over, page not found/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();

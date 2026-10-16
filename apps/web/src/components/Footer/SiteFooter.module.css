@@ -1,0 +1,31 @@
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-6);
+  padding: var(--space-6);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.footer p {
+  margin: 0;
+}
+.tagline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mark {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.links {
+  display: inline-flex;
+  gap: var(--space-4);
+}
+.footer a {
+  color: var(--color-text);
+  font-weight: 700;
+}

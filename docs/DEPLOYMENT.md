@@ -21,15 +21,15 @@
 
 ### Environment variables (dashboard → Environment)
 
-| Variable          | Required      | Notes                                                                                                                                                           |
-| ----------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MONGO_URI`       | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server |
-| `SESSION_SECRET`  | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                  |
-| `NODE_ENV`        | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                       |
-| `ALLOWED_ORIGINS` | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010)                                                   |
-| `PORT`            | set by Render |                                                                                                                                                                 |
-| `WEB_DIST_DIR`    | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                       |
-| `LOG_LEVEL`       | no            | default `info`                                                                                                                                                  |
+| Variable          | Required      | Notes                                                                                                                                                                                                                                   |
+| ----------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MONGO_URI`       | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                         |
+| `SESSION_SECRET`  | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                          |
+| `NODE_ENV`        | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                               |
+| `ALLOWED_ORIGINS` | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047) |
+| `PORT`            | set by Render |                                                                                                                                                                                                                                         |
+| `WEB_DIST_DIR`    | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                               |
+| `LOG_LEVEL`       | no            | default `info`                                                                                                                                                                                                                          |
 
 Secrets live only in Render and local `.env` files — never in the repo (it is public), chat, or PR text.
 
