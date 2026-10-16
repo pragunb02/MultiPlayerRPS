@@ -39,7 +39,8 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 5. Finishing: ✅ on the board, update linked findings in `KNOWN_ISSUES.md`, add a dated changelog line in `PROGRESS.md`
    using ticket IDs, update the stage counters.
 6. Non-trivial decisions (library, pattern, data model) get an ADR in `DECISIONS.md` first.
-7. **Merging to `main` deploys to production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
+7. **CI must be green before merging** (`.github/workflows/ci.yml`: lint, format, audit, unit + integration with
+   coverage gates, browser tests). **Merging to `main` deploys to production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
    dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging (DEPLOYMENT.md).
 8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
 

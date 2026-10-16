@@ -8,7 +8,7 @@ CC-### — <title> · `docs/tickets/CC-###.md`
 
 ## Verification
 
-- [ ] `npm run lint` · `npm run format:check` · `npm run test:coverage` · `npm audit --audit-level=high`
+- [ ] CI green (lint · format · audit · `test:coverage` · `test:e2e`)
 - [ ] Ran it for real (what was checked):
 
 ## Deployment impact (merging to `main` deploys to production — see docs/DEPLOYMENT.md)

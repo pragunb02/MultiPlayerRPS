@@ -10,13 +10,13 @@
 | Stage health  | 🟢 On track                                                                                     |
 | In progress   | —                                                                                               |
 | Blocked on    | —                                                                                               |
-| Next up       | CC-027 CI (lint, unit, e2e on every PR)                                                         |
+| Next up       | Rest of Stage 0: CC-028 staging, CC-031 dependency automation, CC-079 flakes                    |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 36 / 42      |
+| S0 Foundation   | 🟡 In progress | 37 / 42      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -30,12 +30,13 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 0    | 0           | 11    |
 | Bugs (BUG)       | 0    | 0           | 14    |
-| Tech debt (DEBT) | 0    | 1           | 11    |
+| Tech debt (DEBT) | 0    | 0           | 12    |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-027 — **CI** (GitHub Actions) on every PR and push to `main`: lint, format, `npm audit`, unit + integration tests with coverage gates, browser persona tests (desktop + mobile, real server in production config); coverage and Playwright traces as artifacts. Green on its first run (≈ 1½ min). Closes DEBT-09.
 - 2026-10-16 — CC-084, CC-085 — **Every branch and every screen's history tested.** Branch coverage 92.9 % → 99.4 % (lines/functions 100 %, 967 tests; gates raised to 100/100/99); 84 browser tests incl. Back/Forward chains, reloads and Back after every redirect, sign-in/out, create/leave/forfeit/finish, on desktop and mobile. Found and fixed: Back re-entered a room you had left; logging out in a waiting room then Back seated a new guest against you (CC-085 — logout gives up waiting seats); a stale first session answer disconnecting a new socket; corrupt stored password hashes causing 500s; silent "Load more" failures; latecomers now offered a new game.
 - 2026-10-16 — CC-081, CC-082, CC-083 — **Browser persona tests** (`e2e/`, Playwright, desktop + mobile, 34 tests, real server in production config): visitor, guests, account holder, legacy player, attacker; every test fails on console errors, CSP violations, failed requests, secrets in URLs, readable cookies or web storage. They found: a red console 401 on every first visit (CC-082 — `GET /api/session` now answers `{ authenticated: false }`); a socket reconnect race when pages asked for a guest session twice; and a guest who signed up from a room being seated against their own old guest seat (CC-083 — seats now move to the account, with an engine-contract check that every game survives a player rename). 833 unit/integration tests.
 - 2026-10-16 — CC-080 — URL scheme (ADR-011): `/games/:slug`, `/games/:slug/rooms/:code`, readable slugs in the shared catalog, one route module, canonical URLs replacing old spellings (legacy app URLs, `/play/*`, `/room/*`, ids, case, wrong game), safe `next` without loops, signed-in users skip log in/sign up, "Games" nav, page titles. Fixed a login loop (`next` nested in `next`). 819 tests; verified in a real browser. New: CC-081 browser persona tests.
