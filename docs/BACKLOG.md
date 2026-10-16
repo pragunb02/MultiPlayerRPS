@@ -87,7 +87,7 @@ and don't encode the stage — a ticket can move between stages without changing
 
 | ID                          | Title                                                                                                                   | Type  | Pri | Status  | Links            |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----- | --- | ------- | ---------------- |
-| CC-026                      | Dockerfile + docker-compose (app + Mongo) for local dev                                                                 | infra | P1  | ⬜ Todo |                  |
+| [CC-026](tickets/CC-026.md) | Dockerfile + docker-compose (app + Mongo) for local dev                                                                 | infra | P1  | ✅ Done |                  |
 | [CC-027](tickets/CC-027.md) | CI: lint, format, audit, unit + integration with coverage gates, browser persona tests — on every PR and push to `main` | infra | P1  | ✅ Done | DEBT-09          |
 | CC-028                      | Resolve ADR-005; deploy staging environment                                                                             | infra | P1  | ⬜ Todo |                  |
 | [CC-029](tickets/CC-029.md) | Production cutover to the new stack, then delete legacy files (`index.js`, `client/*`, old models, `hw.txt`)            | debt  | P1  | ✅ Done | DEBT-05, DEBT-08 |

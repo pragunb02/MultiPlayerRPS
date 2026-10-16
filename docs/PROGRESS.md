@@ -10,13 +10,13 @@
 | Stage health  | 🟢 On track                                                                                     |
 | In progress   | —                                                                                               |
 | Blocked on    | —                                                                                               |
-| Next up       | Rest of Stage 0: CC-026 Docker for local dev, CC-028 staging + hosting decision                 |
+| Next up       | CC-028 hosting decision (ADR-005) + staging — needs the owner                                   |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 39 / 42      |
+| S0 Foundation   | 🟡 In progress | 40 / 42      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -36,6 +36,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-026 — Docker: multi-stage production image (Node 24 Alpine, web build inside, dev dependencies pruned, non-root, `/health` health check) and `docker-compose.yml` (app + MongoDB 8 with a volume; or MongoDB alone for the dev servers). Verified: both containers healthy, chess played to mate in two browsers, accounts survive `down`/`up`. CI builds the image and checks health, a page and the API on every PR.
 - 2026-10-16 — CC-021 — Closed: already covered by the real-stack integration test "plays Rock Paper Scissors end to end" (create → join → play → result → stored → replayed → XP) plus the browser suites.
 - 2026-10-16 — CC-031 — Dependabot: weekly update PRs (Monday 06:00 IST) for npm (patch/minor grouped as dev tools and runtime; majors one per PR) and GitHub Actions; every update must pass CI. All direct dependencies already on their latest stable versions; `npm audit` 0.
 - 2026-10-16 — CC-079 — Flake hunt: 0 failures in 27 stress runs (two suites at once, with coverage); session writes confirmed awaited through express-session and connect-mongo. Added the missing evidence instead of retries: the server now logs every refused socket (reason, whether a cookie came — never the session id), and a failing integration test prints the server's log. Ticket stays open (P3) until a logged failure shows the cause.

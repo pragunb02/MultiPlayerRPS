@@ -20,6 +20,14 @@ npm run dev:server     # API + realtime on http://localhost:4000
 npm run dev:web        # web app on http://localhost:5173 (proxies to the server)
 ```
 
+### With Docker (no local Node or MongoDB needed)
+
+```bash
+docker compose up --build   # the whole app on http://localhost:4000, with its own MongoDB
+docker compose up mongo     # only MongoDB on localhost:27017, for npm run dev:server / dev:web
+docker compose down         # stop (add -v to delete the local database)
+```
+
 ## Scripts
 
 | Command                 | What it does                                                                                   |

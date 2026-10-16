@@ -73,3 +73,24 @@ jobs:
             e2e/playwright-report/
             e2e/test-results/
           retention-days: 14
+
+  docker:
+    name: Docker image builds and serves (docker compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and start the app with MongoDB, wait until both are healthy
+        run: docker compose up --build --detach --wait --wait-timeout 180
+      - name: Health, a page and the API answer
+        run: |
+          curl --fail --silent http://localhost:4000/health | grep '"database":"up"'
+          curl --fail --silent --output /dev/null http://localhost:4000/games/chess
+          curl --fail --silent http://localhost:4000/api/session | grep '"authenticated":false'
+      - name: Runs as an unprivileged user
+        run: test "$(docker compose exec -T app whoami)" = node
+      - name: Server log on failure
+        if: failure()
+        run: docker compose logs app
+      - run: docker compose down --volumes
+        if: always()
