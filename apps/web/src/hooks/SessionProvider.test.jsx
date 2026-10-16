@@ -93,11 +93,15 @@ describe("SessionProvider", () => {
 
   it("reconnects the socket when the identity changes (the socket authenticates at connect time)", async () => {
     const user = { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "Riya" };
-    const { socket } = setup(fakeApi({ getSession: async () => GUEST, login: async () => user }));
+    const carriedOver = { xp: 30, matchesPlayed: 1, matches: 1 };
+    const { socket } = setup(
+      fakeApi({ getSession: async () => GUEST, login: async () => ({ identity: user, carriedOver }) }),
+    );
     await screen.findByText("ready");
 
-    await act(() => session.login({ email: "riya@example.com", password: "x" }));
+    const result = await act(() => session.login({ email: "riya@example.com", password: "x" }));
 
+    expect(result).toEqual({ identity: user, carriedOver }); // passed through for the welcome message
     expect(session.identity).toEqual(user);
     expect(socket.disconnect).toHaveBeenCalledTimes(2);
     expect(socket.connect).toHaveBeenCalledTimes(2);

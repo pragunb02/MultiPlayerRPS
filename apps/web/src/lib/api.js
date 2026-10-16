@@ -41,13 +41,24 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     },
     startGuest: async () => (await request("POST", "/session/guest")).identity,
     endSession: () => request("DELETE", "/session"),
-    signup: async (credentials) => (await request("POST", "/auth/signup", credentials)).identity,
-    login: async (credentials) => (await request("POST", "/auth/login", credentials)).identity,
+    /**
+     * Signing up or logging in answers who you are now and — when you were a guest with games — what your guest
+     * progress brought along (CC-032).
+     * @returns {Promise<{ identity: object, carriedOver?: { xp: number, matchesPlayed: number, matches: number } }>}
+     */
+    signup: async (credentials) => signedIn(await request("POST", "/auth/signup", credentials)),
+    /** @returns {Promise<{ identity: object, carriedOver?: { xp: number, matchesPlayed: number, matches: number } }>} */
+    login: async (credentials) => signedIn(await request("POST", "/auth/login", credentials)),
     getProgress: async () => (await request("GET", "/progress")).progress,
     getMatches: (query = {}) => request("GET", `/matches${toQuery(query)}`),
     getMatch: async (matchId) => (await request("GET", `/matches/${encodeURIComponent(matchId)}`)).match,
   });
 }
+
+const signedIn = ({ identity, carriedOver }) => ({
+  identity,
+  ...(carriedOver !== undefined && { carriedOver }),
+});
 
 function toQuery(query) {
   const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined));

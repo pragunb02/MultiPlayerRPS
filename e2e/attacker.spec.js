@@ -46,6 +46,8 @@ test.describe("attacker", () => {
 
     await page.goto(`/games/chess/rooms/${encodeURIComponent("<img src=x onerror=alert(1)>")}`);
 
+    await expect(page.getByText("<IMG SRC=X ONERROR=ALERT(1)>")).toBeVisible(); // the invite shows the code as text
+    await page.getByRole("button", { name: "Play as guest" }).click();
     await expect(page.getByRole("heading", { name: "Room not found" })).toBeVisible();
     expect(ran).toBe(false);
   });

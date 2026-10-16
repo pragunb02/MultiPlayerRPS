@@ -5,7 +5,7 @@ import {
   connectMatchPipeline,
   handleFatalErrors,
   handleShutdownSignals,
-  seatsFollowIdentity,
+  identityFollowers,
   startHousekeeping,
 } from "./server.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
@@ -106,16 +106,18 @@ describe("connectMatchPipeline", () => {
   const event = { room: { code: "ROOM22" }, outcome: {} };
   const match = { matchId: "m1", gameId: "rps", result: { reason: "best-of-1" } };
 
-  function setup({ recordFinished, applyMatch }) {
+  function setup({ recordFinished, applyMatch, follow = async ({ match: recorded }) => recorded }) {
     const domainEvents = new EventEmitter();
     const capture = captureLogger();
     const tasks = createBackgroundTasks({ logger: capture.logger });
     connectMatchPipeline({
       domainEvents,
       matchComponent: { recordFinished },
+      playerTransferComponent: { follow },
       progressionComponent: { applyMatch },
       tasks,
       logger: capture.logger,
+      now: () => 7,
     });
     return { domainEvents, tasks, ...capture };
   }
@@ -132,6 +134,23 @@ describe("connectMatchPipeline", () => {
     expect(applyMatch).toHaveBeenCalledWith(match);
     expect(find("match recorded")[0].matchId).toBe("m1");
     expect(find("progression applied")[0]).toEqual(expect.objectContaining({ matchId: "m1", players: 2 }));
+  });
+
+  it("awards progression for the match as it stands after following players who just signed in (CC-032)", async () => {
+    const moved = { ...match, players: [{ playerId: "user_1" }] };
+    const follow = vi.fn().mockResolvedValue(moved);
+    const applyMatch = vi.fn().mockResolvedValue([{}]);
+    const { domainEvents, tasks } = setup({
+      recordFinished: vi.fn().mockResolvedValue(match),
+      applyMatch,
+      follow,
+    });
+
+    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
+    await tasks.drain();
+
+    expect(follow).toHaveBeenCalledWith({ match, now: 7 });
+    expect(applyMatch).toHaveBeenCalledWith(moved);
   });
 
   it("never awards progression when recording the match failed", async () => {
@@ -170,11 +189,18 @@ describe("startHousekeeping", () => {
     vi.useRealTimers();
   });
 
-  function setup(roomComponent) {
+  const idleTransfers = () => ({ resumePending: vi.fn(async () => ({ completed: [], failed: [] })) });
+
+  function setup(roomComponent, playerTransferComponent = idleTransfers()) {
     vi.useFakeTimers();
     const capture = captureLogger();
-    const housekeeping = startHousekeeping({ roomComponent, logger: capture.logger, now: () => 42 });
-    return { housekeeping, ...capture };
+    const housekeeping = startHousekeeping({
+      roomComponent,
+      playerTransferComponent,
+      logger: capture.logger,
+      now: () => 42,
+    });
+    return { housekeeping, playerTransferComponent, ...capture };
   }
 
   it("applies game deadlines every second and sweeps idle rooms every minute", () => {
@@ -189,7 +215,7 @@ describe("startHousekeeping", () => {
     housekeeping.stop();
   });
 
-  it("logs a failing run and keeps going", () => {
+  it("logs a failing run and keeps going", async () => {
     const roomComponent = {
       sweepExpired: vi.fn(() => {
         throw new Error("sweep broke");
@@ -200,7 +226,7 @@ describe("startHousekeeping", () => {
     };
     const { housekeeping, find } = setup(roomComponent);
 
-    vi.advanceTimersByTime(120_000);
+    await vi.advanceTimersByTimeAsync(120_000);
 
     expect(find("room sweep failed")).toHaveLength(2);
     expect(find("applying game deadlines failed")).toHaveLength(120);
@@ -209,71 +235,124 @@ describe("startHousekeeping", () => {
 
   it("does nothing more once stopped", () => {
     const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
-    const { housekeeping } = setup(roomComponent);
+    const { housekeeping, playerTransferComponent } = setup(roomComponent);
 
     housekeeping.stop();
     vi.advanceTimersByTime(120_000);
 
     expect(roomComponent.expireDue).not.toHaveBeenCalled();
     expect(roomComponent.sweepExpired).not.toHaveBeenCalled();
+    expect(playerTransferComponent.resumePending).not.toHaveBeenCalled();
+  });
+
+  it("finishes interrupted guest transfers every minute and logs each one by player id (CC-032)", async () => {
+    const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
+    const transfers = {
+      resumePending: vi.fn(async () => ({
+        completed: ["guest_done"],
+        failed: [{ from: "guest_stuck", error: new Error("still down") }],
+      })),
+    };
+    const { housekeeping, find } = setup(roomComponent, transfers);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(transfers.resumePending).toHaveBeenCalledWith({ now: 42 });
+    expect(find("guest transfer resumed and completed")[0].playerId).toBe("guest_done");
+    expect(find("guest transfer failed again")[0]).toEqual(
+      expect.objectContaining({
+        playerId: "guest_stuck",
+        err: expect.objectContaining({ message: "still down" }),
+      }),
+    );
+    housekeeping.stop();
+  });
+
+  it("logs a failing transfer run and keeps going", async () => {
+    const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
+    const transfers = { resumePending: vi.fn().mockRejectedValue(new Error("database down")) };
+    const { housekeeping, find } = setup(roomComponent, transfers);
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(find("resuming guest transfers failed")).toHaveLength(2);
+    housekeeping.stop();
   });
 });
 
-describe("seatsFollowIdentity", () => {
+describe("identityFollowers", () => {
   const GUEST = { kind: "guest", id: "guest_a", displayName: "Guest-A1" };
   const USER = { kind: "user", id: "user_1", displayName: "Riya" };
+  const CARRIED = { carriedOver: { xp: 30, matchesPlayed: 1, matches: 1 } };
 
   function setup(changedRooms = [{ code: "AB2CD3" }]) {
     const roomComponent = {
       transferPlayer: vi.fn(() => changedRooms),
       giveUpWaitingSeats: vi.fn(() => changedRooms),
     };
+    const playerTransferComponent = { transfer: vi.fn(async () => CARRIED) };
     const domainEvents = new EventEmitter();
     const updates = [];
     domainEvents.on(ROOM_EVENTS.UPDATED, (event) => updates.push(event));
-    const onIdentityChanged = seatsFollowIdentity({ roomComponent, domainEvents, now: () => 7 });
-    return { onIdentityChanged, roomComponent, updates };
+    const onIdentityChanged = identityFollowers({
+      roomComponent,
+      playerTransferComponent,
+      domainEvents,
+      now: () => 7,
+    });
+    return { onIdentityChanged, roomComponent, playerTransferComponent, updates };
   }
 
-  it("moves a guest's seats to the account and tells each room", () => {
+  it("moves a guest's seats to the account and tells each room", async () => {
     const { onIdentityChanged, roomComponent, updates } = setup();
 
-    onIdentityChanged({ previous: GUEST, identity: USER });
+    await onIdentityChanged({ previous: GUEST, identity: USER });
 
     expect(roomComponent.transferPlayer).toHaveBeenCalledWith({ from: GUEST.id, to: USER, now: 7 });
     expect(updates).toEqual([{ room: { code: "AB2CD3" } }]);
+  });
+
+  it("moves a guest's progress and history to the account, and answers what moved (CC-032)", async () => {
+    const { onIdentityChanged, playerTransferComponent } = setup();
+
+    const result = await onIdentityChanged({ previous: GUEST, identity: USER });
+
+    expect(playerTransferComponent.transfer).toHaveBeenCalledWith({ from: GUEST.id, to: USER, now: 7 });
+    expect(result).toEqual(CARRIED);
   });
 
   it.each([
     ["nobody was signed in", undefined],
     ["an account switches to another account", { kind: "user", id: "user_2", displayName: "Bo" }],
     ["the same identity signs in again", USER],
-  ])("leaves rooms alone when %s", (_case, previous) => {
-    const { onIdentityChanged, roomComponent } = setup();
+  ])("leaves rooms and data alone when %s", async (_case, previous) => {
+    const { onIdentityChanged, roomComponent, playerTransferComponent } = setup();
 
-    onIdentityChanged({ previous, identity: USER });
+    expect(await onIdentityChanged({ previous, identity: USER })).toEqual({});
 
     expect(roomComponent.transferPlayer).not.toHaveBeenCalled();
     expect(roomComponent.giveUpWaitingSeats).not.toHaveBeenCalled();
+    expect(playerTransferComponent.transfer).not.toHaveBeenCalled();
   });
 
   it.each([GUEST, USER])(
     "gives up the waiting seats of whoever signs out (%o), and tells each room",
-    (previous) => {
-      const { onIdentityChanged, roomComponent, updates } = setup();
+    async (previous) => {
+      const { onIdentityChanged, roomComponent, playerTransferComponent, updates } = setup();
 
-      onIdentityChanged({ previous, identity: undefined });
+      expect(await onIdentityChanged({ previous, identity: undefined })).toEqual({});
 
       expect(roomComponent.giveUpWaitingSeats).toHaveBeenCalledWith({ playerId: previous.id, now: 7 });
       expect(roomComponent.transferPlayer).not.toHaveBeenCalled();
+      expect(playerTransferComponent.transfer).not.toHaveBeenCalled();
       expect(updates).toEqual([{ room: { code: "AB2CD3" } }]);
     },
   );
 
-  it("does nothing when a visitor without a session 'signs out'", () => {
+  it("does nothing when a visitor without a session 'signs out'", async () => {
     const { onIdentityChanged, roomComponent } = setup();
 
-    onIdentityChanged({ previous: undefined, identity: undefined });
+    await onIdentityChanged({ previous: undefined, identity: undefined });
 
     expect(roomComponent.giveUpWaitingSeats).not.toHaveBeenCalled();
   });

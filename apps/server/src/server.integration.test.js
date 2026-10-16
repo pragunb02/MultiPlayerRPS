@@ -300,6 +300,171 @@ describe("signing in from a guest session (integration)", () => {
   });
 });
 
+describe("a guest's progress moving to their account through the real composition root (integration, CC-032)", () => {
+  const json = { "Content-Type": "application/json" };
+  const RIYA = { username: "Riya", email: "riya@example.com", password: "correct horse battery" };
+
+  async function guest(url) {
+    const res = await fetch(`${url}/api/session/guest`, { method: "POST" });
+    const cookie = res.headers.get("set-cookie").split(";")[0];
+    const socket = connect(url, { transports: ["websocket"], extraHeaders: { cookie }, reconnection: false });
+    await new Promise((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("connect_error", (err) => reject(describeConnectError(err)));
+    });
+    return { socket, cookie, identity: (await res.json()).identity };
+  }
+
+  const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
+
+  /** One game of Rock Paper Scissors: `winner` plays rock, `loser` scissors. Returns the room code. */
+  async function play(winner, loser, { lastMove } = {}) {
+    const { data: room } = await send(winner.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "rps",
+      options: { bestOf: 1 },
+    });
+    await send(loser.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
+    await send(winner.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "rock" } });
+    const finish = () =>
+      send(loser.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "scissors" } });
+    return lastMove ? { finish } : finish();
+  }
+
+  const api = async (url, path, cookie) => (await fetch(`${url}/api${path}`, { headers: { cookie } })).json();
+  const progressOf = (url, cookie, matchesPlayed) =>
+    eventually(async () => {
+      const { progress } = await api(url, "/progress", cookie);
+      return progress.matchesPlayed === matchesPlayed ? progress : undefined;
+    });
+
+  it("moves totals and history exactly once on sign-up, and the moved match still replays", async () => {
+    const app = await start();
+    const sockets = [];
+    try {
+      const alice = await guest(app.url);
+      const bob = await guest(app.url);
+      sockets.push(alice.socket, bob.socket);
+      await play(alice, bob);
+      await progressOf(app.url, alice.cookie, 1);
+
+      const signup = await fetch(`${app.url}/api/auth/signup`, {
+        method: "POST",
+        headers: { ...json, cookie: alice.cookie },
+        body: JSON.stringify(RIYA),
+      });
+      const cookie = signup.headers.get("set-cookie").split(";")[0];
+      const body = await signup.json();
+      const { matches } = await api(app.url, "/matches", cookie);
+      const { match } = await api(app.url, `/matches/${matches[0].matchId}`, cookie);
+      const rps = ENGINES.find((engine) => engine.id === "rps");
+      const replayed = replayGame(rps, {
+        players: match.players.map((p) => p.playerId),
+        options: match.options,
+        seed: match.seed,
+        log: match.log,
+      });
+      const [transfer] = await readCollection(app.config.mongoUri, "player_transfers");
+      const progressDocs = await readCollection(app.config.mongoUri, "player_progress");
+
+      expect(body.carriedOver).toEqual({ xp: 30, matchesPlayed: 1, matches: 1 });
+      expect((await api(app.url, "/progress", cookie)).progress).toEqual(
+        expect.objectContaining({ xp: 30, matchesPlayed: 1, wins: 1 }),
+      );
+      expect(match.players[0]).toEqual({ playerId: body.identity.id, displayName: "Riya" });
+      expect(match.result.winners).toEqual([body.identity.id]);
+      expect(rps.getOutcome(replayed)).toEqual({ status: "finished", ...match.result });
+      expect(transfer).toEqual(
+        expect.objectContaining({ from: alice.identity.id, status: "done", to: body.identity }),
+      );
+      // The guest keeps only a marker naming the account; the account holds the totals.
+      expect(progressDocs.find((doc) => doc.playerId === alice.identity.id).mergedInto).toBe(
+        body.identity.id,
+      );
+      expect(progressDocs.find((doc) => doc.playerId === body.identity.id).mergedFrom).toEqual([
+        alice.identity.id,
+      ]);
+    } finally {
+      sockets.forEach((socket) => socket.disconnect());
+      await app.close();
+    }
+  });
+
+  it("adds a guest's games to an existing account on login: totals summed, histories joined", async () => {
+    const app = await start();
+    const sockets = [];
+    try {
+      const signup = await fetch(`${app.url}/api/auth/signup`, {
+        method: "POST",
+        headers: json,
+        body: JSON.stringify(RIYA),
+      });
+      const accountCookie = signup.headers.get("set-cookie").split(";")[0];
+      const account = connect(app.url, {
+        transports: ["websocket"],
+        extraHeaders: { cookie: accountCookie },
+        reconnection: false,
+      });
+      await new Promise((resolve) => account.once("connect", resolve));
+      const rival = await guest(app.url);
+      sockets.push(account, rival.socket);
+      await play({ socket: account }, rival); // the account wins: 30 XP
+      await progressOf(app.url, accountCookie, 1);
+      const visitor = await guest(app.url);
+      const friend = await guest(app.url);
+      sockets.push(visitor.socket, friend.socket);
+      await play(friend, visitor); // the guest loses: 10 XP
+      await progressOf(app.url, visitor.cookie, 1);
+
+      const login = await fetch(`${app.url}/api/auth/login`, {
+        method: "POST",
+        headers: { ...json, cookie: visitor.cookie },
+        body: JSON.stringify({ email: RIYA.email, password: RIYA.password }),
+      });
+      const cookie = login.headers.get("set-cookie").split(";")[0];
+
+      expect((await login.json()).carriedOver).toEqual({ xp: 10, matchesPlayed: 1, matches: 1 });
+      expect((await api(app.url, "/progress", cookie)).progress).toEqual(
+        expect.objectContaining({ xp: 40, matchesPlayed: 2, wins: 1, losses: 1 }),
+      );
+      expect((await api(app.url, "/matches", cookie)).matches.map((m) => m.outcomeForYou).sort()).toEqual([
+        "loss",
+        "win",
+      ]);
+    } finally {
+      sockets.forEach((socket) => socket.disconnect());
+      await app.close();
+    }
+  });
+
+  it("credits the account for a match that finishes while its guest is signing up", async () => {
+    const app = await start();
+    const sockets = [];
+    try {
+      const alice = await guest(app.url);
+      const bob = await guest(app.url);
+      sockets.push(alice.socket, bob.socket);
+      const { finish } = await play(bob, alice, { lastMove: true }); // alice is about to lose: 10 XP
+
+      const [signup] = await Promise.all([
+        fetch(`${app.url}/api/auth/signup`, {
+          method: "POST",
+          headers: { ...json, cookie: alice.cookie },
+          body: JSON.stringify(RIYA),
+        }),
+        finish(),
+      ]);
+      const cookie = signup.headers.get("set-cookie").split(";")[0];
+
+      const progress = await progressOf(app.url, cookie, 1);
+      expect(progress).toEqual(expect.objectContaining({ xp: 10, losses: 1 }));
+      expect((await api(app.url, "/matches", cookie)).matches).toHaveLength(1);
+    } finally {
+      sockets.forEach((socket) => socket.disconnect());
+      await app.close();
+    }
+  });
+});
+
 describe("legacy player migration through the real composition root (integration, CC-078)", () => {
   it("logs a legacy player in with their old password and leaves the legacy document untouched", async () => {
     const config = freshConfig();

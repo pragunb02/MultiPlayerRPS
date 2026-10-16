@@ -104,5 +104,33 @@ export function createMatchDao({ connection }) {
       const filter = { "players.playerId": playerId, ...(before && { endedAt: { $lt: before } }) };
       return Match.find(filter, FIELDS).sort({ endedAt: -1 }).limit(limit).lean();
     },
+
+    /**
+     * Every match `playerId` played that `excluding` did not (a guest's games, without those against the account
+     * they are moving to), oldest first.
+     *
+     * @param {string} playerId
+     * @param {{ excluding: string }} filter
+     * @returns {Promise<MatchDoc[]>}
+     */
+    listByPlayerExcluding(playerId, { excluding }) {
+      const filter = { $and: [{ "players.playerId": playerId }, { "players.playerId": { $ne: excluding } }] };
+      return Match.find(filter, FIELDS).sort({ endedAt: 1 }).lean();
+    },
+
+    /**
+     * Replaces a match with its renamed copy — only while `from` is still one of its players, so renaming twice
+     * (or concurrently) changes it once.
+     *
+     * @param {{ matchId: string, from: string, doc: Omit<MatchDoc, "schemaVersion"> }} rename
+     * @returns {Promise<boolean>} whether the match was renamed now
+     */
+    async renamePlayer({ matchId, from, doc }) {
+      const { matchedCount } = await Match.replaceOne(
+        { matchId, "players.playerId": from },
+        { ...doc, matchId, schemaVersion: MATCH_SCHEMA_VERSION },
+      );
+      return matchedCount === 1;
+    },
   });
 }

@@ -1,4 +1,4 @@
-import { createRoom, expect, test } from "./fixtures.js";
+import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
 // Every state of every screen a person can reach (CC-084), with what they can do from there.
@@ -66,6 +66,7 @@ test.describe("game lobby", () => {
     await page.getByRole("button", { name: "Join room" }).click();
 
     await expect(page).toHaveURL("/games/chess/rooms/ZZZZZZ");
+    await page.getByRole("button", { name: "Play as guest" }).click(); // no session yet: choose how to join
     await expect(page.getByRole("heading", { name: "Room not found" })).toBeVisible();
     await expect(page).toHaveTitle("Room not found · ClassiCade");
     await page.getByRole("link", { name: "Back to the games" }).click();
@@ -91,11 +92,11 @@ test.describe("room", () => {
     const host = await players.open("host");
     const room = await createRoom(host, "tic-tac-toe");
     const friend = await players.open("friend");
-    await friend.page.goto(room.path);
+    await joinAsGuest(friend, room.path);
     await expect(friend.page.getByRole("grid", { name: "Tic-Tac-Toe board" })).toBeVisible();
     const latecomer = await players.open("latecomer");
 
-    await latecomer.page.goto(room.path);
+    await joinAsGuest(latecomer, room.path);
 
     await expect(latecomer.page.getByRole("heading", { name: "Can't join this room" })).toBeVisible();
     await expect(latecomer.page.getByText("This game has already started")).toBeVisible();
@@ -110,7 +111,7 @@ test.describe("room", () => {
     await expect(host.page).toHaveURL("/games/chess");
     const late = await players.open("late friend");
 
-    await late.page.goto(room.path);
+    await joinAsGuest(late, room.path);
 
     await expect(late.page.getByRole("heading", { name: "Room not found" })).toBeVisible();
   });
@@ -120,7 +121,7 @@ test.describe("room", () => {
     const room = await createRoom(host, "tic-tac-toe");
     await expect(host.page.getByRole("list", { name: "Players" })).toContainText("Waiting for a player");
     const friend = await players.open("friend");
-    await friend.page.goto(room.path);
+    await joinAsGuest(friend, room.path);
 
     for (const player of [host, friend]) {
       await expect(player.page.getByRole("grid", { name: "Tic-Tac-Toe board" })).toBeVisible();
@@ -135,7 +136,7 @@ test.describe("room", () => {
     await expect(host.page.getByRole("list", { name: "Players" })).toContainText("disconnected");
   });
 
-  test("logging out inside a waiting room gives the seat up: Back doesn't seat a new guest in it (CC-085)", async ({
+  test("logging out inside a waiting room gives the seat up: Back doesn't seat anyone in it (CC-085, CC-086)", async ({
     players,
   }) => {
     const account = newAccount();
@@ -149,6 +150,11 @@ test.describe("room", () => {
     await riya.page.goBack();
 
     await expect(riya.page).toHaveURL(room.path);
+    // Signed out, the room link asks how to join — nobody is seated without choosing to.
+    await expect(riya.page.getByRole("heading", { name: "You're invited to play Chess" })).toBeVisible();
+    expect((await riya.context.cookies()).map((c) => c.name)).not.toContain("cc.sid");
+    await riya.page.getByRole("button", { name: "Play as guest" }).click();
+    // The room closed when its only player gave up the seat.
     await expect(riya.page.getByRole("heading", { name: "Room not found" })).toBeVisible();
     await expect(riya.page.getByRole("grid", { name: "Chess board" })).toHaveCount(0);
   });
@@ -162,7 +168,7 @@ test.describe("profile", () => {
     await alice.page.getByRole("button", { name: "Create room" }).click();
     const invite = await alice.page.getByRole("textbox", { name: "Invite link" }).inputValue();
     const bob = await players.open("bob");
-    await bob.page.goto(invite);
+    await joinAsGuest(bob, invite);
     await alice.page
       .getByRole("group", { name: "Your choice" })
       .getByRole("button", { name: /Scissors/ })

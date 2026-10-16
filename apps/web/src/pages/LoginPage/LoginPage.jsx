@@ -4,11 +4,14 @@ import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { useToast } from "../../components/Toast/toastContext.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "../authForms.module.css";
+import { carriedOverMessage } from "../carriedOver.js";
 
 export function LoginPage() {
   const session = useSession();
+  const toast = useToast();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
   const [form, setForm] = useState({ email: "", password: "" });
@@ -19,7 +22,9 @@ export function LoginPage() {
     event.preventDefault();
     setState({ busy: true, error: "" });
     try {
-      await session.login(form);
+      const { carriedOver } = await session.login(form);
+      const welcome = carriedOverMessage(carriedOver);
+      if (welcome !== "") toast.show(welcome, { tone: "success" });
       // Signed in: the redirect below takes over on the next render.
     } catch (err) {
       setState({ busy: false, error: err.message });
@@ -52,6 +57,9 @@ export function LoginPage() {
           value={form.password}
           onChange={update("password")}
         />
+        {session.identity?.kind === "guest" && (
+          <p className={styles.note}>Logging in adds this guest's XP and matches to your account.</p>
+        )}
         {state.error && (
           <p role="alert" className={styles.alert}>
             {state.error}

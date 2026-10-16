@@ -7,10 +7,12 @@ import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createLegacyUserAccessor } from "./data/legacyUserAccessor.js";
 import { createMatchAccessor } from "./data/matchAccessor.js";
+import { createPlayerTransferAccessor } from "./data/playerTransferAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createAccountComponent } from "./domain/accounts/accountComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
+import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
 import { createProgressionComponent } from "./domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
@@ -19,6 +21,7 @@ import { connectDatabase } from "./persistence/database.js";
 import { createInMemoryRoomDao } from "./persistence/inMemoryRoomDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
+import { createPlayerTransferDao } from "./persistence/playerTransferDao.js";
 import { createProgressDao } from "./persistence/progressDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
 import { createHttpApp } from "./service/http/app.js";
@@ -31,6 +34,7 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_ENDED = "sessionEnded";
 const ROOM_SWEEP_INTERVAL_MS = 60_000;
 const CLOCK_TICK_INTERVAL_MS = 1_000;
+const TRANSFER_RESUME_INTERVAL_MS = 60_000;
 
 /**
  * Every playable engine must be listed in the public game catalog (and vice versa once all games exist).
@@ -53,17 +57,28 @@ export function assertEnginesInCatalog(engines) {
 /**
  * After a game ends: record the match, then award progression from the recorded match (so XP only ever comes
  * from a persisted match). Both steps run as background tasks — a slow database never delays a game — and
- * shutdown drains them.
+ * shutdown drains them. In between, a match recorded for a guest who has just signed in moves to their account
+ * (CC-032), so the account gets the XP.
  *
  * @param {{
  *   domainEvents: import("node:events").EventEmitter,
  *   matchComponent: { recordFinished: Function },
+ *   playerTransferComponent: { follow: Function },
  *   progressionComponent: { applyMatch: Function },
  *   tasks: ReturnType<typeof createBackgroundTasks>,
  *   logger: Logger,
+ *   now?: () => number,
  * }} deps
  */
-export function connectMatchPipeline({ domainEvents, matchComponent, progressionComponent, tasks, logger }) {
+export function connectMatchPipeline({
+  domainEvents,
+  matchComponent,
+  playerTransferComponent,
+  progressionComponent,
+  tasks,
+  logger,
+  now = Date.now,
+}) {
   domainEvents.on(ROOM_EVENTS.GAME_FINISHED, (event) => {
     tasks.run(
       "record match",
@@ -76,7 +91,8 @@ export function connectMatchPipeline({ domainEvents, matchComponent, progression
         tasks.run(
           "apply progression",
           async () => {
-            const updates = await progressionComponent.applyMatch(match);
+            const followed = await playerTransferComponent.follow({ match, now: now() });
+            const updates = await progressionComponent.applyMatch(followed);
             logger.info({ matchId: match.matchId, players: updates.length }, "progression applied");
           },
           { matchId: match.matchId },
@@ -88,24 +104,23 @@ export function connectMatchPipeline({ domainEvents, matchComponent, progression
 }
 
 /**
- * Periodic room work: close idle rooms, and apply game deadlines that have passed (a chess flag falling while
- * nobody moves). A failing run is logged and the next one still happens. Timers don't keep the process alive.
+ * Periodic work: close idle rooms, apply game deadlines that have passed (a chess flag falling while nobody
+ * moves), and finish guest → account transfers that were interrupted (CC-032). A failing run is logged and the
+ * next one still happens. Timers don't keep the process alive.
  *
  * @param {{
  *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "sweepExpired" | "expireDue">,
+ *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "resumePending">,
  *   logger: Logger,
  *   now?: () => number,
  * }} deps
  * @returns {{ stop: () => void }}
  */
-export function startHousekeeping({ roomComponent, logger, now = Date.now }) {
+export function startHousekeeping({ roomComponent, playerTransferComponent, logger, now = Date.now }) {
   const every = (intervalMs, work, failure) => {
     const timer = setInterval(() => {
-      try {
-        work();
-      } catch (err) {
-        logger.error({ err }, failure);
-      }
+      // Work may be synchronous or return a promise; both kinds of failure are logged the same way.
+      new Promise((resolve) => resolve(work())).catch((err) => logger.error({ err }, failure));
     }, intervalMs);
     timer.unref();
     return timer;
@@ -117,29 +132,50 @@ export function startHousekeeping({ roomComponent, logger, now = Date.now }) {
       () => roomComponent.expireDue({ now: now() }),
       "applying game deadlines failed",
     ),
+    every(
+      TRANSFER_RESUME_INTERVAL_MS,
+      async () => {
+        const { completed, failed } = await playerTransferComponent.resumePending({ now: now() });
+        completed.forEach((from) => logger.info({ playerId: from }, "guest transfer resumed and completed"));
+        failed.forEach(({ from, error }) =>
+          logger.error({ err: error, playerId: from }, "guest transfer failed again"),
+        );
+      },
+      "resuming guest transfers failed",
+    ),
   ];
   return { stop: () => timers.forEach((timer) => clearInterval(timer)) };
 }
 
 /**
- * Seats follow who the player is, and everyone in the rooms concerned sees the change:
- * - a guest who signs in keeps their seats — rooms hand them to the account (CC-083);
+ * Seats and player data follow who the player is, and everyone in the rooms concerned sees the change:
+ * - a guest who signs in keeps their seats — rooms hand them to the account (CC-083) — and their XP and match
+ *   history move to the account (CC-032); the answer says what moved;
  * - someone who signs out gives up their seats in rooms that haven't started (CC-085).
  *
- * @param {{ roomComponent: ReturnType<typeof createRoomComponent>, domainEvents: import("node:events").EventEmitter, now?: () => number }} deps
+ * @param {{
+ *   roomComponent: ReturnType<typeof createRoomComponent>,
+ *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "transfer">,
+ *   domainEvents: import("node:events").EventEmitter,
+ *   now?: () => number,
+ * }} deps
  * @returns {Parameters<typeof createHttpApp>[0]["onIdentityChanged"]}
  */
-export function seatsFollowIdentity({ roomComponent, domainEvents, now = Date.now }) {
+export function identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now = Date.now }) {
   const announce = (rooms) => rooms.forEach((room) => domainEvents.emit(ROOM_EVENTS.UPDATED, { room }));
-  return ({ previous, identity }) => {
+  return async ({ previous, identity }) => {
     if (previous === undefined) {
-      return;
+      return {};
     }
     if (identity === undefined) {
       announce(roomComponent.giveUpWaitingSeats({ playerId: previous.id, now: now() }));
-    } else if (previous.kind === IDENTITY_KINDS.GUEST && previous.id !== identity.id) {
-      announce(roomComponent.transferPlayer({ from: previous.id, to: identity, now: now() }));
+      return {};
     }
+    if (previous.kind !== IDENTITY_KINDS.GUEST || previous.id === identity.id) {
+      return {};
+    }
+    announce(roomComponent.transferPlayer({ from: previous.id, to: identity, now: now() }));
+    return playerTransferComponent.transfer({ from: previous.id, to: identity, now: now() });
   };
 }
 
@@ -169,7 +205,13 @@ export async function startServer({ config, logger, limits = {} }) {
   const progressDao = createProgressDao({ connection: database.connection });
   const accountDao = createAccountDao({ connection: database.connection });
   const legacyUserDao = createLegacyUserDao({ connection: database.connection }); // read-only, CC-078
-  await Promise.all([matchDao.ensureIndexes(), progressDao.ensureIndexes(), accountDao.ensureIndexes()]);
+  const playerTransferDao = createPlayerTransferDao({ connection: database.connection });
+  await Promise.all([
+    matchDao.ensureIndexes(),
+    progressDao.ensureIndexes(),
+    accountDao.ensureIndexes(),
+    playerTransferDao.ensureIndexes(),
+  ]);
 
   // 3. data
   const roomAccessor = createRoomAccessor({ roomDao });
@@ -177,6 +219,7 @@ export async function startServer({ config, logger, limits = {} }) {
   const progressAccessor = createProgressAccessor({ progressDao });
   const accountAccessor = createAccountAccessor({ accountDao });
   const legacyUserAccessor = createLegacyUserAccessor({ legacyUserDao });
+  const playerTransferAccessor = createPlayerTransferAccessor({ playerTransferDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -194,8 +237,24 @@ export async function startServer({ config, logger, limits = {} }) {
   });
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({ progressAccessor, events: domainEvents });
+  // Everything stored by player id moves with a guest who signs in (ADR-014), in this order.
+  const playerTransferComponent = createPlayerTransferComponent({
+    playerTransferAccessor,
+    participants: [
+      { name: "matches", transferPlayer: matchComponent.transferPlayer },
+      { name: "progress", transferPlayer: progressionComponent.transferPlayer },
+    ],
+    matches: matchComponent,
+  });
   const tasks = createBackgroundTasks({ logger });
-  connectMatchPipeline({ domainEvents, matchComponent, progressionComponent, tasks, logger });
+  connectMatchPipeline({
+    domainEvents,
+    matchComponent,
+    playerTransferComponent,
+    progressionComponent,
+    tasks,
+    logger,
+  });
 
   // 1. service — HTTP and realtime share one session middleware, so both see the same identity
   const sessionMiddleware = createSessionMiddleware({
@@ -216,7 +275,7 @@ export async function startServer({ config, logger, limits = {} }) {
     progressionComponent,
     accountComponent,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
-    onIdentityChanged: seatsFollowIdentity({ roomComponent, domainEvents }),
+    onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents }),
   });
   const server = http.createServer(app);
   const gateway = createRealtimeGateway({
@@ -229,7 +288,7 @@ export async function startServer({ config, logger, limits = {} }) {
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
 
-  const housekeeping = startHousekeeping({ roomComponent, logger });
+  const housekeeping = startHousekeeping({ roomComponent, playerTransferComponent, logger });
 
   const close = async () => {
     housekeeping.stop();

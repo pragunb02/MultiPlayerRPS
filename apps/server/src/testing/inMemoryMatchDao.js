@@ -34,5 +34,22 @@ export function createInMemoryMatchDao() {
         .slice(0, limit)
         .map(copy);
     },
+
+    async listByPlayerExcluding(playerId, { excluding }) {
+      const has = (m, id) => m.players.some((p) => p.playerId === id);
+      return [...matches.values()]
+        .filter((m) => has(m, playerId) && !has(m, excluding))
+        .sort((a, b) => a.endedAt - b.endedAt)
+        .map(copy);
+    },
+
+    async renamePlayer({ matchId, from, doc }) {
+      const stored = matches.get(matchId);
+      if (stored === undefined || !stored.players.some((p) => p.playerId === from)) {
+        return false;
+      }
+      matches.set(matchId, copy({ ...doc, matchId, schemaVersion: 1 }));
+      return true;
+    },
   });
 }

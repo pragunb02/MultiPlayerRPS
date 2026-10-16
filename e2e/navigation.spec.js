@@ -1,4 +1,4 @@
-import { createRoom, expect, test } from "./fixtures.js";
+import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
 // Browser history on every screen (CC-084): links forward, Back, Forward, long Back/Forward chains, reload, and
@@ -124,6 +124,7 @@ test.describe("history: rooms", () => {
     await friend.page.getByRole("textbox", { name: "Room code" }).fill(room.code.toLowerCase());
     await friend.page.getByRole("button", { name: "Join room" }).click();
     await expect(friend.page).toHaveURL(room.path);
+    await friend.page.getByRole("button", { name: "Play as guest" }).click();
     await expect(friend.page.getByRole("grid", { name: "Tic-Tac-Toe board" })).toBeVisible();
 
     await friend.page.goBack();
@@ -150,7 +151,7 @@ test.describe("history: rooms", () => {
     const host = await players.open("host");
     const room = await createRoom(host, "tic-tac-toe");
     const friend = await players.open("friend");
-    await friend.page.goto(room.path);
+    await joinAsGuest(friend, room.path);
     await expect(friend.page.getByRole("grid", { name: "Tic-Tac-Toe board" })).toBeVisible();
 
     await friend.page.getByRole("button", { name: "Leave room" }).click();
@@ -170,7 +171,7 @@ test.describe("history: rooms", () => {
     const invite = await alice.page.getByRole("textbox", { name: "Invite link" }).inputValue();
     const roomUrl = alice.url();
     const bob = await players.open("bob");
-    await bob.page.goto(invite);
+    await joinAsGuest(bob, invite);
     await alice.page
       .getByRole("group", { name: "Your choice" })
       .getByRole("button", { name: /Paper/ })

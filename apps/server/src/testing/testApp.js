@@ -6,15 +6,17 @@ import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
+import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js";
 import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createAccountComponent } from "../domain/accounts/accountComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
+import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "../persistence/inMemoryRoomDao.js";
-import { connectMatchPipeline, seatsFollowIdentity } from "../server.js";
+import { connectMatchPipeline, identityFollowers } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
@@ -24,6 +26,7 @@ import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryLegacyUserDao } from "./inMemoryLegacyUserDao.js";
 import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
+import { createInMemoryPlayerTransferDao } from "./inMemoryPlayerTransferDao.js";
 import { createInMemoryProgressDao } from "./inMemoryProgressDao.js";
 import { testConfig } from "./testConfig.js";
 
@@ -38,6 +41,8 @@ import { testConfig } from "./testConfig.js";
  *   authLimits?: object,
  *   legacyUsers?: ReadonlyArray<object>,
  *   isDatabaseUp?: () => boolean,
+ *   transferParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who
+ *     takes part in moving a guest's data (e.g. one that fails)
  * }} [options]
  */
 export function createTestApp({
@@ -47,6 +52,7 @@ export function createTestApp({
   engines = [raceEngine],
   legacyUsers = [],
   isDatabaseUp = () => true,
+  transferParticipants = (participants) => participants,
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -81,8 +87,25 @@ export function createTestApp({
     progressAccessor: createProgressAccessor({ progressDao: createInMemoryProgressDao() }),
     events: domainEvents,
   });
+  const playerTransferComponent = createPlayerTransferComponent({
+    playerTransferAccessor: createPlayerTransferAccessor({
+      playerTransferDao: createInMemoryPlayerTransferDao(),
+    }),
+    participants: transferParticipants([
+      { name: "matches", transferPlayer: matchComponent.transferPlayer },
+      { name: "progress", transferPlayer: progressionComponent.transferPlayer },
+    ]),
+    matches: matchComponent,
+  });
   const tasks = createBackgroundTasks({ logger: capture.logger });
-  connectMatchPipeline({ domainEvents, matchComponent, progressionComponent, tasks, logger: capture.logger });
+  connectMatchPipeline({
+    domainEvents,
+    matchComponent,
+    playerTransferComponent,
+    progressionComponent,
+    tasks,
+    logger: capture.logger,
+  });
   const endedSessions = [];
   const endedListeners = [];
 
@@ -97,7 +120,7 @@ export function createTestApp({
     accountComponent,
     authLimits,
     guestLimit,
-    onIdentityChanged: seatsFollowIdentity({ roomComponent, domainEvents }),
+    onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents }),
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);
       endedListeners.forEach((listener) => listener(sessionId));
@@ -114,6 +137,7 @@ export function createTestApp({
     roomComponent,
     matchComponent,
     progressionComponent,
+    playerTransferComponent,
     tasks,
     endedSessions,
     onSessionEnded: (listener) => endedListeners.push(listener),

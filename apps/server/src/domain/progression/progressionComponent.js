@@ -91,5 +91,16 @@ export function createProgressionComponent({ progressAccessor, events }) {
     async getProgress(playerId) {
       return describe(await progressAccessor.get(playerId));
     },
+
+    /**
+     * A guest's XP and totals become their account's (CC-032), added to what the account already has; the level
+     * follows from the XP. Idempotent and resumable.
+     *
+     * @param {{ from: string, to: Readonly<import("../../models/identity.js").Identity>, now: number }} transfer
+     * @returns {Promise<{ moved: Readonly<Record<string, number>> }>} the totals added now
+     */
+    transferPlayer({ from, to, now }) {
+      return progressAccessor.mergeInto({ from, to: to.id, at: now });
+    },
   });
 }

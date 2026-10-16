@@ -56,8 +56,12 @@ export function SessionProvider({ children }) {
     };
   }, [api, adopt]);
 
-  const value = useMemo(
-    () => ({
+  const value = useMemo(() => {
+    const signedIn = (result) => {
+      adopt(result.identity);
+      return result;
+    };
+    return {
       ...state,
       /** Ensures there is an identity to play with: keeps the current one, or starts a guest session. */
       // Pages may ask several times while the first guest session is being created; they all share that one.
@@ -71,15 +75,15 @@ export function SessionProvider({ children }) {
           });
         return pendingGuest.current;
       },
-      signup: async (credentials) => adopt(await api.signup(credentials)),
-      login: async (credentials) => adopt(await api.login(credentials)),
+      // Both answer `{ identity, carriedOver? }`: what a guest's games brought to the account (CC-032).
+      signup: async (credentials) => signedIn(await api.signup(credentials)),
+      login: async (credentials) => signedIn(await api.login(credentials)),
       logout: async () => {
         await api.endSession();
         adopt(undefined);
       },
-    }),
-    [state, api, adopt],
-  );
+    };
+  }, [state, api, adopt]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

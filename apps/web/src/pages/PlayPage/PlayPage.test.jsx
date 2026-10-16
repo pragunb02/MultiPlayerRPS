@@ -64,7 +64,11 @@ describe("PlayPage", () => {
     await user.type(screen.getByRole("textbox", { name: "Room code" }), "ab2cd3");
     await user.click(join);
 
-    expect(await screen.findByText(/Joining room AB2CD3/)).toBeInTheDocument();
+    // A visitor without a session first chooses how to join (CC-086).
+    expect(
+      await screen.findByRole("heading", { name: "You're invited to play Rock Paper Scissors" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("AB2CD3")).toBeInTheDocument();
   });
 
   it("shows not-found for an unknown game", () => {

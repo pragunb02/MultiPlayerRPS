@@ -88,4 +88,40 @@ export function runMatchDaoContract(createDao) {
 
     expect((await dao.getByMatchId(matchDoc().matchId)).players[0].displayName).toBe("Alice");
   });
+
+  it("lists a guest's matches without those against a given player, oldest first", async () => {
+    const dao = await createDao();
+    const vs = (opponent) => [
+      { playerId: "guest_a", displayName: "Alice" },
+      { playerId: opponent, displayName: "Other" },
+    ];
+    await dao.insert(matchDoc({ matchId: "m-late", players: vs("guest_b"), endedAt: new Date(T0 + 2000) }));
+    await dao.insert(matchDoc({ matchId: "m-early", players: vs("guest_c"), endedAt: new Date(T0 + 1000) }));
+    await dao.insert(matchDoc({ matchId: "m-vs-account", players: vs("user_1") }));
+
+    const listed = await dao.listByPlayerExcluding("guest_a", { excluding: "user_1" });
+
+    expect(listed.map((m) => m.matchId)).toEqual(["m-early", "m-late"]);
+    expect(await dao.listByPlayerExcluding("guest_nobody", { excluding: "user_1" })).toEqual([]);
+  });
+
+  it("replaces a match with its renamed copy only while the old player is still in it", async () => {
+    const dao = await createDao();
+    await dao.insert(matchDoc());
+    const renamed = matchDoc({
+      players: [
+        { playerId: "user_1", displayName: "Riya" },
+        { playerId: "guest_b", displayName: "Bob" },
+      ],
+    });
+
+    const first = await dao.renamePlayer({ matchId: matchDoc().matchId, from: "guest_a", doc: renamed });
+    const again = await dao.renamePlayer({ matchId: matchDoc().matchId, from: "guest_a", doc: matchDoc() });
+    const unknown = await dao.renamePlayer({ matchId: "m-none", from: "guest_a", doc: renamed });
+
+    expect([first, again, unknown]).toEqual([true, false, false]);
+    expect(await dao.getByMatchId(matchDoc().matchId)).toEqual({ ...renamed, schemaVersion: 1 });
+    expect(await dao.listByPlayer("guest_a", { limit: 10 })).toEqual([]);
+    expect(await dao.listByPlayer("user_1", { limit: 10 })).toHaveLength(1);
+  });
 }

@@ -10,6 +10,8 @@ import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { gameView } from "../../games/registry.js";
 import { useRoom } from "../../hooks/useRoom.js";
+import { useSession } from "../../hooks/useSession.js";
+import { JoinChooser } from "./JoinChooser.jsx";
 import styles from "./RoomPage.module.css";
 
 const CLOSED_REASONS = Object.freeze({
@@ -35,6 +37,9 @@ function outcomeText(room) {
  * A room from joining to the result: waiting with an invite, the game board, the outcome. Its URL names the game
  * and the room; any other spelling (lower-case code, old `/room/:code` link, wrong game) is replaced by the
  * canonical one — before joining where the code alone decides it, after joining where the room's game does.
+ *
+ * Someone who arrives without a session first chooses how to join: as a guest, or by logging in or signing up
+ * and coming straight back (CC-086). Nothing is created for them until they choose.
  */
 export function RoomPage() {
   const params = useParams();
@@ -43,14 +48,35 @@ export function RoomPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
-  const room = useRoom(code);
+  const session = useSession();
+  const room = useRoom(code, { enabled: session.status === "ready" });
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const gameId = room.room?.gameId ?? urlGame?.id;
 
   if (gameId !== undefined && location.pathname !== paths.room(gameId, code)) {
     return <Navigate to={paths.room(gameId, code)} replace />;
   }
-  if (room.status === "joining") {
+  if (session.status === "anonymous") {
+    return (
+      <JoinChooser
+        code={code}
+        game={urlGame}
+        returnTo={location.pathname}
+        onPlayAsGuest={session.ensurePlayer}
+      />
+    );
+  }
+  if (session.status === "error") {
+    return (
+      <section>
+        <PageTitle>Can't join this room</PageTitle>
+        <h1>Can't join this room</h1>
+        <p>{session.error.message}</p>
+        <Link to={paths.home()}>Back to the games</Link>
+      </section>
+    );
+  }
+  if (session.status === "loading" || room.status === "joining") {
     return (
       <>
         <PageTitle>{`Room ${code}`}</PageTitle>

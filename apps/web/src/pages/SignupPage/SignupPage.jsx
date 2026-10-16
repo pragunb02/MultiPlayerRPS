@@ -4,8 +4,10 @@ import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { useToast } from "../../components/Toast/toastContext.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "../authForms.module.css";
+import { carriedOverMessage } from "../carriedOver.js";
 
 // Mirrors the server's rules (models/credentials.js) for instant feedback; the server still decides.
 const RULES = {
@@ -16,6 +18,7 @@ const RULES = {
 
 export function SignupPage() {
   const session = useSession();
+  const toast = useToast();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
   const [form, setForm] = useState({ username: "", email: "", password: "" });
@@ -33,7 +36,9 @@ export function SignupPage() {
     }
     setState({ busy: true, error: "", fieldErrors: {} });
     try {
-      await session.signup(form);
+      const { carriedOver } = await session.signup(form);
+      const welcome = carriedOverMessage(carriedOver);
+      if (welcome !== "") toast.show(welcome, { tone: "success" });
       // Signed in: the redirect below takes over on the next render.
     } catch (err) {
       const field = err.details?.field;
@@ -87,9 +92,7 @@ export function SignupPage() {
           hint="At least 8 characters"
         />
         {session.identity?.kind === "guest" && (
-          <p className={styles.note}>
-            Your guest games won't move to the new account yet — that's coming soon.
-          </p>
+          <p className={styles.note}>Your guest XP, level and match history will move to your new account.</p>
         )}
         {state.error && (
           <p role="alert" className={styles.alert}>

@@ -88,5 +88,26 @@ export function createMatchAccessor({ matchDao }) {
       });
       return Object.freeze(docs.map(toMatch));
     },
+
+    /**
+     * Every match `playerId` played that `excluding` did not, oldest first.
+     *
+     * @param {string} playerId
+     * @param {{ excluding: string }} filter
+     * @returns {Promise<ReadonlyArray<Readonly<Match>>>}
+     */
+    async listExcluding(playerId, { excluding }) {
+      return Object.freeze((await matchDao.listByPlayerExcluding(playerId, { excluding })).map(toMatch));
+    },
+
+    /**
+     * Stores a match's renamed copy, only while `from` still plays in the stored one.
+     *
+     * @param {{ from: string, match: Match }} rename
+     * @returns {Promise<boolean>} whether it was renamed now
+     */
+    replaceRenamed({ from, match }) {
+      return matchDao.renamePlayer({ matchId: match.matchId, from, doc: toDoc(match) });
+    },
   });
 }

@@ -19,7 +19,7 @@ const DEFAULT_GUEST_LIMIT = Object.freeze({ windowMs: 15 * 60 * 1000, limit: 30 
  * @param {{
  *   identityComponent: ReturnType<typeof import("../../domain/identity/identityComponent.js").createIdentityComponent>,
  *   onSessionEnded: (sessionId: string) => void,
- *   onIdentityChanged: (change: { previous: object | undefined, identity: object | undefined }) => void,  told about logouts
+ *   onIdentityChanged: (change: { previous: object | undefined, identity: object | undefined }) => Promise<unknown>,  told about logouts
  *   guestLimit?: { windowMs: number, limit: number },
  * }} deps
  */
@@ -73,7 +73,7 @@ export function createSessionRoutes({
     await destroySession(req);
     res.clearCookie(SESSION_COOKIE_NAME);
     if (previous !== undefined) {
-      onIdentityChanged({ previous, identity: undefined });
+      await onIdentityChanged({ previous, identity: undefined });
       onSessionEnded(sessionId);
     }
     res.status(204).end();

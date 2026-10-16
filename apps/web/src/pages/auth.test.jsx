@@ -11,7 +11,7 @@ describe("LoginPage", () => {
   it("logs in and returns to where the player came from", async () => {
     const user = userEvent.setup();
     const api = fakeApi({
-      login: async () => USER,
+      login: async () => ({ identity: USER }),
       getMatches: async () => ({ matches: [] }),
       getProgress: async () => ({}),
     });
@@ -109,7 +109,7 @@ describe("SignupPage", () => {
 
   it("creates the account and goes home by default", async () => {
     const user = userEvent.setup();
-    const api = fakeApi({ signup: async () => USER });
+    const api = fakeApi({ signup: async () => ({ identity: USER }) });
     renderApp({ path: "/signup", api });
 
     await user.type(screen.getByLabelText("Username"), "Riya");
@@ -120,10 +120,96 @@ describe("SignupPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: /play the classics/i })).toBeInTheDocument();
   });
 
-  it("tells a guest their guest games won't carry over yet", async () => {
+  it("tells a guest their progress comes along (CC-032)", async () => {
     renderApp({ path: "/signup", api: fakeApi({ getSession: async () => GUEST }) });
 
-    expect(await screen.findByText(/guest games won't move to the new account yet/)).toBeInTheDocument();
+    expect(
+      await screen.findByText("Your guest XP, level and match history will move to your new account."),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about guest progress to a visitor without a session", async () => {
+    renderApp({ path: "/signup" });
+    await screen.findByRole("heading", { name: "Create your account" });
+
+    expect(screen.queryByText(/guest XP/)).toBeNull();
+  });
+});
+
+describe("a guest's progress moving to the account (CC-032)", () => {
+  const CARRIED = { xp: 70, matchesPlayed: 3, matches: 3 };
+  const WELCOME = "Welcome! We moved 70 XP and 3 matches from your guest games.";
+
+  async function fillSignup(user) {
+    await user.type(screen.getByLabelText("Username"), "Riya");
+    await user.type(screen.getByLabelText("Email"), "riya@example.com");
+    await user.type(screen.getByLabelText("Password"), "correct horse battery");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+  }
+
+  async function fillLogin(user) {
+    await user.type(screen.getByLabelText("Email"), "riya@example.com");
+    await user.type(screen.getByLabelText("Password"), "correct horse battery");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+  }
+
+  it("tells a guest on the login page that their games are added to the account", async () => {
+    renderApp({ path: "/login", api: fakeApi({ getSession: async () => GUEST }) });
+
+    expect(
+      await screen.findByText("Logging in adds this guest's XP and matches to your account."),
+    ).toBeInTheDocument();
+  });
+
+  it("welcomes a guest who signed up with what moved", async () => {
+    const user = userEvent.setup();
+    renderApp({
+      path: "/signup",
+      api: fakeApi({
+        getSession: async () => GUEST,
+        signup: async () => ({ identity: USER, carriedOver: CARRIED }),
+      }),
+    });
+    await screen.findByText(/will move to your new account/);
+
+    await fillSignup(user);
+
+    expect(await screen.findByText(WELCOME)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /play the classics/i })).toBeInTheDocument();
+  });
+
+  it("welcomes a guest who logged in with what moved", async () => {
+    const user = userEvent.setup();
+    renderApp({
+      path: "/login",
+      api: fakeApi({
+        getSession: async () => GUEST,
+        login: async () => ({ identity: USER, carriedOver: CARRIED }),
+      }),
+    });
+    await screen.findByText(/adds this guest's XP/);
+
+    await fillLogin(user);
+
+    expect(await screen.findByText(WELCOME)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["signup", "/signup", fillSignup],
+    ["login", "/login", fillLogin],
+  ])("stays quiet after %s when no guest games moved", async (method, path, fill) => {
+    const user = userEvent.setup();
+    renderApp({
+      path,
+      api: fakeApi({
+        [method]: async () => ({ identity: USER, carriedOver: { xp: 0, matchesPlayed: 0, matches: 0 } }),
+      }),
+    });
+
+    await fill(user);
+
+    expect(await screen.findByRole("heading", { level: 1, name: /play the classics/i })).toBeInTheDocument();
+    expect(screen.queryByText(/We moved/)).toBeNull();
   });
 });
 
