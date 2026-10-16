@@ -10,13 +10,13 @@
 | Stage health  | 🟢 On track                                                                                     |
 | In progress   | —                                                                                               |
 | Blocked on    | —                                                                                               |
-| Next up       | CC-017 progression → CC-076 auth API → CC-021 integration tests → CC-022 web app                |
+| Next up       | CC-076 auth API → CC-021 integration tests → CC-022 web app → CC-023..025 UI                    |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 20 / 34      |
+| S0 Foundation   | 🟡 In progress | 21 / 34      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -29,13 +29,14 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 0    | 6           | 5     |
-| Bugs (BUG)       | 2    | 10          | 2     |
+| Bugs (BUG)       | 1    | 11          | 2     |
 | Tech debt (DEBT) | 2    | 7           | 3     |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-017 — Progression: shared XP rules (win 30 / draw 15 / loss 10 / forfeit 0) and level curve; `player_progress` with atomic exactly-once application (+ explicit retry for concurrent first inserts) and shared DAO contract; progression component; match pipeline (record → progress) on background tasks drained at shutdown; `GET /api/progress`; `progress:updated` pushed to every tab (BUG-08). 5-run check caught and fixed a flaky push test. 553 tests. Live: 30 → 60 XP with a level-up push; forfeit gave 0 XP.
 - 2026-10-16 — CC-016 — Match history: rooms keep a generic action log; `replayGame()` rebuilds any game from seed + log (re-validating moves); MongoDB `matches` DAO + in-memory double sharing one contract suite; idempotent recording from `room.gameFinished` (shutdown drains writes); `GET /api/matches` (paged, `outcomeForYou`) and `/api/matches/:id` (participants only). Integration test replays a stored RPS match to the same result. 500 tests. Live run checked API and raw MongoDB document + indexes.
 - 2026-10-16 — CC-020 — Chess with server clocks: generic engine time hooks (`deadline`/`expire`, contract check 11, room manager `expireDue` + `room.updated` broadcast, 1 s ticker); chess.js 1.4.0 engine with seeded White, 5 time controls, increments, promotion choice, resign, draw offers, every ending incl. FIDE timeout-vs-insufficient-material; exact timeouts on late moves. All three games now server-authoritative. 454 tests; live scholar's mate with hand-checked clocks.
 - 2026-10-16 — CC-019 — Tic-Tac-Toe engine: seeded starter as X, strict cell moves, server-decided wins/draws with exactly one result (BUG-04 regression: 9th move completing two lines), registered and playable over sockets; clients cannot claim results. Extracted shared socket test helpers. 400 tests; engine 100 % covered. Live game verified.

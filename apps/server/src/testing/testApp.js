@@ -4,17 +4,21 @@ import session from "express-session";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
 import { createMatchAccessor } from "../data/matchAccessor.js";
+import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
+import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "../persistence/inMemoryRoomDao.js";
-import { recordFinishedMatches } from "../server.js";
+import { connectMatchPipeline } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
+import { createBackgroundTasks } from "../utils/backgroundTasks.js";
 import { captureLogger } from "./captureLogger.js";
 import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
+import { createInMemoryProgressDao } from "./inMemoryProgressDao.js";
 import { testConfig } from "./testConfig.js";
 
 /**
@@ -51,7 +55,12 @@ export function createTestApp({ env = {}, guestLimit, engines = [raceEngine] } =
   const matchComponent = createMatchComponent({
     matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }),
   });
-  const matchRecorder = recordFinishedMatches({ domainEvents, matchComponent, logger: capture.logger });
+  const progressionComponent = createProgressionComponent({
+    progressAccessor: createProgressAccessor({ progressDao: createInMemoryProgressDao() }),
+    events: domainEvents,
+  });
+  const tasks = createBackgroundTasks({ logger: capture.logger });
+  connectMatchPipeline({ domainEvents, matchComponent, progressionComponent, tasks, logger: capture.logger });
   const endedSessions = [];
   const endedListeners = [];
 
@@ -61,6 +70,7 @@ export function createTestApp({ env = {}, guestLimit, engines = [raceEngine] } =
     sessionMiddleware,
     identityComponent,
     matchComponent,
+    progressionComponent,
     guestLimit,
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);
@@ -76,7 +86,8 @@ export function createTestApp({ env = {}, guestLimit, engines = [raceEngine] } =
     domainEvents,
     roomComponent,
     matchComponent,
-    matchRecorder,
+    progressionComponent,
+    tasks,
     endedSessions,
     onSessionEnded: (listener) => endedListeners.push(listener),
     ...capture,
@@ -114,7 +125,7 @@ export async function startTestServer({ rateLimit, now = Date.now, ...options } 
     baseUrl: `http://127.0.0.1:${port}`,
     close: async () => {
       await gateway.close();
-      await testApp.matchRecorder.drain();
+      await testApp.tasks.drain();
     },
   };
 }

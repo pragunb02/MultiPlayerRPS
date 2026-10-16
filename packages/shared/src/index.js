@@ -12,3 +12,4 @@ export {
   CHESS_TIME_CONTROLS,
   DEFAULT_CHESS_TIME_CONTROL,
 } from "./chess.js";
+export { levelForXp, MAX_LEVEL, XP_AWARDS, xpForLevel } from "./progression.js";

@@ -194,6 +194,14 @@ describe("games through the real composition root (integration)", () => {
 
       expect(summary.outcomeForYou).toBe("win");
       expect(rps.getOutcome(replayed)).toEqual({ status: "finished", ...match.result });
+
+      // XP is awarded from the recorded match and stored in MongoDB.
+      const progress = await eventually(async () => {
+        const res = await fetch(`${app.url}/api/progress`, { headers: { cookie: alice.cookie } });
+        const body = (await res.json()).progress;
+        return body.matchesPlayed === 1 ? body : undefined;
+      });
+      expect(progress).toEqual(expect.objectContaining({ xp: 30, wins: 1, level: 1 }));
     } finally {
       players.forEach((p) => p.socket.disconnect());
       await app.close();

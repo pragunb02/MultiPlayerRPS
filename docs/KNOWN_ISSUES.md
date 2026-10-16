@@ -6,10 +6,11 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 - **SEC-01, SEC-03** 🟡 Fixed in the new stack (CC-013): identity comes only from the server-side session; sockets need a valid session and an allowed origin. Closes fully when the games move to the new server and legacy is deleted (CC-029).
 - **SEC-08, BUG-09, BUG-10, BUG-13, BUG-14** 🟡 Fixed in the new stack (CC-015): crypto room codes with collision retry; one room system with defined events (no orphan or duplicate events); disconnect/rejoin and expiry sweep; missing rooms → clear `NOT_FOUND`. Close fully when the legacy app is deleted (CC-029).
-- **SEC-09, BUG-02** 🟡 Fixed in the new RPS engine (CC-018): pending choices are never sent to the opponent; every round is kept with a match-level outcome. BUG-02's "every round counts as a game" part is closed by progression on match completion (CC-017).
+- **SEC-09, BUG-02** 🟡 Fixed in the new RPS engine (CC-018): pending choices are never sent to the opponent; every round is kept with a match-level outcome. BUG-02's "every round counts as a game" part is fixed by progression on recorded matches (CC-017).
 - **SEC-04, BUG-03, BUG-04** 🟡 Tic-Tac-Toe is server-authoritative in the new engine (CC-019): the server validates moves and decides one result per move; rooms seat both players correctly. Chess is server-authoritative too since CC-020; all close with CC-029.
 - **BUG-06, BUG-07** 🟡 Fixed in the new chess engine (CC-020): moves go through the room manager (no shared per-connection state, no echo to the sender); clocks are server-side with exact timeouts. Close with CC-029.
-- **DEBT-04, BUG-05** 🟡 One `matches` collection for every game (CC-016), with chess results stored; legacy models are deleted in CC-029. BUG-05's "gamesPlayed on join" part is closed by progression on match completion (CC-017).
+- **DEBT-04, BUG-05** 🟡 One `matches` collection for every game (CC-016), with chess results stored; legacy models are deleted in CC-029. BUG-05's "gamesPlayed on join" part is fixed by progression on recorded matches (CC-017).
+- **BUG-08** 🟡 Progress (incl. level-ups) is pushed to every tab of the player via a per-player socket channel (CC-017). Closes with CC-029.
 - **SEC-05** 🟡 Helmet headers + auth rate limiting (20 req / 15 min / IP) done. CSRF mitigated by `SameSite=Lax` cookies; CSRF tokens and CSP come with the React app (CSP is off because legacy pages use inline scripts/handlers).
 - **SEC-06** ✅ `config.js` validates env at boot; `MONGO_URI` replaces `MONGO_URI_PRODUCTION` (old name still accepted as fallback).
 - **DEBT-01, DEBT-02** 🟡 New structure exists (`apps/server`, `packages/shared`, CC-011); legacy code moves out ticket by ticket and is deleted in CC-029.
@@ -46,7 +47,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | BUG-05 | 🟡     | Chess: `gamesPlayed` incremented on join, not on game end; result never persisted                                  | `index.js` `joinChessGame`                                  | CC-017         |
 | BUG-06 | 🟡     | Chess: `currentCode` per-connection closure; `move` echoes back to sender; `joinGame` start condition wrong        | `index.js:493-512`                                          | CC-020         |
 | BUG-07 | 🟡     | Chess: clocks run client-side only (drift, trivially manipulable); "Reset" only resets local board                 | `client/public/js/index.js`                                 | CC-020         |
-| BUG-08 | 🔴     | `levelUp` emitted but no client sends `registerUser` → level-up popups never fire                                  | `index.js:130,146`                                          | CC-017         |
+| BUG-08 | 🟡     | `levelUp` emitted but no client sends `registerUser` → level-up popups never fire                                  | `index.js:130,146`                                          | CC-017         |
 | BUG-09 | 🟡     | Orphan events: client listens for `gameOverDisconnect`, emits `CancelTicTacToe`; server has neither                | `client/public/js/index.js:429`, `client/script.js:141`     | CC-015         |
 | BUG-10 | 🟡     | No disconnect handling; rooms never deleted (memory leak); all rooms lost on restart                               | `index.js`                                                  | CC-015         |
 | BUG-11 | ✅     | Signup: duplicate username → unhandled Mongo error/500; uses non-standard status `299`                             | `client/routes/auth.js:65`                                  | CC-009         |
