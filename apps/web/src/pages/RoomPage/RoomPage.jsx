@@ -1,8 +1,10 @@
 import { Suspense, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ERROR_CODES, getGame, ROOM_STATUS } from "@classicade/shared";
+import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
+import { PageTitle } from "../../components/PageTitle.jsx";
 import { Seats } from "../../components/Seats/Seats.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
@@ -29,34 +31,52 @@ function outcomeText(room) {
   return outcome.winners.includes(room.you) ? "You won!" : "You lost";
 }
 
-/** A room from joining to the result: waiting with an invite, the game board, the outcome. */
+/**
+ * A room from joining to the result: waiting with an invite, the game board, the outcome. Its URL names the game
+ * and the room; any other spelling (lower-case code, old `/room/:code` link, wrong game) is replaced by the
+ * canonical one — before joining where the code alone decides it, after joining where the room's game does.
+ */
 export function RoomPage() {
-  const { code } = useParams();
+  const params = useParams();
+  const code = normaliseRoomCode(params.code);
+  const urlGame = gameForSlug(params.slug);
+  const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
   const room = useRoom(code);
   const [confirmingLeave, setConfirmingLeave] = useState(false);
+  const gameId = room.room?.gameId ?? urlGame?.id;
 
+  if (gameId !== undefined && location.pathname !== paths.room(gameId, code)) {
+    return <Navigate to={paths.room(gameId, code)} replace />;
+  }
   if (room.status === "joining") {
-    return <p aria-busy="true">Joining room {code}…</p>;
+    return (
+      <>
+        <PageTitle>{`Room ${code}`}</PageTitle>
+        <p aria-busy="true">Joining room {code}…</p>
+      </>
+    );
   }
   if (room.status === "error") {
     const notFound =
       room.error.code === ERROR_CODES.NOT_FOUND || room.error.code === ERROR_CODES.VALIDATION_FAILED;
     return (
       <section>
+        <PageTitle>{notFound ? "Room not found" : "Can't join this room"}</PageTitle>
         <h1>{notFound ? "Room not found" : "Can't join this room"}</h1>
         <p>{notFound ? `There is no room with the code ${code}.` : room.error.message}</p>
-        <Link to="/">Back to the games</Link>
+        <Link to={paths.home()}>Back to the games</Link>
       </section>
     );
   }
   if (room.status === "closed") {
     return (
       <section>
+        <PageTitle>Room closed</PageTitle>
         <h1>Room closed</h1>
         <p>{CLOSED_REASONS[room.closedReason] ?? "This room has been closed."}</p>
-        <Link to="/">Back to the games</Link>
+        <Link to={paths.home()}>Back to the games</Link>
       </section>
     );
   }
@@ -70,7 +90,7 @@ export function RoomPage() {
     setConfirmingLeave(false);
     try {
       await room.leave();
-      navigate(`/play/${view.gameId}`);
+      navigate(paths.game(view.gameId));
     } catch (error) {
       toast.show(error.message, { tone: "danger" });
     }
@@ -78,6 +98,7 @@ export function RoomPage() {
 
   return (
     <section className={styles.room}>
+      <PageTitle>{`${game?.name ?? view.gameId} · Room ${view.code}`}</PageTitle>
       <header className={styles.header}>
         <h1>{game?.name ?? view.gameId}</h1>
         <Button variant="ghost" onClick={() => (playing ? setConfirmingLeave(true) : leave())}>
@@ -104,7 +125,7 @@ export function RoomPage() {
           {view.status === ROOM_STATUS.FINISHED && (
             <div className={styles.outcome} role="status">
               <h2>{outcomeText(view)}</h2>
-              <Link to={`/play/${view.gameId}`}>Play again</Link>
+              <Link to={paths.game(view.gameId)}>Play again</Link>
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { paths, returnPathFor } from "../../app/paths.js";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
 import { useToast } from "../Toast/toastContext.js";
@@ -10,13 +11,15 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
-  const next = encodeURIComponent(location.pathname + location.search);
+  const next = returnPathFor(location);
+  // "Games" covers the catalog and everything inside a game (lobby, rooms).
+  const inGames = location.pathname === paths.home() || location.pathname.startsWith("/games/");
   const identity = session.identity;
 
   async function logout() {
     try {
       await session.logout();
-      navigate("/");
+      navigate(paths.home());
     } catch (err) {
       toast.show(err.message, { tone: "danger" });
     }
@@ -28,14 +31,14 @@ export function Layout() {
         Skip to content
       </a>
       <header className={styles.header}>
-        <Link to="/" className={styles.brand} aria-label="ClassiCade home">
+        <Link to={paths.home()} className={styles.brand} aria-label="ClassiCade home">
           ClassiCade
         </Link>
         <nav aria-label="Main" className={styles.nav}>
-          <NavLink to="/" end>
-            Play
-          </NavLink>
-          {identity && <NavLink to="/profile">Profile</NavLink>}
+          <Link to={paths.home()} aria-current={inGames ? "page" : undefined}>
+            Games
+          </Link>
+          {identity && <NavLink to={paths.profile()}>Profile</NavLink>}
         </nav>
         <div className={styles.identity} aria-live="polite">
           {identity && (
@@ -43,8 +46,8 @@ export function Layout() {
           )}
           {session.status !== "loading" && identity?.kind !== "user" && (
             <>
-              <Link to={`/login?next=${next}`}>Log in</Link>
-              <Link to={`/signup?next=${next}`} className={styles.cta}>
+              <Link to={paths.login(next)}>Log in</Link>
+              <Link to={paths.signup(next)} className={styles.cta}>
                 Sign up
               </Link>
             </>

@@ -19,6 +19,26 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 
 ## Accepted decisions
 
+### ADR-011 — URL scheme: one canonical URL per screen, readable slugs, old URLs redirect
+
+- **Status:** Accepted · 2026-10-16
+- **Context:** The first React app used `/play/rps` and `/room/AB2CD3`: game ids in URLs, room links that don't say which
+  game, lower-case codes that failed, nested `next` parameters on account pages, one title for every tab, and the legacy
+  app's URLs (`/games/chess`, `/u/:name/userprofile`) answering "not found" for anyone with a bookmark.
+- **Decision:**
+  - URLs: `/` · `/games/:slug` · `/games/:slug/rooms/:code` · `/login?next=` · `/signup?next=` · `/profile`.
+  - Games get a readable, permanent `slug` in the shared catalog (`rock-paper-scissors`, `tic-tac-toe`, `chess`); ids
+    stay internal (events, API, database).
+  - All URLs are built by one module (`apps/web/src/app/paths.js`); components never write URL strings.
+  - Each page renders only at its canonical URL and replaces (`history.replace`) any other spelling — old URLs, ids,
+    case, a room opened under the wrong game — so the back button never returns to a redirect.
+  - `next` accepts only same-site paths and never an account page (no open redirect, no loops); signed-in users opening
+    log in / sign up are sent to `next`.
+  - Each page sets its own `<title>`.
+- **Consequences:** Invite links name the game. Old links keep working forever (the redirect table is part of the
+  public contract; slugs are never reused). Public player profiles (`/players/:username`) are a separate decision —
+  they need a privacy choice and a public API.
+
 ### ADR-010 — CSRF defence without tokens for the same-origin app
 
 - **Status:** Accepted · 2026-10-16

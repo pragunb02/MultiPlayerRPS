@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes } from "react-router";
 import { Layout } from "../components/Layout/Layout.jsx";
 import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
@@ -11,6 +11,7 @@ import { ProfilePage } from "../pages/ProfilePage/ProfilePage.jsx";
 import { RoomPage } from "../pages/RoomPage/RoomPage.jsx";
 import { SignupPage } from "../pages/SignupPage/SignupPage.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
+import { LEGACY_ROUTES, paths, ROUTES } from "./paths.js";
 import { ServicesProvider } from "./ServicesProvider.jsx";
 
 /**
@@ -29,11 +30,16 @@ export function App({ services }) {
             <Routes>
               <Route element={<Layout />}>
                 <Route index element={<HomePage />} />
-                <Route path="play/:gameId" element={<PlayPage />} />
-                <Route path="room/:code" element={<RoomPage />} />
-                <Route path="login" element={<LoginPage />} />
-                <Route path="signup" element={<SignupPage />} />
-                <Route path="profile" element={<ProfilePage />} />
+                <Route path={ROUTES.GAME} element={<PlayPage />} />
+                <Route path={ROUTES.ROOM} element={<RoomPage />} />
+                <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+                <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
+                <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                {/* Old URLs stay valid: each page replaces them with its canonical URL. */}
+                <Route path={LEGACY_ROUTES.GAME} element={<PlayPage />} />
+                <Route path={LEGACY_ROUTES.ROOM} element={<RoomPage />} />
+                <Route path={LEGACY_ROUTES.PROFILE} element={<Navigate to={paths.profile()} replace />} />
+                <Route path={LEGACY_ROUTES.AUTH} element={<Navigate to={paths.login()} replace />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Routes>

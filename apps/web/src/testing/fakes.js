@@ -7,8 +7,8 @@ export const GUEST = Object.freeze({
   displayName: "Guest-T001",
 });
 export const GAMES = Object.freeze([
-  { id: "rps", name: "Rock Paper Scissors", minPlayers: 2, maxPlayers: 2 },
-  { id: "chess", name: "Chess", minPlayers: 2, maxPlayers: 2 },
+  { id: "rps", slug: "rock-paper-scissors", name: "Rock Paper Scissors", minPlayers: 2, maxPlayers: 2 },
+  { id: "chess", slug: "chess", name: "Chess", minPlayers: 2, maxPlayers: 2 },
 ]);
 
 export const unauthorized = () =>

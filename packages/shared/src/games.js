@@ -1,6 +1,7 @@
 /**
  * @typedef {Object} GameInfo
- * @property {string} id          stable identifier used in URLs, events and the database
+ * @property {string} id          stable identifier used in events, the API and the database — never shown
+ * @property {string} slug        readable, stable URL segment (`/games/tic-tac-toe`); never reused for another game
  * @property {string} name        display name
  * @property {number} minPlayers
  * @property {number} maxPlayers
@@ -15,9 +16,15 @@ export const GAME_IDS = Object.freeze({
 /** @type {ReadonlyArray<Readonly<GameInfo>>} */
 export const GAMES = Object.freeze(
   [
-    { id: GAME_IDS.RPS, name: "Rock Paper Scissors", minPlayers: 2, maxPlayers: 2 },
-    { id: GAME_IDS.TIC_TAC_TOE, name: "Tic Tac Toe", minPlayers: 2, maxPlayers: 2 },
-    { id: GAME_IDS.CHESS, name: "Chess", minPlayers: 2, maxPlayers: 2 },
+    {
+      id: GAME_IDS.RPS,
+      slug: "rock-paper-scissors",
+      name: "Rock Paper Scissors",
+      minPlayers: 2,
+      maxPlayers: 2,
+    },
+    { id: GAME_IDS.TIC_TAC_TOE, slug: "tic-tac-toe", name: "Tic Tac Toe", minPlayers: 2, maxPlayers: 2 },
+    { id: GAME_IDS.CHESS, slug: "chess", name: "Chess", minPlayers: 2, maxPlayers: 2 },
   ].map((game) => Object.freeze(game)),
 );
 
@@ -27,6 +34,14 @@ export const GAMES = Object.freeze(
  */
 export function getGame(id) {
   return GAMES.find((game) => game.id === id);
+}
+
+/**
+ * @param {string} slug
+ * @returns {Readonly<GameInfo> | undefined}
+ */
+export function getGameBySlug(slug) {
+  return GAMES.find((game) => game.slug === slug);
 }
 
 /**

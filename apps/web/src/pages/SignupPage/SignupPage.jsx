@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, Navigate, useSearchParams } from "react-router";
+import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
+import { PageTitle } from "../../components/PageTitle.jsx";
 import { useSession } from "../../hooks/useSession.js";
-import { nextPath } from "../authNavigation.js";
 import styles from "../authForms.module.css";
 
 // Mirrors the server's rules (models/credentials.js) for instant feedback; the server still decides.
@@ -15,8 +16,8 @@ const RULES = {
 
 export function SignupPage() {
   const session = useSession();
-  const navigate = useNavigate();
   const [params] = useSearchParams();
+  const next = safeNext(params.get("next"));
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [touched, setTouched] = useState({});
   const [state, setState] = useState({ busy: false, error: "", fieldErrors: {} });
@@ -33,7 +34,7 @@ export function SignupPage() {
     setState({ busy: true, error: "", fieldErrors: {} });
     try {
       await session.signup(form);
-      navigate(nextPath(params), { replace: true });
+      // Signed in: the redirect below takes over on the next render.
     } catch (err) {
       const field = err.details?.field;
       setState({
@@ -44,8 +45,14 @@ export function SignupPage() {
     }
   }
 
+  // Already signed in (or just signed in): this page has nothing to offer, go where the player was heading.
+  if (session.identity?.kind === "user") {
+    return <Navigate to={next} replace />;
+  }
+
   return (
     <section className={styles.page}>
+      <PageTitle>Sign up</PageTitle>
       <h1>Create your account</h1>
       <form className={styles.form} onSubmit={submit} noValidate>
         <Field
@@ -94,7 +101,7 @@ export function SignupPage() {
         </Button>
       </form>
       <p className={styles.switch}>
-        Already have an account? <Link to={`/login?${params}`}>Log in</Link>
+        Already have an account? <Link to={paths.login(next)}>Log in</Link>
       </p>
     </section>
   );

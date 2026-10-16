@@ -1,6 +1,8 @@
 import { Link } from "react-router";
 import { getGame } from "@classicade/shared";
+import { paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { PageTitle } from "../../components/PageTitle.jsx";
 import { useMatchHistory } from "../../hooks/useMatchHistory.js";
 import { useProgress } from "../../hooks/useProgress.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -56,7 +58,7 @@ function MatchHistory({ you }) {
   if (history.matches.length === 0) {
     return (
       <p>
-        No games yet. <Link to="/">Play one</Link>
+        No games yet. <Link to={paths.home()}>Play one</Link>
       </p>
     );
   }
@@ -93,25 +95,32 @@ function MatchHistory({ you }) {
 export function ProfilePage() {
   const session = useSession();
   if (session.status === "loading") {
-    return <p>Loading…</p>;
+    return (
+      <>
+        <PageTitle>Your profile</PageTitle>
+        <p>Loading…</p>
+      </>
+    );
   }
   if (session.identity === undefined) {
     return (
       <section>
+        <PageTitle>Your profile</PageTitle>
         <h1>Your profile</h1>
         <p>
-          Play a game or <Link to="/login?next=/profile">log in</Link> to see your progress.
+          Play a game or <Link to={paths.login(paths.profile())}>log in</Link> to see your progress.
         </p>
       </section>
     );
   }
   return (
     <section className={styles.page}>
+      <PageTitle>{session.identity.displayName}</PageTitle>
       <h1>{session.identity.displayName}</h1>
       {session.identity.kind === "guest" && (
         <p className={styles.muted}>
-          You're playing as a guest. <Link to="/signup?next=/profile">Create an account</Link> to keep your
-          name.
+          You're playing as a guest. <Link to={paths.signup(paths.profile())}>Create an account</Link> to keep
+          your name.
         </p>
       )}
       <ProgressCard />

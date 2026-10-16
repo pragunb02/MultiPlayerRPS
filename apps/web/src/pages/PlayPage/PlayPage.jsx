@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router";
-import { getGame, ROOM_CODE_LENGTH } from "@classicade/shared";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { ROOM_CODE_LENGTH } from "@classicade/shared";
+import { gameForSlug, paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { PageTitle } from "../../components/PageTitle.jsx";
 import { gameView } from "../../games/registry.js";
 import { useCreateRoom } from "../../hooks/useCreateRoom.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
@@ -9,8 +11,9 @@ import styles from "./PlayPage.module.css";
 
 /** One game's lobby: create a room with the game's options, or join a friend's room by code. */
 export function PlayPage() {
-  const { gameId } = useParams();
-  const game = getGame(gameId);
+  const { slug } = useParams();
+  const location = useLocation();
+  const game = gameForSlug(slug);
   const navigate = useNavigate();
   const createRoom = useCreateRoom();
   const [options, setOptions] = useState({});
@@ -19,22 +22,26 @@ export function PlayPage() {
   if (game === undefined) {
     return <NotFoundPage />;
   }
+  if (location.pathname !== paths.game(game.id)) {
+    return <Navigate to={paths.game(game.id)} replace />;
+  }
   const { Options } = gameView(game.id);
 
   async function create() {
     const roomCode = await createRoom.create(game.id, options).catch(() => undefined);
     if (roomCode !== undefined) {
-      navigate(`/room/${roomCode}`);
+      navigate(paths.room(game.id, roomCode));
     }
   }
 
   function join(event) {
     event.preventDefault();
-    navigate(`/room/${code.trim().toUpperCase()}`);
+    navigate(paths.room(game.id, code));
   }
 
   return (
     <section className={styles.page}>
+      <PageTitle>{game.name}</PageTitle>
       <h1>{game.name}</h1>
       <div className={styles.panels}>
         <div className={styles.panel}>

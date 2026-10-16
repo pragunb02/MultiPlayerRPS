@@ -76,11 +76,11 @@ describe("ShareRoom", () => {
     withToasts(<ShareRoom code="AB2CD3" gameId="chess" origin="https://classicade.app" />);
 
     expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveValue(
-      "https://classicade.app/room/AB2CD3",
+      "https://classicade.app/games/chess/rooms/AB2CD3",
     );
     await user.click(screen.getByRole("button", { name: "Copy link" }));
 
-    expect(writeText).toHaveBeenCalledWith("https://classicade.app/room/AB2CD3");
+    expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3");
     expect(await screen.findByRole("status")).toHaveTextContent("Link copied");
   });
 

@@ -11,7 +11,7 @@ describe("PlayPage", () => {
     socket.request.mockImplementation(async (event) =>
       event === "room:create" ? { code: "AB2CD3" } : new Promise(() => {}),
     );
-    const { api } = renderApp({ path: "/play/rps", socket });
+    const { api } = renderApp({ path: "/games/rock-paper-scissors", socket });
 
     await user.selectOptions(screen.getByRole("combobox", { name: /match length/i }), "5");
     await user.click(screen.getByRole("button", { name: "Create room" }));
@@ -22,7 +22,7 @@ describe("PlayPage", () => {
   });
 
   it("offers chess time controls", () => {
-    renderApp({ path: "/play/chess" });
+    renderApp({ path: "/games/chess" });
 
     expect(screen.getByRole("combobox", { name: /time control/i })).toHaveDisplayValue("Blitz 5 min");
   });
@@ -31,7 +31,7 @@ describe("PlayPage", () => {
     const user = userEvent.setup();
     const socket = fakeSocket();
     socket.request.mockRejectedValue(new Error("Slow down — too many requests"));
-    renderApp({ path: "/play/tictactoe", socket });
+    renderApp({ path: "/games/tic-tac-toe", socket });
 
     await user.click(screen.getByRole("button", { name: "Create room" }));
 
@@ -40,7 +40,7 @@ describe("PlayPage", () => {
 
   it("joins by code (normalised), enabling the button only for a full code", async () => {
     const user = userEvent.setup();
-    renderApp({ path: "/play/rps" });
+    renderApp({ path: "/games/rock-paper-scissors" });
     const join = screen.getByRole("button", { name: "Join room" });
 
     expect(join).toBeDisabled();
@@ -51,7 +51,7 @@ describe("PlayPage", () => {
   });
 
   it("shows not-found for an unknown game", () => {
-    renderApp({ path: "/play/ludo" });
+    renderApp({ path: "/games/ludo" });
 
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
   });

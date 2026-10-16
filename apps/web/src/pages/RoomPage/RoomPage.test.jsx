@@ -27,8 +27,8 @@ const playing = (overrides = {}) =>
     ...overrides,
   });
 
-/** Renders /room/AB2CD3 as a signed-in guest whose socket answers room:join with `joined`. */
-function openRoom({ joined = roomView(), connected = true } = {}) {
+/** Renders the room AB2CD3 as a signed-in guest whose socket answers room:join with `joined`. */
+function openRoom({ joined = roomView(), connected = true, path = `/games/tic-tac-toe/rooms/AB2CD3` } = {}) {
   const socket = fakeSocket();
   if (connected) socket.connect();
   socket.request.mockImplementation(async (event) => {
@@ -38,7 +38,7 @@ function openRoom({ joined = roomView(), connected = true } = {}) {
     }
     return { left: true };
   });
-  const view = renderApp({ path: "/room/AB2CD3", socket, api: fakeApi({ getSession: async () => GUEST }) });
+  const view = renderApp({ path, socket, api: fakeApi({ getSession: async () => GUEST }) });
   return { ...view, socket };
 }
 
@@ -48,7 +48,7 @@ describe("RoomPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveValue(
-      `${window.location.origin}/room/AB2CD3`,
+      `${window.location.origin}/games/tic-tac-toe/rooms/AB2CD3`,
     );
     expect(screen.getByRole("list", { name: "Players" })).toHaveTextContent("Waiting for a player…");
   });
@@ -56,7 +56,7 @@ describe("RoomPage", () => {
   it("starts a guest session first when opened from a shared link", async () => {
     const socket = fakeSocket();
     socket.request.mockResolvedValue(roomView());
-    const { api } = renderApp({ path: "/room/AB2CD3", socket });
+    const { api } = renderApp({ path: "/games/tic-tac-toe/rooms/AB2CD3", socket });
 
     await vi.waitFor(() => expect(api.startGuest).toHaveBeenCalledOnce());
     act(() => socket.push("connect"));
@@ -103,7 +103,7 @@ describe("RoomPage", () => {
     openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
 
     expect(await screen.findByRole("heading", { name: text })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Play again" })).toHaveAttribute("href", "/play/ludo");
+    expect(screen.getByRole("link", { name: "Play again" })).toHaveAttribute("href", "/games/ludo");
   });
 
   it("explains a closed room", async () => {
@@ -149,7 +149,7 @@ describe("RoomPage", () => {
     await user.click(screen.getByRole("button", { name: "Leave and forfeit" }));
 
     expect(socket.request).toHaveBeenCalledWith("room:leave", { code: "AB2CD3" });
-    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument(); // /play/ludo
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument(); // /games/ludo
   });
 
   it("leaves a waiting room without asking", async () => {
