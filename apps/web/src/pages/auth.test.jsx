@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../lib/errors.js";
@@ -248,7 +248,8 @@ describe("header", () => {
     await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Log out" }));
 
     await within(screen.getByRole("banner")).findByRole("link", { name: "Log in" });
-    expect(url()).toBe("/");
+    // The header shows "Log in" as soon as the session ends; the navigation home follows it.
+    await waitFor(() => expect(url()).toBe("/"));
   });
 
   it("keeps the player signed in and says why when logging out fails", async () => {
