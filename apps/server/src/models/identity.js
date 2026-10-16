@@ -36,3 +36,10 @@ export function createIdentity({ kind, id, displayName }) {
   }
   return Object.freeze({ kind: /** @type {Identity["kind"]} */ (kind), id, displayName });
 }
+
+/**
+ * Whether a player id belongs to an account (not a guest). Leaderboards list accounts only (CC-053).
+ *
+ * @param {string} id
+ */
+export const isAccountId = (id) => ID_PATTERNS[IDENTITY_KINDS.USER].test(id);

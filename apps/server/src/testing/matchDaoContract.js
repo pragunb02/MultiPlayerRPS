@@ -80,6 +80,26 @@ export function runMatchDaoContract(createDao) {
     expect(await dao.listByPlayer("guest_nobody", { limit: 10 })).toEqual([]);
   });
 
+  it("counts a player's wins of one game", async () => {
+    const dao = await createDao();
+    const won = (n, gameId, winners) =>
+      matchDoc({
+        matchId: `00000000-0000-4000-8000-00000000010${n}`,
+        gameId,
+        result: { ...matchDoc().result, winners },
+      });
+    await dao.insert(won(1, "rps", ["guest_b"]));
+    await dao.insert(won(2, "rps", ["guest_b"]));
+    await dao.insert(won(3, "rps", ["guest_a"]));
+    await dao.insert(won(4, "chess", ["guest_b"]));
+    await dao.insert(won(5, "rps", []));
+
+    expect(await dao.countWins({ playerId: "guest_b", gameId: "rps" })).toBe(2);
+    expect(await dao.countWins({ playerId: "guest_b", gameId: "chess" })).toBe(1);
+    expect(await dao.countWins({ playerId: "guest_a", gameId: "chess" })).toBe(0);
+    expect(await dao.countWins({ playerId: "guest_nobody", gameId: "rps" })).toBe(0);
+  });
+
   it("returns copies that cannot change what is stored", async () => {
     const dao = await createDao();
     const stored = await dao.insert(matchDoc());

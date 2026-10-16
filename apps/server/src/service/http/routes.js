@@ -2,17 +2,22 @@ import { Router } from "express";
 import { GAMES } from "@classicade/shared";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
+import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
 import { createMatchRoutes } from "./matchRoutes.js";
 import { createProgressRoutes } from "./progressRoutes.js";
 import { createSessionRoutes } from "./sessionRoutes.js";
 
 /**
- * @param {Parameters<typeof createSessionRoutes>[0] & Parameters<typeof createMatchRoutes>[0] & Parameters<typeof createProgressRoutes>[0] & Parameters<typeof createGamificationRoutes>[0]} deps
+ * @param {Parameters<typeof createSessionRoutes>[0] & Parameters<typeof createMatchRoutes>[0] & Parameters<typeof createProgressRoutes>[0]
+ *   & Parameters<typeof createGamificationRoutes>[0]
+ *   & { leaderboardComponent: Parameters<typeof createLeaderboardRoutes>[0]["leaderboardComponent"], leaderboardLimit?: { windowMs: number, limit: number } }} deps
  */
 export function apiRouter({
   matchComponent,
   progressionComponent,
   gamificationComponent,
+  leaderboardComponent,
+  leaderboardLimit,
   accountComponent,
   authLimits,
   onIdentityChanged,
@@ -41,6 +46,9 @@ export function apiRouter({
   router.use(createMatchRoutes({ matchComponent }));
   router.use(createProgressRoutes({ progressionComponent }));
   router.use(createGamificationRoutes({ gamificationComponent, now }));
+  router.use(
+    createLeaderboardRoutes({ leaderboardComponent, ...(leaderboardLimit && { limit: leaderboardLimit }) }),
+  );
 
   return router;
 }

@@ -22,6 +22,7 @@ export const ROOM_TTL_MS = Object.freeze({
 });
 
 const MAX_CODE_ATTEMPTS = 10;
+const NO_REMATCH = Object.freeze({ requestedBy: Object.freeze([]), available: false });
 
 const randomRoomCode = () =>
   Array.from(
@@ -80,8 +81,26 @@ export function createRoomComponent({
     events.emit(ROOM_EVENTS.CLOSED, { code, reason });
   }
 
+  /** Games finished in this room and wins per player, across rematches (CC-037). */
+  const nextSeries = (series, outcome) => ({
+    games: (series?.games ?? 0) + 1,
+    wins: Object.fromEntries(
+      [...new Set([...Object.keys(series?.wins ?? {}), ...outcome.winners])].map((id) => [
+        id,
+        (series?.wins?.[id] ?? 0) + (outcome.winners.includes(id) ? 1 : 0),
+      ]),
+    ),
+  });
+
   function finish(room, outcome) {
-    const finished = { ...room, status: ROOM_STATUS.FINISHED, result: outcome };
+    const finished = {
+      ...room,
+      status: ROOM_STATUS.FINISHED,
+      result: outcome,
+      series: nextSeries(room.series, outcome),
+      // Someone who forfeited has left the game: there is nobody to play again with.
+      rematch: { requestedBy: [], available: outcome.reason !== "forfeit" },
+    };
     events.emit(ROOM_EVENTS.GAME_FINISHED, { room: finished, outcome });
     return finished;
   }
@@ -220,7 +239,44 @@ export function createRoomComponent({
         return { closed: true };
       }
       const hostId = room.hostId === playerId ? seats[0].playerId : room.hostId;
-      return { closed: false, room: roomAccessor.save({ ...withSeats(room, seats, now), hostId }) };
+      const left = { ...withSeats(room, seats, now), hostId };
+      // A player left a finished game: no rematch any more, and nobody waits for one.
+      const ended = room.status === ROOM_STATUS.FINISHED ? { ...left, rematch: NO_REMATCH } : left;
+      return { closed: false, room: roomAccessor.save(ended) };
+    },
+
+    /**
+     * Toggles a seated player's rematch request in a finished game (CC-037). Each request keeps the room alive
+     * (the finished-room TTL starts again). Once every seated player has asked, a new game starts in the same room:
+     * new match id and seed, same options, seats reversed so the first move (X, White) alternates.
+     *
+     * @param {{ code: string, playerId: string, now: number }} input
+     * @returns {Readonly<import("../../data/roomAccessor.js").Room>}
+     * @throws {ForbiddenError} for someone without a seat
+     * @throws {ConflictError} when the game is not finished or a rematch is no longer possible
+     */
+    requestRematch({ code, playerId, now }) {
+      const room = roomAccessor.getByCode(code);
+      requireSeat(room, playerId);
+      if (room.status !== ROOM_STATUS.FINISHED) {
+        throw new ConflictError("A rematch is only possible after the game is over");
+      }
+      if (!room.rematch.available) {
+        throw new ConflictError("Your opponent left, so a rematch is no longer possible");
+      }
+      const { requestedBy } = room.rematch;
+      const requested = requestedBy.includes(playerId)
+        ? requestedBy.filter((id) => id !== playerId)
+        : [...requestedBy, playerId];
+      if (!room.seats.every((seat) => requested.includes(seat.playerId))) {
+        return roomAccessor.save({
+          ...room,
+          rematch: { ...room.rematch, requestedBy: requested },
+          lastActivityAt: now,
+        });
+      }
+      const { result, rematch, game, ...rest } = room;
+      return roomAccessor.save(start({ ...rest, seats: [...room.seats].reverse() }, now));
     },
 
     /** Marks a player's seat as disconnected (they keep it and can rejoin). */
@@ -327,6 +383,7 @@ export function createRoomComponent({
         const moved = {
           ...withSeats(room, seats, now),
           hostId: room.hostId === from ? to.id : room.hostId,
+          ...(room.series && { series: renamePlayer(room.series, from, to.id) }),
           ...(room.game && {
             game: {
               ...room.game,
@@ -368,9 +425,14 @@ export function createRoomComponent({
       if (room.game === undefined) {
         return view;
       }
-      const outcome = room.status === ROOM_STATUS.FINISHED ? room.result : engine.getOutcome(room.game.state);
+      const finished = room.status === ROOM_STATUS.FINISHED;
+      const outcome = finished ? room.result : engine.getOutcome(room.game.state);
       return {
         ...view,
+        ...(finished && {
+          rematch: { requestedBy: [...room.rematch.requestedBy], available: room.rematch.available },
+        }),
+        ...(room.series && { series: { games: room.series.games, wins: { ...room.series.wins } } }),
         game: {
           view: engine.viewFor(room.game.state, seated ? viewerId : "spectator"),
           activePlayers: room.status === ROOM_STATUS.PLAYING ? engine.activePlayers(room.game.state) : [],

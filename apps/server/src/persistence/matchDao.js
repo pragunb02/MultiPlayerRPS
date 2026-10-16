@@ -132,5 +132,15 @@ export function createMatchDao({ connection }) {
       );
       return matchedCount === 1;
     },
+
+    /**
+     * How many matches of one game a player won (forfeit wins included). Filtering on the player first lets the
+     * history index serve it.
+     *
+     * @param {{ playerId: string, gameId: string }} query
+     * @returns {Promise<number>}
+     */
+    countWins: ({ playerId, gameId }) =>
+      Match.countDocuments({ "players.playerId": playerId, gameId, "result.winners": playerId }),
   });
 }

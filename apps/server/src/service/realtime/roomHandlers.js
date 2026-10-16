@@ -83,6 +83,14 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
       return { left: true };
     },
 
+    async [SOCKET_EVENTS.ROOM_REMATCH](payload) {
+      const { code } = parseRoomRef(payload);
+      const room = roomComponent.requestRematch({ code, playerId: identity.id, now: now() });
+      logger.info({ roomCode: code, status: room.status }, "rematch requested");
+      await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
+      return stampedView({ roomComponent, room, viewerId: identity.id, now });
+    },
+
     async [SOCKET_EVENTS.GAME_MOVE](payload) {
       const { code, move } = parseGameMove(payload);
       const room = roomComponent.makeMove({ code, playerId: identity.id, move, now: now() });

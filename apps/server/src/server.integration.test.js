@@ -552,6 +552,97 @@ describe("a guest's progress moving to their account through the real compositio
   });
 });
 
+describe("leaderboards and rematches through the real composition root (integration, CC-053, CC-037)", () => {
+  async function socketFor(url, cookie) {
+    const socket = connect(url, { transports: ["websocket"], extraHeaders: { cookie }, reconnection: false });
+    await new Promise((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("connect_error", (err) => reject(describeConnectError(err)));
+    });
+    return socket;
+  }
+  async function account(url, username) {
+    const res = await fetch(`${url}/api/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, email: `${username}@example.com`, password: "correct horse battery" }),
+    });
+    const cookie = res.headers.get("set-cookie").split(";")[0];
+    return { cookie, identity: (await res.json()).identity, socket: await socketFor(url, cookie) };
+  }
+  async function guest(url) {
+    const res = await fetch(`${url}/api/session/guest`, { method: "POST" });
+    const cookie = res.headers.get("set-cookie").split(";")[0];
+    return { cookie, identity: (await res.json()).identity, socket: await socketFor(url, cookie) };
+  }
+  const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
+  /** One best-of-1 Rock Paper Scissors game in `code` that `winner` wins. */
+  async function playRound(code, winner, loser) {
+    await send(winner.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "rock" } });
+    return send(loser.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "scissors" } });
+  }
+  async function newRoom(host, other) {
+    const { data } = await send(host.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "rps",
+      options: { bestOf: 1 },
+    });
+    await send(other.socket, SOCKET_EVENTS.ROOM_JOIN, { code: data.code });
+    return data.code;
+  }
+
+  it("ranks the accounts of stored matches, never the guest, and replays a rematch as a second match", async () => {
+    const app = await start();
+    const players = [];
+    try {
+      const riya = await account(app.url, "riya");
+      const sam = await account(app.url, "sam");
+      const visitor = await guest(app.url);
+      players.push(riya, sam, visitor);
+
+      const code = await newRoom(riya, sam);
+      await playRound(code, riya, sam);
+      await send(sam.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
+      const rematch = await send(riya.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
+      expect(rematch.data.status).toBe("playing");
+      expect(rematch.data.seats.map((seat) => seat.playerId)).toEqual([sam.identity.id, riya.identity.id]);
+      const second = await playRound(code, sam, riya);
+      expect(second.data.series).toEqual({ games: 2, wins: { [riya.identity.id]: 1, [sam.identity.id]: 1 } });
+      await playRound(await newRoom(visitor, riya), visitor, riya);
+
+      const board = await eventually(async () => {
+        const res = await fetch(`${app.url}/api/leaderboards/rock-paper-scissors`, {
+          headers: { cookie: visitor.cookie },
+        });
+        const body = await res.json();
+        return body.entries.length === 2 ? body : undefined;
+      });
+      const overall = await eventually(async () => {
+        const res = await fetch(`${app.url}/api/leaderboards/overall`, { headers: { cookie: sam.cookie } });
+        const body = await res.json();
+        return body.entries[0]?.score === 50 ? body : undefined;
+      });
+      const matches = await readCollection(app.config.mongoUri, "matches");
+
+      expect(board.entries.map(({ displayName, score }) => [displayName, score])).toEqual([
+        ["riya", 1],
+        ["sam", 1],
+      ]);
+      expect(board.you).toEqual({ listed: false, reason: "guest" });
+      expect(overall.entries.map(({ displayName, score }) => [displayName, score])).toEqual([
+        ["riya", 50],
+        ["sam", 40],
+      ]);
+      expect(overall.you).toEqual({ listed: true, rank: 2, score: 40 });
+      expect(matches.filter((match) => match.roomCode === code)).toHaveLength(2);
+      const entries = await readCollection(app.config.mongoUri, "leaderboard_entries");
+      expect(entries.some((entry) => entry.playerId === visitor.identity.id)).toBe(false);
+    } finally {
+      players.forEach((player) => player.socket.disconnect());
+      await app.close();
+    }
+  });
+});
+
 describe("legacy player migration through the real composition root (integration, CC-078)", () => {
   it("logs a legacy player in with their old password and leaves the legacy document untouched", async () => {
     const config = freshConfig();
