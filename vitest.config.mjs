@@ -29,12 +29,14 @@ export default defineConfig({
       // Entry points only wire things together (covered indirectly): server index.js, web main.jsx.
       exclude: ["**/*.test.{js,jsx}", "**/testing/**", "apps/server/src/index.js", "apps/web/src/main.jsx"],
       reporter: ["text", "html"],
+      // Every line and function is tested (CC-084). Branches: the few left are listed with reasons in
+      // docs/tickets/CC-084.md (concurrent-write races, old MongoDB fallbacks); the merged report also under-counts
+      // shared files loaded by both projects.
       thresholds: {
-        lines: 80,
-        branches: 80,
-        functions: 80,
-        statements: 80,
-        "packages/games/**": { lines: 90, branches: 90, functions: 90, statements: 90 },
+        lines: 100,
+        functions: 100,
+        statements: 99.9,
+        branches: 99,
       },
     },
   },

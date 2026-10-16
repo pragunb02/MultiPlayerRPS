@@ -167,8 +167,12 @@ Rules:
     cookie, and on anything in web storage. Assert URLs and titles at every step, and what each player must _not_ see
     (hidden game state in the DOM and in WebSocket frames). A test that provokes a failure declares it
     (`player.expect(401, "/api/auth/login")`).
-11. **Coverage gates** (enforced by `npm run test:coverage`, run in CI from CC-027):
-    `packages/games` ≥ 90 % lines and branches · rest of new code ≥ 80 %. Coverage is a floor, not the goal.
+11. **Coverage gates** (enforced by `npm run test:coverage`, run in CI from CC-027): **100 % of lines and functions,
+    99 % of branches**. Every branch is tested; the only exceptions are listed with a reason in `docs/tickets/CC-084.md`.
+    A new untested branch is either tested, removed as dead code, or added to that list with its reason.
+12. **History is behaviour.** Every screen's browser tests cover arriving by link, Back, Forward, Back/Forward chains,
+    reload, and Back after redirects and after actions that change who you are or where you sit (`e2e/navigation.spec.js`).
+    Actions that end a place — leaving a room, signing in — replace the history entry, so Back never re-enters it.
 
 ---
 

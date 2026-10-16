@@ -204,6 +204,34 @@ describe("accountComponent", () => {
       });
     });
 
+    it("does not mistake a database failure for a taken username", async () => {
+      const failing = { ...createAccountAccessor({ accountDao: createInMemoryAccountDao() }) };
+      failing.create = async () => {
+        throw new Error("database unavailable");
+      };
+      const accounts = createAccountComponent({
+        accountAccessor: failing,
+        legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+      });
+
+      await expect(accounts.login(samLogin)).rejects.toThrow("database unavailable");
+    });
+
+    it("gives up with an error when every username candidate is taken", async () => {
+      const taken = { ...createAccountAccessor({ accountDao: createInMemoryAccountDao() }) };
+      taken.create = async () => {
+        throw new ConflictError("That username is taken", { details: { field: "username" } });
+      };
+      const accounts = createAccountComponent({
+        accountAccessor: taken,
+        legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+      });
+
+      await expect(accounts.login(samLogin)).rejects.toThrow(/No free username/);
+    });
+
     it("never looks at legacy data for an email that already has an account", async () => {
       const findByEmail = vi.fn(async () => []);
       const accounts = createAccountComponent({

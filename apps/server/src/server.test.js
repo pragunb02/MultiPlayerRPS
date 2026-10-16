@@ -5,6 +5,8 @@ import {
   connectMatchPipeline,
   handleFatalErrors,
   handleShutdownSignals,
+  seatsFollowIdentity,
+  startHousekeeping,
 } from "./server.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
 import { ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
@@ -160,5 +162,119 @@ describe("connectMatchPipeline", () => {
     expect(find("background task failed")[0]).toEqual(
       expect.objectContaining({ task: "apply progression", matchId: "m1" }),
     );
+  });
+});
+
+describe("startHousekeeping", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function setup(roomComponent) {
+    vi.useFakeTimers();
+    const capture = captureLogger();
+    const housekeeping = startHousekeeping({ roomComponent, logger: capture.logger, now: () => 42 });
+    return { housekeeping, ...capture };
+  }
+
+  it("applies game deadlines every second and sweeps idle rooms every minute", () => {
+    const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
+    const { housekeeping } = setup(roomComponent);
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(roomComponent.expireDue).toHaveBeenCalledTimes(60);
+    expect(roomComponent.expireDue).toHaveBeenLastCalledWith({ now: 42 });
+    expect(roomComponent.sweepExpired).toHaveBeenCalledOnce();
+    housekeeping.stop();
+  });
+
+  it("logs a failing run and keeps going", () => {
+    const roomComponent = {
+      sweepExpired: vi.fn(() => {
+        throw new Error("sweep broke");
+      }),
+      expireDue: vi.fn(() => {
+        throw new Error("clock broke");
+      }),
+    };
+    const { housekeeping, find } = setup(roomComponent);
+
+    vi.advanceTimersByTime(120_000);
+
+    expect(find("room sweep failed")).toHaveLength(2);
+    expect(find("applying game deadlines failed")).toHaveLength(120);
+    housekeeping.stop();
+  });
+
+  it("does nothing more once stopped", () => {
+    const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
+    const { housekeeping } = setup(roomComponent);
+
+    housekeeping.stop();
+    vi.advanceTimersByTime(120_000);
+
+    expect(roomComponent.expireDue).not.toHaveBeenCalled();
+    expect(roomComponent.sweepExpired).not.toHaveBeenCalled();
+  });
+});
+
+describe("seatsFollowIdentity", () => {
+  const GUEST = { kind: "guest", id: "guest_a", displayName: "Guest-A1" };
+  const USER = { kind: "user", id: "user_1", displayName: "Riya" };
+
+  function setup(changedRooms = [{ code: "AB2CD3" }]) {
+    const roomComponent = {
+      transferPlayer: vi.fn(() => changedRooms),
+      giveUpWaitingSeats: vi.fn(() => changedRooms),
+    };
+    const domainEvents = new EventEmitter();
+    const updates = [];
+    domainEvents.on(ROOM_EVENTS.UPDATED, (event) => updates.push(event));
+    const onIdentityChanged = seatsFollowIdentity({ roomComponent, domainEvents, now: () => 7 });
+    return { onIdentityChanged, roomComponent, updates };
+  }
+
+  it("moves a guest's seats to the account and tells each room", () => {
+    const { onIdentityChanged, roomComponent, updates } = setup();
+
+    onIdentityChanged({ previous: GUEST, identity: USER });
+
+    expect(roomComponent.transferPlayer).toHaveBeenCalledWith({ from: GUEST.id, to: USER, now: 7 });
+    expect(updates).toEqual([{ room: { code: "AB2CD3" } }]);
+  });
+
+  it.each([
+    ["nobody was signed in", undefined],
+    ["an account switches to another account", { kind: "user", id: "user_2", displayName: "Bo" }],
+    ["the same identity signs in again", USER],
+  ])("leaves rooms alone when %s", (_case, previous) => {
+    const { onIdentityChanged, roomComponent } = setup();
+
+    onIdentityChanged({ previous, identity: USER });
+
+    expect(roomComponent.transferPlayer).not.toHaveBeenCalled();
+    expect(roomComponent.giveUpWaitingSeats).not.toHaveBeenCalled();
+  });
+
+  it.each([GUEST, USER])(
+    "gives up the waiting seats of whoever signs out (%o), and tells each room",
+    (previous) => {
+      const { onIdentityChanged, roomComponent, updates } = setup();
+
+      onIdentityChanged({ previous, identity: undefined });
+
+      expect(roomComponent.giveUpWaitingSeats).toHaveBeenCalledWith({ playerId: previous.id, now: 7 });
+      expect(roomComponent.transferPlayer).not.toHaveBeenCalled();
+      expect(updates).toEqual([{ room: { code: "AB2CD3" } }]);
+    },
+  );
+
+  it("does nothing when a visitor without a session 'signs out'", () => {
+    const { onIdentityChanged, roomComponent } = setup();
+
+    onIdentityChanged({ previous: undefined, identity: undefined });
+
+    expect(roomComponent.giveUpWaitingSeats).not.toHaveBeenCalled();
   });
 });

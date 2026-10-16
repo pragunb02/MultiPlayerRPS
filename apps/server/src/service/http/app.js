@@ -21,7 +21,7 @@ import { createWebAppRouter } from "./webApp.js";
  *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
- *   onSignedIn: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["onSignedIn"],
+ *   onIdentityChanged: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["onIdentityChanged"],
  *   guestLimit?: { windowMs: number, limit: number },
  *   isDatabaseUp: () => boolean,
  * }} deps
@@ -36,7 +36,7 @@ export function createHttpApp({
   accountComponent,
   authLimits,
   onSessionEnded,
-  onSignedIn,
+  onIdentityChanged,
   guestLimit,
   isDatabaseUp,
 }) {
@@ -78,7 +78,7 @@ export function createHttpApp({
       accountComponent,
       authLimits,
       onSessionEnded,
-      onSignedIn,
+      onIdentityChanged,
       guestLimit,
     }),
   );

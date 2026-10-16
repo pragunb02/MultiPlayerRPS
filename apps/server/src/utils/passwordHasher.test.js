@@ -29,6 +29,18 @@ describe("passwordHasher", () => {
     },
   );
 
+  it.each([
+    ["N not a power of two", "scrypt$3$8$1$c2FsdA==$aGFzaA=="],
+    ["N not a number", "scrypt$lots$8$1$c2FsdA==$aGFzaA=="],
+    ["N too large for memory", `scrypt$${2 ** 40}$8$1$c2FsdA==$aGFzaA==`],
+    ["N of 1", "scrypt$1$8$1$c2FsdA==$aGFzaA=="],
+    ["r of 0", "scrypt$1024$0$1$c2FsdA==$aGFzaA=="],
+    ["r fractional", "scrypt$1024$1.5$1$c2FsdA==$aGFzaA=="],
+    ["p too large", "scrypt$1024$8$17$c2FsdA==$aGFzaA=="],
+  ])("never matches, and never throws, for corrupt stored parameters (%s)", async (_case, stored) => {
+    expect(await hasher.verify("password123", stored)).toBe(false);
+  });
+
   it("verifies hashes made with other parameters (they travel with the hash)", async () => {
     const legacy = await createPasswordHasher({ params: { N: 2 ** 9, r: 8, p: 1 } }).hash("pw-12345678");
 

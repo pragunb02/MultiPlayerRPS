@@ -56,6 +56,12 @@ export const test = base.extend({
         secrets,
         /** Declare a failure the test provokes on purpose, e.g. a wrong password → 401 on /api/auth/login. */
         expect: (status, path) => record.expected.push({ status, path }),
+        /** The person closes their browser: checks run now, while it can still be inspected. */
+        leave: async () => {
+          await checkClean(player);
+          player.closed = true;
+          await context.close();
+        },
         /** The address bar: path and query. */
         url: () => {
           const { pathname, search } = new URL(page.url());
@@ -68,7 +74,7 @@ export const test = base.extend({
 
     await use({ open });
 
-    for (const player of opened) {
+    for (const player of opened.filter((p) => !p.closed)) {
       await checkClean(player);
       await player.context.close();
     }

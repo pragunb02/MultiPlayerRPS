@@ -16,4 +16,10 @@ describe("verifyLegacyPassword", () => {
       expect(await verifyLegacyPassword("anything", hash)).toBe(false);
     },
   );
+
+  it("answers false instead of throwing when the password isn't text", async () => {
+    const hash = bcrypt.hashSync("old password 1", 4);
+
+    expect(await verifyLegacyPassword(undefined, hash)).toBe(false);
+  });
 });

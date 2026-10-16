@@ -155,10 +155,8 @@ export function createRoomComponent({
       if (room.status !== ROOM_STATUS.WAITING) {
         throw new ConflictError("This game has already started");
       }
+      // A waiting room always has a free seat: the game starts the moment the last one is taken.
       const engine = engineFor(room);
-      if (room.seats.length >= engine.players.max) {
-        throw new ConflictError("Room is full");
-      }
       const seated = withSeats(
         room,
         [...room.seats, { playerId: player.id, displayName: player.displayName, connected: true }],
@@ -286,6 +284,23 @@ export function createRoomComponent({
     },
 
     /**
+     * The player signed out: they give up their seats in rooms that haven't started (CC-085), so nobody else on
+     * that browser — a new guest after pressing Back — lands in a game against them. Running games keep the seat.
+     *
+     * @param {{ playerId: string, now: number }} input
+     * @returns {Array<Readonly<import("../../data/roomAccessor.js").Room>>} rooms that changed and still exist
+     */
+    giveUpWaitingSeats({ playerId, now }) {
+      const changed = [];
+      for (const room of roomAccessor.listAll()) {
+        if (room.status !== ROOM_STATUS.WAITING || seatOf(room, playerId) === undefined) continue;
+        const left = component.leaveRoom({ code: room.code, playerId, now });
+        if (!left.closed) changed.push(left.room);
+      }
+      return changed;
+    },
+
+    /**
      * A guest just signed in: every seat they hold in a waiting or running room becomes their account's (CC-083),
      * so they come back to their own game instead of meeting their old guest seat. The seat counts as
      * disconnected until the account's socket rejoins. If the account already sits in the same waiting room, the
@@ -301,8 +316,8 @@ export function createRoomComponent({
         if (!active || seatOf(room, from) === undefined) continue;
         if (seatOf(room, to.id) !== undefined) {
           if (room.status === ROOM_STATUS.WAITING) {
-            const left = component.leaveRoom({ code: room.code, playerId: from, now });
-            if (!left.closed) changed.push(left.room);
+            // The account's own seat stays, so the room never empties here.
+            changed.push(component.leaveRoom({ code: room.code, playerId: from, now }).room);
           }
           continue;
         }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_LEVEL } from "@classicade/shared";
 import { createProgressAccessor } from "../../data/progressAccessor.js";
 import { createInMemoryProgressDao } from "../../testing/inMemoryProgressDao.js";
 import { createProgressionComponent, PROGRESSION_EVENTS, resultFor } from "./progressionComponent.js";
@@ -26,11 +27,12 @@ const forfeitByB = () =>
 
 function setup() {
   const published = [];
+  const progressDao = createInMemoryProgressDao();
   const progression = createProgressionComponent({
-    progressAccessor: createProgressAccessor({ progressDao: createInMemoryProgressDao() }),
+    progressAccessor: createProgressAccessor({ progressDao }),
     events: { emit: (event, payload) => published.push({ event, payload }) },
   });
-  return { progression, published };
+  return { progression, published, progressDao };
 }
 
 describe("resultFor", () => {
@@ -104,6 +106,20 @@ describe("progressionComponent", () => {
   it("starts new players at level 1 with zero XP", async () => {
     expect(await setup().progression.getProgress("guest_new")).toEqual(
       expect.objectContaining({ xp: 0, level: 1, xpIntoLevel: 0, xpForNextLevel: 50 }),
+    );
+  });
+
+  it("caps at the top level: no next level to aim for", async () => {
+    const { progression, progressDao } = setup();
+    await progressDao.applyMatchOnce({
+      playerId: "guest_a",
+      matchId: "m-big",
+      inc: { xp: 10 ** 9 },
+      at: new Date(T0),
+    });
+
+    expect(await progression.getProgress("guest_a")).toEqual(
+      expect.objectContaining({ level: MAX_LEVEL, xpForNextLevel: 0 }),
     );
   });
 });

@@ -17,7 +17,11 @@ export async function connectDatabase({ uri, logger, serverSelectionTimeoutMS = 
   try {
     await connection.asPromise();
   } catch (err) {
-    await connection.close().catch(() => {});
+    try {
+      await connection.close();
+    } catch {
+      // It never opened; nothing more to release.
+    }
     throw new Error("Could not connect to MongoDB", { cause: err });
   }
   logger.info({ database: connection.name }, "database connected");

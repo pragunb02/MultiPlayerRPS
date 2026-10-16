@@ -56,6 +56,13 @@ describe("createLogger", () => {
     expect(entries[0].err.cause).toEqual(expect.objectContaining({ message: "connection reset" }));
   });
 
+  it("writes to standard output unless told otherwise", () => {
+    const logger = createLogger({ level: "silent" });
+
+    expect(logger.level).toBe("silent");
+    expect(typeof logger.info).toBe("function");
+  });
+
   it("accepts every documented level", () => {
     for (const level of LOG_LEVELS) {
       expect(createLogger({ level, destination: { write() {} } }).level).toBe(level);

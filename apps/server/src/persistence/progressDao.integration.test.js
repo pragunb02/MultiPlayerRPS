@@ -32,6 +32,14 @@ async function createDao() {
 describe("MongoDB progress DAO honours the progress DAO contract (integration)", () => {
   runProgressDaoContract(createDao);
 
+  it("passes database errors other than a duplicate through", async () => {
+    const dao = await createDao();
+
+    await expect(
+      dao.applyMatchOnce({ playerId: "guest_a", matchId: "m1", inc: { xp: "lots" }, at: new Date() }),
+    ).rejects.toThrow();
+  });
+
   it("stays exactly-once when the same match is applied concurrently", async () => {
     const dao = await createDao();
     const inc = { xp: 30, matchesPlayed: 1, wins: 1 };
