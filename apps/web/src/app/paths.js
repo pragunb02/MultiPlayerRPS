@@ -1,4 +1,4 @@
-import { getGame, getGameBySlug } from "@classicade/shared";
+import { DEFAULT_LEADERBOARD_ID, getGame, getGameBySlug } from "@classicade/shared";
 
 /**
  * Every URL of the app, in one place (ADR-011). Pages and components build links with `paths.*` and never write
@@ -9,6 +9,7 @@ import { getGame, getGameBySlug } from "@classicade/shared";
  *   /games/:slug/rooms/:code           a room (code upper-case); the invite link
  *   /login?next=…  /signup?next=…      account pages; `next` = where to return afterwards
  *   /profile                           your progress and match history (guests and accounts)
+ *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
@@ -19,6 +20,8 @@ export const ROUTES = Object.freeze({
   LOGIN: "login",
   SIGNUP: "signup",
   PROFILE: "profile",
+  LEADERBOARDS: "leaderboards",
+  LEADERBOARD: "leaderboards/:board",
 });
 
 /** URLs that were public once and must keep working (they redirect to the canonical URL). */
@@ -105,4 +108,6 @@ export const paths = Object.freeze({
   /** @param {string} [next] */
   signup: (next) => withNext("/signup", next),
   profile: () => "/profile",
+  /** @param {string} [boardId]  a leaderboard id (default: overall XP) */
+  leaderboards: (boardId = DEFAULT_LEADERBOARD_ID) => `/leaderboards/${encodeURIComponent(boardId)}`,
 });

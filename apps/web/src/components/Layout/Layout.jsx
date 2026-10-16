@@ -38,6 +38,7 @@ export function Layout() {
           <Link to={paths.home()} aria-current={inGames ? "page" : undefined}>
             Games
           </Link>
+          <NavLink to={paths.leaderboards()}>Leaderboards</NavLink>
           {identity && <NavLink to={paths.profile()}>Profile</NavLink>}
         </nav>
         <div className={styles.identity} aria-live="polite">

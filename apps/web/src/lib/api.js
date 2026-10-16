@@ -58,6 +58,10 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     getStreaks: async () => (await request("GET", "/streaks")).streaks,
     /** Today's quests (UTC day), the sweep bonus and when they reset (CC-089). */
     getQuests: async () => (await request("GET", "/quests")).quests,
+    getLeaderboards: async () => (await request("GET", "/leaderboards")).boards,
+    /** @returns {Promise<{ board: object, entries: object[], you?: object }>} */
+    getLeaderboard: (boardId, query = {}) =>
+      request("GET", `/leaderboards/${encodeURIComponent(boardId)}${toQuery(query)}`),
   });
 }
 

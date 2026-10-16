@@ -8,6 +8,8 @@ describe("paths", () => {
     expect(paths.game("tictactoe")).toBe("/games/tic-tac-toe");
     expect(paths.room("chess", " ab2cd3 ")).toBe("/games/chess/rooms/AB2CD3");
     expect(paths.profile()).toBe("/profile");
+    expect(paths.leaderboards()).toBe("/leaderboards/overall");
+    expect(paths.leaderboards("tic-tac-toe")).toBe("/leaderboards/tic-tac-toe");
   });
 
   it("keeps an unknown game's id, so the link leads to a clear not-found", () => {

@@ -3,6 +3,7 @@ import { getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { AchievementGrid } from "../../components/Achievements/AchievementGrid.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { YourRank } from "../../components/Leaderboard/YourRank.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
 import { StreakCard } from "../../components/Streaks/StreakCard.jsx";
@@ -145,6 +146,7 @@ export function ProfilePage() {
         </p>
       )}
       <ProgressCard />
+      <YourRank identity={session.identity} />
       <PlayerConsole guest={session.identity.kind === "guest"} />
       <h2>Recent matches</h2>
       <MatchHistory you={session.identity.id} />

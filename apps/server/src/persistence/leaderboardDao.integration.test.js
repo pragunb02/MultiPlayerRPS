@@ -60,12 +60,13 @@ describe("MongoDB leaderboard DAO honours the leaderboard DAO contract (integrat
   it("lets MongoDB expire weekly entries after their expiry time", async () => {
     const { dao, database } = await connect();
     await dao.addOnce({ ...ENTRY, period: "2026-W42", key: "m1", inc: 10, at: AT, expiresAt: AT });
+    await dao.raiseScore({ ...ENTRY, period: "2026-W42", score: 40, at: AT, expiresAt: AT });
 
     const indexes = await database.connection.db.collection("leaderboard_entries").indexes();
     const [stored] = await database.connection.db.collection("leaderboard_entries").find().toArray();
 
     expect(indexes).toContainEqual(expect.objectContaining({ key: { expiresAt: 1 }, expireAfterSeconds: 0 }));
-    expect(stored.expiresAt).toEqual(AT);
+    expect(stored).toEqual(expect.objectContaining({ score: 40, expiresAt: AT }));
   });
 
   it("passes other database errors through", async () => {
