@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { handleFatalErrors, handleShutdownSignals } from "./server.js";
+import { assertEnginesInCatalog, handleFatalErrors, handleShutdownSignals } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 
 const fakeProcess = () => Object.assign(new EventEmitter(), { exit: vi.fn() });
@@ -78,5 +78,17 @@ describe("handleFatalErrors", () => {
     expect(entry.level).toBe(60);
     expect(entry.err.message).toBe("kaboom");
     expect(proc.exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("assertEnginesInCatalog", () => {
+  it("accepts engines that are listed in the public game catalog", () => {
+    expect(() => assertEnginesInCatalog([{ id: "rps" }, { id: "chess" }])).not.toThrow();
+  });
+
+  it("refuses to boot with an engine that is missing from the catalog", () => {
+    expect(() => assertEnginesInCatalog([{ id: "rps" }, { id: "race" }])).toThrow(
+      /missing from the game catalog: race/,
+    );
   });
 });

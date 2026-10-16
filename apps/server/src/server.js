@@ -1,7 +1,12 @@
 import { EventEmitter } from "node:events";
 import http from "node:http";
+import { createEngineRegistry, ENGINES } from "@classicade/games";
+import { getGame } from "@classicade/shared";
+import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
+import { createRoomComponent } from "./domain/rooms/roomComponent.js";
 import { connectDatabase } from "./persistence/database.js";
+import { createInMemoryRoomDao } from "./persistence/inMemoryRoomDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
 import { createHttpApp } from "./service/http/app.js";
 import { createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
@@ -9,6 +14,20 @@ import { createRealtimeGateway } from "./service/realtime/gateway.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_ENDED = "sessionEnded";
+const ROOM_SWEEP_INTERVAL_MS = 60_000;
+
+/**
+ * Every playable engine must be listed in the public game catalog (and vice versa once all games exist).
+ * Checked at boot so a half-registered game never ships.
+ *
+ * @param {ReadonlyArray<{ id: string }>} engines
+ */
+export function assertEnginesInCatalog(engines) {
+  const missing = engines.filter((engine) => getGame(engine.id) === undefined).map((engine) => engine.id);
+  if (missing.length > 0) {
+    throw new Error(`Engines missing from the game catalog: ${missing.join(", ")}`);
+  }
+}
 
 /**
  * @typedef {import("./utils/logger.js").Logger} Logger
@@ -27,8 +46,20 @@ export async function startServer({ config, logger }) {
   const database = await connectDatabase({ uri: config.mongoUri, logger });
   const sessionStore = await createSessionStore({ client: database.client, ttlSeconds: SESSION_TTL_SECONDS });
 
+  const roomDao = createInMemoryRoomDao();
+
+  // 3. data
+  const roomAccessor = createRoomAccessor({ roomDao });
+
   // 2. domain
+  assertEnginesInCatalog(ENGINES);
+  const domainEvents = new EventEmitter();
   const identityComponent = createIdentityComponent();
+  const roomComponent = createRoomComponent({
+    roomAccessor,
+    engines: createEngineRegistry(ENGINES),
+    events: domainEvents,
+  });
 
   // 1. service — HTTP and realtime share one session middleware, so both see the same identity
   const sessionMiddleware = createSessionMiddleware({
@@ -50,10 +81,22 @@ export async function startServer({ config, logger }) {
     sessionMiddleware,
     allowedOrigins: config.allowedOrigins,
     logger,
+    roomComponent,
+    domainEvents,
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
 
+  const sweeper = setInterval(() => {
+    try {
+      roomComponent.sweepExpired({ now: Date.now() });
+    } catch (err) {
+      logger.error({ err }, "room sweep failed");
+    }
+  }, ROOM_SWEEP_INTERVAL_MS);
+  sweeper.unref();
+
   const close = async () => {
+    clearInterval(sweeper);
     await gateway.close();
     await database.close();
   };

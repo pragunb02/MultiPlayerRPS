@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { GAME_STATUS, IDENTITY_KINDS, MOVE_REJECTIONS, SOCKET_EVENTS } from "./index.js";
+import {
+  GAME_STATUS,
+  IDENTITY_KINDS,
+  MOVE_REJECTIONS,
+  ROOM_CODE_ALPHABET,
+  ROOM_STATUS,
+  SOCKET_EVENTS,
+} from "./index.js";
 
 describe.each([
   ["IDENTITY_KINDS", IDENTITY_KINDS],
   ["SOCKET_EVENTS", SOCKET_EVENTS],
   ["MOVE_REJECTIONS", MOVE_REJECTIONS],
   ["GAME_STATUS", GAME_STATUS],
+  ["ROOM_STATUS", ROOM_STATUS],
 ])("%s", (_name, constants) => {
   it("is immutable", () => {
     expect(Object.isFrozen(constants)).toBe(true);
@@ -14,5 +22,14 @@ describe.each([
   it("has unique values", () => {
     const values = Object.values(constants);
     expect(new Set(values).size).toBe(values.length);
+  });
+});
+
+describe("ROOM_CODE_ALPHABET", () => {
+  it("has no duplicate or look-alike characters", () => {
+    expect(new Set(ROOM_CODE_ALPHABET).size).toBe(ROOM_CODE_ALPHABET.length);
+    for (const lookAlike of ["0", "O", "1", "I", "L"]) {
+      expect(ROOM_CODE_ALPHABET).not.toContain(lookAlike);
+    }
   });
 });

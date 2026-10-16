@@ -1,9 +1,16 @@
 import { Server } from "socket.io";
 import { SOCKET_EVENTS } from "@classicade/shared";
-import { assertDefined } from "../../utils/assert.js";
+import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { createTokenBucket } from "../../utils/tokenBucket.js";
 import { toClientError } from "../errorTranslation.js";
 import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
+import { createRoomHandlers, handleSocketGone, roomChannel } from "./roomHandlers.js";
+
+// Per-socket event budget: short bursts are fine, sustained flooding is refused.
+const DEFAULT_RATE_LIMIT = Object.freeze({ capacity: 20, refillPerSecond: 10 });
+const MAX_MESSAGE_BYTES = 16 * 1024;
 
 const sessionRoom = (sessionId) => `session:${sessionId}`;
 
@@ -17,16 +24,32 @@ const sessionRoom = (sessionId) => `session:${sessionId}`;
  *   sessionMiddleware: import("express").RequestHandler,
  *   allowedOrigins: ReadonlyArray<string>,
  *   logger: import("../../utils/logger.js").Logger,
+ *   roomComponent: ReturnType<typeof import("../../domain/rooms/roomComponent.js").createRoomComponent>,
+ *   domainEvents: import("node:events").EventEmitter,
+ *   now?: () => number,
+ *   rateLimit?: { capacity: number, refillPerSecond: number },
  * }} deps
  */
-export function createRealtimeGateway({ httpServer, sessionMiddleware, allowedOrigins, logger }) {
+export function createRealtimeGateway({
+  httpServer,
+  sessionMiddleware,
+  allowedOrigins,
+  logger,
+  roomComponent,
+  domainEvents,
+  now = Date.now,
+  rateLimit = DEFAULT_RATE_LIMIT,
+}) {
   assertDefined(httpServer, "httpServer");
   assertDefined(sessionMiddleware, "sessionMiddleware");
   assertDefined(allowedOrigins, "allowedOrigins");
   assertDefined(logger, "logger");
+  assertDefined(roomComponent, "roomComponent");
+  assertFunction(domainEvents?.on, "domainEvents.on");
 
   const io = new Server(httpServer, {
     serveClient: false,
+    maxHttpBufferSize: MAX_MESSAGE_BYTES,
     // Browsers always send Origin on the handshake; rejecting foreign origins blocks cross-site
     // WebSocket hijacking with a victim's cookies. Non-browser clients send none and carry no cookies.
     allowRequest: (req, callback) => {
@@ -53,15 +76,39 @@ export function createRealtimeGateway({ httpServer, sessionMiddleware, allowedOr
     const socketLogger = logger.child({ socketId: socket.id, playerId: identity.id });
     socket.join(sessionRoom(sessionId));
     socketLogger.info("socket connected");
-    socket.on("disconnect", (reason) => socketLogger.info({ reason }, "socket disconnected"));
+    let roomChannels = [];
+    socket.on("disconnecting", () => {
+      roomChannels = [...socket.rooms].filter((channel) => channel.startsWith("room:"));
+    });
+    socket.on("disconnect", (reason) => {
+      socketLogger.info({ reason }, "socket disconnected");
+      handleSocketGone({
+        io,
+        roomComponent,
+        playerId: identity.id,
+        channels: roomChannels,
+        now,
+        logger: socketLogger,
+      });
+    });
 
+    const bucket = createTokenBucket({ ...rateLimit, now });
     registerHandlers(
       socket,
       {
         [SOCKET_EVENTS.IDENTITY_GET]: () => socket.data.identity,
+        ...createRoomHandlers({ io, socket, roomComponent, now, logger: socketLogger }),
       },
       socketLogger,
+      { allow: () => bucket.tryTake() },
     );
+  });
+
+  // Domain → transport: tell everyone in a closed room, then empty the channel.
+  domainEvents.on(ROOM_EVENTS.CLOSED, ({ code, reason }) => {
+    io.to(roomChannel(code)).emit(SOCKET_EVENTS.ROOM_CLOSED, { code, reason });
+    io.in(roomChannel(code)).socketsLeave(roomChannel(code));
+    logger.info({ roomCode: code, reason }, "room closed");
   });
 
   return Object.freeze({
