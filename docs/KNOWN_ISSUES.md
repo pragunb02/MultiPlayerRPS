@@ -6,6 +6,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 - **SEC-01, SEC-03** 🟡 Fixed in the new stack (CC-013): identity comes only from the server-side session; sockets need a valid session and an allowed origin. Closes fully when the games move to the new server and legacy is deleted (CC-029).
 - **SEC-08, BUG-09, BUG-10, BUG-13, BUG-14** 🟡 Fixed in the new stack (CC-015): crypto room codes with collision retry; one room system with defined events (no orphan or duplicate events); disconnect/rejoin and expiry sweep; missing rooms → clear `NOT_FOUND`. Close fully when the legacy app is deleted (CC-029).
+- **SEC-09, BUG-02** 🟡 Fixed in the new RPS engine (CC-018): pending choices are never sent to the opponent; every round is kept with a match-level outcome. BUG-02's "every round counts as a game" part is closed by progression on match completion (CC-017).
 - **SEC-05** 🟡 Helmet headers + auth rate limiting (20 req / 15 min / IP) done. CSRF mitigated by `SameSite=Lax` cookies; CSRF tokens and CSP come with the React app (CSP is off because legacy pages use inline scripts/handlers).
 - **SEC-06** ✅ `config.js` validates env at boot; `MONGO_URI` replaces `MONGO_URI_PRODUCTION` (old name still accepted as fallback).
 - **DEBT-01, DEBT-02** 🟡 New structure exists (`apps/server`, `packages/shared`, CC-011); legacy code moves out ticket by ticket and is deleted in CC-029.
@@ -27,7 +28,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | SEC-06 | ✅     | `SESSION_SECRET` / DB URI not validated at boot; dev always uses production DB                                                        | `index.js:25`, `db.js:9`                                             | CC-006         |
 | SEC-07 | ✅     | No input validation on signup (username/email/password rules)                                                                         | `client/routes/auth.js`                                              | CC-009         |
 | SEC-08 | 🟡     | Room codes: 5 chars from `Math.random`, no collision check                                                                            | `index.js` `generateRoomId`                                          | CC-015         |
-| SEC-09 | 🔴     | RPS choice is sent to the opponent before the result (visible in DevTools)                                                            | `index.js` `player1ChoiceRPS`/`player2ChoiceRPS`, `client/client.js` | CC-018         |
+| SEC-09 | 🟡     | RPS choice is sent to the opponent before the result (visible in DevTools)                                                            | `index.js` `player1ChoiceRPS`/`player2ChoiceRPS`, `client/client.js` | CC-018         |
 | SEC-10 | ✅     | Logout destroys session without `req.logout()`; session cookie not `secure`/`sameSite`                                                | `client/routes/auth.js`, `index.js` session config                   | CC-010         |
 | SEC-11 | ✅     | Login error revealed whether an email is registered ("Incorrect email" vs "Incorrect password")                                       | `client/routes/passport.js`                                          | CC-009         |
 
@@ -36,7 +37,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | ID     | Status | Issue                                                                                                              | Location                                                    | Ticket         |
 | ------ | ------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | -------------- |
 | BUG-01 | ✅     | RPS button sends `"Scissor"`, server checks `"Scissors"` → Scissors never wins                                     | `client/index2.ejs:63`, `index.js` `determineRPSWinner`     | CC-007         |
-| BUG-02 | 🔴     | RPS: single `winner` field overwritten each round; every round counts as a played game                             | `index.js` `determineRPSWinner`                             | CC-017, CC-018 |
+| BUG-02 | 🟡     | RPS: single `winner` field overwritten each round; every round counts as a played game                             | `index.js` `determineRPSWinner`                             | CC-017, CC-018 |
 | BUG-03 | 🔴     | TTT: `ticTacToeRooms[id]` overwritten, losing `player1`                                                            | `index.js:264`                                              | CC-019         |
 | BUG-04 | 🔴     | TTT: `checkWinner` can announce twice when two lines complete on one move                                          | `client/script.js`                                          | CC-019         |
 | BUG-05 | 🔴     | Chess: `gamesPlayed` incremented on join, not on game end; result never persisted                                  | `index.js` `joinChessGame`                                  | CC-017         |
