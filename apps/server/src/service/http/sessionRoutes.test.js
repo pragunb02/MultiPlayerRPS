@@ -1,5 +1,5 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ERROR_CODES } from "@classicade/shared";
 import { PRODUCTION_ENV } from "../../testing/testConfig.js";
 import { createTestApp } from "../../testing/testApp.js";
@@ -13,6 +13,45 @@ const FIRST_GUEST = {
 
 const sessionCookie = (res) =>
   res.headers["set-cookie"]?.find((c) => c.startsWith(`${SESSION_COOKIE_NAME}=`));
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const expiresOf = (cookie) => Date.parse(/Expires=([^;]+)/.exec(cookie)[1]);
+
+describe("rolling sessions (CC-096)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("keeps a player who comes back signed in: every visit moves the expiry to 30 days after it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.UTC(2026, 9, 1) });
+    const { app } = createTestApp();
+    const agent = request.agent(app);
+    const created = await agent.post("/api/session/guest");
+    const firstExpiry = expiresOf(sessionCookie(created));
+
+    vi.setSystemTime(Date.UTC(2026, 9, 26)); // day 25: past the old 7-day limit, inside 30 days
+    const visit = await agent.get("/api/session");
+
+    expect(firstExpiry).toBe(Date.UTC(2026, 9, 1) + 30 * DAY_MS);
+    expect(visit.body).toEqual({ authenticated: true, identity: FIRST_GUEST });
+    expect(expiresOf(sessionCookie(visit))).toBe(Date.UTC(2026, 9, 26) + 30 * DAY_MS);
+  });
+
+  it("forgets a player who stayed away for more than 30 days", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.UTC(2026, 9, 1) });
+    const { app } = createTestApp();
+    const agent = request.agent(app);
+    await agent.post("/api/session/guest");
+
+    vi.setSystemTime(Date.UTC(2026, 9, 1) + 31 * DAY_MS);
+
+    expect((await agent.get("/api/session")).body).toEqual({ authenticated: false });
+  });
+
+  it("still sets no cookie for visitors without a session", async () => {
+    const { app } = createTestApp();
+
+    expect(sessionCookie(await request(app).get("/api/session"))).toBeUndefined();
+  });
+});
 
 describe("session routes", () => {
   describe("GET /api/session", () => {

@@ -10,16 +10,17 @@ export const SESSION_COLLECTION = "player_sessions";
  * Creates the store and waits until it is ready (collection resolved, TTL index created), so a
  * misconfigured database fails at boot and no setup work is still in flight when the app shuts down.
  *
- * @param {{ client: import("mongodb").MongoClient, ttlSeconds: number }} options
+ * @param {{ client: import("mongodb").MongoClient, ttlSeconds: number, touchAfterSeconds?: number }} options
+ *   touchAfterSeconds: how often an unchanged session's expiry is rewritten (rolling sessions, CC-096)
  * @returns {Promise<import("express-session").Store>}
  */
-export async function createSessionStore({ client, ttlSeconds }) {
+export async function createSessionStore({ client, ttlSeconds, touchAfterSeconds = 60 * 60 }) {
   const store = MongoStore.create({
     client,
     collectionName: SESSION_COLLECTION,
     ttl: ttlSeconds,
     autoRemove: "native", // MongoDB TTL index deletes expired sessions
-    touchAfter: 60 * 60, // write an unchanged session at most once an hour
+    touchAfter: touchAfterSeconds, // write an unchanged session at most this often
     stringify: false,
   });
   await store.collectionP;
