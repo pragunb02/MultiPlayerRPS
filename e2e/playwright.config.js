@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL } from "./personas.js";
 
 // Browser tests of whole journeys, one file per kind of person (ENGINEERING.md §4). Run: npm run test:e2e
+// The tests that restart the server (CC-101).
+const RESTARTS = "restart.spec.js";
+
 export default defineConfig({
   testDir: ".",
   testMatch: "*.spec.js",
@@ -15,8 +18,23 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "mobile", use: { ...devices["Pixel 7"] } },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: RESTARTS },
+    { name: "mobile", use: { ...devices["Pixel 7"] }, testIgnore: RESTARTS },
+    // Restarting the server cuts every player off, so these run last and one at a time, after all the others.
+    {
+      name: "restart desktop",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: RESTARTS,
+      fullyParallel: false,
+      dependencies: ["desktop", "mobile"],
+    },
+    {
+      name: "restart mobile",
+      use: { ...devices["Pixel 7"] },
+      testMatch: RESTARTS,
+      fullyParallel: false,
+      dependencies: ["restart desktop"],
+    },
   ],
   webServer: {
     command: "npm run build:web --prefix .. && node server.mjs",

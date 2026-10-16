@@ -10,7 +10,10 @@ const BOB = { playerId: "guest_b", displayName: "Bob", connected: true };
 const WIN = { status: "finished", result: "win", winners: [GUEST.id], reason: "reached-target" };
 
 /** A finished game of a board-less game (generic room page), from the guest's seat. */
-const finished = ({ rematch = { requestedBy: [], available: true }, ...overrides } = {}) => ({
+// The server's clock when it sent the view, and the end of the rematch window 12 min 34 s later.
+const SERVER_T = 7_000_000;
+const UNTIL = SERVER_T + 12 * 60_000 + 34_000;
+const finished = ({ rematch = { requestedBy: [], available: true, until: UNTIL }, ...overrides } = {}) => ({
   code: "AB2CD3",
   gameId: "ludo",
   status: "finished",
@@ -21,6 +24,7 @@ const finished = ({ rematch = { requestedBy: [], available: true }, ...overrides
   game: { view: {}, activePlayers: [], outcome: WIN },
   ...(rematch && { rematch }),
   series: { games: 1, wins: { [GUEST.id]: 1 } },
+  serverTime: SERVER_T,
   ...overrides,
 });
 
@@ -44,7 +48,7 @@ function openRoom(joined, onRematch = vi.fn(async () => joined)) {
 describe("RoomPage rematch (CC-037)", () => {
   it("offers a rematch after the game, and waits for the opponent once asked", async () => {
     const user = userEvent.setup();
-    const asked = finished({ rematch: { requestedBy: [GUEST.id], available: true } });
+    const asked = finished({ rematch: { requestedBy: [GUEST.id], available: true, until: UNTIL } });
     const { socket, onRematch } = openRoom(
       finished(),
       vi.fn(async () => asked),
@@ -61,7 +65,7 @@ describe("RoomPage rematch (CC-037)", () => {
   it("withdraws the request on cancel", async () => {
     const user = userEvent.setup();
     const { onRematch } = openRoom(
-      finished({ rematch: { requestedBy: [GUEST.id], available: true } }),
+      finished({ rematch: { requestedBy: [GUEST.id], available: true, until: UNTIL } }),
       vi.fn(async () => finished()),
     );
 
@@ -88,7 +92,7 @@ describe("RoomPage rematch (CC-037)", () => {
     act(() =>
       view.socket.push(
         "room:updated",
-        finished({ rematch: { requestedBy: [BOB.playerId], available: true } }),
+        finished({ rematch: { requestedBy: [BOB.playerId], available: true, until: UNTIL } }),
       ),
     );
     expect(await screen.findByText("Bob wants a rematch!")).toBeInTheDocument();
@@ -139,7 +143,7 @@ describe("RoomPage rematch (CC-037)", () => {
   });
 
   it("says when the opponent left, and links to a new game instead", async () => {
-    openRoom(finished({ rematch: { requestedBy: [], available: false }, seats: [ME] }));
+    openRoom(finished({ rematch: { requestedBy: [], available: false, until: UNTIL }, seats: [ME] }));
 
     expect(await screen.findByText("Opponent left — no rematch this time.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New game" })).toHaveAttribute("href", "/games/ludo");
@@ -197,5 +201,43 @@ describe("RoomPage rematch (CC-037)", () => {
 
     expect(await screen.findByRole("heading", { name: "You won!" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rematch" })).not.toBeInTheDocument();
+  });
+
+  it("shows how long a rematch is still possible, counting down", async () => {
+    openRoom(finished());
+
+    expect(await screen.findByText(/Rematch available for/)).toHaveTextContent("Rematch available for 12:34");
+  });
+
+  it("shows no countdown once the opponent left", async () => {
+    openRoom(finished({ rematch: { requestedBy: [], available: false, until: UNTIL } }));
+
+    await screen.findByText("Opponent left — no rematch this time.");
+    expect(screen.queryByText(/Rematch available for/)).not.toBeInTheDocument();
+  });
+
+  it("asks the server again when the rematch window ends, and explains that the room closed", async () => {
+    const socket = fakeSocket();
+    socket.connect();
+    let joins = 0;
+    socket.request.mockImplementation(async (event) => {
+      if (event !== "room:join") return { left: true };
+      joins++;
+      if (joins === 1)
+        return finished({ rematch: { requestedBy: [], available: true, until: SERVER_T + 1_000 } });
+      throw new AppRequestError({
+        code: "GONE",
+        message: "This room has closed",
+        details: { reason: "rematch-window-ended", gameId: "tictactoe", closedAt: SERVER_T + 1_000 },
+      });
+    });
+    renderApp({ path: "/games/ludo/rooms/AB2CD3", socket, api: fakeApi({ getSession: async () => GUEST }) });
+    expect(await screen.findByText(/Rematch available for/)).toHaveTextContent("0:01");
+
+    expect(
+      await screen.findByText("The time for a rematch is over, so the room closed.", {}, { timeout: 3_000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Start a new Tic Tac Toe game" })).toBeInTheDocument();
+    expect(joins).toBe(2);
   });
 });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
+import { formatCountdown, useServerCountdown } from "../../hooks/useServerCountdown.js";
 import { Button } from "../Button/Button.jsx";
 import styles from "./RematchPanel.module.css";
 
@@ -25,17 +26,33 @@ function SeriesScore({ room }) {
 }
 
 /**
+ * How long a rematch is still possible. The room closes when the time is up (CC-101), and `onWindowEnded` lets
+ * the page find out at that moment instead of showing 0:00. The text is not announced: it changes every second.
+ */
+function RematchWindow({ until, serverTime, onWindowEnded }) {
+  const left = useServerCountdown({ until, serverTime, onElapsed: onWindowEnded });
+  return (
+    <p className={styles.hint}>
+      Rematch available for <span className={styles.countdown}>{formatCountdown(left)}</span>
+    </p>
+  );
+}
+
+/**
  * After a finished game: ask the same opponent for a rematch, accept theirs, or see that they left (CC-037).
- * The new game starts in this same room, so the page — and its URL — stay where they are.
+ * The new game starts in this same room, so the page and its URL stay where they are.
  *
  * @param {{
- *   room: { gameId: string, you: string, seats: Array<{ playerId: string, displayName: string, connected: boolean }>,
- *     rematch?: { requestedBy: string[], available: boolean }, series?: { games: number, wins: Record<string, number> } },
+ *   room: { gameId: string, you: string, serverTime: number,
+ *     seats: Array<{ playerId: string, displayName: string, connected: boolean }>,
+ *     rematch?: { requestedBy: string[], available: boolean, until: number },
+ *     series?: { games: number, wins: Record<string, number> } },
  *   onRematch: () => Promise<unknown>,
  *   onError: (error: Error) => void,
+ *   onWindowEnded: () => void,
  * }} props  `room` is the RoomView (SOCKET_EVENTS)
  */
-export function RematchPanel({ room, onRematch, onError }) {
+export function RematchPanel({ room, onRematch, onError, onWindowEnded }) {
   const [busy, setBusy] = useState(false);
   if (room.rematch === undefined || room.you === "") {
     return null;
@@ -101,6 +118,13 @@ export function RematchPanel({ room, onRematch, onError }) {
         <p className={styles.hint}>{names(offline)} is offline right now.</p>
       )}
       {action}
+      {available && (
+        <RematchWindow
+          until={room.rematch.until}
+          serverTime={room.serverTime}
+          onWindowEnded={onWindowEnded}
+        />
+      )}
       <SeriesScore room={room} />
     </section>
   );

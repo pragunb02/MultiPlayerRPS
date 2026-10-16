@@ -24,16 +24,17 @@ import {
   XP_SOURCES,
 } from "./domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
+import { roomLifetimes } from "./domain/rooms/roomLifetimes.js";
 import { createAccountDao } from "./persistence/accountDao.js";
 import { createAchievementDao } from "./persistence/achievementDao.js";
 import { connectDatabase } from "./persistence/database.js";
-import { createInMemoryRoomDao } from "./persistence/inMemoryRoomDao.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
 import { createPlayerTransferDao } from "./persistence/playerTransferDao.js";
 import { createProgressDao } from "./persistence/progressDao.js";
 import { createQuestDao } from "./persistence/questDao.js";
+import { createRoomDao } from "./persistence/roomDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
 import { createStatsDao } from "./persistence/statsDao.js";
 import { createHttpApp } from "./service/http/app.js";
@@ -176,10 +177,17 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
  *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "resumePending">,
  *   logger: Logger,
  *   now?: () => number,
- * }} deps
+ *   sweepIntervalMs?: number,
+ * }} deps  `sweepIntervalMs` is shorter only in tests that watch a room close
  * @returns {{ stop: () => void }}
  */
-export function startHousekeeping({ roomComponent, playerTransferComponent, logger, now = Date.now }) {
+export function startHousekeeping({
+  roomComponent,
+  playerTransferComponent,
+  logger,
+  now = Date.now,
+  sweepIntervalMs = ROOM_SWEEP_INTERVAL_MS,
+}) {
   const every = (intervalMs, work, failure) => {
     const timer = setInterval(() => {
       // Work may be synchronous or return a promise; both kinds of failure are logged the same way.
@@ -189,7 +197,7 @@ export function startHousekeeping({ roomComponent, playerTransferComponent, logg
     return timer;
   };
   const timers = [
-    every(ROOM_SWEEP_INTERVAL_MS, () => roomComponent.sweepExpired({ now: now() }), "room sweep failed"),
+    every(sweepIntervalMs, () => roomComponent.sweepExpired({ now: now() }), "room sweep failed"),
     every(
       CLOCK_TICK_INTERVAL_MS,
       () => roomComponent.expireDue({ now: now() }),
@@ -231,13 +239,13 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
       return {};
     }
     if (identity === undefined) {
-      announce(roomComponent.giveUpWaitingSeats({ playerId: previous.id, now: now() }));
+      announce(await roomComponent.giveUpWaitingSeats({ playerId: previous.id, now: now() }));
       return {};
     }
     if (previous.kind !== IDENTITY_KINDS.GUEST || previous.id === identity.id) {
       return {};
     }
-    announce(roomComponent.transferPlayer({ from: previous.id, to: identity, now: now() }));
+    announce(await roomComponent.transferPlayer({ from: previous.id, to: identity, now: now() }));
     return playerTransferComponent.transfer({ from: previous.id, to: identity, now: now() });
   };
 }
@@ -252,10 +260,13 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
  *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number } },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
- * }} deps
+ *   now?: () => number,
+ *   rooms?: { lifetimes?: Partial<import("./domain/rooms/roomLifetimes.js").RoomLifetimes>, sweepIntervalMs?: number },
+ * }} deps  `now` and `rooms` are for tests only. Production runs on the real clock and the standard room
+ *   lifetimes. Integration tests move the clock, and browser tests shorten lifetimes to watch a room close.
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
-export async function startServer({ config, logger, limits = {} }) {
+export async function startServer({ config, logger, limits = {}, now = Date.now, rooms = {} }) {
   if (config.webDistDir !== "" && !existsSync(path.join(config.webDistDir, "index.html"))) {
     throw new Error(`WEB_DIST_DIR has no index.html: ${config.webDistDir} (run npm run build:web)`);
   }
@@ -264,7 +275,7 @@ export async function startServer({ config, logger, limits = {} }) {
   const database = await connectDatabase({ uri: config.mongoUri, logger });
   const sessionStore = await createSessionStore({ client: database.client, ttlSeconds: SESSION_TTL_SECONDS });
 
-  const roomDao = createInMemoryRoomDao();
+  const roomDao = createRoomDao({ connection: database.connection });
   const matchDao = createMatchDao({ connection: database.connection });
   const progressDao = createProgressDao({ connection: database.connection });
   const accountDao = createAccountDao({ connection: database.connection });
@@ -276,6 +287,7 @@ export async function startServer({ config, logger, limits = {} }) {
   const leaderboardDao = createLeaderboardDao({ connection: database.connection });
   await Promise.all(
     [
+      roomDao,
       matchDao,
       progressDao,
       accountDao,
@@ -310,6 +322,7 @@ export async function startServer({ config, logger, limits = {} }) {
     roomAccessor,
     engines: createEngineRegistry(ENGINES),
     events: domainEvents,
+    lifetimes: roomLifetimes(rooms.lifetimes),
   });
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({ progressAccessor, events: domainEvents });
@@ -346,8 +359,20 @@ export async function startServer({ config, logger, limits = {} }) {
     leaderboardComponent,
     tasks,
     logger,
+    now,
   });
-  connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks });
+  connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks, now });
+
+  // Rooms are stored, so they outlive this process (CC-101). Nobody is connected to a process that has only
+  // just started, and a chess flag may have fallen while no server was running: settle both before anyone
+  // can join. A game that ends here is recorded through the match pipeline above.
+  try {
+    await roomComponent.markEveryoneAway({ now: now() });
+    await roomComponent.expireDue({ now: now() });
+  } catch (err) {
+    await database.close();
+    throw err;
+  }
 
   // 1. service — HTTP and realtime share one session middleware, so both see the same identity
   const sessionMiddleware = createSessionMiddleware({
@@ -370,8 +395,9 @@ export async function startServer({ config, logger, limits = {} }) {
     progressionComponent,
     gamificationComponent,
     accountComponent,
+    now,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
-    onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents }),
+    onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
   });
   const server = http.createServer(app);
   const gateway = createRealtimeGateway({
@@ -381,10 +407,17 @@ export async function startServer({ config, logger, limits = {} }) {
     logger,
     roomComponent,
     domainEvents,
+    now,
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
 
-  const housekeeping = startHousekeeping({ roomComponent, playerTransferComponent, logger });
+  const housekeeping = startHousekeeping({
+    roomComponent,
+    playerTransferComponent,
+    logger,
+    now,
+    sweepIntervalMs: rooms.sweepIntervalMs,
+  });
 
   const close = async () => {
     housekeeping.stop();

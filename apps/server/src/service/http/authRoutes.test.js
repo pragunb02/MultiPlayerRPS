@@ -156,7 +156,13 @@ describe("auth routes", () => {
 
     expect(res.status).toBe(204);
     expect(rejoin.ok).toBe(false);
-    expect(rejoin.error.code).toBe(ERROR_CODES.NOT_FOUND); // the room closed when its only player left
+    // The room closed when its only player left, and the answer says so.
+    expect(rejoin.error).toEqual(
+      expect.objectContaining({
+        code: ERROR_CODES.GONE,
+        details: expect.objectContaining({ reason: "empty" }),
+      }),
+    );
   });
 
   it("rate-limits failed logins per email, even across different IPs", async () => {

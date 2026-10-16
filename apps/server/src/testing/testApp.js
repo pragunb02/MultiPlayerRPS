@@ -19,7 +19,7 @@ import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardCo
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent } from "../domain/rooms/roomComponent.js";
-import { createInMemoryRoomDao } from "../persistence/inMemoryRoomDao.js";
+import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
 import { connectLeaderboardBonuses, connectMatchPipeline, identityFollowers } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionMiddleware } from "../service/http/session.js";

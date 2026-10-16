@@ -156,6 +156,24 @@ describe("startServer (integration)", () => {
       await first.close();
     }
   });
+
+  it("refuses to start, and closes the database, when the stored rooms cannot be settled", async () => {
+    const config = freshConfig();
+    const seed = await mongoose.createConnection(config.mongoUri).asPromise();
+    // A room of a game this server does not have (say, one that was removed) cannot be brought up to date.
+    await seed.db.collection("rooms").insertOne({
+      code: "OLD222",
+      gameId: "no-such-game",
+      status: "waiting",
+      seats: [{ playerId: "guest_a", displayName: "Alice", connected: true }],
+      createdAt: Date.now(),
+      lastActivityAt: Date.now(),
+      version: 1,
+    });
+    await seed.close();
+
+    await expect(startServer({ config, logger: captureLogger().logger })).rejects.toThrow(/no-such-game/);
+  });
 });
 
 describe("games through the real composition root (integration)", () => {

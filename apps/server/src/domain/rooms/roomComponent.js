@@ -1,28 +1,39 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { GAME_STATUS, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, ROOM_STATUS } from "@classicade/shared";
+import {
+  GAME_STATUS,
+  ROOM_CLOSE_REASONS,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+  ROOM_STATUS,
+} from "@classicade/shared";
 import { createSeededRng, renamePlayer } from "@classicade/games";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { ConflictError, ForbiddenError, ValidationError } from "../../utils/errors.js";
+import {
+  ConcurrentChangeError,
+  ConflictError,
+  ForbiddenError,
+  GoneError,
+  NotFoundError,
+  ValidationError,
+} from "../../utils/errors.js";
+import { lifetimeOf, roomLifetimes } from "./roomLifetimes.js";
 
-/** Events the room component publishes for other parts of the system to react to (observer pattern). */
+/** Events the room component publishes for other parts of the system to react to. */
 export const ROOM_EVENTS = Object.freeze({
-  /** { code, reason } — a room was removed (empty, expired) */
+  /** `{ code, reason }`: a room was closed, `reason` is a ROOM_CLOSE_REASONS value */
   CLOSED: "room.closed",
-  /** { room, outcome } — a game ended (played to the end or forfeited); consumed by matches/progression */
+  /** `{ room, outcome }`: a game ended (played to the end or forfeited), recorded by matches and progression */
   GAME_FINISHED: "room.gameFinished",
-  /** { room } — a room changed without a player request (e.g. a clock ran out); clients need the new view */
+  /** `{ room }`: a room changed without a player asking (a clock ran out), so clients need the new view */
   UPDATED: "room.updated",
 });
 
-/** How long rooms may sit idle before the sweeper closes them. */
-export const ROOM_TTL_MS = Object.freeze({
-  waiting: 30 * 60 * 1000,
-  finished: 10 * 60 * 1000,
-  abandoned: 5 * 60 * 1000, // every seat disconnected, any status
-});
-
 const MAX_CODE_ATTEMPTS = 10;
+// Two requests for the same room can read the same version, and only one of them can save it. The other reads
+// again and decides again on the new state. A handful of attempts is plenty: a room has at most a few players.
+const MAX_WRITE_ATTEMPTS = 5;
 const NO_REMATCH = Object.freeze({ requestedBy: Object.freeze([]), available: false });
+const CLOSED = Object.freeze({ closed: true });
 
 const randomRoomCode = () =>
   Array.from(
@@ -31,29 +42,44 @@ const randomRoomCode = () =>
   ).join("");
 const randomSeed = () => randomInt(2 ** 31);
 
+/** What a decision returns when the room should close instead of being saved. */
+const closeAs = (reason) => Object.freeze({ closeAs: reason });
+const isClosing = (decision) => Object.hasOwn(decision, "closeAs");
+
+/** A room that is not there any more, or whose record was forgotten, is simply skipped by bulk work. */
+const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError;
+
 /**
- * Room rules and lifecycle (waiting → playing → finished → closed), independent of transport and storage.
- * Every operation reads the room, produces a new room, and saves it; nothing is mutated in place.
+ * Room rules and lifecycle (waiting, playing, finished, closed), independent of transport and storage.
+ * Every change reads the room, decides the new room and saves it as of the version it read. When someone else
+ * saved first, the change is decided again on what they saved, so no update is ever lost.
+ *
+ * Rooms are kept in storage, not in this process, so they outlive a restart. How long each kind of room lives
+ * is in roomLifetimes.js. A room whose time is up is closed the moment anyone touches it, and the regular sweep
+ * closes the rest.
  *
  * @param {{
  *   roomAccessor: ReturnType<typeof import("../../data/roomAccessor.js").createRoomAccessor>,
  *   engines: ReturnType<typeof import("@classicade/games").createEngineRegistry>,
  *   events: { emit: (event: string, payload: unknown) => void },
+ *   lifetimes?: Readonly<import("./roomLifetimes.js").RoomLifetimes>,
  *   generateCode?: () => string,
  *   generateSeed?: () => number,
  *   generateMatchId?: () => string,
- * }} deps  generators are injectable for deterministic tests
+ * }} deps  lifetimes and generators can be given so tests are short and exact
  */
 export function createRoomComponent({
   roomAccessor,
   engines,
   events,
+  lifetimes = roomLifetimes(),
   generateCode = randomRoomCode,
   generateSeed = randomSeed,
   generateMatchId = randomUUID,
 }) {
   assertDefined(roomAccessor, "roomAccessor");
   assertDefined(engines, "engines");
+  assertDefined(lifetimes, "lifetimes");
   assertFunction(events?.emit, "events.emit");
   assertFunction(generateCode, "generateCode");
   assertFunction(generateSeed, "generateSeed");
@@ -76,10 +102,93 @@ export function createRoomComponent({
       now,
     );
 
-  function close(code, reason) {
-    roomAccessor.remove(code);
-    events.emit(ROOM_EVENTS.CLOSED, { code, reason });
+  /**
+   * Adds what storage needs to find the room again at the right moment: when its game's next deadline falls
+   * (a chess flag) and when its lifetime ends.
+   */
+  function stamp(room) {
+    const engine = engineFor(room);
+    const timed = room.status === ROOM_STATUS.PLAYING && engine.deadline !== undefined;
+    return {
+      ...room,
+      dueAt: timed ? engine.deadline(room.game.state) : 0,
+      expiresAt: lifetimeOf(room, lifetimes).endsAt,
+    };
   }
+
+  /**
+   * Reads a room. A room that closed recently answers GoneError with the reason, so the player hears why it is
+   * gone instead of being told it never existed.
+   */
+  async function read(code) {
+    try {
+      return await roomAccessor.getByCode(code);
+    } catch (err) {
+      if (!(err instanceof NotFoundError) || !(await roomAccessor.wasClosed(code))) {
+        throw err;
+      }
+      const { reason, gameId, closedAt } = await roomAccessor.getClosed(code);
+      throw new GoneError("This room has closed", { cause: err, details: { reason, gameId, closedAt } });
+    }
+  }
+
+  async function close(room, reason, now) {
+    await roomAccessor.close({ room, reason, closedAt: now });
+    events.emit(ROOM_EVENTS.CLOSED, { code: room.code, reason });
+  }
+
+  /** Closes the room if its lifetime is over. Answers whether it did. */
+  async function closeIfOver(room, now) {
+    const { endsAt, reason } = lifetimeOf(room, lifetimes);
+    if (now < endsAt) {
+      return false;
+    }
+    await close(room, reason, now);
+    return true;
+  }
+
+  /** Reads a room that is still alive at `now`. One whose time is up is closed here and answers GoneError. */
+  async function load(code, now) {
+    const room = await read(code);
+    if (await closeIfOver(room, now)) {
+      return read(code);
+    }
+    return room;
+  }
+
+  /**
+   * The one way rooms change. `decide` gets the current room and answers the next room, the same room for
+   * no change, or `closeAs(reason)`. It may throw to refuse. It must not have side effects, because it runs
+   * again whenever someone else saved the room first.
+   *
+   * @returns {Promise<{ closed: true } | { closed: false, changed: boolean, room: Readonly<import("../../data/roomAccessor.js").Room> }>}
+   */
+  async function change({ code, now, decide }) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const room = await load(code, now);
+        const decision = decide(room);
+        if (isClosing(decision)) {
+          await close(room, decision.closeAs, now);
+          return CLOSED;
+        }
+        if (decision === room) {
+          return { closed: false, changed: false, room };
+        }
+        const saved = await roomAccessor.save(stamp(decision));
+        if (room.status === ROOM_STATUS.PLAYING && saved.status === ROOM_STATUS.FINISHED) {
+          events.emit(ROOM_EVENTS.GAME_FINISHED, { room: saved, outcome: saved.result });
+        }
+        return { closed: false, changed: true, room: saved };
+      } catch (err) {
+        if (!(err instanceof ConcurrentChangeError) || attempt === MAX_WRITE_ATTEMPTS) {
+          throw err;
+        }
+      }
+    }
+  }
+
+  const changedRoom = async (input) => (await change(input)).room;
 
   /** Games finished in this room and wins per player, across rematches (CC-037). */
   const nextSeries = (series, outcome) => ({
@@ -92,18 +201,15 @@ export function createRoomComponent({
     ),
   });
 
-  function finish(room, outcome) {
-    const finished = {
-      ...room,
-      status: ROOM_STATUS.FINISHED,
-      result: outcome,
-      series: nextSeries(room.series, outcome),
-      // Someone who forfeited has left the game: there is nobody to play again with.
-      rematch: { requestedBy: [], available: outcome.reason !== "forfeit" },
-    };
-    events.emit(ROOM_EVENTS.GAME_FINISHED, { room: finished, outcome });
-    return finished;
-  }
+  const finish = (room, outcome, now) => ({
+    ...room,
+    status: ROOM_STATUS.FINISHED,
+    result: outcome,
+    finishedAt: now,
+    series: nextSeries(room.series, outcome),
+    // Someone who forfeited has left the game, so there is nobody to play again with.
+    rematch: { requestedBy: [], available: outcome.reason !== "forfeit" },
+  });
 
   function start(room, now) {
     const engine = engineFor(room);
@@ -129,13 +235,48 @@ export function createRoomComponent({
     reason: "forfeit",
   });
 
+  /** A player leaves: a game in progress is forfeited, an empty room closes, the host role passes on. */
+  function leaving(room, playerId, now) {
+    requireSeat(room, playerId);
+    if (room.status === ROOM_STATUS.PLAYING) {
+      const left = setConnected(room, playerId, false, now);
+      const logged = {
+        ...left,
+        game: { ...left.game, log: [...left.game.log, { kind: "forfeit", playerId, at: now }] },
+      };
+      return finish(logged, forfeitOutcome(room, playerId), now);
+    }
+    const seats = room.seats.filter((seat) => seat.playerId !== playerId);
+    if (seats.length === 0) {
+      return closeAs(ROOM_CLOSE_REASONS.EMPTY);
+    }
+    const hostId = room.hostId === playerId ? seats[0].playerId : room.hostId;
+    const left = { ...withSeats(room, seats, now), hostId };
+    // A player left a finished game: no rematch any more, and nobody waits for one.
+    return room.status === ROOM_STATUS.FINISHED ? { ...left, rematch: NO_REMATCH } : left;
+  }
+
+  /** Runs `work` for each room, skipping rooms that closed in the meantime. Answers what `work` answered. */
+  async function eachRoom(rooms, work) {
+    const results = [];
+    for (const room of rooms) {
+      try {
+        results.push(await work(room));
+      } catch (err) {
+        if (!isGone(err)) throw err;
+      }
+    }
+    return results;
+  }
+
   const component = {
     /**
-     * Creates a room with the host seated. Unknown games and invalid options are rejected.
+     * Creates a room with the host seated. Unknown games and invalid options are rejected. A code is never one
+     * still in use, nor one that closed recently, so an old link never leads into a stranger's new room.
      *
      * @param {{ host: import("../../models/identity.js").Identity, gameId: string, options: unknown, now: number }} input
      */
-    createRoom({ host, gameId, options, now }) {
+    async createRoom({ host, gameId, options, now }) {
       if (typeof gameId !== "string" || !engines.has(gameId)) {
         throw new ValidationError("That game is not available", { details: { field: "gameId" } });
       }
@@ -145,17 +286,24 @@ export function createRoomComponent({
       }
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
         const code = generateCode();
-        if (!roomAccessor.exists(code)) {
-          return roomAccessor.create({
-            code,
-            gameId,
-            options: validated.value,
-            status: ROOM_STATUS.WAITING,
-            hostId: host.id,
-            seats: [{ playerId: host.id, displayName: host.displayName, connected: true }],
-            createdAt: now,
-            lastActivityAt: now,
-          });
+        if ((await roomAccessor.exists(code)) || (await roomAccessor.wasClosed(code))) {
+          continue;
+        }
+        const room = {
+          code,
+          gameId,
+          options: validated.value,
+          status: ROOM_STATUS.WAITING,
+          hostId: host.id,
+          seats: [{ playerId: host.id, displayName: host.displayName, connected: true }],
+          createdAt: now,
+          lastActivityAt: now,
+        };
+        try {
+          return await roomAccessor.create(stamp(room));
+        } catch (err) {
+          // Another room took the same code a moment ago: try the next one.
+          if (!(err instanceof ConflictError)) throw err;
         }
       }
       throw new Error(`Could not find a free room code after ${MAX_CODE_ATTEMPTS} attempts`);
@@ -165,243 +313,273 @@ export function createRoomComponent({
      * Seats a player (starting the game once enough players have joined), or reconnects a seated player.
      *
      * @param {{ code: string, player: import("../../models/identity.js").Identity, now: number }} input
+     * @throws {GoneError} when the room has closed, with the reason in `details`
      */
-    joinRoom({ code, player, now }) {
-      const room = roomAccessor.getByCode(code);
-      if (seatOf(room, player.id) !== undefined) {
-        return roomAccessor.save(setConnected(room, player.id, true, now));
-      }
-      if (room.status !== ROOM_STATUS.WAITING) {
-        throw new ConflictError("This game has already started");
-      }
-      // A waiting room always has a free seat: the game starts the moment the last one is taken.
-      const engine = engineFor(room);
-      const seated = withSeats(
-        room,
-        [...room.seats, { playerId: player.id, displayName: player.displayName, connected: true }],
+    joinRoom: ({ code, player, now }) =>
+      changedRoom({
+        code,
         now,
-      );
-      const next = seated.seats.length === engine.players.max ? start(seated, now) : seated;
-      return roomAccessor.save(next);
-    },
+        decide(room) {
+          if (seatOf(room, player.id) !== undefined) {
+            return setConnected(room, player.id, true, now);
+          }
+          if (room.status !== ROOM_STATUS.WAITING) {
+            throw new ConflictError("This game has already started");
+          }
+          // A waiting room always has a free seat: the game starts the moment the last one is taken.
+          const seated = withSeats(
+            room,
+            [...room.seats, { playerId: player.id, displayName: player.displayName, connected: true }],
+            now,
+          );
+          return seated.seats.length === engineFor(room).players.max ? start(seated, now) : seated;
+        },
+      }),
 
     /**
      * Applies a move through the game engine. Rule violations become ValidationErrors carrying the reason.
      *
      * @param {{ code: string, playerId: string, move: unknown, now: number }} input
      */
-    makeMove({ code, playerId, move, now }) {
-      const room = roomAccessor.getByCode(code);
-      requireSeat(room, playerId);
-      if (room.status !== ROOM_STATUS.PLAYING) {
-        throw new ConflictError(
-          room.status === ROOM_STATUS.WAITING ? "The game has not started yet" : "The game is over",
-        );
-      }
-      const engine = engineFor(room);
-      const ctx = { now };
-      const validated = engine.validateMove(room.game.state, playerId, move, ctx);
-      if (!validated.ok) {
-        throw new ValidationError(validated.message, { details: { reason: validated.reason } });
-      }
-      const state = engine.applyMove(room.game.state, playerId, validated.value, ctx);
-      const entry = { kind: "move", playerId, move: validated.value, at: now };
-      const played = {
-        ...room,
-        game: { ...room.game, state, log: [...room.game.log, entry] },
-        lastActivityAt: now,
-      };
-      const outcome = engine.getOutcome(state);
-      return roomAccessor.save(outcome.status === GAME_STATUS.FINISHED ? finish(played, outcome) : played);
-    },
+    makeMove: ({ code, playerId, move, now }) =>
+      changedRoom({
+        code,
+        now,
+        decide(room) {
+          requireSeat(room, playerId);
+          if (room.status !== ROOM_STATUS.PLAYING) {
+            throw new ConflictError(
+              room.status === ROOM_STATUS.WAITING ? "The game has not started yet" : "The game is over",
+            );
+          }
+          const engine = engineFor(room);
+          const ctx = { now };
+          const validated = engine.validateMove(room.game.state, playerId, move, ctx);
+          if (!validated.ok) {
+            throw new ValidationError(validated.message, { details: { reason: validated.reason } });
+          }
+          const state = engine.applyMove(room.game.state, playerId, validated.value, ctx);
+          const entry = { kind: "move", playerId, move: validated.value, at: now };
+          const played = {
+            ...room,
+            game: { ...room.game, state, log: [...room.game.log, entry] },
+            lastActivityAt: now,
+          };
+          const outcome = engine.getOutcome(state);
+          return outcome.status === GAME_STATUS.FINISHED ? finish(played, outcome, now) : played;
+        },
+      }),
 
     /**
-     * Leaves a room. Leaving a game in progress forfeits it; an empty room is closed; the host role passes on.
+     * Leaves a room. Leaving a game in progress forfeits it, an empty room is closed, and the host role passes on.
      *
      * @param {{ code: string, playerId: string, now: number }} input
-     * @returns {{ closed: true } | { closed: false, room: Readonly<import("../../data/roomAccessor.js").Room> }}
+     * @returns {Promise<{ closed: true } | { closed: false, room: Readonly<import("../../data/roomAccessor.js").Room> }>}
      */
-    leaveRoom({ code, playerId, now }) {
-      const room = roomAccessor.getByCode(code);
-      requireSeat(room, playerId);
-      if (room.status === ROOM_STATUS.PLAYING) {
-        const left = setConnected(room, playerId, false, now);
-        const logged = {
-          ...left,
-          game: { ...left.game, log: [...left.game.log, { kind: "forfeit", playerId, at: now }] },
-        };
-        const forfeited = finish(logged, forfeitOutcome(room, playerId));
-        return { closed: false, room: roomAccessor.save(forfeited) };
-      }
-      const seats = room.seats.filter((seat) => seat.playerId !== playerId);
-      if (seats.length === 0) {
-        close(code, "empty");
-        return { closed: true };
-      }
-      const hostId = room.hostId === playerId ? seats[0].playerId : room.hostId;
-      const left = { ...withSeats(room, seats, now), hostId };
-      // A player left a finished game: no rematch any more, and nobody waits for one.
-      const ended = room.status === ROOM_STATUS.FINISHED ? { ...left, rematch: NO_REMATCH } : left;
-      return { closed: false, room: roomAccessor.save(ended) };
+    async leaveRoom({ code, playerId, now }) {
+      const result = await change({ code, now, decide: (room) => leaving(room, playerId, now) });
+      return result.closed ? CLOSED : { closed: false, room: result.room };
     },
 
     /**
-     * Toggles a seated player's rematch request in a finished game (CC-037). Each request keeps the room alive
-     * (the finished-room TTL starts again). Once every seated player has asked, a new game starts in the same room:
-     * new match id and seed, same options, seats reversed so the first move (X, White) alternates.
+     * Toggles a seated player's rematch request in a finished game (CC-037). Once every seated player has
+     * asked, a new game starts in the same room: new match id and seed, same options, seats reversed so the
+     * first move (X, White) alternates. Asking does not keep the room open longer: the rematch window ends
+     * at the time the players were shown.
      *
      * @param {{ code: string, playerId: string, now: number }} input
-     * @returns {Readonly<import("../../data/roomAccessor.js").Room>}
+     * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>}
      * @throws {ForbiddenError} for someone without a seat
      * @throws {ConflictError} when the game is not finished or a rematch is no longer possible
+     * @throws {GoneError} when the rematch window has ended and the room closed
      */
-    requestRematch({ code, playerId, now }) {
-      const room = roomAccessor.getByCode(code);
-      requireSeat(room, playerId);
-      if (room.status !== ROOM_STATUS.FINISHED) {
-        throw new ConflictError("A rematch is only possible after the game is over");
-      }
-      if (!room.rematch.available) {
-        throw new ConflictError("Your opponent left, so a rematch is no longer possible");
-      }
-      const { requestedBy } = room.rematch;
-      const requested = requestedBy.includes(playerId)
-        ? requestedBy.filter((id) => id !== playerId)
-        : [...requestedBy, playerId];
-      if (!room.seats.every((seat) => requested.includes(seat.playerId))) {
-        return roomAccessor.save({
-          ...room,
-          rematch: { ...room.rematch, requestedBy: requested },
-          lastActivityAt: now,
-        });
-      }
-      const { result, rematch, game, ...rest } = room;
-      return roomAccessor.save(start({ ...rest, seats: [...room.seats].reverse() }, now));
-    },
-
-    /** Marks a player's seat as disconnected (they keep it and can rejoin). */
-    playerDisconnected({ code, playerId, now }) {
-      const room = roomAccessor.getByCode(code);
-      requireSeat(room, playerId);
-      return roomAccessor.save(setConnected(room, playerId, false, now));
-    },
+    requestRematch: ({ code, playerId, now }) =>
+      changedRoom({
+        code,
+        now,
+        decide(room) {
+          requireSeat(room, playerId);
+          if (room.status !== ROOM_STATUS.FINISHED) {
+            throw new ConflictError("A rematch is only possible after the game is over");
+          }
+          if (!room.rematch.available) {
+            throw new ConflictError("Your opponent left, so a rematch is no longer possible");
+          }
+          const { requestedBy } = room.rematch;
+          const requested = requestedBy.includes(playerId)
+            ? requestedBy.filter((id) => id !== playerId)
+            : [...requestedBy, playerId];
+          if (!room.seats.every((seat) => requested.includes(seat.playerId))) {
+            return { ...room, rematch: { ...room.rematch, requestedBy: requested }, lastActivityAt: now };
+          }
+          const { result, rematch, game, finishedAt, ...rest } = room;
+          return start({ ...rest, seats: [...room.seats].reverse() }, now);
+        },
+      }),
 
     /**
-     * Applies time-based events whose deadline has passed (e.g. a chess flag falling while nobody moves),
-     * for any engine that exposes `deadline`/`expire`. Called every second by the composition root.
+     * Marks a player's seat as disconnected. They keep it and can rejoin.
+     *
+     * @param {{ code: string, playerId: string, now: number }} input
+     */
+    playerDisconnected: ({ code, playerId, now }) =>
+      changedRoom({
+        code,
+        now,
+        decide(room) {
+          requireSeat(room, playerId);
+          return setConnected(room, playerId, false, now);
+        },
+      }),
+
+    /**
+     * After a restart nobody is connected yet, whatever storage says: the old process could not record the
+     * disconnects when it stopped or crashed. Each player is shown as connected again when their browser
+     * rejoins, which it does by itself. The last activity time stays, so an away room is not kept any longer.
      *
      * @param {{ now: number }} input
-     * @returns {string[]} codes of rooms that changed
+     * @returns {Promise<string[]>} codes of rooms that changed
      */
-    expireDue({ now }) {
-      const changed = [];
-      for (const room of roomAccessor.listAll()) {
-        const engine = engineFor(room);
-        if (room.status !== ROOM_STATUS.PLAYING || engine.deadline === undefined) {
-          continue;
-        }
-        const due = engine.deadline(room.game.state);
-        if (due === 0 || now < due) {
-          continue;
-        }
-        const state = engine.expire(room.game.state, { now });
-        const log = [...room.game.log, { kind: "expire", at: now }];
-        const expired = { ...room, game: { ...room.game, state, log }, lastActivityAt: now };
-        const outcome = engine.getOutcome(state);
-        const saved = roomAccessor.save(
-          outcome.status === GAME_STATUS.FINISHED ? finish(expired, outcome) : expired,
-        );
-        events.emit(ROOM_EVENTS.UPDATED, { room: saved });
-        changed.push(room.code);
-      }
-      return changed;
+    async markEveryoneAway({ now }) {
+      const results = await eachRoom(await roomAccessor.listAll(), (stored) =>
+        change({
+          code: stored.code,
+          now,
+          decide: (room) =>
+            room.seats.some((seat) => seat.connected)
+              ? { ...room, seats: room.seats.map((seat) => ({ ...seat, connected: false })) }
+              : room,
+        }),
+      );
+      return results.filter((result) => !result.closed && result.changed).map((result) => result.room.code);
     },
 
     /**
-     * Closes rooms that have been idle too long. Called periodically by the composition root.
+     * Applies time-based events whose deadline has passed (a chess flag falling while nobody moves), for any
+     * engine that exposes `deadline` and `expire`. Called every second, and once at startup for flags that fell
+     * while the server was down.
      *
      * @param {{ now: number }} input
-     * @returns {string[]} codes of closed rooms
+     * @returns {Promise<string[]>} codes of rooms that changed
      */
-    sweepExpired({ now }) {
-      const closed = [];
-      for (const room of roomAccessor.listAll()) {
-        const idle = now - room.lastActivityAt;
-        const abandoned = room.seats.every((seat) => !seat.connected) && idle >= ROOM_TTL_MS.abandoned;
-        const expired =
-          (room.status === ROOM_STATUS.WAITING && idle >= ROOM_TTL_MS.waiting) ||
-          (room.status === ROOM_STATUS.FINISHED && idle >= ROOM_TTL_MS.finished);
-        if (abandoned || expired) {
-          close(room.code, abandoned ? "abandoned" : "expired");
-          closed.push(room.code);
-        }
-      }
-      return closed;
+    async expireDue({ now }) {
+      const results = await eachRoom(await roomAccessor.listDue(now), (stored) =>
+        change({
+          code: stored.code,
+          now,
+          decide(room) {
+            const engine = engineFor(room);
+            if (room.status !== ROOM_STATUS.PLAYING || engine.deadline === undefined) {
+              return room;
+            }
+            const due = engine.deadline(room.game.state);
+            if (due === 0 || now < due) {
+              return room;
+            }
+            const state = engine.expire(room.game.state, { now });
+            const log = [...room.game.log, { kind: "expire", at: now }];
+            const expired = { ...room, game: { ...room.game, state, log }, lastActivityAt: now };
+            const outcome = engine.getOutcome(state);
+            return outcome.status === GAME_STATUS.FINISHED ? finish(expired, outcome, now) : expired;
+          },
+        }),
+      );
+      const changed = results.filter((result) => !result.closed && result.changed);
+      changed.forEach(({ room }) => events.emit(ROOM_EVENTS.UPDATED, { room }));
+      return changed.map(({ room }) => room.code);
     },
 
     /**
-     * The player signed out: they give up their seats in rooms that haven't started (CC-085), so nobody else on
-     * that browser — a new guest after pressing Back — lands in a game against them. Running games keep the seat.
+     * Closes rooms whose lifetime is over, and forgets closed rooms after a day. Called periodically.
+     *
+     * @param {{ now: number }} input
+     * @returns {Promise<string[]>} codes of closed rooms
+     */
+    async sweepExpired({ now }) {
+      const results = await eachRoom(await roomAccessor.listExpired(now), async (room) => {
+        try {
+          return (await closeIfOver(room, now)) ? room.code : "";
+        } catch (err) {
+          // It changed since it was listed, so its lifetime may have moved. The next sweep looks again.
+          if (err instanceof ConcurrentChangeError) return "";
+          throw err;
+        }
+      });
+      await roomAccessor.forgetClosedBefore(now - lifetimes.closedRecordMs);
+      return results.filter((code) => code !== "");
+    },
+
+    /**
+     * The player signed out: they give up their seats in rooms that have not started (CC-085), so nobody else
+     * on that browser (a new guest after pressing Back) lands in a game against them. Running games keep the
+     * seat.
      *
      * @param {{ playerId: string, now: number }} input
-     * @returns {Array<Readonly<import("../../data/roomAccessor.js").Room>>} rooms that changed and still exist
+     * @returns {Promise<Array<Readonly<import("../../data/roomAccessor.js").Room>>>} rooms that changed and still exist
      */
-    giveUpWaitingSeats({ playerId, now }) {
-      const changed = [];
-      for (const room of roomAccessor.listAll()) {
-        if (room.status !== ROOM_STATUS.WAITING || seatOf(room, playerId) === undefined) continue;
-        const left = component.leaveRoom({ code: room.code, playerId, now });
-        if (!left.closed) changed.push(left.room);
-      }
-      return changed;
+    async giveUpWaitingSeats({ playerId, now }) {
+      const results = await eachRoom(await roomAccessor.listBySeat(playerId), (stored) =>
+        change({
+          code: stored.code,
+          now,
+          decide: (room) =>
+            room.status === ROOM_STATUS.WAITING && seatOf(room, playerId) !== undefined
+              ? leaving(room, playerId, now)
+              : room,
+        }),
+      );
+      return results.filter((result) => !result.closed && result.changed).map((result) => result.room);
     },
 
     /**
      * A guest just signed in: every seat they hold in a waiting or running room becomes their account's (CC-083),
      * so they come back to their own game instead of meeting their old guest seat. The seat counts as
      * disconnected until the account's socket rejoins. If the account already sits in the same waiting room, the
-     * guest seat is simply given up; a running game the account already plays in is left alone.
+     * guest seat is simply given up. A running game the account already plays in is left alone.
      *
      * @param {{ from: string, to: import("../../models/identity.js").Identity, now: number }} input
-     * @returns {Array<Readonly<import("../../data/roomAccessor.js").Room>>} rooms that changed
+     * @returns {Promise<Array<Readonly<import("../../data/roomAccessor.js").Room>>>} rooms that changed
      */
-    transferPlayer({ from, to, now }) {
-      const changed = [];
-      for (const room of roomAccessor.listAll()) {
-        const active = room.status === ROOM_STATUS.WAITING || room.status === ROOM_STATUS.PLAYING;
-        if (!active || seatOf(room, from) === undefined) continue;
-        if (seatOf(room, to.id) !== undefined) {
-          if (room.status === ROOM_STATUS.WAITING) {
-            // The account's own seat stays, so the room never empties here.
-            changed.push(component.leaveRoom({ code: room.code, playerId: from, now }).room);
-          }
-          continue;
-        }
-        const seats = room.seats.map((seat) =>
-          seat.playerId === from ? { playerId: to.id, displayName: to.displayName, connected: false } : seat,
-        );
-        const moved = {
-          ...withSeats(room, seats, now),
-          hostId: room.hostId === from ? to.id : room.hostId,
-          ...(room.series && { series: renamePlayer(room.series, from, to.id) }),
-          ...(room.game && {
-            game: {
-              ...room.game,
-              state: renamePlayer(room.game.state, from, to.id),
-              log: renamePlayer(room.game.log, from, to.id),
-            },
-          }),
-        };
-        changed.push(roomAccessor.save(moved));
-      }
-      return changed;
+    async transferPlayer({ from, to, now }) {
+      const results = await eachRoom(await roomAccessor.listBySeat(from), (stored) =>
+        change({
+          code: stored.code,
+          now,
+          decide(room) {
+            const active = room.status === ROOM_STATUS.WAITING || room.status === ROOM_STATUS.PLAYING;
+            if (!active || seatOf(room, from) === undefined) return room;
+            if (seatOf(room, to.id) !== undefined) {
+              // The account's own seat stays, so the room never empties here.
+              return room.status === ROOM_STATUS.WAITING ? leaving(room, from, now) : room;
+            }
+            const seats = room.seats.map((seat) =>
+              seat.playerId === from
+                ? { playerId: to.id, displayName: to.displayName, connected: false }
+                : seat,
+            );
+            return {
+              ...withSeats(room, seats, now),
+              hostId: room.hostId === from ? to.id : room.hostId,
+              ...(room.series && { series: renamePlayer(room.series, from, to.id) }),
+              ...(room.game && {
+                game: {
+                  ...room.game,
+                  state: renamePlayer(room.game.state, from, to.id),
+                  log: renamePlayer(room.game.log, from, to.id),
+                },
+              }),
+            };
+          },
+        }),
+      );
+      return results.filter((result) => result.changed).map((result) => result.room);
     },
 
     /** @param {string} code */
-    getRoom: (code) => roomAccessor.getByCode(code),
+    getRoom: (code) => read(code),
 
     /**
-     * What one viewer may see. Seated players get their own game view; anyone else sees the spectator view.
+     * What one viewer may see. Seated players get their own game view, anyone else sees the spectator view.
      *
      * @param {Readonly<import("../../data/roomAccessor.js").Room>} room
      * @param {string} viewerId
@@ -430,7 +608,11 @@ export function createRoomComponent({
       return {
         ...view,
         ...(finished && {
-          rematch: { requestedBy: [...room.rematch.requestedBy], available: room.rematch.available },
+          rematch: {
+            requestedBy: [...room.rematch.requestedBy],
+            available: room.rematch.available,
+            until: lifetimeOf(room, lifetimes).endsAt,
+          },
         }),
         ...(room.series && { series: { games: room.series.games, wins: { ...room.series.wins } } }),
         game: {

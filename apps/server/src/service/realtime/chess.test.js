@@ -73,7 +73,7 @@ describe("Chess over sockets", () => {
     const bobSeesFlag = nextEvent(bob.socket);
 
     now += 60_000;
-    server.roomComponent.expireDue({ now });
+    await server.roomComponent.expireDue({ now });
 
     const outcome = { status: "finished", result: "win", winners: [bob.identity.id], reason: "timeout" };
     expect((await aliceSeesFlag).game.outcome).toEqual(outcome);

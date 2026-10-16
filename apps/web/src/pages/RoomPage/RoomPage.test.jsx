@@ -130,7 +130,85 @@ describe("RoomPage", () => {
 
     act(() => socket.push("room:closed", { code: "AB2CD3", reason: "expired" }));
 
-    expect(await screen.findByText("This room expired after being idle.")).toBeInTheDocument();
+    expect(await screen.findByText("Nobody joined in time, so the room closed.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Start a new Tic Tac Toe game" })).toHaveAttribute(
+      "href",
+      "/games/tic-tac-toe",
+    );
+  });
+
+  it.each([
+    ["expired", "Nobody joined in time, so the room closed."],
+    ["empty", "Everyone left, so the room closed."],
+    ["abandoned", "Everyone was away from the game for too long, so the room closed."],
+    ["rematch-window-ended", "The time for a rematch is over, so the room closed."],
+  ])(
+    "explains a link to a room that closed (%s) and offers a new game of the same kind",
+    async (reason, text) => {
+      // The link names one game, the closed room another: the room's own game is the one offered.
+      openRoom({
+        path: "/games/tic-tac-toe/rooms/AB2CD3",
+        joined: new AppRequestError({
+          code: "GONE",
+          message: "This room has closed",
+          details: { reason, gameId: "chess", closedAt: 1 },
+        }),
+      });
+
+      expect(await screen.findByRole("heading", { name: "Room closed" })).toBeInTheDocument();
+      expect(screen.getByText(text)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Start a new Chess game" })).toHaveAttribute(
+        "href",
+        "/games/chess",
+      );
+      expect(screen.queryByText(/no room with the code/)).not.toBeInTheDocument();
+      expect(document.title).toBe("Room closed · ClassiCade");
+    },
+  );
+
+  it("explains a room that closed while the join was still on its way", async () => {
+    const socket = fakeSocket();
+    socket.connect();
+    renderApp({
+      path: "/games/tic-tac-toe/rooms/AB2CD3",
+      socket,
+      api: fakeApi({ getSession: async () => GUEST }),
+    });
+    await vi.waitFor(() => expect(socket.request).toHaveBeenCalledWith("room:join", { code: "AB2CD3" }));
+
+    act(() => socket.push("room:closed", { code: "AB2CD3", reason: "abandoned" }));
+
+    expect(
+      await screen.findByText("Everyone was away from the game for too long, so the room closed."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Start a new Tic Tac Toe game" })).toBeInTheDocument();
+  });
+
+  it("offers the link's game when the closed room's game is not known to this build", async () => {
+    openRoom({
+      joined: new AppRequestError({
+        code: "GONE",
+        message: "This room has closed",
+        details: { reason: "expired", gameId: "retired-game", closedAt: 1 },
+      }),
+    });
+
+    expect(await screen.findByRole("link", { name: "Start a new Tic Tac Toe game" })).toBeInTheDocument();
+  });
+
+  it("offers no particular game when neither the link nor the room names one", async () => {
+    openRoom({
+      path: "/room/AB2CD3",
+      joined: new AppRequestError({
+        code: "GONE",
+        message: "This room has closed",
+        details: { reason: "expired", gameId: "retired-game", closedAt: 1 },
+      }),
+    });
+
+    expect(await screen.findByRole("heading", { name: "Room closed" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Start a new/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to the games" })).toBeInTheDocument();
   });
 
   it.each([

@@ -17,8 +17,9 @@
  * @property {string} you             the viewer's player id ("" for spectators)
  * @property {{ view: unknown, activePlayers: string[], outcome: object } | undefined} game   present once started
  * @property {number} serverTime      server clock (ms) when the view was produced — for drift-free timers
- * @property {{ requestedBy: string[], available: boolean } | undefined} rematch   present once finished (CC-037):
- *   who asked to play again, and whether a rematch can still happen (false once a player left)
+ * @property {{ requestedBy: string[], available: boolean, until: number } | undefined} rematch   present once
+ *   finished (CC-037): who asked to play again, whether a rematch can still happen (false once a player left), and
+ *   when the rematch window ends and the room closes (server time in milliseconds, CC-101)
  * @property {{ games: number, wins: Record<string, number> } | undefined} series   games finished in this room
  *   and wins per player id, across rematches
  */
@@ -27,7 +28,11 @@ export const SOCKET_EVENTS = Object.freeze({
   IDENTITY_GET: "identity:get",
   /** client → server, RoomCreatePayload → RoomView */
   ROOM_CREATE: "room:create",
-  /** client → server, RoomCodePayload → RoomView (also used to rejoin after a reconnect) */
+  /**
+   * client to server: sends RoomCodePayload and answers RoomView. Also used to rejoin after a reconnect. For a day
+   * after a room closed, joining it answers GONE with details `{ reason, gameId, closedAt }`, where `reason` is a
+   * ROOM_CLOSE_REASONS value (CC-101).
+   */
   ROOM_JOIN: "room:join",
   /** client → server, RoomCodePayload → { left: true } (forfeits a game in progress) */
   ROOM_LEAVE: "room:leave",
@@ -40,7 +45,7 @@ export const SOCKET_EVENTS = Object.freeze({
   GAME_MOVE: "game:move",
   /** server → client: RoomView after any change in a room you are in */
   ROOM_UPDATED: "room:updated",
-  /** server → client: { code, reason } when a room is closed (expired, emptied) */
+  /** server to client: `{ code, reason }` when a room is closed. The `reason` is a ROOM_CLOSE_REASONS value. */
   ROOM_CLOSED: "room:closed",
   /**
    * server → client, after XP was awarded: { source: "match" | "quest", key, matchId, xpGained, leveledUp, progress }.

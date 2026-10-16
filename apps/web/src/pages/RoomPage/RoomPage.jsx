@@ -1,6 +1,6 @@
 import { Suspense, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
-import { ERROR_CODES, getGame, ROOM_STATUS } from "@classicade/shared";
+import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS, ROOM_STATUS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
@@ -19,11 +19,34 @@ import { useSession } from "../../hooks/useSession.js";
 import { JoinChooser } from "./JoinChooser.jsx";
 import styles from "./RoomPage.module.css";
 
+/** Why a room closed, in the players' words (CC-101). */
 const CLOSED_REASONS = Object.freeze({
-  expired: "This room expired after being idle.",
-  abandoned: "Everyone left, so the room was closed.",
-  empty: "The room is empty and has been closed.",
+  [ROOM_CLOSE_REASONS.EXPIRED]: "Nobody joined in time, so the room closed.",
+  [ROOM_CLOSE_REASONS.EMPTY]: "Everyone left, so the room closed.",
+  [ROOM_CLOSE_REASONS.ABANDONED]: "Everyone was away from the game for too long, so the room closed.",
+  [ROOM_CLOSE_REASONS.REMATCH_WINDOW_ENDED]: "The time for a rematch is over, so the room closed.",
 });
+
+/**
+ * A room that is gone for good: why, and the quickest way to a new game of the same kind.
+ *
+ * @param {{ reason: string, game: { id: string, name: string } | undefined }} props
+ */
+function RoomClosed({ reason, game }) {
+  return (
+    <section>
+      <PageTitle>Room closed</PageTitle>
+      <h1>Room closed</h1>
+      <p>{CLOSED_REASONS[reason] ?? "This room has been closed."}</p>
+      {game && (
+        <p>
+          <Link to={paths.game(game.id)}>Start a new {game.name} game</Link>
+        </p>
+      )}
+      <Link to={paths.home()}>Back to the games</Link>
+    </section>
+  );
+}
 
 /** How the finished game went, from the viewer's point of view. */
 function outcomeText(room) {
@@ -95,6 +118,11 @@ export function RoomPage() {
       </>
     );
   }
+  if (room.status === "error" && room.error.code === ERROR_CODES.GONE) {
+    return (
+      <RoomClosed reason={room.error.details.reason} game={getGame(room.error.details.gameId) ?? urlGame} />
+    );
+  }
   if (room.status === "error") {
     const notFound =
       room.error.code === ERROR_CODES.NOT_FOUND || room.error.code === ERROR_CODES.VALIDATION_FAILED;
@@ -113,14 +141,7 @@ export function RoomPage() {
     );
   }
   if (room.status === "closed") {
-    return (
-      <section>
-        <PageTitle>Room closed</PageTitle>
-        <h1>Room closed</h1>
-        <p>{CLOSED_REASONS[room.closedReason] ?? "This room has been closed."}</p>
-        <Link to={paths.home()}>Back to the games</Link>
-      </section>
-    );
+    return <RoomClosed reason={room.closedReason} game={getGame(room.room?.gameId) ?? urlGame} />;
   }
 
   const view = room.room;
@@ -184,6 +205,7 @@ export function RoomPage() {
               room={view}
               onRematch={room.rematch}
               onError={(error) => toast.show(error.message, { tone: "danger" })}
+              onWindowEnded={room.refresh}
             />
           )}
         </div>

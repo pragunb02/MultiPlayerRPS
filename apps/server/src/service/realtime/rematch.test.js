@@ -38,7 +38,11 @@ describe("rematch over sockets (CC-037)", () => {
 
     const aliceSeesRequest = nextUpdate(alice.socket);
     const asked = await send(bob.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
-    expect(asked.data.rematch).toEqual({ requestedBy: [bob.identity.id], available: true });
+    expect(asked.data.rematch).toEqual({
+      requestedBy: [bob.identity.id],
+      available: true,
+      until: expect.any(Number),
+    });
     expect((await aliceSeesRequest).rematch.requestedBy).toEqual([bob.identity.id]);
 
     const bobSeesStart = nextUpdate(bob.socket);
@@ -77,7 +81,9 @@ describe("rematch over sockets (CC-037)", () => {
     const { alice, bob, code } = await finishedRace();
     const aliceSeesLeave = nextUpdate(alice.socket);
     await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code });
-    expect((await aliceSeesLeave).rematch).toEqual({ requestedBy: [], available: false });
+    expect((await aliceSeesLeave).rematch).toEqual(
+      expect.objectContaining({ requestedBy: [], available: false }),
+    );
 
     const ack = await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
 

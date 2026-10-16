@@ -140,7 +140,7 @@ describe("realtime gateway", () => {
       gameId: "race",
       options: { target: 3 },
     });
-    const room = server.roomComponent.getRoom(created.data.code);
+    const room = await server.roomComponent.getRoom(created.data.code);
 
     // A room whose game the server can't render a view for.
     server.domainEvents.emit(ROOM_EVENTS.UPDATED, { room: { ...room, gameId: "no-such-game" } });

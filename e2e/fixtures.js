@@ -9,6 +9,9 @@ import { test as base, expect } from "@playwright/test";
  *   (except the ones a test declares with `player.expect(status, path)`);
  * - no secret in any URL the browser requested or showed: passwords, emails, the session cookie;
  * - the session cookie is HttpOnly (not readable by page scripts), and nothing is kept in web storage.
+ *
+ * A test that restarts the server declares it with `player.expectRestart()`. Then the realtime connection may
+ * fail while the next server process starts, and only that (CC-101).
  */
 export const test = base.extend({
   players: async ({ browser, baseURL }, use) => {
@@ -23,11 +26,16 @@ export const test = base.extend({
       const record = { problems: [], urls: [], socketFrames: [], expected: [] };
       const isExpected = (status, url) =>
         record.expected.some((e) => e.status === status && new URL(url).pathname === e.path);
+      // While the server restarts, the browser's realtime connection fails until the next process is up, and
+      // Chrome reports each attempt. That is the expected cost of a restart, and the only one (CC-101).
+      const isRestartNoise = (url) => record.restarting && new URL(url).pathname.startsWith("/socket.io/");
+      const RESTART_CONSOLE = /^WebSocket connection to '[^']*\/socket\.io\/[^']*' failed/;
 
       page.on("console", (message) => {
         if (message.type() !== "error" && message.type() !== "warning") return;
         // The browser logs every failed request as a console error; those are judged by status below.
         if (/Failed to load resource/.test(message.text())) return;
+        if (record.restarting && RESTART_CONSOLE.test(message.text())) return;
         record.problems.push(`console.${message.type()}: ${message.text()}`);
       });
       page.on("pageerror", (error) => record.problems.push(`page error: ${error.message}`));
@@ -41,7 +49,7 @@ export const test = base.extend({
       page.on("requestfailed", (request) => {
         const reason = request.failure()?.errorText ?? "";
         // Navigating away cancels in-flight requests and closes sockets; that is not a failure.
-        if (!/ERR_ABORTED|NS_BINDING_ABORTED/.test(reason))
+        if (!/ERR_ABORTED|NS_BINDING_ABORTED/.test(reason) && !isRestartNoise(request.url()))
           record.problems.push(`request failed: ${request.url()} ${reason}`);
       });
       page.on("websocket", (socket) =>
@@ -56,6 +64,10 @@ export const test = base.extend({
         secrets,
         /** Declare a failure the test provokes on purpose, e.g. a wrong password → 401 on /api/auth/login. */
         expect: (status, path) => record.expected.push({ status, path }),
+        /** Declare that the server restarts during this test, so the dropped realtime connection is expected. */
+        expectRestart: () => {
+          record.restarting = true;
+        },
         /** The person closes their browser: checks run now, while it can still be inspected. */
         leave: async () => {
           await checkClean(player);
