@@ -1,7 +1,7 @@
 # Engineering Guidelines
 
 How we structure, write and test code in ClassiCade. These rules apply to all new code (`apps/`, `packages/`).
-The legacy app is exempt until it is deleted (CC-029). Where a rule can be checked by a tool, it is
+The legacy app they replaced was deleted in CC-029. Where a rule can be checked by a tool, it is
 (ESLint, Prettier, Vitest coverage). Rules are a starting point, not a substitute for thinking — if a rule
 gets in the way of a clearly better design, write an ADR.
 
@@ -177,7 +177,7 @@ Rules:
 4. **Zero known vulnerabilities.** `npm audit` must report 0 high/critical before merge; anything lower gets a ticket.
 5. **Stay current.** Patch/minor updates at least monthly; a major upgrade gets its own ticket and is tested like a feature.
    Automated update PRs and an audit step in CI come with CC-027/CC-031.
-6. **Shared versions.** One version of a library across workspaces unless a migration is in progress (e.g. the legacy app on Express 4 while `apps/server` is on Express 5).
+6. **Shared versions.** One version of a library across workspaces unless a migration is in progress (e.g. one workspace moving to a new major ahead of the others).
 
 ---
 

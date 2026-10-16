@@ -35,7 +35,7 @@ Secrets live only in Render and local `.env` files — never in the repo (it is 
 
 ## Cutover to the new stack (CC-029)
 
-The legacy app tolerates every variable above, so the settings change first and the code second:
+Done 2026-10-16. The legacy app tolerated every variable above, so the settings changed first and the code second:
 
 1. In Render, set the environment variables above and change the Build Command. Render redeploys the legacy app with the
    new build step — that proves the web build works on Render before anything switches.
@@ -44,6 +44,10 @@ The legacy app tolerates every variable above, so the settings change first and 
 3. Check `/health`, play a game in two browsers, log in as a legacy player. Everyone is logged out once (new session
    store); legacy players log in with their old email and password and get a new account (CC-078).
 4. Then delete the legacy code (separate PR).
+
+What happened: the first new-server deploy refused to boot (`SESSION_SECRET` shorter than 32 characters); Render kept
+the legacy deploy live. With a new secret the next deploy went live; `/health`, a two-browser chess game and the CSP
+headers were verified in production.
 
 Rehearsed from a fresh clone with `NODE_ENV=production`: build, boot, `/health`, deep links, cached assets, a chess game
 between two browsers with no CSP errors, and a legacy login through the UI. Locally over plain HTTP, add

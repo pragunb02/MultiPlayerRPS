@@ -2,15 +2,5 @@ node_modules
 package-lock.json
 coverage
 dist
-*.min.js
-*.min.css
-client/public/js/chess-*.js
-
-# Legacy app — replaced during Stage 0 (ADR-004); not reformatted to keep diffs reviewable.
-index.js
-db.js
-models/
-client/
-
 # Local tool settings (not project code)
 .claude/

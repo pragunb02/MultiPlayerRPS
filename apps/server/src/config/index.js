@@ -102,7 +102,9 @@ function parseOrigins(raw, { isProduction, errors }) {
     .filter(Boolean);
   const invalid = origins.filter((origin) => !isOrigin(origin));
   if (origins.length === 0 || invalid.length > 0) {
-    errors.push(`ALLOWED_ORIGINS must be a comma-separated list of origins like https://example.com (got "${raw}")`);
+    errors.push(
+      `ALLOWED_ORIGINS must be a comma-separated list of origins like https://example.com (got "${raw}")`,
+    );
   }
   return Object.freeze(origins);
 }

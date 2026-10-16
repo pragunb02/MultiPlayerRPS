@@ -11,10 +11,19 @@ describe("parseRoomCode", () => {
     expect(parseRoomCode(raw)).toBe(expected);
   });
 
-  it.each(["", "AB2CD", "AB2CD34", "AB0CD3", "ABOCD3", "AB1CD3", "AB-CD3", 123456, undefined, null, { code: "AB2CD3" }])(
-    "rejects %j",
-    (raw) => {
-      expect(() => parseRoomCode(raw)).toThrow(ValidationError);
-    },
-  );
+  it.each([
+    "",
+    "AB2CD",
+    "AB2CD34",
+    "AB0CD3",
+    "ABOCD3",
+    "AB1CD3",
+    "AB-CD3",
+    123456,
+    undefined,
+    null,
+    { code: "AB2CD3" },
+  ])("rejects %j", (raw) => {
+    expect(() => parseRoomCode(raw)).toThrow(ValidationError);
+  });
 });

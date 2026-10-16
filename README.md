@@ -2,8 +2,8 @@
 
 Real-time multiplayer classic games — Rock Paper Scissors, Tic-Tac-Toe and Chess — in the browser.
 
-> The codebase is mid-restructure (Stage 0). See [docs/PROGRESS.md](docs/PROGRESS.md) for status and
-> [docs/](docs/) for business/product requirements, architecture and the backlog.
+Live at https://nocapgaming.onrender.com. Status: [docs/PROGRESS.md](docs/PROGRESS.md); business/product requirements,
+architecture and the backlog are in [docs/](docs/).
 
 ## Requirements
 
@@ -15,22 +15,24 @@ Real-time multiplayer classic games — Rock Paper Scissors, Tic-Tac-Toe and Che
 ```bash
 nvm use
 npm install
-cp .env.example .env   # then fill in MONGO_URI and SESSION_SECRET
-npm run dev            # http://localhost:8080
+cp apps/server/.env.example apps/server/.env   # then fill in MONGO_URI and SESSION_SECRET
+npm run dev:server     # API + realtime on http://localhost:4000
+npm run dev:web        # web app on http://localhost:5173 (proxies to the server)
 ```
 
 ## Scripts
 
-| Command                | What it does                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------------------------------- |
-| `npm run dev`          | Legacy app with auto-reload (:8080)                                                            |
-| `npm run dev:server`   | New server with auto-reload (:4000); JSON logs — pipe to `npx pino-pretty` for readable output |
-| `npm run dev:web`      | Web app on :5173 (run the server too)                                                          |
-| `npm start`            | Start (production)                                                                             |
-| `npm run lint`         | ESLint                                                                                         |
-| `npm run format`       | Prettier (write)                                                                               |
-| `npm run format:check` | Prettier (check only)                                                                          |
-| `npm test`             | Vitest                                                                                         |
+| Command                 | What it does                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `npm run dev:server`    | New server with auto-reload (:4000); JSON logs — pipe to `npx pino-pretty` for readable output |
+| `npm run dev:web`       | Web app on :5173 (run the server too)                                                          |
+| `npm run build:web`     | Production build of the web app → `apps/web/dist`                                              |
+| `npm start`             | Start (production): the server, serving the built web app (`WEB_DIST_DIR`)                     |
+| `npm run lint`          | ESLint                                                                                         |
+| `npm run format`        | Prettier (write)                                                                               |
+| `npm run format:check`  | Prettier (check only)                                                                          |
+| `npm test`              | Vitest                                                                                         |
+| `npm run test:coverage` | Vitest with coverage gates                                                                     |
 
 ## Project docs
 

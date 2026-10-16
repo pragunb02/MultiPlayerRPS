@@ -17,9 +17,12 @@ describe("credentials", () => {
     expect(parseUsername(raw)).toBe(raw);
   });
 
-  it.each(["ab", "x".repeat(21), "has space", "emoji😀", "a-b", 42, undefined])("rejects username %j", (raw) => {
-    expect(fieldOf(() => parseUsername(raw))).toBe("username");
-  });
+  it.each(["ab", "x".repeat(21), "has space", "emoji😀", "a-b", 42, undefined])(
+    "rejects username %j",
+    (raw) => {
+      expect(fieldOf(() => parseUsername(raw))).toBe("username");
+    },
+  );
 
   it("normalises email", () => {
     expect(parseEmail("  Riya@Example.COM ")).toBe("riya@example.com");

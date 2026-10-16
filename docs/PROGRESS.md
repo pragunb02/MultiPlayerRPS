@@ -8,15 +8,15 @@
 | Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-080`                                  |
 | Current stage | **Stage 0 — Foundation**                                                                        |
 | Stage health  | 🟢 On track                                                                                     |
-| In progress   | CC-029 production cutover (part 1 ready; needs Render settings)                                 |
+| In progress   | —                                                                                               |
 | Blocked on    | —                                                                                               |
-| Next up       | CC-029 part 2: delete legacy                                                                    |
+| Next up       | Remaining Stage 0: CI (CC-027), staging (CC-028), the rest of 0.G — then Stage 1                |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 28 / 36      |
+| S0 Foundation   | 🟡 In progress | 30 / 36      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -28,14 +28,15 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
-| Security (SEC)   | 0    | 6           | 5     |
-| Bugs (BUG)       | 0    | 12          | 2     |
-| Tech debt (DEBT) | 0    | 9           | 3     |
+| Security (SEC)   | 0    | 0           | 11    |
+| Bugs (BUG)       | 0    | 0           | 14    |
+| Tech debt (DEBT) | 0    | 1           | 11    |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-029, CC-074 — **Production runs the new stack.** Cutover: root `npm start` runs `apps/server`, DB-aware `/health` outside `/api`, `WEB_DIST_DIR` required in production and resolved to an absolute path (a relative path made every page 500 in the fresh-clone rehearsal). Render settings changed first; the first deploy refused to boot on a short `SESSION_SECRET` and Render kept legacy live; the next went live (CSP, HSTS, secure cookies, cross-site POST 403, two-browser chess verified). Then deleted the legacy app (`index.js`, `client/`, `models/`, `db.js`, `config.js`, `hw.txt`, root dependencies, `MONGO_URI_PRODUCTION` fallback). Closed the 26 remaining in-progress findings (SEC 11/11 and BUG 14/14 now fixed; DEBT-09 waits for CI). The old `.prettierignore` entries `models/` and `index.js` had silently excluded 6 new-stack files from format checks — formatted now.
 - 2026-10-16 — CC-078 — Legacy players keep their login: a login with no account falls back to the legacy `users` collection (read-only), checks the bcrypt hash and creates the account (scrypt, cleaned unique username). Signup refuses legacy emails. Legacy XP not imported (client-writable, SEC-01). 766 tests incl. MongoDB integration proving legacy documents are never written.
 - 2026-10-16 — CC-030 — Strict CSP (no inline code; last inline styles removed), CSRF defence via SameSite + Origin + JSON-only bodies (ADR-010), X-Frame-Options DENY, server serves the built web app (`WEB_DIST_DIR`, deep links, cache headers). Built app served by the server: chess played to mate in two browsers with zero CSP violations; cross-site POST 403. 650 server tests.
 - 2026-10-16 — CC-025 — Auth and profile UI: `/signup` / `/login` (accessible fields, instant validation, server field errors, safe `next` redirects), header identity actions, `/profile` (level, progress bar, stats, paged match history). 720 tests. Real-browser journey sign up → play → profile → log out → log in verified; fixed a header height jump.

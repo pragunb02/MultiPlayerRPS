@@ -16,7 +16,17 @@ describe("normaliseLegacyUsername", () => {
   });
 
   it("always produces a username today's rules accept", () => {
-    for (const raw of ["", " ", "😀😀😀", "ab", "a b c d e f g h i j k l m n", "名前", null, undefined, 12345]) {
+    for (const raw of [
+      "",
+      " ",
+      "😀😀😀",
+      "ab",
+      "a b c d e f g h i j k l m n",
+      "名前",
+      null,
+      undefined,
+      12345,
+    ]) {
       expect(() => parseUsername(normaliseLegacyUsername(raw))).not.toThrow();
     }
   });

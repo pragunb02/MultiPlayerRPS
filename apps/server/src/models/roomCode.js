@@ -13,7 +13,9 @@ const PATTERN = new RegExp(`^[${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}}$`);
 export function parseRoomCode(raw) {
   const code = typeof raw === "string" ? raw.trim().toUpperCase() : "";
   if (!PATTERN.test(code)) {
-    throw new ValidationError(`Room codes are ${ROOM_CODE_LENGTH} letters/digits`, { details: { field: "code" } });
+    throw new ValidationError(`Room codes are ${ROOM_CODE_LENGTH} letters/digits`, {
+      details: { field: "code" },
+    });
   }
   return code;
 }
