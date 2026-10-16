@@ -1,42 +1,18 @@
-import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
+import { createSocketClients, nextEvent as nextUpdate, send } from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
 
-const sockets = [];
 let server;
+const clients = createSocketClients(() => server.baseUrl);
+const player = () => clients.player();
+const openSocket = (cookie) => clients.openSocket(cookie);
 
 afterEach(async () => {
-  sockets.splice(0).forEach((socket) => socket.disconnect());
+  clients.disconnectAll();
   await server?.close();
   server = undefined;
 });
-
-/** A guest with a session and a connected socket. */
-async function player(baseUrl = server.baseUrl) {
-  const res = await fetch(`${baseUrl}/api/session/guest`, { method: "POST" });
-  const cookie = res.headers.get("set-cookie").split(";")[0];
-  const { identity } = await res.json();
-  return { identity, cookie, socket: await openSocket(cookie) };
-}
-
-async function openSocket(cookie) {
-  const socket = connect(server.baseUrl, {
-    transports: ["websocket"],
-    extraHeaders: { cookie },
-    reconnection: false,
-  });
-  sockets.push(socket);
-  await new Promise((resolve, reject) => {
-    socket.once("connect", resolve);
-    socket.once("connect_error", reject);
-  });
-  return socket;
-}
-
-const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
-const nextUpdate = (socket, event = SOCKET_EVENTS.ROOM_UPDATED) =>
-  new Promise((resolve) => socket.once(event, resolve));
 
 /** Alice creates a race room and Bob joins; seed 42 makes Bob (second seat) move first. */
 async function startedRace() {

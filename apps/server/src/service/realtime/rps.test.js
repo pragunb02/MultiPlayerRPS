@@ -1,59 +1,31 @@
-import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { ENGINES } from "@classicade/games";
+import { createSocketClients, nextEvent, send, startRoom } from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
 
 // Rock Paper Scissors end to end over real sockets, with the real engine registry.
-const sockets = [];
 let server;
+const clients = createSocketClients(() => server.baseUrl);
 
 afterEach(async () => {
-  sockets.splice(0).forEach((socket) => socket.disconnect());
+  clients.disconnectAll();
   await server?.close();
   server = undefined;
 });
 
-async function player() {
-  const res = await fetch(`${server.baseUrl}/api/session/guest`, { method: "POST" });
-  const cookie = res.headers.get("set-cookie").split(";")[0];
-  const { identity } = await res.json();
-  const socket = connect(server.baseUrl, {
-    transports: ["websocket"],
-    extraHeaders: { cookie },
-    reconnection: false,
-  });
-  sockets.push(socket);
-  await new Promise((resolve, reject) => {
-    socket.once("connect", resolve);
-    socket.once("connect_error", reject);
-  });
-  const received = [];
-  socket.onAny((event, payload) => received.push({ event, payload }));
-  return { identity, socket, received };
-}
-
-const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
-const nextUpdate = (socket) => new Promise((resolve) => socket.once(SOCKET_EVENTS.ROOM_UPDATED, resolve));
-
 async function rpsMatch(bestOf) {
-  const alice = await player();
-  const bob = await player();
-  const { data } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
-    gameId: "rps",
-    options: { bestOf },
-  });
-  const aliceSeesStart = nextUpdate(alice.socket);
-  await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: data.code });
-  await aliceSeesStart;
-  return { alice, bob, code: data.code };
+  server = await startTestServer({ engines: ENGINES });
+  const alice = await clients.player();
+  const bob = await clients.player();
+  const { code } = await startRoom(alice, bob, { gameId: "rps", options: { bestOf } });
+  return { alice, bob, code };
 }
 
 describe("Rock Paper Scissors over sockets", () => {
   it("never sends a pending choice to the opponent — only that they have chosen (SEC-09)", async () => {
-    server = await startTestServer({ engines: ENGINES });
     const { alice, bob, code } = await rpsMatch(3);
-    const bobSeesAliceChoose = nextUpdate(bob.socket);
+    const bobSeesAliceChoose = nextEvent(bob.socket);
 
     const own = await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "scissors" } });
     const bobsView = await bobSeesAliceChoose;
@@ -65,10 +37,9 @@ describe("Rock Paper Scissors over sockets", () => {
   });
 
   it("plays a best-of-1 match to a result both players see, scissors included (BUG-01)", async () => {
-    server = await startTestServer({ engines: ENGINES });
     const { alice, bob, code } = await rpsMatch(1);
     await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "scissors" } });
-    const aliceSeesResult = nextUpdate(alice.socket);
+    const aliceSeesResult = nextEvent(alice.socket);
 
     const final = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "paper" } });
 
@@ -81,9 +52,8 @@ describe("Rock Paper Scissors over sockets", () => {
   });
 
   it("refuses invalid options and invalid choices with clear reasons", async () => {
-    server = await startTestServer({ engines: ENGINES });
     const { alice, code } = await rpsMatch(3);
-    const stranger = await player();
+    const stranger = await clients.player();
 
     const badOptions = await send(stranger.socket, SOCKET_EVENTS.ROOM_CREATE, {
       gameId: "rps",
