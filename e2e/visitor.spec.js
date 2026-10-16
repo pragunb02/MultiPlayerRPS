@@ -1,4 +1,4 @@
-import { createRoom, expect, test } from "./fixtures.js";
+import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
 
 // Someone arriving for the first time, without a session.
 test.describe("first-time visitor", () => {
@@ -23,14 +23,14 @@ test.describe("first-time visitor", () => {
     expect((await visitor.context.cookies()).map((c) => c.name)).not.toContain("cc.sid");
   });
 
-  test("opens a friend's invite link and is seated as a guest, at the room's canonical URL", async ({
+  test("opens a friend's invite link, chooses to play as a guest and is seated, at the room's canonical URL", async ({
     players,
   }) => {
     const host = await players.open("host");
     const room = await createRoom(host, "tic-tac-toe");
     const visitor = await players.open("visitor");
 
-    await visitor.page.goto(room.path);
+    await joinAsGuest(visitor, room.path);
 
     await expect(visitor.page.getByRole("grid", { name: "Tic-Tac-Toe board" })).toBeVisible();
     await expect(host.page.getByRole("grid", { name: "Tic-Tac-Toe board" })).toBeVisible();
@@ -48,11 +48,13 @@ test.describe("first-time visitor", () => {
       ["/play/chess", "/games/chess"],
       ["/games/tictactoe", "/games/tic-tac-toe"],
       ["/games/rockpaperscissors", "/games/rock-paper-scissors"],
-      [`/room/${room.code.toLowerCase()}`, room.path],
     ]) {
       await visitor.page.goto(from);
       await expect(visitor.page, `${from} → ${to}`).toHaveURL(to);
     }
+    // An old room link names no game: the room's URL is known once joined.
+    await joinAsGuest(visitor, `/room/${room.code.toLowerCase()}`);
+    await expect(visitor.page).toHaveURL(room.path);
     // Redirects replace history: Back leaves the redirect instead of bouncing on it.
     await visitor.page.goBack();
     await expect(visitor.page).toHaveURL("/games/rock-paper-scissors");

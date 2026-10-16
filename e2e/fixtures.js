@@ -118,6 +118,15 @@ function safeDecode(url) {
   }
 }
 
+/**
+ * Opens a room link without a session and chooses to play as a guest (CC-086: nobody becomes a guest without
+ * choosing to).
+ */
+export async function joinAsGuest(player, path) {
+  await player.page.goto(path);
+  await player.page.getByRole("button", { name: "Play as guest" }).click();
+}
+
 /** Creates a room in `gameSlug` from its lobby and returns the room URL (path) and code. */
 export async function createRoom(player, gameSlug) {
   await player.page.goto(`/games/${gameSlug}`);

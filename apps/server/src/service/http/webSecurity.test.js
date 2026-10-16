@@ -7,10 +7,10 @@ import { ERROR_CODES } from "@classicade/shared";
 import { PRODUCTION_ENV } from "../../testing/testConfig.js";
 import { createTestApp } from "../../testing/testApp.js";
 
-/** A fake built web app: index.html plus a hashed asset. */
-function fakeWebBuild() {
-  const dir = mkdtempSync(path.join(tmpdir(), "classicade-web-"));
-  mkdirSync(path.join(dir, "assets"));
+/** A fake built web app: index.html plus a hashed asset. `under` puts it below a folder of that name. */
+function fakeWebBuild({ under = "" } = {}) {
+  const dir = path.join(mkdtempSync(path.join(tmpdir(), "classicade-web-")), under);
+  mkdirSync(path.join(dir, "assets"), { recursive: true });
   writeFileSync(path.join(dir, "index.html"), "<!doctype html><title>ClassiCade</title><div id=root></div>");
   writeFileSync(path.join(dir, "assets", "index-abc123.js"), "console.log('app')");
   writeFileSync(path.join(dir, "favicon.svg"), "<svg/>");
@@ -110,6 +110,15 @@ describe("serving the web app", () => {
       expect(res.text).toContain("<title>ClassiCade</title>");
       expect(res.headers["cache-control"]).toBe("no-cache");
     }
+  });
+
+  it("serves the app from a checkout below a dot-folder (e.g. ~/.worktrees/…)", async () => {
+    const { app } = createTestApp({ env: { WEB_DIST_DIR: fakeWebBuild({ under: ".hidden/dist" }) } });
+
+    const res = await request(app).get("/games/chess").set("Accept", "text/html");
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("<title>ClassiCade</title>");
   });
 
   it("caches hashed assets for a year, and revalidates other static files", async () => {

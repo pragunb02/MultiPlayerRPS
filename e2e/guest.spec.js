@@ -1,4 +1,4 @@
-import { createRoom, expect, test } from "./fixtures.js";
+import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
 
 // Two guests playing: what each one can see, and where every button leads.
 test.describe("guest players", () => {
@@ -11,7 +11,7 @@ test.describe("guest players", () => {
     await alice.page.getByRole("button", { name: "Create room" }).click();
     const invite = await alice.page.getByRole("textbox", { name: "Invite link" }).inputValue();
     const bob = await players.open("bob");
-    await bob.page.goto(invite);
+    await joinAsGuest(bob, invite);
     const choices = (player) => player.page.getByRole("group", { name: "Your choice" });
     await expect(choices(alice)).toBeVisible();
     await expect(choices(bob)).toBeVisible();
@@ -39,7 +39,7 @@ test.describe("guest players", () => {
     const alice = await players.open("alice");
     const room = await createRoom(alice, "tic-tac-toe");
     const bob = await players.open("bob");
-    await bob.page.goto(room.path);
+    await joinAsGuest(bob, room.path);
     await expect(bob.page.getByRole("grid", { name: "Tic-Tac-Toe board" })).toBeVisible();
 
     await bob.page.getByRole("button", { name: "Leave room" }).click();
@@ -75,7 +75,7 @@ test.describe("guest players", () => {
     await expect(alice.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
 
     const friend = await players.open("friend");
-    await friend.page.goto(room.path);
+    await joinAsGuest(friend, room.path);
     await expect(friend.page.getByRole("grid", { name: "Chess board" })).toBeVisible();
     await expect(friend.page.getByRole("list", { name: "Players" })).toContainText(account.username);
     await expect(alice.page.getByRole("grid", { name: "Chess board" })).toBeVisible();

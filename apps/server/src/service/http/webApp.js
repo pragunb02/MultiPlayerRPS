@@ -15,7 +15,6 @@ const NOT_APP_ROUTES = /^\/(api|socket\.io)(\/|$)/;
  */
 export function createWebAppRouter({ distDir }) {
   const router = express.Router();
-  const indexFile = path.join(distDir, "index.html");
 
   router.use(
     express.static(distDir, {
@@ -36,7 +35,9 @@ export function createWebAppRouter({ distDir }) {
       return;
     }
     res.setHeader("Cache-Control", "no-cache");
-    res.sendFile(indexFile);
+    // Relative to `root`: `send` refuses absolute paths with a dot-folder anywhere in them (a checkout under
+    // `~/.something/` answered 500 for every page).
+    res.sendFile("index.html", { root: distDir });
   });
 
   return router;
