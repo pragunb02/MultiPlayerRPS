@@ -69,6 +69,7 @@ module.exports = [
       "apps/server/**/*.js",
       "packages/**/*.js",
       "*.mjs",
+      "scripts/**/*.mjs",
       "apps/web/vite.config.js",
       "e2e/**/*.{js,mjs}",
     ],

@@ -1,0 +1,95 @@
+# Nightly encrypted backup of the production database (CC-108). Setup, restore and rehearsal:
+# docs/runbooks/backup-restore.md
+#
+# The repository is public, and so are this workflow's logs. So the dump is encrypted before it is written anywhere,
+# it goes only to the owner's private bucket, and nothing from it is printed. It is never an Actions artifact.
+# Until the owner adds the secrets, every run skips with a notice.
+name: Nightly database backup
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC, a quiet hour. Off the full hour, when GitHub's scheduler is busiest.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump, encrypt and upload
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # Needs no installed packages. Masks the database password for every later step.
+      - name: Check the backup secrets
+        id: config
+        run: node scripts/bin/backup.mjs config
+        env:
+          BACKUP_MONGO_URI: ${{ secrets.BACKUP_MONGO_URI }}
+          BACKUP_AGE_RECIPIENTS: ${{ secrets.BACKUP_AGE_RECIPIENTS }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+
+      # Installed before any secret is in the environment, and without running install scripts.
+      - name: Install dependencies
+        if: steps.config.outputs.ready == 'true'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install mongodump and age
+        if: steps.config.outputs.ready == 'true'
+        uses: ./.github/actions/backup-tools
+
+      - name: Prove the backup user can only read
+        if: steps.config.outputs.ready == 'true'
+        run: node scripts/bin/backup.mjs read-only
+        env:
+          BACKUP_MONGO_URI: ${{ secrets.BACKUP_MONGO_URI }}
+
+      - name: Dump and encrypt
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          printf '%s\n' "$BACKUP_AGE_RECIPIENTS" > "$RUNNER_TEMP/recipients.txt"
+          scripts/backup/dump-and-encrypt.sh "$RUNNER_TEMP/recipients.txt" "$RUNNER_TEMP/backup.age"
+        env:
+          BACKUP_MONGO_URI: ${{ secrets.BACKUP_MONGO_URI }}
+          BACKUP_AGE_RECIPIENTS: ${{ secrets.BACKUP_AGE_RECIPIENTS }}
+
+      - name: Check the archive is encrypted
+        id: archive
+        if: steps.config.outputs.ready == 'true'
+        run: node scripts/bin/backup.mjs prepare-upload --file "$RUNNER_TEMP/backup.age"
+
+      # The bucket's lifecycle rule deletes backups after 30 days. This key can add objects but should not be able
+      # to delete them (see the runbook), so a leaked key can not wipe the backups.
+      - name: Upload to the private bucket
+        if: steps.config.outputs.ready == 'true'
+        run: >-
+          aws s3 cp "$RUNNER_TEMP/backup.age" "s3://$BACKUP_S3_BUCKET/$KEY"
+          --endpoint-url "$BACKUP_S3_ENDPOINT" --only-show-errors --no-progress
+        env:
+          KEY: ${{ steps.archive.outputs.key }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          # Cloudflare R2 takes "auto". For AWS S3 or Backblaze B2 set the bucket's region as this secret.
+          AWS_DEFAULT_REGION: ${{ secrets.BACKUP_S3_REGION || 'auto' }}
+          # Newer AWS CLI versions add checksums that not every S3 compatible store accepts.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+
+      - name: Remove the local copy
+        if: always()
+        run: rm -f "$RUNNER_TEMP/backup.age" "$RUNNER_TEMP/recipients.txt"

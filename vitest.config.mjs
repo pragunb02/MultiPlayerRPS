@@ -9,7 +9,7 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["apps/server/**/*.test.js", "packages/**/*.test.js"],
+          include: ["apps/server/**/*.test.js", "packages/**/*.test.js", "scripts/**/*.test.mjs"],
         },
       },
       {
@@ -25,9 +25,15 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      include: ["apps/*/src/**/*.{js,jsx}", "packages/*/src/**/*.js"],
-      // Entry points only wire things together (covered indirectly): server index.js, web main.jsx.
-      exclude: ["**/*.test.{js,jsx}", "**/testing/**", "apps/server/src/index.js", "apps/web/src/main.jsx"],
+      include: ["apps/*/src/**/*.{js,jsx}", "packages/*/src/**/*.js", "scripts/**/*.mjs"],
+      // Entry points only wire things together (covered indirectly): server index.js, web main.jsx, scripts/bin.
+      exclude: [
+        "**/*.test.{js,jsx,mjs}",
+        "**/testing/**",
+        "apps/server/src/index.js",
+        "apps/web/src/main.jsx",
+        "scripts/bin/**",
+      ],
       reporter: ["text", "html"],
       // Every line and function is tested (CC-084). Branches: the few left are listed with reasons in
       // docs/tickets/CC-084.md (concurrent-write races, old MongoDB fallbacks); the merged report also under-counts
