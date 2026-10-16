@@ -33,6 +33,23 @@
   padding: var(--space-6);
   box-shadow: var(--shadow-sm);
 }
+.card {
+  position: relative;
+}
+.cardLink {
+  color: var(--color-text);
+  text-decoration: none;
+}
+/* The whole card is clickable via the heading link. */
+.cardLink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+}
+.card:hover {
+  border-color: var(--color-primary);
+}
 .card h3 {
   margin-bottom: var(--space-2);
 }

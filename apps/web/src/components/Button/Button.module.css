@@ -7,6 +7,7 @@
   border-radius: var(--radius-full);
   font: inherit;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     transform var(--duration-fast),

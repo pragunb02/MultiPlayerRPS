@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { Button } from "../../components/Button/Button.jsx";
 import { useGames } from "../../hooks/useGames.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -50,7 +51,11 @@ export function HomePage() {
           <ul className={styles.games}>
             {games.games.map((game) => (
               <li key={game.id} className={styles.card}>
-                <h3>{game.name}</h3>
+                <h3>
+                  <Link to={`/play/${game.id}`} className={styles.cardLink}>
+                    {game.name}
+                  </Link>
+                </h3>
                 <p className={styles.meta}>
                   {game.minPlayers === game.maxPlayers
                     ? `${game.minPlayers} players`
