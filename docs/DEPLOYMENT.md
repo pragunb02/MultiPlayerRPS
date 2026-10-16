@@ -89,11 +89,56 @@ the **Deployment impact** section of the PR template. If anything below changes,
 Render → Deploys → pick the last good deploy → **Rollback**. Then fix forward with a PR.
 (While the health check is set, a broken deploy usually never goes live in the first place.)
 
+## Backups (CC-108)
+
+Every night at 03:17 UTC `.github/workflows/backup.yml` dumps the production database with a **read only** user,
+encrypts the dump with the owner's age public key and uploads it to the owner's private S3 compatible bucket, which
+keeps 30 days. Nothing from the dump appears in the (public) logs and it is never an Actions artifact. Until the
+secrets are set every run skips with a notice. Setup, restore, verification and the rehearsal checklist:
+[runbooks/backup-restore.md](runbooks/backup-restore.md).
+
+## Uptime monitoring (CC-049, first part)
+
+`.github/workflows/uptime.yml` checks production every 10 minutes from GitHub Actions. No secrets or accounts needed.
+
+| Step            | What happens                                                                                                                                                                                                                        |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Probe           | `GET /health` must answer 200 with the database up, then `GET /` must answer 200 with HTML. Free plan cold starts are allowed for: retries with doubling waits (5, 10, 20, 40 s) for up to 90 s for `/health` and 30 s for the page |
+| First failure   | A warning on the run, nothing else. One failed check can be a blip                                                                                                                                                                  |
+| Second in a row | Opens an issue labelled **incident** with the time of the first failed check and every attempt's timing and result                                                                                                                  |
+| Still down      | Each check rewrites that issue: failed checks in a row, how long it has been down, the latest timings                                                                                                                               |
+| Back up         | The first passing check comments how long it was down and closes the issue                                                                                                                                                          |
+
+The logic is in `scripts/uptime/` and tested in CI. A run remembers nothing itself: it learns whether the check before
+failed from the previous run's "Site is down" step. Issues filed by hand with the label are left alone. If the
+monitor itself breaks (for example the GitHub API fails), the run fails and GitHub emails the owner.
+
+**Owner:** to hear about incidents, Watch the repository with at least **Issues** (Watch → Custom → Issues), or
+GitHub's mobile app notifies you.
+
+What it does **not** cover yet (the rest of CC-049):
+
+- **Errors and slowness inside the app.** A page that loads but a game that fails, a socket error, a slow API: no
+  error tracking or metrics yet.
+- **Paging.** An issue and a GitHub notification is the only alert. Nobody is woken up.
+- **Exact timing.** GitHub runs schedules on a best effort basis, often a few minutes late and sometimes skipped
+  under load, so "every 10 minutes" is roughly every 10 to 20. An outage shorter than two checks may never open an
+  incident.
+- **GitHub itself.** If Actions is down, nothing is checked. Checks come only from GitHub's network.
+- **Inactivity.** GitHub turns off scheduled workflows in a public repository after 60 days without a commit. Re-enable
+  it under Actions if that happens.
+
+Side effect: a request every 10 minutes keeps the free Render instance from going to sleep (it sleeps after 15 idle
+minutes), so visitors no longer meet cold starts. That uses the free instance hours (750 a month per workspace,
+enough for one service running all month). If a second free service is ever added, slow the schedule down.
+
 ## Known operational risks
 
 - **Free Atlas clusters pause after long inactivity** → DNS stops resolving (`querySrv ENOTFOUND`). Resume it in Atlas.
   Enable Atlas alert emails.
-- **Free Render instances sleep when idle** — first request after a while takes ~30–60 s.
+- **Free Render instances sleep when idle** — first request after a while takes ~30–60 s. The uptime check (above)
+  keeps it awake as a side effect.
+- **No backups until the owner sets them up** — see [runbooks/backup-restore.md](runbooks/backup-restore.md).
 
 ## Incidents
 
