@@ -32,4 +32,6 @@ export const SOCKET_EVENTS = Object.freeze({
   ROOM_UPDATED: "room:updated",
   /** server → client: { code, reason } when a room is closed (expired, emptied) */
   ROOM_CLOSED: "room:closed",
+  /** server → client, after each recorded match: { matchId, xpGained, leveledUp, progress } */
+  PROGRESS_UPDATED: "progress:updated",
 });

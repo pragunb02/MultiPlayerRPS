@@ -3,17 +3,21 @@ import http from "node:http";
 import { createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame } from "@classicade/shared";
 import { createMatchAccessor } from "./data/matchAccessor.js";
+import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
+import { createProgressionComponent } from "./domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createInMemoryRoomDao } from "./persistence/inMemoryRoomDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
+import { createProgressDao } from "./persistence/progressDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
 import { createHttpApp } from "./service/http/app.js";
 import { createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
+import { createBackgroundTasks } from "./utils/backgroundTasks.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_ENDED = "sessionEnded";
@@ -39,29 +43,40 @@ export function assertEnginesInCatalog(engines) {
  */
 
 /**
- * Records every finished game as a match (domain event → match component). Writes run in the background so a
- * slow database never delays a game; failures are logged, and `drain()` lets shutdown wait for pending writes.
+ * After a game ends: record the match, then award progression from the recorded match (so XP only ever comes
+ * from a persisted match). Both steps run as background tasks — a slow database never delays a game — and
+ * shutdown drains them.
  *
- * @param {{ domainEvents: import("node:events").EventEmitter, matchComponent: { recordFinished: Function }, logger: Logger }} deps
- * @returns {{ drain: () => Promise<void> }}
+ * @param {{
+ *   domainEvents: import("node:events").EventEmitter,
+ *   matchComponent: { recordFinished: Function },
+ *   progressionComponent: { applyMatch: Function },
+ *   tasks: ReturnType<typeof createBackgroundTasks>,
+ *   logger: Logger,
+ * }} deps
  */
-export function recordFinishedMatches({ domainEvents, matchComponent, logger }) {
-  const pending = new Set();
+export function connectMatchPipeline({ domainEvents, matchComponent, progressionComponent, tasks, logger }) {
   domainEvents.on(ROOM_EVENTS.GAME_FINISHED, (event) => {
-    const write = Promise.resolve()
-      .then(() => matchComponent.recordFinished(event))
-      .then(
-        (match) =>
-          logger.info(
-            { matchId: match.matchId, gameId: match.gameId, reason: match.result.reason },
-            "match recorded",
-          ),
-        (err) => logger.error({ err, roomCode: event.room.code }, "failed to record match"),
-      )
-      .finally(() => pending.delete(write));
-    pending.add(write);
+    tasks.run(
+      "record match",
+      async () => {
+        const match = await matchComponent.recordFinished(event);
+        logger.info(
+          { matchId: match.matchId, gameId: match.gameId, reason: match.result.reason },
+          "match recorded",
+        );
+        tasks.run(
+          "apply progression",
+          async () => {
+            const updates = await progressionComponent.applyMatch(match);
+            logger.info({ matchId: match.matchId, players: updates.length }, "progression applied");
+          },
+          { matchId: match.matchId },
+        );
+      },
+      { roomCode: event.room.code },
+    );
   });
-  return { drain: () => Promise.all([...pending]).then(() => undefined) };
 }
 
 /**
@@ -78,11 +93,13 @@ export async function startServer({ config, logger }) {
 
   const roomDao = createInMemoryRoomDao();
   const matchDao = createMatchDao({ connection: database.connection });
-  await matchDao.ensureIndexes();
+  const progressDao = createProgressDao({ connection: database.connection });
+  await Promise.all([matchDao.ensureIndexes(), progressDao.ensureIndexes()]);
 
   // 3. data
   const roomAccessor = createRoomAccessor({ roomDao });
   const matchAccessor = createMatchAccessor({ matchDao });
+  const progressAccessor = createProgressAccessor({ progressDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -94,7 +111,9 @@ export async function startServer({ config, logger }) {
     events: domainEvents,
   });
   const matchComponent = createMatchComponent({ matchAccessor });
-  const matchRecorder = recordFinishedMatches({ domainEvents, matchComponent, logger });
+  const progressionComponent = createProgressionComponent({ progressAccessor, events: domainEvents });
+  const tasks = createBackgroundTasks({ logger });
+  connectMatchPipeline({ domainEvents, matchComponent, progressionComponent, tasks, logger });
 
   // 1. service — HTTP and realtime share one session middleware, so both see the same identity
   const sessionMiddleware = createSessionMiddleware({
@@ -109,6 +128,7 @@ export async function startServer({ config, logger }) {
     sessionMiddleware,
     identityComponent,
     matchComponent,
+    progressionComponent,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
   });
   const server = http.createServer(app);
@@ -145,7 +165,7 @@ export async function startServer({ config, logger }) {
     clearInterval(sweeper);
     clearInterval(clockTicker);
     await gateway.close();
-    await matchRecorder.drain();
+    await tasks.drain();
     await database.close();
   };
 

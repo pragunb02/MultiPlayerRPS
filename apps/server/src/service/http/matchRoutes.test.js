@@ -20,7 +20,7 @@ async function playRace(alice, bob) {
   const { code } = await startRoom(alice, bob, { gameId: "race", options: { target: 3 } });
   await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
   await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 2 } });
-  await server.matchRecorder.drain();
+  await server.tasks.drain();
   return code;
 }
 

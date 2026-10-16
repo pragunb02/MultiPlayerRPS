@@ -88,6 +88,7 @@ rejections, full playthrough without mutation, game-over refusal, and identical 
 
 - `users` — id, username, email, passwordHash, avatar, xp, level, createdAt, flags (guest, banned, admin)
 - `matches` (implemented, CC-016) — matchId, roomCode, gameId, options, seed, players[{playerId, displayName}], log[{kind, playerId?, move?, at}], result{result, winners, reason}, startedAt, endedAt, schemaVersion; replayable with `replayGame()`. Ratings fields arrive with CC-042.
+- `player_progress` (implemented, CC-017) — playerId (unique), xp, matchesPlayed, wins, losses, draws, recentMatchIds (exactly-once window), updatedAt.
 - `ratings` — userId, game, rating, rd, volatility
 - `sessions` — managed by session store
 

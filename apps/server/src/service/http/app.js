@@ -15,6 +15,7 @@ import { apiRouter } from "./routes.js";
  *   sessionMiddleware: import("express").RequestHandler,
  *   identityComponent: ReturnType<typeof import("../../domain/identity/identityComponent.js").createIdentityComponent>,
  *   matchComponent: ReturnType<typeof import("../../domain/matches/matchComponent.js").createMatchComponent>,
+ *   progressionComponent: ReturnType<typeof import("../../domain/progression/progressionComponent.js").createProgressionComponent>,
  *   onSessionEnded: (sessionId: string) => void,
  *   guestLimit?: { windowMs: number, limit: number },
  * }} deps
@@ -25,6 +26,7 @@ export function createHttpApp({
   sessionMiddleware,
   identityComponent,
   matchComponent,
+  progressionComponent,
   onSessionEnded,
   guestLimit,
 }) {
@@ -43,7 +45,10 @@ export function createHttpApp({
   app.use(express.json({ limit: "100kb" }));
   app.use("/api", sessionMiddleware);
 
-  app.use("/api", apiRouter({ identityComponent, matchComponent, onSessionEnded, guestLimit }));
+  app.use(
+    "/api",
+    apiRouter({ identityComponent, matchComponent, progressionComponent, onSessionEnded, guestLimit }),
+  );
 
   app.use(notFoundHandler);
   app.use(errorHandler);

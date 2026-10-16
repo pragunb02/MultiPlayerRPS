@@ -1,0 +1,109 @@
+import { describe, expect, it } from "vitest";
+import { createProgressAccessor } from "../../data/progressAccessor.js";
+import { createInMemoryProgressDao } from "../../testing/inMemoryProgressDao.js";
+import { createProgressionComponent, PROGRESSION_EVENTS, resultFor } from "./progressionComponent.js";
+
+const T0 = 1_760_000_000_000;
+const PLAYERS = [
+  { playerId: "guest_a", displayName: "Alice" },
+  { playerId: "guest_b", displayName: "Bob" },
+];
+const match = (overrides = {}) => ({
+  matchId: "m1",
+  gameId: "rps",
+  players: PLAYERS,
+  log: [],
+  result: { result: "win", winners: ["guest_a"], reason: "best-of-1" },
+  startedAt: T0,
+  endedAt: T0 + 1,
+  ...overrides,
+});
+const forfeitByB = () =>
+  match({
+    result: { result: "win", winners: ["guest_a"], reason: "forfeit" },
+    log: [{ kind: "forfeit", playerId: "guest_b", at: T0 + 1 }],
+  });
+
+function setup() {
+  const published = [];
+  const progression = createProgressionComponent({
+    progressAccessor: createProgressAccessor({ progressDao: createInMemoryProgressDao() }),
+    events: { emit: (event, payload) => published.push({ event, payload }) },
+  });
+  return { progression, published };
+}
+
+describe("resultFor", () => {
+  it.each([
+    [match(), "guest_a", "win"],
+    [match(), "guest_b", "loss"],
+    [match({ result: { result: "draw", winners: [], reason: "agreement" } }), "guest_b", "draw"],
+    [forfeitByB(), "guest_b", "forfeit"],
+    [forfeitByB(), "guest_a", "win"],
+  ])("%#: %s → %s", (m, playerId, expected) => {
+    expect(resultFor(m, playerId)).toBe(expected);
+  });
+});
+
+describe("progressionComponent", () => {
+  it("awards XP per result and counts the match (win 30, loss 10)", async () => {
+    const { progression } = setup();
+
+    await progression.applyMatch(match());
+
+    expect(await progression.getProgress("guest_a")).toEqual(
+      expect.objectContaining({
+        xp: 30,
+        matchesPlayed: 1,
+        wins: 1,
+        level: 1,
+        xpIntoLevel: 30,
+        xpForNextLevel: 50,
+      }),
+    );
+    expect(await progression.getProgress("guest_b")).toEqual(expect.objectContaining({ xp: 10, losses: 1 }));
+  });
+
+  it("gives a player who left nothing, but counts the loss", async () => {
+    const { progression } = setup();
+
+    await progression.applyMatch(forfeitByB());
+
+    expect(await progression.getProgress("guest_b")).toEqual(
+      expect.objectContaining({ xp: 0, matchesPlayed: 1, losses: 1 }),
+    );
+  });
+
+  it("publishes one update per player, flagging a level-up (BUG-08)", async () => {
+    const { progression, published } = setup();
+    await progression.applyMatch(match({ matchId: "m0" })); // Alice: 30 XP
+
+    await progression.applyMatch(match({ matchId: "m1" })); // Alice: 60 XP → level 2
+
+    const aliceUpdate = published.filter((p) => p.payload.playerId === "guest_a").at(-1);
+    expect(aliceUpdate).toEqual({
+      event: PROGRESSION_EVENTS.UPDATED,
+      payload: expect.objectContaining({ matchId: "m1", result: "win", xpGained: 30, leveledUp: true }),
+    });
+    expect(aliceUpdate.payload.progress).toEqual(
+      expect.objectContaining({ xp: 60, level: 2, xpIntoLevel: 10, xpForNextLevel: 100 }),
+    );
+  });
+
+  it("awards a match only once, even if it is applied again (BUG-02: no per-round or duplicate XP)", async () => {
+    const { progression, published } = setup();
+    await progression.applyMatch(match());
+
+    const second = await progression.applyMatch(match());
+
+    expect(second).toEqual([]);
+    expect(published).toHaveLength(2);
+    expect((await progression.getProgress("guest_a")).xp).toBe(30);
+  });
+
+  it("starts new players at level 1 with zero XP", async () => {
+    expect(await setup().progression.getProgress("guest_new")).toEqual(
+      expect.objectContaining({ xp: 0, level: 1, xpIntoLevel: 0, xpForNextLevel: 50 }),
+    );
+  });
+});

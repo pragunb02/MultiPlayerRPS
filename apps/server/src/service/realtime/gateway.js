@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
 import { SOCKET_EVENTS } from "@classicade/shared";
+import { PROGRESSION_EVENTS } from "../../domain/progression/progressionComponent.js";
 import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { createTokenBucket } from "../../utils/tokenBucket.js";
@@ -13,6 +14,8 @@ const DEFAULT_RATE_LIMIT = Object.freeze({ capacity: 20, refillPerSecond: 10 });
 const MAX_MESSAGE_BYTES = 16 * 1024;
 
 const sessionRoom = (sessionId) => `session:${sessionId}`;
+/** Every socket of one player (all their tabs), for player-specific pushes such as progress. */
+const playerRoom = (playerId) => `player:${playerId}`;
 
 /**
  * Realtime entry point. Connections are accepted only from allowed browser origins and only with a
@@ -74,7 +77,7 @@ export function createRealtimeGateway({
   io.on("connection", (socket) => {
     const { identity, sessionId } = socket.data;
     const socketLogger = logger.child({ socketId: socket.id, playerId: identity.id });
-    socket.join(sessionRoom(sessionId));
+    socket.join([sessionRoom(sessionId), playerRoom(identity.id)]);
     socketLogger.info("socket connected");
     let roomChannels = [];
     socket.on("disconnecting", () => {
@@ -109,6 +112,16 @@ export function createRealtimeGateway({
     io.to(roomChannel(code)).emit(SOCKET_EVENTS.ROOM_CLOSED, { code, reason });
     io.in(roomChannel(code)).socketsLeave(roomChannel(code));
     logger.info({ roomCode: code, reason }, "room closed");
+  });
+
+  // Domain → transport: progress after a recorded match goes to every tab of that player.
+  domainEvents.on(PROGRESSION_EVENTS.UPDATED, ({ playerId, matchId, xpGained, leveledUp, progress }) => {
+    io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.PROGRESS_UPDATED, {
+      matchId,
+      xpGained,
+      leveledUp,
+      progress,
+    });
   });
 
   // Domain → transport: a room changed on its own (e.g. a clock ran out) — push everyone their new view.
