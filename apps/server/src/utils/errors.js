@@ -74,3 +74,17 @@ export class ConflictError extends AppError {
     super(message, { ...options, code: ERROR_CODES.CONFLICT });
   }
 }
+
+/**
+ * Someone else changed the thing between reading and saving it (optimistic concurrency). Still a conflict for
+ * clients, but the domain can read again and retry instead (CC-101).
+ */
+export class ConcurrentChangeError extends ConflictError {}
+
+/** The thing existed but is gone for good (a closed room). Its `details` say why. */
+export class GoneError extends AppError {
+  /** @param {string} message @param {ErrorOptions} [options] */
+  constructor(message, options = {}) {
+    super(message, { ...options, code: ERROR_CODES.GONE });
+  }
+}

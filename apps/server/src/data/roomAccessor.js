@@ -1,4 +1,4 @@
-import { ConflictError, NotFoundError } from "../utils/errors.js";
+import { ConcurrentChangeError, ConflictError, NotFoundError } from "../utils/errors.js";
 import { assertDefined } from "../utils/assert.js";
 import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
 
@@ -22,13 +22,20 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @property {{ matchId: string, seed: number, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry> }} [game]
  *   present once the game has started; `seed` + `log` reproduce the game exactly (see replayGame)
  * @property {Readonly<{ status: string, result: string, winners: string[], reason: string }>} [result]  final outcome once finished (played out or forfeited)
+ * @property {number} [finishedAt]      when the last game ended, the rematch window counts from here (CC-101)
  * @property {Readonly<{ requestedBy: ReadonlyArray<string>, available: boolean }>} [rematch]  once finished: who asked
  *   to play again, and whether that is still possible (CC-037)
  * @property {Readonly<{ games: number, wins: Readonly<Record<string, number>> }>} [series]  games finished in this room
  *   and wins per player, across rematches
  * @property {number} createdAt
  * @property {number} lastActivityAt
+ * @property {number} dueAt              when the running game's next deadline falls, 0 for none (kept so the
+ *   every second check asks storage for due rooms only)
+ * @property {number} expiresAt          when the room's lifetime ends (see roomLifetimes.js)
  * @property {number} version            optimistic-concurrency token owned by the store
+ *
+ * @typedef {{ code: string, gameId: string, reason: string, closedAt: number }} ClosedRoom   what is left of a
+ *   closed room, so whoever comes back learns why it is gone
  */
 
 function deepFreeze(value) {
@@ -41,11 +48,36 @@ function deepFreeze(value) {
 
 /** @returns {Readonly<Room>} */
 const toRoom = (doc) => deepFreeze(doc);
+const toRooms = (docs) => Object.freeze(docs.map(toRoom));
+
+/** Storage reports "not there" as a RangeError. The domain hears NotFoundError. */
+async function orNotFound(read, message) {
+  try {
+    return await read();
+  } catch (err) {
+    if (err instanceof RangeError) {
+      throw new NotFoundError(message, { cause: err });
+    }
+    throw err;
+  }
+}
+
+/** Storage reports a write from an old version as VersionConflict. The domain hears ConcurrentChangeError. */
+async function orConcurrentChange(write) {
+  try {
+    return await orNotFound(write, "Room not found");
+  } catch (err) {
+    if (err instanceof VersionConflict) {
+      throw new ConcurrentChangeError("The room changed, please retry", { cause: err });
+    }
+    throw err;
+  }
+}
 
 /**
  * Provides rooms to the domain layer and hides how they are stored.
  *
- * @param {{ roomDao: ReturnType<typeof import("../persistence/inMemoryRoomDao.js").createInMemoryRoomDao> }} deps
+ * @param {{ roomDao: ReturnType<typeof import("../persistence/roomDao.js").createRoomDao> }} deps
  */
 export function createRoomAccessor({ roomDao }) {
   assertDefined(roomDao, "roomDao");
@@ -54,26 +86,31 @@ export function createRoomAccessor({ roomDao }) {
     /** @param {string} code */
     exists: (code) => roomDao.has(code),
 
+    /** @param {string} code  whether a room with this code closed recently (its record is still kept) */
+    wasClosed: (code) => roomDao.hasClosed(code),
+
     /**
      * @param {string} code
-     * @returns {Readonly<Room>}
+     * @returns {Promise<Readonly<Room>>}
      * @throws {NotFoundError}
      */
-    getByCode(code) {
-      if (!roomDao.has(code)) {
-        throw new NotFoundError("Room not found");
-      }
-      return toRoom(roomDao.get(code));
-    },
+    getByCode: async (code) => toRoom(await orNotFound(() => roomDao.get(code), "Room not found")),
+
+    /**
+     * @param {string} code
+     * @returns {Promise<Readonly<ClosedRoom>>}
+     * @throws {NotFoundError} when no record of it is kept
+     */
+    getClosed: async (code) => toRoom(await orNotFound(() => roomDao.getClosed(code), "No closed room")),
 
     /**
      * @param {Omit<Room, "version">} room
-     * @returns {Readonly<Room>}
+     * @returns {Promise<Readonly<Room>>}
      * @throws {ConflictError} when the code is already taken
      */
-    create(room) {
+    async create(room) {
       try {
-        return toRoom(roomDao.insert(room));
+        return toRoom(await roomDao.insert(room));
       } catch (err) {
         if (err instanceof DuplicateKey) {
           throw new ConflictError("Room code already in use", { cause: err });
@@ -86,28 +123,40 @@ export function createRoomAccessor({ roomDao }) {
      * Saves a changed room. `room.version` must be the version that was read.
      *
      * @param {Room} room
-     * @returns {Readonly<Room>}
-     * @throws {ConflictError} when the room changed in the meantime
+     * @returns {Promise<Readonly<Room>>}
+     * @throws {ConcurrentChangeError} when the room changed in the meantime
      * @throws {NotFoundError} when the room no longer exists
      */
-    save(room) {
-      if (!roomDao.has(room.code)) {
-        throw new NotFoundError("Room not found");
-      }
-      try {
-        return toRoom(roomDao.update(room));
-      } catch (err) {
-        if (err instanceof VersionConflict) {
-          throw new ConflictError("The room changed, please retry", { cause: err });
-        }
-        throw err;
-      }
-    },
+    save: async (room) => toRoom(await orConcurrentChange(() => roomDao.update(room))),
 
-    /** @param {string} code */
-    remove: (code) => roomDao.delete(code),
+    /**
+     * Removes a room, as of the version that was read, and keeps a record of why.
+     *
+     * @param {{ room: Room, reason: string, closedAt: number }} closing
+     * @throws {ConcurrentChangeError | NotFoundError}
+     */
+    close: ({ room, reason, closedAt }) =>
+      orConcurrentChange(() =>
+        roomDao.close({
+          code: room.code,
+          version: room.version,
+          record: { code: room.code, gameId: room.gameId, reason, closedAt },
+        }),
+      ),
 
-    /** @returns {ReadonlyArray<Readonly<Room>>} */
-    listAll: () => Object.freeze(roomDao.list().map(toRoom)),
+    /** @param {number} time  forgets records of rooms closed before this moment, and answers how many */
+    forgetClosedBefore: (time) => roomDao.deleteClosedBefore(time),
+
+    /** @returns {Promise<ReadonlyArray<Readonly<Room>>>} */
+    listAll: async () => toRooms(await roomDao.list()),
+
+    /** @param {string} playerId  the rooms where this player has a seat */
+    listBySeat: async (playerId) => toRooms(await roomDao.listBySeat(playerId)),
+
+    /** @param {number} now  the rooms whose game deadline has come */
+    listDue: async (now) => toRooms(await roomDao.listDue(now)),
+
+    /** @param {number} now  the rooms whose lifetime has ended */
+    listExpired: async (now) => toRooms(await roomDao.listExpired(now)),
   });
 }

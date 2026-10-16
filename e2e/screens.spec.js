@@ -104,7 +104,9 @@ test.describe("room", () => {
     await expect(latecomer.page).toHaveURL("/games/tic-tac-toe");
   });
 
-  test("a room everyone left is gone for the next person with the link", async ({ players }) => {
+  test("a room everyone left is gone for the next person with the link, who is told why", async ({
+    players,
+  }) => {
     const host = await players.open("host");
     const room = await createRoom(host, "chess");
     await host.page.getByRole("button", { name: "Leave room" }).click();
@@ -113,7 +115,11 @@ test.describe("room", () => {
 
     await joinAsGuest(late, room.path);
 
-    await expect(late.page.getByRole("heading", { name: "Room not found" })).toBeVisible();
+    // The room existed, so the link is not called wrong: it says why the room is gone (CC-101).
+    await expect(late.page.getByRole("heading", { name: "Room closed" })).toBeVisible();
+    await expect(late.page.getByText("Everyone left, so the room closed.")).toBeVisible();
+    await late.page.getByRole("link", { name: "Start a new Chess game" }).click();
+    await expect(late.page).toHaveURL("/games/chess");
   });
 
   test("the opponent's name, connection and turn are shown to both players", async ({ players }) => {
@@ -155,7 +161,8 @@ test.describe("room", () => {
     expect((await riya.context.cookies()).map((c) => c.name)).not.toContain("cc.sid");
     await riya.page.getByRole("button", { name: "Play as guest" }).click();
     // The room closed when its only player gave up the seat.
-    await expect(riya.page.getByRole("heading", { name: "Room not found" })).toBeVisible();
+    await expect(riya.page.getByRole("heading", { name: "Room closed" })).toBeVisible();
+    await expect(riya.page.getByText("Everyone left, so the room closed.")).toBeVisible();
     await expect(riya.page.getByRole("grid", { name: "Chess board" })).toHaveCount(0);
   });
 });
@@ -192,6 +199,8 @@ test.describe("profile", () => {
     const guest = await players.open("guest");
     await guest.page.goto("/");
     await guest.page.getByRole("button", { name: "Play as a guest" }).click();
+    // The guest session must exist before the next page load, or the profile asks to log in instead.
+    await expect(guest.page.getByRole("banner").getByText(/^Guest-/)).toBeVisible();
     await guest.page.goto("/profile");
     await expect(guest.page.getByText("You're playing as a guest.")).toBeVisible();
     await guest.page.getByRole("link", { name: "Create an account" }).click();

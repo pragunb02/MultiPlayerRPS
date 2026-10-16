@@ -86,7 +86,7 @@ describe("Tic-Tac-Toe over sockets", () => {
       code,
       move: { cell: 0, winner: bob.identity.id },
     });
-    const room = server.roomComponent.getRoom(code);
+    const room = await server.roomComponent.getRoom(code);
 
     expect(ack.ok).toBe(true);
     expect(room.status).toBe("playing");

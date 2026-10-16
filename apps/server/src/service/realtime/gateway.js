@@ -64,6 +64,11 @@ export function createRealtimeGateway({
 
   io.engine.use(sessionMiddleware);
 
+  // While the server shuts down every socket is cut, but the players are not leaving: their browsers
+  // reconnect to the next server, which starts by marking everyone away (CC-101). Recording each cut here
+  // would only race the database closing.
+  let closing = false;
+
   io.use((socket, next) => {
     try {
       socket.data.identity = requireIdentity(socket.request.session);
@@ -96,6 +101,7 @@ export function createRealtimeGateway({
     });
     socket.on("disconnect", (reason) => {
       socketLogger.info({ reason }, "socket disconnected");
+      if (closing) return;
       handleSocketGone({
         io,
         roomComponent,
@@ -166,6 +172,7 @@ export function createRealtimeGateway({
     },
     /** Disconnects all sockets and closes the underlying HTTP server. */
     close() {
+      closing = true;
       return new Promise((resolve, reject) => {
         io.close((err) => (err ? reject(err) : resolve()));
         httpServer.closeIdleConnections();

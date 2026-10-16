@@ -3,6 +3,7 @@ import {
   GAME_STATUS,
   IDENTITY_KINDS,
   MOVE_REJECTIONS,
+  ROOM_CLOSE_REASONS,
   ROOM_CODE_ALPHABET,
   ROOM_STATUS,
   SOCKET_EVENTS,
@@ -14,6 +15,7 @@ describe.each([
   ["MOVE_REJECTIONS", MOVE_REJECTIONS],
   ["GAME_STATUS", GAME_STATUS],
   ["ROOM_STATUS", ROOM_STATUS],
+  ["ROOM_CLOSE_REASONS", ROOM_CLOSE_REASONS],
 ])("%s", (_name, constants) => {
   it("is immutable", () => {
     expect(Object.isFrozen(constants)).toBe(true);

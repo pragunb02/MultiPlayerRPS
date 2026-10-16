@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { captureLogger } from "../../testing/captureLogger.js";
-import { ForbiddenError, NotFoundError } from "../../utils/errors.js";
+import { ForbiddenError, GoneError, NotFoundError } from "../../utils/errors.js";
 import { handleSocketGone } from "./roomHandlers.js";
 
 /** An io stand-in whose room channels are empty (the player has no other sockets left). */
@@ -20,18 +20,19 @@ function run(playerDisconnected) {
 }
 
 describe("handleSocketGone", () => {
-  it.each([new NotFoundError("Room not found"), new ForbiddenError("Not in room")])(
-    "quietly ignores rooms that closed or were left meanwhile (%s)",
-    async (err) => {
-      const { promise, entries } = run(() => {
-        throw err;
-      });
+  it.each([
+    new NotFoundError("Room not found"),
+    new GoneError("This room has closed"),
+    new ForbiddenError("Not in room"),
+  ])("quietly ignores rooms that closed or were left meanwhile (%s)", async (err) => {
+    const { promise, entries } = run(() => {
+      throw err;
+    });
 
-      await promise;
+    await promise;
 
-      expect(entries).toEqual([]);
-    },
-  );
+    expect(entries).toEqual([]);
+  });
 
   it("logs unexpected failures instead of crashing the disconnect handler", async () => {
     const { promise, find } = run(() => {

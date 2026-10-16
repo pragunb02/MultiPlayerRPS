@@ -4,6 +4,7 @@ import {
   AppError,
   ConflictError,
   ForbiddenError,
+  GoneError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -17,6 +18,7 @@ describe("toClientError", () => {
     [new ForbiddenError("Not your room"), 403, ERROR_CODES.FORBIDDEN],
     [new NotFoundError("Room not found"), 404, ERROR_CODES.NOT_FOUND],
     [new ConflictError("Room is full"), 409, ERROR_CODES.CONFLICT],
+    [new GoneError("This room has closed"), 410, ERROR_CODES.GONE],
   ])("maps %o to %i", (err, status, code) => {
     expect(toClientError(err)).toEqual({ status, code, message: err.message });
   });

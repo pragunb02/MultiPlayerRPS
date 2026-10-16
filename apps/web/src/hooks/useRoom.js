@@ -8,6 +8,9 @@ import { useServices } from "../app/servicesContext.js";
  * itself: whoever arrives without one chooses how to join first (CC-086). Leaving the page does not leave the
  * room — only `leave()` does (it forfeits a game in progress).
  *
+ * `refresh()` joins again, to learn whether the room is still there when a deadline it showed has passed. A room
+ * that has closed answers with a GONE error saying why (CC-101).
+ *
  * status: "joining" | "ready" | "closed" | "error"
  *
  * @param {string} code
@@ -15,6 +18,7 @@ import { useServices } from "../app/servicesContext.js";
  */
 export function useRoom(code, { enabled }) {
   const { socket } = useServices();
+  const [joins, setJoins] = useState(0);
   const [state, setState] = useState({
     status: "joining",
     room: undefined,
@@ -52,7 +56,7 @@ export function useRoom(code, { enabled }) {
       active = false;
       unsubscribers.forEach((off) => off());
     };
-  }, [socket, code, enabled]);
+  }, [socket, code, enabled, joins]);
 
   const move = useCallback(
     async (payload) => {
@@ -72,5 +76,7 @@ export function useRoom(code, { enabled }) {
     return room;
   }, [socket, code]);
 
-  return { ...state, move, leave, rematch };
+  const refresh = useCallback(() => setJoins((n) => n + 1), []);
+
+  return { ...state, move, leave, rematch, refresh };
 }

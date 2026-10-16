@@ -174,7 +174,18 @@ describe("rooms over sockets", () => {
     await send(alice.socket, SOCKET_EVENTS.ROOM_LEAVE, { code: data.code });
     const carol = await player();
 
-    expect((await send(carol.socket, SOCKET_EVENTS.ROOM_JOIN, { code: data.code })).error.code).toBe(
+    expect((await send(carol.socket, SOCKET_EVENTS.ROOM_JOIN, { code: data.code })).error).toEqual({
+      code: ERROR_CODES.GONE,
+      message: "This room has closed",
+      details: { reason: "empty", gameId: "race", closedAt: expect.any(Number) },
+    });
+  });
+
+  it("answers NOT_FOUND for a code that never was a room", async () => {
+    server = await startTestServer();
+    const carol = await player();
+
+    expect((await send(carol.socket, SOCKET_EVENTS.ROOM_JOIN, { code: "NEVER2" })).error.code).toBe(
       ERROR_CODES.NOT_FOUND,
     );
   });
@@ -208,7 +219,18 @@ describe("rooms over sockets", () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     expect(aliceUpdates).toBe(0);
-    expect(server.roomComponent.getRoom(code).seats.every((s) => s.connected)).toBe(true);
+    expect((await server.roomComponent.getRoom(code)).seats.every((s) => s.connected)).toBe(true);
+  });
+
+  it("leaves seats as they are while the server shuts down, because the players are not leaving", async () => {
+    server = await startTestServer();
+    const { code } = await startedRace();
+    const { roomComponent } = server;
+
+    await server.close();
+    server = undefined;
+
+    expect((await roomComponent.getRoom(code)).seats.map((seat) => seat.connected)).toEqual([true, true]);
   });
 
   it("announces closed rooms to their players", async () => {
@@ -220,7 +242,7 @@ describe("rooms over sockets", () => {
     });
     const closed = nextUpdate(alice.socket, SOCKET_EVENTS.ROOM_CLOSED);
 
-    server.roomComponent.sweepExpired({ now: Date.now() + 24 * 60 * 60 * 1000 });
+    await server.roomComponent.sweepExpired({ now: Date.now() + 24 * 60 * 60 * 1000 });
 
     expect(await closed).toEqual({ code: data.code, reason: "expired" });
   });

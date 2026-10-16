@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { ERROR_CODES } from "@classicade/shared";
 import {
   AppError,
+  ConcurrentChangeError,
   ConflictError,
   ForbiddenError,
+  GoneError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -16,6 +18,8 @@ describe("application errors", () => {
     [ForbiddenError, ERROR_CODES.FORBIDDEN],
     [NotFoundError, ERROR_CODES.NOT_FOUND],
     [ConflictError, ERROR_CODES.CONFLICT],
+    [ConcurrentChangeError, ERROR_CODES.CONFLICT],
+    [GoneError, ERROR_CODES.GONE],
   ])("%o carries code %s and is an AppError", (ErrorType, code) => {
     const err = new ErrorType("something went wrong");
 
@@ -24,6 +28,10 @@ describe("application errors", () => {
     expect(err.code).toBe(code);
     expect(err.name).toBe(ErrorType.name);
     expect(err.message).toBe("something went wrong");
+  });
+
+  it("reports a concurrent change as a conflict to anyone who does not retry", () => {
+    expect(new ConcurrentChangeError("changed")).toBeInstanceOf(ConflictError);
   });
 
   it("cannot be instantiated as the abstract base class", () => {

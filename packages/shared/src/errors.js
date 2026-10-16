@@ -9,6 +9,8 @@ export const ERROR_CODES = Object.freeze({
   FORBIDDEN: "FORBIDDEN",
   NOT_FOUND: "NOT_FOUND",
   CONFLICT: "CONFLICT",
+  /** The thing existed but is gone for good, such as a closed room. The `details` say why (CC-101). */
+  GONE: "GONE",
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
   RATE_LIMITED: "RATE_LIMITED",
   UNSUPPORTED_MEDIA_TYPE: "UNSUPPORTED_MEDIA_TYPE",

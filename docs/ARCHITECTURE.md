@@ -46,7 +46,7 @@ packages/
 tests live next to code: *.test.js (unit), *.integration.test.js
 ```
 
-Status: composition root, config, `service/http/` (sessions, matches), `service/realtime/` (gateway, rooms), `domain/` (identity, rooms, matches), `data/` (room + match accessors), `persistence/` (database, session store, in-memory room DAO, MongoDB match DAO), `models/`, `utils/` exist (CC-011…CC-020, CC-016).
+Status: composition root, config, `service/http/` (sessions, matches), `service/realtime/` (gateway, rooms), `domain/` (identity, rooms, matches), `data/` (room + match accessors), `persistence/` (database, session store, MongoDB room DAO so rooms survive restarts (CC-101), MongoDB match DAO), `models/`, `utils/` exist (CC-011…CC-020, CC-016).
 
 ### Game engine contract (implemented — `packages/games/src/engine.js`, CC-014)
 

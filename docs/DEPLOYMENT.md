@@ -59,6 +59,14 @@ Server-side in MongoDB (`player_sessions`), cookie `cc.sid` (HttpOnly, Secure, S
 (CC-096): every visit re-issues the cookie and moves expiry to 30 days after it; the stored copy's expiry is rewritten
 at most once an hour; MongoDB's TTL index deletes expired sessions. Changing `SESSION_SECRET` logs everyone out.
 
+## Rooms
+
+Stored in MongoDB (`rooms`, and `closed_rooms` for the reason a room closed), so a deploy, a crash or the free plan's
+sleep never loses a game (CC-101). Players' browsers reconnect and rejoin by themselves after a restart. The new
+process marks every seat as away until its player is back, and applies chess flags that fell while no server ran.
+How long rooms live is in `apps/server/src/domain/rooms/roomLifetimes.js` (rematch window 30 minutes, an away game
+2 hours, closed room records 1 day). There are no settings for it in production.
+
 ## Before merging any PR
 
 CI (lint, format, audit, unit + integration tests with coverage gates, browser tests) must be green. Every PR fills in

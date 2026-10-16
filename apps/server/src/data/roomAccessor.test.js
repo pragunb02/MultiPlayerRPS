@@ -1,68 +1,112 @@
 import { describe, expect, it } from "vitest";
-import { createInMemoryRoomDao } from "../persistence/inMemoryRoomDao.js";
-import { ConflictError, NotFoundError } from "../utils/errors.js";
+import { createInMemoryRoomDao } from "../testing/inMemoryRoomDao.js";
+import { ConcurrentChangeError, ConflictError, NotFoundError } from "../utils/errors.js";
 import { createRoomAccessor } from "./roomAccessor.js";
 
-const room = { code: "ROOM22", status: "waiting", seats: [{ playerId: "p1" }] };
+const room = (overrides = {}) => ({
+  code: "ROOM22",
+  gameId: "rps",
+  status: "waiting",
+  seats: [{ playerId: "p1" }],
+  dueAt: 0,
+  expiresAt: 100,
+  ...overrides,
+});
 const setup = () => createRoomAccessor({ roomDao: createInMemoryRoomDao() });
 
 describe("roomAccessor", () => {
-  it("returns deeply frozen domain rooms", () => {
+  it("returns deeply frozen domain rooms", async () => {
     const rooms = setup();
 
-    const created = rooms.create(room);
+    const created = await rooms.create(room());
 
     expect(Object.isFrozen(created)).toBe(true);
     expect(Object.isFrozen(created.seats[0])).toBe(true);
-    expect(rooms.getByCode("ROOM22")).toEqual(created);
+    expect(await rooms.getByCode("ROOM22")).toEqual(created);
+    expect(await rooms.exists("ROOM22")).toBe(true);
   });
 
-  it("translates a missing room into NotFoundError", () => {
+  it("translates a missing room into NotFoundError", async () => {
     const rooms = setup();
 
-    expect(() => rooms.getByCode("NOPE22")).toThrow(NotFoundError);
-    expect(() => rooms.save({ ...room, code: "NOPE22", version: 1 })).toThrow(NotFoundError);
+    await expect(rooms.getByCode("NOPE22")).rejects.toThrow(NotFoundError);
+    await expect(rooms.save(room({ code: "NOPE22", version: 1 }))).rejects.toThrow(NotFoundError);
+    await expect(
+      rooms.close({ room: room({ code: "NOPE22", version: 1 }), reason: "expired", closedAt: 5 }),
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it("translates a code collision into ConflictError", () => {
+  it("translates a code collision into ConflictError", async () => {
     const rooms = setup();
-    rooms.create(room);
+    await rooms.create(room());
 
-    expect(() => rooms.create(room)).toThrow(ConflictError);
+    await expect(rooms.create(room())).rejects.toThrow(ConflictError);
   });
 
-  it("translates a concurrent change into ConflictError (no lost updates)", () => {
+  it("translates a concurrent change into ConcurrentChangeError, so no update is lost", async () => {
     const rooms = setup();
-    const read = rooms.create(room);
-    rooms.save({ ...read, status: "playing" });
+    const read = await rooms.create(room());
+    await rooms.save({ ...read, status: "playing" });
 
-    expect(() => rooms.save({ ...read, status: "finished" })).toThrow(/room changed/);
+    await expect(rooms.save({ ...read, status: "finished" })).rejects.toThrow(ConcurrentChangeError);
+    await expect(rooms.close({ room: read, reason: "expired", closedAt: 5 })).rejects.toThrow(
+      ConcurrentChangeError,
+    );
   });
 
-  it("lists and removes rooms", () => {
+  it("closes a room and keeps a frozen record of why", async () => {
     const rooms = setup();
-    rooms.create(room);
+    const created = await rooms.create(room());
 
-    expect(rooms.listAll().map((r) => r.code)).toEqual(["ROOM22"]);
-    rooms.remove("ROOM22");
-    expect(rooms.exists("ROOM22")).toBe(false);
+    await rooms.close({ room: created, reason: "expired", closedAt: 5 });
+
+    expect(await rooms.exists("ROOM22")).toBe(false);
+    expect(await rooms.wasClosed("ROOM22")).toBe(true);
+    const record = await rooms.getClosed("ROOM22");
+    expect(record).toEqual({ code: "ROOM22", gameId: "rps", reason: "expired", closedAt: 5 });
+    expect(Object.isFrozen(record)).toBe(true);
   });
 
-  it("passes unexpected storage failures through unchanged", () => {
+  it("translates a missing closed record into NotFoundError", async () => {
+    const rooms = setup();
+
+    expect(await rooms.wasClosed("NOPE22")).toBe(false);
+    await expect(rooms.getClosed("NOPE22")).rejects.toThrow(NotFoundError);
+  });
+
+  it("forgets old closed records", async () => {
+    const rooms = setup();
+    await rooms.close({ room: await rooms.create(room()), reason: "empty", closedAt: 5 });
+
+    expect(await rooms.forgetClosedBefore(6)).toBe(1);
+    expect(await rooms.wasClosed("ROOM22")).toBe(false);
+  });
+
+  it("lists all rooms, by seat, by deadline and by end of lifetime, as frozen lists", async () => {
+    const rooms = setup();
+    await rooms.create(room());
+    await rooms.create(room({ code: "ROOM33", seats: [{ playerId: "p2" }], dueAt: 7, expiresAt: 300 }));
+
+    const all = await rooms.listAll();
+
+    expect(all.map((r) => r.code)).toEqual(["ROOM22", "ROOM33"]);
+    expect(Object.isFrozen(all)).toBe(true);
+    expect((await rooms.listBySeat("p2")).map((r) => r.code)).toEqual(["ROOM33"]);
+    expect((await rooms.listDue(7)).map((r) => r.code)).toEqual(["ROOM33"]);
+    expect((await rooms.listExpired(100)).map((r) => r.code)).toEqual(["ROOM22"]);
+  });
+
+  it("passes unexpected storage failures through unchanged", async () => {
     const failure = new Error("disk on fire");
-    const roomDao = {
-      has: () => true,
-      insert: () => {
-        throw failure;
-      },
-      update: () => {
-        throw failure;
-      },
+    const fail = async () => {
+      throw failure;
     };
-    const rooms = createRoomAccessor({ roomDao });
+    const rooms = createRoomAccessor({ roomDao: { get: fail, insert: fail, update: fail, getClosed: fail } });
 
-    expect(() => rooms.create(room)).toThrow(failure);
-    expect(() => rooms.save({ ...room, version: 1 })).toThrow(failure);
+    await expect(rooms.getByCode("ROOM22")).rejects.toThrow(failure);
+    await expect(rooms.getClosed("ROOM22")).rejects.toThrow(failure);
+    await expect(rooms.create(room())).rejects.toThrow(failure);
+    await expect(rooms.save(room({ version: 1 }))).rejects.toThrow(failure);
   });
 
   it("fails fast without a DAO", () => {

@@ -1,5 +1,5 @@
 import { SOCKET_EVENTS } from "@classicade/shared";
-import { ForbiddenError, NotFoundError } from "../../utils/errors.js";
+import { ForbiddenError, GoneError, NotFoundError } from "../../utils/errors.js";
 import { parseCreateRoom, parseGameMove, parseRoomRef } from "./payloads.js";
 
 export const roomChannel = (code) => `room:${code}`;
@@ -55,7 +55,7 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
   return {
     async [SOCKET_EVENTS.ROOM_CREATE](payload) {
       const { gameId, options } = parseCreateRoom(payload);
-      const room = roomComponent.createRoom({ host: identity, gameId, options, now: now() });
+      const room = await roomComponent.createRoom({ host: identity, gameId, options, now: now() });
       socket.join(roomChannel(room.code));
       logger.info({ roomCode: room.code, gameId }, "room created");
       return stampedView({ roomComponent, room, viewerId: identity.id, now });
@@ -63,7 +63,7 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
 
     async [SOCKET_EVENTS.ROOM_JOIN](payload) {
       const { code } = parseRoomRef(payload);
-      const room = roomComponent.joinRoom({ code, player: identity, now: now() });
+      const room = await roomComponent.joinRoom({ code, player: identity, now: now() });
       socket.join(roomChannel(code));
       logger.info({ roomCode: code, status: room.status }, "joined room");
       await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
@@ -72,7 +72,7 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
 
     async [SOCKET_EVENTS.ROOM_LEAVE](payload) {
       const { code } = parseRoomRef(payload);
-      const result = roomComponent.leaveRoom({ code, playerId: identity.id, now: now() });
+      const result = await roomComponent.leaveRoom({ code, playerId: identity.id, now: now() });
       for (const own of await playerSockets(io, code, identity.id)) {
         own.leave(roomChannel(code));
       }
@@ -85,7 +85,7 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
 
     async [SOCKET_EVENTS.ROOM_REMATCH](payload) {
       const { code } = parseRoomRef(payload);
-      const room = roomComponent.requestRematch({ code, playerId: identity.id, now: now() });
+      const room = await roomComponent.requestRematch({ code, playerId: identity.id, now: now() });
       logger.info({ roomCode: code, status: room.status }, "rematch requested");
       await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
       return stampedView({ roomComponent, room, viewerId: identity.id, now });
@@ -93,7 +93,7 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
 
     async [SOCKET_EVENTS.GAME_MOVE](payload) {
       const { code, move } = parseGameMove(payload);
-      const room = roomComponent.makeMove({ code, playerId: identity.id, move, now: now() });
+      const room = await roomComponent.makeMove({ code, playerId: identity.id, move, now: now() });
       await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
       return stampedView({ roomComponent, room, viewerId: identity.id, now });
     },
@@ -113,11 +113,11 @@ export async function handleSocketGone({ io, roomComponent, playerId, channels, 
       continue;
     }
     try {
-      const room = roomComponent.playerDisconnected({ code, playerId, now: now() });
+      const room = await roomComponent.playerDisconnected({ code, playerId, now: now() });
       await broadcastRoom({ io, roomComponent, room, now });
     } catch (err) {
-      // The room may have closed or the seat been given up meanwhile — nothing left to record.
-      if (!(err instanceof NotFoundError || err instanceof ForbiddenError)) {
+      // The room may have closed or the seat been given up meanwhile. Then there is nothing left to record.
+      if (!(err instanceof NotFoundError || err instanceof GoneError || err instanceof ForbiddenError)) {
         logger.error({ err, roomCode: code }, "failed to record disconnect");
       }
     }
