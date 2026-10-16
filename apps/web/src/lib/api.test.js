@@ -120,6 +120,17 @@ describe("api client", () => {
     expect(match.mock.calls[0][0]).toBe("/api/matches/a%2Fb%20c");
   });
 
+  it.each([
+    ["getAchievements", "/api/achievements", { achievements: [{ id: "first-win" }] }, [{ id: "first-win" }]],
+    ["getStreaks", "/api/streaks", { streaks: { win: { current: 1 } } }, { win: { current: 1 } }],
+    ["getQuests", "/api/quests", { quests: { day: "2026-10-16" } }, { day: "2026-10-16" }],
+  ])("%s reads %s and unwraps it", async (method, path, body, expected) => {
+    const fetchImpl = respond(200, body);
+
+    expect(await createApiClient({ fetchImpl })[method]()).toEqual(expected);
+    expect(fetchImpl.mock.calls[0][0]).toBe(path);
+  });
+
   it("asks for match history without a query string when there are no filters", async () => {
     const fetchImpl = respond(200, { matches: [] });
 

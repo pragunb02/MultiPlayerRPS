@@ -5,25 +5,30 @@ import http from "node:http";
 import { createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
+import { createGamificationAccessor } from "./data/gamificationAccessor.js";
 import { createLegacyUserAccessor } from "./data/legacyUserAccessor.js";
 import { createMatchAccessor } from "./data/matchAccessor.js";
 import { createPlayerTransferAccessor } from "./data/playerTransferAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createAccountComponent } from "./domain/accounts/accountComponent.js";
+import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
 import { createProgressionComponent } from "./domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
 import { createAccountDao } from "./persistence/accountDao.js";
+import { createAchievementDao } from "./persistence/achievementDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createInMemoryRoomDao } from "./persistence/inMemoryRoomDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
 import { createPlayerTransferDao } from "./persistence/playerTransferDao.js";
 import { createProgressDao } from "./persistence/progressDao.js";
+import { createQuestDao } from "./persistence/questDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
+import { createStatsDao } from "./persistence/statsDao.js";
 import { createHttpApp } from "./service/http/app.js";
 import { createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
@@ -55,16 +60,18 @@ export function assertEnginesInCatalog(engines) {
  */
 
 /**
- * After a game ends: record the match, then award progression from the recorded match (so XP only ever comes
- * from a persisted match). Both steps run as background tasks — a slow database never delays a game — and
- * shutdown drains them. In between, a match recorded for a guest who has just signed in moves to their account
- * (CC-032), so the account gets the XP.
+ * After a game ends: record the match, award progression from the recorded match (so XP only ever comes from a
+ * persisted match), then count it for achievements, streaks and quests (CC-054, CC-089). Each step runs as a
+ * background task — a slow database never delays a game — and shutdown drains them. Before progression, a match
+ * recorded for a guest who has just signed in moves to their account (CC-032), so the account gets the XP, the
+ * streak and the quest progress.
  *
  * @param {{
  *   domainEvents: import("node:events").EventEmitter,
  *   matchComponent: { recordFinished: Function },
  *   playerTransferComponent: { follow: Function },
  *   progressionComponent: { applyMatch: Function },
+ *   gamificationComponent: { applyMatch: Function },
  *   tasks: ReturnType<typeof createBackgroundTasks>,
  *   logger: Logger,
  *   now?: () => number,
@@ -75,6 +82,7 @@ export function connectMatchPipeline({
   matchComponent,
   playerTransferComponent,
   progressionComponent,
+  gamificationComponent,
   tasks,
   logger,
   now = Date.now,
@@ -94,6 +102,14 @@ export function connectMatchPipeline({
             const followed = await playerTransferComponent.follow({ match, now: now() });
             const updates = await progressionComponent.applyMatch(followed);
             logger.info({ matchId: match.matchId, players: updates.length }, "progression applied");
+            tasks.run(
+              "apply gamification",
+              async () => {
+                await gamificationComponent.applyMatch({ match: followed, updates, now: now() });
+                logger.info({ matchId: match.matchId }, "gamification applied");
+              },
+              { matchId: match.matchId },
+            );
           },
           { matchId: match.matchId },
         );
@@ -204,14 +220,16 @@ export async function startServer({ config, logger, limits = {} }) {
   const matchDao = createMatchDao({ connection: database.connection });
   const progressDao = createProgressDao({ connection: database.connection });
   const accountDao = createAccountDao({ connection: database.connection });
+  const statsDao = createStatsDao({ connection: database.connection });
+  const questDao = createQuestDao({ connection: database.connection });
+  const achievementDao = createAchievementDao({ connection: database.connection });
   const legacyUserDao = createLegacyUserDao({ connection: database.connection }); // read-only, CC-078
   const playerTransferDao = createPlayerTransferDao({ connection: database.connection });
-  await Promise.all([
-    matchDao.ensureIndexes(),
-    progressDao.ensureIndexes(),
-    accountDao.ensureIndexes(),
-    playerTransferDao.ensureIndexes(),
-  ]);
+  await Promise.all(
+    [matchDao, progressDao, accountDao, playerTransferDao, statsDao, questDao, achievementDao].map((dao) =>
+      dao.ensureIndexes(),
+    ),
+  );
 
   // 3. data
   const roomAccessor = createRoomAccessor({ roomDao });
@@ -220,6 +238,7 @@ export async function startServer({ config, logger, limits = {} }) {
   const accountAccessor = createAccountAccessor({ accountDao });
   const legacyUserAccessor = createLegacyUserAccessor({ legacyUserDao });
   const playerTransferAccessor = createPlayerTransferAccessor({ playerTransferDao });
+  const gamificationAccessor = createGamificationAccessor({ statsDao, questDao, achievementDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -237,12 +256,19 @@ export async function startServer({ config, logger, limits = {} }) {
   });
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({ progressAccessor, events: domainEvents });
+  const gamificationComponent = createGamificationComponent({
+    gamificationAccessor,
+    matchAccessor,
+    progressionComponent,
+    events: domainEvents,
+  });
   // Everything stored by player id moves with a guest who signs in (ADR-014), in this order.
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,
     participants: [
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
+      { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
     ],
     matches: matchComponent,
   });
@@ -252,6 +278,7 @@ export async function startServer({ config, logger, limits = {} }) {
     matchComponent,
     playerTransferComponent,
     progressionComponent,
+    gamificationComponent,
     tasks,
     logger,
   });
@@ -273,6 +300,7 @@ export async function startServer({ config, logger, limits = {} }) {
     identityComponent,
     matchComponent,
     progressionComponent,
+    gamificationComponent,
     accountComponent,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
     onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents }),

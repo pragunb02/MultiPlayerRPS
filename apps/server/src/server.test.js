@@ -106,7 +106,12 @@ describe("connectMatchPipeline", () => {
   const event = { room: { code: "ROOM22" }, outcome: {} };
   const match = { matchId: "m1", gameId: "rps", result: { reason: "best-of-1" } };
 
-  function setup({ recordFinished, applyMatch, follow = async ({ match: recorded }) => recorded }) {
+  function setup({
+    recordFinished,
+    applyMatch,
+    follow = async ({ match: recorded }) => recorded,
+    applyGamification = vi.fn().mockResolvedValue(),
+  }) {
     const domainEvents = new EventEmitter();
     const capture = captureLogger();
     const tasks = createBackgroundTasks({ logger: capture.logger });
@@ -115,9 +120,10 @@ describe("connectMatchPipeline", () => {
       matchComponent: { recordFinished },
       playerTransferComponent: { follow },
       progressionComponent: { applyMatch },
+      gamificationComponent: { applyMatch: applyGamification },
       tasks,
       logger: capture.logger,
-      now: () => 7,
+      now: () => 1_234,
     });
     return { domainEvents, tasks, ...capture };
   }
@@ -136,21 +142,57 @@ describe("connectMatchPipeline", () => {
     expect(find("progression applied")[0]).toEqual(expect.objectContaining({ matchId: "m1", players: 2 }));
   });
 
-  it("awards progression for the match as it stands after following players who just signed in (CC-032)", async () => {
+  it("awards progression and gamification for the match as it stands after following players who just signed in (CC-032)", async () => {
     const moved = { ...match, players: [{ playerId: "user_1" }] };
     const follow = vi.fn().mockResolvedValue(moved);
-    const applyMatch = vi.fn().mockResolvedValue([{}]);
+    const updates = [{ playerId: "user_1" }];
+    const applyMatch = vi.fn().mockResolvedValue(updates);
+    const applyGamification = vi.fn().mockResolvedValue();
     const { domainEvents, tasks } = setup({
       recordFinished: vi.fn().mockResolvedValue(match),
       applyMatch,
       follow,
+      applyGamification,
     });
 
     domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
     await tasks.drain();
 
-    expect(follow).toHaveBeenCalledWith({ match, now: 7 });
+    expect(follow).toHaveBeenCalledWith({ match, now: 1_234 });
     expect(applyMatch).toHaveBeenCalledWith(moved);
+    expect(applyGamification).toHaveBeenCalledWith({ match: moved, updates, now: 1_234 });
+  });
+
+  it("then counts the match for achievements, streaks and quests, with progression's updates", async () => {
+    const updates = [{ playerId: "guest_a" }];
+    const applyGamification = vi.fn().mockResolvedValue();
+    const { domainEvents, tasks, find } = setup({
+      recordFinished: vi.fn().mockResolvedValue(match),
+      applyMatch: vi.fn().mockResolvedValue(updates),
+      applyGamification,
+    });
+
+    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
+    await tasks.drain();
+
+    expect(applyGamification).toHaveBeenCalledWith({ match, updates, now: 1_234 });
+    expect(find("gamification applied")[0].matchId).toBe("m1");
+  });
+
+  it("logs a failed gamification update with the match id, after progression was applied", async () => {
+    const { domainEvents, tasks, find } = setup({
+      recordFinished: vi.fn().mockResolvedValue(match),
+      applyMatch: vi.fn().mockResolvedValue([]),
+      applyGamification: vi.fn().mockRejectedValue(new Error("db down")),
+    });
+
+    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
+    await tasks.drain();
+
+    expect(find("progression applied")).toHaveLength(1);
+    expect(find("background task failed")[0]).toEqual(
+      expect.objectContaining({ task: "apply gamification", matchId: "m1" }),
+    );
   });
 
   it("never awards progression when recording the match failed", async () => {

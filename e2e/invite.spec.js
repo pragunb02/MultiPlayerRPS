@@ -17,6 +17,27 @@ async function fillSignup(page, account) {
   await page.getByRole("button", { name: "Create account" }).click();
 }
 
+/**
+ * Bonus XP the player's daily quests paid for their games so far (CC-089) — the day's quests depend on the player
+ * id and the date, so a guest's first win may also finish "Get a win". Waits until gamification has counted the
+ * first match (unlocking "First Move" is its last step).
+ */
+async function questBonusXp(page) {
+  const read = async (path) => (await page.request.get(path)).json();
+  await expect
+    .poll(
+      async () =>
+        (await read("/api/achievements")).achievements.find((a) => a.id === "first-match").unlockedAt,
+    )
+    .not.toBeNull();
+  const { quests } = await read("/api/quests");
+  const done = quests.items.filter((item) => item.completedAt !== null);
+  return (
+    done.reduce((xp, item) => xp + item.bonusXp, 0) +
+    (quests.sweep.completedAt === null ? 0 : quests.sweep.bonusXp)
+  );
+}
+
 /** An account that exists before the test's visitor arrives (signed up and out in its own browser). */
 async function existingAccount(players) {
   const account = newAccount();
@@ -181,6 +202,7 @@ test.describe("guest progress carries over to the account (CC-032)", () => {
       .click();
     await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
     await expect(alice.page.getByText("+30 XP")).toBeVisible(); // the XP is stored before she signs up
+    const xp = 30 + (await questBonusXp(alice.page));
 
     await alice.page.goto("/signup?next=%2Fprofile");
     await expect(
@@ -190,10 +212,10 @@ test.describe("guest progress carries over to the account (CC-032)", () => {
 
     await expect(alice.page).toHaveURL("/profile");
     await expect(
-      alice.page.getByText("Welcome! We moved 30 XP and 1 match from your guest games."),
+      alice.page.getByText(`Welcome! We moved ${xp} XP and 1 match from your guest games.`),
     ).toBeVisible();
     await expect(alice.page.getByRole("heading", { level: 1 })).toHaveText(account.username);
-    await expect(main(alice.page)).toContainText("30 XP");
+    await expect(main(alice.page)).toContainText(`${xp} XP`);
     const history = alice.page.getByRole("list", { name: "Match history" });
     await expect(history.getByRole("listitem")).toHaveCount(1);
     await expect(history).toContainText("Won");

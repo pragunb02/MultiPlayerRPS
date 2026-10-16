@@ -33,6 +33,15 @@ export const SOCKET_EVENTS = Object.freeze({
   ROOM_UPDATED: "room:updated",
   /** server → client: { code, reason } when a room is closed (expired, emptied) */
   ROOM_CLOSED: "room:closed",
-  /** server → client, after each recorded match: { matchId, xpGained, leveledUp, progress } */
+  /**
+   * server → client, after XP was awarded: { source: "match" | "quest", key, matchId, xpGained, leveledUp, progress }.
+   * `key` is the match id or the quest key (`quest:<day>:<questId>` / `quest:<day>:sweep`); `matchId` is "" for quests.
+   */
   PROGRESS_UPDATED: "progress:updated",
+  /** server → client: { achievements: Achievement[] } — newly unlocked only (same shape as GET /api/achievements items) */
+  ACHIEVEMENTS_UNLOCKED: "achievements:unlocked",
+  /** server → client: { quests: QuestsView } after any quest progress (same shape as GET /api/quests) */
+  QUESTS_UPDATED: "quests:updated",
+  /** server → client: { streaks: StreaksView } after a counted match (same shape as GET /api/streaks) */
+  STREAKS_UPDATED: "streaks:updated",
 });

@@ -3,9 +3,16 @@ import { assertDefined } from "../../utils/assert.js";
 
 /** Events the progression component publishes. */
 export const PROGRESSION_EVENTS = Object.freeze({
-  /** { playerId, matchId, xpGained, leveledUp, progress } — a player's progress changed after a match */
+  /**
+   * { playerId, displayName, source: "match" | "quest", key, matchId, result?, xpGained, leveledUp, progress } —
+   * a player's progress changed: after a match (`key` = matchId), or a quest bonus (`key` = the quest key,
+   * `matchId` = "").
+   */
   UPDATED: "progression.updated",
 });
+
+/** Where XP came from. */
+export const XP_SOURCES = Object.freeze({ MATCH: "match", QUEST: "quest" });
 
 /**
  * How a recorded match went for one player. A player who left a game in progress forfeited it.
@@ -61,7 +68,7 @@ export function createProgressionComponent({ progressAccessor, events }) {
      */
     async applyMatch(match) {
       const updates = [];
-      for (const { playerId } of match.players) {
+      for (const { playerId, displayName } of match.players) {
         const result = resultFor(match, playerId);
         const xpGained = XP_AWARDS[result];
         const { applied, before, after } = await progressAccessor.applyMatchOnce({
@@ -75,6 +82,9 @@ export function createProgressionComponent({ progressAccessor, events }) {
         }
         const update = {
           playerId,
+          displayName,
+          source: XP_SOURCES.MATCH,
+          key: match.matchId,
           matchId: match.matchId,
           result,
           xpGained,
@@ -85,6 +95,35 @@ export function createProgressionComponent({ progressAccessor, events }) {
         updates.push(update);
       }
       return updates;
+    },
+
+    /**
+     * Awards bonus XP (a completed quest) at most once per `key`. It adds XP only — it is not a match played.
+     * Publishes an update when it was awarded.
+     *
+     * @param {{ playerId: string, displayName: string, key: string, xp: number, at: number }} bonus
+     * @returns {Promise<{ applied: boolean }>}
+     */
+    async awardBonus({ playerId, displayName, key, xp, at }) {
+      const { applied, before, after } = await progressAccessor.applyAwardOnce({
+        playerId,
+        key,
+        inc: { xp },
+        at,
+      });
+      if (applied) {
+        events.emit(PROGRESSION_EVENTS.UPDATED, {
+          playerId,
+          displayName,
+          source: XP_SOURCES.QUEST,
+          key,
+          matchId: "",
+          xpGained: xp,
+          leveledUp: levelForXp(after.xp) > levelForXp(before.xp),
+          progress: describe(after),
+        });
+      }
+      return Object.freeze({ applied });
     },
 
     /** @param {string} playerId */

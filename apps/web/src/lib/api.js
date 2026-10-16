@@ -52,6 +52,12 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     getProgress: async () => (await request("GET", "/progress")).progress,
     getMatches: (query = {}) => request("GET", `/matches${toQuery(query)}`),
     getMatch: async (matchId) => (await request("GET", `/matches/${encodeURIComponent(matchId)}`)).match,
+    /** The whole achievement catalog with your progress and unlock times (CC-054). */
+    getAchievements: async () => (await request("GET", "/achievements")).achievements,
+    /** Your win streak and daily play streak (CC-054). */
+    getStreaks: async () => (await request("GET", "/streaks")).streaks,
+    /** Today's quests (UTC day), the sweep bonus and when they reset (CC-089). */
+    getQuests: async () => (await request("GET", "/quests")).quests,
   });
 }
 

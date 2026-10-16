@@ -1,8 +1,11 @@
 import { Link } from "react-router";
 import { getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
+import { AchievementGrid } from "../../components/Achievements/AchievementGrid.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
+import { StreakCard } from "../../components/Streaks/StreakCard.jsx";
 import { useMatchHistory } from "../../hooks/useMatchHistory.js";
 import { useProgress } from "../../hooks/useProgress.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -92,6 +95,23 @@ function MatchHistory({ you }) {
   );
 }
 
+/** Streaks, today's quests and achievements (CC-054, CC-089). Guests earn them too; signing up keeps them. */
+function PlayerConsole({ guest }) {
+  return (
+    <section className={styles.console} aria-labelledby="player-console">
+      <h2 id="player-console">Player console</h2>
+      {guest && (
+        <p className={styles.muted}>
+          <Link to={paths.signup(paths.profile())}>Sign up to keep your streak and achievements</Link>
+        </p>
+      )}
+      <StreakCard />
+      <DailyQuests />
+      <AchievementGrid />
+    </section>
+  );
+}
+
 /** Your level, stats and match history — for guests and account holders alike. */
 export function ProfilePage() {
   const session = useSession();
@@ -125,6 +145,7 @@ export function ProfilePage() {
         </p>
       )}
       <ProgressCard />
+      <PlayerConsole guest={session.identity.kind === "guest"} />
       <h2>Recent matches</h2>
       <MatchHistory you={session.identity.id} />
     </section>

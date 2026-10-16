@@ -18,12 +18,14 @@ import { createWebAppRouter } from "./webApp.js";
  *   identityComponent: ReturnType<typeof import("../../domain/identity/identityComponent.js").createIdentityComponent>,
  *   matchComponent: ReturnType<typeof import("../../domain/matches/matchComponent.js").createMatchComponent>,
  *   progressionComponent: ReturnType<typeof import("../../domain/progression/progressionComponent.js").createProgressionComponent>,
+ *   gamificationComponent: ReturnType<typeof import("../../domain/gamification/gamificationComponent.js").createGamificationComponent>,
  *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
  *   onIdentityChanged: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["onIdentityChanged"],
  *   guestLimit?: { windowMs: number, limit: number },
  *   isDatabaseUp: () => boolean,
+ *   now?: () => number,   the clock for date-dependent answers (daily quests); tests pick a day
  * }} deps
  */
 export function createHttpApp({
@@ -33,12 +35,14 @@ export function createHttpApp({
   identityComponent,
   matchComponent,
   progressionComponent,
+  gamificationComponent,
   accountComponent,
   authLimits,
   onSessionEnded,
   onIdentityChanged,
   guestLimit,
   isDatabaseUp,
+  now = Date.now,
 }) {
   assertDefined(config, "config");
   assertFunction(isDatabaseUp, "isDatabaseUp");
@@ -75,11 +79,13 @@ export function createHttpApp({
       identityComponent,
       matchComponent,
       progressionComponent,
+      gamificationComponent,
       accountComponent,
       authLimits,
       onSessionEnded,
       onIdentityChanged,
       guestLimit,
+      now,
     }),
   );
 

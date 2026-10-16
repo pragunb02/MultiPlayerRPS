@@ -102,3 +102,10 @@
   background: var(--color-primary-soft);
   color: var(--color-primary);
 }
+.console {
+  display: grid;
+  gap: var(--space-4);
+}
+.console h2 {
+  margin: 0;
+}

@@ -219,7 +219,56 @@ describe("games through the real composition root (integration)", () => {
         const body = (await res.json()).progress;
         return body.matchesPlayed === 1 ? body : undefined;
       });
-      expect(progress).toEqual(expect.objectContaining({ xp: 30, wins: 1, level: 1 }));
+      expect(progress).toEqual(expect.objectContaining({ wins: 1 }));
+    } finally {
+      players.forEach((p) => p.socket.disconnect());
+      await app.close();
+    }
+  });
+
+  it("counts a match for achievements, streaks and quests in MongoDB, and pushes the unlock (CC-054, CC-089)", async () => {
+    const app = await start();
+    const players = [];
+    try {
+      const alice = await connectedGuest(app.url);
+      const bob = await connectedGuest(app.url);
+      players.push(alice, bob);
+      const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
+      const unlockedPush = new Promise((resolve) =>
+        alice.socket.once(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, resolve),
+      );
+      const api = async (path) =>
+        await (await fetch(`${app.url}/api${path}`, { headers: { cookie: alice.cookie } })).json();
+
+      const { data: room } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+        gameId: "rps",
+        options: { bestOf: 1 },
+      });
+      await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
+      await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "paper" } });
+      await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "rock" } });
+
+      expect((await unlockedPush).achievements.map((a) => a.id)).toEqual(["first-match", "first-win"]);
+      const achievements = await eventually(async () => {
+        const list = (await api("/achievements")).achievements;
+        return list.find((a) => a.id === "first-win").unlockedAt === null ? undefined : list;
+      });
+      expect(achievements.filter((a) => a.unlockedAt !== null).map((a) => a.id)).toEqual([
+        "first-match",
+        "first-win",
+      ]);
+      expect((await api("/streaks")).streaks).toEqual(
+        expect.objectContaining({ win: { current: 1, best: 1 } }),
+      );
+      const { quests } = await api("/quests");
+      // Every player's win slot has a win quest; one win always moves it.
+      const winQuest = quests.items[1];
+      expect(winQuest.progress).toBe(1);
+
+      const stored = await readCollection(app.config.mongoUri, "player_achievements");
+      expect(stored.filter((u) => u.playerId === alice.identity.id)).toHaveLength(2);
+      expect(await readCollection(app.config.mongoUri, "player_stats")).toHaveLength(2);
+      expect(await readCollection(app.config.mongoUri, "player_quests")).toHaveLength(2);
     } finally {
       players.forEach((p) => p.socket.disconnect());
       await app.close();
@@ -337,6 +386,23 @@ describe("a guest's progress moving to their account through the real compositio
       return progress.matchesPlayed === matchesPlayed ? progress : undefined;
     });
 
+  /**
+   * Waits until gamification has counted the player's first match (achievements are its last step) and answers
+   * the bonus XP their daily quests paid — the day's quests depend on the player id and the date (CC-089).
+   */
+  const questBonusOf = async (url, cookie) => {
+    await eventually(async () => {
+      const { achievements } = await api(url, "/achievements", cookie);
+      return achievements.find((a) => a.id === "first-match").unlockedAt ?? undefined;
+    });
+    const { quests } = await api(url, "/quests", cookie);
+    const done = quests.items.filter((item) => item.completedAt !== null);
+    return (
+      done.reduce((xp, item) => xp + item.bonusXp, 0) +
+      (quests.sweep.completedAt === null ? 0 : quests.sweep.bonusXp)
+    );
+  };
+
   it("moves totals and history exactly once on sign-up, and the moved match still replays", async () => {
     const app = await start();
     const sockets = [];
@@ -346,6 +412,7 @@ describe("a guest's progress moving to their account through the real compositio
       sockets.push(alice.socket, bob.socket);
       await play(alice, bob);
       await progressOf(app.url, alice.cookie, 1);
+      const bonus = await questBonusOf(app.url, alice.cookie);
 
       const signup = await fetch(`${app.url}/api/auth/signup`, {
         method: "POST",
@@ -366,10 +433,19 @@ describe("a guest's progress moving to their account through the real compositio
       const [transfer] = await readCollection(app.config.mongoUri, "player_transfers");
       const progressDocs = await readCollection(app.config.mongoUri, "player_progress");
 
-      expect(body.carriedOver).toEqual({ xp: 30, matchesPlayed: 1, matches: 1 });
+      const { achievements } = await api(app.url, "/achievements", cookie);
+      const { streaks } = await api(app.url, "/streaks", cookie);
+
+      expect(body.carriedOver).toEqual({ xp: 30 + bonus, matchesPlayed: 1, matches: 1 });
       expect((await api(app.url, "/progress", cookie)).progress).toEqual(
-        expect.objectContaining({ xp: 30, matchesPlayed: 1, wins: 1 }),
+        expect.objectContaining({ xp: 30 + bonus, matchesPlayed: 1, wins: 1 }),
       );
+      // Achievements and streaks came along too (CC-054, CC-089).
+      expect(achievements.filter((a) => a.unlockedAt !== null).map((a) => a.id)).toEqual(
+        expect.arrayContaining(["first-match", "first-win"]),
+      );
+      expect(streaks.win.current).toBe(1);
+      expect(streaks.daily.current).toBe(1);
       expect(match.players[0]).toEqual({ playerId: body.identity.id, displayName: "Riya" });
       expect(match.result.winners).toEqual([body.identity.id]);
       expect(rps.getOutcome(replayed)).toEqual({ status: "finished", ...match.result });
@@ -407,13 +483,15 @@ describe("a guest's progress moving to their account through the real compositio
       await new Promise((resolve) => account.once("connect", resolve));
       const rival = await guest(app.url);
       sockets.push(account, rival.socket);
-      await play({ socket: account }, rival); // the account wins: 30 XP
+      await play({ socket: account }, rival); // the account wins: 30 XP, plus its quest bonus
       await progressOf(app.url, accountCookie, 1);
+      const accountBonus = await questBonusOf(app.url, accountCookie);
       const visitor = await guest(app.url);
       const friend = await guest(app.url);
       sockets.push(visitor.socket, friend.socket);
-      await play(friend, visitor); // the guest loses: 10 XP
+      await play(friend, visitor); // the guest loses: 10 XP, plus its quest bonus
       await progressOf(app.url, visitor.cookie, 1);
+      const visitorBonus = await questBonusOf(app.url, visitor.cookie);
 
       const login = await fetch(`${app.url}/api/auth/login`, {
         method: "POST",
@@ -422,9 +500,18 @@ describe("a guest's progress moving to their account through the real compositio
       });
       const cookie = login.headers.get("set-cookie").split(";")[0];
 
-      expect((await login.json()).carriedOver).toEqual({ xp: 10, matchesPlayed: 1, matches: 1 });
+      expect((await login.json()).carriedOver).toEqual({
+        xp: 10 + visitorBonus,
+        matchesPlayed: 1,
+        matches: 1,
+      });
       expect((await api(app.url, "/progress", cookie)).progress).toEqual(
-        expect.objectContaining({ xp: 40, matchesPlayed: 2, wins: 1, losses: 1 }),
+        expect.objectContaining({
+          xp: 40 + accountBonus + visitorBonus,
+          matchesPlayed: 2,
+          wins: 1,
+          losses: 1,
+        }),
       );
       expect((await api(app.url, "/matches", cookie)).matches.map((m) => m.outcomeForYou).sort()).toEqual([
         "loss",

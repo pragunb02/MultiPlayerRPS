@@ -11,6 +11,63 @@ export const GAMES = Object.freeze([
   { id: "chess", slug: "chess", name: "Chess", minPlayers: 2, maxPlayers: 2 },
 ]);
 
+/** A player with no streaks yet. */
+export const NO_STREAKS = Object.freeze({
+  win: { current: 0, best: 0 },
+  daily: { current: 0, best: 0, lastDay: "", playedToday: false, atRisk: false },
+});
+
+/** Today's quests (2026-10-16), untouched. */
+export const QUESTS = Object.freeze({
+  day: "2026-10-16",
+  resetsAt: Date.UTC(2026, 9, 17),
+  items: [
+    {
+      id: "play-3",
+      name: "Warm-up",
+      description: "Finish 3 matches",
+      gameId: null,
+      target: 3,
+      progress: 0,
+      bonusXp: 20,
+      completedAt: null,
+    },
+    {
+      id: "win-1",
+      name: "First blood",
+      description: "Get a win",
+      gameId: null,
+      target: 1,
+      progress: 0,
+      bonusXp: 20,
+      completedAt: null,
+    },
+    {
+      id: "rps-win-2",
+      name: "Rock on",
+      description: "Win 2 Rock Paper Scissors matches",
+      gameId: "rps",
+      target: 2,
+      progress: 0,
+      bonusXp: 30,
+      completedAt: null,
+    },
+  ],
+  sweep: { bonusXp: 30, completedAt: null },
+});
+
+/** An achievement as the API lists it; locked unless `unlockedAt` is given. */
+export const achievement = (overrides = {}) => ({
+  id: "wins-10",
+  name: "Rising Star",
+  description: "Win 10 matches",
+  icon: "star",
+  tier: "silver",
+  unlockedAt: null,
+  progress: { current: 3, target: 10 },
+  ...overrides,
+});
+
 export const unauthorized = () =>
   new AppRequestError({ code: "UNAUTHORIZED", message: "No active session", status: 401 });
 
@@ -26,6 +83,9 @@ export function fakeApi(overrides = {}) {
     getProgress: vi.fn(),
     getMatches: vi.fn(),
     getMatch: vi.fn(),
+    getAchievements: vi.fn().mockResolvedValue([]),
+    getStreaks: vi.fn().mockResolvedValue(NO_STREAKS),
+    getQuests: vi.fn().mockResolvedValue(QUESTS),
     ...overrides,
   };
 }

@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
 import { SOCKET_EVENTS } from "@classicade/shared";
+import { GAMIFICATION_EVENTS } from "../../domain/gamification/gamificationComponent.js";
 import { PROGRESSION_EVENTS } from "../../domain/progression/progressionComponent.js";
 import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
@@ -125,13 +126,29 @@ export function createRealtimeGateway({
   });
 
   // Domain → transport: progress after a recorded match goes to every tab of that player.
-  domainEvents.on(PROGRESSION_EVENTS.UPDATED, ({ playerId, matchId, xpGained, leveledUp, progress }) => {
-    io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.PROGRESS_UPDATED, {
-      matchId,
-      xpGained,
-      leveledUp,
-      progress,
-    });
+  domainEvents.on(
+    PROGRESSION_EVENTS.UPDATED,
+    ({ playerId, source, key, matchId, xpGained, leveledUp, progress }) => {
+      io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.PROGRESS_UPDATED, {
+        source,
+        key,
+        matchId,
+        xpGained,
+        leveledUp,
+        progress,
+      });
+    },
+  );
+
+  // Domain → transport: achievements, quests and streaks go to every tab of the player concerned only (CC-054).
+  domainEvents.on(GAMIFICATION_EVENTS.ACHIEVEMENTS_UNLOCKED, ({ playerId, achievements }) => {
+    io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, { achievements });
+  });
+  domainEvents.on(GAMIFICATION_EVENTS.QUESTS_UPDATED, ({ playerId, quests }) => {
+    io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.QUESTS_UPDATED, { quests });
+  });
+  domainEvents.on(GAMIFICATION_EVENTS.STREAKS_UPDATED, ({ playerId, streaks }) => {
+    io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.STREAKS_UPDATED, { streaks });
   });
 
   // Domain → transport: a room changed on its own (e.g. a clock ran out) — push everyone their new view.

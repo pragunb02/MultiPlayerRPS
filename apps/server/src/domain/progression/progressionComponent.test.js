@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { MAX_LEVEL } from "@classicade/shared";
 import { createProgressAccessor } from "../../data/progressAccessor.js";
 import { createInMemoryProgressDao } from "../../testing/inMemoryProgressDao.js";
-import { createProgressionComponent, PROGRESSION_EVENTS, resultFor } from "./progressionComponent.js";
+import {
+  createProgressionComponent,
+  PROGRESSION_EVENTS,
+  resultFor,
+  XP_SOURCES,
+} from "./progressionComponent.js";
 
 const T0 = 1_760_000_000_000;
 const PLAYERS = [
@@ -101,6 +106,69 @@ describe("progressionComponent", () => {
     expect(second).toEqual([]);
     expect(published).toHaveLength(2);
     expect((await progression.getProgress("guest_a")).xp).toBe(30);
+  });
+
+  it("says who earned it and that it came from a match, keyed by the match id", async () => {
+    const { progression, published } = setup();
+
+    await progression.applyMatch(match());
+
+    expect(published[1].payload).toEqual(
+      expect.objectContaining({
+        playerId: "guest_b",
+        displayName: "Bob",
+        source: XP_SOURCES.MATCH,
+        key: "m1",
+        matchId: "m1",
+        result: "loss",
+      }),
+    );
+  });
+
+  it("awards bonus XP once per key, without counting a match, and publishes it as quest XP", async () => {
+    const { progression, published } = setup();
+    const bonus = {
+      playerId: "guest_a",
+      displayName: "Alice",
+      key: "quest:2026-10-16:win-1",
+      xp: 60,
+      at: T0,
+    };
+
+    const first = await progression.awardBonus(bonus);
+    const again = await progression.awardBonus(bonus);
+
+    expect(first).toEqual({ applied: true });
+    expect(again).toEqual({ applied: false });
+    expect(published).toEqual([
+      {
+        event: PROGRESSION_EVENTS.UPDATED,
+        payload: expect.objectContaining({
+          playerId: "guest_a",
+          displayName: "Alice",
+          source: XP_SOURCES.QUEST,
+          key: "quest:2026-10-16:win-1",
+          matchId: "",
+          xpGained: 60,
+          leveledUp: true,
+          progress: expect.objectContaining({ xp: 60, level: 2, matchesPlayed: 0 }),
+        }),
+      },
+    ]);
+  });
+
+  it("does not flag a level-up for bonus XP that stays within the level", async () => {
+    const { progression, published } = setup();
+
+    await progression.awardBonus({
+      playerId: "guest_a",
+      displayName: "Alice",
+      key: "quest:d:x",
+      xp: 20,
+      at: T0,
+    });
+
+    expect(published[0].payload.leveledUp).toBe(false);
   });
 
   it("starts new players at level 1 with zero XP", async () => {
