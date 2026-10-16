@@ -1,4 +1,6 @@
 import { EventEmitter } from "node:events";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import http from "node:http";
 import { createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame } from "@classicade/shared";
@@ -91,6 +93,10 @@ export function connectMatchPipeline({ domainEvents, matchComponent, progression
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
 export async function startServer({ config, logger }) {
+  if (config.webDistDir !== "" && !existsSync(path.join(config.webDistDir, "index.html"))) {
+    throw new Error(`WEB_DIST_DIR has no index.html: ${config.webDistDir} (run npm run build:web)`);
+  }
+
   // 4. persistence
   const database = await connectDatabase({ uri: config.mongoUri, logger });
   const sessionStore = await createSessionStore({ client: database.client, ttlSeconds: SESSION_TTL_SECONDS });

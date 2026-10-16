@@ -13,6 +13,7 @@ const STATUS_BY_CODE = Object.freeze({
   [ERROR_CODES.NOT_FOUND]: 404,
   [ERROR_CODES.CONFLICT]: 409,
   [ERROR_CODES.PAYLOAD_TOO_LARGE]: 413,
+  [ERROR_CODES.UNSUPPORTED_MEDIA_TYPE]: 415,
 });
 
 const INTERNAL = Object.freeze({ status: 500, code: ERROR_CODES.INTERNAL, message: "Internal server error" });

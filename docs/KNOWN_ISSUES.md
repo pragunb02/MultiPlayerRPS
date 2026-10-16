@@ -12,7 +12,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 - **DEBT-04, BUG-05** 🟡 One `matches` collection for every game (CC-016), with chess results stored; legacy models are deleted in CC-029. BUG-05's "gamesPlayed on join" part is fixed by progression on recorded matches (CC-017).
 - **BUG-08** 🟡 Progress (incl. level-ups) is pushed to every tab of the player via a per-player socket channel (CC-017). Closes with CC-029.
 - **DEBT-03, DEBT-05, BUG-12** 🟡 Replaced in the new web app (CC-023): one `ShareRoom` component naming the actual game, CSS Modules over design tokens. Close when the legacy client is deleted (CC-029).
-- **SEC-05** 🟡 Helmet headers + auth rate limiting (20 req / 15 min / IP) done. CSRF mitigated by `SameSite=Lax` cookies; CSRF tokens and CSP come with the React app (CSP is off because legacy pages use inline scripts/handlers).
+- **SEC-05** 🟡 Legacy app: Helmet headers, auth rate limiting, SameSite cookies (CC-010). New stack complete (CC-030): strict CSP with no inline code, CSRF defence via SameSite + Origin + JSON-only bodies (ADR-010). Closes when the legacy app (no CSP) is removed (CC-029).
 - **SEC-06** ✅ `config.js` validates env at boot; `MONGO_URI` replaces `MONGO_URI_PRODUCTION` (old name still accepted as fallback).
 - **DEBT-01, DEBT-02** 🟡 New structure exists (`apps/server`, `packages/shared`, CC-011); legacy code moves out ticket by ticket and is deleted in CC-029.
 - **DEBT-10** 🟡 Legacy deps on latest same-major versions; new code uses latest stable majors (Express 5). Legacy majors not upgraded — the code is deleted in CC-029.

@@ -17,6 +17,7 @@ describe("loadConfig", () => {
       mongoUri: REQUIRED.MONGO_URI,
       sessionSecret: REQUIRED.SESSION_SECRET,
       allowedOrigins: ["http://localhost:4000", "http://localhost:5173"],
+      webDistDir: "",
     });
   });
 
@@ -57,6 +58,7 @@ describe("loadConfig", () => {
     [{ ALLOWED_ORIGINS: "https://classicade.app/path" }, /ALLOWED_ORIGINS must be/],
     [{ ALLOWED_ORIGINS: "ftp://classicade.app" }, /ALLOWED_ORIGINS must be/],
     [{ ALLOWED_ORIGINS: " , " }, /ALLOWED_ORIGINS must be/],
+    [{ WEB_DIST_DIR: "  " }, /WEB_DIST_DIR, when set, must be a directory path/],
   ])("rejects %o", (overrides, message) => {
     expect(() => loadConfig({ ...REQUIRED, ...overrides })).toThrow(message);
   });

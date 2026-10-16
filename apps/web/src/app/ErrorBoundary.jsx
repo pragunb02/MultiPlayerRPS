@@ -1,4 +1,5 @@
 import { Component } from "react";
+import styles from "./ErrorBoundary.module.css";
 
 /**
  * Last line of defence for rendering errors: shows a friendly message instead of a blank page.
@@ -14,7 +15,7 @@ export class ErrorBoundary extends Component {
   render() {
     if (this.state.failed) {
       return (
-        <div role="alert" style={{ padding: "var(--space-8)", textAlign: "center" }}>
+        <div role="alert" className={styles.failed}>
           <h1>Something went wrong</h1>
           <p>Please reload the page.</p>
         </div>

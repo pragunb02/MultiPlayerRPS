@@ -12,7 +12,8 @@ const DEV_ALLOWED_ORIGINS = ["http://localhost:4000", "http://localhost:5173"];
  * @property {string} logLevel
  * @property {string} mongoUri
  * @property {string} sessionSecret
- * @property {ReadonlyArray<string>} allowedOrigins  browser origins allowed to open realtime connections
+ * @property {ReadonlyArray<string>} allowedOrigins  browser origins allowed to open realtime connections and send state-changing requests
+ * @property {string} webDistDir      built web app to serve ("" = API only, e.g. in development with Vite)
  */
 
 /**
@@ -21,7 +22,7 @@ const DEV_ALLOWED_ORIGINS = ["http://localhost:4000", "http://localhost:5173"];
  *
  * Required: MONGO_URI, SESSION_SECRET (≥ 32 chars); ALLOWED_ORIGINS in production.
  * Documented defaults: NODE_ENV=development, PORT=4000, LOG_LEVEL=info (silent when NODE_ENV=test),
- * ALLOWED_ORIGINS=http://localhost:4000,http://localhost:5173 outside production.
+ * ALLOWED_ORIGINS=http://localhost:4000,http://localhost:5173 outside production. Optional: WEB_DIST_DIR (serve the built web app).
  *
  * @param {Record<string, string | undefined>} env
  * @returns {Readonly<Config>}
@@ -57,6 +58,11 @@ export function loadConfig(env) {
 
   const allowedOrigins = parseOrigins(env.ALLOWED_ORIGINS, { isProduction, errors });
 
+  const webDistDir = env.WEB_DIST_DIR ?? "";
+  if (env.WEB_DIST_DIR !== undefined && webDistDir.trim() === "") {
+    errors.push("WEB_DIST_DIR, when set, must be a directory path");
+  }
+
   if (errors.length > 0) {
     throw new Error(`Invalid configuration:\n  - ${errors.join("\n  - ")}`);
   }
@@ -69,6 +75,7 @@ export function loadConfig(env) {
     mongoUri,
     sessionSecret,
     allowedOrigins,
+    webDistDir,
   });
 }
 

@@ -163,7 +163,7 @@ describe("ProfilePage", () => {
 
     expect(await screen.findByText("Level 2")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Progress to next level" })).toHaveAttribute(
-      "aria-valuenow",
+      "value",
       "10",
     );
     expect(screen.getByText("10 / 100 XP to level 3 · 60 XP total")).toBeInTheDocument();

@@ -21,12 +21,13 @@
 
 ### Environment variables (dashboard → Environment)
 
-| Variable         | Required      | Notes                                                                                      |
-| ---------------- | ------------- | ------------------------------------------------------------------------------------------ |
-| `MONGO_URI`      | yes           | Atlas connection string. `MONGO_URI_PRODUCTION` still accepted with a warning until CC-074 |
-| `SESSION_SECRET` | yes           | long random string (`openssl rand -hex 32`); changing it logs everyone out                 |
-| `NODE_ENV`       | yes           | `production` (secure cookies, proxy trust)                                                 |
-| `PORT`           | set by Render |                                                                                            |
+| Variable         | Required                | Notes                                                                                      |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| `MONGO_URI`      | yes                     | Atlas connection string. `MONGO_URI_PRODUCTION` still accepted with a warning until CC-074 |
+| `SESSION_SECRET` | yes                     | long random string (`openssl rand -hex 32`); changing it logs everyone out                 |
+| `NODE_ENV`       | yes                     | `production` (secure cookies, proxy trust)                                                 |
+| `PORT`           | set by Render           |                                                                                            |
+| `WEB_DIST_DIR`   | new stack only (CC-029) | built web app served by the server, e.g. `apps/web/dist`                                   |
 
 Secrets live only in Render and local `.env` files — never in the repo (it is public), chat, or PR text.
 

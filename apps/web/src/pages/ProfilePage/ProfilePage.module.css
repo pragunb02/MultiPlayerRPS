@@ -20,17 +20,26 @@
   font-size: var(--text-xl);
   font-weight: 800;
 }
+/* Native <progress>: accessible by default, styled without inline styles (strict CSP). */
 .bar {
+  appearance: none;
+  width: 100%;
   height: 0.75rem;
+  border: none;
   border-radius: var(--radius-full);
   background: var(--color-surface-raised);
   overflow: hidden;
 }
-.bar span {
-  display: block;
-  height: 100%;
+.bar::-webkit-progress-bar {
+  background: var(--color-surface-raised);
+}
+.bar::-webkit-progress-value {
   background: var(--color-primary);
-  border-radius: inherit;
+  border-radius: var(--radius-full);
+}
+.bar::-moz-progress-bar {
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
 }
 .muted {
   margin: 0;
