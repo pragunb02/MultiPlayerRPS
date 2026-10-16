@@ -74,6 +74,8 @@ Status: `index.js`, `server.js`, `config/`, `service/http/`, `service/realtime/`
  * @property {(state) => Outcome} getOutcome                                  never null
  * @property {(state, viewer | "spectator") => View} viewFor                 hides secret info (e.g. RPS choice)
  * @property {(state) => PlayerId[]} activePlayers                           who may act now (empty when finished)
+ * @property {(state) => number} [deadline]       optional: when a time-based event happens if nobody acts (0 = none)
+ * @property {(state, { now }) => State} [expire]  optional, with deadline: applies it (e.g. chess flag falls)
  */
 ```
 

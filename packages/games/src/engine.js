@@ -27,7 +27,14 @@
  * @property {(state: State) => Outcome} getOutcome
  * @property {(state: State, viewer: PlayerId | "spectator") => unknown} viewFor   hides what the viewer may not see
  * @property {(state: State) => PlayerId[]} activePlayers                         who may move right now
+ * @property {(state: State) => number} [deadline]
+ *   Optional time hook: when (ms timestamp) something happens if nobody acts — e.g. a chess flag falls.
+ *   0 means "no deadline". Computed purely from state; the server schedules, the engine never sets timers.
+ * @property {(state: State, ctx: MoveContext) => State} [expire]
+ *   Optional, required with `deadline`: applies the time-based event once `ctx.now >= deadline(state)`.
  */
+
+const OPTIONAL_TIME_HOOKS = ["deadline", "expire"];
 
 const REQUIRED_FUNCTIONS = [
   "validateOptions",
@@ -61,6 +68,10 @@ export function defineEngine(engine) {
     if (typeof engine?.[name] !== "function") {
       problems.push(`${name} must be a function`);
     }
+  }
+  const timeHooks = OPTIONAL_TIME_HOOKS.filter((name) => engine?.[name] !== undefined);
+  if (timeHooks.length > 0 && !OPTIONAL_TIME_HOOKS.every((name) => typeof engine[name] === "function")) {
+    problems.push("deadline and expire must be provided together, as functions");
   }
   if (problems.length > 0) {
     throw new TypeError(`Invalid game engine "${engine?.id}": ${problems.join("; ")}`);

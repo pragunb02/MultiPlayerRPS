@@ -235,6 +235,37 @@ const CHECKS = Object.freeze([
     },
   },
   {
+    name: "keeps time hooks pure: integer deadlines, no mutation, none after the end",
+    run(engine, scenario) {
+      if (engine.deadline === undefined) {
+        return;
+      }
+      const final = play(engine, scenario, (state, index) => {
+        const due = engine.deadline(state);
+        assert(
+          Number.isInteger(due) && due >= 0,
+          `step ${index}: deadline must be a non-negative integer, got ${due}`,
+        );
+        let expired;
+        try {
+          expired = engine.expire(state, { now: due > 0 ? due : CTX.now });
+        } catch (err) {
+          throw new ContractViolation(
+            `step ${index}: expire threw on frozen state — does it mutate? (${err.message})`,
+          );
+        }
+        assert(isJsonSafe(expired), `step ${index}: expired state is not plain JSON data`);
+        if (due > 0) {
+          assert(
+            engine.getOutcome(expired).status === GAME_STATUS.FINISHED || engine.deadline(expired) !== due,
+            `step ${index}: expiring at the deadline must change the game`,
+          );
+        }
+      });
+      assert(engine.deadline(final) === 0, "a finished game must have no deadline");
+    },
+  },
+  {
     name: "replays identically",
     run(engine, scenario) {
       assert(

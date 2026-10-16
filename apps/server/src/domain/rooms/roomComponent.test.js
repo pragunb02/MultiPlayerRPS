@@ -366,4 +366,62 @@ describe("roomComponent", () => {
     expect(() => createRoomComponent({ engines: {}, events: { emit() {} } })).toThrow(TypeError);
     expect(() => createRoomComponent({ roomAccessor: {}, engines: {}, events: {} })).toThrow(TypeError);
   });
+
+  describe("expireDue (engine time hooks)", () => {
+    // A timed race variant: the player to move loses once 1 s has passed since the game started.
+    const timedEngine = defineEngine({
+      ...raceEngine,
+      id: "timed",
+      init: (setup) => ({ ...raceEngine.init(setup), deadline: T0 + 1_000 }),
+      deadline: (state) => (state.winner === "" ? state.deadline : 0),
+      expire: (state, { now }) =>
+        now >= state.deadline ? { ...state, winner: state.players.find((p, i) => i !== state.turn) } : state,
+    });
+
+    function timedGame() {
+      const ctx = setup({ engines: [timedEngine, raceEngine] });
+      const { code } = ctx.rooms.createRoom({
+        host: ALICE,
+        gameId: "timed",
+        options: { target: 3 },
+        now: T0,
+      });
+      ctx.rooms.joinRoom({ code, player: BOB, now: T0 });
+      return { ...ctx, code };
+    }
+
+    it("does nothing before the deadline", () => {
+      const { rooms, code, published } = timedGame();
+
+      expect(rooms.expireDue({ now: T0 + 999 })).toEqual([]);
+      expect(rooms.getRoom(code).status).toBe("playing");
+      expect(published).toEqual([]);
+    });
+
+    it("applies the deadline, finishes the room and publishes the change", () => {
+      const { rooms, code, published } = timedGame();
+
+      const changed = rooms.expireDue({ now: T0 + 1_000 });
+
+      const room = rooms.getRoom(code);
+      expect(changed).toEqual([code]);
+      expect(room.status).toBe("finished");
+      expect(room.result.winners).toEqual([ALICE.id]); // Bob was to move
+      expect(published.map((p) => p.event)).toEqual([ROOM_EVENTS.GAME_FINISHED, ROOM_EVENTS.UPDATED]);
+    });
+
+    it("ignores engines without time hooks and rooms that are not playing", () => {
+      const { rooms } = timedGame();
+      const race = createRace(rooms, CAROL);
+
+      expect(rooms.expireDue({ now: T0 + 1_000_000 })).not.toContain(race.code);
+    });
+
+    it("applies a deadline only once", () => {
+      const { rooms } = timedGame();
+      rooms.expireDue({ now: T0 + 1_000 });
+
+      expect(rooms.expireDue({ now: T0 + 2_000 })).toEqual([]);
+    });
+  });
 });

@@ -26,6 +26,20 @@ describe("defineEngine", () => {
     expect(() => defineEngine(engine)).toThrow(message);
   });
 
+  it("accepts the optional time hooks when both are provided", () => {
+    const timed = defineEngine({ ...valid, deadline: () => 0, expire: (state) => state });
+
+    expect(typeof timed.deadline).toBe("function");
+  });
+
+  it.each([
+    [{ ...valid, deadline: () => 0 }],
+    [{ ...valid, expire: (state) => state }],
+    [{ ...valid, deadline: 5, expire: (state) => state }],
+  ])("refuses half or malformed time hooks (%#)", (engine) => {
+    expect(() => defineEngine(engine)).toThrow(/deadline and expire must be provided together/);
+  });
+
   it("lists every problem at once", () => {
     expect(() => defineEngine({})).toThrow(
       /id must be[\s\S]*players must be[\s\S]*validateOptions must be a function/,

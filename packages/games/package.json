@@ -9,6 +9,7 @@
     "./testing": "./src/testing/index.js"
   },
   "dependencies": {
-    "@classicade/shared": "*"
+    "@classicade/shared": "*",
+    "chess.js": "^1.4.0"
   }
 }
