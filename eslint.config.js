@@ -65,7 +65,13 @@ module.exports = [
     languageOptions: { sourceType: "commonjs", globals: globals.node },
   },
   {
-    files: ["apps/server/**/*.js", "packages/**/*.js", "*.mjs", "apps/web/vite.config.js"],
+    files: [
+      "apps/server/**/*.js",
+      "packages/**/*.js",
+      "*.mjs",
+      "apps/web/vite.config.js",
+      "e2e/**/*.{js,mjs}",
+    ],
     languageOptions: { sourceType: "module", globals: globals.node },
     rules: {
       "no-unused-vars": ["error", { argsIgnorePattern: "^_", ignoreRestSiblings: true }],
@@ -74,6 +80,11 @@ module.exports = [
       "prefer-const": "error",
       "no-console": "error",
     },
+  },
+  {
+    // Browser tests: callbacks passed to page.evaluate() run in the page.
+    files: ["e2e/**/*.js"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   ...layerRules,
   {

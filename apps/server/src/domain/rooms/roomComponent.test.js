@@ -239,6 +239,56 @@ describe("roomComponent", () => {
     });
   });
 
+  describe("transferPlayer (a guest signs in, CC-083)", () => {
+    const RIYA = Object.freeze({ kind: "user", id: "user_r", displayName: "Riya" });
+
+    it("hands a waiting room's seat and host role to the account", () => {
+      const { rooms } = setup();
+      const { code } = createRace(rooms);
+
+      const [moved] = rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 5 });
+
+      expect(moved.seats).toEqual([{ playerId: RIYA.id, displayName: "Riya", connected: false }]);
+      expect(moved.hostId).toBe(RIYA.id);
+      // When the friend joins, the game is between the account and the friend — not against the old guest seat.
+      const started = rooms.joinRoom({ code, player: BOB, now: T0 + 6 });
+      expect([...started.game.state.players].sort()).toEqual([BOB.id, RIYA.id].sort());
+    });
+
+    it("keeps a running game going under the account's id", () => {
+      const { rooms, code } = startedGame();
+      rooms.makeMove({ code, playerId: BOB.id, move: { add: 1 }, now: T0 + 2 });
+
+      rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 3 });
+
+      const room = rooms.makeMove({ code, playerId: RIYA.id, move: { add: 2 }, now: T0 + 4 });
+      expect(room.game.log.map((entry) => entry.playerId)).toEqual([BOB.id, RIYA.id]);
+      expect(() => rooms.makeMove({ code, playerId: ALICE.id, move: { add: 1 }, now: T0 + 5 })).toThrow(
+        ForbiddenError,
+      );
+    });
+
+    it("gives the guest seat up when the account already sits in that waiting room", () => {
+      const { rooms } = setup({ engines: [partyEngine] });
+      const { code } = rooms.createRoom({ host: ALICE, gameId: "party", options: { target: 3 }, now: T0 });
+      rooms.joinRoom({ code, player: RIYA, now: T0 + 1 });
+
+      const [room] = rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 2 });
+
+      expect(room.seats.map((seat) => seat.playerId)).toEqual([RIYA.id]);
+    });
+
+    it("leaves finished games and other players' rooms alone", () => {
+      const { rooms, code } = startedGame();
+      rooms.makeMove({ code, playerId: BOB.id, move: { add: 1 }, now: T0 + 2 });
+      rooms.makeMove({ code, playerId: ALICE.id, move: { add: 2 }, now: T0 + 3 }); // Alice reaches 3: finished
+      const other = createRace(rooms, CAROL);
+
+      expect(rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 3 })).toEqual([]);
+      expect(rooms.getRoom(other.code).seats[0].playerId).toBe(CAROL.id);
+    });
+  });
+
   describe("disconnects", () => {
     it("keeps the seat but marks it disconnected", () => {
       const { rooms, code } = startedGame();

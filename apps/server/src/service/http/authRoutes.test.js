@@ -113,7 +113,30 @@ describe("auth routes", () => {
     expect(signedUp.cookie).not.toBe(guest.cookie); // new session id: no fixation
     const userSocket = await clients.openSocket(signedUp.cookie);
     expect((await send(userSocket, SOCKET_EVENTS.IDENTITY_GET)).data).toEqual(signedUp.body.identity);
-    expect((await whoAmI(guest.cookie)).error.code).toBe(ERROR_CODES.UNAUTHORIZED);
+    expect(await whoAmI(guest.cookie)).toEqual({ authenticated: false }); // the old session is gone
+  });
+
+  it("a guest who signs up from a room keeps their seat, and the friend sees the new name (CC-083)", async () => {
+    server = await startTestServer();
+    const guest = await clients.player();
+    const friend = await clients.player();
+    const created = await send(guest.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "race",
+      options: { target: 3 },
+    });
+    const code = created.data.code;
+
+    const signedUp = await post("/api/auth/signup", RIYA, guest.cookie);
+    const userSocket = await clients.openSocket(signedUp.cookie);
+    const rejoined = await send(userSocket, SOCKET_EVENTS.ROOM_JOIN, { code });
+    const joined = await send(friend.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
+
+    expect(rejoined.data.you).toBe(signedUp.body.identity.id);
+    expect(rejoined.data.seats).toEqual([
+      { playerId: signedUp.body.identity.id, displayName: "Riya", connected: true },
+    ]);
+    expect(joined.data.status).toBe("playing"); // the account against the friend, not against the old guest seat
+    expect(joined.data.seats.map((seat) => seat.displayName)).toEqual(["Riya", friend.identity.displayName]);
   });
 
   it("rate-limits failed logins per email, even across different IPs", async () => {

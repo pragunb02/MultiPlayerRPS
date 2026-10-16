@@ -11,7 +11,8 @@ const DEFAULT_GUEST_LIMIT = Object.freeze({ windowMs: 15 * 60 * 1000, limit: 30 
  * Session endpoints. Identity is created and read only here, on the server; nothing a client sends
  * can choose or change who they are.
  *
- *   GET    /session        → 200 { identity } | 401
+ *   GET    /session        → 200 { authenticated: true, identity } | 200 { authenticated: false } (no session yet —
+ *                             a normal state for a first visit, not an error) | 401 (a session with a corrupt identity)
  *   POST   /session/guest  → 201 { identity } (new guest) | 200 { identity } (already has one)
  *   DELETE /session        → 204 (ends the session and disconnects its sockets)
  *
@@ -41,7 +42,11 @@ export function createSessionRoutes({ identityComponent, onSessionEnded, guestLi
   });
 
   router.get("/session", (req, res) => {
-    res.json({ identity: requireIdentity(req.session) });
+    if (req.session.identity === undefined) {
+      res.json({ authenticated: false });
+      return;
+    }
+    res.json({ authenticated: true, identity: requireIdentity(req.session) });
   });
 
   router.post("/session/guest", guestRateLimit, async (req, res) => {

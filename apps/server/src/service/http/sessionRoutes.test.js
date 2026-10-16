@@ -16,13 +16,13 @@ const sessionCookie = (res) =>
 
 describe("session routes", () => {
   describe("GET /api/session", () => {
-    it("is 401 without a session", async () => {
+    it("answers 200 'not authenticated' without a session — a first visit is not an error (CC-082)", async () => {
       const { app } = createTestApp();
 
       const res = await request(app).get("/api/session");
 
-      expect(res.status).toBe(401);
-      expect(res.body.error.code).toBe(ERROR_CODES.UNAUTHORIZED);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ authenticated: false });
     });
 
     it("does not create a session or cookie for anonymous reads", async () => {
@@ -57,7 +57,7 @@ describe("session routes", () => {
       const res = await agent.get("/api/session");
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ identity: FIRST_GUEST });
+      expect(res.body).toEqual({ authenticated: true, identity: FIRST_GUEST });
     });
 
     it("returns the existing identity instead of creating a second one", async () => {
@@ -116,7 +116,7 @@ describe("session routes", () => {
       expect(res.status).toBe(204);
       expect(sessionCookie(res)).toMatch(/Expires=Thu, 01 Jan 1970/);
       expect(endedSessions).toEqual([sessionId]);
-      expect((await agent.get("/api/session")).status).toBe(401);
+      expect((await agent.get("/api/session")).body).toEqual({ authenticated: false });
     });
 
     it("is a no-op without a session", async () => {

@@ -32,6 +32,7 @@ npm run dev:web        # web app on http://localhost:5173 (proxies to the server
 | `npm run format`        | Prettier (write)                                                                               |
 | `npm run format:check`  | Prettier (check only)                                                                          |
 | `npm test`              | Vitest                                                                                         |
+| `npm run test:e2e`      | Browser persona tests (Playwright; first time: `npx playwright install chromium`)              |
 | `npm run test:coverage` | Vitest with coverage gates                                                                     |
 
 ## Project docs

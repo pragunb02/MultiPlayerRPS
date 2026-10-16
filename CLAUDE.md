@@ -72,6 +72,7 @@ npm run lint           # must have 0 errors
 npm run format:check
 npm test               # Vitest across all workspaces (*.test.js next to the code)
 npm run test:coverage  # with coverage gates (ENGINEERING.md §4)
+npm run test:e2e       # browser persona tests (first time: npx playwright install chromium)
 npm audit              # must be 0 high/critical
 ./scripts/issue-counts.sh  # issue counts for PROGRESS.md (never hand-edit them)
 ```

@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { GAME_STATUS, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, ROOM_STATUS } from "@classicade/shared";
-import { createSeededRng } from "@classicade/games";
+import { createSeededRng, renamePlayer } from "@classicade/games";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { ConflictError, ForbiddenError, ValidationError } from "../../utils/errors.js";
 
@@ -283,6 +283,46 @@ export function createRoomComponent({
         }
       }
       return closed;
+    },
+
+    /**
+     * A guest just signed in: every seat they hold in a waiting or running room becomes their account's (CC-083),
+     * so they come back to their own game instead of meeting their old guest seat. The seat counts as
+     * disconnected until the account's socket rejoins. If the account already sits in the same waiting room, the
+     * guest seat is simply given up; a running game the account already plays in is left alone.
+     *
+     * @param {{ from: string, to: import("../../models/identity.js").Identity, now: number }} input
+     * @returns {Array<Readonly<import("../../data/roomAccessor.js").Room>>} rooms that changed
+     */
+    transferPlayer({ from, to, now }) {
+      const changed = [];
+      for (const room of roomAccessor.listAll()) {
+        const active = room.status === ROOM_STATUS.WAITING || room.status === ROOM_STATUS.PLAYING;
+        if (!active || seatOf(room, from) === undefined) continue;
+        if (seatOf(room, to.id) !== undefined) {
+          if (room.status === ROOM_STATUS.WAITING) {
+            const left = component.leaveRoom({ code: room.code, playerId: from, now });
+            if (!left.closed) changed.push(left.room);
+          }
+          continue;
+        }
+        const seats = room.seats.map((seat) =>
+          seat.playerId === from ? { playerId: to.id, displayName: to.displayName, connected: false } : seat,
+        );
+        const moved = {
+          ...withSeats(room, seats, now),
+          hostId: room.hostId === from ? to.id : room.hostId,
+          ...(room.game && {
+            game: {
+              ...room.game,
+              state: renamePlayer(room.game.state, from, to.id),
+              log: renamePlayer(room.game.log, from, to.id),
+            },
+          }),
+        };
+        changed.push(roomAccessor.save(moved));
+      }
+      return changed;
     },
 
     /** @param {string} code */

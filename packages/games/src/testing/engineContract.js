@@ -1,4 +1,5 @@
 import { GAME_STATUS, MOVE_REJECTIONS } from "@classicade/shared";
+import { renamePlayer } from "../renamePlayer.js";
 import { createSeededRng } from "../rng.js";
 
 /**
@@ -209,6 +210,37 @@ const CHECKS = Object.freeze([
         `expected outcome ${JSON.stringify(scenario.expectedOutcome)}, got ${JSON.stringify(engine.getOutcome(final))}`,
       );
       assert(isJsonSafe(final), "final state is not plain JSON data");
+    },
+  },
+  {
+    // A guest who signs in mid-game keeps their seat under their account's id (CC-083).
+    name: "keeps playing after a player is renamed mid-game",
+    run(engine, scenario) {
+      const [from] = scenario.players;
+      const to = "renamed-player";
+      const half = Math.floor(scenario.playthrough.length / 2);
+      const rest = scenario.playthrough.slice(half).map((step) => renamePlayer(step, from, to));
+      let state = deepFreeze(
+        renamePlayer(
+          play(engine, { ...scenario, playthrough: scenario.playthrough.slice(0, half) }),
+          from,
+          to,
+        ),
+      );
+      assert(!engine.activePlayers(state).includes(from), "the old id is still active after the rename");
+      rest.forEach(({ player, move }, index) => {
+        const validated = engine.validateMove(state, player, move, CTX);
+        assert(
+          validated.ok,
+          `after rename, step ${half + index}: ${player}'s legal move was rejected (${validated.reason})`,
+        );
+        state = deepFreeze(engine.applyMove(state, player, validated.value, CTX));
+      });
+      const expected = renamePlayer(scenario.expectedOutcome, from, to);
+      assert(
+        JSON.stringify(engine.getOutcome(state)) === JSON.stringify(expected),
+        `after rename, expected outcome ${JSON.stringify(expected)}, got ${JSON.stringify(engine.getOutcome(state))}`,
+      );
     },
   },
   {
