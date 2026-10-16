@@ -13,6 +13,7 @@ export function apiRouter({
   progressionComponent,
   accountComponent,
   authLimits,
+  onSignedIn,
   ...sessionDeps
 }) {
   const router = Router();
@@ -30,6 +31,7 @@ export function apiRouter({
     createAuthRoutes({
       accountComponent,
       onSessionEnded: sessionDeps.onSessionEnded,
+      onSignedIn,
       ...(authLimits && { limits: authLimits }),
     }),
   );

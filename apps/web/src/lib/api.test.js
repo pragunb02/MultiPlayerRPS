@@ -18,6 +18,16 @@ describe("api client", () => {
     );
   });
 
+  it.each([
+    [
+      { authenticated: true, identity: { kind: "guest", id: "guest_x" } },
+      { kind: "guest", id: "guest_x" },
+    ],
+    [{ authenticated: false }, undefined],
+  ])("reads the session: identity, or none yet (%o)", async (body, expected) => {
+    expect(await createApiClient({ fetchImpl: respond(200, body) }).getSession()).toEqual(expected);
+  });
+
   it("sends JSON bodies", async () => {
     const fetchImpl = respond(200, { identity: { id: "user_x" } });
 

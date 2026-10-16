@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServices } from "../app/servicesContext.js";
 import { isUnauthorized } from "../lib/errors.js";
 import { SessionContext } from "./useSession.js";
@@ -6,7 +6,7 @@ import { SessionContext } from "./useSession.js";
 /**
  * Who the player is, for the whole app. Loads the session on start, and keeps the realtime connection bound to
  * it: the socket authenticates with the session cookie at connect time, so it reconnects whenever the identity
- * changes (guest → signed in → signed out).
+ * changes (guest → signed in → signed out) — and only then: the same identity again leaves a connecting socket alone.
  *
  * status: "loading" | "anonymous" | "ready" | "error"
  */
@@ -14,11 +14,17 @@ export function SessionProvider({ children }) {
   const { api, socket } = useServices();
   const [state, setState] = useState({ status: "loading", identity: undefined, error: undefined });
 
+  const connectedAs = useRef(undefined);
+  const pendingGuest = useRef(undefined);
+
   const adopt = useCallback(
     (identity) => {
-      socket.disconnect();
-      if (identity !== undefined) {
-        socket.connect();
+      if (identity?.id !== connectedAs.current) {
+        connectedAs.current = identity?.id;
+        socket.disconnect();
+        if (identity !== undefined) {
+          socket.connect();
+        }
       }
       setState({ status: identity === undefined ? "anonymous" : "ready", identity, error: undefined });
       return identity;
@@ -48,7 +54,17 @@ export function SessionProvider({ children }) {
     () => ({
       ...state,
       /** Ensures there is an identity to play with: keeps the current one, or starts a guest session. */
-      ensurePlayer: async () => state.identity ?? adopt(await api.startGuest()),
+      // Pages may ask several times while the first guest session is being created; they all share that one.
+      ensurePlayer: async () => {
+        if (state.identity !== undefined) return state.identity;
+        pendingGuest.current ??= api
+          .startGuest()
+          .then(adopt)
+          .finally(() => {
+            pendingGuest.current = undefined;
+          });
+        return pendingGuest.current;
+      },
       signup: async (credentials) => adopt(await api.signup(credentials)),
       login: async (credentials) => adopt(await api.login(credentials)),
       logout: async () => {

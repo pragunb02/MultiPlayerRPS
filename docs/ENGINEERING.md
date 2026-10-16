@@ -143,11 +143,11 @@ Data objects are **plain and frozen** — no methods that do work, so logic can'
 
 **Pyramid:** many unit tests → some integration tests → few end-to-end tests.
 
-| Level       | What                                                                     | Tools                                                      | Where                   |
-| ----------- | ------------------------------------------------------------------------ | ---------------------------------------------------------- | ----------------------- |
-| Unit        | One module, its collaborators faked. Engines, components, models, utils. | Vitest                                                     | `*.test.js` beside code |
-| Integration | Real HTTP/socket stack + in-memory MongoDB, one flow end to end.         | Vitest, supertest, socket.io-client, mongodb-memory-server | `*.integration.test.js` |
-| End to end  | Browser flows on the real app (later, CC-025+).                          | Playwright                                                 | `apps/web/e2e/`         |
+| Level       | What                                                                                                                                           | Tools                                                      | Where                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------- |
+| Unit        | One module, its collaborators faked. Engines, components, models, utils.                                                                       | Vitest                                                     | `*.test.js` beside code |
+| Integration | Real HTTP/socket stack + in-memory MongoDB, one flow end to end.                                                                               | Vitest, supertest, socket.io-client, mongodb-memory-server | `*.integration.test.js` |
+| End to end  | Whole journeys in real browsers (desktop + mobile) against the real server, production config, in-memory MongoDB — one file per kind of person | Playwright                                                 | `e2e/*.spec.js`         |
 
 Rules:
 
@@ -161,7 +161,13 @@ Rules:
 7. **Assert errors by type**: `expect(() => fn()).toThrow(NotFoundError)` / `await expect(p).rejects.toThrow(...)`.
 8. **Every bug fix starts with a failing test** that reproduces it.
 9. **Cover edges**: empty, boundary, invalid, duplicate, concurrent/out-of-order where relevant.
-10. **Coverage gates** (enforced by `npm run test:coverage`, run in CI from CC-027):
+10. **Browser tests are persona journeys** (`e2e/`, CC-081): visitor, guest, account holder, legacy player, attacker.
+    The `players` fixture fails a test on any console error or warning, page error, CSP violation or unexpected failed
+    request, on a secret (password, email, session id) in any URL, on a readable or non-`Secure`/`HttpOnly` session
+    cookie, and on anything in web storage. Assert URLs and titles at every step, and what each player must _not_ see
+    (hidden game state in the DOM and in WebSocket frames). A test that provokes a failure declares it
+    (`player.expect(401, "/api/auth/login")`).
+11. **Coverage gates** (enforced by `npm run test:coverage`, run in CI from CC-027):
     `packages/games` ≥ 90 % lines and branches · rest of new code ≥ 80 %. Coverage is a floor, not the goal.
 
 ---

@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
 import { fakeApi, fakeSocket, GUEST } from "../testing/fakes.js";
 import { SessionProvider } from "./SessionProvider.jsx";
@@ -55,6 +55,25 @@ describe("SessionProvider", () => {
     expect(api.startGuest).toHaveBeenCalledOnce();
     expect(session.identity).toEqual(GUEST);
     expect(socket.connect).toHaveBeenCalledOnce();
+  });
+
+  it("shares one guest session between pages asking at the same time, connecting once (CC-081)", async () => {
+    let finish;
+    const { api, socket } = setup(
+      fakeApi({ startGuest: vi.fn(() => new Promise((resolve) => (finish = resolve))) }),
+    );
+    await screen.findByText("anonymous");
+
+    const asks = [session.ensurePlayer(), session.ensurePlayer()];
+    await act(async () => {
+      finish(GUEST);
+      await Promise.all(asks);
+    });
+
+    expect(await Promise.all(asks)).toEqual([GUEST, GUEST]);
+    expect(api.startGuest).toHaveBeenCalledOnce();
+    expect(socket.connect).toHaveBeenCalledOnce();
+    expect(socket.disconnect).toHaveBeenCalledOnce(); // only before the first connect, never a connecting socket
   });
 
   it("reconnects the socket when the identity changes (the socket authenticates at connect time)", async () => {

@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { createEngineRegistry, ENGINES } from "@classicade/games";
-import { getGame } from "@classicade/shared";
+import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createLegacyUserAccessor } from "./data/legacyUserAccessor.js";
 import { createMatchAccessor } from "./data/matchAccessor.js";
@@ -88,13 +88,36 @@ export function connectMatchPipeline({ domainEvents, matchComponent, progression
 }
 
 /**
+ * A guest who signs in keeps their seats: rooms hand them to the account, and everyone in them sees the change
+ * (CC-083).
+ *
+ * @param {{ roomComponent: ReturnType<typeof createRoomComponent>, domainEvents: import("node:events").EventEmitter, now?: () => number }} deps
+ * @returns {Parameters<typeof createHttpApp>[0]["onSignedIn"]}
+ */
+export function seatHandoverOnSignIn({ roomComponent, domainEvents, now = Date.now }) {
+  return ({ previous, identity }) => {
+    if (previous?.kind !== IDENTITY_KINDS.GUEST || previous.id === identity.id) {
+      return;
+    }
+    for (const room of roomComponent.transferPlayer({ from: previous.id, to: identity, now: now() })) {
+      domainEvents.emit(ROOM_EVENTS.UPDATED, { room });
+    }
+  };
+}
+
+/**
  * Composition root: builds every layer bottom-up, wires dependencies, and starts listening.
  * The only module allowed to know about all layers.
  *
- * @param {{ config: Readonly<import("./config/index.js").Config>, logger: Logger }} deps
+ * @param {{
+ *   config: Readonly<import("./config/index.js").Config>,
+ *   logger: Logger,
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number } },  rate limits; production uses the
+ *     defaults — only browser tests raise them, because every test player shares one IP
+ * }} deps
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
-export async function startServer({ config, logger }) {
+export async function startServer({ config, logger, limits = {} }) {
   if (config.webDistDir !== "" && !existsSync(path.join(config.webDistDir, "index.html"))) {
     throw new Error(`WEB_DIST_DIR has no index.html: ${config.webDistDir} (run npm run build:web)`);
   }
@@ -147,12 +170,15 @@ export async function startServer({ config, logger }) {
     config,
     logger,
     isDatabaseUp: database.isConnected,
+    authLimits: limits.auth,
+    guestLimit: limits.guest,
     sessionMiddleware,
     identityComponent,
     matchComponent,
     progressionComponent,
     accountComponent,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
+    onSignedIn: seatHandoverOnSignIn({ roomComponent, domainEvents }),
   });
   const server = http.createServer(app);
   const gateway = createRealtimeGateway({

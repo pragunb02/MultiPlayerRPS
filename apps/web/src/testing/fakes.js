@@ -18,7 +18,7 @@ export const unauthorized = () =>
 export function fakeApi(overrides = {}) {
   return {
     getGames: vi.fn().mockResolvedValue(GAMES),
-    getSession: vi.fn().mockRejectedValue(unauthorized()),
+    getSession: vi.fn().mockResolvedValue(undefined),
     startGuest: vi.fn().mockResolvedValue(GUEST),
     endSession: vi.fn().mockResolvedValue({}),
     signup: vi.fn(),

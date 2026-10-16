@@ -34,7 +34,11 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
 
   return Object.freeze({
     getGames: async () => (await request("GET", "/games")).games,
-    getSession: async () => (await request("GET", "/session")).identity,
+    /** @returns {Promise<object | undefined>} the session's identity, or undefined before the first visit has one */
+    getSession: async () => {
+      const body = await request("GET", "/session");
+      return body.authenticated ? body.identity : undefined;
+    },
     startGuest: async () => (await request("POST", "/session/guest")).identity,
     endSession: () => request("DELETE", "/session"),
     signup: async (credentials) => (await request("POST", "/auth/signup", credentials)).identity,

@@ -180,6 +180,6 @@ describe("checkEngineContract catches broken engines", () => {
   });
 
   it("exposes the list of checks", () => {
-    expect(CONTRACT_CHECK_NAMES).toHaveLength(11);
+    expect(CONTRACT_CHECK_NAMES).toHaveLength(12);
   });
 });

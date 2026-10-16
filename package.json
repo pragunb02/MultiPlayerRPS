@@ -8,7 +8,8 @@
   },
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "e2e"
   ],
   "scripts": {
     "start": "node apps/server/src/index.js",
@@ -21,7 +22,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "dev:web": "npm run dev -w @classicade/web",
-    "build:web": "npm run build -w @classicade/web"
+    "build:web": "npm run build -w @classicade/web",
+    "test:e2e": "npm test -w @classicade/e2e"
   },
   "license": "ISC",
   "devDependencies": {
