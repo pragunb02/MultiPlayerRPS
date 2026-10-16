@@ -201,7 +201,10 @@ test.describe("guest progress carries over to the account (CC-032)", () => {
       .getByRole("button", { name: /Scissors/ })
       .click();
     await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
-    await expect(alice.page.getByText("+30 XP")).toBeVisible(); // the XP is stored before she signs up
+    // The XP toast (not the result panel's decorative "+30 XP"): the XP is stored before she signs up.
+    await expect(
+      alice.page.getByRole("status").filter({ hasText: "+30 XP" }).filter({ hasNotText: "Play again" }),
+    ).toBeVisible();
     const xp = 30 + (await questBonusXp(alice.page));
 
     await alice.page.goto("/signup?next=%2Fprofile");

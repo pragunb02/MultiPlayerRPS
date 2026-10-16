@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.js";
+import { expect, joinAsGuest, test } from "./fixtures.js";
 
 // The arcade look (CC-087, ADR-012): every themed screen renders in light and dark with no CSP violations or
 // console errors (the players fixture checks), celebrations play, and with reduced motion nothing moves while
@@ -12,7 +12,12 @@ async function aliceBeatsBob(alice, bob) {
   await alice.page.getByRole("combobox", { name: /match length/i }).selectOption("1");
   await alice.page.getByRole("button", { name: "Create room" }).click();
   const invite = await alice.page.getByRole("textbox", { name: "Invite link" }).inputValue();
-  await bob.page.goto(invite);
+  // Bob's first invite asks how to join (CC-086); after that he has a guest session.
+  if ((await bob.context.cookies()).length === 0) {
+    await joinAsGuest(bob, invite);
+  } else {
+    await bob.page.goto(invite);
+  }
   const choices = (player) => player.page.getByRole("group", { name: "Your choice" });
   await choices(alice).getByRole("button", { name: /Rock/ }).click();
   await choices(bob)
@@ -22,6 +27,35 @@ async function aliceBeatsBob(alice, bob) {
   return new URL(invite).pathname;
 }
 
+/**
+ * The header chip shows the player's stored progress. A win is 30 XP, and the day's quests (CC-089, chosen by player
+ * and date) may add a bonus, so the expected numbers are read from the API once the server has caught up.
+ */
+async function expectChipToFollowProgress(page) {
+  await expect(async () => {
+    const { progress } = await (await page.request.get("/api/progress")).json();
+    expect(progress.xp).toBeGreaterThanOrEqual(30);
+    const name = `Level ${progress.level}: ${progress.xpIntoLevel} of ${progress.xpForNextLevel} XP`;
+    await expect(page.getByRole("banner").getByRole("progressbar", { name })).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
+}
+
+/**
+ * After Alice's first win, waits for her level-up — or wins once more for it. Level 2 starts at 50 XP and a win is
+ * 30, so the second win always gets there; a quest bonus on the first win can get there sooner.
+ */
+async function untilLevelTwo(alice, bob) {
+  const levelUp = toast(alice.page, "Level up! You reached level 2");
+  const already = await levelUp
+    .waitFor({ state: "attached", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!already) {
+    await aliceBeatsBob(alice, bob);
+  }
+  return levelUp;
+}
+
 const animationCount = (page) => page.evaluate(() => document.getAnimations().length);
 const effect = (page, name) => page.locator(`[data-effect="${name}"]`);
 /** A toast. (The room's result panel is a status region too, and its art repeats the XP.) */
@@ -29,10 +63,18 @@ const toast = (page, text) =>
   page.getByRole("status").filter({ hasText: text }).filter({ hasNotText: "Play again" });
 
 for (const colorScheme of SCHEMES) {
-  test(`home, lobby, profile and 404 render in the ${colorScheme} theme`, async ({ players }) => {
+  test(`home, lobby, profile, leaderboards, invite and 404 render in the ${colorScheme} theme`, async ({
+    players,
+  }) => {
     const visitor = await players.open("visitor");
     const { page } = visitor;
     await page.emulateMedia({ colorScheme });
+
+    // An invite link, before choosing how to join (CC-086): the envelope art over the choice.
+    await page.goto("/games/tic-tac-toe/rooms/AB2CD3");
+    const chooser = page.getByRole("region", { name: "You're invited to play Tic Tac Toe" });
+    await expect(chooser.locator("svg").first()).toBeVisible();
+    await expect(chooser.getByRole("button", { name: "Play as guest" })).toBeVisible();
 
     await page.goto("/");
     await expect(
@@ -49,9 +91,22 @@ for (const colorScheme of SCHEMES) {
     await expect(page).toHaveURL("/games/chess");
     await expect(page.getByRole("heading", { name: "Chess", exact: true })).toBeVisible();
 
+    // The quest card on home (CC-089), now that there is a player.
+    await page.goto("/");
+    await expect(page.getByRole("region", { name: "Daily quests" })).toBeVisible();
+
     await page.goto("/profile");
     await expect(page.getByText("Rookie rank")).toBeVisible();
     await expect(page.getByText("No games yet.")).toBeVisible();
+    // The player console: every achievement drawn as a medal, the streak as a flame.
+    const achievements = page.getByRole("list", { name: "Achievements" }).getByRole("listitem");
+    await expect(achievements.first()).toBeVisible();
+    await expect(achievements.locator("svg")).toHaveCount(await achievements.count());
+    await expect(page.getByRole("region", { name: "Streaks" }).locator("svg")).toBeVisible();
+
+    await page.goto("/leaderboards/overall");
+    const tabs = page.getByRole("navigation", { name: "Leaderboards" }).getByRole("link");
+    await expect(tabs.locator("svg")).toHaveCount(await tabs.count());
 
     await page.goto("/no/such/page");
     await expect(page.getByRole("img", { name: /game over, page not found/ })).toBeVisible();
@@ -68,18 +123,22 @@ for (const colorScheme of SCHEMES) {
     const room = await aliceBeatsBob(alice, bob);
 
     await expect(alice.page.getByText("Victory!")).toBeVisible();
-    await expect(effect(alice.page, "confetti")).toBeAttached();
+    // The win's confetti (and, for a first win, the achievement's too).
+    await expect(effect(alice.page, "confetti").first()).toBeAttached();
     await expect(toast(alice.page, "+30 XP")).toBeAttached();
+    // A first win unlocks achievements: their toasts carry the medal.
+    await expect(
+      toast(alice.page, "Achievement unlocked: First Victory").locator("svg").first(),
+    ).toBeAttached();
     await expect(bob.page.getByText("Defeat")).toBeVisible();
     await expect(effect(bob.page, "confetti")).toHaveCount(0);
-    const chip = alice.page.getByRole("banner").getByRole("progressbar", { name: /^Level 1: 30 of 50 XP/ });
-    await expect(chip).toBeVisible();
+    await expectChipToFollowProgress(alice.page);
 
     // The result survives a reload and a trip through history, as the same screen.
     await alice.page.reload();
     await expect(alice.page).toHaveURL(room);
     await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
-    await expect(chip).toBeVisible();
+    await expectChipToFollowProgress(alice.page);
     await alice.page.getByRole("link", { name: "Play again" }).click();
     await expect(alice.page).toHaveURL("/games/rock-paper-scissors");
     await alice.page.goBack();
@@ -92,11 +151,10 @@ for (const colorScheme of SCHEMES) {
 test("a level-up bursts behind the new badge", async ({ players }) => {
   const alice = await players.open("alice");
   const bob = await players.open("bob");
-  await aliceBeatsBob(alice, bob); // 30 XP
+  await aliceBeatsBob(alice, bob);
+  const levelUp = await untilLevelTwo(alice, bob);
 
-  await aliceBeatsBob(alice, bob); // 60 XP: level 2 starts at 50
-
-  await expect(toast(alice.page, "Level up! You reached level 2")).toBeAttached();
+  await expect(levelUp).toBeAttached();
   await expect(effect(alice.page, "level-up")).toBeAttached();
   await expect(effect(alice.page, "level-up")).toHaveCount(0, { timeout: 5_000 }); // and clears itself
   await expect(alice.page.getByRole("banner").getByRole("progressbar", { name: /^Level 2:/ })).toBeVisible();
@@ -116,8 +174,7 @@ test("with reduced motion nothing animates after a win or a level-up, and the wo
   await expect(effect(alice.page, "confetti")).toHaveCount(0);
   await expect(effect(alice.page, "xp-pop")).toHaveCount(0);
 
-  await aliceBeatsBob(alice, bob);
-  await expect(toast(alice.page, "Level up! You reached level 2")).toBeAttached();
+  await expect(await untilLevelTwo(alice, bob)).toBeAttached();
   expect(await animationCount(alice.page)).toBe(0);
   await expect(effect(alice.page, "level-up")).toHaveCount(0);
   await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
