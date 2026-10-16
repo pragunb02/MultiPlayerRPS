@@ -100,6 +100,28 @@ describe("RoomPage", () => {
     expect(screen.getByRole("link", { name: "Play again" })).toHaveAttribute("href", "/games/ludo");
   });
 
+  it.each([
+    [{ result: "win", winners: [GUEST.id], reason: "three-in-a-row" }, "Victory!", true],
+    [{ result: "win", winners: ["guest_b"], reason: "three-in-a-row" }, "Defeat", false],
+  ])("celebrates the result: banner, and confetti for a win (%o)", async (outcome, banner, confetti) => {
+    openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
+
+    expect(await screen.findByText(banner)).toBeInTheDocument();
+    expect(Boolean(document.querySelector("[data-effect='confetti']"))).toBe(confetti);
+    // The status region still says the result in words; the banner is decoration.
+    expect(screen.getByRole("heading", { name: confetti ? "You won!" : "You lost" })).toBeInTheDocument();
+  });
+
+  it("shows the game's icon in the room title and invite art while waiting", async () => {
+    openRoom();
+
+    const title = await screen.findByRole("heading", { level: 1, name: "Tic Tac Toe" });
+    expect(title.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("heading", { name: "Invite a friend" }).previousElementSibling.tagName).toBe(
+      "svg",
+    );
+  });
+
   it("explains a closed room", async () => {
     const { socket } = openRoom();
     await screen.findByRole("heading", { name: "Invite a friend" });

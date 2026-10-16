@@ -1,37 +1,82 @@
-.page h1 {
-  font-size: var(--text-xl);
+/* The lobby's title banner, in the game's accent colour with its illustration. */
+.banner {
+  --accent: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--color-border);
+  border-left: 8px solid var(--accent);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.rps {
+  --accent: var(--color-game-rps);
+}
+.tictactoe {
+  --accent: var(--color-game-tictactoe);
+}
+.chess {
+  --accent: var(--color-game-chess);
+}
+.primary {
+  --accent: var(--color-primary);
+}
+.banner h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+}
+.art {
+  width: 12rem;
+  flex: none;
+}
+@media (max-width: 30rem) {
+  .banner h1 {
+    font-size: var(--text-xl);
+  }
+  .art {
+    width: 8rem;
+  }
 }
 .panels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: var(--space-4);
+  gap: var(--space-6);
 }
 .panel {
   display: grid;
   gap: var(--space-4);
   align-content: start;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
   padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+.panel h2 {
+  margin: 0;
 }
 .panel label {
   display: grid;
   gap: var(--space-1);
-  font-weight: 600;
+  font-weight: 700;
 }
 .panel input,
 .panel select {
   font: inherit;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
   background: var(--color-surface-raised);
   color: var(--color-text);
 }
 .panel input {
   font-family: var(--font-mono);
-  letter-spacing: 0.15em;
+  font-size: var(--text-lg);
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 .error {

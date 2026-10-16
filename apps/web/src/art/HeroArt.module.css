@@ -1,0 +1,38 @@
+/* The scene sits on the dark hero gradient in both themes, so it always paints with the neon inks. */
+.hero {
+  --color-game-rps: var(--color-neon-rps);
+  --color-game-tictactoe: var(--color-neon-tictactoe);
+  --color-accent: var(--color-neon-accent);
+  --color-gold: var(--color-neon-gold);
+  --color-xp: var(--color-neon-xp);
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.floor {
+  stroke: var(--color-art-white);
+  opacity: 0.28;
+}
+/* The cabinet is always dark with a neon edge, so it stands out on the hero gradient in both themes. */
+.cabinet {
+  fill: var(--color-art-ink);
+  stroke: var(--color-primary-soft);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 18px var(--color-glow-white));
+}
+.screen {
+  fill: var(--color-art-ink);
+  stroke: var(--color-xp);
+  stroke-width: 2;
+}
+.panel {
+  fill: var(--color-primary-soft);
+}
+.rps {
+  color: var(--color-game-rps);
+}
+.chess {
+  color: var(--color-gold);
+}

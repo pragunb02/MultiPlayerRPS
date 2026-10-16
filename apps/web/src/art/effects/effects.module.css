@@ -1,0 +1,356 @@
+/*
+ * Celebrations (ADR-012): overlays that never take input (pointer-events: none), play once, finish within
+ * 1.5 s, and animate only transform and opacity. Under reduced motion the components render nothing at all.
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 40;
+}
+
+/* Confetti: 24 pieces; each one's spot, drift, spin and colour come from its :nth-child rule below. */
+.piece {
+  position: absolute;
+  top: -1.5rem;
+  left: var(--x);
+  width: 0.55rem;
+  height: 0.95rem;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti-fall var(--duration-celebrate) var(--ease-out) both;
+}
+.piece:nth-child(3n) {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: var(--radius-full);
+}
+.piece:nth-child(4n + 1) {
+  height: 0.45rem;
+  width: 1rem;
+}
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift), var(--fall), 0) rotate(var(--spin));
+  }
+}
+.piece:nth-child(1) {
+  --x: 42.5%;
+  --drift: -23px;
+  --spin: 253deg;
+  --fall: 84vh;
+  animation-delay: 53ms;
+  background: var(--color-xp);
+}
+.piece:nth-child(2) {
+  --x: 83.5%;
+  --drift: 14px;
+  --spin: -326deg;
+  --fall: 83vh;
+  animation-delay: 106ms;
+  background: var(--color-gold);
+}
+.piece:nth-child(3) {
+  --x: 27.5%;
+  --drift: 51px;
+  --spin: 399deg;
+  --fall: 82vh;
+  animation-delay: 159ms;
+  background: var(--color-primary);
+}
+.piece:nth-child(4) {
+  --x: 68.5%;
+  --drift: -32px;
+  --spin: -472deg;
+  --fall: 81vh;
+  animation-delay: 212ms;
+  background: var(--color-streak);
+}
+.piece:nth-child(5) {
+  --x: 12.5%;
+  --drift: 5px;
+  --spin: 545deg;
+  --fall: 80vh;
+  animation-delay: 45ms;
+  background: var(--color-game-tictactoe);
+}
+.piece:nth-child(6) {
+  --x: 53.5%;
+  --drift: 42px;
+  --spin: -618deg;
+  --fall: 79vh;
+  animation-delay: 98ms;
+  background: var(--color-accent);
+}
+.piece:nth-child(7) {
+  --x: 94.5%;
+  --drift: -41px;
+  --spin: 691deg;
+  --fall: 78vh;
+  animation-delay: 151ms;
+  background: var(--color-xp);
+}
+.piece:nth-child(8) {
+  --x: 38.5%;
+  --drift: -4px;
+  --spin: -224deg;
+  --fall: 77vh;
+  animation-delay: 204ms;
+  background: var(--color-gold);
+}
+.piece:nth-child(9) {
+  --x: 79.5%;
+  --drift: 33px;
+  --spin: 297deg;
+  --fall: 76vh;
+  animation-delay: 37ms;
+  background: var(--color-primary);
+}
+.piece:nth-child(10) {
+  --x: 23.5%;
+  --drift: -50px;
+  --spin: -370deg;
+  --fall: 75vh;
+  animation-delay: 90ms;
+  background: var(--color-streak);
+}
+.piece:nth-child(11) {
+  --x: 64.5%;
+  --drift: -13px;
+  --spin: 443deg;
+  --fall: 74vh;
+  animation-delay: 143ms;
+  background: var(--color-game-tictactoe);
+}
+.piece:nth-child(12) {
+  --x: 8.5%;
+  --drift: 24px;
+  --spin: -516deg;
+  --fall: 73vh;
+  animation-delay: 196ms;
+  background: var(--color-accent);
+}
+.piece:nth-child(13) {
+  --x: 49.5%;
+  --drift: -59px;
+  --spin: 589deg;
+  --fall: 72vh;
+  animation-delay: 29ms;
+  background: var(--color-xp);
+}
+.piece:nth-child(14) {
+  --x: 90.5%;
+  --drift: -22px;
+  --spin: -662deg;
+  --fall: 71vh;
+  animation-delay: 82ms;
+  background: var(--color-gold);
+}
+.piece:nth-child(15) {
+  --x: 34.5%;
+  --drift: 15px;
+  --spin: 195deg;
+  --fall: 70vh;
+  animation-delay: 135ms;
+  background: var(--color-primary);
+}
+.piece:nth-child(16) {
+  --x: 75.5%;
+  --drift: 52px;
+  --spin: -268deg;
+  --fall: 69vh;
+  animation-delay: 188ms;
+  background: var(--color-streak);
+}
+.piece:nth-child(17) {
+  --x: 19.5%;
+  --drift: -31px;
+  --spin: 341deg;
+  --fall: 68vh;
+  animation-delay: 21ms;
+  background: var(--color-game-tictactoe);
+}
+.piece:nth-child(18) {
+  --x: 60.5%;
+  --drift: 6px;
+  --spin: -414deg;
+  --fall: 67vh;
+  animation-delay: 74ms;
+  background: var(--color-accent);
+}
+.piece:nth-child(19) {
+  --x: 4.5%;
+  --drift: 43px;
+  --spin: 487deg;
+  --fall: 66vh;
+  animation-delay: 127ms;
+  background: var(--color-xp);
+}
+.piece:nth-child(20) {
+  --x: 45.5%;
+  --drift: -40px;
+  --spin: -560deg;
+  --fall: 65vh;
+  animation-delay: 180ms;
+  background: var(--color-gold);
+}
+.piece:nth-child(21) {
+  --x: 86.5%;
+  --drift: -3px;
+  --spin: 633deg;
+  --fall: 64vh;
+  animation-delay: 13ms;
+  background: var(--color-primary);
+}
+.piece:nth-child(22) {
+  --x: 30.5%;
+  --drift: 34px;
+  --spin: -706deg;
+  --fall: 63vh;
+  animation-delay: 66ms;
+  background: var(--color-streak);
+}
+.piece:nth-child(23) {
+  --x: 71.5%;
+  --drift: -49px;
+  --spin: 239deg;
+  --fall: 62vh;
+  animation-delay: 119ms;
+  background: var(--color-game-tictactoe);
+}
+.piece:nth-child(24) {
+  --x: 15.5%;
+  --drift: -12px;
+  --spin: -312deg;
+  --fall: 61vh;
+  animation-delay: 172ms;
+  background: var(--color-accent);
+}
+
+/* Level-up: rays burst out behind the new badge, which pops in. */
+.burst {
+  display: grid;
+  place-items: center;
+}
+.burstStage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 16rem;
+  height: 16rem;
+}
+.rays {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--color-gold);
+  opacity: 0;
+  animation: rays var(--duration-celebrate) var(--ease-out) both;
+}
+@keyframes rays {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25) rotate(40deg);
+  }
+}
+.burstBadge {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  animation: burst-out var(--duration-celebrate) var(--ease-in-out) both;
+}
+@keyframes burst-out {
+  0%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.burstLabel {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--text-xl);
+  letter-spacing: 0.04em;
+  color: var(--color-gold);
+  text-shadow: 0 2px 0 var(--color-art-ink);
+}
+
+/* "+30 XP" rises and fades. */
+.xpPop {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-xp);
+  opacity: 0;
+  animation: xp-rise var(--duration-celebrate) var(--ease-spring) both;
+}
+@keyframes xp-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.8);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(0) scale(1.1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-24px) scale(1);
+  }
+}
+
+/* Streak flame: flickers three times, then holds still. */
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-streak);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.flame {
+  width: 1.5em;
+  height: 1.5em;
+  transform-origin: 50% 90%;
+  animation: flicker 900ms var(--ease-in-out) 3;
+}
+@keyframes flicker {
+  30% {
+    transform: scale(1.06, 0.94) rotate(-3deg);
+  }
+  60% {
+    transform: scale(0.95, 1.06) rotate(2deg);
+  }
+}
+.inactive {
+  color: var(--color-text-muted);
+}
+.inactive .flame {
+  animation: none;
+}

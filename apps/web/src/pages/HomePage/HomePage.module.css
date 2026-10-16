@@ -1,40 +1,117 @@
+/* The hero: an arcade marquee panel. Text is white on the gradient (5.6:1 or better on every stop). */
 .hero {
-  padding: var(--space-12) 0 var(--space-8);
-  max-width: 40rem;
+  --color-focus: var(--color-focus-on-hero);
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-12);
+  padding: var(--space-8) var(--space-8) var(--space-6);
+  border-radius: var(--radius-xl);
+  background: var(--gradient-hero);
+  color: var(--color-on-hero);
+  box-shadow: var(--shadow-md), var(--glow-primary);
+  overflow: hidden;
 }
-.hero h1 {
-  font-size: var(--text-2xl);
-  letter-spacing: -0.03em;
+@media (max-width: 48rem) {
+  .hero {
+    grid-template-columns: 1fr;
+    padding: var(--space-6);
+  }
+}
+.heroText h1 {
+  font-size: var(--text-3xl);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+@media (max-width: 30rem) {
+  .heroText h1 {
+    font-size: var(--text-2xl);
+  }
 }
 .lead {
   font-size: var(--text-lg);
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-6);
+  margin: 0 0 var(--space-6);
+}
+.heroArt {
+  aspect-ratio: 400 / 320; /* reserved before the lazy art arrives: no layout jump */
+  width: 100%;
+  max-width: 26rem;
+  justify-self: center;
 }
 .ready {
-  font-weight: 600;
-  color: var(--color-success);
+  display: inline-block;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--color-backdrop);
+  color: var(--color-on-hero);
+  font-weight: 700;
 }
 .error {
+  display: inline-block;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   color: var(--color-danger);
+  font-weight: 700;
 }
+
 .games {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-6);
 }
+/* A game tile: its own accent colour, illustrated, lifts on hover and keyboard focus (the whole tile is the link). */
 .card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-6);
-  box-shadow: var(--shadow-sm);
-}
-.card {
+  --accent: var(--color-primary);
   position: relative;
+  display: grid;
+  gap: var(--space-1);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-bottom-width: 6px;
+  border-bottom-color: var(--accent);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+.rps {
+  --accent: var(--color-game-rps);
+}
+.tictactoe {
+  --accent: var(--color-game-tictactoe);
+}
+.chess {
+  --accent: var(--color-game-chess);
+}
+.primary {
+  --accent: var(--color-primary);
+}
+.card:hover,
+.card:focus-within {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+.cardArt {
+  margin: 0 calc(-1 * var(--space-2)) var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.card:hover .cardArt,
+.card:focus-within .cardArt {
+  transform: scale(1.04);
 }
 .cardLink {
   color: var(--color-text);
@@ -45,16 +122,38 @@
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
 }
-.card:hover {
-  border-color: var(--color-primary);
+.cardLink:focus-visible {
+  outline: none;
+}
+.cardLink:focus-visible::after {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
 }
 .card h3 {
-  margin-bottom: var(--space-2);
+  margin: 0;
+  font-size: var(--text-lg);
 }
 .meta {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+.play {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--color-primary-contrast);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--text-sm);
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+.card:hover .play,
+.card:focus-within .play {
+  transform: scale(1.08);
 }

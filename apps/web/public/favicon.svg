@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- ClassiCade glyph (same drawing as LogoMark in src/art/Logo.jsx): a joystick on an arcade pad. -->
+  <rect x="1" y="1" width="30" height="30" rx="9" fill="#5b4cf0"/>
+  <ellipse cx="16" cy="24" rx="9" ry="3.5" fill="#0b0c1d" opacity="0.35"/>
+  <path d="M16 23 L13 11" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="12.5" cy="9.5" r="5" fill="#ff5fa2"/>
+  <circle cx="11" cy="8" r="1.6" fill="#ffffff" opacity="0.7"/>
+</svg>

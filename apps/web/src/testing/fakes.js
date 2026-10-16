@@ -68,6 +68,18 @@ export const achievement = (overrides = {}) => ({
   ...overrides,
 });
 
+/** A new player's progress, as GET /api/progress returns it. */
+export const PROGRESS = Object.freeze({
+  xp: 0,
+  level: 1,
+  xpIntoLevel: 0,
+  xpForNextLevel: 50,
+  matchesPlayed: 0,
+  wins: 0,
+  losses: 0,
+  draws: 0,
+});
+
 export const unauthorized = () =>
   new AppRequestError({ code: "UNAUTHORIZED", message: "No active session", status: 401 });
 
@@ -80,7 +92,7 @@ export function fakeApi(overrides = {}) {
     endSession: vi.fn().mockResolvedValue({}),
     signup: vi.fn(),
     login: vi.fn(),
-    getProgress: vi.fn(),
+    getProgress: vi.fn().mockResolvedValue(PROGRESS),
     getMatches: vi.fn(),
     getMatch: vi.fn(),
     getAchievements: vi.fn().mockResolvedValue([]),

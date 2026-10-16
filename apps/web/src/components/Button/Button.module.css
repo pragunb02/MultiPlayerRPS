@@ -1,24 +1,35 @@
+/*
+ * Chunky arcade buttons: a solid "base" shadow under the face. Hover lifts the face, pressing pushes it down
+ * onto its base (ADR-012). Reduced motion keeps the look and drops the movement.
+ */
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   cursor: pointer;
   transition:
-    transform var(--duration-fast),
-    background var(--duration-fast);
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
 }
 .button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
+.button:not(:disabled):hover {
+  transform: translateY(-2px);
+}
 .button:not(:disabled):active {
-  transform: scale(0.98);
+  transform: translateY(2px);
+  transition-duration: var(--duration-instant);
 }
 .md {
   padding: var(--space-2) var(--space-4);
@@ -31,13 +42,38 @@
 .primary {
   background: var(--color-primary);
   color: var(--color-primary-contrast);
+  box-shadow: var(--shadow-press);
+}
+.primary:not(:disabled):hover {
+  box-shadow: var(--shadow-press), var(--glow-primary);
+}
+.primary:not(:disabled):active {
+  box-shadow: var(--shadow-press-small);
+}
+.accent {
+  background: var(--color-accent);
+  color: var(--color-primary-contrast);
+  box-shadow: var(--shadow-press-accent);
+}
+.accent:not(:disabled):active {
+  box-shadow: var(--shadow-press-accent-small);
 }
 .secondary {
   background: var(--color-surface);
   color: var(--color-text);
   border-color: var(--color-border);
+  box-shadow: var(--shadow-press-neutral);
+}
+.secondary:not(:disabled):hover {
+  border-color: var(--color-primary);
+}
+.secondary:not(:disabled):active {
+  box-shadow: var(--shadow-press-neutral-small);
 }
 .ghost {
   background: transparent;
   color: var(--color-primary);
+}
+.ghost:not(:disabled):hover {
+  background: var(--color-surface-raised);
 }

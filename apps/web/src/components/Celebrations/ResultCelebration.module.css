@@ -1,0 +1,37 @@
+.celebration {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+}
+/* The result word, stamped in with a bounce (once). */
+.banner {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--text-3xl);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  animation: stamp var(--duration-slow) var(--ease-spring) both;
+}
+.win .banner {
+  color: var(--color-gold);
+  text-shadow: var(--glow-gold);
+}
+.loss .banner {
+  color: var(--color-text-muted);
+}
+.draw .banner,
+.watched .banner {
+  color: var(--color-primary);
+}
+@media (max-width: 30rem) {
+  .banner {
+    font-size: var(--text-2xl);
+  }
+}
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}

@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../lib/errors.js";
-import { fakeApi, GUEST } from "../testing/fakes.js";
+import { fakeApi, GUEST, PROGRESS } from "../testing/fakes.js";
 import { renderApp } from "../testing/render.jsx";
 
 const USER = { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "Riya" };
@@ -13,7 +13,7 @@ describe("LoginPage", () => {
     const api = fakeApi({
       login: async () => ({ identity: USER }),
       getMatches: async () => ({ matches: [] }),
-      getProgress: async () => ({}),
+      getProgress: async () => PROGRESS,
     });
     renderApp({ path: "/login?next=/play/chess", api });
 
@@ -240,7 +240,7 @@ describe("header", () => {
       path: "/profile",
       api: fakeApi({
         getSession: async () => USER,
-        getProgress: async () => ({}),
+        getProgress: async () => PROGRESS,
         getMatches: async () => ({ matches: [] }),
       }),
     });
@@ -304,12 +304,14 @@ describe("ProfilePage", () => {
     });
 
     expect(await screen.findByText("Level 2")).toBeInTheDocument();
+    expect(screen.getByText("Rookie rank")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Progress to next level" })).toHaveAttribute(
       "value",
       "10",
     );
     expect(screen.getByText("10 / 100 XP to level 3 · 60 XP total")).toBeInTheDocument();
     expect(await screen.findByText(/No games yet/)).toBeInTheDocument();
+    expect(screen.getByText(/No games yet/).previousElementSibling).toHaveAttribute("aria-hidden", "true");
   });
 
   it("lists matches with outcomes and loads more pages", async () => {

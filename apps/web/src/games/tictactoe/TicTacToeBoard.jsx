@@ -1,3 +1,5 @@
+import { MarkO } from "../../art/tictactoe/MarkO.jsx";
+import { MarkX } from "../../art/tictactoe/MarkX.jsx";
 import { TurnBanner } from "../../components/TurnBanner/TurnBanner.jsx";
 import { useMove } from "../useMove.js";
 import styles from "./TicTacToeBoard.module.css";
@@ -5,6 +7,13 @@ import styles from "./TicTacToeBoard.module.css";
 const ROWS = ["top", "middle", "bottom"];
 const COLUMNS = ["left", "centre", "right"];
 const cellName = (index) => `${ROWS[Math.floor(index / 3)]} ${COLUMNS[index % 3]}`;
+// Each mark draws itself in when placed; a mark this version doesn't know is shown as its letter.
+const MARKS = Object.freeze({ X: MarkX, O: MarkO });
+
+function Mark({ mark }) {
+  const Drawn = MARKS[mark];
+  return Drawn ? <Drawn className={styles.markArt} /> : mark;
+}
 
 /**
  * Tic-Tac-Toe: a 3×3 grid of buttons. The server decides legality and the result; the board only sends
@@ -39,7 +48,7 @@ export function TicTacToeBoard({ room, onMove }) {
                   disabled={!yourTurn || mark !== ""}
                   onClick={() => move.send({ cell: index })}
                 >
-                  {mark}
+                  <Mark mark={mark} />
                 </button>
               );
             })}

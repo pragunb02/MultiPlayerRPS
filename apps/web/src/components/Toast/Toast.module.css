@@ -1,33 +1,60 @@
+/* Toasts slide in at the top right, under the header. They never take clicks, so they can't cover a button. */
 .region {
   position: fixed;
+  top: 5.5rem;
   right: var(--space-4);
-  bottom: var(--space-4);
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: var(--space-2);
   z-index: 20;
+  pointer-events: none;
 }
 @media (max-width: 30rem) {
   .region {
     left: var(--space-4);
+    align-items: stretch;
   }
 }
 .toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   background: var(--color-surface);
   color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-left-width: 4px;
-  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   box-shadow: var(--shadow-md);
   max-width: 22rem;
+  font-weight: 700;
+  animation: toast-in var(--duration-base) var(--ease-out) both;
+}
+/* A tone-coloured gem in front of the message. */
+.toast::before {
+  content: "";
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 3px;
+  transform: rotate(45deg);
+  background: var(--tone);
 }
 .info {
-  border-left-color: var(--color-primary);
+  --tone: var(--color-xp);
+  border-color: var(--color-xp);
 }
 .success {
-  border-left-color: var(--color-success);
+  --tone: var(--color-success);
+  border-color: var(--color-success);
 }
 .danger {
-  border-left-color: var(--color-danger);
+  --tone: var(--color-danger);
+  border-color: var(--color-danger);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(1.5rem, -0.5rem);
+  }
 }

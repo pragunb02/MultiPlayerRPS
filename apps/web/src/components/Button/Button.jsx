@@ -1,7 +1,7 @@
 import styles from "./Button.module.css";
 
 /**
- * @param {{ variant?: "primary" | "secondary" | "ghost", size?: "md" | "lg", busy?: boolean } & import("react").ButtonHTMLAttributes<HTMLButtonElement>} props
+ * @param {{ variant?: "primary" | "accent" | "secondary" | "ghost", size?: "md" | "lg", busy?: boolean } & import("react").ButtonHTMLAttributes<HTMLButtonElement>} props
  */
 export function Button({
   variant = "primary",

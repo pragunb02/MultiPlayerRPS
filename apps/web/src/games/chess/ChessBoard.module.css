@@ -18,9 +18,10 @@
   grid-template-rows: repeat(8, 1fr);
   aspect-ratio: 1;
   width: 100%;
-  border-radius: var(--radius-sm);
+  border: 6px solid var(--color-game-chess);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md), var(--glow-primary);
   user-select: none;
 }
 .rank {
@@ -43,51 +44,57 @@
   height: 88%;
   pointer-events: none;
 }
+.square:focus-visible {
+  outline-offset: -4px;
+}
 .light {
-  background: #eeeed2;
+  background: var(--color-board-light);
 }
 .dark {
-  background: #769656;
+  background: var(--color-board-dark);
 }
 .last {
-  box-shadow: inset 0 0 0 100vmax rgb(255 220 0 / 35%);
+  box-shadow: inset 0 0 0 100vmax var(--color-board-last);
 }
 .selected {
-  box-shadow: inset 0 0 0 100vmax rgb(91 76 240 / 45%);
+  box-shadow: inset 0 0 0 100vmax var(--color-board-selected);
 }
 .check {
-  box-shadow: inset 0 0 0 100vmax rgb(220 30 60 / 55%);
+  box-shadow: inset 0 0 0 100vmax var(--color-board-check);
 }
 .target::after {
   content: "";
   width: 28%;
   height: 28%;
   border-radius: 50%;
-  background: rgb(20 20 50 / 35%);
+  background: var(--color-board-hint);
 }
 .capture::after {
   content: "";
   position: absolute;
   inset: 4%;
   border-radius: 50%;
-  border: 4px solid rgb(20 20 50 / 35%);
+  border: 4px solid var(--color-board-hint);
 }
 .clock {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border);
+  font-weight: 700;
 }
 .running {
   border-color: var(--color-primary);
+  box-shadow: var(--glow-primary);
 }
 .time {
   font-family: var(--font-mono);
   font-size: var(--text-lg);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .running .time {
   color: var(--color-primary);
@@ -96,8 +103,9 @@
   display: grid;
   gap: var(--space-3);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  border-top: 6px solid var(--color-game-chess);
+  border-radius: var(--radius-xl);
   padding: var(--space-4);
 }
 .panelTitle {

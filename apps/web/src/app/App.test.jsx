@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fakeApi, GUEST } from "../testing/fakes.js";
 import { renderApp } from "../testing/render.jsx";
 
@@ -15,6 +15,40 @@ describe("App", () => {
         .getAllByRole("listitem")
         .map((li) => within(li).getByRole("heading").textContent),
     ).toEqual(["Rock Paper Scissors", "Chess"]);
+  });
+
+  it("illustrates each game card with its art and accent, keeping the game's name as the link", async () => {
+    renderApp();
+
+    const games = await screen.findByRole("list");
+    const [rps, chess] = within(games).getAllByRole("listitem");
+    expect(rps).toHaveClass("rps");
+    expect(chess).toHaveClass("chess");
+    expect(rps.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(within(rps).getByRole("link")).toHaveAccessibleName("Rock Paper Scissors");
+  });
+
+  it("gives a game this build has no art for the joystick and the default accent", async () => {
+    renderApp({
+      api: fakeApi({
+        getGames: async () => [{ id: "ludo", slug: "ludo", name: "Ludo", minPlayers: 2, maxPlayers: 4 }],
+      }),
+    });
+
+    expect((await screen.findByRole("listitem")).className).toContain("primary");
+  });
+
+  it("shows the arcade scene in the hero once it has loaded", async () => {
+    const { container } = renderApp();
+
+    await vi.waitFor(() => expect(container.querySelector(".heroArt svg")).not.toBeNull());
+  });
+
+  it("brands the header with the logo, named by its link", () => {
+    renderApp();
+
+    const home = screen.getByRole("link", { name: "ClassiCade home" });
+    expect(home.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("starts playing as a guest in one click", async () => {
@@ -67,6 +101,7 @@ describe("App", () => {
     renderApp({ path: "/nope" });
 
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /game over, page not found/ })).toBeInTheDocument();
   });
 
   it("offers a skip link to the main content (keyboard users)", () => {

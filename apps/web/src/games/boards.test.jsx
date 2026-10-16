@@ -93,6 +93,37 @@ describe("RpsBoard", () => {
     expect(screen.getByTitle("Riya: lizard")).toHaveTextContent("?");
   });
 
+  it("plays the last round out as two hands, hidden from screen readers", () => {
+    const { container } = render(<RpsBoard room={room(rpsView())} onMove={vi.fn()} />);
+
+    const reveal = container.querySelector(".reveal");
+    expect(reveal).toHaveAttribute("aria-hidden", "true");
+    expect([...reveal.querySelectorAll(".who")].map((who) => who.textContent)).toEqual(["You", "Riya"]);
+    expect(reveal.querySelectorAll(".shaker")).toHaveLength(2);
+    expect(reveal.querySelectorAll(".shown")).toHaveLength(2);
+    expect(reveal.children[1]).toHaveClass("mirrored");
+  });
+
+  it("shows no reveal before the first round, and '?' in it for an unknown choice", () => {
+    const first = render(<RpsBoard room={room(rpsView({ rounds: [] }))} onMove={vi.fn()} />);
+    expect(first.container.querySelector(".reveal")).toBeNull();
+    first.unmount();
+
+    const view = rpsView({ rounds: [{ choices: { [ME]: "rock", [THEM]: "lizard" }, winner: THEM }] });
+    const { container } = render(<RpsBoard room={room(view)} onMove={vi.fn()} />);
+
+    expect(container.querySelector(".reveal").children[1]).toHaveTextContent("?");
+  });
+
+  it("draws each move button with its hand, keeping the word as its name", () => {
+    render(<RpsBoard room={room(rpsView())} onMove={vi.fn()} />);
+
+    for (const name of ["Rock", "Paper", "Scissors"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    }
+  });
+
   it("hides the choices once the match is over, keeping the history", () => {
     render(<RpsBoard room={room(rpsView(), { status: "finished" })} onMove={vi.fn()} />);
 
@@ -171,6 +202,18 @@ describe("TicTacToeBoard", () => {
     );
 
     expect(container.querySelectorAll(".win")).toHaveLength(3);
+  });
+
+  it("draws X and O as art that draws itself in, and a mark it doesn't know as its letter", () => {
+    const view = tttView({ board: ["X", "O", "Z", "", "", "", "", "", ""] });
+    render(<TicTacToeBoard room={room(view)} onMove={vi.fn()} />);
+
+    const svgIn = (name) => screen.getByRole("gridcell", { name }).querySelector("svg");
+    expect(svgIn("top left: X")).toHaveAttribute("aria-hidden", "true");
+    expect(svgIn("top left: X").querySelectorAll(".draw")).toHaveLength(2);
+    expect(svgIn("top centre: O").querySelector("circle")).toHaveClass("draw");
+    expect(screen.getByRole("gridcell", { name: "top right: Z" })).toHaveTextContent("Z");
+    expect(svgIn("middle left: empty")).toBeNull();
   });
 });
 

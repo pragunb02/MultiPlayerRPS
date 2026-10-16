@@ -1,0 +1,30 @@
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+/* Glyph colours: the glyphs paint with currentColor. */
+.rps {
+  color: var(--color-game-rps);
+}
+.tictactoe {
+  color: var(--color-game-tictactoe);
+}
+.chess {
+  color: var(--color-game-chess);
+}
+.primary {
+  color: var(--color-primary);
+}
+.accent {
+  color: var(--color-accent);
+}
+.gold {
+  color: var(--color-gold);
+}

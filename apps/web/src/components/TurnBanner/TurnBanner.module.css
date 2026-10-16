@@ -4,10 +4,19 @@
   border-radius: var(--radius-full);
   background: var(--color-surface-raised);
   color: var(--color-text-muted);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 800;
   justify-self: start;
 }
+/* Your turn: lit up, with one springy pop when it becomes yours. */
 .yours {
   background: var(--color-primary);
   color: var(--color-primary-contrast);
+  box-shadow: var(--glow-primary);
+  animation: turn-pop var(--duration-slow) var(--ease-spring);
+}
+@keyframes turn-pop {
+  from {
+    transform: scale(0.9);
+  }
 }
