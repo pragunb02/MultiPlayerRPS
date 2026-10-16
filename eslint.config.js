@@ -64,7 +64,7 @@ module.exports = [
     files: ["apps/server/**/*.js", "packages/**/*.js", "*.mjs"],
     languageOptions: { sourceType: "module", globals: globals.node },
     rules: {
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", ignoreRestSiblings: true }],
       eqeqeq: "error",
       "no-var": "error",
       "prefer-const": "error",

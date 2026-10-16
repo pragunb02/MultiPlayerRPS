@@ -152,13 +152,15 @@ Rules:
 1. **Test behaviour through the public API**, not private helpers or internal state.
 2. **One behaviour per test**, named as a sentence: `it("rejects a move when it is not the player's turn")`.
 3. **Arrange – Act – Assert**, visibly separated. Build inputs with small factory helpers, not copy-pasted literals.
-4. **Deterministic.** Inject clock, RNG and id generators; use fake timers. No real network or sleeps in unit tests.
-5. **Fakes over mocks.** For our own layers use simple in-memory fakes (e.g. a fake accessor). Use spies/mocks only to assert an interaction that _is_ the behaviour (e.g. "emits `levelUp`").
-6. **Assert errors by type**: `expect(() => fn()).toThrow(NotFoundError)` / `await expect(p).rejects.toThrow(...)`.
-7. **Every bug fix starts with a failing test** that reproduces it.
-8. **Cover edges**: empty, boundary, invalid, duplicate, concurrent/out-of-order where relevant.
-9. **Coverage gates** (enforced by `npm run test:coverage`, run in CI from CC-027):
-   `packages/games` ≥ 90 % lines and branches · rest of new code ≥ 80 %. Coverage is a floor, not the goal.
+4. **Deterministic.** Inject clock, RNG and id generators; use fake timers. No real network or sleeps in unit tests; in integration tests, poll for a condition instead of sleeping a fixed time.
+5. **Test doubles of our own storage honour the real contract.** An in-memory DAO used in tests must pass the same
+   contract suite as the real DAO (e.g. `testing/matchDaoContract.js` runs against MongoDB and the double), so the double can never drift.
+6. **Fakes over mocks.** For our own layers use simple in-memory fakes (e.g. a fake accessor). Use spies/mocks only to assert an interaction that _is_ the behaviour (e.g. "emits `levelUp`").
+7. **Assert errors by type**: `expect(() => fn()).toThrow(NotFoundError)` / `await expect(p).rejects.toThrow(...)`.
+8. **Every bug fix starts with a failing test** that reproduces it.
+9. **Cover edges**: empty, boundary, invalid, duplicate, concurrent/out-of-order where relevant.
+10. **Coverage gates** (enforced by `npm run test:coverage`, run in CI from CC-027):
+    `packages/games` ≥ 90 % lines and branches · rest of new code ≥ 80 %. Coverage is a floor, not the goal.
 
 ---
 

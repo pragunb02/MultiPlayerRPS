@@ -55,7 +55,7 @@ packages/
 tests live next to code: *.test.js (unit), *.integration.test.js
 ```
 
-Status: `index.js`, `server.js`, `config/`, `service/http/`, `service/realtime/` (gateway, room handlers, payloads), `domain/identity/`, `domain/rooms/`, `data/` (room accessor), `persistence/` (database, session store, in-memory room DAO), `models/` (identity, room code), `utils/` exist (CC-011…CC-015); other folders arrive with their tickets.
+Status: composition root, config, `service/http/` (sessions, matches), `service/realtime/` (gateway, rooms), `domain/` (identity, rooms, matches), `data/` (room + match accessors), `persistence/` (database, session store, in-memory room DAO, MongoDB match DAO), `models/`, `utils/` exist (CC-011…CC-020, CC-016).
 
 ### Game engine contract (implemented — `packages/games/src/engine.js`, CC-014)
 
@@ -87,7 +87,7 @@ rejections, full playthrough without mutation, game-over refusal, and identical 
 ### Data model (target, draft)
 
 - `users` — id, username, email, passwordHash, avatar, xp, level, createdAt, flags (guest, banned, admin)
-- `matches` — id, game, options, players[{userId, seat, ratingBefore/After}], moves[], result, startedAt, endedAt, rated
+- `matches` (implemented, CC-016) — matchId, roomCode, gameId, options, seed, players[{playerId, displayName}], log[{kind, playerId?, move?, at}], result{result, winners, reason}, startedAt, endedAt, schemaVersion; replayable with `replayGame()`. Ratings fields arrive with CC-042.
 - `ratings` — userId, game, rating, rd, volatility
 - `sessions` — managed by session store
 

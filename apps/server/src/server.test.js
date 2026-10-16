@@ -1,6 +1,12 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assertEnginesInCatalog, handleFatalErrors, handleShutdownSignals } from "./server.js";
+import {
+  assertEnginesInCatalog,
+  handleFatalErrors,
+  handleShutdownSignals,
+  recordFinishedMatches,
+} from "./server.js";
+import { ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
 import { captureLogger } from "./testing/captureLogger.js";
 
 const fakeProcess = () => Object.assign(new EventEmitter(), { exit: vi.fn() });
@@ -90,5 +96,62 @@ describe("assertEnginesInCatalog", () => {
     expect(() => assertEnginesInCatalog([{ id: "rps" }, { id: "race" }])).toThrow(
       /missing from the game catalog: race/,
     );
+  });
+});
+
+describe("recordFinishedMatches", () => {
+  const event = { room: { code: "ROOM22" }, outcome: {} };
+
+  it("records each finished game in the background and logs it", async () => {
+    const domainEvents = new EventEmitter();
+    const { logger, find } = captureLogger();
+    const recordFinished = vi
+      .fn()
+      .mockResolvedValue({ matchId: "m1", gameId: "rps", result: { reason: "best-of-1" } });
+    const recorder = recordFinishedMatches({ domainEvents, matchComponent: { recordFinished }, logger });
+
+    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
+    await recorder.drain();
+
+    expect(recordFinished).toHaveBeenCalledWith(event);
+    expect(find("match recorded")[0]).toEqual(expect.objectContaining({ matchId: "m1", gameId: "rps" }));
+  });
+
+  it("logs a failed write instead of crashing the game", async () => {
+    const domainEvents = new EventEmitter();
+    const { logger, find } = captureLogger();
+    const recorder = recordFinishedMatches({
+      domainEvents,
+      matchComponent: { recordFinished: vi.fn().mockRejectedValue(new Error("db down")) },
+      logger,
+    });
+
+    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
+    await recorder.drain();
+
+    expect(find("failed to record match")[0]).toEqual(
+      expect.objectContaining({ roomCode: "ROOM22", level: 50 }),
+    );
+  });
+
+  it("lets shutdown wait for writes still in flight", async () => {
+    const domainEvents = new EventEmitter();
+    let finishWrite;
+    const recordFinished = () => new Promise((resolve) => (finishWrite = resolve));
+    const recorder = recordFinishedMatches({
+      domainEvents,
+      matchComponent: { recordFinished },
+      logger: captureLogger().logger,
+    });
+    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
+    let drained = false;
+
+    const draining = recorder.drain().then(() => (drained = true));
+    await Promise.resolve();
+    expect(drained).toBe(false);
+    finishWrite({ matchId: "m1", gameId: "rps", result: { reason: "x" } });
+    await draining;
+
+    expect(drained).toBe(true);
   });
 });

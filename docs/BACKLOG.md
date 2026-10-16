@@ -62,7 +62,7 @@ and don't encode the stage — a ticket can move between stages without changing
 | [CC-013](tickets/CC-013.md) | Socket auth via shared session; identity from session only (guests get session identity)                                                           | security | P0  | ✅ Done | SEC-01, SEC-03, FR-ROOM-3                             |
 | [CC-014](tickets/CC-014.md) | `GameEngine` interface + typed socket event contracts                                                                                              | feature  | P1  | ✅ Done | FR-GAME-1                                             |
 | [CC-015](tickets/CC-015.md) | `RoomManager`: create/join/leave, secure room codes, expiry/cleanup, disconnect handling                                                           | feature  | P1  | ✅ Done | FR-ROOM-1/2/5, SEC-08, BUG-10, BUG-13, BUG-14, BUG-09 |
-| CC-016                      | Unified `matches` model + repository; migrate away from 3 legacy models                                                                            | debt     | P1  | ⬜ Todo | FR-ROOM-8, DEBT-04                                    |
+| [CC-016](tickets/CC-016.md) | Unified `matches` model + repository; migrate away from 3 legacy models                                                                            | debt     | P1  | ✅ Done | FR-ROOM-8, DEBT-04                                    |
 | CC-017                      | Progression service: XP/level on match completion only; level-up event wired                                                                       | bug      | P1  | ⬜ Todo | FR-PROG-1, BUG-02, BUG-05, BUG-08                     |
 
 ### 0.D Port games (server-authoritative, unit tested)

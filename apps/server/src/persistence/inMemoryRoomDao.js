@@ -6,8 +6,9 @@
  * Persistence objects are plain JSON; every read and write is a deep copy, so callers can never mutate
  * stored state by accident.
  */
-export class VersionConflict extends Error {}
-export class DuplicateKey extends Error {}
+import { DuplicateKey, VersionConflict } from "./errors.js";
+
+export { DuplicateKey, VersionConflict };
 
 export function createInMemoryRoomDao() {
   /** @type {Map<string, object>} */
