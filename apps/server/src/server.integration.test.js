@@ -64,8 +64,8 @@ describe("startServer (integration)", () => {
   it("serves requests and closes the HTTP server and database cleanly", async () => {
     const app = await start();
 
-    const res = await fetch(`${app.url}/api/health`);
-    expect(await res.json()).toEqual({ status: "ok" });
+    const res = await fetch(`${app.url}/health`);
+    expect(await res.json()).toEqual({ status: "ok", database: "up" });
 
     await app.close();
     expect(app.server.listening).toBe(false);

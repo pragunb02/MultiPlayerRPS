@@ -1,3 +1,4 @@
+import path from "node:path";
 import { LOG_LEVELS } from "../utils/logger.js";
 
 const NODE_ENVS = ["development", "test", "production"];
@@ -13,7 +14,7 @@ const DEV_ALLOWED_ORIGINS = ["http://localhost:4000", "http://localhost:5173"];
  * @property {string} mongoUri
  * @property {string} sessionSecret
  * @property {ReadonlyArray<string>} allowedOrigins  browser origins allowed to open realtime connections and send state-changing requests
- * @property {string} webDistDir      built web app to serve ("" = API only, e.g. in development with Vite)
+ * @property {string} webDistDir      absolute path of the built web app to serve ("" = API only, e.g. in development with Vite)
  */
 
 /**
@@ -61,6 +62,9 @@ export function loadConfig(env) {
   const webDistDir = env.WEB_DIST_DIR ?? "";
   if (env.WEB_DIST_DIR !== undefined && webDistDir.trim() === "") {
     errors.push("WEB_DIST_DIR, when set, must be a directory path");
+  } else if (isProduction && webDistDir === "") {
+    // In production this server is the website: without the build it would answer every page with a 404.
+    errors.push("WEB_DIST_DIR is required in production");
   }
 
   if (errors.length > 0) {
@@ -75,7 +79,8 @@ export function loadConfig(env) {
     mongoUri,
     sessionSecret,
     allowedOrigins,
-    webDistDir,
+    // Relative paths are taken from the working directory; Express can only send files by absolute path.
+    webDistDir: webDistDir === "" ? "" : path.resolve(webDistDir),
   });
 }
 

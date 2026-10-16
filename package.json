@@ -12,7 +12,7 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "node index.js",
+    "start": "node apps/server/src/index.js",
     "dev": "node --watch index.js",
     "dev:server": "npm run dev -w @classicade/server",
     "start:server": "npm start -w @classicade/server",

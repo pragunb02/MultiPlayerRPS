@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { TEST_ENV } from "../testing/testConfig.js";
 import { loadConfig } from "./index.js";
@@ -29,6 +30,7 @@ describe("loadConfig", () => {
       LOG_LEVEL: "warn",
       MONGO_URI: "mongodb+srv://cluster.example.net/classicade",
       ALLOWED_ORIGINS: "https://classicade.app, https://www.classicade.app",
+      WEB_DIST_DIR: "apps/web/dist",
     });
 
     expect(config).toEqual(
@@ -39,8 +41,16 @@ describe("loadConfig", () => {
         logLevel: "warn",
         mongoUri: "mongodb+srv://cluster.example.net/classicade",
         allowedOrigins: ["https://classicade.app", "https://www.classicade.app"],
+        webDistDir: path.resolve("apps/web/dist"),
       }),
     );
+  });
+
+  it("resolves a relative WEB_DIST_DIR against the working directory", () => {
+    const { webDistDir } = loadConfig({ ...REQUIRED, WEB_DIST_DIR: "apps/web/dist" });
+
+    expect(webDistDir).toBe(path.join(process.cwd(), "apps", "web", "dist"));
+    expect(loadConfig({ ...REQUIRED, WEB_DIST_DIR: "/srv/web" }).webDistDir).toBe("/srv/web");
   });
 
   it("silences logs by default in tests, but honours an explicit LOG_LEVEL", () => {
@@ -59,6 +69,10 @@ describe("loadConfig", () => {
     [{ ALLOWED_ORIGINS: "ftp://classicade.app" }, /ALLOWED_ORIGINS must be/],
     [{ ALLOWED_ORIGINS: " , " }, /ALLOWED_ORIGINS must be/],
     [{ WEB_DIST_DIR: "  " }, /WEB_DIST_DIR, when set, must be a directory path/],
+    [
+      { NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app" },
+      /WEB_DIST_DIR is required in production/,
+    ],
   ])("rejects %o", (overrides, message) => {
     expect(() => loadConfig({ ...REQUIRED, ...overrides })).toThrow(message);
   });

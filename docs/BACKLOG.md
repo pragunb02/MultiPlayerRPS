@@ -85,12 +85,12 @@ and don't encode the stage — a ticket can move between stages without changing
 
 ### 0.F Delivery
 
-| ID     | Title                                                                       | Type  | Pri | Status  | Links            |
-| ------ | --------------------------------------------------------------------------- | ----- | --- | ------- | ---------------- |
-| CC-026 | Dockerfile + docker-compose (app + Mongo) for local dev                     | infra | P1  | ⬜ Todo |                  |
-| CC-027 | CI: lint, test, build on every push                                         | infra | P1  | ⬜ Todo | DEBT-09          |
-| CC-028 | Resolve ADR-005; deploy staging environment                                 | infra | P1  | ⬜ Todo |                  |
-| CC-029 | Delete legacy files (`index.js` handlers, `client/*`, old models, `hw.txt`) | debt  | P1  | ⬜ Todo | DEBT-05, DEBT-08 |
+| ID                          | Title                                                                                                        | Type  | Pri | Status         | Links            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ | ----- | --- | -------------- | ---------------- |
+| CC-026                      | Dockerfile + docker-compose (app + Mongo) for local dev                                                      | infra | P1  | ⬜ Todo        |                  |
+| CC-027                      | CI: lint, test, build on every push                                                                          | infra | P1  | ⬜ Todo        | DEBT-09          |
+| CC-028                      | Resolve ADR-005; deploy staging environment                                                                  | infra | P1  | ⬜ Todo        |                  |
+| [CC-029](tickets/CC-029.md) | Production cutover to the new stack, then delete legacy files (`index.js`, `client/*`, old models, `hw.txt`) | debt  | P1  | 🟦 In progress | DEBT-05, DEBT-08 |
 
 ### 0.G Follow-ups found during Stage 0
 
