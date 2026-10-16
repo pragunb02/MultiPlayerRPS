@@ -18,6 +18,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-6);
+  min-height: 4.5rem; /* same height signed in or out (no layout jump) */
   padding: var(--space-4) var(--space-6);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
@@ -43,8 +44,27 @@
 }
 .identity {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+.identity a {
+  font-weight: 600;
+  text-decoration: none;
+}
+.cta {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-primary-contrast) !important;
+}
+@media (max-width: 30rem) {
+  .header {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
 }
 .main {
   width: 100%;
