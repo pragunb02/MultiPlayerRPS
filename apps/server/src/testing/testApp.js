@@ -54,6 +54,7 @@ import { testConfig } from "./testConfig.js";
  *   transferParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who
  *     takes part in moving a guest's data (e.g. one that fails)
  *   leaderboardLimit?: { windowMs: number, limit: number },
+ *   apiLimit?: { windowMs: number, limit: number },
  *   now?: () => number,
  * }} [options]
  */
@@ -66,6 +67,7 @@ export function createTestApp({
   isDatabaseUp = () => true,
   transferParticipants = (participants) => participants,
   leaderboardLimit,
+  apiLimit,
   now = Date.now,
 } = {}) {
   const config = testConfig(env);
@@ -156,6 +158,7 @@ export function createTestApp({
     now,
     leaderboardComponent,
     leaderboardLimit,
+    apiLimit,
     onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);

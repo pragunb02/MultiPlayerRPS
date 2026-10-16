@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { rateLimit } from "express-rate-limit";
-import { ERROR_CODES, LEADERBOARD_MAX_ENTRIES } from "@classicade/shared";
+import { LEADERBOARD_MAX_ENTRIES } from "@classicade/shared";
 import { assertDefined } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
+import { createRateLimit } from "./rateLimits.js";
 import { requireIdentity } from "./session.js";
 
 // Public reads: generous for people browsing, but a scraper looping on them is slowed down.
@@ -41,19 +41,7 @@ function parseQuery(query) {
 export function createLeaderboardRoutes({ leaderboardComponent, limit = DEFAULT_LIMIT, now = Date.now }) {
   assertDefined(leaderboardComponent, "leaderboardComponent");
   const router = Router();
-  const readLimit = rateLimit({
-    ...limit,
-    standardHeaders: "draft-7",
-    legacyHeaders: false,
-    handler: (req, res) =>
-      res.status(429).json({
-        error: {
-          code: ERROR_CODES.RATE_LIMITED,
-          message: "Too many requests, try again later",
-          requestId: req.id,
-        },
-      }),
-  });
+  const readLimit = createRateLimit({ ...limit, message: "Too many requests, try again later" });
 
   router.get("/leaderboards", readLimit, (req, res) => {
     res.json({ boards: leaderboardComponent.listBoards() });

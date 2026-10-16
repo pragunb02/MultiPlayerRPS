@@ -2,6 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
+import { createApiRateLimit, DEFAULT_API_LIMIT } from "./rateLimits.js";
 import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createRequestLogger } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
@@ -26,6 +27,7 @@ import { createWebAppRouter } from "./webApp.js";
  *   guestLimit?: { windowMs: number, limit: number },
  *   leaderboardComponent: ReturnType<typeof import("../../domain/leaderboards/leaderboardComponent.js").createLeaderboardComponent>,
  *   leaderboardLimit?: { windowMs: number, limit: number },
+ *   apiLimit?: { windowMs: number, limit: number },   the budget for all of /api together, per session or address
  *   isDatabaseUp: () => boolean,
  *   now?: () => number,   the clock for date-dependent answers (daily quests); tests pick a day
  * }} deps
@@ -45,6 +47,7 @@ export function createHttpApp({
   guestLimit,
   leaderboardComponent,
   leaderboardLimit,
+  apiLimit = DEFAULT_API_LIMIT,
   isDatabaseUp,
   now = Date.now,
 }) {
@@ -56,9 +59,10 @@ export function createHttpApp({
   const app = express();
 
   app.disable("x-powered-by");
-  if (config.isProduction) {
-    app.set("trust proxy", 1);
-  }
+  // Rate limits key on req.ip, and Express finds it by counting this many proxies in from the right of
+  // X-Forwarded-For. Zero means the header is ignored. The number comes from TRUST_PROXY_HOPS (see DEPLOYMENT.md).
+  app.set("trust proxy", config.trustProxyHops === 0 ? false : config.trustProxyHops);
+  logger.info({ trustProxyHops: config.trustProxyHops }, "client addresses read through trusted proxies");
   app.use(createRequestLogger({ logger }));
   app.use(
     helmet({
@@ -76,6 +80,8 @@ export function createHttpApp({
   app.use(express.json({ limit: "100kb" }));
   app.use("/api", createCsrfGuard({ allowedOrigins: config.allowedOrigins }));
   app.use("/api", sessionMiddleware);
+  // After the session, so a signed-in or guest player is counted by session rather than by address.
+  app.use("/api", createApiRateLimit(apiLimit));
 
   app.use(
     "/api",

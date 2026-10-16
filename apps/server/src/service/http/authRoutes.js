@@ -1,8 +1,7 @@
 import { Router } from "express";
-import { ipKeyGenerator, rateLimit } from "express-rate-limit";
-import { ERROR_CODES } from "@classicade/shared";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
+import { clientIpKey, createRateLimit } from "./rateLimits.js";
 import { establishSession } from "./session.js";
 
 const DEFAULT_LIMITS = Object.freeze({
@@ -28,14 +27,7 @@ function requireFields(body, fields) {
   return body;
 }
 
-const tooMany = (req, res) =>
-  res.status(429).json({
-    error: {
-      code: ERROR_CODES.RATE_LIMITED,
-      message: "Too many attempts, try again later",
-      requestId: req.id,
-    },
-  });
+const TOO_MANY_ATTEMPTS = "Too many attempts, try again later";
 
 /**
  * Accounts over HTTP. Logout is `DELETE /api/session`, "who am I" is `GET /api/session`.
@@ -68,23 +60,15 @@ export function createAuthRoutes({
   assertFunction(onIdentityChanged, "onIdentityChanged");
   const router = Router();
 
-  const perIp = rateLimit({
-    ...limits.perIp,
-    standardHeaders: "draft-7",
-    legacyHeaders: false,
-    handler: tooMany,
-  });
+  const perIp = createRateLimit({ ...limits.perIp, message: TOO_MANY_ATTEMPTS });
   // Stops guessing one account's password from many IPs: only failed logins count, keyed by the email tried.
-  const failedLoginsPerEmail = rateLimit({
+  const failedLoginsPerEmail = createRateLimit({
     ...limits.failedLoginsPerEmail,
+    message: TOO_MANY_ATTEMPTS,
     skipSuccessfulRequests: true,
-    standardHeaders: false,
-    legacyHeaders: false,
+    headers: false,
     keyGenerator: (req) =>
-      typeof req.body?.email === "string"
-        ? `email:${req.body.email.trim().toLowerCase()}`
-        : ipKeyGenerator(req.ip),
-    handler: tooMany,
+      typeof req.body?.email === "string" ? `email:${req.body.email.trim().toLowerCase()}` : clientIpKey(req),
   });
 
   async function signIn(req, res, identity, status) {

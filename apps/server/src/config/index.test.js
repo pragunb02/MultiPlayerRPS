@@ -19,6 +19,7 @@ describe("loadConfig", () => {
       sessionSecret: REQUIRED.SESSION_SECRET,
       allowedOrigins: ["http://localhost:4000", "http://localhost:5173"],
       webDistDir: "",
+      trustProxyHops: 0,
     });
   });
 
@@ -31,6 +32,7 @@ describe("loadConfig", () => {
       MONGO_URI: "mongodb+srv://cluster.example.net/classicade",
       ALLOWED_ORIGINS: "https://classicade.app, https://www.classicade.app",
       WEB_DIST_DIR: "apps/web/dist",
+      TRUST_PROXY_HOPS: "2",
     });
 
     expect(config).toEqual(
@@ -42,6 +44,7 @@ describe("loadConfig", () => {
         mongoUri: "mongodb+srv://cluster.example.net/classicade",
         allowedOrigins: ["https://classicade.app", "https://www.classicade.app"],
         webDistDir: path.resolve("apps/web/dist"),
+        trustProxyHops: 2,
       }),
     );
   });
@@ -58,6 +61,19 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...REQUIRED, NODE_ENV: "test", LOG_LEVEL: "debug" }).logLevel).toBe("debug");
   });
 
+  it("trusts one proxy by default in production and none elsewhere", () => {
+    const production = {
+      NODE_ENV: "production",
+      ALLOWED_ORIGINS: "https://classicade.app",
+      WEB_DIST_DIR: "/srv",
+    };
+
+    expect(loadConfig({ ...REQUIRED, ...production }).trustProxyHops).toBe(1);
+    expect(loadConfig({ ...REQUIRED, NODE_ENV: "test" }).trustProxyHops).toBe(0);
+    expect(loadConfig({ ...REQUIRED, TRUST_PROXY_HOPS: "0" }).trustProxyHops).toBe(0);
+    expect(loadConfig({ ...REQUIRED, TRUST_PROXY_HOPS: " 5 " }).trustProxyHops).toBe(5);
+  });
+
   it.each([
     [{ MONGO_URI: undefined }, /MONGO_URI is required/],
     [{ MONGO_URI: "postgres://db" }, /MONGO_URI is required/],
@@ -68,6 +84,20 @@ describe("loadConfig", () => {
     [{ ALLOWED_ORIGINS: "https://classicade.app/path" }, /ALLOWED_ORIGINS must be/],
     [{ ALLOWED_ORIGINS: "ftp://classicade.app" }, /ALLOWED_ORIGINS must be/],
     [{ ALLOWED_ORIGINS: " , " }, /ALLOWED_ORIGINS must be/],
+    [{ TRUST_PROXY_HOPS: "6" }, /TRUST_PROXY_HOPS must be a whole number from 0 to 5 \(got "6"\)/],
+    [{ TRUST_PROXY_HOPS: "-1" }, /TRUST_PROXY_HOPS must be/],
+    [{ TRUST_PROXY_HOPS: "1.5" }, /TRUST_PROXY_HOPS must be/],
+    [{ TRUST_PROXY_HOPS: "true" }, /TRUST_PROXY_HOPS must be/],
+    [{ TRUST_PROXY_HOPS: "" }, /TRUST_PROXY_HOPS must be/],
+    [
+      {
+        NODE_ENV: "production",
+        ALLOWED_ORIGINS: "https://classicade.app",
+        WEB_DIST_DIR: "/srv",
+        TRUST_PROXY_HOPS: "0",
+      },
+      /TRUST_PROXY_HOPS must be a whole number from 1 to 5 in production/,
+    ],
     [{ WEB_DIST_DIR: "  " }, /WEB_DIST_DIR, when set, must be a directory path/],
     [
       { NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app" },

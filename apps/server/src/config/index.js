@@ -4,6 +4,7 @@ import { LOG_LEVELS } from "../utils/logger.js";
 const NODE_ENVS = ["development", "test", "production"];
 const MIN_SESSION_SECRET_LENGTH = 32;
 const DEV_ALLOWED_ORIGINS = ["http://localhost:4000", "http://localhost:5173"];
+const MAX_TRUST_PROXY_HOPS = 5;
 
 /**
  * @typedef {Object} Config
@@ -15,6 +16,7 @@ const DEV_ALLOWED_ORIGINS = ["http://localhost:4000", "http://localhost:5173"];
  * @property {string} sessionSecret
  * @property {ReadonlyArray<string>} allowedOrigins  browser origins allowed to open realtime connections and send state-changing requests
  * @property {string} webDistDir      absolute path of the built web app to serve ("" = API only, e.g. in development with Vite)
+ * @property {number} trustProxyHops  how many proxies in front of the server add to X-Forwarded-For (0 = none, trust no header)
  */
 
 /**
@@ -23,7 +25,8 @@ const DEV_ALLOWED_ORIGINS = ["http://localhost:4000", "http://localhost:5173"];
  *
  * Required: MONGO_URI, SESSION_SECRET (≥ 32 chars); ALLOWED_ORIGINS in production.
  * Documented defaults: NODE_ENV=development, PORT=4000, LOG_LEVEL=info (silent when NODE_ENV=test),
- * ALLOWED_ORIGINS=http://localhost:4000,http://localhost:5173 outside production. Optional: WEB_DIST_DIR (serve the built web app).
+ * ALLOWED_ORIGINS=http://localhost:4000,http://localhost:5173 outside production,
+ * TRUST_PROXY_HOPS=1 in production and 0 elsewhere. Optional: WEB_DIST_DIR (serve the built web app).
  *
  * @param {Record<string, string | undefined>} env
  * @returns {Readonly<Config>}
@@ -67,6 +70,8 @@ export function loadConfig(env) {
     errors.push("WEB_DIST_DIR is required in production");
   }
 
+  const trustProxyHops = parseTrustProxyHops(env.TRUST_PROXY_HOPS, { isProduction, errors });
+
   if (errors.length > 0) {
     throw new Error(`Invalid configuration:\n  - ${errors.join("\n  - ")}`);
   }
@@ -81,7 +86,34 @@ export function loadConfig(env) {
     allowedOrigins,
     // Relative paths are taken from the working directory; Express can only send files by absolute path.
     webDistDir: webDistDir === "" ? "" : path.resolve(webDistDir),
+    trustProxyHops,
   });
+}
+
+/**
+ * The number of proxies between the player and this server. Each one adds an address to the right end of
+ * X-Forwarded-For, and the server counts that many entries in from the right to find the player. A number that is
+ * too high lets a player write their own address into the header and pick their own rate limit key, so the default
+ * is the smallest number that is always true. Production needs at least 1, because HTTPS ends at the hosting
+ * platform's proxy and secure cookies depend on trusting it (see DEPLOYMENT.md).
+ *
+ * @param {string | undefined} raw  a whole number, for example "2"
+ * @param {{ isProduction: boolean, errors: string[] }} context
+ * @returns {number}
+ */
+function parseTrustProxyHops(raw, { isProduction, errors }) {
+  const minimum = isProduction ? 1 : 0;
+  if (raw === undefined) {
+    return minimum;
+  }
+  const hops = /^\d+$/.test(raw.trim()) ? Number(raw) : Number.NaN;
+  if (!(hops >= minimum && hops <= MAX_TRUST_PROXY_HOPS)) {
+    errors.push(
+      `TRUST_PROXY_HOPS must be a whole number from ${minimum} to ${MAX_TRUST_PROXY_HOPS}${isProduction ? " in production" : ""} (got "${raw}")`,
+    );
+    return minimum;
+  }
+  return hops;
 }
 
 /**
