@@ -124,6 +124,47 @@ describe("startServer (integration)", () => {
   });
 });
 
+describe("games through the real composition root (integration)", () => {
+  async function connectedGuest(url) {
+    const res = await fetch(`${url}/api/session/guest`, { method: "POST" });
+    const cookie = res.headers.get("set-cookie").split(";")[0];
+    const socket = connect(url, { transports: ["websocket"], extraHeaders: { cookie }, reconnection: false });
+    await new Promise((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("connect_error", reject);
+    });
+    return { socket, identity: (await res.json()).identity };
+  }
+
+  it("plays Rock Paper Scissors end to end", async () => {
+    const app = await start();
+    const players = [];
+    try {
+      const alice = await connectedGuest(app.url);
+      const bob = await connectedGuest(app.url);
+      players.push(alice, bob);
+      const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
+
+      const { data: room } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+        gameId: "rps",
+        options: { bestOf: 1 },
+      });
+      await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
+      await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "rock" } });
+      const final = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, {
+        code: room.code,
+        move: { choice: "scissors" },
+      });
+
+      expect(final.data.status).toBe("finished");
+      expect(final.data.game.outcome.winners).toEqual([alice.identity.id]);
+    } finally {
+      players.forEach((p) => p.socket.disconnect());
+      await app.close();
+    }
+  });
+});
+
 describe("createSessionStore (integration)", () => {
   it("creates the TTL index that expires sessions before the server takes traffic", async () => {
     const app = await start();

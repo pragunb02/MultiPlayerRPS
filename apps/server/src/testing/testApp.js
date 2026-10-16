@@ -63,14 +63,23 @@ export function createTestApp({ env = {}, guestLimit } = {}) {
  * Starts the HTTP app plus the realtime gateway on a random local port, with rooms running the
  * reference "race" engine (seed 42: the second seat moves first).
  *
- * @param {Parameters<typeof createTestApp>[0] & { rateLimit?: { capacity: number, refillPerSecond: number }, now?: () => number }} [options]
+ * @param {Parameters<typeof createTestApp>[0] & {
+ *   rateLimit?: { capacity: number, refillPerSecond: number },
+ *   now?: () => number,
+ *   engines?: ReadonlyArray<any>,
+ * }} [options]
  */
-export async function startTestServer({ rateLimit, now = Date.now, ...options } = {}) {
+export async function startTestServer({
+  rateLimit,
+  now = Date.now,
+  engines = [raceEngine],
+  ...options
+} = {}) {
   const testApp = createTestApp(options);
   const domainEvents = new EventEmitter();
   const roomComponent = createRoomComponent({
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
-    engines: createEngineRegistry([raceEngine]),
+    engines: createEngineRegistry(engines),
     events: domainEvents,
     generateSeed: () => 42,
   });
