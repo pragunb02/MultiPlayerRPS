@@ -1,8 +1,9 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { paths, returnPathFor } from "../../app/paths.js";
-import { Logo, LogoMark } from "../../art/Logo.jsx";
+import { Logo } from "../../art/Logo.jsx";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
+import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import styles from "./Layout.module.css";
@@ -70,10 +71,7 @@ export function Layout() {
       <main id="main" className={styles.main}>
         <Outlet />
       </main>
-      <footer className={styles.footer}>
-        <LogoMark className={styles.footerMark} />
-        <span>Play the classics with anyone, anywhere.</span>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

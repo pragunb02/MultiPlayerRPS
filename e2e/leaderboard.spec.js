@@ -79,6 +79,7 @@ test.describe("leaderboards", () => {
     await page.goBack();
     await expect(page).toHaveURL("/");
 
+    visitor.expect(404, "/leaderboards/ludo"); // the server knows there is no such board (CC-047)
     await page.goto("/leaderboards/ludo");
     await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
     await expect(page).toHaveURL("/leaderboards/ludo");

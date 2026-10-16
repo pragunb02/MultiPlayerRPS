@@ -44,7 +44,10 @@ test.describe("attacker", () => {
       await dialog.dismiss();
     });
 
-    await page.goto(`/games/chess/rooms/${encodeURIComponent("<img src=x onerror=alert(1)>")}`);
+    const path = `/games/chess/rooms/${encodeURIComponent("<img src=x onerror=alert(1)>")}`;
+    // No room can have that code, so the server answers 404 (CC-047). The app still opens and explains.
+    prober.expect(404, new URL(path, "http://localhost").pathname);
+    await page.goto(path);
 
     await expect(page.getByText("<IMG SRC=X ONERROR=ALERT(1)>")).toBeVisible(); // the invite shows the code as text
     await page.getByRole("button", { name: "Play as guest" }).click();

@@ -1,4 +1,4 @@
-import { DEFAULT_LEADERBOARD_ID, getGame, getGameBySlug } from "@classicade/shared";
+import { DEFAULT_LEADERBOARD_ID, gameForSlug, getGame } from "@classicade/shared";
 
 /**
  * Every URL of the app, in one place (ADR-011). Pages and components build links with `paths.*` and never write
@@ -10,6 +10,7 @@ import { DEFAULT_LEADERBOARD_ID, getGame, getGameBySlug } from "@classicade/shar
  *   /login?next=…  /signup?next=…      account pages; `next` = where to return afterwards
  *   /profile                           your progress and match history (guests and accounts)
  *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
+ *   /privacy  /terms                   the privacy policy and the terms of use
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
@@ -22,6 +23,8 @@ export const ROUTES = Object.freeze({
   PROFILE: "profile",
   LEADERBOARDS: "leaderboards",
   LEADERBOARD: "leaderboards/:board",
+  PRIVACY: "privacy",
+  TERMS: "terms",
 });
 
 /** URLs that were public once and must keep working (they redirect to the canonical URL). */
@@ -35,28 +38,13 @@ export const LEGACY_ROUTES = Object.freeze({
   AUTH: "login-signup.html",
 });
 
-// Earlier URL segments for games: legacy app (`/games/rockpaperscissors`) and game ids (`/play/rps`).
-const LEGACY_GAME_SLUGS = Object.freeze({
-  rockpaperscissors: "rock-paper-scissors",
-  rps: "rock-paper-scissors",
-  tictactoe: "tic-tac-toe",
-});
-
 const AUTH_PATHS = Object.freeze(["/login", "/signup"]);
 
 /** Room codes are upper-case; links and typed codes may not be. */
 export const normaliseRoomCode = (code) => String(code).trim().toUpperCase();
 
-/**
- * The game a URL segment names: its slug, or a slug or id it had before.
- *
- * @param {string | undefined} segment
- * @returns {Readonly<import("@classicade/shared").GameInfo> | undefined}
- */
-export function gameForSlug(segment) {
-  const slug = String(segment ?? "").toLowerCase();
-  return getGameBySlug(slug) ?? getGameBySlug(LEGACY_GAME_SLUGS[slug] ?? "");
-}
+/** The game a URL segment names (its slug, or a slug or id it had before). Shared with the server. */
+export { gameForSlug };
 
 /**
  * A game's URL segment. A game the server knows but this build doesn't (a deploy in progress) keeps its id, so the
@@ -110,4 +98,6 @@ export const paths = Object.freeze({
   profile: () => "/profile",
   /** @param {string} [boardId]  a leaderboard id (default: overall XP) */
   leaderboards: (boardId = DEFAULT_LEADERBOARD_ID) => `/leaderboards/${encodeURIComponent(boardId)}`,
+  privacy: () => "/privacy",
+  terms: () => "/terms",
 });

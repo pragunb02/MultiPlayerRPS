@@ -11,7 +11,10 @@ import { createTestApp } from "../../testing/testApp.js";
 function fakeWebBuild({ under = "" } = {}) {
   const dir = path.join(mkdtempSync(path.join(tmpdir(), "classicade-web-")), under);
   mkdirSync(path.join(dir, "assets"), { recursive: true });
-  writeFileSync(path.join(dir, "index.html"), "<!doctype html><title>ClassiCade</title><div id=root></div>");
+  writeFileSync(
+    path.join(dir, "index.html"),
+    "<!doctype html><head><title data-server-head>ClassiCade</title></head><div id=root></div>",
+  );
   writeFileSync(path.join(dir, "assets", "index-abc123.js"), "console.log('app')");
   writeFileSync(path.join(dir, "favicon.svg"), "<svg/>");
   return dir;
@@ -107,7 +110,7 @@ describe("serving the web app", () => {
     for (const route of ["/", "/room/AB2CD3", "/profile"]) {
       const res = await request(app).get(route).set("Accept", "text/html");
       expect(res.status).toBe(200);
-      expect(res.text).toContain("<title>ClassiCade</title>");
+      expect(res.text).toContain("<div id=root>");
       expect(res.headers["cache-control"]).toBe("no-cache");
     }
   });
@@ -118,7 +121,7 @@ describe("serving the web app", () => {
     const res = await request(app).get("/games/chess").set("Accept", "text/html");
 
     expect(res.status).toBe(200);
-    expect(res.text).toContain("<title>ClassiCade</title>");
+    expect(res.text).toContain("<title data-server-head>Play Chess with a friend on ClassiCade</title>");
   });
 
   it("caches hashed assets for a year, and revalidates other static files", async () => {

@@ -42,7 +42,7 @@ apps/
   web/src/                # React + Vite (CC-022, ADR-009): app/ (App, providers), lib/ (api, socket), hooks/, components/, pages/, styles/
 packages/
   games/src/              # pure engines + registry (CC-014)
-  shared/src/             # catalog, event names, constants
+  shared/src/             # catalog, event names, constants, page list for head tags (site.js, CC-047)
 tests live next to code: *.test.js (unit), *.integration.test.js
 ```
 
