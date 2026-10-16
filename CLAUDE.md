@@ -63,7 +63,7 @@ npm-workspaces monorepo, JavaScript ES modules with JSDoc types, React + Vite fr
 `apps/server`, `apps/web`, `packages/games` (pure engines), `packages/shared` (event names, constants).
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Built so far: `apps/server` — composition root, config, MongoDB + session store, identity model/component, HTTP app (request logging, error translation, `/api/session`), Socket.IO gateway (session-authenticated, origin-checked, rate-limited, standard acks, room handlers), room manager (domain state machine + accessor + in-memory DAO), match history (MongoDB, replayable via `replayGame`), progression (XP/levels, exactly-once, pushed via `progress:updated`), accounts (scrypt, `/api/auth/signup|login`), background tasks for post-game work, typed errors, pino logger; `packages/shared` — game catalog, error codes, socket events, identity kinds, move rejections; `packages/games` — engine contract, registry, seeded RNG, contract test kit (`@classicade/games/testing`), engines: RPS, Tic-Tac-Toe, Chess (server clocks via the optional `deadline`/`expire` time hooks). Integration tests use an in-memory MongoDB (`testing/memoryMongo.js`).
+Built so far: `apps/web` — React app scaffold (session, home, layout, API/socket clients; ADR-009); `apps/server` — composition root, config, MongoDB + session store, identity model/component, HTTP app (request logging, error translation, `/api/session`), Socket.IO gateway (session-authenticated, origin-checked, rate-limited, standard acks, room handlers), room manager (domain state machine + accessor + in-memory DAO), match history (MongoDB, replayable via `replayGame`), progression (XP/levels, exactly-once, pushed via `progress:updated`), accounts (scrypt, `/api/auth/signup|login`), background tasks for post-game work, typed errors, pino logger; `packages/shared` — game catalog, error codes, socket events, identity kinds, move rejections; `packages/games` — engine contract, registry, seeded RNG, contract test kit (`@classicade/games/testing`), engines: RPS, Tic-Tac-Toe, Chess (server clocks via the optional `deadline`/`expire` time hooks). Integration tests use an in-memory MongoDB (`testing/memoryMongo.js`).
 New code: ES modules, JSDoc types, Express 5, pure functions where possible, a `*.test.js` beside every module,
 dependencies passed in (e.g. `createApp({ config })`) rather than imported globals.
 
@@ -74,6 +74,8 @@ nvm use && npm install
 cp .env.example .env   # MONGO_URI (non-production DB!), SESSION_SECRET
 npm run dev            # legacy app (node --watch index.js) on :8080
 npm run dev:server     # new server (apps/server) on :4000 — own env file apps/server/.env
+npm run dev:web        # web app (apps/web) on :5173, proxies /api and /socket.io to :4000
+npm run build:web      # production build → apps/web/dist
 npm run lint           # must have 0 errors
 npm run format:check
 npm test               # Vitest across all workspaces (*.test.js next to the code)

@@ -76,12 +76,12 @@ and don't encode the stage — a ticket can move between stages without changing
 
 ### 0.E Frontend parity
 
-| ID     | Title                                                                         | Type    | Pri | Status  | Links                    |
-| ------ | ----------------------------------------------------------------------------- | ------- | --- | ------- | ------------------------ |
-| CC-022 | Frontend scaffold per ADR-002; shared layout, design tokens                   | feature | P1  | ⬜ Todo |                          |
-| CC-023 | Shared components: room lobby, share menu (correct game name), modals, toasts | feature | P1  | ⬜ Todo | DEBT-03, DEBT-05, BUG-12 |
-| CC-024 | Game screens: RPS, TTT, Chess rendering server state                          | feature | P1  | ⬜ Todo |                          |
-| CC-025 | Auth, home, profile pages rebuilt                                             | feature | P1  | ⬜ Todo |                          |
+| ID                          | Title                                                                         | Type    | Pri | Status  | Links                    |
+| --------------------------- | ----------------------------------------------------------------------------- | ------- | --- | ------- | ------------------------ |
+| [CC-022](tickets/CC-022.md) | Frontend scaffold per ADR-002; shared layout, design tokens                   | feature | P1  | ✅ Done |                          |
+| CC-023                      | Shared components: room lobby, share menu (correct game name), modals, toasts | feature | P1  | ⬜ Todo | DEBT-03, DEBT-05, BUG-12 |
+| CC-024                      | Game screens: RPS, TTT, Chess rendering server state                          | feature | P1  | ⬜ Todo |                          |
+| CC-025                      | Auth, home, profile pages rebuilt                                             | feature | P1  | ⬜ Todo |                          |
 
 ### 0.F Delivery
 
