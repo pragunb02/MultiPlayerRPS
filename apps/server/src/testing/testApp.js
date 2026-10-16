@@ -1,6 +1,12 @@
+import { EventEmitter } from "node:events";
 import http from "node:http";
 import session from "express-session";
+import { createEngineRegistry } from "@classicade/games";
+import { raceEngine } from "@classicade/games/testing";
+import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
+import { createRoomComponent } from "../domain/rooms/roomComponent.js";
+import { createInMemoryRoomDao } from "../persistence/inMemoryRoomDao.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
@@ -54,21 +60,39 @@ export function createTestApp({ env = {}, guestLimit } = {}) {
 }
 
 /**
- * Starts the HTTP app plus the realtime gateway on a random local port.
+ * Starts the HTTP app plus the realtime gateway on a random local port, with rooms running the
+ * reference "race" engine (seed 42: the second seat moves first).
  *
- * @param {Parameters<typeof createTestApp>[0]} [options]
+ * @param {Parameters<typeof createTestApp>[0] & { rateLimit?: { capacity: number, refillPerSecond: number }, now?: () => number }} [options]
  */
-export async function startTestServer(options) {
+export async function startTestServer({ rateLimit, now = Date.now, ...options } = {}) {
   const testApp = createTestApp(options);
+  const domainEvents = new EventEmitter();
+  const roomComponent = createRoomComponent({
+    roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
+    engines: createEngineRegistry([raceEngine]),
+    events: domainEvents,
+    generateSeed: () => 42,
+  });
   const server = http.createServer(testApp.app);
   const gateway = createRealtimeGateway({
     httpServer: server,
     sessionMiddleware: testApp.sessionMiddleware,
     allowedOrigins: testApp.config.allowedOrigins,
     logger: testApp.logger,
+    roomComponent,
+    domainEvents,
+    now,
+    ...(rateLimit && { rateLimit }),
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = /** @type {import("node:net").AddressInfo} */ (server.address());
-  return { ...testApp, gateway, baseUrl: `http://127.0.0.1:${port}`, close: () => gateway.close() };
+  return {
+    ...testApp,
+    gateway,
+    roomComponent,
+    baseUrl: `http://127.0.0.1:${port}`,
+    close: () => gateway.close(),
+  };
 }

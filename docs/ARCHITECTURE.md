@@ -55,7 +55,7 @@ packages/
 tests live next to code: *.test.js (unit), *.integration.test.js
 ```
 
-Status: `index.js`, `server.js`, `config/`, `service/http/`, `service/realtime/`, `domain/identity/`, `persistence/` (database, session store), `models/identity`, `utils/` exist (CC-011…CC-013); other folders arrive with their tickets.
+Status: `index.js`, `server.js`, `config/`, `service/http/`, `service/realtime/` (gateway, room handlers, payloads), `domain/identity/`, `domain/rooms/`, `data/` (room accessor), `persistence/` (database, session store, in-memory room DAO), `models/` (identity, room code), `utils/` exist (CC-011…CC-015); other folders arrive with their tickets.
 
 ### Game engine contract (implemented — `packages/games/src/engine.js`, CC-014)
 

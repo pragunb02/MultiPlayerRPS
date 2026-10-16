@@ -63,7 +63,7 @@ npm-workspaces monorepo, JavaScript ES modules with JSDoc types, React + Vite fr
 `apps/server`, `apps/web`, `packages/games` (pure engines), `packages/shared` (event names, constants).
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Built so far: `apps/server` — composition root, config, MongoDB + session store, identity model/component, HTTP app (request logging, error translation, `/api/session`), Socket.IO gateway (session-authenticated, origin-checked, standard acks), typed errors, pino logger; `packages/shared` — game catalog, error codes, socket events, identity kinds, move rejections; `packages/games` — engine contract, registry, seeded RNG, contract test kit (`@classicade/games/testing`). Integration tests use an in-memory MongoDB (`testing/memoryMongo.js`).
+Built so far: `apps/server` — composition root, config, MongoDB + session store, identity model/component, HTTP app (request logging, error translation, `/api/session`), Socket.IO gateway (session-authenticated, origin-checked, rate-limited, standard acks, room handlers), room manager (domain state machine + accessor + in-memory DAO), typed errors, pino logger; `packages/shared` — game catalog, error codes, socket events, identity kinds, move rejections; `packages/games` — engine contract, registry, seeded RNG, contract test kit (`@classicade/games/testing`). Integration tests use an in-memory MongoDB (`testing/memoryMongo.js`).
 New code: ES modules, JSDoc types, Express 5, pure functions where possible, a `*.test.js` beside every module,
 dependencies passed in (e.g. `createApp({ config })`) rather than imported globals.
 
@@ -79,6 +79,7 @@ npm run format:check
 npm test               # Vitest across all workspaces (*.test.js next to the code)
 npm run test:coverage  # with coverage gates (ENGINEERING.md §4)
 npm audit              # must be 0 high/critical
+./scripts/issue-counts.sh  # issue counts for PROGRESS.md (never hand-edit them)
 ```
 
 No local MongoDB? A throwaway `mongodb-memory-server` instance in a temp dir works for smoke tests.
