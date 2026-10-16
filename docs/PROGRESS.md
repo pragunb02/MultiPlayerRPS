@@ -2,15 +2,15 @@
 
 ## Status
 
-|               |                                                                                                          |
-| ------------- | -------------------------------------------------------------------------------------------------------- |
-| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)          |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-080`                                           |
-| Current stage | **Stage 0 — Foundation**                                                                                 |
-| Stage health  | 🟢 On track                                                                                              |
-| In progress   | Gamification batch (multi-agent): CC-086 + CC-032, CC-054 + CC-089, CC-053 + CC-037, CC-087; then CC-088 |
-| Blocked on    | —                                                                                                        |
-| Next up       | CC-028 hosting decision (ADR-005) + staging — needs the owner                                            |
+|               |                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md) |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-080`                                  |
+| Current stage | **Stage 0 — Foundation**                                                                        |
+| Stage health  | 🟢 On track                                                                                     |
+| In progress   | CC-087 arcade visual identity (PR #34, rebasing onto the batch)                                 |
+| Blocked on    | —                                                                                               |
+| Next up       | CC-028 hosting decision (ADR-005) + staging — needs the owner                                   |
 
 ## Stage tracker
 
@@ -36,6 +36,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-086, CC-032, CC-054, CC-089, CC-053, CC-037, CC-090 — **Gamification batch** (built by four parallel agents from one design brief, integrated one PR at a time). Invite links opened without a session ask "Play as guest / Log in / Sign up" (CC-086). A guest's XP, level, match history, achievements, streaks and quests move to the account on sign-up/login, exactly once and crash-safe (CC-032, ADR-014). 15 achievements in 4 tiers, win and daily streaks with "at risk", 3 daily quests per player with bonus XP (CC-054, CC-089, ADR-013). Accounts-only leaderboards — overall, this week, per game — with "your rank"; mutual-accept rematch with a series score (CC-053, CC-037, ADR-015). Fixed: every page 500 from a dot-folder path (CC-090). Each verified in production in a real browser. Follow-ups CC-091–CC-095.
 - 2026-10-16 — CC-026 — Docker: multi-stage production image (Node 24 Alpine, web build inside, dev dependencies pruned, non-root, `/health` health check) and `docker-compose.yml` (app + MongoDB 8 with a volume; or MongoDB alone for the dev servers). Verified: both containers healthy, chess played to mate in two browsers, accounts survive `down`/`up`. CI builds the image and checks health, a page and the API on every PR.
 - 2026-10-16 — CC-021 — Closed: already covered by the real-stack integration test "plays Rock Paper Scissors end to end" (create → join → play → result → stored → replayed → XP) plus the browser suites.
 - 2026-10-16 — CC-031 — Dependabot: weekly update PRs (Monday 06:00 IST) for npm (patch/minor grouped as dev tools and runtime; majors one per PR) and GitHub Actions; every update must pass CI. All direct dependencies already on their latest stable versions; `npm audit` 0.

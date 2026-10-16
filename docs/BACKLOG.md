@@ -3,7 +3,7 @@
 Every unit of work is a ticket with a permanent ID **`CC-###`** (ClassiCade). IDs are sequential, never reused,
 and don't encode the stage — a ticket can move between stages without changing its ID.
 
-**Next free ID: `CC-090`** — bump this when you add a ticket.
+**Next free ID: `CC-096`** — bump this when you add a ticket.
 
 | Field  | Values                                                                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -110,10 +110,16 @@ and don't encode the stage — a ticket can move between stages without changing
 | [CC-083](tickets/CC-081.md) | A guest signing up/in from a room came back seated against their own old guest seat (the game started against themselves). Seats now move to the account; guest-session creation de-duplicated (socket reconnect race)                                                                                                                                                                                                        | bug      | P1  | ✅ Done        | CC-081, CC-076           |
 | [CC-084](tickets/CC-084.md) | Every branch tested (unit/integration) and every screen's history tested in browsers: Back, Forward, chains, reload, Back after redirects, sign-in/out, create/leave/finish                                                                                                                                                                                                                                                   | test     | P1  | ✅ Done        | CC-081                   |
 | [CC-085](tickets/CC-084.md) | Logging out inside a waiting room, then pressing Back, seated a new guest against the account that just left; leaving a room left it in history (Back re-seated you). Logout now gives up waiting seats; leaving replaces history                                                                                                                                                                                             | bug      | P1  | ✅ Done        | CC-084, CC-083           |
-| CC-086                      | Invite link opened without a session asks first: play as guest, log in or sign up (and comes back to the room) — no silent guest                                                                                                                                                                                                                                                                                              | feature  | P1  | 🟦 In progress | CC-032, CC-080           |
+| [CC-086](tickets/CC-086.md) | Invite link opened without a session asks first: play as guest, log in or sign up (and comes back to the room) — no silent guest                                                                                                                                                                                                                                                                                              | feature  | P1  | ✅ Done        | CC-032, CC-080           |
 | CC-087                      | Arcade visual identity: game-site theme, motion (reduced-motion aware), vector art for every game, celebrations for wins and level-ups                                                                                                                                                                                                                                                                                        | feature  | P1  | 🟦 In progress | CC-047, ADR-012          |
 | CC-088                      | Player dashboard / console: stats per game, win rate, streaks, XP over time, achievements, quests, rank                                                                                                                                                                                                                                                                                                                       | feature  | P1  | ⬜ Todo        | CC-053, CC-054, CC-089   |
-| CC-089                      | Daily quests with bonus XP (e.g. "win 2 games of Tic Tac Toe today"), reset daily                                                                                                                                                                                                                                                                                                                                             | feature  | P1  | 🟦 In progress | CC-054, ADR-013          |
+| [CC-089](tickets/CC-089.md) | Daily quests with bonus XP (e.g. "win 2 games of Tic Tac Toe today"), reset daily                                                                                                                                                                                                                                                                                                                                             | feature  | P1  | ✅ Done        | CC-054, ADR-013          |
+| CC-090                      | Every page answered 500 when the app ran from a path with a dot-folder (`res.sendFile` refuses dot segments) — found by three agents in worktrees; fixed in #32 with `sendFile("index.html", { root })`                                                                                                                                                                                                                       | bug      | P2  | ✅ Done        | CC-030                   |
+| CC-091                      | Rematch: who moves first should alternate (engines pick the starter by seeded RNG, not by seat) — needs a `starter` option in the TTT and chess engines                                                                                                                                                                                                                                                                       | feature  | P2  | ⬜ Todo        | CC-037                   |
+| CC-092                      | Adopt Motion for interaction animation: piece movement, drag-to-move chess, exit animations (toasts, dialogs, result), card flips, page transitions — LazyMotion, reduced motion respected, CSP-safe, bundle budget                                                                                                                                                                                                           | feature  | P1  | ⬜ Todo        | CC-087, ADR-016          |
+| CC-093                      | Gamification follow-ups from the guest carry-over: a match recorded under the guest id after the gamification participant ran leaves its streak/quest counts on the guest; a guest's quest XP from this week doesn't reach the weekly board                                                                                                                                                                                   | bug      | P3  | ⬜ Todo        | CC-032, CC-054, CC-053   |
+| CC-094                      | Backfill achievements, streaks and leaderboards from match history recorded before these features existed                                                                                                                                                                                                                                                                                                                     | debt     | P3  | ⬜ Todo        | CC-054, CC-053           |
+| CC-095                      | Anti-farming: per-opponent daily caps on XP, wins and quest progress (guest-vs-guest farming)                                                                                                                                                                                                                                                                                                                                 | security | P2  | ⬜ Todo        | CC-054, CC-053, CC-060   |
 
 ---
 
@@ -121,43 +127,43 @@ and don't encode the stage — a ticket can move between stages without changing
 
 **Exit criteria:** public URL · 3 polished games · bots for each · invite links · guest play · ratings · legal pages · monitoring.
 
-| ID     | Title                                                                         | Type     | Pri | Status         | Links                |
-| ------ | ----------------------------------------------------------------------------- | -------- | --- | -------------- | -------------------- |
-| CC-032 | Guest play + guest→account upgrade                                            | feature  | P1  | 🟦 In progress | FR-ACC-2, FR-ACC-3   |
-| CC-033 | Password reset email                                                          | feature  | P1  | ⬜ Todo        | FR-ACC-4             |
-| CC-034 | Public profile, avatars                                                       | feature  | P1  | ⬜ Todo        | FR-ACC-6             |
-| CC-035 | Account deletion & data export                                                | security | P1  | ⬜ Todo        | FR-ACC-7             |
-| CC-036 | Reconnect grace period + forfeit                                              | feature  | P1  | ⬜ Todo        | FR-ROOM-4, NFR-4     |
-| CC-037 | Rematch flow                                                                  | feature  | P1  | 🟦 In progress | FR-ROOM-6            |
-| CC-038 | Bot interface + RPS bots (random, Markov)                                     | feature  | P1  | ⬜ Todo        | FR-AI-1, FR-AI-2     |
-| CC-039 | TTT bots (easy/medium/minimax)                                                | feature  | P1  | ⬜ Todo        | FR-AI-3              |
-| CC-040 | Chess bot (Stockfish WASM/worker, levels)                                     | feature  | P1  | ⬜ Todo        | FR-AI-4              |
-| CC-041 | Chess: time controls, draw offer, promotion picker, PGN export, replay viewer | feature  | P1  | ⬜ Todo        | FR-GAME-4, FR-GAME-5 |
-| CC-042 | Glicko-2 ratings per game                                                     | feature  | P1  | ⬜ Todo        | FR-PROG-2            |
-| CC-043 | Share result cards; emotes                                                    | feature  | P1  | ⬜ Todo        | FR-SOC-1, FR-SOC-2   |
-| CC-044 | Block / mute / report                                                         | feature  | P1  | ⬜ Todo        | FR-SOC-4             |
-| CC-045 | Analytics events                                                              | feature  | P1  | ⬜ Todo        | FR-ADM-3             |
-| CC-046 | Privacy policy, ToS, cookie consent                                           | docs     | P1  | ⬜ Todo        | FR-LEG-1             |
-| CC-047 | Landing + SEO pages per game; brand identity                                  | feature  | P1  | ⬜ Todo        | FR-MKT-1             |
-| CC-048 | Accessibility & mobile pass                                                   | feature  | P1  | ⬜ Todo        | NFR-8, NFR-9         |
-| CC-049 | Observability: error tracking, metrics, alerts, uptime                        | infra    | P1  | ⬜ Todo        | NFR-7                |
-| CC-050 | Production deploy + launch checklist                                          | infra    | P1  | ⬜ Todo        |                      |
+| ID                          | Title                                                                         | Type     | Pri | Status  | Links                |
+| --------------------------- | ----------------------------------------------------------------------------- | -------- | --- | ------- | -------------------- |
+| [CC-032](tickets/CC-032.md) | Guest play + guest→account upgrade                                            | feature  | P1  | ✅ Done | FR-ACC-2, FR-ACC-3   |
+| CC-033                      | Password reset email                                                          | feature  | P1  | ⬜ Todo | FR-ACC-4             |
+| CC-034                      | Public profile, avatars                                                       | feature  | P1  | ⬜ Todo | FR-ACC-6             |
+| CC-035                      | Account deletion & data export                                                | security | P1  | ⬜ Todo | FR-ACC-7             |
+| CC-036                      | Reconnect grace period + forfeit                                              | feature  | P1  | ⬜ Todo | FR-ROOM-4, NFR-4     |
+| [CC-037](tickets/CC-037.md) | Rematch flow                                                                  | feature  | P1  | ✅ Done | FR-ROOM-6            |
+| CC-038                      | Bot interface + RPS bots (random, Markov)                                     | feature  | P1  | ⬜ Todo | FR-AI-1, FR-AI-2     |
+| CC-039                      | TTT bots (easy/medium/minimax)                                                | feature  | P1  | ⬜ Todo | FR-AI-3              |
+| CC-040                      | Chess bot (Stockfish WASM/worker, levels)                                     | feature  | P1  | ⬜ Todo | FR-AI-4              |
+| CC-041                      | Chess: time controls, draw offer, promotion picker, PGN export, replay viewer | feature  | P1  | ⬜ Todo | FR-GAME-4, FR-GAME-5 |
+| CC-042                      | Glicko-2 ratings per game                                                     | feature  | P1  | ⬜ Todo | FR-PROG-2            |
+| CC-043                      | Share result cards; emotes                                                    | feature  | P1  | ⬜ Todo | FR-SOC-1, FR-SOC-2   |
+| CC-044                      | Block / mute / report                                                         | feature  | P1  | ⬜ Todo | FR-SOC-4             |
+| CC-045                      | Analytics events                                                              | feature  | P1  | ⬜ Todo | FR-ADM-3             |
+| CC-046                      | Privacy policy, ToS, cookie consent                                           | docs     | P1  | ⬜ Todo | FR-LEG-1             |
+| CC-047                      | Landing + SEO pages per game; brand identity                                  | feature  | P1  | ⬜ Todo | FR-MKT-1             |
+| CC-048                      | Accessibility & mobile pass                                                   | feature  | P1  | ⬜ Todo | NFR-8, NFR-9         |
+| CC-049                      | Observability: error tracking, metrics, alerts, uptime                        | infra    | P1  | ⬜ Todo | NFR-7                |
+| CC-050                      | Production deploy + launch checklist                                          | infra    | P1  | ⬜ Todo |                      |
 
 ## Stage 2 — Retention
 
-| ID     | Title                                                     | Type    | Pri | Status         | Links              |
-| ------ | --------------------------------------------------------- | ------- | --- | -------------- | ------------------ |
-| CC-051 | Quick-match matchmaking (rating-based) + bot fallback     | feature | P2  | ⬜ Todo        | FR-AI-5            |
-| CC-052 | Friends, presence, direct challenge                       | feature | P2  | ⬜ Todo        | FR-SOC-3           |
-| CC-053 | Leaderboards                                              | feature | P2  | 🟦 In progress | FR-PROG-3          |
-| CC-054 | Achievements, streaks                                     | feature | P2  | 🟦 In progress | FR-PROG-4          |
-| CC-055 | Seasons                                                   | feature | P2  | ⬜ Todo        | FR-PROG-5          |
-| CC-056 | Spectating                                                | feature | P2  | ⬜ Todo        | FR-ROOM-7          |
-| CC-057 | Ludo (2–4 players)                                        | feature | P2  | ⬜ Todo        | FR-GAME-6          |
-| CC-058 | Social login                                              | feature | P2  | ⬜ Todo        | FR-ACC-5           |
-| CC-059 | Admin console + feature flags                             | feature | P2  | ⬜ Todo        | FR-ADM-1, FR-ADM-2 |
-| CC-060 | Anti-cheat signals                                        | feature | P2  | ⬜ Todo        | FR-AI-7            |
-| CC-061 | Redis-backed rooms + Socket.IO adapter (horizontal scale) | infra   | P2  | ⬜ Todo        | NFR-5              |
+| ID                          | Title                                                     | Type    | Pri | Status  | Links              |
+| --------------------------- | --------------------------------------------------------- | ------- | --- | ------- | ------------------ |
+| CC-051                      | Quick-match matchmaking (rating-based) + bot fallback     | feature | P2  | ⬜ Todo | FR-AI-5            |
+| CC-052                      | Friends, presence, direct challenge                       | feature | P2  | ⬜ Todo | FR-SOC-3           |
+| [CC-053](tickets/CC-053.md) | Leaderboards                                              | feature | P2  | ✅ Done | FR-PROG-3          |
+| [CC-054](tickets/CC-054.md) | Achievements, streaks                                     | feature | P2  | ✅ Done | FR-PROG-4          |
+| CC-055                      | Seasons                                                   | feature | P2  | ⬜ Todo | FR-PROG-5          |
+| CC-056                      | Spectating                                                | feature | P2  | ⬜ Todo | FR-ROOM-7          |
+| CC-057                      | Ludo (2–4 players)                                        | feature | P2  | ⬜ Todo | FR-GAME-6          |
+| CC-058                      | Social login                                              | feature | P2  | ⬜ Todo | FR-ACC-5           |
+| CC-059                      | Admin console + feature flags                             | feature | P2  | ⬜ Todo | FR-ADM-1, FR-ADM-2 |
+| CC-060                      | Anti-cheat signals                                        | feature | P2  | ⬜ Todo | FR-AI-7            |
+| CC-061                      | Redis-backed rooms + Socket.IO adapter (horizontal scale) | infra   | P2  | ⬜ Todo | NFR-5              |
 
 ## Stage 3 — Monetization
 
