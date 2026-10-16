@@ -185,8 +185,10 @@ Rules:
    widely-used packages with no native build step.
 3. **Ranges and lockfile.** Caret ranges (`^x.y.z`) in `package.json`; `package-lock.json` is committed and is what CI installs (`npm ci`).
 4. **Zero known vulnerabilities.** `npm audit` must report 0 high/critical before merge; anything lower gets a ticket.
-5. **Stay current.** Patch/minor updates at least monthly; a major upgrade gets its own ticket and is tested like a feature.
-   Automated update PRs and an audit step in CI come with CC-027/CC-031.
+5. **Stay current.** Dependabot (`.github/dependabot.yml`, CC-031) opens update PRs every Monday: patch + minor releases
+   grouped (dev tools in one PR, runtime libraries in another), each major release in its own PR, GitHub Actions
+   grouped. Every update PR must pass CI; merging deploys, so read its release notes and deployment impact first. A
+   major upgrade that needs code changes gets its own ticket. `npm audit` runs in CI on every PR (CC-027).
 6. **Shared versions.** One version of a library across workspaces unless a migration is in progress (e.g. one workspace moving to a new major ahead of the others).
 
 ---
