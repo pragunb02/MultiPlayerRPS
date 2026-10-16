@@ -3,8 +3,9 @@ import { renamePlayer } from "../renamePlayer.js";
 import { createSeededRng } from "../rng.js";
 
 /**
- * Shared contract checks every GameEngine must pass. Each check throws a ContractViolation; run them all
- * with `checkEngineContract` (returns violations) or `describeEngineContract` (one Vitest test per check).
+ * Shared contract checks every GameEngine must pass. Each check throws a ContractViolation. Run them all
+ * with `checkEngineContract`, which returns the violations, or with `describeEngineContract`, which adds one
+ * Vitest test per check.
  *
  * @typedef {Object} ContractScenario
  * @property {string[]} players                    a valid player list
@@ -81,7 +82,7 @@ function setup(engine, scenario, seed = scenario.seed ?? 42) {
   );
 }
 
-/** Plays the scenario, calling `onStep` before each move; returns the final state. */
+/** Plays the scenario, calling `onStep` before each move, and returns the final state. */
 function play(engine, scenario, onStep = () => {}) {
   let state = setup(engine, scenario);
   scenario.playthrough.forEach(({ player, move }, index) => {

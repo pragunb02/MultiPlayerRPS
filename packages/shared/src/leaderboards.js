@@ -1,9 +1,9 @@
 import { GAMES } from "./games.js";
 
 /**
- * Public leaderboards (CC-053). Accounts only — guests never appear on a board. The id is the board's URL segment
- * (`/leaderboards/chess`); per-game boards are generated from `GAMES`, so a new game gets a board without code
- * changes elsewhere.
+ * Public leaderboards (CC-053). Only accounts are listed, guests never appear on a board. The id is the board's
+ * URL segment (`/leaderboards/chess`). The boards for each game are generated from `GAMES`, so a new game gets a
+ * board without code changes elsewhere.
  *
  * @typedef {Object} LeaderboardInfo
  * @property {string} id                  stable URL segment, never reused for another board
@@ -17,7 +17,7 @@ export const LEADERBOARD_METRICS = Object.freeze({ XP: "xp", WINS: "wins" });
 export const LEADERBOARD_PERIODS = Object.freeze({ ALL: "all", WEEK: "week" });
 /** Why the viewer has no rank on a board (`you.reason`). */
 export const LEADERBOARD_UNLISTED = Object.freeze({ GUEST: "guest", UNRANKED: "unranked" });
-/** Most entries one board response lists; your own rank is reported even outside them. */
+/** The most entries one board response lists. Your own rank is reported even when it is outside them. */
 export const LEADERBOARD_MAX_ENTRIES = 50;
 
 /** @type {ReadonlyArray<Readonly<LeaderboardInfo>>} */

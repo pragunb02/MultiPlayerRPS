@@ -40,7 +40,7 @@ describeEngineContract(
   { describe, it },
 );
 
-/** A new game: seed 42 → bob is White. */
+/** A new game. With seed 42, bob plays White. */
 const newGame = (timeControl = "blitz-5+0") =>
   chessEngine.init({ players: [A, B], options: { timeControl }, rng: createSeededRng(42) });
 
@@ -163,7 +163,7 @@ describe("chessEngine endings", () => {
 });
 
 describe("chessEngine promotion", () => {
-  // 1. a4 b5 2. axb5 a6 3. bxa6 Bb7 4. axb7 Nc6 → White pawn on b7 with b8 free.
+  // After 1. a4 b5 2. axb5 a6 3. bxa6 Bb7 4. axb7 Nc6, a White pawn stands on b7 and b8 is free.
   const readyToPromote = () => playSan(newGame(), ["a4", "b5", "axb5", "a6", "bxa6", "Bb7", "axb7", "Nc6"]);
 
   it("requires choosing a piece", () => {
@@ -190,7 +190,7 @@ describe("chessEngine promotion", () => {
   it("keeps the promoted piece for the rest of the game", () => {
     const promoted = act(readyToPromote(), B, { type: "move", from: "b7", to: "b8", promotion: "q" });
 
-    // The new queen on b8 can capture the rook on a8 — only possible if the promotion was replayed.
+    // The new queen on b8 can capture the rook on a8. That is only possible if the promotion was replayed.
     const state = playSan(promoted, ["Nf6", "Qxa8"]);
 
     expect(chessEngine.viewFor(state, A).moves.slice(-3)).toEqual(["b8=Q", "Nf6", "Qxa8"]);
@@ -553,7 +553,7 @@ describe("chessEngine clocks", () => {
   });
 
   it("still loses on time when the opponent has two minor pieces (enough to mate)", () => {
-    // White (bob) has king, bishop and knight; Black (alice) to move with no time left.
+    // White (bob) has king, bishop and knight. Black (alice) is to move with no time left.
     const bishopAndKnight = {
       ...playSan(newGame(), ["e4"], T0),
       fen: "4k3/8/8/8/8/8/8/2BNK3 b - - 0 40",

@@ -1,6 +1,6 @@
 /**
  * Error codes returned by the API (`{ error: { code } }`) and socket acknowledgements.
- * Clients switch on these, never on messages — messages are for humans and may change.
+ * Clients decide what to do from these codes, never from the messages. Messages are for people and may change.
  */
 export const ERROR_CODES = Object.freeze({
   VALIDATION_FAILED: "VALIDATION_FAILED",

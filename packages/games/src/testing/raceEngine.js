@@ -4,8 +4,8 @@ import { randomIndex } from "../rng.js";
 import { ok, reject } from "../result.js";
 
 /**
- * A tiny reference engine used to test the engine tooling itself (not a real game):
- * players take turns adding 1 or 2 to a counter; whoever reaches `target` exactly wins.
+ * A tiny reference engine used to test the engine tooling itself (not a real game).
+ * Players take turns adding 1 or 2 to a counter, and whoever reaches `target` exactly wins.
  * The starting player is chosen with the injected RNG.
  */
 export const raceEngine = defineEngine({

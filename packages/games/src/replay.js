@@ -1,8 +1,9 @@
 import { createSeededRng } from "./rng.js";
 
 /**
- * Rebuilds a game from its setup and action log. Engines are deterministic, so seed + options + log
- * reproduce the exact final state — the basis for match history, replays and audits.
+ * Rebuilds a game from its setup and action log. Engines always give the same result for the same input, so the
+ * seed, the options and the log together reproduce the exact final state. Match history, replays and audits rely
+ * on this.
  *
  * Every logged move is re-validated (with the time it was played), so a tampered log cannot be replayed
  * into a result the rules would not allow.
@@ -39,7 +40,7 @@ export function replayGame(engine, { players, options, seed, log }) {
         state = engine.expire(state, ctx);
         break;
       case "forfeit":
-        // A forfeit ends the match outside the rules of the game; the board itself is unchanged.
+        // A forfeit ends the match outside the rules of the game. The board itself stays as it was.
         break;
       default:
         throw new Error(`Log entry ${index} has unknown kind "${entry.kind}"`);

@@ -1,6 +1,6 @@
 /**
  * Progression rules, shared so the web app shows exactly what the server awards.
- * XP is earned per recorded match; leaving a game in progress (forfeit) earns nothing.
+ * XP is earned for each recorded match. Leaving a game in progress (a forfeit) earns nothing.
  */
 export const XP_AWARDS = Object.freeze({ win: 30, draw: 15, loss: 10, forfeit: 0 });
 
@@ -8,8 +8,8 @@ const XP_STEP = 50;
 export const MAX_LEVEL = 100;
 
 /**
- * Total XP needed to reach `level` (level 1 = 0 XP). Each level needs 50 XP more than the last:
- * 1 → 0, 2 → 50, 3 → 150, 4 → 300, 5 → 500 …
+ * Total XP needed to reach `level`. Level 1 needs 0 XP, and each level needs 50 XP more than the one before.
+ * So level 2 needs 50 XP, level 3 needs 150, level 4 needs 300 and level 5 needs 500.
  *
  * @param {number} level
  */

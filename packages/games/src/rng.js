@@ -1,6 +1,7 @@
 /**
- * Deterministic pseudo-random numbers (mulberry32). Engines never call Math.random: the caller injects an
- * RNG, so a game can be replayed exactly from its seed and tests are reproducible.
+ * Pseudo-random numbers that come out the same every time for the same seed (mulberry32). Engines never call
+ * `Math.random`: the caller passes in an RNG, so a game can be replayed exactly from its seed and tests give the
+ * same result on every run.
  *
  * @typedef {() => number} Rng  returns a float in [0, 1)
  */

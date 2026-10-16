@@ -5,5 +5,5 @@ export const RPS_CHOICES = Object.freeze({
   SCISSORS: "scissors",
 });
 
-/** Allowed "best of" values; the first player to win a majority of rounds wins the match. */
+/** Allowed "best of" values. The first player to win more than half of the rounds wins the match. */
 export const RPS_BEST_OF = Object.freeze([1, 3, 5, 7]);

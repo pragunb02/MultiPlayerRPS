@@ -1,7 +1,7 @@
 /**
  * @typedef {Object} GameInfo
- * @property {string} id          stable identifier used in events, the API and the database — never shown
- * @property {string} slug        readable, stable URL segment (`/games/tic-tac-toe`); never reused for another game
+ * @property {string} id          stable identifier used in events, the API and the database. It is never shown.
+ * @property {string} slug        readable, stable URL segment (`/games/tic-tac-toe`), never reused for another game
  * @property {string} name        display name
  * @property {number} minPlayers
  * @property {number} maxPlayers

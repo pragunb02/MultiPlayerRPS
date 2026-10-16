@@ -22,7 +22,7 @@ const scenario = {
   ],
 };
 
-// The reference engine must pass every check — this is exactly how real engines use the kit.
+// The reference engine must pass every check. This is exactly how real engines use the kit.
 describeEngineContract(raceEngine, scenario, { describe, it });
 
 /** A copy of the reference engine with one behaviour broken. */
