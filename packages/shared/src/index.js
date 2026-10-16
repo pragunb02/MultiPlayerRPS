@@ -1,3 +1,4 @@
+export { ACHIEVEMENT_METRICS, ACHIEVEMENT_TIERS, ACHIEVEMENTS, winsOfMetric } from "./achievements.js";
 export { ERROR_CODES } from "./errors.js";
 export { SOCKET_EVENTS } from "./events.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";
@@ -13,3 +14,4 @@ export {
   DEFAULT_CHESS_TIME_CONTROL,
 } from "./chess.js";
 export { levelForXp, MAX_LEVEL, XP_AWARDS, xpForLevel } from "./progression.js";
+export { DAILY_SWEEP_BONUS_XP, QUEST_COUNTS, QUEST_SLOTS, QUESTS } from "./quests.js";

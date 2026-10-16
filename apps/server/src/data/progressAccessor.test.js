@@ -44,6 +44,23 @@ describe("progressAccessor", () => {
     expect(again.after).toEqual(again.before);
   });
 
+  it("adds a bonus once per key, as XP only (no match played)", async () => {
+    const progress = setup();
+    const award = {
+      playerId: "guest_a",
+      key: "quest:2026-10-16:win-1",
+      inc: { xp: 20 },
+      at: Date.UTC(2026, 9, 16),
+    };
+
+    const first = await progress.applyAwardOnce(award);
+    const again = await progress.applyAwardOnce(award);
+
+    expect(first.after).toEqual(expect.objectContaining({ xp: 20, matchesPlayed: 0 }));
+    expect(again.applied).toBe(false);
+    expect((await progress.get("guest_a")).xp).toBe(20);
+  });
+
   it("passes unexpected storage failures through", async () => {
     const failure = new Error("disk on fire");
     const progress = createProgressAccessor({
@@ -121,5 +138,18 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
     );
     expect(replay.applied).toBe(false);
     expect((await progress.get("user_1")).xp).toBe(60);
+  });
+
+  it("pays a quest bonus earned during the move to the account, once (CC-089)", async () => {
+    const progress = setup();
+    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1 });
+    const award = { playerId: "guest_a", key: "quest:2026-10-16:win-1", inc: { xp: 20 }, at: 2 };
+
+    const late = await progress.applyAwardOnce(award);
+    const again = await progress.applyAwardOnce(award);
+
+    expect(late.after).toEqual(expect.objectContaining({ playerId: "user_1", xp: 20, matchesPlayed: 0 }));
+    expect(again.applied).toBe(false);
+    expect((await progress.get("user_1")).xp).toBe(20);
   });
 });

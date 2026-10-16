@@ -4,12 +4,14 @@ import session from "express-session";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
+import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
 import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js";
 import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createAccountComponent } from "../domain/accounts/accountComponent.js";
+import { createGamificationComponent } from "../domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
@@ -24,6 +26,11 @@ import { createBackgroundTasks } from "../utils/backgroundTasks.js";
 import { createPasswordHasher } from "../utils/passwordHasher.js";
 import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
+import {
+  createInMemoryAchievementDao,
+  createInMemoryQuestDao,
+  createInMemoryStatsDao,
+} from "./inMemoryGamificationDaos.js";
 import { createInMemoryLegacyUserDao } from "./inMemoryLegacyUserDao.js";
 import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
 import { createInMemoryPlayerTransferDao } from "./inMemoryPlayerTransferDao.js";
@@ -43,6 +50,7 @@ import { testConfig } from "./testConfig.js";
  *   isDatabaseUp?: () => boolean,
  *   transferParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who
  *     takes part in moving a guest's data (e.g. one that fails)
+ *   now?: () => number,
  * }} [options]
  */
 export function createTestApp({
@@ -53,6 +61,7 @@ export function createTestApp({
   legacyUsers = [],
   isDatabaseUp = () => true,
   transferParticipants = (participants) => participants,
+  now = Date.now,
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -80,11 +89,20 @@ export function createTestApp({
     events: domainEvents,
     generateSeed: () => 42,
   });
-  const matchComponent = createMatchComponent({
-    matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }),
-  });
+  const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
+  const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({
     progressAccessor: createProgressAccessor({ progressDao: createInMemoryProgressDao() }),
+    events: domainEvents,
+  });
+  const gamificationComponent = createGamificationComponent({
+    gamificationAccessor: createGamificationAccessor({
+      statsDao: createInMemoryStatsDao(),
+      questDao: createInMemoryQuestDao(),
+      achievementDao: createInMemoryAchievementDao(),
+    }),
+    matchAccessor,
+    progressionComponent,
     events: domainEvents,
   });
   const playerTransferComponent = createPlayerTransferComponent({
@@ -94,6 +112,7 @@ export function createTestApp({
     participants: transferParticipants([
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
+      { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
     ]),
     matches: matchComponent,
   });
@@ -103,8 +122,10 @@ export function createTestApp({
     matchComponent,
     playerTransferComponent,
     progressionComponent,
+    gamificationComponent,
     tasks,
     logger: capture.logger,
+    now,
   });
   const endedSessions = [];
   const endedListeners = [];
@@ -117,10 +138,12 @@ export function createTestApp({
     identityComponent,
     matchComponent,
     progressionComponent,
+    gamificationComponent,
     accountComponent,
     authLimits,
     guestLimit,
-    onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents }),
+    now,
+    onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);
       endedListeners.forEach((listener) => listener(sessionId));
@@ -138,11 +161,24 @@ export function createTestApp({
     matchComponent,
     progressionComponent,
     playerTransferComponent,
+    gamificationComponent,
     tasks,
     endedSessions,
     onSessionEnded: (listener) => endedListeners.push(listener),
     ...capture,
   };
+}
+
+/**
+ * A clock that runs in real time from noon UTC on `day` — daily quests depend on the date, so tests pick one.
+ *
+ * @param {string} day  "YYYY-MM-DD"
+ * @returns {() => number}
+ */
+export function clockOn(day) {
+  const start = Date.now();
+  const noon = Date.parse(`${day}T12:00:00.000Z`);
+  return () => noon + (Date.now() - start);
 }
 
 /**
@@ -155,7 +191,7 @@ export function createTestApp({
  * }} [options]
  */
 export async function startTestServer({ rateLimit, now = Date.now, ...options } = {}) {
-  const testApp = createTestApp(options);
+  const testApp = createTestApp({ ...options, now });
   const server = http.createServer(testApp.app);
   const gateway = createRealtimeGateway({
     httpServer: server,

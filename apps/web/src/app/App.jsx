@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router";
 import { Layout } from "../components/Layout/Layout.jsx";
+import { GamificationToasts } from "../components/GamificationToasts.jsx";
 import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
@@ -27,6 +28,7 @@ export function App({ services }) {
         <SessionProvider>
           <ToastProvider>
             <ProgressToasts />
+            <GamificationToasts />
             <Routes>
               <Route element={<Layout />}>
                 <Route index element={<HomePage />} />

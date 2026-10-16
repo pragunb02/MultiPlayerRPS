@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
 import { useGames } from "../../hooks/useGames.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./HomePage.module.css";
@@ -45,6 +46,8 @@ export function HomePage() {
           </p>
         )}
       </section>
+
+      {session.status === "ready" && <DailyQuests compact />}
 
       <section aria-labelledby="games-heading">
         <h2 id="games-heading">Games</h2>

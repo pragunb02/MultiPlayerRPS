@@ -57,21 +57,17 @@ export function createProgressAccessor({ progressDao }) {
      * @param {{ playerId: string, matchId: string, inc: Partial<Omit<Progress, "playerId">>, at: number }} change
      * @returns {Promise<{ applied: boolean, before: Readonly<Progress>, after: Readonly<Progress> }>}
      */
-    async applyMatchOnce({ playerId, matchId, inc, at }) {
-      const change = { matchId, inc, at: new Date(at) };
-      const first = await progressDao.applyMatchOnce({ playerId, ...change });
-      const owner = first.mergedInto ?? playerId;
-      const { applied, before } =
-        owner === playerId ? first : await progressDao.applyMatchOnce({ playerId: owner, ...change });
-      const after = applied
-        ? Object.fromEntries(Object.entries(before).map(([key, value]) => [key, value + (inc[key] ?? 0)]))
-        : before;
-      return {
-        applied,
-        before: Object.freeze({ playerId: owner, ...before }),
-        after: Object.freeze({ playerId: owner, ...after }),
-      };
-    },
+    applyMatchOnce: ({ playerId, matchId, inc, at }) => applyOnce({ playerId, key: matchId, inc, at }),
+
+    /**
+     * Adds a bonus (quest XP) to a player's totals, at most once per key. Shares the exactly-once window with
+     * matches, so bonus keys never look like match ids (`quest:<day>:<questId>`). Like a match, a bonus for a
+     * guest who has moved to an account (CC-032) goes to that account.
+     *
+     * @param {{ playerId: string, key: string, inc: Partial<Omit<Progress, "playerId">>, at: number }} change
+     * @returns {Promise<{ applied: boolean, before: Readonly<Progress>, after: Readonly<Progress> }>}
+     */
+    applyAwardOnce: ({ playerId, key, inc, at }) => applyOnce({ playerId, key, inc, at }),
 
     /**
      * Moves a guest's totals into an account, exactly once (CC-032). Each step is idempotent, so running it
@@ -88,4 +84,21 @@ export function createProgressAccessor({ progressDao }) {
       return { moved: Object.freeze(applied ? { ...totals } : { ...ZERO }) };
     },
   });
+
+  /** Applies `inc` once per `key`; a guest whose progress moved to an account (CC-032) credits that account. */
+  async function applyOnce({ playerId, key, inc, at }) {
+    const change = { matchId: key, inc, at: new Date(at) };
+    const first = await progressDao.applyMatchOnce({ playerId, ...change });
+    const owner = first.mergedInto ?? playerId;
+    const { applied, before } =
+      owner === playerId ? first : await progressDao.applyMatchOnce({ playerId: owner, ...change });
+    const after = applied
+      ? Object.fromEntries(Object.entries(before).map(([field, value]) => [field, value + (inc[field] ?? 0)]))
+      : before;
+    return {
+      applied,
+      before: Object.freeze({ playerId: owner, ...before }),
+      after: Object.freeze({ playerId: owner, ...after }),
+    };
+  }
 }

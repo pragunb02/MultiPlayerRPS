@@ -81,6 +81,9 @@ rejections, full playthrough without mutation, game-over refusal, and identical 
 - `matches` (implemented, CC-016) — matchId, roomCode, gameId, options, seed, players[{playerId, displayName}], log[{kind, playerId?, move?, at}], result{result, winners, reason}, startedAt, endedAt, schemaVersion; replayable with `replayGame()`. Ratings fields arrive with CC-042.
 - `accounts` (implemented, CC-076) — _id, username, usernameKey (unique, lower-case), email (unique), passwordHash (`scrypt$N$r$p$salt$hash`), createdAt. Identity id = `user_<_id>`. Legacy `users` are migrated lazily at first login (CC-078): read-only lookup, bcrypt check, scrypt re-hash.
 - `player_progress` (implemented, CC-017) — playerId (unique), xp, matchesPlayed, wins, losses, draws, recentMatchIds (exactly-once window), updatedAt.
+- `player_stats` (implemented, CC-054) — playerId (unique), winsByGame, matchesByGame, checkmateWins, questsCompleted, winStreak{current,best}, dailyStreak{current,best,lastDay}, recentKeys (exactly-once window), mergedFrom, updatedAt, version (compare-and-set).
+- `player_achievements` (implemented, CC-054) — playerId + achievementId (unique), unlockedAt, matchId.
+- `player_quests` (implemented, CC-089) — playerId + day (unique), items (self-contained snapshot of the day's 3 quests), sweepAt, recentKeys, expiresAt (TTL, day + 8 days), version.
 - `ratings` — userId, game, rating, rd, volatility
 - `sessions` — managed by session store
 

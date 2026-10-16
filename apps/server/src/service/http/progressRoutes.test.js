@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, nextEvent, send, startRoom } from "../../testing/socketClients.js";
-import { startTestServer } from "../../testing/testApp.js";
+import { clockOn, startTestServer } from "../../testing/testApp.js";
 
 // Race engine, seed 42: bob moves first. Bob +1, Alice +2 → Alice wins.
+// Quests depend on the day: on 2026-10-16 Alice (the first guest) has "Get a win" (+20 XP); on 2026-10-23 her
+// quests need more than two races, so only match XP is awarded.
 let server;
 const clients = createSocketClients(() => server.baseUrl);
 
@@ -23,8 +25,8 @@ const getProgress = async (cookie) =>
   (await (await fetch(`${server.baseUrl}/api/progress`, { headers: { cookie } })).json()).progress;
 
 describe("progression end to end", () => {
-  it("pushes each player their XP after a match, and the API agrees", async () => {
-    server = await startTestServer();
+  it("pushes each player their XP after a match, and the API agrees (match XP plus quest XP)", async () => {
+    server = await startTestServer({ now: clockOn("2026-10-16") });
     const alice = await clients.player();
     const bob = await clients.player();
     const alicePush = nextEvent(alice.socket, SOCKET_EVENTS.PROGRESS_UPDATED);
@@ -34,6 +36,7 @@ describe("progression end to end", () => {
 
     expect(await alicePush).toEqual(
       expect.objectContaining({
+        source: "match",
         xpGained: 30,
         leveledUp: false,
         progress: expect.objectContaining({ xp: 30, wins: 1 }),
@@ -42,12 +45,12 @@ describe("progression end to end", () => {
     expect((await bobPush).xpGained).toBe(10);
     await server.tasks.drain();
     expect(await getProgress(alice.cookie)).toEqual(
-      expect.objectContaining({ xp: 30, level: 1, matchesPlayed: 1 }),
+      expect.objectContaining({ xp: 50, level: 2, matchesPlayed: 1 }),
     );
   });
 
   it("delivers the level-up to the player's browser (BUG-08)", async () => {
-    server = await startTestServer();
+    server = await startTestServer({ now: clockOn("2026-10-23") });
     const alice = await clients.player();
     const bob = await clients.player();
     // Wait until the first push has reached the client, so the next listener cannot catch it instead.
@@ -64,7 +67,7 @@ describe("progression end to end", () => {
   });
 
   it("reaches every open tab of the player", async () => {
-    server = await startTestServer();
+    server = await startTestServer({ now: clockOn("2026-10-23") });
     const alice = await clients.player();
     const bob = await clients.player();
     const secondTab = await clients.openSocket(alice.cookie);
