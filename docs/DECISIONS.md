@@ -19,6 +19,61 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 
 ## Accepted decisions
 
+### ADR-012: visual identity — "neon arcade"
+
+- **Status:** Accepted · 2026-10-16 (proposed in [CC-087](tickets/CC-087.md))
+  **Decision.** The web app's look is a self-contained arcade theme built only from what the CSP already allows:
+
+1. **Tokens are the single source of colour, size and motion.** Every existing token name is kept (values may
+   change), so B's and C's components restyle automatically. New tokens: display font stack (system fonts only, no
+   `@font-face`), `--text-3xl`, `--radius-xl`, accent / XP / gold / streak / per-game / tier / locked colours,
+   hero and XP gradients, the background grid line, glows, chunky press shadows, five durations and three easings.
+   Art-only inks (`--color-art-ink`, `--color-art-white`, `--color-on-tier`, `--color-neon-*`), chess-square colours
+   and the backdrop moved into tokens too, so components hold no raw colours.
+2. **Art is hand-drawn SVG in React components** (`apps/web/src/art/`), painted with SVG presentation attributes and
+   CSS-module classes over tokens — never a `style` attribute or `<style>` element. Variation without inline styles:
+   confetti pieces get their position, drift, spin and colour from `:nth-child` rules; bars are `<progress>`.
+   Glyphs are `<g>` groups so scenes, icons and medals reuse one drawing.
+3. **Motion is decoration, never information.** Only `transform` and `opacity` animate (two documented exceptions
+   below); nothing loops forever (sparkles 3 twinkles, flame 3 flickers); celebrations are `pointer-events: none`,
+   `aria-hidden`, portalled to `<body>`, and finish within 1.5 s. The meaning is always also text: the room's
+   "You won!" status, the "+30 XP" and "Level up! …" toasts.
+4. **Reduced motion** sets every duration to 0, `global.css` turns off all animations and transitions, and
+   `useReducedMotion()` (a `useSyncExternalStore` over `matchMedia`) makes `Confetti`, `LevelUpBurst` and `XpPop`
+   render nothing. States that animate in are drawn so their resting (un-animated) style is the final one.
+5. **Registries for extension.** `GAME_ART` maps game id → `{ Art, Glyph, tone }`; a new game adds one entry and
+   falls back to the joystick until it does. Achievement icons fall back to a star.
+6. **Lint guard.** `no-restricted-syntax` on `JSXAttribute[name.name='style']` ("inline styles violate CSP; use a
+   CSS module") in `apps/web/src`, no new dependency.
+
+**Alternatives considered.** An icon font or an icon library (new dependency, external assets, copyright);
+a web font for the display face (a font file and a CSP change for little gain — `ui-rounded` and fallbacks look
+right on all major platforms); a motion library (bundle cost; CSS keyframes do everything needed); inline style
+variables for confetti (blocked by the CSP).
+
+**Consequences.** Initial JS grows by about 9.5 KB gzip against main after the gamification batch (112.1 → 121.7 KB,
+including the 3.4 KB `jsx-runtime` chunk Vite now splits out because the hero art is lazy), CSS by about 5.4 KB gzip
+(4.6 → 10.0 KB); the hero scene is its own 1.2 KB chunk.
+New screens must use tokens and the art registry; a style attribute fails `npm run lint`.
+
+### Where the brief and the repo rules differ
+
+- **Animated properties.** The brief allows only `transform`/`opacity` but also asks for a press shadow that
+  shrinks and a stroke draw-in for X/O. Both are kept: `box-shadow` changes on press (80 ms) and
+  `stroke-dashoffset` draws marks in (200 ms) — both paint-only, no layout.
+- **XP bar shimmer.** A `<progress>` has no reliable `::after`, so the header chip's bar pulses once
+  (`transform: scaleY`) when XP arrives instead of a gradient sweep.
+- **Toasts** moved to the top right as the brief asks; the region is `pointer-events: none`, so a toast can never
+  cover a button (relevant for the e2e suite and for people).
+- **Focus colour.** `--color-focus` in light was `#f0a400` (1.9:1 on the background). It is now `#b45309`
+  (4.6:1 on bg, 5.0:1 on surface); on the hero gradient the ring is `--color-focus-on-hero` `#ffe08a`
+  (4.4:1 light, 8.4:1+ dark). Cells of the coloured TTT grid and chess squares draw the ring inside the cell.
+- **Primary on primary-soft** is 4.49:1 (light) / 4.26:1 (dark), just under AA for small text, so the active nav
+  pill, seat tags and ghost-button hover use text colour (14:1 / 12:1) or the raised surface instead.
+- **Header chip.** The brief says "using the existing `useProgress`". It does, plus it follows `progress:updated`
+  pushes so the level is live; it is mounted per identity (`key`), and only when there is a session, so visitors
+  never request `/api/progress`.
+
 ### ADR-015 — Leaderboards and rematch
 
 - **Status:** Accepted · 2026-10-16 (proposed in [CC-053](tickets/CC-053.md))
