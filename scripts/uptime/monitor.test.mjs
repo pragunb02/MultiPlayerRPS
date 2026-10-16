@@ -12,6 +12,8 @@ const SITE = "https://nocapgaming.onrender.com";
 const API = "https://api.github.com/repos/o/r";
 const RUN_ID = 900;
 const HEALTHY = '{"status":"ok","database":"up"}';
+/** Whether a request goes to the site rather than to GitHub, compared by origin. */
+const isSite = (/** @type {unknown} */ url) => new URL(String(url)).origin === SITE;
 
 /**
  * @typedef {{ number: number, body: string, created_at: string, state: string, comments: string[], title?: string }} FakeIssue
@@ -32,7 +34,7 @@ function fakeWorld({ siteUp, previousRuns = [], issues = [], labelExists = true 
   const { fetch, calls } = fakeFetch(async (url, init) => {
     const method = init.method ?? "GET";
     const body = init.body ? JSON.parse(String(init.body)) : {};
-    if (url.startsWith(SITE)) {
+    if (isSite(url)) {
       if (!siteUp) {
         return new Response("", { status: 503 });
       }
@@ -309,7 +311,7 @@ describe("uptime monitor", () => {
       );
       const world = fakeWorld({ siteUp: true });
       const failingGitHub = /** @type {typeof globalThis.fetch} */ (
-        async (url, init) => (String(url).startsWith(SITE) ? world.fetch(url, init) : fetch(url, init))
+        async (url, init) => (isSite(url) ? world.fetch(url, init) : fetch(url, init))
       );
 
       const code = await runUptimeMonitor({
@@ -329,7 +331,7 @@ describe("uptime monitor", () => {
       const world = fakeWorld({ siteUp: true });
       const throwsString = /** @type {typeof globalThis.fetch} */ (
         async (url, init) => {
-          if (String(url).startsWith(SITE)) {
+          if (isSite(url)) {
             return world.fetch(url, init);
           }
           throw "rate limited";
