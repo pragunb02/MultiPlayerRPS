@@ -142,7 +142,7 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
     },
 
     /**
-     * Pipeline step after progression: the accounts of a recorded match move up the boards.
+     * Pipeline step after progression and gamification: the accounts of a recorded match move up the boards.
      *
      * @param {{
      *   match: Readonly<import("../../data/matchAccessor.js").Match>,
@@ -152,9 +152,16 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
     async applyMatch({ match, updates }) {
       for (const update of updates.filter(({ playerId }) => isAccountId(playerId))) {
         const { displayName } = match.players.find(({ playerId }) => playerId === update.playerId);
-        const player = { playerId: update.playerId, displayName, level: update.progress.level };
+        // Quest bonuses earned by this match (CC-089) may already have raised the player's XP: the board shows
+        // the latest total and level, never the older ones from progression's update.
+        const { xp } = await progressAccessor.get(update.playerId);
+        const latest =
+          xp > update.progress.xp
+            ? { xp, level: levelForXp(xp) }
+            : { xp: update.progress.xp, level: update.progress.level };
+        const player = { playerId: update.playerId, displayName, level: latest.level };
         const at = match.endedAt;
-        await addXp({ player, xp: update.progress.xp, gained: update.xpGained, key: match.matchId, at });
+        await addXp({ player, xp: latest.xp, gained: update.xpGained, key: match.matchId, at });
         if (update.result === "win" && hasWinsBoard(match.gameId)) {
           await raiseWins({ player, gameId: match.gameId, at });
         }

@@ -115,8 +115,16 @@ test.describe("leaderboards", () => {
       await expect(yourRow).toContainText("1 win", { timeout: 1_000 });
     }).toPass({ timeout: 10_000 });
     await expect(yourRow).toHaveAttribute("aria-current", "true");
-    await boardTabs(riya.page).getByRole("link", { name: "This week" }).click();
-    await expect(yourRow).toContainText("30 XP");
+    // A win is 30 XP; the day's quests may add a bonus (CC-089). A new account earned all of it this week.
+    // Quest bonuses reach the boards in the background too: reload until both boards agree.
+    await expect(async () => {
+      await riya.page.goto("/leaderboards/overall");
+      await expect(yourRow).toContainText(/\d+ XP/, { timeout: 1_000 });
+      const [, overallXp] = (await yourRow.textContent()).match(/(\d+) XP/);
+      expect(Number(overallXp)).toBeGreaterThanOrEqual(30);
+      await boardTabs(riya.page).getByRole("link", { name: "This week" }).click();
+      await expect(yourRow).toContainText(`${overallXp} XP`, { timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
     await expect(riya.page.getByText(bobName)).toHaveCount(0);
 
     await riya.page.goto("/profile");

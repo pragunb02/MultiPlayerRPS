@@ -436,7 +436,21 @@ describe("a guest's progress moving to their account through the real compositio
       const { achievements } = await api(app.url, "/achievements", cookie);
       const { streaks } = await api(app.url, "/streaks", cookie);
 
+      const boards = await eventually(async () => {
+        const [overallBoard, winsBoard] = await Promise.all(
+          ["overall", "rock-paper-scissors"].map((id) => api(app.url, `/leaderboards/${id}`, cookie)),
+        );
+        return overallBoard.you.listed && winsBoard.you.listed ? { overallBoard, winsBoard } : undefined;
+      });
+
       expect(body.carriedOver).toEqual({ xp: 30 + bonus, matchesPlayed: 1, matches: 1 });
+      // The carried-over XP and win put the new account on the leaderboards (CC-053).
+      expect(boards.overallBoard.entries).toEqual([
+        expect.objectContaining({ rank: 1, displayName: "Riya", score: 30 + bonus }),
+      ]);
+      expect(boards.winsBoard.entries).toEqual([
+        expect.objectContaining({ rank: 1, displayName: "Riya", score: 1 }),
+      ]);
       expect((await api(app.url, "/progress", cookie)).progress).toEqual(
         expect.objectContaining({ xp: 30 + bonus, matchesPlayed: 1, wins: 1 }),
       );
@@ -616,10 +630,21 @@ describe("leaderboards and rematches through the real composition root (integrat
         const body = await res.json();
         return body.entries.length === 2 ? body : undefined;
       });
-      const overall = await eventually(async () => {
-        const res = await fetch(`${app.url}/api/leaderboards/overall`, { headers: { cookie: sam.cookie } });
-        const body = await res.json();
-        return body.entries[0]?.score === 50 ? body : undefined;
+      // 50 and 40 XP from the matches, plus whatever daily quests paid (they depend on the player and the day).
+      const xpOf = async ({ cookie }) => {
+        const res = await fetch(`${app.url}/api/progress`, { headers: { cookie } });
+        return (await res.json()).progress.xp;
+      };
+      const { overall, weekly, riyaXp, samXp } = await eventually(async () => {
+        const [riyaXp, samXp] = [await xpOf(riya), await xpOf(sam)];
+        const boardFor = async (id) =>
+          (await fetch(`${app.url}/api/leaderboards/${id}`, { headers: { cookie: sam.cookie } })).json();
+        const [overall, weekly] = [await boardFor("overall"), await boardFor("weekly")];
+        const scores = (body) => Object.fromEntries(body.entries.map((e) => [e.displayName, e.score]));
+        const settled = (body) => scores(body).riya === riyaXp && scores(body).sam === samXp;
+        return riyaXp >= 50 && samXp >= 40 && settled(overall) && settled(weekly)
+          ? { overall, weekly, riyaXp, samXp }
+          : undefined;
       });
       const matches = await readCollection(app.config.mongoUri, "matches");
 
@@ -628,11 +653,14 @@ describe("leaderboards and rematches through the real composition root (integrat
         ["sam", 1],
       ]);
       expect(board.you).toEqual({ listed: false, reason: "guest" });
-      expect(overall.entries.map(({ displayName, score }) => [displayName, score])).toEqual([
-        ["riya", 50],
-        ["sam", 40],
-      ]);
-      expect(overall.you).toEqual({ listed: true, rank: 2, score: 40 });
+      // Overall and this week's XP agree for new accounts: match XP and quest bonuses both count for the week.
+      for (const body of [overall, weekly]) {
+        expect(body.entries.map(({ displayName, score }) => [displayName, score]).sort()).toEqual([
+          ["riya", riyaXp],
+          ["sam", samXp],
+        ]);
+        expect(body.you).toEqual(expect.objectContaining({ listed: true, score: samXp }));
+      }
       expect(matches.filter((match) => match.roomCode === code)).toHaveLength(2);
       const entries = await readCollection(app.config.mongoUri, "leaderboard_entries");
       expect(entries.some((entry) => entry.playerId === visitor.identity.id)).toBe(false);

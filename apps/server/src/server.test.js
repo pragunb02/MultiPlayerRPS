@@ -146,7 +146,12 @@ describe("connectMatchPipeline", () => {
     const applyToBoards = vi.fn(async () => {
       order.push("leaderboards");
     });
-    const { domainEvents, tasks, find } = setup({ recordFinished, applyMatch, applyGamification, applyToBoards });
+    const { domainEvents, tasks, find } = setup({
+      recordFinished,
+      applyMatch,
+      applyGamification,
+      applyToBoards,
+    });
 
     domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
     await tasks.drain();

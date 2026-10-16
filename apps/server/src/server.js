@@ -18,7 +18,11 @@ import { createIdentityComponent } from "./domain/identity/identityComponent.js"
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "./domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
-import { createProgressionComponent, PROGRESSION_EVENTS, XP_SOURCES } from "./domain/progression/progressionComponent.js";
+import {
+  createProgressionComponent,
+  PROGRESSION_EVENTS,
+  XP_SOURCES,
+} from "./domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
 import { createAccountDao } from "./persistence/accountDao.js";
 import { createAchievementDao } from "./persistence/achievementDao.js";
@@ -271,9 +275,16 @@ export async function startServer({ config, logger, limits = {} }) {
   const playerTransferDao = createPlayerTransferDao({ connection: database.connection });
   const leaderboardDao = createLeaderboardDao({ connection: database.connection });
   await Promise.all(
-    [matchDao, progressDao, accountDao, playerTransferDao, statsDao, questDao, achievementDao, leaderboardDao].map(
-      (dao) => dao.ensureIndexes(),
-    ),
+    [
+      matchDao,
+      progressDao,
+      accountDao,
+      playerTransferDao,
+      statsDao,
+      questDao,
+      achievementDao,
+      leaderboardDao,
+    ].map((dao) => dao.ensureIndexes()),
   );
 
   // 3. data

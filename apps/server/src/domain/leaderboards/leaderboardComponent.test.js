@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { levelForXp } from "@classicade/shared";
 import { createLeaderboardAccessor } from "../../data/leaderboardAccessor.js";
 import { createMatchAccessor } from "../../data/matchAccessor.js";
 import { createProgressAccessor } from "../../data/progressAccessor.js";
@@ -94,6 +95,25 @@ describe("leaderboardComponent", () => {
       { rank: 1, displayName: "alice", level: 5, score: 1 },
     ]);
     expect(await entries("chess")).toEqual([]);
+  });
+
+  it("shows the latest XP and level when quest bonuses raised them after progression's update (CC-089)", async () => {
+    const { play, entries, progressAccessor } = setup();
+    await progressAccessor.applyAwardOnce({
+      playerId: ALICE.id,
+      key: "quest:2026-10-16:win-1",
+      inc: { xp: 130 },
+      at: NOW,
+    });
+
+    await play({}, [update(ALICE, { xp: 30, level: 1 })]);
+
+    expect(await entries("overall")).toEqual([
+      { rank: 1, displayName: "alice", level: levelForXp(130), score: 130 },
+    ]);
+    expect((await entries("weekly"))[0]).toEqual(
+      expect.objectContaining({ level: levelForXp(130), score: 30 }),
+    );
   });
 
   it("never stores or lists guests, however much they play", async () => {
