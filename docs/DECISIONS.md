@@ -19,6 +19,126 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 
 ## Accepted decisions
 
+### ADR-015 — Leaderboards and rematch
+
+- **Status:** Accepted · 2026-10-16 (proposed in [CC-053](tickets/CC-053.md))
+  **Context.** We need global, per-game and weekly leaderboards (FR-PROG-3) that stay correct when a match is applied
+  twice, when quest XP arrives outside matches, and when a guest's data moves to an account (ADR-014).
+
+**Decision.**
+
+1. **Accounts only.** Entries are written only for `user_…` ids (`isAccountId`). Guest XP is never stored on a board;
+   it reaches the boards through the account once the guest signs up.
+2. **One collection, keyed by board and period**: `leaderboard_entries { board: "xp" | "wins:<gameId>", period:
+"all" | "2026-W42", playerId, displayName, level, score, recentKeys, updatedAt, expiresAt? }`. Unique
+   `{board, period, playerId}`; list index `{board, period, score: -1, updatedAt: 1, playerId: 1}` (the player id
+   makes the order total, so the index serves the sort); TTL on `expiresAt` (weekly entries: week end + 28 days).
+3. **Two idempotent writes only.**
+   - `raiseScore` for totals (overall XP from the player's progress, wins per game from `matchDao.countWins`): the
+     score only rises, `updatedAt` changes only when it does. Re-applying a total is a no-op; it also self-heals:
+     wins before this feature count as soon as the player wins again.
+   - `addOnce` for this week's XP, keyed by match id or quest key (last 200 keys remembered, like progress).
+4. **Ranks**: list position for the top entries; "your rank" = entries ahead of yours + 1, using the same order
+   (higher score; on a tie, earlier `updatedAt`; then lower player id). The brief said "number with a higher score +
+   1" — that would disagree with the tie-broken list, so the list's order is used for both.
+5. **Board ids are URL slugs** generated from `GAMES` (a new game gets a board with no code changes); the catalog
+   lives in `@classicade/shared`, so the web app renders tabs without a request and paths can validate.
+6. **Public endpoints** with their own rate limit (120/min per IP, raised for browser tests like the other limits).
+7. **Rematch** (CC-037) is a transition inside the room state machine: `finished → playing` in the same room code,
+   new match id and seed, same options, seats reversed. The room keeps `rematch { requestedBy, available }` and a
+   `series { games, wins }`. See `docs/tickets/CC-037.md`.
+
+**Consequences.** Weekly scores are kept for four weeks for history; older ones vanish via TTL. A player's weekly
+score after a guest transfer is recomputed from this week's matches (scores only rise, so quest XP already on the
+weekly entry is not lost, but a guest's quest XP from this week is not added). Leaderboards trust progression for
+XP; if progression is ever recomputed downwards, boards keep the higher value until a dedicated rebuild job exists.
+
+### ADR-014 — Player data follows the identity
+
+- **Status:** Accepted · 2026-10-16 (proposed in [CC-032](tickets/CC-032.md))
+  **Context.** Several components store data by player id (matches, progress; soon achievements, streaks, quests,
+  leaderboards). A guest who signs in becomes a different player id. Moving the data must be exactly-once, survive a
+  crash at any point, never block the sign-in, and must not lose a match that finishes while the player signs in.
+
+**Decision.**
+
+1. Every domain component that stores data by player id exposes
+   `transferPlayer({ from, to: Identity, now }) → { moved: Record<string, number> }`: move everything stored for
+   `from` to `to`, merging into what `to` already has; idempotent and resumable. Rooms keep their synchronous
+   `transferPlayer` for seats (CC-083).
+2. `domain/identity/playerTransferComponent.js` orchestrates: insert a `player_transfers` record (`{ from }` unique —
+   a guest moves once) as `pending` → run each participant in the order the composition root lists them → mark
+   `done` with `carriedOver`. `resumePending({ now })` re-runs transfers still pending 30 s after they started
+   (housekeeping, every 60 s). `follow({ match, now })` runs in the match pipeline between recording and
+   progression: a match recorded under the guest's id after their history moved is moved too.
+3. Participants, in order: `matches` (CC-032), `progress` (CC-032), then gamification (B) and leaderboards (C) add
+   one line each in `server.js` and `testing/testApp.js`.
+4. Matches: every match `from` played that `to` did not is rewritten with `renamePlayer(match, from, to.id)` (the
+   same helper rooms use) and the account's display name; the replacement only applies while `from` is still in the
+   stored document, so re-runs are no-ops. A match the guest played against that same account stays unchanged.
+5. Progress, two guarded steps: (1) mark the guest's document `mergedInto: <account>` (creating an empty one if the
+   guest has none); (2) add its totals to the account, guarded by `mergedFrom: { $ne: guest }`, and remember the
+   guest's recent match ids so none of them is applied to the account twice.
+6. The sign-in route awaits the transfer and reports `carriedOver`; errors are caught there, logged with ids only,
+   and the sign-in still succeeds.
+
+**Deviations from the design brief** (and why):
+
+- The guest's progress document is **kept as a marker** (`mergedInto`) instead of being deleted in a third step.
+  Any match applied to that guest later (one that finished during the sign-in and slipped past `follow`) finds the
+  marker, and `progressAccessor.applyMatchOnce` credits the account instead — exactly once, thanks to the merged
+  match ids. Deleting the document would let such a match recreate a guest document nobody will ever read. Cost:
+  one small document per converted guest.
+- `follow` takes `{ match, now }` (named parameters, like every other call), and the transfer component receives
+  `matches: { transferPlayer, getById }` explicitly for `follow`, besides the participant list.
+- `carriedOver` is omitted when nothing moved (a guest who never finished a match), so clients show nothing.
+
+**Consequences.** Adding a new kind of per-player data means adding a participant, not editing sign-in code.
+Participants must be idempotent; their contract tests include running the move twice and resuming after a partial
+run. Guests can no longer be "re-used": a guest id that moved once is refused for a second account (409 inside the
+transfer, logged; the sign-in itself succeeds).
+
+### ADR-013 — Gamification rules
+
+- **Status:** Accepted · 2026-10-16 (proposed in [CC-054](tickets/CC-054.md))
+  **Context.** We want achievements, streaks and daily quests that drive return visits without breaking the XP
+  economy, that work for guests, and that can be rebuilt from what we already store.
+
+**Decision.**
+
+1. **One pipeline step after progression.** `connectMatchPipeline` runs `gamificationComponent.applyMatch({ match,
+updates, now })` as its own background task after progression, so it only ever sees recorded matches and a
+   failure is logged separately ("apply gamification") without touching XP already awarded.
+2. **Counting.** A recorded match counts once per player (exactly-once by match id in a 200-key window per
+   document, like progression). The player who left gets a loss; the opponent a win (`resultFor`). The match day is
+   the UTC day of `endedAt`.
+3. **Win streak** across all games in arrival order: win +1, loss or forfeit → 0, draw unchanged.
+   **Daily streak** in UTC days: same day no change, next day +1, gap → 1, own forfeit ignored. A late match from
+   _before_ the last counted day changes nothing (otherwise one late write would reset a streak). Read with `now`:
+   last day before yesterday → shown as 0; last day yesterday → `atRisk`.
+4. **Achievements are status only — no XP.** Evaluated by a pure `evaluateAchievements(stats, progress)` over
+   `player_stats` + progress totals. Every metric except `questsCompleted` can be rebuilt from `matches`.
+   "Triple Threat" grows with the catalog (`GAMES.length`).
+5. **Quest XP goes through progression** with an idempotency key (`quest:<day>:<questId>`, `quest:<day>:sweep`),
+   via `progressAccessor.applyAwardOnce` (XP only, not a match played). After each match, every completed quest of
+   the day is (re)awarded by key, so a crash between saving the quests and awarding the XP heals with the next match.
+6. **Concurrency.** Stats and quest days are read-modify-write with a `version` compare-and-set (retry up to 5
+   times, then `ConflictError`); unlocks rely on a unique `{playerId, achievementId}` index.
+7. **Events** `GAMIFICATION_EVENTS.{ACHIEVEMENTS_UNLOCKED, QUESTS_UPDATED, STREAKS_UPDATED}`, each mapped by the
+   gateway to the player's own `player:<id>` room. `PROGRESS_UPDATED` gains `source: "match" | "quest"` and `key`;
+   the web shows "+30 XP" for match XP and "Quest complete! +40 XP" for quest XP.
+8. **Transfer (ADR-014 participant).** Unlocks move with the earlier time kept; stats are rebuilt from the account's
+   (already moved) history — and those match ids are remembered, so a match that finishes during the sign-in is
+   never counted twice; completed quests are added once (`mergedFrom`); guest quest days are deleted (their XP moved
+   with progress).
+
+**Consequences.** Cheap reads (one stats doc, one quest doc, a small unlock list). Up to ~8 extra small writes per
+player per match. **Known risk:** someone can farm XP by playing guest against guest with themselves; quest XP is
+capped at 150 a day (see CC-089) and leaderboards are accounts-only (CC-053). A per-opponent daily cap can come later.
+
+**Alternatives.** Achievements awarding XP (rejected: feedback loops, harder to balance); computing everything on
+read from `matches` (rejected: grows with history; kept as the rebuild path for transfers instead).
+
 ### ADR-011 — URL scheme: one canonical URL per screen, readable slugs, old URLs redirect
 
 - **Status:** Accepted · 2026-10-16
