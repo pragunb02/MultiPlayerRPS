@@ -70,6 +70,16 @@ export function createRealtimeGateway({
       next();
     } catch (err) {
       const { code, message } = toClientError(err);
+      // Why a client couldn't connect, for operators (and failing tests, CC-079) — never the session id itself.
+      logger.warn(
+        {
+          code,
+          reason: message,
+          sentCookie: Boolean(socket.request.headers.cookie),
+          hadSession: socket.request.session !== undefined,
+        },
+        "socket refused",
+      );
       next(Object.assign(new Error(message), { data: { code } }));
     }
   });

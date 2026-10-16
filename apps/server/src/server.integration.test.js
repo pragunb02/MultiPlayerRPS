@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { ENGINES, replayGame } from "@classicade/games";
 import { connectDatabase } from "./persistence/database.js";
@@ -56,6 +56,11 @@ const freshConfig = () => testConfig({ MONGO_URI: mongo.uri(`it-${++dbCounter}`)
 
 async function start(config = freshConfig()) {
   const capture = captureLogger();
+  // A failing test shows what the server saw (refused sockets, session lookups) — rare flakes explain themselves.
+  onTestFailed(() => {
+    process.stderr.write(`\n--- server log (${config.mongoUri.split("/").pop()}) ---\n`);
+    capture.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`));
+  });
   const app = await startServer({ config, logger: capture.logger });
   return { ...app, ...capture, config, url: `http://127.0.0.1:${app.port}` };
 }
