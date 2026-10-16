@@ -8,11 +8,21 @@ import { test as base, expect } from "@playwright/test";
  * - no console errors or warnings, no uncaught page errors, no CSP violations, no failed requests
  *   (except the ones a test declares with `player.expect(status, path)`);
  * - no secret in any URL the browser requested or showed: passwords, emails, the session cookie;
- * - the session cookie is HttpOnly (not readable by page scripts), and nothing is kept in web storage.
+ * - the session cookie is HttpOnly (not readable by page scripts), and web storage holds only allowlisted
+ *   preferences (STORAGE_ALLOWLIST, CC-103).
  *
  * A test that restarts the server declares it with `player.expectRestart()`. Then the realtime connection may
  * fail while the next server process starts, and only that (CC-101).
  */
+/**
+ * The only things the app may keep in web storage, with the exact shape each must have. A preference of this browser
+ * (is sound on, how loud) is fine there. Anything that identifies the player or a game is not, because page scripts
+ * can read web storage and it outlives the session (CC-103).
+ */
+export const STORAGE_ALLOWLIST = Object.freeze({
+  "cc.sound": (value) => /^\{"muted":(true|false),"volume":(0|1|0\.\d+)\}$/.test(value),
+});
+
 export const test = base.extend({
   players: async ({ browser, baseURL }, use) => {
     const opened = [];
@@ -113,11 +123,17 @@ async function checkClean({ name, page, context, record, secrets }) {
   if (!page.isClosed() && page.url().startsWith("http")) {
     const exposed = await page.evaluate(() => ({
       cookie: document.cookie,
-      local: Object.keys(localStorage),
+      local: Object.entries(localStorage),
       session: Object.keys(sessionStorage),
     }));
     expect(exposed.cookie, `${name}: page scripts can read cookies`).not.toContain("cc.sid");
-    expect(exposed.local, `${name}: localStorage`).toEqual([]);
+    for (const [key, value] of exposed.local) {
+      const allowed = Object.hasOwn(STORAGE_ALLOWLIST, key) && STORAGE_ALLOWLIST[key](value);
+      expect(
+        allowed,
+        `${name}: localStorage holds ${key}=${value}, which is not an allowlisted preference`,
+      ).toBe(true);
+    }
     expect(exposed.session, `${name}: sessionStorage`).toEqual([]);
   }
 }

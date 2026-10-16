@@ -39,13 +39,13 @@ function RematchWindow({ until, serverTime, onWindowEnded }) {
 }
 
 /**
- * After a finished game: ask the same opponent for a rematch, accept theirs, or see that they left (CC-037).
- * The new game starts in this same room, so the page and its URL stay where they are.
+ * After a finished game: ask the same opponent for a rematch, accept theirs, see that they declined (CC-104), or
+ * see that they left (CC-037). The new game starts in this same room, so the page and its URL stay where they are.
  *
  * @param {{
  *   room: { gameId: string, you: string, serverTime: number,
  *     seats: Array<{ playerId: string, displayName: string, connected: boolean }>,
- *     rematch?: { requestedBy: string[], available: boolean, until: number },
+ *     rematch?: { requestedBy: string[], available: boolean, until: number, declinedBy?: string },
  *     series?: { games: number, wins: Record<string, number> } },
  *   onRematch: () => Promise<unknown>,
  *   onError: (error: Error) => void,
@@ -98,7 +98,15 @@ export function RematchPanel({ room, onRematch, onError, onWindowEnded }) {
       </Button>
     );
   } else {
-    message = "Fancy another round?";
+    // After a "no" the panel says so, and asking again stays possible (CC-104).
+    const declinedBy = room.rematch.declinedBy ?? "";
+    if (declinedBy === room.you) {
+      message = "You declined the rematch. Changed your mind?";
+    } else if (declinedBy !== "") {
+      message = `${names(opponents.filter((seat) => seat.playerId === declinedBy))} declined the rematch.`;
+    } else {
+      message = "Fancy another round?";
+    }
     action = (
       <Button size="lg" busy={busy} onClick={toggle}>
         Rematch

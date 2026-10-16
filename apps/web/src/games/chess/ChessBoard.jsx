@@ -5,6 +5,7 @@ import { Button } from "../../components/Button/Button.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { MotionProvider } from "../../components/Motion/MotionProvider.jsx";
 import { TurnBanner } from "../../components/TurnBanner/TurnBanner.jsx";
+import { useLowTimeTick } from "../../hooks/useSound.js";
 import { useMove } from "../useMove.js";
 import { Board } from "./Board.jsx";
 import { materialBalance, opposite, positionWithMove, replayGame } from "./chessGame.js";
@@ -95,7 +96,6 @@ export function ChessBoard({ room, onMove, site = window.location.origin }) {
 
   const yourTurn = playing && seated && view.toMove === room.you && !move.busy;
   const interactive = yourTurn && shown === latest;
-  const opponentId = room.seats.find((seat) => seat.playerId !== room.you)?.playerId ?? "";
 
   const byColour = (colour) => Object.keys(view.colors).find((id) => view.colors[id] === colour) ?? "";
   const seatName = (playerId) =>
@@ -111,6 +111,7 @@ export function ChessBoard({ room, onMove, site = window.location.origin }) {
     serverTime: room.serverTime,
   });
   const balance = materialBalance(position.fen);
+  useLowTimeTick(clocks[yourColour], playing && room.you in view.colors && running === yourColour);
 
   async function play(boardMove, { dragged }) {
     setDropped(dragged ? boardMove : { from: "", to: "" });
@@ -202,20 +203,14 @@ export function ChessBoard({ room, onMove, site = window.location.origin }) {
           <MoveList moves={timeline.slice(1).map((p) => p.san)} ply={shown} latest={latest} onGoTo={goTo} />
           {playing && seated && (
             <div className={styles.actions}>
-              {view.drawOfferBy === opponentId && opponentId !== "" ? (
-                <>
-                  <p className={styles.offer}>{seatName(opponentId)} offers a draw.</p>
-                  <Button onClick={() => move.send({ type: CHESS_ACTIONS.ACCEPT_DRAW })}>Accept draw</Button>
-                </>
-              ) : (
-                <Button
-                  variant="secondary"
-                  disabled={view.drawOfferBy === room.you}
-                  onClick={() => move.send({ type: CHESS_ACTIONS.OFFER_DRAW })}
-                >
-                  {view.drawOfferBy === room.you ? "Draw offered" : "Offer draw"}
-                </Button>
-              )}
+              {/* A standing offer is answered or withdrawn in the room's request popup (CC-104). */}
+              <Button
+                variant="secondary"
+                disabled={view.drawOfferBy !== ""}
+                onClick={() => move.send({ type: CHESS_ACTIONS.OFFER_DRAW })}
+              >
+                {view.drawOfferBy === room.you ? "Draw offered" : "Offer draw"}
+              </Button>
               <Button variant="ghost" onClick={() => setConfirmResign(true)}>
                 Resign
               </Button>

@@ -184,10 +184,6 @@
   display: grid;
   gap: var(--space-2);
 }
-.offer {
-  margin: 0;
-  font-weight: 600;
-}
 .error {
   margin: 0;
   color: var(--color-danger);

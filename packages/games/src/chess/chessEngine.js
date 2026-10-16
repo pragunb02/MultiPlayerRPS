@@ -1,6 +1,7 @@
 import { Chess } from "chess.js";
 import {
   CHESS_ACTIONS,
+  CHESS_DRAW_ANSWERS as ANSWERS,
   CHESS_END_REASONS as END,
   CHESS_PROMOTIONS,
   CHESS_TIME_CONTROLS,
@@ -32,6 +33,7 @@ const FLAG = "flag";
  * @property {Array<{ from: string, to: string, san: string, at: number, promotion?: string }>} moves
  * @property {string} fen                         current position (derived from `moves`, kept for fast validation)
  * @property {string} drawOfferBy                 player id with a standing draw offer, or ""
+ * @property {string} drawAnswer                  how the last offer ended without a draw (CHESS_DRAW_ANSWERS)
  * @property {{ reason: string, winner: string }} end   reason is "" while the game is on. winner is "" for a draw.
  */
 
@@ -154,6 +156,7 @@ export const chessEngine = defineEngine({
       moves: [],
       fen: new Chess().fen(),
       drawOfferBy: "",
+      drawAnswer: ANSWERS.NONE,
       end: { reason: "", winner: "" },
     };
   },
@@ -184,6 +187,14 @@ export const chessEngine = defineEngine({
         return state.drawOfferBy === opponent
           ? ok({ type: CHESS_ACTIONS.ACCEPT_DRAW })
           : reject(MOVE_REJECTIONS.ILLEGAL_MOVE, "There is no draw offer to accept");
+      case CHESS_ACTIONS.DECLINE_DRAW:
+        return state.drawOfferBy === opponent
+          ? ok({ type: CHESS_ACTIONS.DECLINE_DRAW })
+          : reject(MOVE_REJECTIONS.ILLEGAL_MOVE, "There is no draw offer to decline");
+      case CHESS_ACTIONS.WITHDRAW_DRAW:
+        return state.drawOfferBy === playerId
+          ? ok({ type: CHESS_ACTIONS.WITHDRAW_DRAW })
+          : reject(MOVE_REJECTIONS.ILLEGAL_MOVE, "You have no draw offer to withdraw");
       default: {
         const color = state.colors[playerId];
         if (sideToMove(state) !== color) {
@@ -203,7 +214,11 @@ export const chessEngine = defineEngine({
       case CHESS_ACTIONS.RESIGN:
         return { ...state, drawOfferBy: "", end: { reason: END.RESIGNATION, winner: opponent } };
       case CHESS_ACTIONS.OFFER_DRAW:
-        return { ...state, drawOfferBy: playerId };
+        return { ...state, drawOfferBy: playerId, drawAnswer: ANSWERS.NONE };
+      case CHESS_ACTIONS.DECLINE_DRAW:
+        return { ...state, drawOfferBy: "", drawAnswer: ANSWERS.DECLINED };
+      case CHESS_ACTIONS.WITHDRAW_DRAW:
+        return { ...state, drawOfferBy: "", drawAnswer: ANSWERS.WITHDRAWN };
       case CHESS_ACTIONS.ACCEPT_DRAW:
         return { ...state, drawOfferBy: "", end: { reason: END.AGREEMENT, winner: "" } };
       case FLAG:
@@ -215,6 +230,8 @@ export const chessEngine = defineEngine({
           : { from: move.from, to: move.to };
         const chess = replay(state.moves);
         const { san } = chess.move(played);
+        // Moving instead of answering declines the opponent's offer, but your own offer stands.
+        const declines = state.drawOfferBy === opponent;
         const remaining =
           state.lastMoveAt > 0
             ? state.clocks[color] - (now - state.lastMoveAt) + state.incrementMs
@@ -225,8 +242,8 @@ export const chessEngine = defineEngine({
           lastMoveAt: now,
           moves: [...state.moves, { ...played, san, at: now }],
           fen: chess.fen(),
-          // Moving instead of answering declines the opponent's draw offer. Your own offer stays open.
-          drawOfferBy: state.drawOfferBy === opponent ? "" : state.drawOfferBy,
+          drawOfferBy: declines ? "" : state.drawOfferBy,
+          drawAnswer: declines ? ANSWERS.DECLINED : state.drawAnswer,
           end: boardEnd(chess, playerId),
         };
       }
@@ -261,6 +278,8 @@ export const chessEngine = defineEngine({
       clocks: state.clocks,
       lastMoveAt: state.lastMoveAt,
       drawOfferBy: state.drawOfferBy,
+      // Games stored before draw answers existed (CC-104) have none: nobody answered an offer in them.
+      drawAnswer: state.drawAnswer ?? ANSWERS.NONE,
     };
   },
 

@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
-import { fakeApi, fakeSocket } from "../../testing/fakes.js";
+import { fakeApi, fakeSocket, fakeSound } from "../../testing/fakes.js";
 import { installMatchMedia } from "../../testing/matchMedia.js";
 import { outcomeFor } from "./outcome.js";
 import { ResultCelebration } from "./ResultCelebration.jsx";
@@ -13,7 +13,7 @@ const finished = ({ you = "a", result = "win", winners = ["a"] } = {}) => ({
 
 function celebrate(room, socket = fakeSocket()) {
   const view = render(
-    <ServicesProvider services={{ api: fakeApi(), socket }}>
+    <ServicesProvider services={{ api: fakeApi(), socket, sound: fakeSound() }}>
       <ResultCelebration room={room} />
     </ServicesProvider>,
   );

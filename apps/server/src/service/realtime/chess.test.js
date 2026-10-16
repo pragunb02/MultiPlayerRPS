@@ -93,4 +93,31 @@ describe("Chess over sockets", () => {
     expect(ack.data.game.view.clocks).toEqual({ w: 180_000, b: 175_000 }); // 180 − 7 + 2
     expect(ack.data.serverTime).toBe(now); // views carry server time, so clients can show drift-free clocks
   });
+
+  it("tells the offerer when the opponent declines a draw, and the game goes on (CC-104)", async () => {
+    const { alice, bob, code } = await chessGame();
+    const aliceSeesOffer = nextEvent(alice.socket);
+    await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "offer-draw" } });
+    expect((await aliceSeesOffer).game.view.drawOfferBy).toBe(bob.identity.id);
+
+    const bobSeesAnswer = nextEvent(bob.socket);
+    await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "decline-draw" } });
+
+    const answer = await bobSeesAnswer;
+    expect(answer.status).toBe("playing");
+    expect(answer.game.view).toEqual(expect.objectContaining({ drawOfferBy: "", drawAnswer: "declined" }));
+    expect((await move(bob, code, "e2", "e4")).ok).toBe(true);
+  });
+
+  it("tells the opponent when the offerer withdraws, and refuses accepting afterwards (CC-104)", async () => {
+    const { alice, bob, code } = await chessGame();
+    await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "offer-draw" } });
+    const aliceSeesWithdrawal = nextEvent(alice.socket);
+
+    await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "withdraw-draw" } });
+
+    expect((await aliceSeesWithdrawal).game.view.drawAnswer).toBe("withdrawn");
+    const late = await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "accept-draw" } });
+    expect(late.error.details).toEqual({ reason: "ILLEGAL_MOVE" });
+  });
 });

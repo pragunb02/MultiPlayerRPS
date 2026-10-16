@@ -45,7 +45,7 @@ describe("roomComponent rematch (CC-037)", () => {
 
     const view = rooms.viewFor(await rooms.getRoom(code), ALICE.id);
 
-    expect(view.rematch).toEqual({ requestedBy: [], available: true, until: UNTIL });
+    expect(view.rematch).toEqual({ requestedBy: [], available: true, until: UNTIL, declinedBy: "" });
     expect(view.series).toEqual({ games: 1, wins: { [ALICE.id]: 1 } });
   });
 
@@ -59,6 +59,7 @@ describe("roomComponent rematch (CC-037)", () => {
       requestedBy: [BOB.id],
       available: true,
       until: UNTIL,
+      declinedBy: "",
     });
     expect(await rooms.sweepExpired({ now: UNTIL })).toEqual([code]);
   });
@@ -108,7 +109,12 @@ describe("roomComponent rematch (CC-037)", () => {
     expect(rooms.viewFor(room, BOB.id)).toEqual(
       expect.objectContaining({
         status: "finished",
-        rematch: { requestedBy: [], available: true, until: T0 + 7 + ROOM_LIFETIMES.rematchWindowMs },
+        rematch: {
+          requestedBy: [],
+          available: true,
+          until: T0 + 7 + ROOM_LIFETIMES.rematchWindowMs,
+          declinedBy: "",
+        },
         series: { games: 2, wins: { [ALICE.id]: 1, [BOB.id]: 1 } },
       }),
     );
@@ -124,6 +130,7 @@ describe("roomComponent rematch (CC-037)", () => {
       requestedBy: [],
       available: false,
       until: T0 + 2 + ROOM_LIFETIMES.rematchWindowMs,
+      declinedBy: "",
     });
     await expect(
       ctx.rooms.requestRematch({ code: ctx.code, playerId: ALICE.id, now: T0 + 3 }),
@@ -136,7 +143,7 @@ describe("roomComponent rematch (CC-037)", () => {
 
     const { room } = await rooms.leaveRoom({ code, playerId: BOB.id, now: T0 + 5 });
 
-    expect(room.rematch).toEqual({ requestedBy: [], available: false });
+    expect(room.rematch).toEqual({ requestedBy: [], available: false, declinedBy: "" });
     await expect(rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 6 })).rejects.toThrow(
       /opponent left/,
     );
@@ -210,5 +217,93 @@ describe("roomComponent rematch (CC-037)", () => {
 
     expect(room.status).toBe("playing");
     expect(room).not.toHaveProperty("finishedAt");
+  });
+});
+
+describe("roomComponent declining a rematch (CC-104)", () => {
+  it("drops the opponent's request and remembers who declined", async () => {
+    const { rooms, code } = await finishedGame();
+    await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 4 });
+
+    const room = await rooms.declineRematch({ code, playerId: BOB.id, now: T0 + 5 });
+
+    expect(room.status).toBe("finished");
+    expect(rooms.viewFor(room, ALICE.id).rematch).toEqual({
+      requestedBy: [],
+      available: true,
+      until: UNTIL,
+      declinedBy: BOB.id,
+    });
+    expect(room.lastActivityAt).toBe(T0 + 5);
+  });
+
+  it("forgets the old answer as soon as anyone asks again", async () => {
+    const { rooms, code } = await finishedGame();
+    await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 4 });
+    await rooms.declineRematch({ code, playerId: BOB.id, now: T0 + 5 });
+
+    const room = await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 6 });
+
+    expect(room.rematch).toEqual({ requestedBy: [ALICE.id], available: true, declinedBy: "" });
+  });
+
+  it("still starts a rematch when the decliner changes their mind and both ask", async () => {
+    const { rooms, code } = await finishedGame();
+    await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 4 });
+    await rooms.declineRematch({ code, playerId: BOB.id, now: T0 + 5 });
+    await rooms.requestRematch({ code, playerId: BOB.id, now: T0 + 6 });
+
+    expect((await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 7 })).status).toBe("playing");
+  });
+
+  it("refuses when nobody else asked, including declining your own request", async () => {
+    const { rooms, code } = await finishedGame();
+
+    await expect(rooms.declineRematch({ code, playerId: BOB.id, now: T0 + 4 })).rejects.toThrow(
+      ConflictError,
+    );
+    await rooms.requestRematch({ code, playerId: BOB.id, now: T0 + 5 });
+    await expect(rooms.declineRematch({ code, playerId: BOB.id, now: T0 + 6 })).rejects.toThrow(
+      /Nobody asked/,
+    );
+  });
+
+  it("refuses while the game is on, after the opponent left, and for someone without a seat", async () => {
+    const ctx = setup();
+    await ctx.rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 3 }, now: T0 });
+    await ctx.rooms.joinRoom({ code: ctx.code, player: BOB, now: T0 + 1 });
+    await expect(
+      ctx.rooms.declineRematch({ code: ctx.code, playerId: ALICE.id, now: T0 + 2 }),
+    ).rejects.toThrow(ConflictError);
+
+    const finished = await finishedGame();
+    await finished.rooms.requestRematch({ code: finished.code, playerId: ALICE.id, now: T0 + 4 });
+    await expect(
+      finished.rooms.declineRematch({ code: finished.code, playerId: CAROL.id, now: T0 + 5 }),
+    ).rejects.toThrow(ForbiddenError);
+    await finished.rooms.leaveRoom({ code: finished.code, playerId: ALICE.id, now: T0 + 6 });
+    await expect(
+      finished.rooms.declineRematch({ code: finished.code, playerId: BOB.id, now: T0 + 7 }),
+    ).rejects.toThrow(/no rematch to decline/);
+  });
+
+  it("cannot be declined once the rematch window has ended, and says why the room closed (CC-101)", async () => {
+    const { rooms, code } = await finishedGame();
+    await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 4 });
+
+    const error = await rooms.declineRematch({ code, playerId: BOB.id, now: UNTIL }).catch((err) => err);
+
+    expect(error).toBeInstanceOf(GoneError);
+    expect(error.details).toEqual({ reason: "rematch-window-ended", gameId: "race", closedAt: UNTIL });
+  });
+
+  it("shows nobody as having declined in a room stored before declines existed", async () => {
+    const { rooms, code } = await finishedGame();
+    const { declinedBy, ...stored } = (await rooms.getRoom(code)).rematch;
+
+    expect(declinedBy).toBe("");
+    expect(
+      rooms.viewFor({ ...(await rooms.getRoom(code)), rematch: stored }, ALICE.id).rematch.declinedBy,
+    ).toBe("");
   });
 });

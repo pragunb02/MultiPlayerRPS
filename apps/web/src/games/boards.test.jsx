@@ -1,10 +1,18 @@
-import { render, screen, within } from "@testing-library/react";
+import { render as renderPlain, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { gameView } from "./registry.js";
 import { RpsBoard } from "./rps/RpsBoard.jsx";
 import { TicTacToeBoard } from "./tictactoe/TicTacToeBoard.jsx";
+import { ServicesProvider } from "../app/ServicesProvider.jsx";
+import { fakeSound } from "../testing/fakes.js";
+
+// Boards may play sounds (the chess clock ticks), so they get a fake sound player.
+const Services = ({ children }) => (
+  <ServicesProvider services={{ sound: fakeSound() }}>{children}</ServicesProvider>
+);
+const render = (ui, options) => renderPlain(ui, { wrapper: Services, ...options });
 
 const ME = "guest_me";
 const THEM = "guest_them";

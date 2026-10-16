@@ -1,4 +1,4 @@
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS, ROOM_STATUS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
@@ -15,9 +15,12 @@ import { Seats } from "../../components/Seats/Seats.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { gameView } from "../../games/registry.js";
+import { gameNumber } from "../../games/roomView.js";
+import { useRoomAlerts } from "../../games/useRoomAlerts.js";
 import { useRoom } from "../../hooks/useRoom.js";
 import { useSession } from "../../hooks/useSession.js";
 import { JoinChooser } from "./JoinChooser.jsx";
+import { RoomRequests } from "./RoomRequests.jsx";
 import styles from "./RoomPage.module.css";
 
 /** Why a room closed, in the players' words (CC-101). */
@@ -62,12 +65,6 @@ function outcomeText(room) {
   return outcome.winners.includes(room.you) ? "You won!" : "You lost";
 }
 
-/** Which game of the room this is (0 = the first; each rematch adds one), the same while playing and finished. */
-function gameNumber(room) {
-  if (room.series === undefined) return 0;
-  return room.series.games - (room.status === ROOM_STATUS.FINISHED ? 1 : 0);
-}
-
 /**
  * A room from joining to the result: waiting with an invite, the game board, the outcome. Its URL names the game
  * and the room; any other spelling (lower-case code, old `/room/:code` link, wrong game) is replaced by the
@@ -87,6 +84,8 @@ export function RoomPage() {
   const room = useRoom(code, { enabled: session.status === "ready" });
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const gameId = room.room?.gameId ?? urlGame?.id;
+  const notify = useCallback((message) => toast.show(message, { tone: "info" }), [toast]);
+  useRoomAlerts(room.room, { notify });
 
   if (gameId !== undefined && location.pathname !== paths.room(gameId, code)) {
     return <Navigate to={paths.room(gameId, code)} replace />;
@@ -150,6 +149,12 @@ export function RoomPage() {
   const { Board } = gameView(view.gameId);
   const playing = view.status === ROOM_STATUS.PLAYING;
 
+  /** What a request button does (RoomAction): a game move, or asking for or declining a rematch. */
+  function act(action) {
+    if (action.type === "move") return room.move(action.move);
+    return action.type === "rematch" ? room.rematch() : room.declineRematch();
+  }
+
   async function leave() {
     setConfirmingLeave(false);
     try {
@@ -176,6 +181,11 @@ export function RoomPage() {
 
       <div className={styles.layout}>
         <div className={styles.stage}>
+          <RoomRequests
+            room={view}
+            onAction={act}
+            onError={(error) => toast.show(error.message, { tone: "danger" })}
+          />
           {view.status === ROOM_STATUS.WAITING && (
             <div className={`${styles.card} ${styles.invite}`}>
               <InviteArt className={styles.inviteArt} />

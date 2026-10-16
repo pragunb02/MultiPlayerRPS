@@ -6,6 +6,7 @@ import { Button } from "../Button/Button.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { useSaveProgress } from "../SaveProgress/saveProgressContext.js";
+import { SoundControl } from "../SoundControl/SoundControl.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import styles from "./Layout.module.css";
 
@@ -49,6 +50,7 @@ export function Layout() {
           {identity && <NavLink to={paths.profile()}>Profile</NavLink>}
         </nav>
         <div className={styles.player}>
+          <SoundControl />
           {identity && <LevelChip key={identity.id} />}
           <div className={styles.identity} aria-live="polite">
             {identity && (

@@ -16,6 +16,20 @@ export const CHESS_ACTIONS = Object.freeze({
   RESIGN: "resign",
   OFFER_DRAW: "offer-draw",
   ACCEPT_DRAW: "accept-draw",
+  /** the opponent says no to a standing draw offer (CC-104) */
+  DECLINE_DRAW: "decline-draw",
+  /** the player who offered a draw takes the offer back (CC-104) */
+  WITHDRAW_DRAW: "withdraw-draw",
+});
+
+/**
+ * How the last draw offer ended without a draw (the chess view's `drawAnswer`, CC-104): "" while an offer stands or
+ * none was made, "declined" by the opponent (pressing Decline or simply moving), or "withdrawn" by the offerer.
+ */
+export const CHESS_DRAW_ANSWERS = Object.freeze({
+  NONE: "",
+  DECLINED: "declined",
+  WITHDRAWN: "withdrawn",
 });
 
 export const CHESS_PROMOTIONS = Object.freeze(["q", "r", "b", "n"]);

@@ -23,7 +23,7 @@ import { ServicesProvider } from "./ServicesProvider.jsx";
  * The app, independent of the browser entry point (router and services are passed in), so tests can render it
  * with a memory router and fake clients.
  *
- * @param {{ services: { api: object, socket: object } }} props
+ * @param {{ services: { api: object, socket: object, sound: object } }} props
  */
 export function App({ services }) {
   return (

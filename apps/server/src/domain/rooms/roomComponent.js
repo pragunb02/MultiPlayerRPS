@@ -34,7 +34,7 @@ const MAX_CODE_ATTEMPTS = 10;
 const MAX_WRITE_ATTEMPTS = 5;
 // Rooms whose seats move to the account when a guest signs in (CC-083, CC-097): every room still open.
 const SEATS_FOLLOW_IDENTITY = new Set([ROOM_STATUS.WAITING, ROOM_STATUS.PLAYING, ROOM_STATUS.FINISHED]);
-const NO_REMATCH = Object.freeze({ requestedBy: Object.freeze([]), available: false });
+const NO_REMATCH = Object.freeze({ requestedBy: Object.freeze([]), available: false, declinedBy: "" });
 const CLOSED = Object.freeze({ closed: true });
 
 const randomRoomCode = () =>
@@ -210,7 +210,7 @@ export function createRoomComponent({
     finishedAt: now,
     series: nextSeries(room.series, outcome),
     // Someone who forfeited has left the game, so there is nobody to play again with.
-    rematch: { requestedBy: [], available: outcome.reason !== "forfeit" },
+    rematch: { requestedBy: [], available: outcome.reason !== "forfeit", declinedBy: "" },
   });
 
   function start(room, now) {
@@ -412,10 +412,46 @@ export function createRoomComponent({
             ? requestedBy.filter((id) => id !== playerId)
             : [...requestedBy, playerId];
           if (!room.seats.every((seat) => requested.includes(seat.playerId))) {
-            return { ...room, rematch: { ...room.rematch, requestedBy: requested }, lastActivityAt: now };
+            return {
+              ...room,
+              // Any new request or withdrawal starts over, so an old "no" is not shown again.
+              rematch: { ...room.rematch, requestedBy: requested, declinedBy: "" },
+              lastActivityAt: now,
+            };
           }
           const { result, rematch, game, finishedAt, ...rest } = room;
           return start({ ...rest, seats: [...room.seats].reverse() }, now);
+        },
+      }),
+
+    /**
+     * A seated player says no to the rematch their opponent asked for (CC-104). The request is dropped and the room
+     * remembers who declined, so the asker is told. A rematch stays possible: either player may ask again until the
+     * rematch window ends.
+     *
+     * @param {{ code: string, playerId: string, now: number }} input
+     * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>}
+     * @throws {ForbiddenError} for someone without a seat
+     * @throws {ConflictError} when the game is not finished, a rematch is no longer possible, or nobody else asked
+     * @throws {GoneError} when the rematch window has ended and the room closed
+     */
+    declineRematch: ({ code, playerId, now }) =>
+      changedRoom({
+        code,
+        now,
+        decide(room) {
+          requireSeat(room, playerId);
+          if (room.status !== ROOM_STATUS.FINISHED || !room.rematch.available) {
+            throw new ConflictError("There is no rematch to decline");
+          }
+          if (!room.rematch.requestedBy.some((id) => id !== playerId)) {
+            throw new ConflictError("Nobody asked you for a rematch");
+          }
+          return {
+            ...room,
+            rematch: { ...room.rematch, requestedBy: [], declinedBy: playerId },
+            lastActivityAt: now,
+          };
         },
       }),
 
@@ -617,6 +653,8 @@ export function createRoomComponent({
             requestedBy: [...room.rematch.requestedBy],
             available: room.rematch.available,
             until: lifetimeOf(room, lifetimes).endsAt,
+            // Rooms stored before declines existed (CC-104) have none: nobody declined in them.
+            declinedBy: room.rematch.declinedBy ?? "",
           },
         }),
         ...(room.series && { series: { games: room.series.games, wins: { ...room.series.wins } } }),

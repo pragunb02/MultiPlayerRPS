@@ -78,5 +78,12 @@ export function useRoom(code, { enabled }) {
 
   const refresh = useCallback(() => setJoins((n) => n + 1), []);
 
-  return { ...state, move, leave, rematch, refresh };
+  /** Says no to the opponent's rematch request (CC-104). They are told, and either player may ask again. */
+  const declineRematch = useCallback(async () => {
+    const room = await socket.request(SOCKET_EVENTS.ROOM_REMATCH_DECLINE, { code });
+    setState((s) => ({ ...s, room }));
+    return room;
+  }, [socket, code]);
+
+  return { ...state, move, leave, rematch, declineRematch, refresh };
 }
