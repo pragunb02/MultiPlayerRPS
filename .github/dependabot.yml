@@ -1,0 +1,37 @@
+# Dependency updates (CC-031). Every update is a pull request that must pass CI before merging — and merging deploys
+# (docs/DEPLOYMENT.md), so read each one's deployment impact. Dependabot only proposes stable releases, which is
+# our policy (docs/ENGINEERING.md §5).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: / # one lockfile for every workspace
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      # Patch and minor releases of dev tools in one PR a week; runtime ones in another, to review them separately.
+      dev-tools:
+        dependency-type: development
+        update-types: [minor, patch]
+      runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+      # Major releases come one per PR: each may need code changes and a migration note.
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
