@@ -24,11 +24,13 @@
 
 ## Issue tracker
 
+Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-counts.sh`), not edited by hand.
+
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 2    | 4           | 5     |
-| Bugs (BUG)       | 7    | 5           | 2     |
-| Tech debt (DEBT) | 4    | 6           | 3     |
+| Bugs (BUG)       | 8    | 4           | 2     |
+| Tech debt (DEBT) | 3    | 6           | 3     |
 
 ## Changelog
 

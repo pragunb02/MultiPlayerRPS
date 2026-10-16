@@ -79,6 +79,7 @@ npm run format:check
 npm test               # Vitest across all workspaces (*.test.js next to the code)
 npm run test:coverage  # with coverage gates (ENGINEERING.md §4)
 npm audit              # must be 0 high/critical
+./scripts/issue-counts.sh  # issue counts for PROGRESS.md (never hand-edit them)
 ```
 
 No local MongoDB? A throwaway `mongodb-memory-server` instance in a temp dir works for smoke tests.
