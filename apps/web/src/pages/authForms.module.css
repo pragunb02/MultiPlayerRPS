@@ -1,0 +1,25 @@
+.page {
+  max-width: 26rem;
+  margin: 0 auto;
+}
+.form {
+  display: grid;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+}
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.alert {
+  margin: 0;
+  color: var(--color-danger);
+}
+.switch {
+  text-align: center;
+  font-size: var(--text-sm);
+}

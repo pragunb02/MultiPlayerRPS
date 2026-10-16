@@ -10,13 +10,13 @@
 | Stage health  | 🟢 On track                                                                                     |
 | In progress   | —                                                                                               |
 | Blocked on    | —                                                                                               |
-| Next up       | CC-025 auth/profile pages → CC-030 CSP/CSRF → CC-078 user migration → CC-029 cutover            |
+| Next up       | CC-030 CSP/CSRF → CC-078 legacy user migration → CC-029 cutover + delete legacy                 |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 25 / 36      |
+| S0 Foundation   | 🟡 In progress | 26 / 36      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -36,6 +36,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-025 — Auth and profile UI: `/signup` / `/login` (accessible fields, instant validation, server field errors, safe `next` redirects), header identity actions, `/profile` (level, progress bar, stats, paged match history). 720 tests. Real-browser journey sign up → play → profile → log out → log in verified; fixed a header height jump.
 - 2026-10-16 — CC-024 — Game boards: RPS (secret choices), Tic-Tac-Toe (accessible grid), Chess (click-to-move with legal hints, promotion, resign/draw, live clocks); drift-free clocks via `serverTime` on every room view; lazy-loaded boards (chess.js only for chess). Two browsers played all three games end to end; screenshots caught and fixed a collapsed Tic-Tac-Toe row. Rare flake logged as CC-079. 701 tests.
 - 2026-10-16 — CC-023 — Lobby and room UI: `/play/:gameId` (options, create, join by code) and `/room/:code` (full lifecycle); client game registry; `useRoom` (reconnect rejoin, no accidental forfeit); ShareRoom (BUG-12), Seats, accessible Modal, toasts + XP/level-up toasts. 681 tests. Visual check with Playwright (two players, light/dark, desktop/mobile) — fixed two mobile layout issues found in screenshots.
 - 2026-10-16 — CC-022 — Web app scaffold: React 19.3 / Vite 8.3 / React Router 8.4; design tokens (light/dark); API + socket clients in `lib/`; DI services context; SessionProvider (guest on demand, socket reconnect on identity change); layout, home, not-found, error boundary; same-origin Vite dev proxy; React lint rules; jsdom test project (ADR-009). 654 tests. Live: app + API + WebSocket through the dev proxy.

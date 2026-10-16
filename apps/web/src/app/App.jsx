@@ -4,9 +4,12 @@ import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { HomePage } from "../pages/HomePage/HomePage.jsx";
+import { LoginPage } from "../pages/LoginPage/LoginPage.jsx";
 import { NotFoundPage } from "../pages/NotFoundPage/NotFoundPage.jsx";
 import { PlayPage } from "../pages/PlayPage/PlayPage.jsx";
+import { ProfilePage } from "../pages/ProfilePage/ProfilePage.jsx";
 import { RoomPage } from "../pages/RoomPage/RoomPage.jsx";
+import { SignupPage } from "../pages/SignupPage/SignupPage.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { ServicesProvider } from "./ServicesProvider.jsx";
 
@@ -28,6 +31,9 @@ export function App({ services }) {
                 <Route index element={<HomePage />} />
                 <Route path="play/:gameId" element={<PlayPage />} />
                 <Route path="room/:code" element={<RoomPage />} />
+                <Route path="login" element={<LoginPage />} />
+                <Route path="signup" element={<SignupPage />} />
+                <Route path="profile" element={<ProfilePage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Routes>
