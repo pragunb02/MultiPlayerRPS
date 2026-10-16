@@ -1,0 +1,4 @@
+.failed {
+  padding: var(--space-8);
+  text-align: center;
+}

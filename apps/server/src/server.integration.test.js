@@ -132,6 +132,14 @@ describe("startServer (integration)", () => {
     expect(ack).toEqual({ ok: true, data: identity });
   });
 
+  it("refuses to start when the configured web build is missing", async () => {
+    const config = testConfig({ MONGO_URI: mongo.uri("no-web"), WEB_DIST_DIR: "/nonexistent/web/dist" });
+
+    await expect(startServer({ config, logger: captureLogger().logger })).rejects.toThrow(
+      /WEB_DIST_DIR has no index.html/,
+    );
+  });
+
   it("fails to start, without leaking a connection, when the port is taken", async () => {
     const first = await start();
     const config = testConfig({ MONGO_URI: first.config.mongoUri, PORT: String(first.port) });

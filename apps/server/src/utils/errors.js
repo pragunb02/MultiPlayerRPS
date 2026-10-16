@@ -59,6 +59,14 @@ export class NotFoundError extends AppError {
   }
 }
 
+/** The request body is not JSON (state-changing requests only accept JSON — also a CSRF defence). */
+export class UnsupportedMediaTypeError extends AppError {
+  /** @param {string} message @param {ErrorOptions} [options] */
+  constructor(message, options = {}) {
+    super(message, { ...options, code: ERROR_CODES.UNSUPPORTED_MEDIA_TYPE });
+  }
+}
+
 /** The request conflicts with current state (room full, username taken). */
 export class ConflictError extends AppError {
   /** @param {string} message @param {ErrorOptions} [options] */

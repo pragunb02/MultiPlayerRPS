@@ -14,21 +14,15 @@ function ProgressCard() {
   const { status, progress, error } = useProgress();
   if (status === "loading") return <p>Loading progress…</p>;
   if (status === "error") return <p role="alert">Couldn't load progress. {error.message}</p>;
-  const percent =
-    progress.xpForNextLevel === 0 ? 100 : Math.round((progress.xpIntoLevel / progress.xpForNextLevel) * 100);
   return (
     <div className={styles.card}>
       <p className={styles.level}>Level {progress.level}</p>
-      <div
+      <progress
         className={styles.bar}
-        role="progressbar"
         aria-label="Progress to next level"
-        aria-valuemin={0}
-        aria-valuemax={progress.xpForNextLevel}
-        aria-valuenow={progress.xpIntoLevel}
-      >
-        <span style={{ width: `${percent}%` }} />
-      </div>
+        max={Math.max(progress.xpForNextLevel, 1)}
+        value={progress.xpForNextLevel === 0 ? 1 : progress.xpIntoLevel}
+      />
       <p className={styles.muted}>
         {progress.xpIntoLevel} / {progress.xpForNextLevel} XP to level {progress.level + 1} · {progress.xp} XP
         total

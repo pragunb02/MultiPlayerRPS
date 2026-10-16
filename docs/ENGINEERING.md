@@ -65,7 +65,7 @@ Data objects are **plain and frozen** — no methods that do work, so logic can'
 ### Frontend (`apps/web`) and engines (`packages/games`)
 
 - `packages/games`: **pure** functions — `(state, input) → newState`. No I/O, no timers, no `Math.random` (RNG is injected), no imports from apps. Enforced by lint.
-- `apps/web` (ADR-009): pages → components → hooks → `lib/` (API + socket clients). Only `lib/` talks to the server; clients are injected via the services context; components never call `fetch` or import `socket.io-client` (lint-enforced). Styles are CSS Modules over design tokens (`styles/tokens.css`) — no raw colours/sizes in components. The server is the source of truth for game state.
+- `apps/web` (ADR-009): pages → components → hooks → `lib/` (API + socket clients). Only `lib/` talks to the server; clients are injected via the services context; components never call `fetch` or import `socket.io-client` (lint-enforced). Styles are CSS Modules over design tokens (`styles/tokens.css`) — no raw colours/sizes in components, and **no inline `style=` or inline scripts** (the CSP forbids them, CC-030). The server is the source of truth for game state.
 
 ---
 

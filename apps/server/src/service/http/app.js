@@ -2,8 +2,10 @@ import express from "express";
 import helmet from "helmet";
 import { assertDefined } from "../../utils/assert.js";
 import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
+import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createRequestLogger } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
+import { createWebAppRouter } from "./webApp.js";
 
 /**
  * Service layer entry point for HTTP: creates the Express app without binding a port,
@@ -45,8 +47,14 @@ export function createHttpApp({
     app.set("trust proxy", 1);
   }
   app.use(createRequestLogger({ logger }));
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: contentSecurityPolicy({ isProduction: config.isProduction }),
+      frameguard: { action: "deny" }, // matches frame-ancestors 'none' for older browsers
+    }),
+  );
   app.use(express.json({ limit: "100kb" }));
+  app.use("/api", createCsrfGuard({ allowedOrigins: config.allowedOrigins }));
   app.use("/api", sessionMiddleware);
 
   app.use(
@@ -61,6 +69,10 @@ export function createHttpApp({
       guestLimit,
     }),
   );
+
+  if (config.webDistDir !== "") {
+    app.use(createWebAppRouter({ distDir: config.webDistDir }));
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

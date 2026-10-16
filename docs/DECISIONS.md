@@ -19,6 +19,18 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 
 ## Accepted decisions
 
+### ADR-010 — CSRF defence without tokens for the same-origin app
+
+- **Status:** Accepted · 2026-10-16
+- **Context:** CC-030 was written as "CSRF tokens". The new app is a same-origin SPA talking JSON to its own API; it has no
+  cross-site HTML forms and never enables CORS.
+- **Decision:** Defend in depth without tokens (OWASP "verify origin with standard headers" + SameSite cookies):
+  session cookies `SameSite=Lax`; state-changing `/api` requests must carry an allowed `Origin` when the browser sends one;
+  request bodies must be `application/json` (cross-site pages cannot send JSON without a preflight we never grant).
+  Sockets already check `Origin` at the handshake (CC-013).
+- **Consequences:** No token plumbing in the client; stateless. Revisit if we ever allow cross-origin API clients, embed the
+  app in other sites, or add classic HTML form posts.
+
 ### ADR-009 — Web app conventions: CSS Modules + tokens, injected clients, same-origin dev proxy
 
 - **Status:** Accepted · 2026-10-16
