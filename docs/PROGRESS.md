@@ -2,15 +2,15 @@
 
 ## Status
 
-|               |                                                                                                 |
-| ------------- | ----------------------------------------------------------------------------------------------- |
-| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md) |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-080`                                  |
-| Current stage | **Stage 0 — Foundation**                                                                        |
-| Stage health  | 🟢 On track                                                                                     |
-| In progress   | —                                                                                               |
-| Blocked on    | —                                                                                               |
-| Next up       | CC-028 hosting decision (ADR-005) + staging — needs the owner                                   |
+|               |                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)          |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-080`                                           |
+| Current stage | **Stage 0 — Foundation**                                                                                 |
+| Stage health  | 🟢 On track                                                                                              |
+| In progress   | Gamification batch (multi-agent): CC-086 + CC-032, CC-054 + CC-089, CC-053 + CC-037, CC-087; then CC-088 |
+| Blocked on    | —                                                                                                        |
+| Next up       | CC-028 hosting decision (ADR-005) + staging — needs the owner                                            |
 
 ## Stage tracker
 
