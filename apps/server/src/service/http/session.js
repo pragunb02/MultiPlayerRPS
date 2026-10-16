@@ -3,7 +3,11 @@ import { createIdentity } from "../../models/identity.js";
 import { UnauthorizedError } from "../../utils/errors.js";
 
 export const SESSION_COOKIE_NAME = "cc.sid";
-export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
+/**
+ * Sessions last 30 days after the LAST visit (rolling, CC-096): a guest who keeps playing never loses their progress
+ * to an expired cookie, and anyone who stays away for a month starts fresh.
+ */
+export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 /**
  * Cookie-backed server-side sessions. The same middleware instance is used by HTTP and the realtime
@@ -19,6 +23,9 @@ export function createSessionMiddleware({ store, secret, secureCookies }) {
     store,
     resave: false,
     saveUninitialized: false, // no session (and no cookie) until there is an identity to remember
+    // Every response re-issues the cookie with a fresh expiry; the store only rewrites its copy now and then
+    // (see touchAfter in persistence/sessionStore.js), so a visit costs no database write.
+    rolling: true,
     cookie: {
       httpOnly: true,
       sameSite: "lax",

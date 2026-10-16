@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest"
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { ENGINES, replayGame } from "@classicade/games";
 import { connectDatabase } from "./persistence/database.js";
-import { SESSION_COLLECTION } from "./persistence/sessionStore.js";
+import { createSessionStore, SESSION_COLLECTION } from "./persistence/sessionStore.js";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
@@ -711,6 +711,53 @@ describe("legacy player migration through the real composition root (integration
 });
 
 describe("createSessionStore (integration)", () => {
+  /** Plays the store's part of a visit, the way express-session does for an unchanged session. */
+  const touch = (store, sid, session) =>
+    new Promise((resolve, reject) => store.touch(sid, session, (err) => (err ? reject(err) : resolve())));
+  const set = (store, sid, session) =>
+    new Promise((resolve, reject) => store.set(sid, session, (err) => (err ? reject(err) : resolve())));
+  const get = (store, sid) =>
+    new Promise((resolve, reject) => store.get(sid, (err, value) => (err ? reject(err) : resolve(value))));
+  const cookieFor = (expires) => ({
+    originalMaxAge: 1000,
+    expires: new Date(expires),
+    httpOnly: true,
+    path: "/",
+  });
+
+  it("moves a returning player's stored expiry forward, writing at most once per touch interval (CC-096)", async () => {
+    const database = await connectDatabase({
+      uri: mongo.uri(`roll-${++dbCounter}`),
+      logger: captureLogger().logger,
+    });
+    try {
+      const often = await createSessionStore({
+        client: database.client,
+        ttlSeconds: 60,
+        touchAfterSeconds: 0,
+      });
+      const rarely = await createSessionStore({
+        client: database.client,
+        ttlSeconds: 60,
+        touchAfterSeconds: 3600,
+      });
+      const day = 24 * 60 * 60 * 1000;
+      await set(often, "sid-often", { cookie: cookieFor(Date.now() + day), identity: { kind: "guest" } });
+      await set(rarely, "sid-rarely", { cookie: cookieFor(Date.now() + day), identity: { kind: "guest" } });
+
+      const later = Date.now() + 25 * day;
+      await touch(often, "sid-often", { ...(await get(often, "sid-often")), cookie: cookieFor(later) });
+      await touch(rarely, "sid-rarely", { ...(await get(rarely, "sid-rarely")), cookie: cookieFor(later) });
+
+      const docs = await database.connection.db.collection(SESSION_COLLECTION).find().toArray();
+      const expiry = (id) => docs.find((doc) => doc._id === id).expires.getTime();
+      expect(expiry("sid-often")).toBe(later);
+      expect(expiry("sid-rarely")).toBeLessThan(later); // touched within the hour: no write
+    } finally {
+      await database.close();
+    }
+  });
+
   it("creates the TTL index that expires sessions before the server takes traffic", async () => {
     const app = await start();
     try {
