@@ -57,6 +57,15 @@ describe("ResultCelebration", () => {
     expect(document.querySelector("[data-effect='xp-pop']")).toHaveTextContent("+30 XP");
   });
 
+  it("floats the match's XP, not a quest bonus that follows it", () => {
+    const { socket } = celebrate(finished());
+
+    act(() => socket.push("progress:updated", { source: "match", xpGained: 30, progress: { level: 1 } }));
+    act(() => socket.push("progress:updated", { source: "quest", xpGained: 20, progress: { level: 1 } }));
+
+    expect(document.querySelector("[data-effect='xp-pop']")).toHaveTextContent("+30 XP");
+  });
+
   it("shows no XP pop for a match that earned nothing (a forfeit)", () => {
     const { socket } = celebrate(finished({ winners: ["b"] }));
 

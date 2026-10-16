@@ -27,7 +27,14 @@ export function ResultCelebration({ room }) {
   const [xp, setXp] = useState(0);
   const outcome = outcomeFor(room);
 
-  useEffect(() => socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, ({ xpGained }) => setXp(xpGained)), [socket]);
+  // The match's own XP; a quest bonus that follows it has its own toast and pop (GamificationToasts).
+  useEffect(
+    () =>
+      socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, ({ source, xpGained }) => {
+        if (source !== "quest") setXp(xpGained);
+      }),
+    [socket],
+  );
 
   return (
     <div className={`${styles.celebration} ${styles[outcome]}`} aria-hidden="true">

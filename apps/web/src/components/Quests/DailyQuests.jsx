@@ -1,6 +1,8 @@
 import { useId } from "react";
 import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
+import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
+import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { useCountdown } from "../../hooks/useCountdown.js";
 import { useQuests } from "../../hooks/useQuests.js";
 import { Button } from "../Button/Button.jsx";
@@ -19,10 +21,24 @@ function ResetsIn({ at, onElapsed }) {
   );
 }
 
+/** A quest's picture: the game's glyph for a game quest, a scroll (gold once done) for the others. Decoration. */
+function QuestIcon({ item }) {
+  return (
+    <span className={styles.icon} aria-hidden="true">
+      {item.gameId ? (
+        <GameIcon gameId={item.gameId} size={32} />
+      ) : (
+        <AchievementIcon name="scroll" tier={isDone(item) ? "gold" : "silver"} className={styles.scroll} />
+      )}
+    </span>
+  );
+}
+
 function QuestItem({ item }) {
   const done = isDone(item);
   return (
     <li className={`${styles.quest} ${done ? styles.done : ""}`}>
+      <QuestIcon item={item} />
       <span className={styles.text}>
         <span className={styles.name}>{item.name}</span>
         <span className={styles.muted}>{item.description}</span>

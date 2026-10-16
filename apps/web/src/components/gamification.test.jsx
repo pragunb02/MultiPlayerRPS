@@ -6,8 +6,9 @@ import { SOCKET_EVENTS } from "@classicade/shared";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
 import { AppRequestError } from "../lib/errors.js";
 import { achievement, fakeApi, fakeSocket, NO_STREAKS, QUESTS } from "../testing/fakes.js";
+import { installMatchMedia } from "../testing/matchMedia.js";
 import { AchievementGrid } from "./Achievements/AchievementGrid.jsx";
-import { GamificationToasts } from "./GamificationToasts.jsx";
+import { CELEBRATION_MS, GamificationToasts } from "./GamificationToasts.jsx";
 import { ProgressToasts } from "./ProgressToasts.jsx";
 import { DailyQuests } from "./Quests/DailyQuests.jsx";
 import { resetsIn } from "./Quests/resetsIn.js";
@@ -412,5 +413,170 @@ describe("GamificationToasts", () => {
       socket.push(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, { achievements: [achievement()] }),
     ).not.toThrow();
     expect(socket.on).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("arcade art (CC-087)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  const effect = (name) => document.querySelector(`[data-effect='${name}']`);
+
+  it("draws each achievement's medal in its tier, padlocked while locked, bronze for an unknown tier", async () => {
+    renderWith(<AchievementGrid />, {
+      api: fakeApi({
+        getAchievements: vi
+          .fn()
+          .mockResolvedValue([
+            achievement({ id: "a", icon: "trophy", tier: "gold", unlockedAt: Date.UTC(2026, 9, 16) }),
+            achievement({ id: "b", icon: "flame", tier: "silver" }),
+            achievement({ id: "c", icon: "dragon", tier: "mythic" }),
+          ]),
+      }),
+    });
+
+    const [gold, locked, unknown] = within(
+      await screen.findByRole("list", { name: "Achievements" }),
+    ).getAllByRole("listitem");
+    expect(gold).toHaveClass("gold");
+    expect(gold.querySelector("svg circle")).toHaveClass("gold");
+    expect(gold.querySelector("svg")).toHaveClass("unlocked");
+    expect(locked).toHaveClass("silver", "locked");
+    expect(locked.querySelector("svg")).toHaveClass("isLocked");
+    expect(locked.querySelector("svg circle")).toHaveClass("locked");
+    expect(unknown).not.toHaveClass("bronze", "silver", "gold", "platinum");
+    expect(unknown.querySelector("svg circle")).not.toHaveClass("bronze"); // locked: grey silhouette
+  });
+
+  it("draws an unlocked achievement of an unknown tier in bronze", async () => {
+    renderWith(<AchievementGrid />, {
+      api: fakeApi({
+        getAchievements: vi
+          .fn()
+          .mockResolvedValue([achievement({ tier: "mythic", unlockedAt: Date.UTC(2026, 9, 16) })]),
+      }),
+    });
+
+    const [item] = within(await screen.findByRole("list", { name: "Achievements" })).getAllByRole("listitem");
+    expect(item.querySelector("svg circle")).toHaveClass("bronze");
+  });
+
+  it("shows the daily streak as a flame, unlit at zero, hidden from screen readers", async () => {
+    renderWith(<StreakCard />, {
+      api: fakeApi({
+        getStreaks: vi.fn().mockResolvedValue({
+          ...NO_STREAKS,
+          daily: { current: 4, best: 4, lastDay: "2026-10-15", playedToday: false, atRisk: true },
+        }),
+      }),
+    });
+
+    await screen.findByText("Play today to keep your 4-day streak");
+    const flame = document.querySelector(".flameWrap");
+    expect(flame).toHaveAttribute("aria-hidden", "true");
+    expect(flame.querySelector(".streak")).not.toHaveClass("inactive");
+    expect(flame).toHaveTextContent("4");
+  });
+
+  it("leaves the flame unlit for a new player", async () => {
+    renderWith(<StreakCard />);
+
+    await screen.findByText(/No streak yet/);
+    expect(document.querySelector(".flameWrap .streak")).toHaveClass("inactive");
+  });
+
+  it("pictures game quests with the game's glyph and the others with a scroll, gold once done", async () => {
+    renderWith(<DailyQuests />, {
+      api: fakeApi({
+        getQuests: vi
+          .fn()
+          .mockResolvedValue(
+            questsWith(quest(0), quest(1, { progress: 1, completedAt: Date.UTC(2026, 9, 16) })),
+          ),
+      }),
+    });
+
+    const [warmUp, firstBlood, rockOn] = within(
+      await screen.findByRole("list", { name: "Today's quests" }),
+    ).getAllByRole("listitem");
+    expect(warmUp.querySelector(".icon")).toHaveAttribute("aria-hidden", "true");
+    expect(warmUp.querySelector(".icon svg circle")).toHaveClass("silver");
+    expect(firstBlood.querySelector(".icon svg circle")).toHaveClass("gold");
+    expect(rockOn.querySelector(".icon svg")).toHaveClass("rps");
+  });
+
+  it("puts the medal in the unlock toast and showers confetti once, then clears it", () => {
+    vi.useFakeTimers();
+    const { socket } = renderWith(<GamificationToasts />);
+
+    act(() =>
+      socket.push(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, {
+        achievements: [achievement({ name: "First Move", icon: "flag", tier: "bronze" })],
+      }),
+    );
+
+    const art = screen.getByRole("status").querySelector(".art");
+    expect(art).toHaveAttribute("aria-hidden", "true");
+    expect(art.querySelector("circle")).toHaveClass("bronze");
+    expect(art.parentElement).toHaveClass("withArt");
+    expect(effect("confetti")).not.toBeNull();
+
+    act(() => vi.advanceTimersByTime(CELEBRATION_MS));
+    expect(effect("confetti")).toBeNull();
+  });
+
+  it("draws an unlocked achievement of an unknown tier in bronze in its toast, and ignores an empty unlock", () => {
+    const { socket } = renderWith(<GamificationToasts />);
+
+    act(() => socket.push(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, { achievements: [] }));
+    expect(effect("confetti")).toBeNull();
+
+    act(() =>
+      socket.push(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, { achievements: [achievement({ tier: "mythic" })] }),
+    );
+    expect(screen.getByRole("status").querySelector(".art circle")).toHaveClass("bronze");
+  });
+
+  it("raises the quest XP beside the toasts, outside the announced region", () => {
+    vi.useFakeTimers();
+    const { socket } = renderWith(<GamificationToasts />);
+
+    act(() =>
+      socket.push(SOCKET_EVENTS.PROGRESS_UPDATED, {
+        source: "quest",
+        key: "quest:2026-10-16:win-1",
+        xpGained: 20,
+        leveledUp: false,
+        progress: {},
+      }),
+    );
+
+    expect(screen.getByRole("status").textContent).toBe("Quest complete! +20 XP");
+    expect(screen.getByRole("status").querySelector(".art circle")).toHaveClass("gold");
+    expect(effect("xp-pop")).toHaveTextContent("+20 XP");
+    expect(effect("xp-pop").parentElement).toHaveAttribute("aria-hidden", "true");
+
+    act(() => vi.advanceTimersByTime(CELEBRATION_MS));
+    expect(effect("xp-pop")).toBeNull();
+  });
+
+  it("keeps the words and drops the confetti and the XP pop under reduced motion", () => {
+    installMatchMedia({ reducedMotion: true });
+    const { socket } = renderWith(<GamificationToasts />);
+
+    act(() => socket.push(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, { achievements: [achievement()] }));
+    act(() =>
+      socket.push(SOCKET_EVENTS.PROGRESS_UPDATED, {
+        source: "quest",
+        key: "quest:2026-10-16:sweep",
+        xpGained: 30,
+        leveledUp: false,
+        progress: {},
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Achievement unlocked: Rising Star");
+    expect(screen.getByRole("status")).toHaveTextContent("Daily sweep! +30 XP");
+    expect(effect("confetti")).toBeNull();
+    expect(effect("xp-pop")).toBeNull();
   });
 });

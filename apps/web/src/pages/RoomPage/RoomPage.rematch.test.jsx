@@ -127,14 +127,15 @@ describe("RoomPage rematch (CC-037)", () => {
       won,
       vi.fn(async () => rematch),
     );
-    const grid = await screen.findByRole("grid", { name: "Tic-Tac-Toe board" });
-    expect(grid).toHaveTextContent("XXXOO");
+    // Marks are drawn (CC-087); each cell's name says what is in it.
+    const marks = () =>
+      screen.getAllByRole("gridcell").map((cell) => cell.getAttribute("aria-label").split(": ")[1]);
+    await screen.findByRole("grid", { name: "Tic-Tac-Toe board" });
+    expect(marks().join("")).toBe("XXXOOemptyemptyemptyempty");
 
     await user.click(screen.getByRole("button", { name: "Rematch" }));
 
-    await waitFor(() =>
-      expect(screen.getByRole("grid", { name: "Tic-Tac-Toe board" })).not.toHaveTextContent("X"),
-    );
+    await waitFor(() => expect(marks().every((mark) => mark === "empty")).toBe(true));
   });
 
   it("says when the opponent left, and links to a new game instead", async () => {

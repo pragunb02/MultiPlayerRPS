@@ -5,6 +5,7 @@ import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { outcomeFor } from "../../components/Celebrations/outcome.js";
 import { ResultCelebration } from "../../components/Celebrations/ResultCelebration.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
@@ -170,7 +171,7 @@ export function RoomPage() {
               <p className={styles.card}>The {game?.name ?? "game"} board is not available yet.</p>
             ))}
           {view.status === ROOM_STATUS.FINISHED && (
-            <div className={styles.outcome} role="status">
+            <div className={`${styles.outcome} ${styles[outcomeFor(view)]}`} role="status">
               <ResultCelebration room={view} />
               <h2>{outcomeText(view)}</h2>
               <Link to={paths.game(view.gameId)} className={styles.again}>

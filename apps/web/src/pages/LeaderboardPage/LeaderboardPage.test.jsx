@@ -51,6 +51,13 @@ describe("LeaderboardPage", () => {
     expect(rows()[1]).toHaveClass("silver");
     expect(rows()[2]).toHaveClass("bronze");
     expect(rows()[3]).not.toHaveClass("gold", "silver", "bronze");
+    // Arcade art (CC-087): medals behind the podium places, a tier shield beside each level; the text is unchanged.
+    expect(
+      rows().map((row) => row.querySelector(".rank svg")?.querySelector("circle").getAttribute("class")),
+    ).toEqual(["gold", "silver", "bronze", undefined]);
+    expect(rows()[0].querySelector(".level svg")).toHaveAttribute("aria-hidden", "true");
+    expect(rows()[0].querySelector(".level")).toHaveAttribute("title", "Challenger rank");
+    expect(rows()[1].querySelector(".level")).toHaveAttribute("title", "Rookie rank");
     expect(document.title).toBe("Overall XP · Leaderboards · ClassiCade");
     expect(screen.getByRole("heading", { level: 2, name: "Overall XP" })).toBeInTheDocument();
   });
@@ -205,6 +212,12 @@ describe("LeaderboardPage", () => {
         ["Chess", "/leaderboards/chess"],
       ]);
       expect(tabs[1]).toHaveAttribute("aria-current", "page");
+      // Each tab is pictured: medals for the XP boards, the game's glyph for a game's board.
+      expect(tabs.map((tab) => tab.querySelector("svg").getAttribute("aria-hidden"))).toEqual(
+        Array(5).fill("true"),
+      );
+      expect(tabs[2].querySelector("svg")).toHaveClass("rps");
+      expect(tabs[0].querySelector("svg circle")).toHaveClass("gold");
     });
 
     it("switches boards by link, and Back and Forward return to each one", async () => {

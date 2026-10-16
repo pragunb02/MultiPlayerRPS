@@ -1,31 +1,75 @@
+/* The rematch panel, under the result (CC-037) in the arcade look (CC-087): a chunky card and a scoreboard. */
 .panel {
   display: grid;
   justify-items: center;
   gap: var(--space-3);
   padding: var(--space-6);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  border: 2px dashed var(--color-primary);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
   text-align: center;
 }
 .message {
   margin: 0;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 800;
   font-size: var(--text-lg);
 }
-.hint,
-.series {
+.hint {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+/* "Series after 3 games: You 2 – 1 Bob" as a scoreboard strip. */
+.series {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.series strong {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+}
+/* "New game": a link (it goes to a page) that looks like a secondary button. */
 .link {
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-6);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-press-neutral);
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.link:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+}
+.link:active {
+  transform: translateY(2px);
+  box-shadow: var(--shadow-press-neutral-small);
+}
+.link:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
 }
 /* The opponent is waiting: the accept button pulses a few times to draw the eye, then rests. */
 .invited {
-  animation: pulse var(--duration-slow, 360ms) var(--ease-in-out, ease-in-out) 3 alternate;
-  box-shadow: var(--glow-primary, var(--shadow-md));
+  animation: pulse var(--duration-slow) var(--ease-in-out) 3 alternate;
+  box-shadow: var(--shadow-press), var(--glow-primary);
 }
 @keyframes pulse {
   from {

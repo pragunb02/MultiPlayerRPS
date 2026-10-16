@@ -1,19 +1,28 @@
-/* Plain token-based styles; the arcade look (tier colours, icons) comes with CC-087. */
+/* Achievements in the arcade look (CC-087): medals by tier, a tier-coloured edge once unlocked, XP-gradient meters. */
 .card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
   padding: var(--space-6);
   display: grid;
   gap: var(--space-3);
 }
 .heading {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 800;
 }
 .summary {
   margin: 0;
-  font-weight: 700;
+  justify-self: start;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 .muted {
   margin: 0;
@@ -37,26 +46,46 @@
   gap: var(--space-3);
 }
 .item {
+  --tier: var(--color-border);
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--space-2) var(--space-3);
-  align-items: start;
+  align-items: center;
   padding: var(--space-3);
-  background: var(--color-surface-raised);
-  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-left: 6px solid var(--tier);
+  border-radius: var(--radius-md);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.item:not(.locked):hover {
+  transform: translateY(-2px);
+}
+.bronze {
+  --tier: var(--color-tier-bronze);
+}
+.silver {
+  --tier: var(--color-tier-silver);
+}
+.gold {
+  --tier: var(--color-tier-gold);
+}
+.platinum {
+  --tier: var(--color-tier-platinum);
 }
 .text {
   display: grid;
 }
 .name {
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 800;
 }
 .tier {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
+  letter-spacing: 0.06em;
+  color: var(--tier);
 }
 .meter,
 .unlockedAt {
@@ -68,46 +97,35 @@
 }
 .unlockedAt {
   color: var(--color-success);
-  font-weight: 600;
+  font-weight: 700;
 }
 .count {
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 800;
 }
-/* Locked: muted, but text stays at full contrast (the meaning is in the words, not the colour). */
-.locked .name {
+/* Locked: a dashed, untinted card and a grey medal; the words ("Locked.", the count) carry the meaning. */
+.locked {
+  --tier: var(--color-locked);
+  border-style: dashed;
+  border-left-style: solid;
+  background: var(--color-surface-raised);
+}
+.locked .tier {
   color: var(--color-text-muted);
 }
 .badge {
   display: inline-grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--radius-full);
-  border: 3px solid var(--color-border);
-  background: var(--color-surface);
-  font-weight: 800;
 }
-.bronze {
-  border-color: var(--color-warning);
+.icon {
+  width: 3rem;
+  height: 3rem;
 }
-.silver {
-  border-color: var(--color-text-muted);
-}
-.gold {
-  border-color: var(--color-focus);
-}
-.platinum {
-  border-color: var(--color-primary);
-}
-.lockedBadge {
-  border-style: dashed;
-  color: var(--color-text-muted);
-}
+/* Native <progress>: accessible, and styled without inline styles (strict CSP). */
 .bar {
   appearance: none;
   flex: 1;
-  height: 0.5rem;
+  height: 0.6rem;
   border: none;
   border-radius: var(--radius-full);
   background: var(--color-surface);
@@ -117,8 +135,10 @@
   background: var(--color-surface);
 }
 .bar::-webkit-progress-value {
-  background: var(--color-primary);
+  background: var(--gradient-xp);
+  border-radius: var(--radius-full);
 }
 .bar::-moz-progress-bar {
-  background: var(--color-primary);
+  background: var(--gradient-xp);
+  border-radius: var(--radius-full);
 }

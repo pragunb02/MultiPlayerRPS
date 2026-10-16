@@ -1,15 +1,35 @@
-/* Plain token-based styles; the arcade look comes with CC-087's tokens. */
+/* Streaks in the arcade look (CC-087): a big flame for the daily streak, chunky stat tiles. */
 .card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
   padding: var(--space-6);
   display: grid;
   gap: var(--space-3);
 }
 .heading {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 800;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.flameWrap {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+.flame {
+  font-size: var(--text-xl);
 }
 .muted {
   margin: 0;
@@ -19,10 +39,10 @@
 .atRisk {
   margin: 0;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-streak);
   background: var(--color-surface-raised);
-  font-weight: 700;
+  font-weight: 800;
 }
 .problem {
   display: grid;
@@ -40,19 +60,24 @@
 }
 .stats div {
   background: var(--color-surface-raised);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
 }
 .stats dt {
   font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--color-text-muted);
 }
 .stats dd {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.flame {
-  color: var(--color-warning);
+/* The daily streak's tile burns in the streak colour. */
+.stats div:first-child dd {
+  color: var(--color-streak);
 }

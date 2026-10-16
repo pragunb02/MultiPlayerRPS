@@ -1,6 +1,11 @@
 import { Link, useLocation, useParams } from "react-router";
 import { getLeaderboard, LEADERBOARD_METRICS, LEADERBOARD_PERIODS, LEADERBOARDS } from "@classicade/shared";
 import { paths, returnPathFor } from "../../app/paths.js";
+import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
+import { LevelBadge } from "../../art/badges/LevelBadge.jsx";
+import { Medal } from "../../art/badges/Medal.jsx";
+import { rankForLevel } from "../../art/badges/ranks.js";
+import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { useLeaderboard } from "../../hooks/useLeaderboard.js";
@@ -10,6 +15,36 @@ import styles from "./LeaderboardPage.module.css";
 
 const MEDALS = Object.freeze({ 1: "gold", 2: "silver", 3: "bronze" });
 const MINUTE_MS = 60_000;
+/** The picture on each tab: the game's glyph for a game board, a medal for the XP boards (a star if new). Decoration. */
+const TAB_ICONS = Object.freeze({ overall: "trophy", weekly: "calendar" });
+
+function TabIcon({ board }) {
+  if (board.gameId !== undefined) {
+    return <GameIcon gameId={board.gameId} className={styles.tabIcon} />;
+  }
+  return <AchievementIcon name={TAB_ICONS[board.id]} tier="gold" className={styles.tabIcon} />;
+}
+
+/** The place, on a medal for the podium (1–3). The number stays text; the medal is decoration behind it. */
+function Place({ rank }) {
+  const medal = MEDALS[rank];
+  return (
+    <span className={styles.rank}>
+      {medal && <Medal tier={medal} className={styles.medal} />}
+      <span className={styles.place}>{rank}</span>
+    </span>
+  );
+}
+
+/** "Lv 6" beside a bare shield in the rank's tier colour; the rank's name is the tooltip. */
+function Level({ level }) {
+  return (
+    <span className={styles.level} title={`${rankForLevel(level).name} rank`}>
+      <LevelBadge level={level} size="sm" decorative numbered={false} className={styles.shield} />
+      Lv {level}
+    </span>
+  );
+}
 
 /** "560 XP", "1 win", "12 wins". */
 function formatScore(metric, score) {
@@ -91,12 +126,12 @@ function Board({ info }) {
                 .join(" ")}
               aria-current={entry.rank === yourRank ? "true" : undefined}
             >
-              <span className={styles.rank}>{entry.rank}</span>
+              <Place rank={entry.rank} />
               <span className={styles.name}>
                 {entry.displayName}
                 {entry.rank === yourRank && <span className={styles.tag}>you</span>}
               </span>
-              <span className={styles.level}>Lv {entry.level}</span>
+              <Level level={entry.level} />
               <span className={styles.score}>{formatScore(info.metric, entry.score)}</span>
             </li>
           ))}
@@ -130,6 +165,7 @@ export function LeaderboardPage() {
                 className={styles.tab}
                 aria-current={tab.id === info.id ? "page" : undefined}
               >
+                <TabIcon board={tab} />
                 {tab.name}
               </Link>
             </li>

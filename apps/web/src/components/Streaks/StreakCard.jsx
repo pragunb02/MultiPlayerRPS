@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { StreakFlame } from "../../art/effects/StreakFlame.jsx";
 import { useStreaks } from "../../hooks/useStreaks.js";
 import { Button } from "../Button/Button.jsx";
 import styles from "./StreakCard.module.css";
@@ -38,16 +39,17 @@ export function StreakCard() {
     const { daily, win } = streaks.data;
     body = (
       <>
-        <DailyHint daily={daily} />
+        <div className={styles.top}>
+          {/* The flame is the picture of the daily streak; the list below says the same in words. */}
+          <span className={styles.flameWrap} aria-hidden="true">
+            <StreakFlame count={daily.current} className={styles.flame} />
+          </span>
+          <DailyHint daily={daily} />
+        </div>
         <dl className={styles.stats}>
           <div>
             <dt>Daily streak</dt>
-            <dd>
-              <span className={styles.flame} aria-hidden="true">
-                ▲{" "}
-              </span>
-              {days(daily.current)}
-            </dd>
+            <dd>{days(daily.current)}</dd>
           </div>
           <div>
             <dt>Best daily streak</dt>

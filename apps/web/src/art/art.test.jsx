@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { installMatchMedia } from "../testing/matchMedia.js";
 import { AchievementIcon } from "./achievements/AchievementIcon.jsx";
 import { LevelBadge } from "./badges/LevelBadge.jsx";
+import { Medal } from "./badges/Medal.jsx";
 import { RANKS, rankForLevel } from "./badges/ranks.js";
 import { CONFETTI_PIECES, Confetti } from "./effects/Confetti.jsx";
 import { LevelUpBurst } from "./effects/LevelUpBurst.jsx";
@@ -44,6 +45,7 @@ const TITLED_ART = [
   ["MarkO", MarkO],
   ["EmptyMatches", EmptyMatches],
   ["InviteArt", InviteArt],
+  ["Medal", Medal],
 ];
 
 describe("art", () => {
@@ -212,11 +214,34 @@ describe("LevelBadge", () => {
     expect(svgOf(container).querySelector("path")).toHaveClass("sPlatinum");
   });
 
+  it("can be a bare shield when the row's own text says the level", () => {
+    const { container } = render(<LevelBadge level={20} size="sm" decorative numbered={false} />);
+
+    expect(container.querySelector("text")).toBeNull();
+    expect(svgOf(container).textContent).toBe("");
+    expect(svgOf(container).querySelector("path")).toHaveClass("platinum");
+  });
+
   it("pops in on request and fits three digits", () => {
     const { container } = render(<LevelBadge level={100} size="lg" pop />);
 
     expect(svgOf(container)).toHaveClass("pop", "lg");
     expect(container.querySelector("text")).toHaveClass("small");
+  });
+});
+
+describe("Medal", () => {
+  it.each(["gold", "silver", "bronze"])("is a %s disc on a ribbon, with no text of its own", (tier) => {
+    const { container } = render(<Medal tier={tier} />);
+
+    expect(svgOf(container).querySelector("circle")).toHaveClass(tier);
+    expect(svgOf(container).textContent).toBe("");
+  });
+
+  it("is gold by default", () => {
+    const { container } = render(<Medal />);
+
+    expect(svgOf(container).querySelector("circle")).toHaveClass("gold");
   });
 });
 
