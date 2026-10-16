@@ -10,13 +10,13 @@
 | Stage health  | 🟢 On track                                                                                     |
 | In progress   | —                                                                                               |
 | Blocked on    | —                                                                                               |
-| Next up       | Rest of Stage 0: CC-028 staging, CC-031 dependency automation, CC-079 flakes                    |
+| Next up       | Rest of Stage 0: CC-026 Docker for local dev, CC-028 staging + hosting decision                 |
 
 ## Stage tracker
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 38 / 42      |
+| S0 Foundation   | 🟡 In progress | 39 / 42      |
 | S1 MVP launch   | ⚪ Not started | 0 / 19       |
 | S2 Retention    | ⚪ Not started | 0 / 11       |
 | S3 Monetization | ⚪ Not started | 0 / 4        |
@@ -36,6 +36,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-16 — CC-021 — Closed: already covered by the real-stack integration test "plays Rock Paper Scissors end to end" (create → join → play → result → stored → replayed → XP) plus the browser suites.
 - 2026-10-16 — CC-031 — Dependabot: weekly update PRs (Monday 06:00 IST) for npm (patch/minor grouped as dev tools and runtime; majors one per PR) and GitHub Actions; every update must pass CI. All direct dependencies already on their latest stable versions; `npm audit` 0.
 - 2026-10-16 — CC-079 — Flake hunt: 0 failures in 27 stress runs (two suites at once, with coverage); session writes confirmed awaited through express-session and connect-mongo. Added the missing evidence instead of retries: the server now logs every refused socket (reason, whether a cookie came — never the session id), and a failing integration test prints the server's log. Ticket stays open (P3) until a logged failure shows the cause.
 - 2026-10-16 — CC-027 — **CI** (GitHub Actions) on every PR and push to `main`: lint, format, `npm audit`, unit + integration tests with coverage gates, browser persona tests (desktop + mobile, real server in production config); coverage and Playwright traces as artifacts. Green on its first run (≈ 1½ min). Closes DEBT-09.
