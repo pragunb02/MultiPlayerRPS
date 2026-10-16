@@ -40,24 +40,16 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
    using ticket IDs, update the stage counters.
 6. Non-trivial decisions (library, pattern, data model) get an ADR in `DECISIONS.md` first.
 7. **Merging to `main` deploys to production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
-   dependencies or env vars change, verify `NODE_ENV=production npm ci && npm start` from a fresh clone before merging.
+   dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging (DEPLOYMENT.md).
 8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
 
-## Current state (legacy code — being replaced)
+## History
 
-- Stack: Node.js, Express 4, Socket.IO 4, MongoDB/Mongoose 6, Passport (local), EJS, jQuery, chess.js 0.10, chessboard.js.
-- `index.js` — monolith: HTTP routes, all socket handlers for all games, game rules, DB writes, leveling.
-- `config.js` — env loading + validation (fails fast on missing `MONGO_URI` / `SESSION_SECRET`).
-- `db.js` — Mongo connection + session store.
-- `models/` — `User`, `RPSData`, `TicTacToeData`, `ChessData`.
-- `client/` — **mixes server and client code**: EJS views, static assets, browser JS, _and_ server routes in `client/routes/`.
-  - `index.ejs` home, `index2.ejs` RPS, `index3.ejs` TTT, `index4.ejs` chess lobby, `game.ejs` chess board, `profile.ejs`.
-  - `client.js` RPS, `script.js` TTT, `chessJs.js` chess lobby, `public/js/index.js` chess board, `signup.js` auth, `scriptindex.js` home.
-- Legacy files are excluded from Prettier and their browser scripts lint with warnings only — don't reformat them; they are deleted in CC-029.
+The original app (Express 4 monolith, EJS, client-authoritative games) ran production until 2026-10-16 and was deleted
+in CC-029. Its audit findings and how each was fixed are in `docs/KNOWN_ISSUES.md`; the code is in git history before
+the CC-029 merge. Its MongoDB `users` collection is still read (never written) so legacy players can log in (CC-078).
 
-See `docs/KNOWN_ISSUES.md` before touching any legacy file — many behaviours are known bugs, not intent.
-
-## Target structure (being built — ADR-001/002/004/006)
+## Structure (ADR-001/002/004/006)
 
 npm-workspaces monorepo, JavaScript ES modules with JSDoc types, React + Vite frontend:
 `apps/server`, `apps/web`, `packages/games` (pure engines), `packages/shared` (event names, constants).
@@ -71,11 +63,11 @@ dependencies passed in (e.g. `createApp({ config })`) rather than imported globa
 
 ```bash
 nvm use && npm install
-cp .env.example .env   # MONGO_URI (non-production DB!), SESSION_SECRET
-npm run dev            # legacy app (node --watch index.js) on :8080
-npm run dev:server     # new server (apps/server) on :4000 — own env file apps/server/.env
+cp apps/server/.env.example apps/server/.env   # MONGO_URI (non-production DB!), SESSION_SECRET
+npm run dev:server     # server (apps/server) on :4000
 npm run dev:web        # web app (apps/web) on :5173, proxies /api and /socket.io to :4000
 npm run build:web      # production build → apps/web/dist
+npm start              # production: the server, serving apps/web/dist (WEB_DIST_DIR)
 npm run lint           # must have 0 errors
 npm run format:check
 npm test               # Vitest across all workspaces (*.test.js next to the code)

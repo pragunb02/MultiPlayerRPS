@@ -2,22 +2,13 @@
 
 Last updated: 2026-10-16
 
-## 1. Current (legacy)
+## 1. Legacy (deleted in CC-029)
 
-```
-Browser (EJS pages + jQuery + per-game scripts)
-   │  HTTP (Express)            │  Socket.IO (no auth)
-   ▼                            ▼
-index.js — routes + ALL socket handlers + game rules + DB writes + leveling
-   │ in-memory rooms: rpsRooms / ticTacToeRooms / chessRooms
-   ▼
-MongoDB (users, sessions, RPSData, TicTacToeData, ChessData)
-```
+Until 2026-10-16 production ran an Express 4 monolith (`index.js`: routes, every socket handler, game rules, DB writes)
+with EJS pages and client-authoritative games. Its findings and their fixes: [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Its
+`users` collection is still read so legacy players can log in (CC-078).
 
-Key problems: client-authoritative games (TTT, chess), identity from free-text names, monolithic handler file,
-server code under `client/`, triplicated models and UI code, no tests. Full list: [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
-
-## 2. Target
+## 2. Architecture
 
 ```
 web/  (SPA, mobile-first)  ──HTTP──►  API (REST)        ─┐
@@ -86,7 +77,7 @@ rejections, full playthrough without mutation, game-over refusal, and identical 
 
 ### Data model (target, draft)
 
-- `users` — id, username, email, passwordHash, avatar, xp, level, createdAt, flags (guest, banned, admin)
+- `users` (legacy, read-only) — username, email, bcrypt `password`; read at a legacy player's first login (CC-078), never written.
 - `matches` (implemented, CC-016) — matchId, roomCode, gameId, options, seed, players[{playerId, displayName}], log[{kind, playerId?, move?, at}], result{result, winners, reason}, startedAt, endedAt, schemaVersion; replayable with `replayGame()`. Ratings fields arrive with CC-042.
 - `accounts` (implemented, CC-076) — _id, username, usernameKey (unique, lower-case), email (unique), passwordHash (`scrypt$N$r$p$salt$hash`), createdAt. Identity id = `user_<_id>`. Legacy `users` are migrated lazily at first login (CC-078): read-only lookup, bcrypt check, scrypt re-hash.
 - `player_progress` (implemented, CC-017) — playerId (unique), xp, matchesPlayed, wins, losses, draws, recentMatchIds (exactly-once window), updatedAt.

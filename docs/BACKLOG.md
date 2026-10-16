@@ -85,12 +85,12 @@ and don't encode the stage — a ticket can move between stages without changing
 
 ### 0.F Delivery
 
-| ID                          | Title                                                                                                        | Type  | Pri | Status         | Links            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------ | ----- | --- | -------------- | ---------------- |
-| CC-026                      | Dockerfile + docker-compose (app + Mongo) for local dev                                                      | infra | P1  | ⬜ Todo        |                  |
-| CC-027                      | CI: lint, test, build on every push                                                                          | infra | P1  | ⬜ Todo        | DEBT-09          |
-| CC-028                      | Resolve ADR-005; deploy staging environment                                                                  | infra | P1  | ⬜ Todo        |                  |
-| [CC-029](tickets/CC-029.md) | Production cutover to the new stack, then delete legacy files (`index.js`, `client/*`, old models, `hw.txt`) | debt  | P1  | 🟦 In progress | DEBT-05, DEBT-08 |
+| ID                          | Title                                                                                                        | Type  | Pri | Status  | Links            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ | ----- | --- | ------- | ---------------- |
+| CC-026                      | Dockerfile + docker-compose (app + Mongo) for local dev                                                      | infra | P1  | ⬜ Todo |                  |
+| CC-027                      | CI: lint, test, build on every push                                                                          | infra | P1  | ⬜ Todo | DEBT-09          |
+| CC-028                      | Resolve ADR-005; deploy staging environment                                                                  | infra | P1  | ⬜ Todo |                  |
+| [CC-029](tickets/CC-029.md) | Production cutover to the new stack, then delete legacy files (`index.js`, `client/*`, old models, `hw.txt`) | debt  | P1  | ✅ Done | DEBT-05, DEBT-08 |
 
 ### 0.G Follow-ups found during Stage 0
 
@@ -98,7 +98,7 @@ and don't encode the stage — a ticket can move between stages without changing
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --- | ------- | ------------------------ |
 | [CC-030](tickets/CC-030.md) | CSP and CSRF defence for the new app (finishes SEC-05) — see ADR-010                                                                                                                                                                 | security | P0  | ✅ Done | SEC-05, NFR-1            |
 | CC-031                      | Automated dependency updates (Dependabot) + `npm audit` gate in CI; new code adopts latest stable majors (Mongoose 9, chess.js) as it is written                                                                                     | debt     | P2  | ⬜ Todo | DEBT-10                  |
-| CC-074                      | Rename `MONGO_URI_PRODUCTION` → `MONGO_URI` in the deployment, then remove the fallback in `config.js` (needs owner access to hosting)                                                                                               | debt     | P2  | ⬜ Todo | DEBT-12, SEC-06          |
+| [CC-074](tickets/CC-029.md) | Rename `MONGO_URI_PRODUCTION` → `MONGO_URI` in the deployment, then remove the fallback in `config.js` (needs owner access to hosting)                                                                                               | debt     | P2  | ✅ Done | DEBT-12, SEC-06          |
 | CC-075                      | Flaky test: `startServer` close check probed a freed port that parallel workers can reuse                                                                                                                                            | test     | P1  | ✅ Done |                          |
 | [CC-076](tickets/CC-076.md) | Auth API on the new server: signup / login / logout / me with users persistence, password hashing, rate limits (user identities for CC-013)                                                                                          | security | P0  | ✅ Done | FR-ACC-1, SEC-01, SEC-07 |
 | CC-077                      | Deployment safety: DEPLOYMENT.md, `/health` + Render health check, PR template with deployment impact, incident note                                                                                                                 | infra    | P0  | ✅ Done |                          |
