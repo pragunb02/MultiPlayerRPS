@@ -2,13 +2,16 @@ import { EventEmitter } from "node:events";
 import http from "node:http";
 import { createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame } from "@classicade/shared";
+import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createMatchAccessor } from "./data/matchAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
+import { createAccountComponent } from "./domain/accounts/accountComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
 import { createProgressionComponent } from "./domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
+import { createAccountDao } from "./persistence/accountDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createInMemoryRoomDao } from "./persistence/inMemoryRoomDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
@@ -18,6 +21,7 @@ import { createHttpApp } from "./service/http/app.js";
 import { createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
+import { createPasswordHasher } from "./utils/passwordHasher.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_ENDED = "sessionEnded";
@@ -94,17 +98,23 @@ export async function startServer({ config, logger }) {
   const roomDao = createInMemoryRoomDao();
   const matchDao = createMatchDao({ connection: database.connection });
   const progressDao = createProgressDao({ connection: database.connection });
-  await Promise.all([matchDao.ensureIndexes(), progressDao.ensureIndexes()]);
+  const accountDao = createAccountDao({ connection: database.connection });
+  await Promise.all([matchDao.ensureIndexes(), progressDao.ensureIndexes(), accountDao.ensureIndexes()]);
 
   // 3. data
   const roomAccessor = createRoomAccessor({ roomDao });
   const matchAccessor = createMatchAccessor({ matchDao });
   const progressAccessor = createProgressAccessor({ progressDao });
+  const accountAccessor = createAccountAccessor({ accountDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
   const domainEvents = new EventEmitter();
   const identityComponent = createIdentityComponent();
+  const accountComponent = createAccountComponent({
+    accountAccessor,
+    passwordHasher: createPasswordHasher(),
+  });
   const roomComponent = createRoomComponent({
     roomAccessor,
     engines: createEngineRegistry(ENGINES),
@@ -129,6 +139,7 @@ export async function startServer({ config, logger }) {
     identityComponent,
     matchComponent,
     progressionComponent,
+    accountComponent,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
   });
   const server = http.createServer(app);

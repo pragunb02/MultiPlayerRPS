@@ -209,6 +209,46 @@ describe("games through the real composition root (integration)", () => {
   });
 });
 
+describe("accounts through the real composition root (integration)", () => {
+  it("signs up, logs in and connects a socket as the user, with production-strength hashing", async () => {
+    const app = await start();
+    let socket;
+    try {
+      const body = JSON.stringify({
+        username: "Riya",
+        email: "riya@example.com",
+        password: "correct horse battery",
+      });
+      const headers = { "Content-Type": "application/json" };
+      const signup = await fetch(`${app.url}/api/auth/signup`, { method: "POST", headers, body });
+      const login = await fetch(`${app.url}/api/auth/login`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email: "riya@example.com", password: "correct horse battery" }),
+      });
+      const cookie = login.headers.get("set-cookie").split(";")[0];
+      const { identity } = await login.json();
+
+      socket = connect(app.url, { transports: ["websocket"], extraHeaders: { cookie }, reconnection: false });
+      await new Promise((resolve, reject) => {
+        socket.once("connect", resolve);
+        socket.once("connect_error", reject);
+      });
+      const ack = await socket.timeout(2_000).emitWithAck(SOCKET_EVENTS.IDENTITY_GET);
+      const [stored] = await readCollection(app.config.mongoUri, "accounts");
+
+      expect(signup.status).toBe(201);
+      expect(identity).toEqual({ kind: "user", id: `user_${stored._id.toHexString()}`, displayName: "Riya" });
+      expect(ack.data).toEqual(identity);
+      expect(stored.passwordHash).toMatch(/^scrypt\$32768\$8\$1\$/);
+      expect(JSON.stringify(stored)).not.toContain("correct horse battery");
+    } finally {
+      socket?.disconnect();
+      await app.close();
+    }
+  });
+});
+
 describe("createSessionStore (integration)", () => {
   it("creates the TTL index that expires sessions before the server takes traffic", async () => {
     const app = await start();

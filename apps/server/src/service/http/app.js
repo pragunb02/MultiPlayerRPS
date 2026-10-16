@@ -16,6 +16,8 @@ import { apiRouter } from "./routes.js";
  *   identityComponent: ReturnType<typeof import("../../domain/identity/identityComponent.js").createIdentityComponent>,
  *   matchComponent: ReturnType<typeof import("../../domain/matches/matchComponent.js").createMatchComponent>,
  *   progressionComponent: ReturnType<typeof import("../../domain/progression/progressionComponent.js").createProgressionComponent>,
+ *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
+ *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
  *   guestLimit?: { windowMs: number, limit: number },
  * }} deps
@@ -27,6 +29,8 @@ export function createHttpApp({
   identityComponent,
   matchComponent,
   progressionComponent,
+  accountComponent,
+  authLimits,
   onSessionEnded,
   guestLimit,
 }) {
@@ -47,7 +51,15 @@ export function createHttpApp({
 
   app.use(
     "/api",
-    apiRouter({ identityComponent, matchComponent, progressionComponent, onSessionEnded, guestLimit }),
+    apiRouter({
+      identityComponent,
+      matchComponent,
+      progressionComponent,
+      accountComponent,
+      authLimits,
+      onSessionEnded,
+      guestLimit,
+    }),
   );
 
   app.use(notFoundHandler);

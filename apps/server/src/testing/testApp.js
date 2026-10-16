@@ -3,9 +3,11 @@ import http from "node:http";
 import session from "express-session";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
+import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
 import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
+import { createAccountComponent } from "../domain/accounts/accountComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
@@ -16,7 +18,9 @@ import { createHttpApp } from "../service/http/app.js";
 import { createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
 import { createBackgroundTasks } from "../utils/backgroundTasks.js";
+import { createPasswordHasher } from "../utils/passwordHasher.js";
 import { captureLogger } from "./captureLogger.js";
+import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
 import { createInMemoryProgressDao } from "./inMemoryProgressDao.js";
 import { testConfig } from "./testConfig.js";
@@ -29,9 +33,10 @@ import { testConfig } from "./testConfig.js";
  *   env?: Record<string, string>,
  *   guestLimit?: { windowMs: number, limit: number },
  *   engines?: ReadonlyArray<any>,
+ *   authLimits?: object,
  * }} [options]
  */
-export function createTestApp({ env = {}, guestLimit, engines = [raceEngine] } = {}) {
+export function createTestApp({ env = {}, guestLimit, authLimits, engines = [raceEngine] } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
   const store = new session.MemoryStore();
@@ -44,6 +49,10 @@ export function createTestApp({ env = {}, guestLimit, engines = [raceEngine] } =
   const identityComponent = createIdentityComponent({
     generateId: () => `00000000-0000-4000-8000-${String(++guestNumber).padStart(12, "0")}`,
     generateGuestSuffix: () => `T${String(guestNumber).padStart(3, "0")}`,
+  });
+  const accountComponent = createAccountComponent({
+    accountAccessor: createAccountAccessor({ accountDao: createInMemoryAccountDao() }),
+    passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }), // fast for tests
   });
   const domainEvents = new EventEmitter();
   const roomComponent = createRoomComponent({
@@ -71,6 +80,8 @@ export function createTestApp({ env = {}, guestLimit, engines = [raceEngine] } =
     identityComponent,
     matchComponent,
     progressionComponent,
+    accountComponent,
+    authLimits,
     guestLimit,
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);
