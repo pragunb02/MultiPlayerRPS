@@ -37,6 +37,7 @@ import { testConfig } from "./testConfig.js";
  *   engines?: ReadonlyArray<any>,
  *   authLimits?: object,
  *   legacyUsers?: ReadonlyArray<object>,
+ *   isDatabaseUp?: () => boolean,
  * }} [options]
  */
 export function createTestApp({
@@ -45,6 +46,7 @@ export function createTestApp({
   authLimits,
   engines = [raceEngine],
   legacyUsers = [],
+  isDatabaseUp = () => true,
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -87,6 +89,7 @@ export function createTestApp({
   const app = createHttpApp({
     config,
     logger: capture.logger,
+    isDatabaseUp,
     sessionMiddleware,
     identityComponent,
     matchComponent,

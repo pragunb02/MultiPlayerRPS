@@ -5,7 +5,12 @@ import mongoose from "mongoose";
  * and multiple instances never share connections).
  *
  * @param {{ uri: string, logger: import("../utils/logger.js").Logger, serverSelectionTimeoutMS?: number }} options
- * @returns {Promise<{ connection: mongoose.Connection, client: import("mongodb").MongoClient, close: () => Promise<void> }>}
+ * @returns {Promise<{
+ *   connection: mongoose.Connection,
+ *   client: import("mongodb").MongoClient,
+ *   isConnected: () => boolean,
+ *   close: () => Promise<void>,
+ * }>}
  */
 export async function connectDatabase({ uri, logger, serverSelectionTimeoutMS = 10_000 }) {
   const connection = mongoose.createConnection(uri, { serverSelectionTimeoutMS });
@@ -20,6 +25,7 @@ export async function connectDatabase({ uri, logger, serverSelectionTimeoutMS = 
   return {
     connection,
     client: connection.getClient(),
+    isConnected: () => connection.readyState === mongoose.ConnectionStates.connected,
     close: async () => {
       await connection.close();
       logger.info("database connection closed");

@@ -146,6 +146,7 @@ export async function startServer({ config, logger }) {
   const app = createHttpApp({
     config,
     logger,
+    isDatabaseUp: database.isConnected,
     sessionMiddleware,
     identityComponent,
     matchComponent,

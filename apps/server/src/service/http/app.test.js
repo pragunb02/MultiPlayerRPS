@@ -1,6 +1,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ERROR_CODES, GAMES } from "@classicade/shared";
+import { PRODUCTION_ENV } from "../../testing/testConfig.js";
 import { createTestApp } from "../../testing/testApp.js";
 
 const setup = (env) => createTestApp({ env });
@@ -13,6 +14,19 @@ describe("HTTP app", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: "ok" });
+  });
+
+  it.each([
+    [true, 200, { status: "ok", database: "up" }],
+    [false, 503, { status: "unavailable", database: "down" }],
+  ])("GET /health reports the database to the hosting platform (up: %s)", async (up, status, body) => {
+    const { app } = createTestApp({ isDatabaseUp: () => up });
+
+    const res = await request(app).get("/health");
+
+    expect(res.status).toBe(status);
+    expect(res.body).toEqual(body);
+    expect(res.headers["set-cookie"]).toBeUndefined();
   });
 
   it("GET /api/games returns the shared catalog", async () => {
@@ -35,9 +49,7 @@ describe("HTTP app", () => {
   });
 
   it("trusts the first proxy only in production (for secure cookies behind TLS termination)", () => {
-    expect(
-      setup({ NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app" }).app.get("trust proxy"),
-    ).toBe(1);
+    expect(setup(PRODUCTION_ENV).app.get("trust proxy")).toBe(1);
     expect(setup().app.get("trust proxy")).toBe(false);
   });
 

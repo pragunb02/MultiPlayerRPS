@@ -4,6 +4,7 @@ import path from "node:path";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ERROR_CODES } from "@classicade/shared";
+import { PRODUCTION_ENV } from "../../testing/testConfig.js";
 import { createTestApp } from "../../testing/testApp.js";
 
 /** A fake built web app: index.html plus a hashed asset. */
@@ -86,7 +87,7 @@ describe("Content-Security-Policy", () => {
 
   it("upgrades insecure requests in production only", async () => {
     const prod = createTestApp({
-      env: { NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app" },
+      env: PRODUCTION_ENV,
     });
     const dev = createTestApp();
 

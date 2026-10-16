@@ -9,5 +9,12 @@ export const TEST_ENV = Object.freeze({
   ALLOWED_ORIGINS: "http://localhost:5173",
 });
 
+/** Overrides that make a valid production environment (the web build path is never read by these tests). */
+export const PRODUCTION_ENV = Object.freeze({
+  NODE_ENV: "production",
+  ALLOWED_ORIGINS: "https://classicade.app",
+  WEB_DIST_DIR: "/srv/classicade/web",
+});
+
 /** @param {Record<string, string>} [overrides] */
 export const testConfig = (overrides = {}) => loadConfig({ ...TEST_ENV, ...overrides });

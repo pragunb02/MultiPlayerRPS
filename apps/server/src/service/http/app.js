@@ -1,6 +1,6 @@
 import express from "express";
 import helmet from "helmet";
-import { assertDefined } from "../../utils/assert.js";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
 import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createRequestLogger } from "./requestLogger.js";
@@ -22,6 +22,7 @@ import { createWebAppRouter } from "./webApp.js";
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
  *   guestLimit?: { windowMs: number, limit: number },
+ *   isDatabaseUp: () => boolean,
  * }} deps
  */
 export function createHttpApp({
@@ -35,8 +36,10 @@ export function createHttpApp({
   authLimits,
   onSessionEnded,
   guestLimit,
+  isDatabaseUp,
 }) {
   assertDefined(config, "config");
+  assertFunction(isDatabaseUp, "isDatabaseUp");
   assertDefined(logger, "logger");
   assertDefined(sessionMiddleware, "sessionMiddleware");
 
@@ -53,6 +56,13 @@ export function createHttpApp({
       frameguard: { action: "deny" }, // matches frame-ancestors 'none' for older browsers
     }),
   );
+  // For the hosting platform (Render "Health Check Path"): 503 while the database is down, so a broken deploy is
+  // never promoted to live. Outside /api: no session, no CSRF guard.
+  app.get("/health", (req, res) => {
+    const up = isDatabaseUp();
+    res.status(up ? 200 : 503).json({ status: up ? "ok" : "unavailable", database: up ? "up" : "down" });
+  });
+
   app.use(express.json({ limit: "100kb" }));
   app.use("/api", createCsrfGuard({ allowedOrigins: config.allowedOrigins }));
   app.use("/api", sessionMiddleware);

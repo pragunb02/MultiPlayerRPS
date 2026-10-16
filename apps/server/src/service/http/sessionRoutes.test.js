@@ -1,6 +1,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ERROR_CODES } from "@classicade/shared";
+import { PRODUCTION_ENV } from "../../testing/testConfig.js";
 import { createTestApp } from "../../testing/testApp.js";
 import { SESSION_COOKIE_NAME } from "./session.js";
 
@@ -82,7 +83,7 @@ describe("session routes", () => {
 
     it("marks the cookie Secure in production behind a TLS proxy", async () => {
       const { app } = createTestApp({
-        env: { NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app" },
+        env: PRODUCTION_ENV,
       });
 
       const res = await request(app).post("/api/session/guest").set("X-Forwarded-Proto", "https");

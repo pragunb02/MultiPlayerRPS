@@ -8,9 +8,9 @@
 | Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-080`                                  |
 | Current stage | **Stage 0 — Foundation**                                                                        |
 | Stage health  | 🟢 On track                                                                                     |
-| In progress   | —                                                                                               |
+| In progress   | CC-029 production cutover (part 1 ready; needs Render settings)                                 |
 | Blocked on    | —                                                                                               |
-| Next up       | CC-029 production cutover to the new stack, then delete legacy                                  |
+| Next up       | CC-029 part 2: delete legacy                                                                    |
 
 ## Stage tracker
 
