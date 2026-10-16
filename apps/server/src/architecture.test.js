@@ -1,20 +1,48 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ESLint } from "eslint";
-import { beforeAll, describe, expect, it } from "vitest";
+import { Worker } from "node:worker_threads";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Guards the guardrail: proves the layer rules in eslint.config.js reject illegal imports
 // and accept legal ones (docs/ENGINEERING.md §1).
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-let eslint;
+
+// ESLint runs in a worker thread. The real config loads the local rules in eslint-rules/ outside the test runner.
+// Loaded in this thread, that second copy of the rule files would spoil their coverage report (CC-125).
+const LINT_WORKER = `
+  const { parentPort, workerData } = require("node:worker_threads");
+  const ready = import("eslint").then(({ ESLint }) => new ESLint({ cwd: workerData.cwd }));
+  parentPort.on("message", async ({ id, filePath, source }) => {
+    try {
+      const [result] = await (await ready).lintText(source, { filePath });
+      parentPort.postMessage({ id, messages: result.messages.map(({ ruleId, message }) => ({ ruleId, message })) });
+    } catch (error) {
+      parentPort.postMessage({ id, error: String(error) });
+    }
+  });
+`;
+let worker;
+let nextId = 0;
 
 beforeAll(() => {
-  eslint = new ESLint({ cwd: repoRoot });
+  worker = new Worker(LINT_WORKER, { eval: true, workerData: { cwd: repoRoot } });
 });
 
+afterAll(() => worker.terminate());
+
 async function importErrors(file, source) {
-  const [result] = await eslint.lintText(`${source}\n`, { filePath: path.join(repoRoot, file) });
-  return result.messages.filter((m) => m.ruleId?.startsWith("no-restricted"));
+  const id = nextId++;
+  const messages = await new Promise((resolve, reject) => {
+    const onMessage = (reply) => {
+      if (reply.id !== id) return;
+      worker.off("message", onMessage);
+      if (reply.error === undefined) resolve(reply.messages);
+      else reject(new Error(reply.error));
+    };
+    worker.on("message", onMessage);
+    worker.postMessage({ id, filePath: path.join(repoRoot, file), source: `${source}\n` });
+  });
+  return messages.filter((m) => m.ruleId?.startsWith("no-restricted"));
 }
 
 describe("server layer rules", () => {

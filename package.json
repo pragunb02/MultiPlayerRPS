@@ -2,7 +2,7 @@
   "name": "classicade",
   "version": "0.1.0",
   "private": true,
-  "description": "ClassiCade \u2014 real-time multiplayer classic games",
+  "description": "ClassiCade — real-time multiplayer classic games",
   "engines": {
     "node": ">=22"
   },
@@ -15,7 +15,7 @@
     "start": "node apps/server/src/index.js",
     "dev:server": "npm run dev -w @classicade/server",
     "start:server": "npm start -w @classicade/server",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/check-comments.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
@@ -31,6 +31,7 @@
     "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
+    "espree": "^11.2.0",
     "globals": "^17.13.0",
     "mongodb": "^7.7.0",
     "prettier": "^3.9.10",

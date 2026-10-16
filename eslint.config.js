@@ -5,6 +5,8 @@ const reactRefreshModule = require("eslint-plugin-react-refresh");
 const reactRefresh = reactRefreshModule.default ?? reactRefreshModule;
 const globals = require("globals");
 const prettier = require("eslint-config-prettier");
+const { classicadePlugin } = require("./eslint-rules/commentStyle.mjs");
+const { COMMENT_STYLE_ON, COMMENT_STYLE_SWEEP, globsFor } = require("./eslint-rules/commentStyleScope.mjs");
 
 const SERVER = "apps/server/src";
 const TESTS = ["**/*.test.js", "**/*.test.jsx"];
@@ -54,6 +56,19 @@ const layerRules = Object.entries(SERVER_LAYERS).map(([name, { layers, packages 
   },
 }));
 
+// Comment style (docs/ENGINEERING.md, coding standard 14). On where the comments are already clean. The folders still
+// to be reworded are listed in COMMENT_STYLE_SWEEP in sweep order (docs/ROADMAP.md section 7). They get the rule
+// switched on in the same pull request that cleans them.
+const JS_FILES = ["js", "jsx", "mjs", "cjs"];
+const commentStyle = [
+  { plugins: { classicade: classicadePlugin } },
+  { files: globsFor(COMMENT_STYLE_ON, JS_FILES), rules: { "classicade/comment-style": "error" } },
+  ...COMMENT_STYLE_SWEEP.map(({ paths }) => ({
+    files: globsFor(paths, JS_FILES),
+    rules: { "classicade/comment-style": "off" },
+  })),
+];
+
 module.exports = [
   {
     ignores: ["node_modules/", "coverage/", "**/dist/"],
@@ -69,6 +84,7 @@ module.exports = [
       "apps/server/**/*.js",
       "packages/**/*.js",
       "*.mjs",
+      "eslint-rules/**/*.mjs",
       "scripts/**/*.mjs",
       "apps/web/vite.config.js",
       "apps/web/og/*.mjs",
@@ -152,4 +168,5 @@ module.exports = [
       "no-restricted-globals": ["error", "setTimeout", "setInterval", "fetch", "process"],
     },
   },
+  ...commentStyle,
 ];

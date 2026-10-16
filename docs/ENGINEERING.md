@@ -139,6 +139,15 @@ Data objects are **plain and frozen** — no methods that do work, so logic can'
 
 ---
 
+### Comment style (owner's rule, enforcement CC-125)
+
+**14. Comments are for people.** Write a comment where the code cannot speak for itself: a business rule, a decision that is not obvious, or an order that matters. Say why, not what. Write in plain words for a new teammate who knows JavaScript but not this codebase. Avoid jargon and shorthand such as idempotent, upsert, observer pattern, e.g., i.e., and arrows in prose. Say what happens instead, for example "running it twice changes nothing". Use short sentences that end with a full stop. Do not use semicolons. Do not use dashes as punctuation (a spaced hyphen, a double hyphen, an en dash or an em dash). Use a full stop, comma, colon or brackets instead. Hyphens inside a word are fine (best-of-3, read-only, CC-089). Write lists as numbered items or as separate sentences, not as hyphen bullets. Anything inside backticks is code and is exempt. Put a ticket or ADR ID at the end in brackets only when the reader needs the background, and never as the only explanation, for example "(see ADR-014)". Every exported function, hook and component has a JSDoc block. Parameter descriptions go after the type, never inside the braces. Checked by `npm run lint` (rule `classicade/comment-style`).
+
+Until `classicade/comment-style` lands (CC-125), reviewers check this by hand; new and changed comments must follow it
+now. The sweep of existing comments is CC-125 and CC-126 (ROADMAP.md §7).
+
+---
+
 ## 4. Testing standards
 
 **Pyramid:** many unit tests → some integration tests → few end-to-end tests.

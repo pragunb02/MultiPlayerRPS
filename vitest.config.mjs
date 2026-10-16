@@ -9,7 +9,12 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["apps/server/**/*.test.js", "packages/**/*.test.js", "scripts/**/*.test.mjs"],
+          include: [
+            "apps/server/**/*.test.js",
+            "packages/**/*.test.js",
+            "eslint-rules/**/*.test.mjs",
+            "scripts/**/*.test.mjs",
+          ],
         },
       },
       {
@@ -25,14 +30,22 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      include: ["apps/*/src/**/*.{js,jsx}", "packages/*/src/**/*.js", "scripts/**/*.mjs"],
-      // Entry points only wire things together (covered indirectly): server index.js, web main.jsx, scripts/bin.
+      include: [
+        "apps/*/src/**/*.{js,jsx}",
+        "packages/*/src/**/*.js",
+        "eslint-rules/**/*.mjs",
+        "scripts/**/*.mjs",
+      ],
+      // Entry points only wire things together (covered indirectly): server index.js, web main.jsx, scripts/bin and
+      // the two comment scripts, whose logic is tested in eslint-rules/cssComments.mjs and scripts/commentOnly.mjs.
       exclude: [
         "**/*.test.{js,jsx,mjs}",
         "**/testing/**",
         "apps/server/src/index.js",
         "apps/web/src/main.jsx",
         "scripts/bin/**",
+        "scripts/check-comments.mjs",
+        "scripts/comment-only-diff.mjs",
       ],
       reporter: ["text", "html"],
       // Every line and function is tested (CC-084). Branches: the few left are listed with reasons in
