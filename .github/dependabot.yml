@@ -45,6 +45,11 @@ updates:
       timezone: Asia/Kolkata
     commit-message:
       prefix: "docker"
+    ignore:
+      # Node majors follow the Active LTS line together with .nvmrc (ENGINEERING.md §5) — odd "Current" releases
+      # never; the next LTS by a deliberate PR. Patch and minor images still come here.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker-compose # MongoDB image for local development
     directory: /
