@@ -17,8 +17,10 @@ const roomView = (overrides = {}) => ({
   you: GUEST.id,
   ...overrides,
 });
+// A game with no board in the client registry, to exercise the generic room page (fallback board).
 const playing = (overrides = {}) =>
   roomView({
+    gameId: "ludo",
     status: "playing",
     seats: [ME, BOB],
     game: { view: {}, activePlayers: [GUEST.id], outcome: { status: "ongoing" } },
@@ -73,6 +75,26 @@ describe("RoomPage", () => {
     expect(await screen.findByText(/board is not available yet/)).toBeInTheDocument();
   });
 
+  it("loads the game's own board when the game has one", async () => {
+    openRoom({
+      joined: playing({
+        gameId: "tictactoe",
+        game: {
+          view: {
+            board: Array(9).fill(""),
+            marks: { [GUEST.id]: "X", guest_b: "O" },
+            turn: GUEST.id,
+            winningLine: [],
+          },
+          activePlayers: [GUEST.id],
+          outcome: { status: "ongoing" },
+        },
+      }),
+    });
+
+    expect(await screen.findByRole("grid", { name: "Tic-Tac-Toe board" })).toBeInTheDocument();
+  });
+
   it.each([
     [{ result: "win", winners: [GUEST.id], reason: "three-in-a-row" }, "You won!"],
     [{ result: "win", winners: ["guest_b"], reason: "three-in-a-row" }, "You lost"],
@@ -81,7 +103,7 @@ describe("RoomPage", () => {
     openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
 
     expect(await screen.findByRole("heading", { name: text })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Play again" })).toHaveAttribute("href", "/play/tictactoe");
+    expect(screen.getByRole("link", { name: "Play again" })).toHaveAttribute("href", "/play/ludo");
   });
 
   it("explains a closed room", async () => {
@@ -127,7 +149,7 @@ describe("RoomPage", () => {
     await user.click(screen.getByRole("button", { name: "Leave and forfeit" }));
 
     expect(socket.request).toHaveBeenCalledWith("room:leave", { code: "AB2CD3" });
-    expect(await screen.findByRole("heading", { name: "Tic Tac Toe" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument(); // /play/ludo
   });
 
   it("leaves a waiting room without asking", async () => {

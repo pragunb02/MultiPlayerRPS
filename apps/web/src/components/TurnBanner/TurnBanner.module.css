@@ -1,0 +1,13 @@
+.banner {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  justify-self: start;
+}
+.yours {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}

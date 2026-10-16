@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ERROR_CODES, getGame, ROOM_STATUS } from "@classicade/shared";
 import { Button } from "../../components/Button/Button.jsx";
@@ -95,7 +95,9 @@ export function RoomPage() {
           )}
           {view.status !== ROOM_STATUS.WAITING &&
             (Board ? (
-              <Board room={view} onMove={room.move} />
+              <Suspense fallback={<p aria-busy="true">Loading the board…</p>}>
+                <Board room={view} onMove={room.move} />
+              </Suspense>
             ) : (
               <p className={styles.card}>The {game?.name ?? "game"} board is not available yet.</p>
             ))}
