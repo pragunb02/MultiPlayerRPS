@@ -91,6 +91,26 @@ export function returnPathFor({ pathname, search }) {
   return `${pathname}${search}`;
 }
 
+// A room's page, canonical (`/games/:slug/rooms/:code`) or from the first React app (`/room/:code`).
+const ROOM_PAGE = /^\/(?:games\/[^/]+\/rooms|room)\/([^/?#]+)\/?$/;
+
+/**
+ * Whether going to `path` brings the player back to room `code`: its own page under any spelling, or logging in
+ * or signing up with `next` pointing at it. A seat in a waiting room is kept for such a trip (CC-112), because the
+ * seat follows the player who signs in (CC-083).
+ *
+ * @param {string} path  a same-site path with its query
+ * @param {string} code
+ */
+export function returnsToRoom(path, code) {
+  const url = new URL(path, "https://classicade.invalid");
+  const target = AUTH_PATHS.includes(url.pathname)
+    ? new URL(safeNext(url.searchParams.get("next")), url).pathname
+    : url.pathname;
+  const room = ROOM_PAGE.exec(target);
+  return room !== null && normaliseRoomCode(decodeURIComponent(room[1])) === normaliseRoomCode(code);
+}
+
 export const paths = Object.freeze({
   home: () => "/",
   /** @param {string} gameId */

@@ -58,6 +58,16 @@ describe("RoomPage", () => {
     expect(screen.getByRole("list", { name: "Players" })).toHaveTextContent("Waiting for a player…");
   });
 
+  it("says who is away when every seat is taken but the game waits for them (CC-112)", async () => {
+    openRoom({
+      joined: roomView({ hostId: BOB.playerId, seats: [{ ...BOB, connected: false }, ME] }),
+    });
+
+    expect(await screen.findByRole("heading", { name: "Waiting for Bob" })).toBeInTheDocument();
+    expect(screen.getByText("Bob is away. The game starts as soon as they are back.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Invite a friend" })).not.toBeInTheDocument();
+  });
+
   it("follows pushed updates for this room only", async () => {
     const { socket } = openRoom();
     await screen.findByRole("heading", { name: "Invite a friend" });

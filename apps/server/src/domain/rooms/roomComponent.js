@@ -238,6 +238,15 @@ export function createRoomComponent({
     rematch: { requestedBy: [], available: outcome.reason !== "forfeit", declinedBy: "" },
   });
 
+  /**
+   * A waiting room starts its game once every seat is taken and every seated player is there. A host who went away
+   * after opening the room is never put into a game they cannot see (CC-112). The player who joined waits, and
+   * the game starts the moment the host is back.
+   */
+  const readyToStart = (room) =>
+    room.seats.length === engineFor(room).players.max && room.seats.every((seat) => seat.connected);
+  const startWhenReady = (room, now) => (readyToStart(room) ? start(room, now) : room);
+
   function start(room, now) {
     const engine = engineFor(room);
     const seed = generateSeed();
@@ -387,8 +396,9 @@ export function createRoomComponent({
     },
 
     /**
-     * Seats a player (starting the game once enough players have joined), or reconnects a seated player. A computer
-     * player (CC-138) keeps its `bot` label on the seat, so every view shows it as one.
+     * Seats a player, or reconnects a seated player. The game starts once every seat is taken and every seated
+     * player is connected, so it may start when the last player who was away comes back. A computer player
+     * (CC-138) keeps its `bot` label on the seat, so every view shows it as one.
      *
      * @param {{ code: string, player: import("../../models/identity.js").Identity | import("../../models/botIdentity.js").BotIdentity, now: number }} input
      * @throws {GoneError} when the room has closed, with the reason in `details`
@@ -398,13 +408,18 @@ export function createRoomComponent({
         code,
         now,
         decide(room) {
+          const waiting = room.status === ROOM_STATUS.WAITING;
           if (seatOf(room, player.id) !== undefined) {
-            return setConnected(room, player.id, true, now);
+            const back = setConnected(room, player.id, true, now);
+            return waiting ? startWhenReady(back, now) : back;
           }
-          if (room.status !== ROOM_STATUS.WAITING) {
+          if (!waiting) {
             throw new ConflictError("This game has already started");
           }
-          // A waiting room always has a free seat: the game starts the moment the last one is taken.
+          // Every seat is taken, and the game waits for a player who is away.
+          if (room.seats.length === engineFor(room).players.max) {
+            throw new ConflictError("This room is full");
+          }
           const seated = withSeats(
             room,
             [
@@ -418,7 +433,7 @@ export function createRoomComponent({
             ],
             now,
           );
-          return seated.seats.length === engineFor(room).players.max ? start(seated, now) : seated;
+          return startWhenReady(seated, now);
         },
       }),
 

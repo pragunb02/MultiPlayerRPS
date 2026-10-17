@@ -350,8 +350,10 @@ describe("roomComponent", () => {
 
       expect(moved.seats).toEqual([{ playerId: RIYA.id, displayName: "Riya", connected: false }]);
       expect(moved.hostId).toBe(RIYA.id);
-      // When the friend joins, the game is between the account and the friend — not against the old guest seat.
-      const started = await rooms.joinRoom({ code, player: BOB, now: T0 + 6 });
+      // When the friend joins, the game is between the account and the friend, not against the old guest seat.
+      // It starts once the account's own connection joins the room (CC-112).
+      await rooms.joinRoom({ code, player: BOB, now: T0 + 6 });
+      const started = await rooms.joinRoom({ code, player: RIYA, now: T0 + 7 });
       expect([...started.game.state.players].sort()).toEqual([BOB.id, RIYA.id].sort());
     });
 

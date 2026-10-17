@@ -100,7 +100,9 @@ test.describe("history: browsing", () => {
 });
 
 test.describe("history: rooms", () => {
-  test("create a room → Back to the lobby → Forward into the same room → reload", async ({ players }) => {
+  test("create a room → reload keeps it → Back to the lobby leaves it → Forward says it closed", async ({
+    players,
+  }) => {
     const host = await players.open("host");
     await host.page.goto("/games/chess");
     await host.page.getByRole("button", { name: "Create room" }).click();
@@ -108,15 +110,17 @@ test.describe("history: rooms", () => {
     const roomUrl = host.url();
     expect(roomUrl).toMatch(/^\/games\/chess\/rooms\/[A-Z0-9]{6}$/);
 
+    await host.page.reload();
+    await expect(host.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
+    // Still one seat: coming back after a reload never seated the host twice.
+    await expect(host.page.getByRole("list", { name: "Players" }).getByRole("listitem")).toHaveCount(2); // host + "waiting"
+
+    // Leaving the room page leaves a waiting room, so nobody starts a game against a host who has gone (CC-112).
     await host.page.goBack();
     await at(host.page, ...CHESS);
     await host.page.goForward();
     await expect(host.page).toHaveURL(roomUrl);
-    await expect(host.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
-    await host.page.reload();
-    await expect(host.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
-    // Still one seat: going back and forth never seated the host twice.
-    await expect(host.page.getByRole("list", { name: "Players" }).getByRole("listitem")).toHaveCount(2); // host + "waiting"
+    await expect(host.page.getByRole("heading", { name: "Room closed" })).toBeVisible();
   });
 
   test("join by code → Back → Forward, and the friend still plays the same game", async ({ players }) => {
