@@ -1,12 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseEmail, parsePassword, parseUsername } from "../apps/server/src/models/credentials.js";
 import { newAccount } from "./personas.js";
 
 // The browser tests sign up with these accounts. A name the server refuses fails a browser test now and then, far
 // from the cause, so the server's own rules check them here (CC-237).
 describe("newAccount (CC-237)", () => {
-  afterEach(() => vi.restoreAllMocks());
-
   it("always makes a username, email and password that sign-up accepts", () => {
     for (let i = 0; i < 20_000; i += 1) {
       const account = newAccount();
@@ -17,22 +15,15 @@ describe("newAccount (CC-237)", () => {
   });
 
   it("is accepted whatever the clock and the random digits are", () => {
-    const clocks = [0, 1, 1_760_000_000_000, 99_999_999_999_999];
-    const randoms = [0, 0.5, 0.9999];
-    for (const clock of clocks) {
-      for (const random of randoms) {
-        vi.spyOn(Date, "now").mockReturnValue(clock);
-        vi.spyOn(Math, "random").mockReturnValue(random);
-        expect(() => parseUsername(newAccount().username)).not.toThrow();
+    for (const now of [0, 1, 1_760_000_000_000, 99_999_999_999_999]) {
+      for (const random of [0, 42, 5000, 9999]) {
+        expect(() => parseUsername(newAccount({ now, random }).username)).not.toThrow();
       }
     }
   });
 
   it("fills the 20 character limit, so two accounts differ unless made in the same millisecond", () => {
-    vi.spyOn(Date, "now").mockReturnValue(1_760_712_345_678);
-    vi.spyOn(Math, "random").mockReturnValue(0.0042);
-
-    expect(newAccount().username).toBe("riya_607123456780042");
+    expect(newAccount({ now: 1_760_712_345_678, random: 42 }).username).toBe("riya_607123456780042");
   });
 
   it("no longer makes names like the one that failed: letters in the tag could spell a reserved word", () => {
