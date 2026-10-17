@@ -1,4 +1,5 @@
 import { DuplicateKey, VersionConflict } from "./errors.js";
+import { roomChanges } from "./roomChanges.js";
 
 const DUPLICATE_KEY_CODE = 11000;
 const ROOMS = "rooms";
@@ -111,21 +112,27 @@ export function createRoomDao({ connection }) {
     },
 
     /**
-     * Replaces a room only if nobody changed it since it was read.
+     * Changes a room only if nobody changed it since it was read. Only the fields that differ from `previous`
+     * are written, and the stored room comes back in the same round trip (CC-182). That is safe because the
+     * write only matches the version that was read, and that version is exactly `previous`.
      *
-     * @param {RoomDoc} doc   `version` is the version that was read
+     * @param {{ doc: RoomDoc, previous: RoomDoc }} change   `doc.version` is the version that was read, and
+     *   `previous` is the room as it was read at that version
      * @returns {Promise<RoomDoc>} the stored room, its version counted up
      * @throws {VersionConflict | RangeError}
      */
-    async update(doc) {
-      const { matchedCount } = await rooms.replaceOne(
-        { code: doc.code, version: doc.version, ...OPEN },
-        { ...structuredClone(doc), version: doc.version + 1 },
+    async update({ doc, previous }) {
+      const { version, ...next } = doc;
+      const { version: _, ...before } = previous;
+      const stored = await rooms.findOneAndUpdate(
+        { code: doc.code, version, ...OPEN },
+        { ...roomChanges(before, next), $inc: { version: 1 } },
+        { ...WITHOUT_ID, returnDocument: "after" },
       );
-      if (matchedCount === 0) {
-        await missed(doc.code, doc.version);
+      if (stored === null) {
+        await missed(doc.code, version);
       }
-      return get(doc.code);
+      return stored;
     },
 
     /**

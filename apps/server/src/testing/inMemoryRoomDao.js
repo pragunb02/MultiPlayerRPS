@@ -43,7 +43,9 @@ export function createInMemoryRoomDao() {
       return copy(rooms.get(doc.code));
     },
 
-    async update(doc) {
+    // Stores the whole room. Writing only what changed since `previous` is how the MongoDB DAO saves round trips,
+    // and the shared contract tests check that both end up storing the same room.
+    async update({ doc }) {
       checkVersion(doc.code, doc.version);
       rooms.set(doc.code, copy({ ...doc, version: doc.version + 1 }));
       return copy(rooms.get(doc.code));

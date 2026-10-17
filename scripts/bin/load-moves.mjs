@@ -3,7 +3,7 @@
 // child process, then plays chess and Rock Paper Scissors pairs of guests against it and prints the move times.
 //
 // Settings come from the environment: LOAD_PORT (default 4967), PAIRS (chess pairs and as many RPS pairs,
-// default 40), SECONDS (default 60), THINK_MS (pause before each move, default 200).
+// default 40), DURATION_S (default 60), THINK_MS (pause before each move, default 200).
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
@@ -18,7 +18,7 @@ import { GAME_IDS, SOCKET_EVENTS } from "../../packages/shared/src/index.js";
 const PORT = Number(process.env.LOAD_PORT ?? 4967);
 const BASE = `http://localhost:${PORT}`;
 const PAIRS = Number(process.env.PAIRS ?? 40);
-const SECONDS = Number(process.env.SECONDS ?? 60);
+const SECONDS = Number(process.env.DURATION_S ?? 60);
 const THINK_MS = Number(process.env.THINK_MS ?? 200);
 const HTTPS = { "X-Forwarded-Proto": "https" };
 
@@ -34,6 +34,8 @@ async function serve() {
     MONGO_URI: process.env.LOAD_MONGO_URI,
     SESSION_SECRET: "load-test-session-secret-not-used-anywhere-else-0123456789",
     ALLOWED_ORIGINS: BASE,
+    // Production needs a built web app (`npm run build:web`), even though the players here never load it.
+    WEB_DIST_DIR: fileURLToPath(new URL("../../apps/web/dist", import.meta.url)),
   });
   const logger = createLogger({ level: config.logLevel });
   // Every player connects from the same address, so the limits per address are raised out of the way.
@@ -145,8 +147,8 @@ async function pair(gameId, options) {
 
 const percentile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
 
-async function waitForHealth() {
-  for (let tries = 0; tries < 120; tries += 1) {
+async function waitForHealth(server) {
+  for (let tries = 0; tries < 120 && server.exitCode === null; tries += 1) {
     const healthy = await fetch(`${BASE}/health`).then(
       (res) => res.ok,
       () => false,
@@ -164,7 +166,7 @@ async function run() {
     env: { ...process.env, LOAD_MONGO_URI: mongo.getUri("load") },
   });
   try {
-    await waitForHealth();
+    await waitForHealth(server);
     const sockets = (
       await Promise.all(
         Array.from({ length: PAIRS }, () => [
@@ -176,6 +178,8 @@ async function run() {
     await sleep(SECONDS * 1000);
     stopping = true;
     sockets.forEach((socket) => socket.close());
+    // Lets the server finish noting the disconnects before it is stopped.
+    await sleep(2000);
     const sorted = [...times].sort((a, b) => a - b);
     const ms = (value) => `${value.toFixed(1)} ms`;
     process.stdout.write(
@@ -187,9 +191,11 @@ async function run() {
       process.stdout.write(`failures: ${JSON.stringify(Object.fromEntries(failures))}\n`);
     }
   } finally {
-    const exited = new Promise((resolve) => server.once("exit", resolve));
-    server.kill("SIGTERM");
-    await exited;
+    if (server.exitCode === null) {
+      const exited = new Promise((resolve) => server.once("exit", resolve));
+      server.kill("SIGTERM");
+      await exited;
+    }
     await mongo.stop();
   }
 }
