@@ -6,7 +6,15 @@ import { SOCKET_EVENTS } from "@classicade/shared";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { AppRequestError } from "../lib/errors.js";
-import { achievement, fakeApi, fakeSocket, fakeSound, NO_STREAKS, QUESTS } from "../testing/fakes.js";
+import {
+  achievement,
+  fakeApi,
+  fakeSessionBroadcast,
+  fakeSocket,
+  fakeSound,
+  NO_STREAKS,
+  QUESTS,
+} from "../testing/fakes.js";
 import { installMatchMedia } from "../testing/matchMedia.js";
 import { AchievementGrid } from "./Achievements/AchievementGrid.jsx";
 import { CELEBRATION_MS, GamificationToasts } from "./GamificationToasts.jsx";
@@ -22,7 +30,7 @@ const down = () => new AppRequestError({ code: "NETWORK", message: "Can't reach 
 function renderWith(ui, { api = fakeApi(), socket = fakeSocket(), sound = fakeSound() } = {}) {
   render(
     <MemoryRouter>
-      <ServicesProvider services={{ api, socket, sound }}>
+      <ServicesProvider services={{ api, socket, sound, sessionBroadcast: fakeSessionBroadcast() }}>
         <SessionProvider>
           <ToastProvider>
             <SaveProgressProvider>{ui}</SaveProgressProvider>

@@ -114,6 +114,7 @@ export function fakeApi(overrides = {}) {
 /** A fake socket client recording connect/disconnect and letting tests push server events. */
 export function fakeSocket() {
   const handlers = new Map();
+  const endedHandlers = new Set();
   let connected = false;
   return {
     connect: vi.fn(() => {
@@ -133,9 +134,37 @@ export function fakeSocket() {
           (handlers.get(event) ?? []).filter((h) => h !== handler),
         );
     }),
+    onEndedByServer: vi.fn((handler) => {
+      endedHandlers.add(handler);
+      return () => endedHandlers.delete(handler);
+    }),
     /** Test helper: simulate a server push. */
     push(event, payload) {
       (handlers.get(event) ?? []).forEach((handler) => handler(payload));
+    },
+    /** Test helper: the server ends this socket on purpose, as after a sign out elsewhere (CC-234). */
+    endByServer() {
+      connected = false;
+      endedHandlers.forEach((handler) => handler());
+    },
+  };
+}
+
+/**
+ * A fake of the message between this browser's tabs (lib/sessionBroadcast.js). `announce` records what this tab
+ * told the others, and `receive()` plays a message from another tab (CC-115).
+ */
+export function fakeSessionBroadcast() {
+  const listeners = new Set();
+  return {
+    announce: vi.fn(),
+    onChange: vi.fn((handler) => {
+      listeners.add(handler);
+      return () => listeners.delete(handler);
+    }),
+    /** Test helper: another tab of this browser changed who the browser is. */
+    receive() {
+      listeners.forEach((handler) => handler());
     },
   };
 }
