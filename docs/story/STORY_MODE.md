@@ -3,7 +3,7 @@
 Written 2026-10-17. Design only, no code. It builds on the bot strategies on branch `cc-038-bot-strategies`
 (`packages/games/src/bots/`), the game shell (ADR-020, proposed, see [docs/ux/MATCH_EXPERIENCE.md](../ux/MATCH_EXPERIENCE.md)),
 the visual identity (ADR-012), the gamification rules (ADR-013) and player data that follows the identity (ADR-014).
-It proposes ADR-021 (story mode) and tickets CC-187 to CC-202.
+It proposes ADR-024 (story mode) and tickets CC-187 to CC-202.
 
 Contents:
 
@@ -375,10 +375,10 @@ document.
 | Board themes and skins    | Origami hand skin (RPS), Neon Grid board (TTT), Castle Stone board (chess), at each boss                                        | CC-143 unlocks                             |
 | Avatar frames             | Paper Crane, Circuit and Crown frames for the encores, plus an animated frame per district for all 27 or 33 stars               | CC-143 unlocks                             |
 | Badges                    | Paper Town Hero, Grid City Hero, Kingdom Hero, Arcade Relit, Star Collector (one district at full stars), Quest Legend (all 96) | achievements (ADR-013: status only, no XP) |
-| Coins, once CC-142 exists | 10 for a first clear, 50 for a boss, once per level                                                                             | coin ledger (ADR-017)                      |
+| Coins, once CC-142 exists | 10 for a first clear, 50 for a boss, once per level                                                                             | coin ledger (ADR-026)                      |
 
 Total story XP is at most 1,960 (1,000 for first clears and 960 for stars), about level 9. It can never be earned
-twice, so it cannot be farmed. Story matches are bot matches, so the normal bot match XP of ADR-016 also applies, with
+twice, so it cannot be farmed. Story matches are bot matches, so the normal bot match XP of ADR-025 also applies, with
 its caps, and they never count on the leaderboards. Nothing in Quest can be bought, and no reward changes how a game
 plays. Every reward is cosmetic or a badge.
 
@@ -1259,7 +1259,7 @@ Bot seating follows CC-138: the story room seats the player and a bot identity w
 name and whose difficulty is the level's strategy id. The room is private: no invite code works for it, it is not
 listed, and nobody can spectate. The bot answers a rematch request at once and never offers or accepts a draw. Story
 matches are recorded like other bot matches, labelled in match history as "Quest: Paper Town 5 against Whirly", never
-counted on leaderboards, and rewarded under ADR-016's bot rules plus the story rewards above.
+counted on leaderboards, and rewarded under ADR-025's bot rules plus the story rewards above.
 
 ### Daily return hooks, without dark patterns
 
@@ -1302,7 +1302,7 @@ board's next free ID becomes **CC-203** when they are added.
 
 | Order | Ticket | Title                                                                                                                                                                                        | Type    | Pri | Size | Depends on                                         |
 | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | --- | ---- | -------------------------------------------------- |
-| 1     | CC-187 | ADR-021 story mode: server scored stars, `story_progress`, XP keys and source `story`, transfer participant, URLs, private bot rooms                                                         | docs    | P1  | S    | CC-179                                             |
+| 1     | CC-187 | ADR-024 story mode: server scored stars, `story_progress`, XP keys and source `story`, transfer participant, URLs, private bot rooms                                                         | docs    | P1  | S    | CC-179                                             |
 | 2     | CC-188 | Story catalogue in `@classicade/shared`: districts, 32 levels, 19 characters, goal and star types, reward ids, with a validation test                                                        | feature | P1  | S    | CC-187                                             |
 | 3     | CC-189 | Engine options for Quest: chess `startFen`, `untimed` and fixed colours, TTT `startBoard` with closed cells and a fixed starter, the last move in the TTT view, bots read the start position | feature | P1  | M    | CC-038, CC-039, CC-040                             |
 | 4     | CC-190 | Character strategies: parameters for `pattern` and the chess levels, new `favourite`, `copycat`, `cycle`, `win-stay`, `practice`, `blocker`, `corners`, `mirror`, `stylist`, `listed: false` | feature | P1  | M    | CC-189, CC-138                                     |

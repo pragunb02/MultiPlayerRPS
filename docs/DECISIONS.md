@@ -26,7 +26,7 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 ### ADR-024 — Story mode "ClassiCade Quest"
 
 - **Status:** Proposed · 2026-10-17
-- **Where:** `docs/story/STORY_MODE.md` in PR #50 (CC-179, CC-187). It is recorded here once that PR lands.
+- **Where:** [story/STORY_MODE.md](story/STORY_MODE.md) (CC-179). Accepting it is CC-187.
 
 ### ADR-025, ADR-026, ADR-027 — to be written
 
