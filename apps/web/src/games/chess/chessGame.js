@@ -40,15 +40,36 @@ const ARROW_STEPS = Object.freeze({
   ArrowLeft: [-1, 0],
   ArrowRight: [1, 0],
 });
-export const isArrowKey = (key) => Object.hasOwn(ARROW_STEPS, key);
 
 /** The neighbouring square on screen in the direction of an arrow key. At the edge the square stays the same. */
-export function squareInDirection(square, key, orientation) {
+function squareInDirection(square, key, orientation) {
   const sign = orientation === "w" ? 1 : -1;
   const [df, dr] = ARROW_STEPS[key];
   const file = FILES.indexOf(square[0]) + df * sign;
   const rank = Number(square[1]) + dr * sign;
   return file < 0 || file > 7 || rank < 1 || rank > 8 ? square : `${FILES[file]}${rank}`;
+}
+
+/**
+ * Where the board's keyboard cursor goes for a key, as the grid pattern for screen readers sets out. An arrow moves
+ * one square on screen and stops at the edge. Home and End go to the first and last square of the row on screen.
+ * With Ctrl (Cmd on a Mac) they go to the top left and bottom right squares of the board. Any other key answers
+ * an empty string, so the key keeps its usual job.
+ *
+ * @param {{ square: string, key: string, ctrl: boolean, orientation: "w" | "b" }} input  `ctrl` is true while Ctrl
+ *   or Cmd is held down
+ * @returns {string}
+ */
+export function squareForKey({ square, key, ctrl, orientation }) {
+  if (Object.hasOwn(ARROW_STEPS, key)) {
+    return squareInDirection(square, key, orientation);
+  }
+  if (key !== "Home" && key !== "End") {
+    return "";
+  }
+  const rows = boardRows(orientation);
+  const row = ctrl ? rows[key === "Home" ? 0 : 7] : rows.find((squares) => squares.includes(square));
+  return key === "Home" ? row[0] : row[7];
 }
 
 /**

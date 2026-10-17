@@ -77,7 +77,9 @@ export function RpsBoard({ room, onMove, reason = playReason(room, { reconnectin
   return (
     <div className={styles.board}>
       <TurnBanner room={room} />
-      <p className={styles.score} aria-label="Score">
+      {/* A paragraph cannot carry a label, so screen readers hear the word as part of the text (CC-183). */}
+      <p className={styles.score}>
+        <span className="visually-hidden">Score: </span>
         {room.seats
           .map((seat) => `${nameOf(room, seat.playerId)} ${view.score[seat.playerId] ?? 0}`)
           .join(" — ")}

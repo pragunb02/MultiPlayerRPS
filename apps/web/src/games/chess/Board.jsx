@@ -52,8 +52,38 @@ function Piece({ piece, slide, lifted }) {
 }
 
 /**
+ * The rank numbers down the left edge and the file letters along the bottom, in the colour of the other kind of
+ * square so they read on both. They are drawn over the board, outside the square buttons: a number printed inside
+ * a button would be part of what voice control users see as its label, yet not part of the name they say ("a8,
+ * black rook"). Screen readers skip them because every square says where it is.
+ */
+function Coordinates({ rows }) {
+  const tone = (square) => (isDarkSquare(square) ? styles.onDark : styles.onLight);
+  return (
+    <div className={styles.coords} aria-hidden="true">
+      <div className={styles.rankCoords}>
+        {rows.map(([first]) => (
+          <span key={first} className={`${styles.coord} ${tone(first)}`}>
+            {first[1]}
+          </span>
+        ))}
+      </div>
+      <div className={styles.fileCoords}>
+        {rows[7].map((square) => (
+          <span key={square} className={`${styles.coord} ${tone(square)}`}>
+            {square[0]}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * The 64 squares, the pieces and every marker on them. Each square is a button in a grid (screen readers read
- * "e4, white pawn, legal move"), and only one square is in the Tab order: the arrow keys move between them.
+ * "e4, white pawn, legal move"), and only one square is in the Tab order: the arrow keys, Home and End move
+ * between them. The picked up piece's square is the grid's selected cell. A grid cell cannot be "pressed", so
+ * `aria-pressed` would be ignored there (CC-183).
  *
  * @param {{
  *   chess: import("chess.js").Chess,
@@ -92,9 +122,9 @@ export function Board({ chess, orientation, input, interactive, colour, lastMove
         aria-label="Chess board"
         {...handlers}
       >
-        {rows.map((row, r) => (
+        {rows.map((row) => (
           <div role="row" key={row[0]} className={styles.rank}>
-            {row.map((square, c) => {
+            {row.map((square) => {
               const piece = chess.get(square);
               const target = input.targets.find((move) => move.to === square);
               const classes = [
@@ -118,22 +148,12 @@ export function Board({ chess, orientation, input, interactive, colour, lastMove
                   data-cc-control="chess.square"
                   className={classes.join(" ")}
                   aria-label={`${square}${name}${target ? ", legal move" : ""}`}
-                  aria-pressed={square === input.selected}
+                  aria-selected={square === input.selected}
                   aria-disabled={!interactive}
                   tabIndex={square === input.cursor ? 0 : -1}
                   onClick={(event) => input.click(square, event)}
                   onFocus={() => input.focus(square)}
                 >
-                  {c === 0 && (
-                    <span className={`${styles.coord} ${styles.rankCoord}`} aria-hidden="true">
-                      {square[1]}
-                    </span>
-                  )}
-                  {r === 7 && (
-                    <span className={`${styles.coord} ${styles.fileCoord}`} aria-hidden="true">
-                      {square[0]}
-                    </span>
-                  )}
                   {piece && (
                     <Piece
                       key={slides[square] ? `${square}:${slide.key}` : square}
@@ -147,6 +167,7 @@ export function Board({ chess, orientation, input, interactive, colour, lastMove
             })}
           </div>
         ))}
+        <Coordinates rows={rows} />
         {dragged && (
           <img
             ref={attachGhost}

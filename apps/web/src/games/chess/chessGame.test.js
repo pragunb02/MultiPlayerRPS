@@ -6,7 +6,6 @@ import {
   colourName,
   describePieces,
   endReasonText,
-  isArrowKey,
   isDarkSquare,
   materialBalance,
   opposite,
@@ -16,7 +15,7 @@ import {
   replayGame,
   resultToken,
   squareAtPoint,
-  squareInDirection,
+  squareForKey,
   squareOffset,
 } from "./chessGame.js";
 
@@ -45,10 +44,9 @@ describe("board geometry", () => {
     expect(pieceImage("b", "n")).toBe("/pieces/bN.png");
   });
 
-  it("only treats the four arrows as board keys", () => {
-    expect(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].every(isArrowKey)).toBe(true);
-    expect(isArrowKey("Enter")).toBe(false);
-    expect(isArrowKey("toString")).toBe(false);
+  it.each(["Enter", " ", "Escape", "PageUp", "toString"])("leaves %j to do its usual job", (key) => {
+    expect(squareForKey({ square: "e2", key, ctrl: false, orientation: "w" })).toBe("");
+    expect(squareForKey({ square: "e2", key, ctrl: true, orientation: "b" })).toBe("");
   });
 
   it.each([
@@ -60,7 +58,7 @@ describe("board geometry", () => {
     ["e7", "ArrowUp", "b", "e6"],
     ["e7", "ArrowRight", "b", "d7"],
   ])("moves from %s with %s on %s's board to %s", (from, key, orientation, to) => {
-    expect(squareInDirection(from, key, orientation)).toBe(to);
+    expect(squareForKey({ square: from, key, ctrl: false, orientation })).toBe(to);
   });
 
   it.each([
@@ -69,7 +67,26 @@ describe("board geometry", () => {
     ["a1", "ArrowDown"],
     ["a8", "ArrowUp"],
   ])("stays on %s at the edge of the board when pressing %s", (square, key) => {
-    expect(squareInDirection(square, key, "w")).toBe(square);
+    expect(squareForKey({ square, key, ctrl: false, orientation: "w" })).toBe(square);
+  });
+
+  it.each([
+    ["e4", "Home", "w", "a4"],
+    ["e4", "End", "w", "h4"],
+    // On Black's board the a-file is on the right, so Home goes to the h-file.
+    ["e4", "Home", "b", "h4"],
+    ["e4", "End", "b", "a4"],
+  ])("jumps from %s with %s to the end of the row on %s's board, %s", (square, key, orientation, to) => {
+    expect(squareForKey({ square, key, ctrl: false, orientation })).toBe(to);
+  });
+
+  it.each([
+    ["Home", "w", "a8"],
+    ["End", "w", "h1"],
+    ["Home", "b", "h1"],
+    ["End", "b", "a8"],
+  ])("jumps with Ctrl and %s on %s's board to the corner square %s", (key, orientation, to) => {
+    expect(squareForKey({ square: "e4", key, ctrl: true, orientation })).toBe(to);
   });
 
   it("finds the square under a point, from either side", () => {
