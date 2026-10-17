@@ -1,15 +1,22 @@
 # Product Requirements Document — ClassiCade
 
-|                  |                  |
-| ---------------- | ---------------- |
-| Status           | Draft v0.1       |
-| Last updated     | 2026-10-16       |
-| Business context | [BRD.md](BRD.md) |
+|                  |                                                              |
+| ---------------- | ------------------------------------------------------------ |
+| Status           | Draft v0.2                                                   |
+| Last updated     | 2026-10-17                                                   |
+| Business context | [BRD.md](BRD.md)                                             |
+| Product vision   | [PRODUCT_VISION.md](PRODUCT_VISION.md) (accepted 2026-10-17) |
 
 Requirement IDs: `FR-<area>-<n>` functional, `NFR-<n>` non-functional. Each has a target **stage** (S0–S4).
 Backlog tasks in [BACKLOG.md](BACKLOG.md) reference these IDs.
 
+The accepted [PRODUCT_VISION.md](PRODUCT_VISION.md) sets the personas, the order of work, the phases and the targets.
+Its decisions D9, D10 and D11 are applied below. Our promise to players: **No betting. No cash. Ever.**
+
 ## 1. Personas
+
+The primary personas for phases 1 and 2 are in [PRODUCT_VISION.md](PRODUCT_VISION.md) §2: Riya (an adult friend
+group), Meena (a family on one phone) and the drop-in searcher. The list below is the original sketch.
 
 - **Casey (casual):** opens a link from a friend on mobile, plays without signing up.
 - **Riya (competitive):** wants ratings, history, leaderboards, replays.
@@ -18,7 +25,7 @@ Backlog tasks in [BACKLOG.md](BACKLOG.md) reference these IDs.
 ## 2. Core user journeys
 
 1. **Invite & play:** Create room → share link → friend opens link → both in game → result → rematch. _(S1)_
-2. **Quick match:** Pick game + time control → matched within 15 s (bot fallback) → play. _(S2)_
+2. **Quick match:** Pick a game. A labelled character is the main Play button, and "Find a person" searches in parallel for at most 4 seconds. _(S1)_
 3. **Play a bot:** Pick game + difficulty → play instantly. _(S1)_
 4. **Guest → account:** Guest plays 3 games → prompted to save progress → signs up, history preserved. _(S1)_
 5. **Review:** Open profile → see history & ratings → replay a chess game. _(S1/S2)_
@@ -52,63 +59,68 @@ Backlog tasks in [BACKLOG.md](BACKLOG.md) reference these IDs.
 
 ### 3.3 Games
 
-| ID        | Requirement                                                                                                        | Stage |
-| --------- | ------------------------------------------------------------------------------------------------------------------ | ----- |
-| FR-GAME-1 | All rules and results computed on the server via a common engine interface                                         | S0    |
-| FR-GAME-2 | **RPS:** best-of-N (1/3/5), simultaneous hidden choices, round history                                             | S0/S1 |
-| FR-GAME-3 | **Tic-Tac-Toe:** standard 3×3; alternating first player on rematch                                                 | S0    |
-| FR-GAME-4 | **Chess:** full rules (chess.js), server clocks, time controls (blitz/rapid), resign, offer draw, promotion choice | S0/S1 |
-| FR-GAME-5 | Chess move list, PGN export, replay viewer                                                                         | S1    |
-| FR-GAME-6 | Ludo (2–4 players)                                                                                                 | S2    |
-| FR-GAME-7 | Additional games (Connect Four, Checkers, Dots & Boxes, …)                                                         | S4    |
+| ID         | Requirement                                                                                                        | Stage |
+| ---------- | ------------------------------------------------------------------------------------------------------------------ | ----- |
+| FR-GAME-1  | All rules and results computed on the server via a common engine interface                                         | S0    |
+| FR-GAME-2  | **RPS:** best-of-N (1/3/5), simultaneous hidden choices, round history                                             | S0/S1 |
+| FR-GAME-3  | **Tic-Tac-Toe:** standard 3×3; alternating first player on rematch                                                 | S0    |
+| FR-GAME-4  | **Chess:** full rules (chess.js), server clocks, time controls (blitz/rapid), resign, offer draw, promotion choice | S0/S1 |
+| FR-GAME-5  | Chess move list, PGN export, replay viewer                                                                         | S1    |
+| FR-GAME-6  | Ludo (2–4 players), with characters and pass and play                                                              | S3    |
+| FR-GAME-7  | Additional games (Connect Four, Checkers, Dots & Boxes, …)                                                         | S4    |
+| FR-GAME-8  | Pass and play on one phone for all three games. Results are not counted                                            | S1    |
+| FR-GAME-9  | Ultimate Tic Tac Toe as a permanent mode                                                                           | S2    |
+| FR-GAME-10 | Turn-based Tic Tac Toe, Ultimate Tic Tac Toe and chess, with "your move" in the inbox                              | S2    |
 
 ### 3.4 Bots & AI
 
-| ID      | Requirement                                                                   | Stage |
-| ------- | ----------------------------------------------------------------------------- | ----- |
-| FR-AI-1 | Bot interface: a bot is a server-side player implementing `chooseMove(state)` | S1    |
-| FR-AI-2 | RPS bots: random, pattern-learning (Markov)                                   | S1    |
-| FR-AI-3 | TTT bots: easy (random), medium, unbeatable (minimax)                         | S1    |
-| FR-AI-4 | Chess bots: Stockfish with difficulty levels                                  | S1    |
-| FR-AI-5 | Quick-match bot fallback when no human found in N seconds                     | S2    |
-| FR-AI-6 | Post-game coach / analysis (chess first)                                      | S4    |
-| FR-AI-7 | Anti-cheat signals (engine-correlation, abnormal win patterns)                | S2    |
+| ID      | Requirement                                                                                                                 | Stage |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- | ----- |
+| FR-AI-1 | Bot interface: a bot is a server-side player implementing `chooseMove(state)`                                               | S1    |
+| FR-AI-2 | RPS bots: random, pattern-learning (Markov)                                                                                 | S1    |
+| FR-AI-3 | TTT bots: easy (random), medium, unbeatable (minimax)                                                                       | S1    |
+| FR-AI-4 | Chess bots: Stockfish with difficulty levels                                                                                | S1    |
+| FR-AI-5 | Quick match: a labelled character for each game is the main Play button, with a parallel search for a person of at most 4 s | S1    |
+| FR-AI-6 | Post-game coach / analysis (chess first)                                                                                    | S4    |
+| FR-AI-7 | Anti-cheat signals (engine-correlation, abnormal win patterns)                                                              | S3    |
+| FR-AI-8 | Every bot is labelled as a bot. Bot games never count for ratings or leaderboards (ADR-025)                                 | S1    |
+| FR-AI-9 | Rock Paper Scissors characters lock in their throw first with a commitment the client checks (ADR-025)                      | S1    |
 
 ### 3.5 Progression & competition
 
-| ID        | Requirement                                                | Stage |
-| --------- | ---------------------------------------------------------- | ----- |
-| FR-PROG-1 | XP & levels from completed matches (not rounds, not joins) | S0    |
-| FR-PROG-2 | Rating per game (Glicko-2) for rated human matches         | S1    |
-| FR-PROG-3 | Leaderboards: global, per game, weekly                     | S2    |
-| FR-PROG-4 | Achievements & badges; win streaks                         | S2    |
-| FR-PROG-5 | Seasons with rewards                                       | S2    |
-| FR-PROG-6 | Tournaments (swiss/knockout), private for clubs            | S4    |
+| ID        | Requirement                                                                                           | Stage |
+| --------- | ----------------------------------------------------------------------------------------------------- | ----- |
+| FR-PROG-1 | XP & levels from completed matches (not rounds, not joins)                                            | S0    |
+| FR-PROG-2 | Chess rating (Glicko-2) for rated human matches only. Provisional for 10 games, never reset (ADR-027) | S1    |
+| FR-PROG-3 | Leaderboards: global, per game, weekly                                                                | S2    |
+| FR-PROG-4 | Achievements & badges; win streaks                                                                    | S2    |
+| FR-PROG-5 | Seasons with a free track and a season rank separate from the chess rating                            | S3    |
+| FR-PROG-6 | Tournaments (swiss/knockout), private for clubs                                                       | S4    |
 
 ### 3.6 Social
 
-| ID       | Requirement                                                | Stage |
-| -------- | ---------------------------------------------------------- | ----- |
-| FR-SOC-1 | Share result card / room link (correct game name per game) | S1    |
-| FR-SOC-2 | Emotes / quick chat in game                                | S1    |
-| FR-SOC-3 | Friends, online presence, direct challenge                 | S2    |
-| FR-SOC-4 | Block, mute, report player                                 | S1    |
-| FR-SOC-5 | Clubs/groups with private leaderboards                     | S4    |
+| ID       | Requirement                                                                       | Stage |
+| -------- | --------------------------------------------------------------------------------- | ----- |
+| FR-SOC-1 | Share result card / room link (correct game name per game)                        | S1    |
+| FR-SOC-2 | Emotes / quick chat in game                                                       | S1    |
+| FR-SOC-3 | Friends, online presence, direct challenge                                        | S2    |
+| FR-SOC-4 | Block, mute, report player                                                        | S1    |
+| FR-SOC-5 | Circles: private groups of 2 to 50 with a circle board, safe for minors (ADR-028) | S2    |
 
 ### 3.7 Monetization
 
-| ID       | Requirement                                         | Stage |
-| -------- | --------------------------------------------------- | ----- |
-| FR-MON-1 | Plus subscription (payments provider, entitlements) | S3    |
-| FR-MON-2 | Cosmetics store (themes, piece sets, emotes)        | S3    |
-| FR-MON-3 | Ads for free tier, between matches only             | S3    |
+| ID       | Requirement                                                           | Stage |
+| -------- | --------------------------------------------------------------------- | ----- |
+| FR-MON-1 | Plus subscription (payments provider, entitlements)                   | S3    |
+| FR-MON-2 | Cosmetics store (themes, piece sets, emotes)                          | S3    |
+| FR-MON-3 | No ads in Stages 1 and 2. If ads ever come, between matches only (D9) | S3+   |
 
 ### 3.8 Admin & operations
 
 | ID       | Requirement                                                               | Stage |
 | -------- | ------------------------------------------------------------------------- | ----- |
 | FR-ADM-1 | Admin console: users, bans, reports queue, live rooms                     | S2    |
-| FR-ADM-2 | Feature flags                                                             | S2    |
+| FR-ADM-2 | Feature flags, including the liquidity gates (ADR-029)                    | S1    |
 | FR-ADM-3 | Product analytics events (match_started, match_completed, invite_sent, …) | S1    |
 
 ### 3.9 Legal & marketing pages
@@ -133,6 +145,19 @@ Backlog tasks in [BACKLOG.md](BACKLOG.md) reference these IDs.
 | NFR-9  | **Responsive:** mobile-first, works on 360 px width                                                                       | S1    |
 | NFR-10 | **Privacy:** minimal PII, data deletion, environment separation (dev/staging/prod)                                        | S0/S1 |
 
-## 5. Open questions
+## 5. Stage 1 exit criteria (amended by D11)
+
+Public URL, 3 polished games in the game shell, a labelled character for each game as the main Play button, pass
+and play, invite links, guest play, chess rating, legal pages and monitoring. The full phase 1 exit list, with its
+measured targets, is in [PRODUCT_VISION.md](PRODUCT_VISION.md) §8.1.
+
+## 6. Metrics
+
+North Star: **Weekly Returning Players (WRP)**, players with a day of real play on 3 or more different local days
+in a week, with the person share, account share and bot XP guardrails. Day 1, day 7 and day 30 return targets for
+phases 1 and 2 are in [PRODUCT_VISION.md](PRODUCT_VISION.md) §7.2. The day 7 target of 20% or more is a Stage 3
+stretch goal (D10).
+
+## 7. Open questions
 
 See [DECISIONS.md](DECISIONS.md) → "Open decisions".

@@ -1,5 +1,9 @@
 # ClassiCade Roadmap
 
+> **Note, 17 October 2026.** [PRODUCT_VISION.md](PRODUCT_VISION.md) was accepted by the owner on 17 October 2026. It
+> now sets the order of work (phases 0 to 3, mapped onto the Stages) and supersedes the batch order in §3 where the
+> two differ. The board ([BACKLOG.md](BACKLOG.md)) carries each ticket's phase. §5 below is updated for ADR-026.
+
 Written 2026-10-16. Based on a read-only audit of `main` at 9560048 (security, bugs, code quality, product and platform). Every security and bug item below was checked a second time against the code. Ticket IDs start at the next free ID on the board, **CC-105**. CC-101 to CC-104 are already reserved. New finding IDs start at SEC-12, BUG-15 and DEBT-13. New ADRs start at ADR-016. (Renumbered on 2026-10-17, after ADR-016 to ADR-024 went to decisions made since: bot rewards is ADR-025, the coin economy ADR-026 and ratings ADR-027.)
 
 ## 1. Where we are
@@ -132,7 +136,7 @@ One-way "following" (for streamers) is deliberately left out until there are str
 | CC-094          | Backfill from older match history                                                                                                                                       | P2  | M    | CC-130         |
 | CC-142          | Soft-coin ledger that only grows (each entry written once, keyed like quests), cached balance, guest transfer participant, admin revoke (ADR-026)                       | P2  | L    | CC-095, CC-099 |
 | CC-143          | Unlocks by level, achievement or coins: board themes, piece sets, RPS hand skins, avatar frames, emotes, victory animations, game variants. Base games are never locked | P2  | M    | CC-142         |
-| CC-145          | Streak freeze (200 coins, hold at most 2) and a coin bonus for the day's first match                                                                                    | P2  | S    | CC-142         |
+| CC-145          | Streak protection: one free freeze a week earned by playing, hold at most 2, earn back, longest streak kept. Freezes are not a coin sink (ADR-026)                      | P2  | S    | CC-146         |
 | CC-146          | Days in local time (revisit ADR-013). Show the reset time in local time right away                                                                                      | P2  | M    | none           |
 | CC-141          | Weekly leagues of 20 to 30 players, Bronze to Legend, top 5 move up, bottom 5 move down                                                                                 | P2  | M    | CC-095, CC-142 |
 | CC-055          | Seasons                                                                                                                                                                 | P3  | M    | CC-141         |
@@ -190,7 +194,9 @@ Churn prediction gets no ticket until CC-045 has 3 months of data. Until then, t
 
 ## 5. Economy design
 
-1. **One soft currency: coins.** There is no paid currency before Stage 3. Coins are earned only by playing, never bought at first, never cashed out, traded or gifted. Gifting is a route for fraud.
+Updated 17 October 2026 for ADR-026 (vision decision D4).
+
+1. **One soft currency: coins.** There is no paid currency before Stage 3. Coins are earned only by playing, never bought at first, and never cashed out, traded, gifted, wagered, given as prizes or used for story levels. Gifting is a route for fraud.
 2. **Where coins come from.** Every payment is a ledger entry written exactly once, and each day has a cap.
    1. First completed match of the day: +20.
    2. Human match: +5 for a win, +2 for a draw or a loss.
@@ -198,14 +204,14 @@ Churn prediction gets no ticket until CC-045 has 3 months of data. Until then, t
    4. Quest: +10 to 25. Daily sweep: +20.
    5. Puzzle: +10. Level-up: +50.
    6. Achievement: +25 to 200 by tier.
-   7. League finish: +50 to 500. Referral: +200 each.
+   7. League finish: a badge, not coins, because coins are never prizes. Referral: +200 each, if CC-149 ever ships.
    8. An active day earns about 60 to 100 coins.
-3. **Where coins go.**
+3. **Where coins go: cosmetics and name changes only.**
    1. Board themes cost 300 to 800 and piece sets 500 to 1500.
    2. Avatar frames, emote packs and victory animations.
-   3. Streak freeze costs 200, and a player can hold at most 2.
-   4. A name change after the first free one costs 500.
-   5. Early access to a variant before its level unlock.
+   3. A name change after the first free one costs 500.
+   4. Streak freezes are free: one a week earned by playing, hold at most 2 (CC-145). They are not a coin sink.
+   5. Coins never buy game variants, early access, story levels or anything that changes play.
 4. **Never pay-to-win.**
    1. Coins never buy rating, rating protection, hints in rated games or XP boosts in ranked play.
    2. Base games are never locked, and nothing reached from an invite link is ever locked.
