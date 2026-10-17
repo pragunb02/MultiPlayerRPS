@@ -15,7 +15,12 @@ export function PrivacyPage() {
       <LegalSection title="1. Who looks after your data">
         <p>
           ClassiCade is run by its owner as an independent project. The owner decides what is stored and is
-          responsible for it. A contact address for privacy questions will be added here before launch.
+          responsible for it. For privacy questions or requests, open an issue at{" "}
+          <a href="https://github.com/pragunb02/MultiPlayerRPS/issues">
+            github.com/pragunb02/MultiPlayerRPS/issues
+          </a>{" "}
+          saying only that you have a privacy request. Do not put your email, username or anything personal in
+          it: the owner will reply and continue the conversation privately.
         </p>
       </LegalSection>
 
@@ -66,8 +71,13 @@ export function PrivacyPage() {
           We use one cookie, <code>cc.sid</code>, and only after you choose to play. It holds the random id of
           your session and nothing else. Scripts on the page cannot read it, and it is only sent over secure
           connections. It is strictly necessary for the site to work, so we do not ask for consent, and you
-          can still look around without it. We use no other cookies and no browser storage, and there are no
-          advertising, analytics or social media cookies.
+          can still look around without it. We use no other cookies, and there are no advertising, analytics
+          or social media cookies.
+        </p>
+        <p>
+          Your browser also keeps one setting for this site, <code>cc.sound</code>: whether sound is on and
+          how loud. It is stored only in your browser, is never sent to us, and contains nothing about you.
+          Clearing your browser's site data removes it.
         </p>
       </LegalSection>
 
