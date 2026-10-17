@@ -4,13 +4,14 @@
 
 /**
  * The page moved on and the browser cancelled a request it no longer needed. That is not a failure. Chromium says
- * `net::ERR_ABORTED`, Firefox `NS_BINDING_ABORTED` and WebKit `cancelled`.
+ * `net::ERR_ABORTED`, Firefox `NS_BINDING_ABORTED` and WebKit `cancelled`, or for a page load that another one
+ * replaced, `Provisional navigation canceled.`
  *
  * @param {string} errorText what the browser gave as the reason the request failed
  * @returns {boolean}
  */
 export const isCancelledRequest = (errorText) =>
-  /^net::ERR_ABORTED$|^NS_BINDING_ABORTED$|^cancelled$/i.test(errorText);
+  /^net::ERR_ABORTED$|^NS_BINDING_ABORTED$|^cancelled$|^Provisional navigation canceled\.$/i.test(errorText);
 
 /** The realtime connection failing to reach the server, one pattern per engine's wording. */
 const REALTIME_DOWN = Object.freeze([

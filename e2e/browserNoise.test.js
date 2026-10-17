@@ -10,11 +10,14 @@ import {
 // The exact wording each engine used in the browser suite (Playwright 1.64, CC-184).
 describe("isCancelledRequest", () => {
   it("knows a cancelled request in Chromium's, Firefox's and WebKit's words", () => {
-    expect(["net::ERR_ABORTED", "NS_BINDING_ABORTED", "cancelled"].map(isCancelledRequest)).toEqual([
-      true,
-      true,
-      true,
-    ]);
+    for (const reason of [
+      "net::ERR_ABORTED",
+      "NS_BINDING_ABORTED",
+      "cancelled",
+      "Provisional navigation canceled.",
+    ]) {
+      expect(isCancelledRequest(reason), reason).toBe(true);
+    }
   });
 
   it("does not pass a request that really failed", () => {

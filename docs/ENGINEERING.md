@@ -193,8 +193,9 @@ Rules:
     Keep a fast check of the same behaviour untagged beside it (fewer games, a shorter walk), so the PR gates still
     reach every line without the slow ones.
 14. **Every browser engine** (CC-184). The suite runs on Chromium (laptop and phone) as the required check, and on
-    Firefox and WebKit (laptop) as their own CI jobs; `E2E_BROWSER=firefox|webkit npm run test:e2e` runs one
-    locally. The e2e server serves HTTPS with a certificate made for each run (`e2e/tlsFront.js`), so every engine
+    Firefox (laptop) beside it on every pull request. WebKit (laptop, on macOS) is much slower on GitHub's runners,
+    so `.github/workflows/webkit.yml` runs it nightly, on demand and on pull requests that change `apps/web`,
+    `packages/shared` or `e2e`. `E2E_BROWSER=firefox|webkit npm run test:e2e` runs one engine locally. The e2e server serves HTTPS with a certificate made for each run (`e2e/tlsFront.js`), so every engine
     sees the production headers and the `Secure` cookie unchanged. Branch on `formFactor(testInfo)`, never on the
     project name. Engine wording the `players` fixture lets pass lives in `e2e/browserNoise.js`, each rule as
     narrow as the words allow and unit tested.
