@@ -110,6 +110,11 @@ async function pressAndWatch(state, entry, target) {
         () => false,
       )
     : Promise.resolve(false);
+  if (entry.blocked) {
+    // A forced press skips the check that nothing covers the control, so the control is brought to the middle of
+    // the screen first, clear of the request banner that stays at the top while the page scrolls (CC-160).
+    await target.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  }
   await target.click({ force: entry.blocked });
   await page.waitForTimeout(ANSWER_MS + 50);
   const answer = await answerTo(page, armed);
