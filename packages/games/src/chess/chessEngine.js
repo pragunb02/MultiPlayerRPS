@@ -54,9 +54,8 @@ const isPlainObject = (value) =>
 const halfMoveClock = (fen) => Number(fen.split(" ")[4]);
 
 /**
- * Position keys of a game stored before `positions` existed (CC-180). It replays the game once to rebuild them,
- * after which every move carries the list forward. The key is chess.js's own position hash, the same one it
- * counts for threefold repetition, so the result matches what a full replay would decide.
+ * Position keys of a game replayed from its moves. The key is chess.js's own position hash, the same one it counts
+ * for threefold repetition, so the result matches what a full replay would decide.
  */
 function positionsFromMoves(moves) {
   const chess = new Chess();
@@ -68,7 +67,20 @@ function positionsFromMoves(moves) {
   return positions;
 }
 
-const positionsOf = (state) => state.positions ?? positionsFromMoves(state.moves);
+/**
+ * The positions since the last capture or pawn move. A game stored before they were kept has none. A game that an
+ * older version of the server went on playing after a rollback has a list that no longer fits the board: it ends on
+ * another position, or it is shorter than the half move clock says. Either way the list is rebuilt once from the
+ * moves, after which every move carries it forward (CC-180).
+ *
+ * @param {ChessState} state
+ * @param {string} current   the key of the position on the board now
+ */
+function positionsOf(state, current) {
+  const kept = state.positions;
+  const fits = kept?.at(-1) === current && kept.length === halfMoveClock(state.fen) + 1;
+  return fits ? kept : positionsFromMoves(state.moves);
+}
 
 /**
  * Whether `color` still has mating material (approximation used by most servers): anything beyond a lone
@@ -249,9 +261,11 @@ export const chessEngine = defineEngine({
           ? { from: move.from, to: move.to, promotion: move.promotion }
           : { from: move.from, to: move.to };
         const chess = new Chess(state.fen);
+        const current = chess.hash();
         const { san } = chess.move(played);
         const fen = chess.fen();
-        const positions = halfMoveClock(fen) === 0 ? [chess.hash()] : [...positionsOf(state), chess.hash()];
+        const positions =
+          halfMoveClock(fen) === 0 ? [chess.hash()] : [...positionsOf(state, current), chess.hash()];
         // Moving instead of answering declines the opponent's offer, but your own offer stands.
         const declines = state.drawOfferBy === opponent;
         const remaining =

@@ -678,6 +678,35 @@ describe("chessEngine position history (CC-180)", () => {
     expect(state.positions).toHaveLength(9);
   });
 
+  it("rebuilds a history that ends on another position, as an older server leaves it after a rollback", () => {
+    // An older version played on without updating the list, so it still ends where that version took over.
+    const keptUntilRollback = playSan(newGame(), shuffle.slice(0, 2));
+    const playedByOlderVersion = {
+      ...playSan(withoutHistory(keptUntilRollback), [...shuffle.slice(2), ...shuffle.slice(0, 3)]),
+      positions: keptUntilRollback.positions,
+    };
+
+    const state = playSan(playedByOlderVersion, ["Ng8"]);
+
+    expect(chessEngine.getOutcome(state).reason).toBe("threefold-repetition");
+    expect(state.positions).toHaveLength(9);
+  });
+
+  it("rebuilds a history that is too short for the half move clock, even when it ends on the right position", () => {
+    // The older version shuffled the knights out and back, so the board is where the list ends, but two positions
+    // are missing from it.
+    const keptUntilRollback = playSan(newGame(), shuffle.slice(0, 2));
+    const playedByOlderVersion = {
+      ...playSan(withoutHistory(keptUntilRollback), [...shuffle.slice(2), ...shuffle.slice(0, 2)]),
+      positions: keptUntilRollback.positions,
+    };
+
+    const afterThree = playSan(playedByOlderVersion, ["Ng1"]);
+
+    expect(chessEngine.getOutcome(afterThree).status).toBe("ongoing");
+    expect(chessEngine.getOutcome(playSan(afterThree, ["Ng8"])).reason).toBe("threefold-repetition");
+  });
+
   it("rebuilds the same history a game played after the change keeps", () => {
     const sans = ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6", "Be2", "e5"];
     const kept = playSan(newGame(), [...sans, "Nb3"]);
