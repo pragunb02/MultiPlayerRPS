@@ -4,28 +4,34 @@ import { expect, joinAsGuest, test } from "./fixtures.js";
 // for the board file of the version it started with, and the new version no longer has it. The tab reloads once
 // into the new version and the player is back in the room, instead of an error page in place of the whole app.
 //
-// The deploy is simulated in this tab only, by answering its first request for the board file the way the server
-// answers any file it no longer has. Renaming the file in the shared build would break every other test running
-// at the same time.
+// The deploy is simulated in this tab only. Until the page loads again, every request for the board file gets what
+// the server answers for any file it no longer has. Vite asks for the file twice (once to preload it, once to run
+// it), so both must fail, as they would after a real deploy. The reloaded page counts as the new version, where the
+// file is there. Renaming the file in the shared build would break every other test running at the same time.
 
 const BOARD_FILE = "**/assets/RpsBoard-*.js";
 const choices = (player) => player.page.getByRole("group", { name: "Your choice" });
 
-/** From now on the first request for the board file fails as it does after a deploy. Answers what was asked. */
+/**
+ * From now on, until the page loads again, the board file is gone as it is after a deploy. Answers the page loads
+ * since then.
+ */
 async function deployRemovesBoardFile(player) {
-  const removed = [];
+  const pageLoads = [];
+  player.page.on("request", (request) => {
+    if (request.isNavigationRequest()) pageLoads.push(new URL(request.url()));
+  });
   await player.page.route(BOARD_FILE, async (route) => {
     const url = new URL(route.request().url());
-    if (removed.length > 0) {
+    if (pageLoads.length > 0) {
       await route.continue();
       return;
     }
-    removed.push(url.pathname);
     player.expect(404, url.pathname);
     const response = await route.fetch({ url: `${url.origin}/assets/RpsBoard-from-the-previous-deploy.js` });
     await route.fulfill({ response });
   });
-  return removed;
+  return pageLoads;
 }
 
 test.describe("a tab from before a deploy", () => {
@@ -39,14 +45,10 @@ test.describe("a tab from before a deploy", () => {
     const invite = await alice.page.getByRole("textbox", { name: "Invite link" }).inputValue();
     const room = new URL(invite).pathname;
     const answers = [];
-    const pageLoads = [];
     alice.page.on("response", (response) => {
       if (/\/assets\/RpsBoard-[^/]*\.js$/.test(response.url())) answers.push(response);
     });
-    alice.page.on("request", (request) => {
-      if (request.isNavigationRequest()) pageLoads.push(new URL(request.url()));
-    });
-    const removed = await deployRemovesBoardFile(alice);
+    const pageLoads = await deployRemovesBoardFile(alice);
 
     // Bob joins, the game starts, and Alice's tab needs the board it has not downloaded yet.
     const bob = await players.open("bob");
@@ -59,10 +61,14 @@ test.describe("a tab from before a deploy", () => {
     expect(alice.url()).toBe(room);
     await expect(alice.page).toHaveTitle(`Rock Paper Scissors · Room ${room.split("/").pop()} · ClassiCade`);
     // The missing file got a script's 404, not the app's HTML. Then the page reloaded once and the file loaded.
-    expect(removed).toHaveLength(1);
-    expect(answers.map((response) => response.status())).toEqual([404, 200]);
-    expect(answers[0].headers()["content-type"]).toMatch(/^text\/javascript/);
     expect(pageLoads.map((url) => `${url.pathname}${url.search}`)).toEqual([`${room}?reloaded=1`]);
+    const statuses = answers.map((response) => response.status());
+    expect(statuses.at(-1)).toBe(200);
+    expect(statuses.slice(0, -1)).toEqual(expect.arrayContaining([404]));
+    expect(statuses.slice(0, -1).every((status) => status === 404)).toBe(true);
+    for (const missing of answers.filter((response) => response.status() === 404)) {
+      expect(missing.headers()["content-type"]).toMatch(/^text\/javascript/);
+    }
 
     // The game goes on from the reloaded tab.
     await choices(alice).getByRole("button", { name: /Rock/ }).click();
