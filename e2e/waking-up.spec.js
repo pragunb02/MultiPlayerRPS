@@ -16,6 +16,32 @@ async function slowDown(page, url) {
   });
 }
 
+/** Holds every request matching `url` back until the returned function is called, like a very slow network. */
+async function holdBack(page, url) {
+  let release;
+  const released = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route(url, async (route) => {
+    await released;
+    await route.continue();
+  });
+  return release;
+}
+
+/**
+ * Moves every animation on the page forward to `ms` after it started, as if the player had waited that long. The
+ * screen's lines appear after delays of up to a minute and a half, far too long to sit through in a test.
+ */
+const waitAsIf = (page, ms) =>
+  page.evaluate((time) => {
+    for (const animation of document.getAnimations()) animation.currentTime = time;
+  }, ms);
+
+/** Whether the element is drawn right now, without waiting for it as `toBeVisible` would. */
+const shownNow = (locator) =>
+  locator.evaluate((element) => getComputedStyle(element).visibility === "visible");
+
 /**
  * Records what the player sees on every frame the browser draws: which waking up screens are showing, or "none".
  * A frame that looks like the one before is not recorded again, so the record reads as a story. Only a styled
@@ -98,6 +124,45 @@ test.describe("a visitor who has to wait", () => {
     // screen went straight to the app's, with no frame of nothing in between.
     expect(await framesSeen(page)).toEqual(["none", "page", "app", "none"]);
     await expect(page.locator("html")).toHaveClass(/wake-waited/);
+  });
+});
+
+test.describe("a visitor who waits a long time", () => {
+  test("keeps the still waking up line when the app starts after it appeared", async ({ players }) => {
+    const { page } = await players.open("visitor");
+    const startApp = await holdBack(page, "**/assets/index-*.js");
+    const answerSession = await holdBack(page, "**/api/session");
+
+    await page.goto("/", AS_SOON_AS_IT_ARRIVES);
+    await expect(pageScreen(page)).toBeVisible();
+    await waitAsIf(page, 11_000);
+    expect(await shownNow(pageScreen(page).locator(".wake-later"))).toBe(true);
+    startApp();
+    await expect(appScreen(page)).toBeVisible();
+
+    // The line stays on screen as the app takes over, instead of going away for another ten seconds.
+    expect(await shownNow(appScreen(page).locator(".wake-later"))).toBe(true);
+    answerSession();
+    await homeIsReady(page);
+  });
+
+  test("is offered a reload when the app never loads, and the reload brings the app", async ({ players }) => {
+    const { page } = await players.open("visitor");
+    // The main script never arrives, as on a dropped connection. Aborted, so the check for failed requests that
+    // every test makes does not count this one, which the test causes on purpose.
+    await page.route("**/assets/index-*.js", (route) => route.abort("aborted"));
+
+    await page.goto("/");
+    await expect(pageScreen(page)).toBeVisible();
+    // Held back until long after the slowest wake, so nobody is told to reload a page that is only slow.
+    expect(await shownNow(pageScreen(page).locator(".wake-stuck"))).toBe(false);
+    await waitAsIf(page, 95_000);
+    const reload = pageScreen(page).getByRole("link", { name: "Reload the page" });
+    await expect(reload).toBeVisible();
+
+    await page.unroute("**/assets/index-*.js");
+    await reload.click();
+    await homeIsReady(page);
   });
 });
 

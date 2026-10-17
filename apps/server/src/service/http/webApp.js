@@ -28,8 +28,9 @@ const MISSING_ASSET = "/* Not found: this file is not part of this version of th
  * script. The answer is never cached, so a cache in front of the server cannot keep serving the 404.
  *
  * Each page's index.html carries that page's title, description and link preview tags (CC-047), because crawlers
- * and chat apps read the HTML without running the app. A URL where the app has no page answers 404, still with
- * the app, which then shows its own "not found" page.
+ * and chat apps read the HTML without running the app. Its body carries the same title and description, so a
+ * crawler that reads the body text does not take the loading screen for the page (CC-232). A URL where the app has
+ * no page answers 404, still with the app, which then shows its own "not found" page.
  *
  * @param {{ distDir: string, siteOrigin: string }} options
  *   siteOrigin: the site's public address, for the absolute URLs in previews, the sitemap and robots.txt
@@ -81,7 +82,13 @@ export function createWebAppRouter({ distDir, siteOrigin }) {
     res
       .status(info.found ? 200 : 404)
       .type("html")
-      .send(page(renderPageHead({ page: info, origin: siteOrigin })));
+      .send(
+        page({
+          head: renderPageHead({ page: info, origin: siteOrigin }),
+          title: info.title,
+          description: info.description,
+        }),
+      );
   });
 
   return router;

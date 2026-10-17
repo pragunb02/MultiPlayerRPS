@@ -92,6 +92,23 @@ describe("the waking up screen in index.html", () => {
     expect(wake.querySelector(".wake-title").textContent).toBe(TITLE);
   });
 
+  it("starts with the page's own title and description, which the server writes in for crawlers", () => {
+    const wake = indexHtml().querySelector("[data-wake='page']");
+    const [title, description] = wake.children;
+
+    expect(title.tagName).toBe("H1");
+    expect(title.dataset.serverBody).toBe("title");
+    expect(description.dataset.serverBody).toBe("description");
+    expect(indexHtml().querySelectorAll("[data-server-body]")).toHaveLength(2);
+  });
+
+  it("ends with a reload link that needs no script, for when the app never loads", () => {
+    const reload = indexHtml().querySelector("[data-wake='page'] .wake-stuck a");
+
+    expect(reload.textContent).toBe("Reload the page");
+    expect(reload.getAttribute("href")).toBe("");
+  });
+
   it("needs no inline style or script, which the content security policy would block", () => {
     const document = indexHtml();
 

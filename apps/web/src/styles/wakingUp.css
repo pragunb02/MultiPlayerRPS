@@ -33,6 +33,26 @@
   animation: none;
 }
 
+/* The page had also shown its "still waking up" line, so the app's copy keeps it instead of waiting again. */
+.wake-waited-long .wake--inline .wake-later {
+  animation: none;
+}
+
+/* The page's own title and description, written by the server for crawlers. People see them as a small header. */
+.wake-page {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.wake-about {
+  margin: 0 0 var(--space-4);
+  max-width: 28rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 .wake-title {
   margin: 0;
   font-family: var(--font-display);
@@ -41,7 +61,8 @@
 }
 
 .wake-detail,
-.wake-later {
+.wake-later,
+.wake-stuck {
   margin: 0;
   max-width: 28rem;
   color: var(--color-text-muted);
@@ -50,6 +71,14 @@
 /* After ten seconds a loop alone stops reassuring people, so a second line says how long it can take. */
 .wake-later {
   animation: wake-appear 1ms linear 10s backwards;
+}
+
+/*
+ * Half a minute after the slowest wake, the app's script most likely failed to load, and nothing on the page can
+ * fix that by itself. So a last line offers a reload, a plain link that needs no script.
+ */
+.wake-stuck {
+  animation: wake-appear 1ms linear 90s backwards;
 }
 
 /* The cabinet. All of it is decoration, hidden from screen readers in the markup. */
@@ -212,7 +241,11 @@
   .wake-later {
     animation: wake-appear 1ms linear 10s backwards !important;
   }
-  .wake-waited .wake--inline {
+  .wake-stuck {
+    animation: wake-appear 1ms linear 90s backwards !important;
+  }
+  .wake-waited .wake--inline,
+  .wake-waited-long .wake--inline .wake-later {
     animation: none !important;
   }
 }

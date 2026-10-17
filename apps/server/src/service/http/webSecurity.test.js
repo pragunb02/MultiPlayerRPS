@@ -13,7 +13,7 @@ function fakeWebBuild({ under = "" } = {}) {
   mkdirSync(path.join(dir, "assets"), { recursive: true });
   writeFileSync(
     path.join(dir, "index.html"),
-    "<!doctype html><head><title data-server-head>ClassiCade</title></head><div id=root></div>",
+    '<!doctype html><head><title data-server-head>ClassiCade</title></head><div id=root><h1 data-server-body="title"></h1><p data-server-body="description"></p></div>',
   );
   writeFileSync(path.join(dir, "assets", "index-abc123.js"), "console.log('app')");
   writeFileSync(path.join(dir, "favicon.svg"), "<svg/>");
