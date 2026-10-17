@@ -6,6 +6,7 @@ import { removeServerHead } from "./app/serverHead.js";
 import { recoverFromStaleBuild } from "./app/staleBuild.js";
 import { noteWaitingScreen } from "./app/wakingUp.js";
 import { createApiClient } from "./lib/api.js";
+import { createSessionBroadcast } from "./lib/sessionBroadcast.js";
 import { createSocketClient } from "./lib/socket.js";
 import { createSoundPlayer } from "./lib/sound/soundPlayer.js";
 import { createSoundPreferences } from "./lib/sound/soundPreferences.js";
@@ -22,7 +23,13 @@ const sound = createSoundPlayer({
   preferences: createSoundPreferences({ getStorage: () => window.localStorage }),
 });
 sound.listen(window);
-const services = { api: createApiClient(), socket: createSocketClient(), sound };
+const services = {
+  api: createApiClient(),
+  socket: createSocketClient(),
+  sound,
+  // Tabs of this browser tell each other the session changed (ADR-033). Older browsers without it get none.
+  sessionBroadcast: createSessionBroadcast({ Channel: window.BroadcastChannel }),
+};
 removeServerHead(document);
 // Before the first render, which takes the waking up screen of index.html away (CC-232).
 noteWaitingScreen({ document, window });
