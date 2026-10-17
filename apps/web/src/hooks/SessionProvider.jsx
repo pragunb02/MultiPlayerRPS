@@ -65,27 +65,24 @@ export function SessionProvider({ children }) {
       }
       asks.current.inFlight = true;
       const before = changes.current;
-      const stale = () => isGone() || changes.current !== before || asks.current.again;
-      api
-        .getSession()
-        .then(
-          (identity) => !stale() && adopt(identity),
-          (err) => {
-            if (stale()) return;
-            if (isUnauthorized(err)) {
-              adopt(undefined);
-            } else {
-              setState({ status: "error", identity: undefined, error: err });
-            }
-          },
-        )
-        .finally(() => {
-          asks.current.inFlight = false;
-          if (asks.current.again) {
-            asks.current.again = false;
-            askLatest();
+      // The request is back. When a newer ask waits behind it, that one decides and this answer is dropped.
+      const dropped = () => {
+        const newer = asks.current.again;
+        asks.current = { inFlight: false, again: false };
+        if (newer) askLatest();
+        return newer || isGone() || changes.current !== before;
+      };
+      api.getSession().then(
+        (identity) => !dropped() && adopt(identity),
+        (err) => {
+          if (dropped()) return;
+          if (isUnauthorized(err)) {
+            adopt(undefined);
+          } else {
+            setState({ status: "error", identity: undefined, error: err });
           }
-        });
+        },
+      );
     },
     [api, adopt, askLatest],
   );

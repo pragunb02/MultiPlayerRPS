@@ -270,7 +270,7 @@ describe("SessionProvider", () => {
       act(() => sessionBroadcast.receive());
 
       expect(await screen.findByText("ready")).toBeInTheDocument();
-      expect(session.identity).toEqual(USER);
+      await waitFor(() => expect(session.identity).toEqual(USER));
       expect(socket.isConnected()).toBe(true);
     });
 
