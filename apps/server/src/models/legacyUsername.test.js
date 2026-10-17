@@ -32,6 +32,31 @@ describe("normaliseLegacyUsername", () => {
   });
 });
 
+describe("normaliseLegacyUsername with a reserved or rude old name", () => {
+  it.each(["admin", "Admin!!", "Classi Cade", "Chess Bot", "fuck you", "5h1t!!", "ass"])(
+    "swaps %j for a neutral player name",
+    (raw) => {
+      expect(normaliseLegacyUsername(raw)).toMatch(/^Player_\d{4}$/);
+    },
+  );
+
+  it("gives the same old name the same neutral name every time", () => {
+    expect(normaliseLegacyUsername("admin")).toBe(normaliseLegacyUsername("admin"));
+    expect(normaliseLegacyUsername("admin")).not.toBe(normaliseLegacyUsername("moderator"));
+  });
+
+  it("keeps a fair old name that only looks close to a listed word", () => {
+    expect(normaliseLegacyUsername("Charles Dickens")).toBe("Charles_Dickens");
+    expect(normaliseLegacyUsername("Scunthorpe!")).toBe("Scunthorpe");
+  });
+
+  it("produces a neutral name that today's rules accept", () => {
+    for (const raw of ["admin", "nocap gaming", "bitch", "cpu", "rps"]) {
+      expect(() => parseUsername(normaliseLegacyUsername(raw))).not.toThrow();
+    }
+  });
+});
+
 describe("usernameCandidates", () => {
   it("adds numbered suffixes and stays within 20 characters", () => {
     expect(usernameCandidates("riya", 3)).toEqual(["riya", "riya_2", "riya_3"]);

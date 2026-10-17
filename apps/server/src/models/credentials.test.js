@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../utils/errors.js";
-import { parseEmail, parsePassword, parseUsername } from "./credentials.js";
+import { parseEmail, parsePassword, parseUsername, RESERVED_NAME, UNSUITABLE_NAME } from "./credentials.js";
 
 const fieldOf = (fn) => {
   try {
@@ -23,6 +23,29 @@ describe("credentials", () => {
       expect(fieldOf(() => parseUsername(raw))).toBe("username");
     },
   );
+
+  it.each(["Admin_1", "ClassiCade", "ChessBot", "Tic_Tac_Toe"])(
+    "refuses the reserved username %j kindly",
+    (raw) => {
+      expect(() => parseUsername(raw)).toThrow(RESERVED_NAME);
+      expect(fieldOf(() => parseUsername(raw))).toBe("username");
+    },
+  );
+
+  it.each(["fuuuck", "5h1t", "Big_Ass"])("refuses the rude username %j without naming the word", (raw) => {
+    expect(() => parseUsername(raw)).toThrow(UNSUITABLE_NAME);
+    expect(fieldOf(() => parseUsername(raw))).toBe("username");
+  });
+
+  it.each(["Scunthorpe", "Dickens", "Assassin", "classic_fan"])("accepts the fair username %j", (raw) => {
+    expect(parseUsername(raw)).toBe(raw);
+  });
+
+  it("never repeats a listed word in the refusal", () => {
+    for (const message of [RESERVED_NAME, UNSUITABLE_NAME]) {
+      expect(message.toLowerCase()).not.toMatch(/admin|bot|fuck|shit|\bass\b/);
+    }
+  });
 
   it("normalises email", () => {
     expect(parseEmail("  Riya@Example.COM ")).toBe("riya@example.com");

@@ -62,6 +62,8 @@ describe("accountComponent", () => {
       [{ ...RIYA, username: "a" }, "username"],
       [{ ...RIYA, email: "nope" }, "email"],
       [{ ...RIYA, password: "short" }, "password"],
+      [{ ...RIYA, username: "Admin_1" }, "username"],
+      [{ ...RIYA, username: "sh1t_head" }, "username"],
     ])("validates every field (%#)", async (input, field) => {
       const { accounts } = setup();
 
@@ -153,6 +155,14 @@ describe("accountComponent", () => {
       expect(identity).toMatchObject({ kind: "user", displayName: "Sam_Lee" });
       const stored = await accountDao.getByEmail("sam@example.com");
       expect(stored).toMatchObject({ username: "Sam_Lee", passwordHash: expect.stringMatching(/^scrypt\$/) });
+    });
+
+    it("gives a legacy player with a reserved name a neutral one", async () => {
+      const { accounts } = setup({ legacyUsers: [{ ...LEGACY_SAM, username: "Admin" }] });
+
+      const identity = await accounts.login(samLogin);
+
+      expect(identity.displayName).toMatch(/^Player_\d{4}$/);
     });
 
     it("logs in to the same account afterwards, through the new hash", async () => {
