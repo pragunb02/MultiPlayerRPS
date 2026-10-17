@@ -31,7 +31,8 @@ const FLAG = "flag";
  * @property {Record<Color, number>} clocks       remaining ms per side, as of `lastMoveAt`
  * @property {number} lastMoveAt                  time of the last move, or 0 before White's first move (the clocks start then)
  * @property {Array<{ from: string, to: string, san: string, at: number, promotion?: string }>} moves
- * @property {string} fen                         current position (derived from `moves`, kept for fast validation)
+ * @property {string} fen                         current position, so a move never needs the game replayed
+ * @property {string[]} positions                 position keys since the last capture or pawn move, current one last
  * @property {string} drawOfferBy                 player id with a standing draw offer, or ""
  * @property {string} drawAnswer                  how the last offer ended without a draw (CHESS_DRAW_ANSWERS)
  * @property {{ reason: string, winner: string }} end   reason is "" while the game is on. winner is "" for a draw.
@@ -46,14 +47,28 @@ const isPlainObject = (value) =>
   !Array.isArray(value) &&
   Object.getPrototypeOf(value) === Object.prototype;
 
-/** Replays the whole game from the start, so repetition and fifty-move history are exact. */
-function replay(moves) {
+/**
+ * The half move clock in a FEN. It goes back to 0 on every capture and pawn move. No position from before such a
+ * move can ever come back, so the repetition history only needs the positions since then.
+ */
+const halfMoveClock = (fen) => Number(fen.split(" ")[4]);
+
+/**
+ * Position keys of a game stored before `positions` existed (CC-180). It replays the game once to rebuild them,
+ * after which every move carries the list forward. The key is chess.js's own position hash, the same one it
+ * counts for threefold repetition, so the result matches what a full replay would decide.
+ */
+function positionsFromMoves(moves) {
   const chess = new Chess();
+  let positions = [chess.hash()];
   for (const { from, to, promotion } of moves) {
     chess.move(promotion ? { from, to, promotion } : { from, to });
+    positions = halfMoveClock(chess.fen()) === 0 ? [chess.hash()] : [...positions, chess.hash()];
   }
-  return chess;
+  return positions;
 }
+
+const positionsOf = (state) => state.positions ?? positionsFromMoves(state.moves);
 
 /**
  * Whether `color` still has mating material (approximation used by most servers): anything beyond a lone
@@ -82,11 +97,14 @@ function timeout(state, loser) {
 }
 
 /** Result of the position after a move, if the board itself ends the game. */
-function boardEnd(chess, mover) {
+function boardEnd(chess, mover, positions) {
+  const key = chess.hash();
   if (chess.isCheckmate()) return { reason: END.CHECKMATE, winner: mover };
   if (chess.isStalemate()) return { reason: END.STALEMATE, winner: "" };
   if (chess.isInsufficientMaterial()) return { reason: END.INSUFFICIENT_MATERIAL, winner: "" };
-  if (chess.isThreefoldRepetition()) return { reason: END.THREEFOLD_REPETITION, winner: "" };
+  if (positions.filter((seen) => seen === key).length >= 3) {
+    return { reason: END.THREEFOLD_REPETITION, winner: "" };
+  }
   if (chess.isDrawByFiftyMoves()) return { reason: END.FIFTY_MOVE_RULE, winner: "" };
   return { reason: "", winner: "" };
 }
@@ -144,6 +162,7 @@ export const chessEngine = defineEngine({
   init({ players, options, rng }) {
     const white = players[randomIndex(rng, players.length)];
     const black = players.find((p) => p !== white);
+    const board = new Chess();
     const { initialSeconds, incrementSeconds } = CHESS_TIME_CONTROLS[options.timeControl];
     return {
       players: [players[0], players[1]],
@@ -154,7 +173,8 @@ export const chessEngine = defineEngine({
       clocks: { w: initialSeconds * 1000, b: initialSeconds * 1000 },
       lastMoveAt: 0,
       moves: [],
-      fen: new Chess().fen(),
+      fen: board.fen(),
+      positions: [board.hash()],
       drawOfferBy: "",
       drawAnswer: ANSWERS.NONE,
       end: { reason: "", winner: "" },
@@ -228,8 +248,10 @@ export const chessEngine = defineEngine({
         const played = move.promotion
           ? { from: move.from, to: move.to, promotion: move.promotion }
           : { from: move.from, to: move.to };
-        const chess = replay(state.moves);
+        const chess = new Chess(state.fen);
         const { san } = chess.move(played);
+        const fen = chess.fen();
+        const positions = halfMoveClock(fen) === 0 ? [chess.hash()] : [...positionsOf(state), chess.hash()];
         // Moving instead of answering declines the opponent's offer, but your own offer stands.
         const declines = state.drawOfferBy === opponent;
         const remaining =
@@ -241,10 +263,11 @@ export const chessEngine = defineEngine({
           clocks: { ...state.clocks, [color]: remaining },
           lastMoveAt: now,
           moves: [...state.moves, { ...played, san, at: now }],
-          fen: chess.fen(),
+          fen,
+          positions,
           drawOfferBy: declines ? "" : state.drawOfferBy,
           drawAnswer: declines ? ANSWERS.DECLINED : state.drawAnswer,
-          end: boardEnd(chess, playerId),
+          end: boardEnd(chess, playerId, positions),
         };
       }
     }

@@ -648,3 +648,95 @@ describe("chessEngine view", () => {
     expect(chessEngine.viewFor(state, A).inCheck).toBe(true);
   });
 });
+
+describe("chessEngine position history (CC-180)", () => {
+  const shuffle = ["Nf3", "Nf6", "Ng1", "Ng8"];
+  const withoutHistory = ({ positions, ...stored }) => stored;
+
+  it("only keeps the positions since the last capture or pawn move", () => {
+    const shuffled = playSan(newGame(), ["Nf3", "Nf6", "Ng1"]);
+    const afterPawn = playSan(shuffled, ["e5"]);
+
+    expect(shuffled.positions).toHaveLength(4);
+    expect(afterPawn.positions).toEqual([new Chess(afterPawn.fen).hash()]);
+  });
+
+  it("does not count a position from before a pawn move as a repetition", () => {
+    // The knights return to where they stood before e4 and e5, but the pawns have moved, so it is a new position.
+    const state = playSan(newGame(), [...shuffle, "e4", "e5", ...shuffle, ...shuffle.slice(0, 3)]);
+
+    expect(chessEngine.getOutcome(state).status).toBe("ongoing");
+    expect(chessEngine.getOutcome(playSan(state, ["Ng8"])).reason).toBe("threefold-repetition");
+  });
+
+  it("rebuilds the history of a game stored before it was kept, and still sees the repetition", () => {
+    const stored = withoutHistory(playSan(newGame(), [...shuffle, ...shuffle.slice(0, 3)]));
+
+    const state = playSan(stored, ["Ng8"]);
+
+    expect(chessEngine.getOutcome(state).reason).toBe("threefold-repetition");
+    expect(state.positions).toHaveLength(9);
+  });
+
+  it("rebuilds the same history a game played after the change keeps", () => {
+    const sans = ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6", "Be2", "e5"];
+    const kept = playSan(newGame(), [...sans, "Nb3"]);
+
+    const rebuilt = playSan(withoutHistory(playSan(newGame(), sans)), ["Nb3"]);
+
+    expect(rebuilt).toEqual(kept);
+    expect(chessEngine.viewFor(rebuilt, A).moves).toEqual([...sans, "Nb3"]);
+  });
+
+  it("rebuilds the history of a stored game that had a promotion", () => {
+    const sans = ["a4", "b5", "axb5", "a6", "bxa6", "Bb7", "axb7", "Nc6", "b8=Q", "Nf6"];
+    const kept = playSan(newGame(), [...sans, "Qb7"]);
+
+    const rebuilt = playSan(withoutHistory(playSan(newGame(), sans)), ["Qb7"]);
+
+    expect(rebuilt).toEqual(kept);
+  });
+
+  /** How a chess.js game that kept its whole history ended, checked in the same order as the engine. */
+  const referenceEnd = (chess) =>
+    [
+      [chess.isCheckmate(), "checkmate"],
+      [chess.isStalemate(), "stalemate"],
+      [chess.isInsufficientMaterial(), "insufficient-material"],
+      [chess.isThreefoldRepetition(), "threefold-repetition"],
+      [chess.isDrawByFiftyMoves(), "fifty-move-rule"],
+    ].find(([ended]) => ended)[1];
+
+  // A dozen whole games take a few seconds, more with coverage on.
+  it("ends random games exactly when and how a full chess.js replay would", { timeout: 30_000 }, () => {
+    // Seeded random games pass en passant chances and lost castling rights on the way. Now and then a player takes
+    // back their own last move, so some games end by repetition, not only by the fifty-move rule or on the board.
+    // The engine refuses moves once a game is over, so a game it ended too early fails inside `act`.
+    const reasons = new Set();
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const rng = createSeededRng(seed);
+      const reference = new Chess();
+      const played = [];
+      let state = newGame();
+      while (!reference.isGameOver()) {
+        const legal = reference.moves({ verbose: true });
+        const own = played.at(-2);
+        const back = legal.filter((m) => own && m.from === own.to && m.to === own.from && !m.captured);
+        const pool = back.length > 0 && rng() < 0.3 ? back : legal;
+        const { from, to, promotion } = pool[Math.floor(rng() * pool.length)];
+        played.push({ from, to });
+        reference.move({ from, to, promotion });
+        state = act(
+          state,
+          sideToMove(state),
+          promotion ? { type: "move", from, to, promotion } : { type: "move", from, to },
+        );
+      }
+      reasons.add(referenceEnd(reference));
+
+      expect(state.fen).toBe(reference.fen());
+      expect(chessEngine.getOutcome(state).reason).toBe(referenceEnd(reference));
+    }
+    expect(reasons).toContain("threefold-repetition");
+  });
+});
