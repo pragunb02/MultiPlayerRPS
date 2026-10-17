@@ -12,6 +12,39 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 
 ## Accepted decisions
 
+### ADR-031 — Notification channels and caps
+
+- **Status:** Accepted · 2026-10-18 (from [GROWTH.md](GROWTH.md) §5)
+- **Context:** Reminders bring players back, but too many make them leave and break the promise of at most one
+  reminder a day (PRODUCT_VISION.md).
+- **Decision:**
+  1. Messages about something the player started (your move, a challenge, a rematch, a friend accepted) are on once
+     push is allowed, for adults only: at most 1 per opponent every 15 minutes and 10 a day, bundled when 3 or more are
+     waiting, and none while the tab is open.
+  2. Reminders the player did not ask for (daily puzzle ready, streak reminder) are off until an adult turns them on:
+     at most 1 a day and 4 a week, only on days the player has not played. After 3 ignored they drop to once a week,
+     after 7 ignored they stop and leave one inbox item.
+  3. A weekly email recap is off by default with double opt in, only when something happened, and it uses that day's
+     reminder slot.
+  4. Across all channels, at most 1 contact a day the player did not ask for. Quiet hours in local time. Every message
+     has a one tap opt out. Minors and people of unknown age get no reminders or marketing of any kind (ADR-028).
+  5. Web push and email first. WhatsApp and SMS cost money per message and wait.
+- **Consequences:** Reminders reach few players at first, and that is accepted. Notification work (CC-147, CC-215,
+  CC-208) follows these rules.
+
+### ADR-032 — Launch sequence and the brand domain
+
+- **Status:** Accepted · 2026-10-18 (from [GROWTH.md](GROWTH.md) §7.3)
+- **Decision:**
+  1. A friends launch by word of mouth, on a date the owner picks once Phase 0 is closed (the leaked password rotated,
+     the security batch merged, staging) and Play vs Computer and the rematch fixes are live.
+  2. A public launch (communities, Product Hunt and similar) only after 4 weeks of friends data in the owner console,
+     and only if about 15 % of new players come back on day 2.
+  3. Buy a short brand domain soon (about ₹800 to ₹1,500 a year), so Search Console can be verified by DNS with no
+     code and search history starts early (CC-123).
+  4. Later, before any email is sent: decide whether to put a card on Render, and use a postal address that is not a
+     home address, as email law requires.
+
 ### ADR-029 — Liquidity gates: crowd features switch on only when the crowd is there
 
 - **Status:** Accepted · 2026-10-17 ([PRODUCT_VISION.md](PRODUCT_VISION.md) §6.0, decision D14. Built by CC-228 on
