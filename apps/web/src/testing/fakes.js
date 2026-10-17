@@ -135,3 +135,35 @@ export function fakeSocket() {
     },
   };
 }
+
+/**
+ * A fake sound player with the real one's interface (lib/sound/soundPlayer.js). It plays nothing and records
+ * what would have played, in order, in `played`, so tests can listen to a page.
+ *
+ * @param {{ muted?: boolean, volume?: number }} [initial]
+ */
+export function fakeSound({ muted = false, volume = 0.6 } = {}) {
+  let settings = Object.freeze({ muted, volume });
+  const listeners = new Set();
+  const played = [];
+  const update = (next) => {
+    settings = Object.freeze(next);
+    listeners.forEach((listener) => listener());
+  };
+  return {
+    played,
+    settings: () => settings,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    setMuted: vi.fn((value) => update({ ...settings, muted: value })),
+    setVolume: vi.fn((value) => update({ ...settings, volume: value })),
+    unlock: vi.fn(),
+    play: vi.fn((names) => {
+      played.push(...(typeof names === "string" ? [names] : names));
+      return true;
+    }),
+    listen: vi.fn(() => () => undefined),
+  };
+}

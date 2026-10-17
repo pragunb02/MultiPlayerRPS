@@ -5,6 +5,8 @@ import { useServices } from "../app/servicesContext.js";
 import { AchievementIcon } from "../art/achievements/AchievementIcon.jsx";
 import { Confetti } from "../art/effects/Confetti.jsx";
 import { XpPop } from "../art/effects/XpPop.jsx";
+import { useSound } from "../hooks/useSound.js";
+import { SOUNDS } from "../lib/sound/sounds.js";
 import styles from "./GamificationToasts.module.css";
 import { useToast } from "./Toast/toastContext.js";
 
@@ -15,12 +17,14 @@ export const CELEBRATION_MS = 1_500;
 
 /**
  * Celebrates what the server pushes (CC-054, CC-089): "Achievement unlocked: Hat Trick" for each new unlock, and
- * "Quest complete! +40 XP" when a quest's bonus is awarded (once each — the server sends quest XP exactly once).
- * The toasts say it in words, with the achievement's medal or a quest scroll beside them; confetti (an unlock) and
- * the rising "+N XP" (a quest) show it, and are skipped under reduced motion (CC-087).
+ * "Quest complete! +40 XP" when a quest's bonus is awarded (once each, because the server sends quest XP only
+ * once). The toasts say it in words, with the achievement's medal or a quest scroll beside them. Confetti (an
+ * unlock) and the rising "+N XP" (a quest) show it, and are skipped under reduced motion (CC-087). A short chime plays for
+ * both (CC-103).
  */
 export function GamificationToasts() {
   const { socket } = useServices();
+  const sound = useSound();
   const toast = useToast();
   const [celebration, setCelebration] = useState(undefined);
   const next = useRef(0);
@@ -40,6 +44,7 @@ export function GamificationToasts() {
       );
       if (achievements.length > 0) {
         setCelebration({ id: ++next.current, kind: "unlock" });
+        sound.play(SOUNDS.ACHIEVEMENT);
       }
     });
     const offQuestXp = socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, ({ source, key, xpGained }) => {
@@ -49,12 +54,13 @@ export function GamificationToasts() {
         { tone: "success", art: <AchievementIcon name="scroll" tier="gold" /> },
       );
       setCelebration({ id: ++next.current, kind: "quest", xp: xpGained });
+      sound.play(SOUNDS.ACHIEVEMENT);
     });
     return () => {
       offUnlocks();
       offQuestXp();
     };
-  }, [socket, toast]);
+  }, [socket, sound, toast]);
 
   useEffect(() => {
     if (celebration === undefined) {

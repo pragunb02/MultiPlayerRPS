@@ -23,8 +23,8 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  *   present once the game has started; `seed` + `log` reproduce the game exactly (see replayGame)
  * @property {Readonly<{ status: string, result: string, winners: string[], reason: string }>} [result]  final outcome once finished (played out or forfeited)
  * @property {number} [finishedAt]      when the last game ended, the rematch window counts from here (CC-101)
- * @property {Readonly<{ requestedBy: ReadonlyArray<string>, available: boolean }>} [rematch]  once finished: who asked
- *   to play again, and whether that is still possible (CC-037)
+ * @property {Readonly<{ requestedBy: ReadonlyArray<string>, available: boolean, declinedBy: string }>} [rematch]  once
+ *   finished: who asked to play again, whether that is still possible (CC-037), and who last declined (CC-104)
  * @property {Readonly<{ games: number, wins: Readonly<Record<string, number>> }>} [series]  games finished in this room
  *   and wins per player, across rematches
  * @property {number} createdAt

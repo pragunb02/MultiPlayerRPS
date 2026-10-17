@@ -6,7 +6,7 @@ import { SOCKET_EVENTS } from "@classicade/shared";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { AppRequestError } from "../lib/errors.js";
-import { achievement, fakeApi, fakeSocket, NO_STREAKS, QUESTS } from "../testing/fakes.js";
+import { achievement, fakeApi, fakeSocket, fakeSound, NO_STREAKS, QUESTS } from "../testing/fakes.js";
 import { installMatchMedia } from "../testing/matchMedia.js";
 import { AchievementGrid } from "./Achievements/AchievementGrid.jsx";
 import { CELEBRATION_MS, GamificationToasts } from "./GamificationToasts.jsx";
@@ -19,10 +19,10 @@ import { ToastProvider } from "./Toast/ToastProvider.jsx";
 
 const down = () => new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" });
 
-function renderWith(ui, { api = fakeApi(), socket = fakeSocket() } = {}) {
+function renderWith(ui, { api = fakeApi(), socket = fakeSocket(), sound = fakeSound() } = {}) {
   render(
     <MemoryRouter>
-      <ServicesProvider services={{ api, socket }}>
+      <ServicesProvider services={{ api, socket, sound }}>
         <SessionProvider>
           <ToastProvider>
             <SaveProgressProvider>{ui}</SaveProgressProvider>
@@ -31,7 +31,7 @@ function renderWith(ui, { api = fakeApi(), socket = fakeSocket() } = {}) {
       </ServicesProvider>
     </MemoryRouter>,
   );
-  return { api, socket };
+  return { api, socket, sound };
 }
 
 const quest = (index, overrides) => ({ ...QUESTS.items[index], ...overrides });
@@ -350,7 +350,7 @@ describe("AchievementGrid", () => {
 
 describe("GamificationToasts", () => {
   it("announces each newly unlocked achievement", async () => {
-    const { socket } = renderWith(<GamificationToasts />);
+    const { socket, sound } = renderWith(<GamificationToasts />);
 
     act(() =>
       socket.push(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, {
@@ -360,17 +360,20 @@ describe("GamificationToasts", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("Achievement unlocked: First Move");
     expect(screen.getByRole("status")).toHaveTextContent("Achievement unlocked: Hat Trick");
+    // One chime for the batch, not one per achievement (CC-103).
+    expect(sound.played).toEqual(["achievement"]);
   });
 
   it.each([
     [{ source: "quest", key: "quest:2026-10-16:win-3", xpGained: 40 }, "Quest complete! +40 XP"],
     [{ source: "quest", key: "quest:2026-10-16:sweep", xpGained: 30 }, "Daily sweep! +30 XP"],
   ])("celebrates quest XP: %o", (payload, text) => {
-    const { socket } = renderWith(<GamificationToasts />);
+    const { socket, sound } = renderWith(<GamificationToasts />);
 
     act(() => socket.push(SOCKET_EVENTS.PROGRESS_UPDATED, { leveledUp: false, progress: {}, ...payload }));
 
     expect(screen.getByRole("status")).toHaveTextContent(text);
+    expect(sound.played).toEqual(["achievement"]);
   });
 
   it("leaves match XP to the progress toasts, which leave quest XP to it", () => {
@@ -406,7 +409,7 @@ describe("GamificationToasts", () => {
   it("stops listening when unmounted", () => {
     const socket = fakeSocket();
     const view = render(
-      <ServicesProvider services={{ api: fakeApi(), socket }}>
+      <ServicesProvider services={{ api: fakeApi(), socket, sound: fakeSound() }}>
         <ToastProvider>
           <GamificationToasts />
         </ToastProvider>

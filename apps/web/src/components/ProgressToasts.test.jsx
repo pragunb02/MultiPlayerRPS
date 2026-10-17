@@ -1,6 +1,6 @@
 import { act, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fakeSocket } from "../testing/fakes.js";
+import { fakeSocket, fakeSound } from "../testing/fakes.js";
 import { installMatchMedia } from "../testing/matchMedia.js";
 import { renderApp } from "../testing/render.jsx";
 import { BURST_MS } from "./ProgressToasts.jsx";
@@ -13,12 +13,14 @@ describe("ProgressToasts level-up burst", () => {
 
   it("bursts behind the new level, says it in words, and clears itself", async () => {
     const socket = fakeSocket();
-    renderApp({ socket });
+    const sound = fakeSound();
+    renderApp({ socket, sound });
     await screen.findByRole("heading", { name: /Play the classics/ });
     vi.useFakeTimers();
 
     act(() => socket.push("progress:updated", levelUp(3)));
 
+    expect(sound.played).toEqual(["level-up"]);
     expect(burst()).toHaveTextContent("3");
     expect(screen.getByRole("status")).toHaveTextContent("Level up! You reached level 3");
     act(() => vi.advanceTimersByTime(BURST_MS));
@@ -51,12 +53,14 @@ describe("ProgressToasts level-up burst", () => {
 
   it("does not burst for XP without a level-up", async () => {
     const socket = fakeSocket();
-    renderApp({ socket });
+    const sound = fakeSound();
+    renderApp({ socket, sound });
     await screen.findByRole("heading", { name: /Play the classics/ });
 
     act(() => socket.push("progress:updated", { xpGained: 30, leveledUp: false, progress: { level: 1 } }));
 
     expect(burst()).toBeNull();
+    expect(sound.played).toEqual([]);
   });
 
   it("says why a match didn't count, instead of XP (CC-095)", async () => {

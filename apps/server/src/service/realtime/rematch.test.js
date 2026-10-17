@@ -42,6 +42,7 @@ describe("rematch over sockets (CC-037)", () => {
       requestedBy: [bob.identity.id],
       available: true,
       until: expect.any(Number),
+      declinedBy: "",
     });
     expect((await aliceSeesRequest).rematch.requestedBy).toEqual([bob.identity.id]);
 
@@ -82,12 +83,48 @@ describe("rematch over sockets (CC-037)", () => {
     const aliceSeesLeave = nextUpdate(alice.socket);
     await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code });
     expect((await aliceSeesLeave).rematch).toEqual(
-      expect.objectContaining({ requestedBy: [], available: false }),
+      expect.objectContaining({ requestedBy: [], available: false, declinedBy: "" }),
     );
 
     const ack = await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
 
     expect(ack).toEqual({ ok: false, error: expect.objectContaining({ code: ERROR_CODES.CONFLICT }) });
+  });
+
+  it("tells the asker who declined, and lets them ask again (CC-104)", async () => {
+    server = await startTestServer();
+    const { alice, bob, code } = await finishedRace();
+    await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
+    const aliceSeesDecline = nextUpdate(alice.socket);
+
+    const declined = await send(bob.socket, SOCKET_EVENTS.ROOM_REMATCH_DECLINE, { code });
+
+    const expected = {
+      requestedBy: [],
+      available: true,
+      until: expect.any(Number),
+      declinedBy: bob.identity.id,
+    };
+    expect(declined.data.rematch).toEqual(expected);
+    expect((await aliceSeesDecline).rematch).toEqual(expected);
+    const again = await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
+    expect(again.data.rematch).toEqual({
+      requestedBy: [alice.identity.id],
+      available: true,
+      until: expect.any(Number),
+      declinedBy: "",
+    });
+  });
+
+  it("refuses a decline when nobody asked, from spectators, and with malformed payloads", async () => {
+    server = await startTestServer();
+    const { bob, code } = await finishedRace();
+    const carol = await clients.player();
+    const decline = (player, payload) => send(player.socket, SOCKET_EVENTS.ROOM_REMATCH_DECLINE, payload);
+
+    expect((await decline(bob, { code })).error.code).toBe(ERROR_CODES.CONFLICT);
+    expect((await decline(carol, { code })).error.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect((await decline(bob, { code: "nope" })).error.code).toBe(ERROR_CODES.VALIDATION_FAILED);
   });
 
   it("refuses spectators and malformed payloads", async () => {

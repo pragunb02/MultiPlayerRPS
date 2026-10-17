@@ -91,6 +91,14 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
       return stampedView({ roomComponent, room, viewerId: identity.id, now });
     },
 
+    async [SOCKET_EVENTS.ROOM_REMATCH_DECLINE](payload) {
+      const { code } = parseRoomRef(payload);
+      const room = await roomComponent.declineRematch({ code, playerId: identity.id, now: now() });
+      logger.info({ roomCode: code }, "rematch declined");
+      await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
+      return stampedView({ roomComponent, room, viewerId: identity.id, now });
+    },
+
     async [SOCKET_EVENTS.GAME_MOVE](payload) {
       const { code, move } = parseGameMove(payload);
       const room = await roomComponent.makeMove({ code, playerId: identity.id, move, now: now() });

@@ -1,8 +1,8 @@
 import { createContext, useContext } from "react";
 
 /**
- * Dependency injection for the UI: the API and socket clients are provided once at the root, so components
- * and hooks never construct them — and tests provide fakes. The provider lives in ServicesProvider.jsx.
+ * Dependency injection for the UI: the API and socket clients and the sound player are provided once at the root,
+ * so components and hooks never construct them, and tests provide fakes. The provider lives in ServicesProvider.jsx.
  */
 export const ServicesContext = createContext(null);
 

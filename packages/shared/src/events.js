@@ -18,9 +18,10 @@
  * @property {string} you             the viewer's player id ("" for spectators)
  * @property {{ view: unknown, activePlayers: string[], outcome: object } | undefined} game   present once started
  * @property {number} serverTime      server clock (ms) when the view was produced, so client timers do not drift
- * @property {{ requestedBy: string[], available: boolean, until: number } | undefined} rematch   present once
- *   finished (CC-037): who asked to play again, whether a rematch can still happen (false once a player left), and
- *   when the rematch window ends and the room closes (server time in milliseconds, CC-101)
+ * @property {{ requestedBy: string[], available: boolean, until: number, declinedBy: string } | undefined} rematch
+ *   present once finished (CC-037): who asked to play again, whether a rematch can still happen (false once a player
+ *   left), when the rematch window ends and the room closes (server time in milliseconds, CC-101), and who last said
+ *   no to a request ("" when nobody did since the last request, CC-104)
  * @property {{ games: number, wins: Record<string, number> } | undefined} series   games finished in this room
  *   and wins per player id, across rematches
  */
@@ -42,6 +43,11 @@ export const SOCKET_EVENTS = Object.freeze({
    * Once every seated player has asked, a new game starts in the same room with the seats reversed (CC-037).
    */
   ROOM_REMATCH: "room:rematch",
+  /**
+   * Client sends `RoomCodePayload`. Answer: `RoomView`. Says no to the opponent's rematch request (CC-104). Their
+   * request is dropped and they see who declined, and either player may still ask again later.
+   */
+  ROOM_REMATCH_DECLINE: "room:rematch-decline",
   /** Client sends `GameMovePayload`. Answer: `RoomView`. */
   GAME_MOVE: "game:move",
   /** Server sends a `RoomView` after any change in a room you are in. */

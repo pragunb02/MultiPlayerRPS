@@ -1,10 +1,18 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render as renderPlain, screen, within } from "@testing-library/react";
 import { Chess } from "chess.js";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { ServicesProvider } from "../../app/ServicesProvider.jsx";
+import { fakeSound } from "../../testing/fakes.js";
 import { installMatchMedia } from "../../testing/matchMedia.js";
 import { ChessBoard } from "./ChessBoard.jsx";
 import { formatClock, useChessClocks } from "./useChessClocks.js";
+
+// The board plays sounds (the low time tick, CC-103), so it gets a fake sound player.
+const Services = ({ children }) => (
+  <ServicesProvider services={{ sound: fakeSound() }}>{children}</ServicesProvider>
+);
+const render = (ui, options) => renderPlain(ui, { wrapper: Services, ...options });
 
 const ME = "guest_me";
 const THEM = "guest_them";
@@ -95,7 +103,7 @@ describe("ChessBoard", () => {
     expect(onMove).toHaveBeenCalledWith({ type: "resign" });
   });
 
-  it("offers a draw, and lets you accept the opponent's offer", async () => {
+  it("offers a draw, and leaves answering the opponent's offer to the room's request popup (CC-104)", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn().mockResolvedValue({});
     const { rerender } = render(<ChessBoard room={room(chessView())} onMove={onMove} />);
@@ -104,9 +112,9 @@ describe("ChessBoard", () => {
     expect(onMove).toHaveBeenLastCalledWith({ type: "offer-draw" });
 
     rerender(<ChessBoard room={room(chessView({ drawOfferBy: THEM }))} onMove={onMove} />);
-    expect(screen.getByText("Riya offers a draw.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Accept draw" }));
-    expect(onMove).toHaveBeenLastCalledWith({ type: "accept-draw" });
+    expect(screen.queryByText("Riya offers a draw.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Accept draw" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Offer draw" })).toBeDisabled();
   });
 
   it("deselects a piece when it is clicked again or an unreachable square is clicked", async () => {
@@ -243,12 +251,11 @@ describe("ChessBoard", () => {
     expect(screen.queryByRole("button", { name: "Resign" })).toBeNull();
   });
 
-  it("calls a player it can't find among the seats 'Opponent', and offers no draw to accept", () => {
-    const view = chessView({ colors: { [ME]: "w", guest_gone: "b" }, drawOfferBy: "guest_gone" });
+  it("calls a player it can't find among the seats 'Opponent'", () => {
+    const view = chessView({ colors: { [ME]: "w", guest_gone: "b" } });
     render(<ChessBoard room={room(view, { seats: [seats[0]] })} onMove={vi.fn()} />);
 
     expect(screen.getByText("Opponent")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Accept draw" })).toBeNull();
     expect(screen.getByRole("button", { name: "Offer draw" })).toBeEnabled();
   });
 

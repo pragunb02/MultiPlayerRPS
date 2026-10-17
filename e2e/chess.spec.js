@@ -392,8 +392,10 @@ test.describe("chess", () => {
 
     await white.page.getByRole("button", { name: "Offer draw" }).click();
     await expect(white.page.getByRole("button", { name: "Draw offered" })).toBeDisabled();
-    await expect(black.page.getByText(/offers a draw\./)).toBeVisible();
-    await black.page.getByRole("button", { name: "Accept draw" }).click();
+    // Black answers in the room's request popup (CC-104).
+    const offer = black.page.getByRole("region", { name: "Draw offer" });
+    await expect(offer).toContainText(/offers a draw\./);
+    await offer.getByRole("button", { name: "Accept" }).click();
 
     for (const player of [white, black]) {
       await expect(player.page.getByRole("heading", { name: "Draw by agreement" })).toBeVisible();

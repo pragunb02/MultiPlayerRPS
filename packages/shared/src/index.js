@@ -8,6 +8,7 @@ export { RPS_BEST_OF, RPS_CHOICES } from "./rps.js";
 export { TTT_CELLS, TTT_MARKS } from "./tictactoe.js";
 export {
   CHESS_ACTIONS,
+  CHESS_DRAW_ANSWERS,
   CHESS_END_REASONS,
   CHESS_PROMOTIONS,
   CHESS_TIME_CONTROLS,
