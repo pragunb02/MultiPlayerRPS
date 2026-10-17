@@ -30,7 +30,7 @@ function setup({ lifetimes, wrap = (a) => a } = {}) {
 }
 
 const waitingRoom = async (ctx, now = T0) =>
-  ctx.rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 3 }, now });
+  ctx.rooms.createRoom({ network: "net-a", host: ALICE, gameId: "race", options: { target: 3 }, now });
 
 async function runningGame(ctx, now = T0) {
   await waitingRoom(ctx, now);
@@ -283,7 +283,13 @@ describe("room lifetimes in the room component (CC-101)", () => {
         events: { emit() {} },
         generateCode: () => "ROOM22",
       });
-      await rooms.createRoom({ host: ALICE, gameId: "timed", options: { target: 3 }, now: T0 });
+      await rooms.createRoom({
+        network: "net-a",
+        host: ALICE,
+        gameId: "timed",
+        options: { target: 3 },
+        now: T0,
+      });
       stale = [await rooms.joinRoom({ code: "ROOM22", player: BOB, now: T0 })];
       await rooms.leaveRoom({ code: "ROOM22", playerId: BOB.id, now: T0 + 1 });
 
@@ -299,7 +305,13 @@ describe("room lifetimes in the room component (CC-101)", () => {
         events: { emit() {} },
         generateCode: () => "ROOM22",
       });
-      await rooms.createRoom({ host: ALICE, gameId: "timed", options: { target: 3 }, now: T0 });
+      await rooms.createRoom({
+        network: "net-a",
+        host: ALICE,
+        gameId: "timed",
+        options: { target: 3 },
+        now: T0,
+      });
       await rooms.joinRoom({ code: "ROOM22", player: BOB, now: T0 });
 
       expect(await rooms.expireDue({ now: T0 + 999 })).toEqual([]);

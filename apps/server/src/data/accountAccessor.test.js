@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInMemoryAccountDao } from "../testing/inMemoryAccountDao.js";
-import { ConflictError } from "../utils/errors.js";
+import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { createAccountAccessor } from "./accountAccessor.js";
 
 const NOW = Date.UTC(2026, 9, 16);
@@ -10,7 +10,7 @@ describe("accountAccessor", () => {
   it("creates frozen accounts with ms timestamps", async () => {
     const created = await createAccountAccessor({ accountDao: createInMemoryAccountDao() }).create(account);
 
-    expect(created).toEqual({ accountId: expect.any(String), ...account });
+    expect(created).toEqual({ accountId: expect.any(String), ...account, sessionVersion: 0 });
     expect(Object.isFrozen(created)).toBe(true);
   });
 
@@ -37,9 +37,38 @@ describe("accountAccessor", () => {
     const fail = async () => {
       throw failure;
     };
-    const accounts = createAccountAccessor({ accountDao: { insert: fail, getByEmail: fail } });
+    const accounts = createAccountAccessor({
+      accountDao: {
+        insert: fail,
+        getByEmail: fail,
+        getById: fail,
+        getSessionVersion: fail,
+        bumpSessionVersion: fail,
+      },
+    });
 
     await expect(accounts.create(account)).rejects.toBe(failure);
     await expect(accounts.findByEmail("riya@example.com")).rejects.toBe(failure);
+    await expect(accounts.getById("x")).rejects.toBe(failure);
+    await expect(accounts.getSessionVersion("x")).rejects.toBe(failure);
+    await expect(accounts.bumpSessionVersion({ accountId: "x" })).rejects.toBe(failure);
+  });
+
+  it("reads an account and its session version by id, and counts the version up (CC-116)", async () => {
+    const accounts = createAccountAccessor({ accountDao: createInMemoryAccountDao() });
+    const { accountId } = await accounts.create(account);
+
+    expect(await accounts.getById(accountId)).toMatchObject({ accountId, createdAt: NOW, sessionVersion: 0 });
+    expect(await accounts.bumpSessionVersion({ accountId, passwordHash: "scrypt$y" })).toBe(1);
+    expect(await accounts.getSessionVersion(accountId)).toBe(1);
+    expect((await accounts.getById(accountId)).passwordHash).toBe("scrypt$y");
+  });
+
+  it("translates a missing account into NotFoundError", async () => {
+    const accounts = createAccountAccessor({ accountDao: createInMemoryAccountDao() });
+
+    await expect(accounts.getById("nope")).rejects.toThrow(NotFoundError);
+    await expect(accounts.getSessionVersion("nope")).rejects.toThrow(NotFoundError);
+    await expect(accounts.bumpSessionVersion({ accountId: "nope" })).rejects.toThrow(NotFoundError);
   });
 });

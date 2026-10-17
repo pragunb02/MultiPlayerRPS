@@ -32,7 +32,13 @@ function setup() {
 /** Alice hosts, Bob joins and moves first (seed 42); Alice reaches 3 and wins. */
 async function finishedGame() {
   const ctx = setup();
-  await ctx.rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 3 }, now: T0 });
+  await ctx.rooms.createRoom({
+    network: "net-a",
+    host: ALICE,
+    gameId: "race",
+    options: { target: 3 },
+    now: T0,
+  });
   await ctx.rooms.joinRoom({ code: ctx.code, player: BOB, now: T0 + 1 });
   await ctx.rooms.makeMove({ code: ctx.code, playerId: BOB.id, move: { add: 1 }, now: T0 + 2 });
   await ctx.rooms.makeMove({ code: ctx.code, playerId: ALICE.id, move: { add: 2 }, now: T0 + 3 });
@@ -122,7 +128,13 @@ describe("roomComponent rematch (CC-037)", () => {
 
   it("is not offered after a forfeit", async () => {
     const ctx = setup();
-    await ctx.rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 3 }, now: T0 });
+    await ctx.rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "race",
+      options: { target: 3 },
+      now: T0,
+    });
     await ctx.rooms.joinRoom({ code: ctx.code, player: BOB, now: T0 + 1 });
     await ctx.rooms.leaveRoom({ code: ctx.code, playerId: BOB.id, now: T0 + 2 });
 
@@ -175,7 +187,13 @@ describe("roomComponent rematch (CC-037)", () => {
 
   it("refuses a rematch before the game is over", async () => {
     const { rooms, code } = setup();
-    await rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 3 }, now: T0 });
+    await rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "race",
+      options: { target: 3 },
+      now: T0,
+    });
 
     await expect(rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 1 })).rejects.toThrow(
       ConflictError,
@@ -200,7 +218,13 @@ describe("roomComponent rematch (CC-037)", () => {
 
   it("has no rematch or series in a room that has not finished a game", async () => {
     const { rooms } = setup();
-    const room = await rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 3 }, now: T0 });
+    const room = await rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "race",
+      options: { target: 3 },
+      now: T0,
+    });
 
     const view = rooms.viewFor(room, ALICE.id);
 
@@ -294,7 +318,13 @@ describe("roomComponent declining a rematch (CC-104)", () => {
 
   it("refuses while the game is on, after the opponent left, and for someone without a seat", async () => {
     const ctx = setup();
-    await ctx.rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 3 }, now: T0 });
+    await ctx.rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "race",
+      options: { target: 3 },
+      now: T0,
+    });
     await ctx.rooms.joinRoom({ code: ctx.code, player: BOB, now: T0 + 1 });
     await expect(
       ctx.rooms.declineRematch({ code: ctx.code, playerId: ALICE.id, now: T0 + 2 }),

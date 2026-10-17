@@ -7,6 +7,8 @@ import {
   ForbiddenError,
   GoneError,
   NotFoundError,
+  ServerBusyError,
+  TooManyRequestsError,
   UnauthorizedError,
   ValidationError,
 } from "./errors.js";
@@ -20,6 +22,8 @@ describe("application errors", () => {
     [ConflictError, ERROR_CODES.CONFLICT],
     [ConcurrentChangeError, ERROR_CODES.CONFLICT],
     [GoneError, ERROR_CODES.GONE],
+    [TooManyRequestsError, ERROR_CODES.RATE_LIMITED],
+    [ServerBusyError, ERROR_CODES.SERVER_BUSY],
   ])("%o carries code %s and is an AppError", (ErrorType, code) => {
     const err = new ErrorType("something went wrong");
 

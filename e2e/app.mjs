@@ -19,17 +19,24 @@ const config = loadConfig({
   WEB_DIST_DIR: path.join(root, "apps/web/dist"),
 });
 const logger = createLogger({ level: config.logLevel });
-// Every test player connects from 127.0.0.1, so the per-IP limits would trip. The per-email limit stays real.
+// Every test player connects from 127.0.0.1, so the per-IP limits would trip. The failed-login rules stay real
+// (CC-117): they count per email, and every test has its own.
 const limits = {
   auth: {
     perIp: { windowMs: 60_000, limit: 10_000 },
-    failedLoginsPerEmail: { windowMs: 15 * 60 * 1000, limit: 5 },
+    signupPerIp: { windowMs: 60_000, limit: 10_000 },
   },
   guest: { windowMs: 60_000, limit: 10_000 },
   leaderboard: { windowMs: 60_000, limit: 10_000 },
   api: { windowMs: 60_000, limit: 10_000 },
 };
-// Standard room lifetimes, unless a test asked the next process for short ones (CC-101).
-const rooms = JSON.parse(process.env.E2E_ROOMS);
+// Standard room lifetimes and limits, unless a test asked the next process for others (CC-101, CC-107). The
+// realtime connections and the open rooms per address are raised for the same reason as above. Every other room
+// limit stays real.
+const requested = JSON.parse(process.env.E2E_ROOMS);
+const rooms = {
+  ...requested,
+  limits: { socketsPerAddress: 10_000, openRoomsPerAddress: 10_000, ...requested.limits },
+};
 const { close } = await startServer({ config, logger, limits, rooms });
 handleShutdownSignals({ close, logger });

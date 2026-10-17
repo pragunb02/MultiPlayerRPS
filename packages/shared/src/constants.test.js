@@ -6,6 +6,7 @@ import {
   NOT_COUNTED_REASONS,
   ROOM_CLOSE_REASONS,
   ROOM_CODE_ALPHABET,
+  ROOM_LIMIT_REASONS,
   ROOM_STATUS,
   SOCKET_EVENTS,
 } from "./index.js";
@@ -17,6 +18,7 @@ describe.each([
   ["GAME_STATUS", GAME_STATUS],
   ["ROOM_STATUS", ROOM_STATUS],
   ["ROOM_CLOSE_REASONS", ROOM_CLOSE_REASONS],
+  ["ROOM_LIMIT_REASONS", ROOM_LIMIT_REASONS],
   ["NOT_COUNTED_REASONS", NOT_COUNTED_REASONS],
 ])("%s", (_name, constants) => {
   it("is immutable", () => {

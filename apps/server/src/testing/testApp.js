@@ -22,9 +22,10 @@ import { createRoomComponent } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
 import { connectLeaderboardBonuses, connectMatchPipeline, identityFollowers } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
-import { createSessionMiddleware } from "../service/http/session.js";
+import { createSessionCheck, createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
 import { createBackgroundTasks } from "../utils/backgroundTasks.js";
+import { createNetworkKey } from "../utils/networkKey.js";
 import { createPasswordHasher } from "../utils/passwordHasher.js";
 import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
@@ -55,6 +56,8 @@ import { testConfig } from "./testConfig.js";
  *     takes part in moving a guest's data (e.g. one that fails)
  *   leaderboardLimit?: { windowMs: number, limit: number },
  *   apiLimit?: { windowMs: number, limit: number },
+ *   roomLimits?: Readonly<import("../domain/rooms/roomLimits.js").RoomLimits>,
+ *   accountDao?: ReturnType<typeof createInMemoryAccountDao>,   lets a test make account storage fail
  *   now?: () => number,
  * }} [options]
  */
@@ -68,6 +71,8 @@ export function createTestApp({
   transferParticipants = (participants) => participants,
   leaderboardLimit,
   apiLimit,
+  roomLimits,
+  accountDao = createInMemoryAccountDao(),
   now = Date.now,
 } = {}) {
   const config = testConfig(env);
@@ -83,7 +88,6 @@ export function createTestApp({
     generateId: () => `00000000-0000-4000-8000-${String(++guestNumber).padStart(12, "0")}`,
     generateGuestSuffix: () => `T${String(guestNumber).padStart(3, "0")}`,
   });
-  const accountDao = createInMemoryAccountDao();
   const accountComponent = createAccountComponent({
     accountAccessor: createAccountAccessor({ accountDao }),
     legacyUserAccessor: createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao(legacyUsers) }),
@@ -95,6 +99,7 @@ export function createTestApp({
     engines: createEngineRegistry(engines),
     events: domainEvents,
     generateSeed: () => 42,
+    ...(roomLimits && { limits: roomLimits }),
   });
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
@@ -146,6 +151,9 @@ export function createTestApp({
   connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks, now });
   const endedSessions = [];
   const endedListeners = [];
+  const otherSessionsEnded = [];
+  const otherEndedListeners = [];
+  const checkSession = createSessionCheck({ accountComponent, now });
 
   const app = createHttpApp({
     config,
@@ -168,6 +176,11 @@ export function createTestApp({
       endedSessions.push(sessionId);
       endedListeners.forEach((listener) => listener(sessionId));
     },
+    onOtherSessionsEnded: (which) => {
+      otherSessionsEnded.push(which);
+      otherEndedListeners.forEach((listener) => listener(which));
+    },
+    checkSession,
   });
 
   return {
@@ -185,7 +198,10 @@ export function createTestApp({
     leaderboardComponent,
     tasks,
     endedSessions,
+    otherSessionsEnded,
+    checkSession,
     onSessionEnded: (listener) => endedListeners.push(listener),
+    onOtherSessionsEnded: (listener) => otherEndedListeners.push(listener),
     ...capture,
   };
 }
@@ -206,12 +222,10 @@ export function clockOn(day) {
  * Starts the HTTP app plus the realtime gateway on a random local port, with rooms running the
  * reference "race" engine by default (seed 42: the second seat moves first).
  *
- * @param {Parameters<typeof createTestApp>[0] & {
- *   rateLimit?: { capacity: number, refillPerSecond: number },
- *   now?: () => number,
- * }} [options]
+ * @param {Parameters<typeof createTestApp>[0] & { now?: () => number }} [options]  `roomLimits` also sets the
+ *   realtime limits (connections and events), and `env.TRUST_PROXY_HOPS` how sockets find the player's address
  */
-export async function startTestServer({ rateLimit, now = Date.now, ...options } = {}) {
+export async function startTestServer({ now = Date.now, ...options } = {}) {
   const testApp = createTestApp({ ...options, now });
   const server = http.createServer(testApp.app);
   const gateway = createRealtimeGateway({
@@ -221,10 +235,14 @@ export async function startTestServer({ rateLimit, now = Date.now, ...options } 
     logger: testApp.logger,
     roomComponent: testApp.roomComponent,
     domainEvents: testApp.domainEvents,
+    checkSession: testApp.checkSession,
+    trustProxyHops: testApp.config.trustProxyHops,
+    networkOf: createNetworkKey({ secret: testApp.config.sessionSecret }),
     now,
-    ...(rateLimit && { rateLimit }),
+    ...(options.roomLimits && { limits: options.roomLimits }),
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
+  testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = /** @type {import("node:net").AddressInfo} */ (server.address());
   return {

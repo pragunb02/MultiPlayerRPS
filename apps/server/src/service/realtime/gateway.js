@@ -3,16 +3,17 @@ import { SOCKET_EVENTS } from "@classicade/shared";
 import { GAMIFICATION_EVENTS } from "../../domain/gamification/gamificationComponent.js";
 import { PROGRESSION_EVENTS } from "../../domain/progression/progressionComponent.js";
 import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
+import { roomLimits } from "../../domain/rooms/roomLimits.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { createTokenBucket } from "../../utils/tokenBucket.js";
+import { TooManyRequestsError } from "../../utils/errors.js";
 import { toClientError } from "../errorTranslation.js";
+import { addressKey, clientAddress } from "../http/rateLimits.js";
 import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
 import { trackConnections } from "./connections.js";
 import { broadcastRoom, createRoomHandlers, handleSocketGone, roomChannel } from "./roomHandlers.js";
+import { createSocketAdmission } from "./socketAdmission.js";
 
-// Per-socket event budget: short bursts are fine, sustained flooding is refused.
-const DEFAULT_RATE_LIMIT = Object.freeze({ capacity: 20, refillPerSecond: 10 });
 const MAX_MESSAGE_BYTES = 16 * 1024;
 
 const sessionRoom = (sessionId) => `session:${sessionId}`;
@@ -22,7 +23,9 @@ const playerRoom = (playerId) => `player:${playerId}`;
 /**
  * Realtime entry point. Connections are accepted only from allowed browser origins and only with a
  * session that holds a valid identity; the identity is read from the server-side session, never from
- * anything the client sends.
+ * anything the client sends. A session that was signed out elsewhere or is too old is refused (CC-116), and so is
+ * a connection over the caps per session and per network address (CC-107). Every player has one event budget
+ * shared by all their tabs.
  *
  * @param {{
  *   httpServer: import("node:http").Server,
@@ -31,8 +34,12 @@ const playerRoom = (playerId) => `player:${playerId}`;
  *   logger: import("../../utils/logger.js").Logger,
  *   roomComponent: ReturnType<typeof import("../../domain/rooms/roomComponent.js").createRoomComponent>,
  *   domainEvents: import("node:events").EventEmitter,
+ *   checkSession: (sessionData: object) => Promise<void>,   throws UnauthorizedError for a session that may no
+ *     longer be used (see createSessionCheck)
+ *   trustProxyHops: number,   how many proxies to look through for the player's address, as for HTTP
+ *   networkOf: (address: string) => string,   names an address without being it, for the rooms per network
+ *   limits?: Readonly<import("../../domain/rooms/roomLimits.js").RoomLimits>,
  *   now?: () => number,
- *   rateLimit?: { capacity: number, refillPerSecond: number },
  * }} deps
  */
 export function createRealtimeGateway({
@@ -42,8 +49,11 @@ export function createRealtimeGateway({
   logger,
   roomComponent,
   domainEvents,
+  checkSession,
+  trustProxyHops,
+  networkOf,
+  limits = roomLimits(),
   now = Date.now,
-  rateLimit = DEFAULT_RATE_LIMIT,
 }) {
   assertDefined(httpServer, "httpServer");
   assertDefined(sessionMiddleware, "sessionMiddleware");
@@ -51,6 +61,9 @@ export function createRealtimeGateway({
   assertDefined(logger, "logger");
   assertDefined(roomComponent, "roomComponent");
   assertFunction(domainEvents?.on, "domainEvents.on");
+  assertFunction(checkSession, "checkSession");
+  assertDefined(trustProxyHops, "trustProxyHops");
+  assertFunction(networkOf, "networkOf");
 
   const io = new Server(httpServer, {
     serveClient: false,
@@ -70,14 +83,52 @@ export function createRealtimeGateway({
   // would only race the database closing.
   let closing = false;
   const connections = trackConnections(httpServer);
+  const admission = createSocketAdmission({ limits, now });
+  /**
+   * How often each player has signed out their other devices, and which session stayed (CC-116). A handshake that
+   * was being checked while that happened had not joined the player's channel yet, so it was missed. It is
+   * disconnected as soon as it connects instead.
+   *
+   * @type {Map<string, { generation: number, keptSessionId: string }>}
+   */
+  const signOuts = new Map();
+  const signOutGeneration = (playerId) => signOuts.get(playerId)?.generation ?? 0;
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       socket.data.identity = requireIdentity(socket.request.session);
       socket.data.sessionId = socket.request.sessionID;
+      socket.data.signOutGeneration = signOutGeneration(socket.data.identity.id);
+      await checkSession(socket.request.session);
+      const address = clientAddress({
+        remoteAddress: socket.request.socket.remoteAddress,
+        forwardedFor: socket.request.headers["x-forwarded-for"],
+        trustProxyHops,
+      });
+      const admitted = admission.admit({
+        sessionId: socket.data.sessionId,
+        address: addressKey(address),
+        playerId: socket.data.identity.id,
+      });
+      if (!admitted.admitted) {
+        throw new TooManyRequestsError(admitted.message);
+      }
+      socket.data.release = admitted.release;
+      socket.data.network = networkOf(addressKey(address));
+      // The browser may have gone while its session was checked. Socket.IO then drops the socket without any
+      // event, so the place is given back when the connection itself closes, or now if it already has.
+      if (socket.conn.readyState === "open") {
+        socket.conn.once("close", admitted.release);
+      } else {
+        admitted.release();
+      }
       next();
     } catch (err) {
-      const { code, message } = toClientError(err);
+      const { status, code, message } = toClientError(err);
+      if (status >= 500) {
+        // The check itself failed (the database is down, for example), not the player.
+        logger.error({ err }, "checking a socket's session failed");
+      }
       // Why a client couldn't connect, for operators (and failing tests, CC-079) — never the session id itself.
       logger.warn(
         {
@@ -95,6 +146,17 @@ export function createRealtimeGateway({
   io.on("connection", (socket) => {
     const { identity, sessionId } = socket.data;
     const socketLogger = logger.child({ socketId: socket.id, playerId: identity.id });
+    const signOut = signOuts.get(identity.id);
+    if (
+      signOut !== undefined &&
+      signOut.generation !== socket.data.signOutGeneration &&
+      signOut.keptSessionId !== sessionId
+    ) {
+      socketLogger.info("socket of a session signed out during its handshake disconnected");
+      socket.data.release();
+      socket.disconnect(true);
+      return;
+    }
     socket.join([sessionRoom(sessionId), playerRoom(identity.id)]);
     socketLogger.info("socket connected");
     let roomChannels = [];
@@ -102,6 +164,7 @@ export function createRealtimeGateway({
       roomChannels = [...socket.rooms].filter((channel) => channel.startsWith("room:"));
     });
     socket.on("disconnect", (reason) => {
+      socket.data.release();
       socketLogger.info({ reason }, "socket disconnected");
       if (closing) return;
       handleSocketGone({
@@ -114,7 +177,6 @@ export function createRealtimeGateway({
       });
     });
 
-    const bucket = createTokenBucket({ ...rateLimit, now });
     registerHandlers(
       socket,
       {
@@ -122,7 +184,7 @@ export function createRealtimeGateway({
         ...createRoomHandlers({ io, socket, roomComponent, now, logger: socketLogger }),
       },
       socketLogger,
-      { allow: () => bucket.tryTake() },
+      { allow: () => admission.allowEvent(identity.id) },
     );
   });
 
@@ -174,6 +236,21 @@ export function createRealtimeGateway({
     disconnectSession(sessionId) {
       io.in(sessionRoom(sessionId)).disconnectSockets(true);
     },
+    /**
+     * The device that changed the password or asked to sign out its other devices got a new session id (CC-116).
+     * Its sockets move from the old id to the new one and stay connected. Every other socket of the player is
+     * disconnected, and so is any handshake of the player that is being checked right now.
+     *
+     * @param {{ playerId: string, fromSessionId: string, toSessionId: string }} which
+     */
+    disconnectOtherSessions({ playerId, fromSessionId, toSessionId }) {
+      signOuts.set(playerId, { generation: signOutGeneration(playerId) + 1, keptSessionId: toSessionId });
+      io.in(sessionRoom(fromSessionId)).socketsJoin(sessionRoom(toSessionId));
+      io.in(sessionRoom(fromSessionId)).socketsLeave(sessionRoom(fromSessionId));
+      io.in(playerRoom(playerId)).except(sessionRoom(toSessionId)).disconnectSockets(true);
+    },
+    /** @returns {{ connections: number, players: number }} realtime connections and connected players, for the gauge */
+    counts: () => admission.counts(),
     /** Disconnects all sockets and closes the underlying HTTP server. */
     close() {
       closing = true;

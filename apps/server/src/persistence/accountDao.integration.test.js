@@ -19,7 +19,7 @@ afterAll(async () => {
   await mongo?.stop();
 });
 
-async function createDao() {
+async function connected() {
   const database = await connectDatabase({
     uri: mongo.uri(`accounts-${++counter}`),
     logger: captureLogger().logger,
@@ -27,8 +27,10 @@ async function createDao() {
   databases.push(database);
   const dao = createAccountDao({ connection: database.connection });
   await dao.ensureIndexes();
-  return dao;
+  return { dao, database };
 }
+
+const createDao = async () => (await connected()).dao;
 
 describe("MongoDB account DAO honours the account DAO contract (integration)", () => {
   runAccountDaoContract(createDao);
@@ -42,5 +44,21 @@ describe("MongoDB account DAO honours the account DAO contract (integration)", (
 
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(DuplicateKey);
+  });
+
+  it("reads an account stored before session versions existed as version 0, and counts it up from there (CC-116)", async () => {
+    const { dao, database } = await connected();
+    const { insertedId } = await database.connection.db.collection("accounts").insertOne({
+      username: "Old",
+      usernameKey: "old",
+      email: "old@example.com",
+      passwordHash: "scrypt$x",
+      createdAt: new Date(0),
+    });
+    const accountId = insertedId.toHexString();
+
+    expect((await dao.getById(accountId)).sessionVersion).toBe(0);
+    expect(await dao.getSessionVersion(accountId)).toBe(0);
+    expect(await dao.bumpSessionVersion({ accountId })).toBe(1);
   });
 });
