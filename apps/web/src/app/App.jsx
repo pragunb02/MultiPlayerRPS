@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router";
+import { MatchProgressProvider } from "../components/Celebrations/MatchProgressProvider.jsx";
 import { Layout } from "../components/Layout/Layout.jsx";
 import { GamificationToasts } from "../components/GamificationToasts.jsx";
 import { ProgressToasts } from "../components/ProgressToasts.jsx";
@@ -33,33 +34,35 @@ export function App({ services }) {
         <SessionProvider>
           <ToastProvider>
             <SaveProgressProvider>
-              <ProgressToasts />
-              <GamificationToasts />
-              <Routes>
-                <Route element={<Layout />}>
-                  <Route index element={<HomePage />} />
-                  <Route path={ROUTES.GAME} element={<PlayPage />} />
-                  <Route path={ROUTES.ROOM} element={<RoomPage />} />
-                  <Route path={ROUTES.LOGIN} element={<LoginPage />} />
-                  <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
-                  <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
-                  <Route path={ROUTES.LEADERBOARD} element={<LeaderboardPage />} />
-                  <Route
-                    path={ROUTES.LEADERBOARDS}
-                    element={<Navigate to={paths.leaderboards()} replace />}
-                  />
-                  <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
-                  <Route path={ROUTES.TERMS} element={<TermsPage />} />
-                  <Route path={ROUTES.ADMIN} element={<AdminRoute />} />
-                  <Route path={ROUTES.ADMIN_SECTION} element={<AdminRoute />} />
-                  {/* Old URLs stay valid: each page replaces them with its canonical URL. */}
-                  <Route path={LEGACY_ROUTES.GAME} element={<PlayPage />} />
-                  <Route path={LEGACY_ROUTES.ROOM} element={<RoomPage />} />
-                  <Route path={LEGACY_ROUTES.PROFILE} element={<Navigate to={paths.profile()} replace />} />
-                  <Route path={LEGACY_ROUTES.AUTH} element={<Navigate to={paths.login()} replace />} />
-                  <Route path="*" element={<NotFoundPage />} />
-                </Route>
-              </Routes>
+              <MatchProgressProvider>
+                <ProgressToasts />
+                <GamificationToasts />
+                <Routes>
+                  <Route element={<Layout />}>
+                    <Route index element={<HomePage />} />
+                    <Route path={ROUTES.GAME} element={<PlayPage />} />
+                    <Route path={ROUTES.ROOM} element={<RoomPage />} />
+                    <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+                    <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
+                    <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                    <Route path={ROUTES.LEADERBOARD} element={<LeaderboardPage />} />
+                    <Route
+                      path={ROUTES.LEADERBOARDS}
+                      element={<Navigate to={paths.leaderboards()} replace />}
+                    />
+                    <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
+                    <Route path={ROUTES.TERMS} element={<TermsPage />} />
+                    <Route path={ROUTES.ADMIN} element={<AdminRoute />} />
+                    <Route path={ROUTES.ADMIN_SECTION} element={<AdminRoute />} />
+                    {/* Old URLs stay valid: each page replaces them with its canonical URL. */}
+                    <Route path={LEGACY_ROUTES.GAME} element={<PlayPage />} />
+                    <Route path={LEGACY_ROUTES.ROOM} element={<RoomPage />} />
+                    <Route path={LEGACY_ROUTES.PROFILE} element={<Navigate to={paths.profile()} replace />} />
+                    <Route path={LEGACY_ROUTES.AUTH} element={<Navigate to={paths.login()} replace />} />
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Route>
+                </Routes>
+              </MatchProgressProvider>
             </SaveProgressProvider>
           </ToastProvider>
         </SessionProvider>

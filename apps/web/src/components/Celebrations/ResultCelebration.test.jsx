@@ -1,26 +1,54 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
-import { fakeApi, fakeSocket, fakeSound } from "../../testing/fakes.js";
+import { SessionProvider } from "../../hooks/SessionProvider.jsx";
+import { fakeApi, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
 import { installMatchMedia } from "../../testing/matchMedia.js";
+import { MatchProgressProvider } from "./MatchProgressProvider.jsx";
 import { outcomeFor } from "./outcome.js";
 import { ResultCelebration } from "./ResultCelebration.jsx";
 
-const finished = ({ you = "a", result = "win", winners = ["a"] } = {}) => ({
+const MATCH = "match-1";
+const finished = ({ you = "a", result = "win", winners = ["a"], matchId = MATCH } = {}) => ({
   you,
-  game: { outcome: { status: "finished", result, winners } },
+  game: { matchId, outcome: { status: "finished", result, winners } },
+});
+/** A `progress:updated` push for a match, as the server sends it. */
+const matchUpdate = (overrides = {}) => ({
+  source: "match",
+  key: MATCH,
+  matchId: MATCH,
+  xpGained: 30,
+  leveledUp: false,
+  progress: { level: 1 },
+  counted: true,
+  notCountedReason: "",
+  ...overrides,
+});
+const questUpdate = (overrides = {}) => ({
+  ...matchUpdate({ source: "quest", key: "quest:2026-10-16:win-1", matchId: "", xpGained: 20 }),
+  ...overrides,
 });
 
-function celebrate(room, socket = fakeSocket()) {
+/** Renders the result as a signed-in guest, once the session is ready. */
+async function celebrate(room, socket = fakeSocket()) {
   const view = render(
-    <ServicesProvider services={{ api: fakeApi(), socket, sound: fakeSound() }}>
-      <ResultCelebration room={room} />
+    <ServicesProvider
+      services={{ api: fakeApi({ getSession: async () => GUEST }), socket, sound: fakeSound() }}
+    >
+      <SessionProvider>
+        <MatchProgressProvider>
+          <ResultCelebration room={room} />
+        </MatchProgressProvider>
+      </SessionProvider>
     </ServicesProvider>,
   );
+  await waitFor(() => expect(socket.connect).toHaveBeenCalled());
   return { ...view, socket };
 }
 
 const confetti = () => document.querySelector("[data-effect='confetti']");
+const xpPop = () => document.querySelector("[data-effect='xp-pop']");
 
 describe("outcomeFor", () => {
   it.each([
@@ -40,85 +68,84 @@ describe("ResultCelebration", () => {
     ["a loss", finished({ winners: ["b"] }), "Defeat", false],
     ["a draw", finished({ result: "draw", winners: [] }), "Draw", false],
     ["a spectator", finished({ you: "" }), "Game over", false],
-  ])("celebrates %s with its banner; confetti only for a win", (_case, room, banner, withConfetti) => {
-    const { container } = celebrate(room);
+  ])("celebrates %s with its banner; confetti only for a win", async (_case, room, banner, withConfetti) => {
+    const { container } = await celebrate(room);
 
     expect(screen.getByText(banner)).toBeInTheDocument();
     expect(container.firstChild).toHaveAttribute("aria-hidden", "true");
     expect(Boolean(confetti())).toBe(withConfetti);
   });
 
-  it("floats the XP once the server has recorded the match", () => {
-    const { socket } = celebrate(finished());
-    expect(document.querySelector("[data-effect='xp-pop']")).toBeNull();
+  it("floats the XP once the server has recorded the match", async () => {
+    const { socket } = await celebrate(finished());
+    expect(xpPop()).toBeNull();
 
-    act(() => socket.push("progress:updated", { xpGained: 30, leveledUp: false, progress: { level: 1 } }));
+    act(() => socket.push("progress:updated", matchUpdate()));
 
-    expect(document.querySelector("[data-effect='xp-pop']")).toHaveTextContent("+30 XP");
+    expect(xpPop()).toHaveTextContent("+30 XP");
   });
 
-  it("floats the match's XP, not a quest bonus that follows it", () => {
-    const { socket } = celebrate(finished());
+  it("floats the match's XP, not a quest bonus that follows it", async () => {
+    const { socket } = await celebrate(finished());
 
-    act(() => socket.push("progress:updated", { source: "match", xpGained: 30, progress: { level: 1 } }));
-    act(() => socket.push("progress:updated", { source: "quest", xpGained: 20, progress: { level: 1 } }));
+    act(() => socket.push("progress:updated", matchUpdate()));
+    act(() => socket.push("progress:updated", questUpdate()));
 
-    expect(document.querySelector("[data-effect='xp-pop']")).toHaveTextContent("+30 XP");
+    expect(xpPop()).toHaveTextContent("+30 XP");
   });
 
-  it("shows no XP pop for a match that earned nothing (a forfeit)", () => {
-    const { socket } = celebrate(finished({ winners: ["b"] }));
+  it("shows no XP pop for a match that earned nothing (a forfeit)", async () => {
+    const { socket } = await celebrate(finished({ winners: ["b"] }));
 
-    act(() => socket.push("progress:updated", { xpGained: 0, leveledUp: false, progress: { level: 1 } }));
+    act(() => socket.push("progress:updated", matchUpdate({ xpGained: 0 })));
 
-    expect(document.querySelector("[data-effect='xp-pop']")).toBeNull();
+    expect(xpPop()).toBeNull();
   });
 
-  it("keeps the banner and drops the motion under reduced motion", () => {
+  it("keeps the banner and drops the motion under reduced motion", async () => {
     installMatchMedia({ reducedMotion: true });
-    const { socket } = celebrate(finished());
+    const { socket } = await celebrate(finished());
 
-    act(() => socket.push("progress:updated", { xpGained: 30, leveledUp: false, progress: { level: 1 } }));
+    act(() => socket.push("progress:updated", matchUpdate()));
 
     expect(screen.getByText("Victory!")).toBeInTheDocument();
     expect(confetti()).toBeNull();
-    expect(document.querySelector("[data-effect='xp-pop']")).toBeNull();
+    expect(xpPop()).toBeNull();
   });
 
-  it("says under the banner why a game didn't count, and forgets it when the next match counted (CC-095)", () => {
-    const { socket } = celebrate(finished());
-    const uncounted = { source: "match", xpGained: 0, counted: false, notCountedReason: "ended-too-soon" };
+  it("says under the banner why a game didn't count, with no XP (CC-095)", async () => {
+    const { socket } = await celebrate(finished());
 
-    act(() => socket.push("progress:updated", { ...uncounted, progress: { level: 1 } }));
+    act(() =>
+      socket.push(
+        "progress:updated",
+        matchUpdate({ xpGained: 0, counted: false, notCountedReason: "ended-too-soon" }),
+      ),
+    );
 
     expect(screen.getByText("This game didn't count: it ended too soon")).toBeInTheDocument();
-    expect(document.querySelector("[data-effect='xp-pop']")).toBeNull();
-
-    act(() =>
-      socket.push("progress:updated", {
-        source: "match",
-        xpGained: 30,
-        counted: true,
-        progress: { level: 1 },
-      }),
-    );
-
-    expect(screen.queryByText(/didn't count/)).toBeNull();
+    expect(xpPop()).toBeNull();
   });
 
-  it("keeps the reason when a quest push follows", () => {
-    const { socket } = celebrate(finished());
+  it("keeps the reason when a quest push follows", async () => {
+    const { socket } = await celebrate(finished());
 
     act(() =>
-      socket.push("progress:updated", {
-        source: "match",
-        xpGained: 0,
-        counted: false,
-        notCountedReason: "hourly-limit",
-      }),
+      socket.push(
+        "progress:updated",
+        matchUpdate({ xpGained: 0, counted: false, notCountedReason: "hourly-limit" }),
+      ),
     );
-    act(() => socket.push("progress:updated", { source: "quest", xpGained: 20, counted: true }));
+    act(() => socket.push("progress:updated", questUpdate()));
 
     expect(screen.getByText(/didn't count: you reached the limit/)).toBeInTheDocument();
+  });
+
+  it("shows only its own match's update, not another room's or the game before a rematch", async () => {
+    const { socket } = await celebrate(finished());
+
+    act(() => socket.push("progress:updated", matchUpdate({ matchId: "match-0", key: "match-0" })));
+
+    expect(xpPop()).toBeNull();
   });
 });

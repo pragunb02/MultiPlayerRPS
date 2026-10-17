@@ -761,6 +761,8 @@ export function createRoomComponent({
         ...(room.series && { series: { games: room.series.games, wins: { ...room.series.wins } } }),
         ...(room.game.seals?.length > 0 && { fairness: botTurns.fairness(room) }),
         game: {
+          // Which match this is, so the result can show the progress update the server sends for it (CC-235).
+          matchId: room.game.matchId,
           view: engine.viewFor(room.game.state, seated ? viewerId : "spectator"),
           activePlayers: room.status === ROOM_STATUS.PLAYING ? engine.activePlayers(room.game.state) : [],
           outcome,
