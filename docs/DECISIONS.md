@@ -23,11 +23,6 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 - **Where:** [ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md) §2, from the two-browser match experience audit. Tickets
   CC-157 to CC-178.
 
-### ADR-024 — Story mode "ClassiCade Quest"
-
-- **Status:** Proposed · 2026-10-17
-- **Where:** [story/STORY_MODE.md](story/STORY_MODE.md) (CC-179). Accepting it is CC-187.
-
 ### ADR-025, ADR-026, ADR-027 — to be written
 
 - **Status:** Open. The roadmap ([ROADMAP.md](ROADMAP.md) §8) asks for these before the work starts:
@@ -37,6 +32,20 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 - The roadmap first called them ADR-016, ADR-017 and ADR-018. Those numbers went to the decisions above.
 
 ## Accepted decisions
+
+### ADR-024 — Story mode "ClassiCade Quest"
+
+- **Status:** Accepted · 2026-10-17 (design in [story/STORY_MODE.md](story/STORY_MODE.md), CC-179; built from CC-187)
+- **Decision.** A single player story across three districts (Paper Town, Grid City, The Kingdom) against character
+  rivals built on the bots, with tutorials, bosses and 1 to 3 stars per level, scored on the server. The owner's
+  decisions:
+  1. The mascot is named Bit, everywhere (story mode, the CC-153 mascot, empty states, the 404 page).
+  2. Story rewards are cosmetic only (avatars, frames, board themes and skins, badges). Nothing affects play,
+     nothing is for sale, and Quest gives no coins.
+  3. Story XP counts towards the player's level but not towards the weekly leaderboard. Story matches never count on
+     any leaderboard.
+- **Consequences.** See STORY_MODE.md sections 6 and 7 for the data (`story_progress`, XP source `story`), URLs,
+  private bot rooms and the build plan.
 
 ### ADR-023 — Cookie notice: a line in the footer, not a banner
 

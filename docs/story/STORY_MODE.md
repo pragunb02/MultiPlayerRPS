@@ -3,7 +3,8 @@
 Written 2026-10-17. Design only, no code. It builds on the bot strategies on branch `cc-038-bot-strategies`
 (`packages/games/src/bots/`), the game shell (ADR-020, proposed, see [docs/ux/MATCH_EXPERIENCE.md](../ux/MATCH_EXPERIENCE.md)),
 the visual identity (ADR-012), the gamification rules (ADR-013) and player data that follows the identity (ADR-014).
-It proposes ADR-024 (story mode) and tickets CC-187 to CC-202.
+Its decision record is ADR-024 (story mode), accepted with the owner's decisions in section 7. Tickets: CC-187 to
+CC-202.
 
 Contents:
 
@@ -367,20 +368,20 @@ document.
 
 ### Rewards summary
 
-| Reward                    | How                                                                                                                             | System                                     |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| XP for a first clear      | Tutorials 20, rivals 30, bosses 60, finale levels 40, encores 30. Once per level, ever.                                         | progression, source `story`                |
-| XP for each new star      | 10 per star the first time it is earned                                                                                         | progression, source `story`                |
-| Character avatars         | Clearing a rival or boss level unlocks that character's portrait as a preset avatar                                             | CC-143 unlocks, CC-034 avatars             |
-| Board themes and skins    | Origami hand skin (RPS), Neon Grid board (TTT), Castle Stone board (chess), at each boss                                        | CC-143 unlocks                             |
-| Avatar frames             | Paper Crane, Circuit and Crown frames for the encores, plus an animated frame per district for all 27 or 33 stars               | CC-143 unlocks                             |
-| Badges                    | Paper Town Hero, Grid City Hero, Kingdom Hero, Arcade Relit, Star Collector (one district at full stars), Quest Legend (all 96) | achievements (ADR-013: status only, no XP) |
-| Coins, once CC-142 exists | 10 for a first clear, 50 for a boss, once per level                                                                             | coin ledger (ADR-026)                      |
+| Reward                 | How                                                                                                                             | System                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| XP for a first clear   | Tutorials 20, rivals 30, bosses 60, finale levels 40, encores 30. Once per level, ever.                                         | progression, source `story`                |
+| XP for each new star   | 10 per star the first time it is earned                                                                                         | progression, source `story`                |
+| Character avatars      | Clearing a rival or boss level unlocks that character's portrait as a preset avatar                                             | CC-143 unlocks, CC-034 avatars             |
+| Board themes and skins | Origami hand skin (RPS), Neon Grid board (TTT), Castle Stone board (chess), at each boss                                        | CC-143 unlocks                             |
+| Avatar frames          | Paper Crane, Circuit and Crown frames for the encores, plus an animated frame per district for all 27 or 33 stars               | CC-143 unlocks                             |
+| Badges                 | Paper Town Hero, Grid City Hero, Kingdom Hero, Arcade Relit, Star Collector (one district at full stars), Quest Legend (all 96) | achievements (ADR-013: status only, no XP) |
 
 Total story XP is at most 1,960 (1,000 for first clears and 960 for stars), about level 9. It can never be earned
 twice, so it cannot be farmed. Story matches are bot matches, so the normal bot match XP of ADR-025 also applies, with
 its caps, and they never count on the leaderboards. Nothing in Quest can be bought, and no reward changes how a game
-plays. Every reward is cosmetic or a badge.
+plays. Every reward is cosmetic (avatars, frames, board themes and skins) or a badge, and Quest gives no coins (owner
+decision 2). Story XP raises the player's level but is never added to the weekly leaderboard (owner decision 3).
 
 CC-156 tie in: the "next unlock" teaser under the XP bar includes the next Quest reward ("Clear Whirly to unlock the
 Whirly avatar"). Encore levels are the natural home for a one time taste of an upcoming variant (a single Lizard Spock
@@ -1175,7 +1176,9 @@ merge caps of CC-095 apply.
    from `pending`. A crash between the two steps heals on the next story update, and because pending keys are always
    recent they are still inside progression's window of remembered keys. Old keys are never re-sent, so the window can
    never forget them and pay twice.
-3. `PROGRESS_UPDATED` with `source: "story"` shows as "Quest star! +10 XP" in the reward queue (CC-099).
+3. `PROGRESS_UPDATED` with `source: "story"` shows as "Quest star! +10 XP" in the reward queue (CC-099). The
+   leaderboard component adds no XP with source `story` to the weekly board, so story XP raises the level but never
+   the weekly leaderboard (owner decision 3).
 4. Unlocks (avatars, themes, frames) are written to the CC-143 unlock catalogue with `source: { kind: "story",
 levelId }`, keyed by player and unlock id, so they are written once.
 5. Badges are new achievements whose metric is read from `story_progress`. ADR-013 says achievements give no XP, and
@@ -1370,10 +1373,14 @@ seeds the bot rng so every run plays the same games):
 7. Grid City and The Kingdom get one journey each in their content tickets (CC-198, CC-199) and the finale in CC-200.
 8. Every test uses the `players` fixture, so console errors, CSP violations and anything in web storage fail it.
 
-### Open questions for the owner
+### Decisions (owner, 2026-10-17)
 
-1. Is "Bit" the right name for the mascot, or does CC-153 already have one in mind?
-2. Should the finale also unlock a free month of a cosmetic bundle once the store (CC-063) exists, or stay purely
-   badges and avatars? This design assumes the latter.
-3. Should story XP count on the weekly XP board? This design says no: story XP raises the player's level and the
-   overall XP board, but is not added to the weekly board, so new players cannot top a week with one time rewards.
+These replace the open questions. ADR-024 is accepted with them.
+
+1. **The mascot is named Bit**, and that name is used everywhere: in story mode, for the CC-153 mascot drawing, in
+   empty states and on the 404 page.
+2. **Story rewards are cosmetic only:** avatars, avatar frames, board themes and skins, and badges. Nothing changes
+   how a game plays and nothing is for sale. Quest gives no coins, and the finale stays purely badges and avatars
+   (no store bundle).
+3. **Story XP counts towards the player's level, but not towards the weekly leaderboard,** so a new player cannot top
+   a week with one time rewards. Story matches never count on any leaderboard (bot matches, ADR-025).
