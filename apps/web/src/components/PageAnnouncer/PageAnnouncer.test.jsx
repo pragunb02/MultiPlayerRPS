@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useState } from "react";
 import { Link, MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LocationProbe } from "../../testing/LocationProbe.jsx";
 import { PageAnnouncer } from "./PageAnnouncer.jsx";
 
@@ -134,7 +134,12 @@ function Focused() {
 const announced = () => document.querySelector("[aria-live='polite']").textContent;
 const heading = () => screen.getByRole("heading", { level: 1 });
 
+/** Watches how the heading is focused. The real focus still happens, only the options are recorded. */
+const watchFocus = () => vi.spyOn(HTMLElement.prototype, "focus");
+
 describe("PageAnnouncer", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("leaves focus and the announcement alone on the first page", () => {
     renderAt("/");
 
@@ -153,12 +158,16 @@ describe("PageAnnouncer", () => {
   it("moves focus to the new heading and reads the title after a link in the header", async () => {
     const user = userEvent.setup();
     renderAt("/");
+    const focus = watchFocus();
 
     await user.click(screen.getByRole("link", { name: "About" }));
 
     expect(heading()).toHaveTextContent("About");
     expect(heading()).toHaveFocus();
     expect(announced()).toBe("About");
+    // A new page brings its heading into view, so a sighted keyboard user sees where focus went.
+    expect(focus.mock.contexts.at(-1)).toBe(heading());
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: false });
   });
 
   it("moves focus to the new heading after a link on the page that goes away", async () => {
@@ -194,12 +203,16 @@ describe("PageAnnouncer", () => {
 
   it("counts Back and Forward even when nothing on the page was pressed", () => {
     const view = renderAt("/about", { history: ["/"] });
+    const focus = watchFocus();
 
     view.navigate(-1);
 
     expect(heading()).toHaveTextContent("Home");
     expect(heading()).toHaveFocus();
     expect(announced()).toBe("Home");
+    // The browser puts the page back where the player left it, and focusing the heading must not undo that.
+    expect(focus.mock.contexts.at(-1)).toBe(heading());
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
   it("does nothing for a change that keeps the path", async () => {

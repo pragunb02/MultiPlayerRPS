@@ -35,14 +35,14 @@ function whenHeading({ main, waitMs, onReady }) {
 
 /**
  * Focuses an element that is not normally focusable. The temporary tabindex goes again when focus leaves, so a
- * click on the heading later does not leave it focused.
+ * click on the heading later does not leave it focused. With `keepScroll` the page does not scroll to it.
  */
-function focusTarget(element) {
+function focusTarget(element, keepScroll) {
   if (!element.hasAttribute("tabindex")) {
     element.setAttribute("tabindex", "-1");
     element.addEventListener("blur", () => element.removeAttribute("tabindex"), { once: true });
   }
-  element.focus();
+  element.focus({ preventScroll: keepScroll });
 }
 
 /**
@@ -99,7 +99,8 @@ export function PageAnnouncer({ waitMs = HEADING_WAIT_MS }) {
       onReady: (target) => {
         const untouched = document.activeElement === start || document.activeElement === document.body;
         if (!stayed && untouched) {
-          focusTarget(target);
+          // Back and Forward keep the place the browser scrolled back to, so a long page does not jump to the top.
+          focusTarget(target, navigationType === "POP");
         }
         region.current.textContent = document.title;
       },

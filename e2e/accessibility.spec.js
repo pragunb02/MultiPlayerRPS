@@ -9,6 +9,9 @@ import { newAccount } from "./personas.js";
 // axe's best practices.
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 const FAILING = new Set(["serious", "critical"]);
+// The dark theme only swaps colour tokens (styles/tokens.css), so in dark only the rules about colour can answer
+// differently. Running just those keeps the suite inside CI's time limit.
+const COLOUR_RULES = ["color-contrast", "link-in-text-block"];
 
 /** One line per broken rule: what it is and where, so a failure reads without opening the report. */
 const describe = (violation) =>
@@ -18,13 +21,17 @@ const describe = (violation) =>
     .join(", ")}${violation.nodes.length > 5 ? ` and ${violation.nodes.length - 5} more` : ""}`;
 
 /**
- * Scans what `player` sees now, once in each colour scheme. Motion is reduced for the scan, so a toast or a piece
- * caught half way through fading in is never judged on its half-faded colours.
+ * Scans what `player` sees now with every rule in the light theme, then with the colour rules in the dark theme.
+ * Motion is reduced for the scan, so a toast or a piece caught half way through fading in is never judged on its
+ * half faded colours.
  */
 async function scan(player, screen) {
   for (const colorScheme of ["light", "dark"]) {
     await player.page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
-    const { violations } = await new AxeBuilder({ page: player.page }).withTags(TAGS).analyze();
+    const axe = new AxeBuilder({ page: player.page });
+    const { violations } = await (
+      colorScheme === "light" ? axe.withTags(TAGS) : axe.withRules(COLOUR_RULES)
+    ).analyze();
     expect(
       violations.filter((violation) => FAILING.has(violation.impact)).map(describe),
       `${player.name} on ${screen}, ${colorScheme}`,
@@ -33,10 +40,19 @@ async function scan(player, screen) {
   await player.page.emulateMedia({ colorScheme: null, reducedMotion: null });
 }
 
+/**
+ * Skips a scan on the phone. Each screen is scanned once, on the desktop browser, so the scans add as little as they
+ * can to CI's time limit. The phone layout uses the same markup and colours, and the page change checks below still
+ * run on both.
+ */
+const desktopOnly = (testInfo) =>
+  test.skip(testInfo.project.name !== "desktop", "each screen is scanned once");
+
 const control = (page, id) => page.locator(`main [data-cc-control="${id}"]`);
 
 test.describe("pages", () => {
-  test("pages a visitor can open", async ({ players }) => {
+  test("pages a visitor can open", async ({ players }, testInfo) => {
+    desktopOnly(testInfo);
     test.setTimeout(120_000);
     const visitor = await players.open("visitor");
     visitor.expect(404, "/no-such-page");
@@ -60,7 +76,8 @@ test.describe("pages", () => {
     }
   });
 
-  test("a wrong password and a form sent with mistakes", async ({ players }) => {
+  test("a wrong password and a form sent with mistakes", async ({ players }, testInfo) => {
+    desktopOnly(testInfo);
     const visitor = await players.open("visitor", { secrets: ["not my password"] });
     visitor.expect(401, "/api/auth/login");
     await visitor.page.goto("/login");
@@ -79,7 +96,8 @@ test.describe("pages", () => {
     await scan(visitor, "signup with mistakes");
   });
 
-  test("a guest's home and profile, and an account's profile", async ({ players }) => {
+  test("a guest's home and profile, and an account's profile", async ({ players }, testInfo) => {
+    desktopOnly(testInfo);
     const guest = await players.open("guest");
     await guest.page.goto("/");
     await guest.page.getByRole("button", { name: "Play as a guest" }).click();
@@ -104,7 +122,8 @@ test.describe("pages", () => {
 });
 
 test.describe("joining a room", () => {
-  test("the invite chooser, a room that does not exist and a full room", async ({ players }) => {
+  test("the invite chooser, a room that does not exist and a full room", async ({ players }, testInfo) => {
+    desktopOnly(testInfo);
     const host = await players.open("host");
     const room = await createRoom(host, "tic-tac-toe");
     await scan(host, "a room waiting for an opponent");
@@ -140,7 +159,8 @@ const MATCH_STATES = Object.freeze({
 for (const [gameId, names] of Object.entries(MATCH_STATES)) {
   test.describe(`${gameId} match`, () => {
     for (const name of names) {
-      test(name, async ({ players }) => {
+      test(name, async ({ players }, testInfo) => {
+        desktopOnly(testInfo);
         test.setTimeout(90_000);
         const pair = await openPair(players);
         const { clicker, other } = await statesFor(gameId)[name](pair);
@@ -154,7 +174,8 @@ for (const [gameId, names] of Object.entries(MATCH_STATES)) {
 }
 
 test.describe("dialogs and the chess board in use", () => {
-  test("a picked up piece, the resign dialog and the leave dialog", async ({ players }) => {
+  test("a picked up piece, the resign dialog and the leave dialog", async ({ players }, testInfo) => {
+    desktopOnly(testInfo);
     test.setTimeout(90_000);
     const pair = await openPair(players);
     const { clicker } = await statesFor("chess")["my-turn"](pair);
@@ -196,6 +217,30 @@ test.describe("page changes", () => {
     await visitor.page.goBack();
     await expect(visitor.page).toHaveURL("/");
     await expect(visitor.page.getByRole("heading", { level: 1 })).toBeFocused();
+  });
+
+  // A behaviour check only: after Back, focus is on the heading and the page is still where the player left it.
+  // It cannot prove the focus call passed preventScroll, because the browser may restore the scroll after the focus
+  // and hide a jump to the top. PageAnnouncer.test.jsx pins the option itself.
+  test("Back focuses the heading and keeps the place the browser scrolled back to", async ({ players }) => {
+    const visitor = await players.open("visitor");
+    const page = visitor.page;
+    // Short enough that the home page scrolls on both browsers.
+    await page.setViewportSize({ width: page.viewportSize().width, height: 400 });
+    await page.goto("/");
+    const privacy = page.getByRole("contentinfo").getByRole("link", { name: /privacy/i });
+    await privacy.scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => scrollY)).toBeGreaterThan(100);
+
+    await privacy.click();
+    await expect(page).toHaveURL("/privacy");
+    await page.goBack();
+
+    const heading = page.getByRole("heading", { level: 1 });
+    await expect(heading).toBeFocused();
+    // The heading is still above the screen, so the page did not jump to the top.
+    const box = await heading.boundingBox();
+    expect(box.y + box.height).toBeLessThanOrEqual(0);
   });
 
   test("a move by the opponent never takes the focus off the board", async ({ players }) => {
