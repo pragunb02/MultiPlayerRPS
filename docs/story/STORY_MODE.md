@@ -3,7 +3,7 @@
 Written 2026-10-17. Design only, no code. It builds on the bot strategies on branch `cc-038-bot-strategies`
 (`packages/games/src/bots/`), the game shell (ADR-020, proposed, see [docs/ux/MATCH_EXPERIENCE.md](../ux/MATCH_EXPERIENCE.md)),
 the visual identity (ADR-012), the gamification rules (ADR-013) and player data that follows the identity (ADR-014).
-It proposes ADR-021 (story mode) and tickets CC-180 to CC-195.
+It proposes ADR-021 (story mode) and tickets CC-187 to CC-202.
 
 Contents:
 
@@ -234,7 +234,7 @@ the shipped values as defaults, so the shipped levels play exactly as today.
 | `practice`  | TTT   | Any free cell, at random. Never looks for wins or blocks. Bit uses it in GC1 so the first game is about finding lines, not about losing.                                                                     | none                                                  | never completes a line when another free cell exists                                                  |
 | `blocker`   | TTT   | Win if it can. Block if the opponent can win next. Otherwise any free cell at random (no centre or corner preference, which is the only difference from `medium`).                                           | none                                                  | always wins when it can, always blocks a single threat                                                |
 | `corners`   | TTT   | Win if it can. Block with probability `blockRate`. Otherwise the first free corner in the order 0, 2, 6, 8 (ties between remaining corners at random), then the centre, then any edge.                       | `blockRate: 0.75`                                     | blocks at least 72 % of single threats, opens on a corner every time                                  |
-| `mirror`    | TTT   | Win if it can. Block if it must. Otherwise the cell opposite the opponent's last move (cell `8 - last`) if it is free, otherwise the `medium` order. Needs the last move in the view (CC-182).               | none                                                  | answers a corner with the opposite corner whenever nothing is at stake                                |
+| `mirror`    | TTT   | Win if it can. Block if it must. Otherwise the cell opposite the opponent's last move (cell `8 - last`) if it is free, otherwise the `medium` order. Needs the last move in the view (CC-189).               | none                                                  | answers a corner with the opposite corner whenever nothing is at stake                                |
 | `stylist`   | Chess | Beginner, but every move made by a piece of type `favouritePiece` gets `bonus` added to its score before the noise and the pick. Blunders keep their own rate.                                               | `favouritePiece`, `bonus: 40`, `blunderRate`, `noise` | moves the favourite piece in a clearly higher share of turns than plain Beginner                      |
 
 Duchess Diagonal uses `stylist` with `favouritePiece: "bishop"`, `blunderRate: 0.2`, `noise: 60`. Hopscotch uses
@@ -298,7 +298,7 @@ Encores (after the ending): PT9, GC9, KG11
 6. **Move limits** keep chess levels finite. Reaching the limit ends the game kindly ("The candles burned down. Let's
    rest and try again.") and counts as not cleared, never as a loss.
 7. **Who plays which side** is fixed by the level, not random: in chess you are White unless a level says otherwise.
-8. **Clocks.** Chess levels are untimed (new `untimed` time control for bot rooms, CC-182). Only GC7 has a move timer,
+8. **Clocks.** Chess levels are untimed (new `untimed` time control for bot rooms, CC-189). Only GC7 has a move timer,
    and the "Extra time" setting (section 6) triples it without costing a star.
 9. **Stages.** Some levels have several stages (puzzle sets, two game series). Stages are played as consecutive games
    in one room, like a rematch. A stage you fail can be retried at once with Try again.
@@ -1131,7 +1131,7 @@ Goal types: `win-match`, `win-games` (wins before losses), `no-loss-series`, `pr
 How a level is played and scored:
 
 1. `POST /api/story/levels/:levelId/play` checks that the level is open for this player, creates a private bot room
-   from the level (CC-186), and answers `{ roomCode }`. If the player already has an open room for that level, it
+   from the level (CC-193), and answers `{ roomCode }`. If the player already has an open room for that level, it
    answers the same room, so pressing Play twice changes nothing. A locked level answers 409 with the code
    `STORY_LEVEL_LOCKED`.
 2. The room runs the game engine wrapped by `withStoryRules(engine, level)` from `packages/games/src/story/`. The
@@ -1297,30 +1297,30 @@ and `quest_first_finish`. The owner dashboard gets a Quest panel with M1 to M13.
 
 ### Tickets
 
-Next free ID on the board (branch `cc-docs-reserve-101`) is CC-180. These tickets take CC-180 to CC-195, so the
-board's next free ID becomes **CC-196** when they are added.
+Next free ID on the board (branch `cc-docs-reserve-101`) is CC-187. These tickets take CC-187 to CC-202, so the
+board's next free ID becomes **CC-203** when they are added.
 
 | Order | Ticket | Title                                                                                                                                                                                        | Type    | Pri | Size | Depends on                                         |
 | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | --- | ---- | -------------------------------------------------- |
-| 1     | CC-180 | ADR-021 story mode: server scored stars, `story_progress`, XP keys and source `story`, transfer participant, URLs, private bot rooms                                                         | docs    | P1  | S    | CC-179                                             |
-| 2     | CC-181 | Story catalogue in `@classicade/shared`: districts, 32 levels, 19 characters, goal and star types, reward ids, with a validation test                                                        | feature | P1  | S    | CC-180                                             |
-| 3     | CC-182 | Engine options for Quest: chess `startFen`, `untimed` and fixed colours, TTT `startBoard` with closed cells and a fixed starter, the last move in the TTT view, bots read the start position | feature | P1  | M    | CC-038, CC-039, CC-040                             |
-| 4     | CC-183 | Character strategies: parameters for `pattern` and the chess levels, new `favourite`, `copycat`, `cycle`, `win-stay`, `practice`, `blocker`, `corners`, `mirror`, `stylist`, `listed: false` | feature | P1  | M    | CC-182, CC-138                                     |
-| 5     | CC-184 | Story rules and scoring in `packages/games/src/story/`: `withStoryRules`, goals, stars, mistakes, hints, story moments, stages                                                               | feature | P1  | M    | CC-181, CC-182                                     |
-| 6     | CC-185 | Story progress on the server: DAO and contract suite, component, routes, pipeline step, XP awards, `story:updated`, ADR-014 participant                                                      | feature | P1  | M    | CC-184, CC-138, CC-111                             |
-| 7     | CC-186 | Story rooms: seat the character bot (CC-138), stages as a series, Try again, hint move, Pass, private rooms, reconnect and Back/Forward rejoin                                               | feature | P1  | M    | CC-185, CC-036                                     |
-| 8     | CC-187 | Character art: Bit's story poses, 18 characters with 5 expressions each, district backdrops and map nodes, `CHARACTER_ART`, three new art tokens                                             | feature | P1  | L    | CC-153                                             |
-| 9     | CC-188 | Quest map and level pages: `/quest` routes, desktop and mobile layouts, keyboard path, titles, Continue, home teaser card                                                                    | feature | P1  | M    | CC-185 (CC-187 may land later, placeholders first) |
-| 10    | CC-189 | Quest in the game shell: dialogue strip slot, moments to beats, goal text, goal tracker, Hint and end actions, star beats in the result card, scene skipping and settings, sounds            | feature | P1  | M    | CC-157, CC-166, CC-167, CC-168, CC-099, CC-103     |
-| 11    | CC-190 | Paper Town content: 9 levels, scripts, tutorial rule card, e2e for the whole district on desktop and mobile                                                                                  | feature | P1  | M    | CC-183, CC-186, CC-188, CC-189                     |
-| 12    | CC-191 | Grid City content: 9 levels, scripts, start boards, timer level, e2e for the district                                                                                                        | feature | P1  | M    | CC-190                                             |
-| 13    | CC-192 | The Kingdom content: 11 levels, start positions and puzzles, piece value card, scripts, e2e for the district                                                                                 | feature | P1  | L    | CC-190                                             |
-| 14    | CC-193 | The Marquee, the ending scene and share card, encores, rewards through CC-143 (avatars, themes, frames) and the story badges                                                                 | feature | P1  | M    | CC-191, CC-192, CC-143, CC-034                     |
-| 15    | CC-194 | Quest telemetry and dashboard panel, profile star collection, "Earn a star in Quest" daily quest, optional weekly inbox note                                                                 | feature | P2  | S    | CC-173, CC-178, CC-045, CC-190                     |
-| 16    | CC-195 | Quest accessibility and journey pass: axe on every Quest screen, screen reader script, reduced motion, Back/Forward chains, guest to account carry over in browsers                          | test    | P1  | M    | CC-193                                             |
+| 1     | CC-187 | ADR-021 story mode: server scored stars, `story_progress`, XP keys and source `story`, transfer participant, URLs, private bot rooms                                                         | docs    | P1  | S    | CC-179                                             |
+| 2     | CC-188 | Story catalogue in `@classicade/shared`: districts, 32 levels, 19 characters, goal and star types, reward ids, with a validation test                                                        | feature | P1  | S    | CC-187                                             |
+| 3     | CC-189 | Engine options for Quest: chess `startFen`, `untimed` and fixed colours, TTT `startBoard` with closed cells and a fixed starter, the last move in the TTT view, bots read the start position | feature | P1  | M    | CC-038, CC-039, CC-040                             |
+| 4     | CC-190 | Character strategies: parameters for `pattern` and the chess levels, new `favourite`, `copycat`, `cycle`, `win-stay`, `practice`, `blocker`, `corners`, `mirror`, `stylist`, `listed: false` | feature | P1  | M    | CC-189, CC-138                                     |
+| 5     | CC-191 | Story rules and scoring in `packages/games/src/story/`: `withStoryRules`, goals, stars, mistakes, hints, story moments, stages                                                               | feature | P1  | M    | CC-188, CC-189                                     |
+| 6     | CC-192 | Story progress on the server: DAO and contract suite, component, routes, pipeline step, XP awards, `story:updated`, ADR-014 participant                                                      | feature | P1  | M    | CC-191, CC-138, CC-111                             |
+| 7     | CC-193 | Story rooms: seat the character bot (CC-138), stages as a series, Try again, hint move, Pass, private rooms, reconnect and Back/Forward rejoin                                               | feature | P1  | M    | CC-192, CC-036                                     |
+| 8     | CC-194 | Character art: Bit's story poses, 18 characters with 5 expressions each, district backdrops and map nodes, `CHARACTER_ART`, three new art tokens                                             | feature | P1  | L    | CC-153                                             |
+| 9     | CC-195 | Quest map and level pages: `/quest` routes, desktop and mobile layouts, keyboard path, titles, Continue, home teaser card                                                                    | feature | P1  | M    | CC-192 (CC-194 may land later, placeholders first) |
+| 10    | CC-196 | Quest in the game shell: dialogue strip slot, moments to beats, goal text, goal tracker, Hint and end actions, star beats in the result card, scene skipping and settings, sounds            | feature | P1  | M    | CC-157, CC-166, CC-167, CC-168, CC-099, CC-103     |
+| 11    | CC-197 | Paper Town content: 9 levels, scripts, tutorial rule card, e2e for the whole district on desktop and mobile                                                                                  | feature | P1  | M    | CC-190, CC-193, CC-195, CC-196                     |
+| 12    | CC-198 | Grid City content: 9 levels, scripts, start boards, timer level, e2e for the district                                                                                                        | feature | P1  | M    | CC-197                                             |
+| 13    | CC-199 | The Kingdom content: 11 levels, start positions and puzzles, piece value card, scripts, e2e for the district                                                                                 | feature | P1  | L    | CC-197                                             |
+| 14    | CC-200 | The Marquee, the ending scene and share card, encores, rewards through CC-143 (avatars, themes, frames) and the story badges                                                                 | feature | P1  | M    | CC-198, CC-199, CC-143, CC-034                     |
+| 15    | CC-201 | Quest telemetry and dashboard panel, profile star collection, "Earn a star in Quest" daily quest, optional weekly inbox note                                                                 | feature | P2  | S    | CC-173, CC-178, CC-045, CC-197                     |
+| 16    | CC-202 | Quest accessibility and journey pass: axe on every Quest screen, screen reader script, reduced motion, Back/Forward chains, guest to account carry over in browsers                          | test    | P1  | M    | CC-200                                             |
 
-CC-190 is the first slice players see: once Paper Town works end to end on the shell, Grid City and The Kingdom are
-mostly content. Levels whose rewards need CC-143 show "Reward coming soon" until CC-193 lands, and the rewards are
+CC-197 is the first slice players see: once Paper Town works end to end on the shell, Grid City and The Kingdom are
+mostly content. Levels whose rewards need CC-143 show "Reward coming soon" until CC-200 lands, and the rewards are
 granted then, because clears are already stored.
 
 ### Test plan
@@ -1367,7 +1367,7 @@ seeds the bot rng so every run plays the same games):
 5. Skipping: scenes skipped with Escape, the "never" setting, and Watch scene on the level page.
 6. Accessibility: axe passes on every Quest screen, reduced motion shows no animation, the screen reader announcements
    arrive in order.
-7. Grid City and The Kingdom get one journey each in their content tickets (CC-191, CC-192) and the finale in CC-193.
+7. Grid City and The Kingdom get one journey each in their content tickets (CC-198, CC-199) and the finale in CC-200.
 8. Every test uses the `players` fixture, so console errors, CSP violations and anything in web storage fail it.
 
 ### Open questions for the owner
