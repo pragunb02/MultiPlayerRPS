@@ -9,8 +9,8 @@ import { APP_PORT, BASE_URL } from "./personas.js";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const config = loadConfig({
-  // Secure cookies and proxy trust, as on Render. server.mjs ends TLS in front of this process, and the tests send
-  // X-Forwarded-Proto: https as Render's proxy does.
+  // Secure cookies and proxy trust, as on Render. tlsFront.js serves HTTPS in front of this process, and the tests
+  // send X-Forwarded-Proto: https as Render's proxy does.
   NODE_ENV: "production",
   PORT: String(APP_PORT),
   LOG_LEVEL: "warn",
