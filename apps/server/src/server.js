@@ -383,7 +383,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     limits: limitsOfRooms,
     botTurns,
   });
-  const botComponent = createBotComponent({ roomComponent });
+  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const botDriver = createBotDriver({
     roomComponent,
     roomAccessor,

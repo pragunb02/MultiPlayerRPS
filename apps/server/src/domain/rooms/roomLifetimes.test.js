@@ -66,4 +66,11 @@ describe("room lifetimes", () => {
 
     expect(lifetimeOf(room, ROOM_LIFETIMES)).toEqual({ endsAt: T0 + 24 * 60 * MINUTE, reason: "abandoned" });
   });
+
+  it("counts only people: a game against the computer whose person is away is kept for two hours (CC-138)", () => {
+    const computer = { playerId: "bot_pip_easy", displayName: "Pip", connected: true, bot: {} };
+    const room = { status: "playing", seats: [...seats(false), computer], lastActivityAt: T0 };
+
+    expect(lifetimeOf(room, ROOM_LIFETIMES)).toEqual({ endsAt: T0 + 120 * MINUTE, reason: "abandoned" });
+  });
 });

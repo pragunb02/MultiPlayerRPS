@@ -119,7 +119,7 @@ export function createTestApp({
     ...(roomLimits && { limits: roomLimits }),
     botTurns,
   });
-  const botComponent = createBotComponent({ roomComponent });
+  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
   const botDriver = createBotDriver({
     roomComponent,

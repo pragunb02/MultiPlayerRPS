@@ -9,7 +9,7 @@ const HOUR_MS = 60 * MINUTE_MS;
  * 1. A waiting room that nobody joins closes `waitingMs` after the last thing that happened in it.
  * 2. A finished game offers a rematch for `rematchWindowMs` from the moment it ended, then the room closes. The
  *    deadline is fixed and shown to the players, so asking for a rematch does not move it.
- * 3. A game in progress where every player is away (phones lock, tabs close, networks drop) is kept for `awayMs`
+ * 3. A game in progress where every person is away (phones lock, tabs close, networks drop) is kept for `awayMs`
  *    after the last thing that happened. That is long enough to come back from a lock screen, a train tunnel or
  *    a meal.
  * 4. A game in progress where nobody makes a move closes after `idleGameMs` even if a tab is still open, so a
@@ -64,7 +64,10 @@ export function lifetimeOf(room, lifetimes) {
         reason: ROOM_CLOSE_REASONS.REMATCH_WINDOW_ENDED,
       };
     default: {
-      const everyoneAway = room.seats.every((seat) => !seat.connected);
+      // A computer player is always there (CC-138), so only people decide whether everyone is away.
+      const everyoneAway = room.seats
+        .filter((seat) => seat.bot === undefined)
+        .every((seat) => !seat.connected);
       return {
         endsAt: room.lastActivityAt + (everyoneAway ? lifetimes.awayMs : lifetimes.idleGameMs),
         reason: ROOM_CLOSE_REASONS.ABANDONED,

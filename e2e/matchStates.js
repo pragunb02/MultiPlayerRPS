@@ -289,14 +289,16 @@ const COMPUTER = Object.freeze({
   },
   chess: {
     name: "Queen Vee",
-    // One move each before resigning, whichever colour the visitor got, so the move list always has moves.
-    async finish(player) {
+    // A move each first, whichever colour the visitor got, so the move list always has moves to step through.
+    async opening(player) {
       const white =
         (await square(player, "a8").boundingBox()).y < (await square(player, "a1").boundingBox()).y;
       await square(player, white ? "e2" : "e7").click();
       await square(player, white ? "e4" : "e5").click();
       await expect(phaseOf(player)).toHaveAttribute("data-cc-phase", "their-turn");
       await expect(phaseOf(player)).toHaveAttribute("data-cc-phase", "my-turn", { timeout: 10_000 });
+    },
+    async finish(player) {
       await control(player.page, "chess.resign").click();
       await control(player.page, "chess.resign.confirm").click();
     },
@@ -314,6 +316,7 @@ async function startVsComputer(pair, gameId) {
   await control(alice.page, "lobby.play_computer").click();
   await expect(phaseOf(alice)).toHaveAttribute("data-cc-phase", "my-turn", { timeout: 15_000 });
   await GAMES[gameId].ready?.(alice, alice);
+  await COMPUTER[gameId].opening?.(alice);
   return alice;
 }
 

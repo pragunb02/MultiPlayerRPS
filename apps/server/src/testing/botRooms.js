@@ -26,21 +26,22 @@ export function botRooms({ seed = 1, onChange = () => {} } = {}) {
   const codes = ["ROOM22", "ROOM33", "ROOM44", "ROOM55", "ROOM66", "ROOM77"];
   let nextSeed = seed;
   let matchNumber = 0;
+  const events = {
+    emit(event, payload) {
+      (event === ROOM_EVENTS.CHANGED ? changes : published).push({ event, payload });
+      if (event === ROOM_EVENTS.CHANGED) onChange(payload.room);
+    },
+  };
   const rooms = createRoomComponent({
     roomAccessor,
     engines,
-    events: {
-      emit(event, payload) {
-        (event === ROOM_EVENTS.CHANGED ? changes : published).push({ event, payload });
-        if (event === ROOM_EVENTS.CHANGED) onChange(payload.room);
-      },
-    },
+    events,
     generateCode: () => codes.shift(),
     generateSeed: () => nextSeed++,
     generateMatchId: () => `m${++matchNumber}`,
     botTurns,
   });
-  const botComponent = createBotComponent({ roomComponent: rooms });
+  const botComponent = createBotComponent({ roomComponent: rooms, roomAccessor, events });
   /** A started game against the game's character at `level`. */
   const playComputer = ({ gameId, level = "easy", options = {}, now = 1_000 }) =>
     botComponent.playComputer({ host: PERSON, gameId, options, level, now });
