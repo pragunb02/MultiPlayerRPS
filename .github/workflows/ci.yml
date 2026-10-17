@@ -42,6 +42,41 @@ jobs:
           path: coverage/
           retention-days: 14
 
+  backup-round-trip:
+    name: Backup round trip (mongodump, age, mongorestore)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - uses: ./.github/actions/backup-tools
+      # Test data only. A missing tool fails the test here instead of skipping it.
+      - run: npx vitest run scripts/backup/roundTrip.integration.test.mjs
+        env:
+          REQUIRE_BACKUP_TOOLS: "1"
+
+  workflows:
+    name: Workflow files (actionlint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint, with shellcheck on every run block
+        run: docker run --rm --volume "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
+      - name: shellcheck on the backup script
+        run: >-
+          docker run --rm --volume "$PWD:/repo" --workdir /repo --entrypoint shellcheck rhysd/actionlint:1.7.12
+          scripts/backup/dump-and-encrypt.sh
+
   e2e:
     name: Browser persona tests (desktop + mobile)
     runs-on: ubuntu-latest

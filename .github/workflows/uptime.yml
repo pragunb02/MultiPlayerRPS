@@ -1,0 +1,46 @@
+# Uptime check of production every 10 minutes (CC-049, the free part). What it covers and what it does not:
+# docs/DEPLOYMENT.md, "Uptime monitoring".
+#
+# Two failed checks in a row open an issue labelled "incident" (later failures update it), and the first check
+# that passes again closes it. No secrets: the workflow's own token writes the issues.
+name: Uptime check
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  # Reads the previous run, to know whether the check before this one failed.
+  actions: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check production
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Probe the site and open or close the incident
+        id: monitor
+        run: node scripts/bin/uptime.mjs
+        env:
+          UPTIME_BASE_URL: https://nocapgaming.onrender.com
+          GITHUB_TOKEN: ${{ github.token }}
+      # The next run looks for this step by name to learn that this check failed. Keep the name the same as
+      # DOWN_STEP_NAME in scripts/uptime/incident.mjs.
+      - name: Site is down
+        if: always() && steps.monitor.outputs.state == 'down'
+        run: echo "Production failed this check. Details are in the step above."
