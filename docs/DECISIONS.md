@@ -10,32 +10,137 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 - **Context:** Ratings, leaderboards, friends, payments are relational; matches/moves fit documents.
 - **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
 
-### ADR-005 — Hosting
-
-- **Status:** Open
-- **Context:** Needs WebSockets, low cost, simple ops.
-- **Options:** Render / Fly.io / Railway / AWS (ECS Fargate or Lightsail) + MongoDB Atlas.
-- **Recommendation:** Decide in Stage 0 exit; containerize first so it's portable.
-
-### ADR-020 — Game shell: one match layout every game plugs into
-
-- **Status:** Proposed · 2026-10-17
-- **Where:** [ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md) §2, from the two-browser match experience audit. Tickets
-  CC-157 to CC-178.
-
-### ADR-025, ADR-026, ADR-027 — to be written
-
-- **Status:** Open. The roadmap ([ROADMAP.md](ROADMAP.md) §8) asks for these before the work starts:
-  1. ADR-025: bot identity and rewards (CC-138).
-  2. ADR-026: coin economy (CC-142).
-  3. ADR-027: ratings only for skill games (CC-042).
-- The roadmap first called them ADR-016, ADR-017 and ADR-018. Those numbers went to the decisions above.
-
 ## Accepted decisions
+
+### ADR-029 — Liquidity gates: crowd features switch on only when the crowd is there
+
+- **Status:** Accepted · 2026-10-17 ([PRODUCT_VISION.md](PRODUCT_VISION.md) §6.0, decision D14. Built by CC-228 on
+  CC-176)
+- **Context.** Nobody has a counted result on production yet. An empty arena, an empty leaderboard or "0 playing
+  now" tells a visitor the site is empty.
+- **Decision.**
+  1. Every feature that needs a crowd has a numeric switch-on threshold, from the table below.
+  2. A nightly job (CC-176) checks the thresholds and a small flag table (CC-228) switches the features on and off.
+  3. A gate opens after its threshold has held for 2 weeks in a row, and closes after it has stayed below for 4
+     weeks in a row.
+  4. Before a gate opens, the screen shows the fallback in the table, never an empty list.
+  5. Every threshold is an estimate, tuned once data exists. Changing a threshold is a one-line change with a test.
+
+| Feature                                             | Switch-on threshold                                             | Shown before the gate opens                        |
+| --------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------- |
+| "Find a person" as the main button for an hour slot | 60% or more of searches in that slot find a person within 4 s   | A character is the main button                     |
+| Search timeout                                      | The 80th percentile wait of successful searches, at most 4 s    | 4 s                                                |
+| "N playing now"                                     | Median of 50 or more people online at that hour over 7 days     | Nothing                                            |
+| Recent wins row on home                             | 200 or more opted-in adult accounts finishing matches per day   | Nothing                                            |
+| Top 5 on a game page                                | 50 or more accounts on that game's weekly board                 | "Your best this week"                              |
+| Any leaderboard tab                                 | 25 or more entries                                              | "Your week"                                        |
+| Achievement rarity                                  | 500 or more accounts                                            | The achievement without a percentage               |
+| Weekly arena per game (CC-210)                      | 30 or more accounts active in that hour slot, two weeks running | A turn-based "arena week" with friends, or nothing |
+| Circle weekly board and arena                       | 6 or more members active in that circle that week               | The circle's shared goal only                      |
+| Leagues (CC-141)                                    | 250 or more weekly accounts (10 groups of 25)                   | A personal weekly goal                             |
+| Season rank (CC-055)                                | Same as leagues                                                 | The free season track only                         |
+| Spectating (CC-056)                                 | 100 or more rated chess games at the same time                  | Nothing                                            |
+
+- **Consequences.** Crowd features can be built before the crowd exists and stay hidden. The owner dashboard
+  (CC-177) shows each gate and its measured value. The admin console (CC-059) can replace the flag table later.
+
+### ADR-028 — Social graph and minors: friends first, circles second, follow last and adults only
+
+- **Status:** Accepted · 2026-10-17 ([PRODUCT_VISION.md](PRODUCT_VISION.md) §6.8 and §6.10, decision D13)
+- **Context.** Retention comes from people you know, and many players may be children. India's DPDP Act bars
+  tracking and behavioural monitoring of under 18s, and an open social graph exposes children to strangers.
+- **Decision.**
+  1. **Unknown age means minor.** Guests and accounts without a stated birth year get the under 18 defaults
+     (CC-152). The defaults ship before any social feature.
+  2. **Friends (mutual) come first, in Stage 2:** presence for friends only, direct challenge, turn-based games,
+     head to head records and a friends filter on leaderboards (CC-139, CC-052, CC-140). Duo Streaks follow in
+     Stage 3 (CC-213).
+  3. **Circles come second, in Stage 2** (CC-214, replacing CC-068 clubs). A circle is a private group of 2 to 50,
+     created and joined by a link that works well in WhatsApp. It has a circle board and a shared goal, with an
+     arena behind its gate (ADR-029). There is no public directory of circles.
+  4. **Circle safety rules.**
+     1. Circle names pass the name filter (ADR-022) and can be reported.
+     2. Owners can invite, remove and rename. Owners cannot see members' private profiles or message anyone.
+     3. A circle with any minor or unknown age member is a safe circle: members see only display names and
+        avatars, emotes are off, and the circle board shows a minor as "Player 4" to anyone who is not already
+        their friend.
+     4. A minor cannot own a circle of more than 10 people.
+     5. Teacher circles (Stage 3) use class codes and collect no student contact details.
+  5. **Follow (one way) comes last, in Stage 3, for adults only.** It is opt in per profile and private profiles are
+     allowed. Nobody can follow a minor or an unknown age account. CC-206 is cut down to a friends and circles feed,
+     and public follow is added only if top adult players ask for it.
+  6. Players talk through emotes and challenges, never free text or voice. Emotes are off for minors and guests
+     (CC-169).
+  7. Share cards never carry a minor's or a guest's username. A minor's card shows the avatar and "a ClassiCade
+     player".
+  8. Prerequisites, in order: public profile and avatars (CC-034), block, mute and report (CC-044), age signal and
+     defaults (CC-152), then challenges, then friends, then circles.
+  9. A verifiable parental consent step ships before 13 May 2027, when the remaining DPDP provisions apply.
+- **Consequences.** Social features wait for CC-152 and CC-044. Kabir (a minor chess player) is served safely but
+  is not a primary persona. The lawyer's review checks these rules against the DPDP Act.
+
+### ADR-027 — Ratings: chess only, Glicko-2, never reset
+
+- **Status:** Accepted · 2026-10-17 ([PRODUCT_VISION.md](PRODUCT_VISION.md) §6.3, decision D12. Built by CC-042
+  and CC-221)
+- **Context.** Rock Paper Scissors between people is mostly chance and Tic Tac Toe is solved. A rating on either
+  would not measure skill and would break the promise that results are fair.
+- **Decision.**
+  1. Only chess has a rating, using Glicko-2.
+  2. Only rated chess games between two people that count under ADR-021 change it. Bot games never do (ADR-025).
+  3. A rating is provisional, shown with a "?", for the first 10 games. It is seeded by a one-tap level pick
+     (CC-221).
+  4. The result card shows the change with its ± and the profile shows a rating graph.
+  5. The chess rating is never reset, like Lichess and Chess.com.
+  6. Seasons (CC-055) get a separate season rank that resets at the end of each season. The badge for the best
+     rank is kept.
+  7. Rock Paper Scissors and Tic Tac Toe get XP, series records and head to head results instead of a rating.
+- **Consequences.** Stage 1's "ratings" reads "chess rating". Quick match uses the rating window for chess only.
+  Anti-cheat signals (CC-060) matter once the rating carries status. The verdict from ADR-021 is reused.
+
+### ADR-026 — Coin economy: cosmetics and name changes only
+
+- **Status:** Accepted · 2026-10-17 ([PRODUCT_VISION.md](PRODUCT_VISION.md) §6.7, decision D4. Built by CC-142,
+  CC-143 and CC-156 in Stage 3)
+- **Context.** India's Online Gaming Act 2025 bans online money games, and coins that can be turned into money
+  count as stakes. Our promise is "No betting. No cash. Ever."
+- **Decision.**
+  1. Coins are earned by play only.
+  2. Coins are spent on cosmetics and name changes only.
+  3. Coins are never cashed out, transferred, traded, wagered, given as prizes or used to buy story levels.
+  4. No paid random rewards of any kind.
+  5. Streak freezes are free and are not a coin sink: one free freeze a week, earned by playing, and a player holds
+     at most 2 (CC-145).
+  6. Story mode gives no coins (ADR-024).
+  7. The lawyer reviews this decision before any payment ships.
+- **Consequences.** ROADMAP.md §5 is updated to match. Coins have fewer sinks, so the analytics watch coins earned
+  against coins spent, and more cosmetic sinks are added if balances grow too large.
+
+### ADR-025 — Bot identity and rewards
+
+- **Status:** Accepted · 2026-10-17 ([PRODUCT_VISION.md](PRODUCT_VISION.md) §6.2, decision D5. Built by CC-138,
+  CC-150 and CC-225)
+- **Context.** A solo visitor needs someone to play, so bots must sit in rooms. Bot games must not become an XP
+  machine, and no player may ever be fooled into thinking a bot is a person.
+- **Decision.**
+  1. Bots have their own identity kind and a character name. Every bot is labelled as a bot before the match
+     starts and during it. Bots are never disguised as people.
+  2. Bot games never count toward a rating or any leaderboard.
+  3. Bot games give XP and quest progress, within the ADR-021 caps. Each character counts as one opponent for the
+     10 games per pair per day cap, and bot games count toward the 20 games per player per hour cap.
+  4. At most 100 XP a day comes from bot matches. This budget is separate from the 150 XP a day quest cap.
+  5. Adaptive difficulty (CC-150) is disclosed. A label says "Rocky plays at your level", changes happen only
+     between matches, and settings has an off switch. For minors and unknown ages the level adapts only from the
+     last few results in the current session, and no profile is stored.
+  6. Rock Paper Scissors characters use commit and reveal (CC-225). Before the player chooses, the server sends a
+     SHA-256 hash of the character's throw plus a random salt. After the reveal the client checks the hash and
+     shows "Lock checked".
+- **Consequences.** The owner dashboard reports bot XP per player per day as a North Star guardrail. Whether
+  adaptive difficulty counts as behavioural monitoring under the DPDP Act goes to the lawyer's review.
 
 ### ADR-024 — Story mode "ClassiCade Quest"
 
-- **Status:** Accepted · 2026-10-17 (design in [story/STORY_MODE.md](story/STORY_MODE.md), CC-179; built from CC-187)
+- **Status:** Accepted · 2026-10-17, amended 2026-10-17 (design in [story/STORY_MODE.md](story/STORY_MODE.md), CC-179; built from CC-187)
 - **Decision.** A single player story across three districts (Paper Town, Grid City, The Kingdom) against character
   rivals built on the bots, with tutorials, bosses and 1 to 3 stars per level, scored on the server. The owner's
   decisions:
@@ -44,6 +149,15 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
      nothing is for sale, and Quest gives no coins.
   3. Story XP counts towards the player's level but not towards the weekly leaderboard. Story matches never count on
      any leaderboard.
+- **Amended · 2026-10-17** (accepted [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D3).
+  1. Story mode ships first as a **two-district slice**: Paper Town levels 1 to 4 as the tutorial, and The Kingdom
+     levels 1 to 4 as the real test. Grid City, the rest of The Kingdom and the finale follow in Stage 3, and only
+     after the slice meets the targets M1, M4 and M8. If it misses them, story work stops after the slice.
+  2. **Star rules reward reading the character, not luck.** For example "win after Rocky switches habit" or "win
+     three rounds in a row once you spot his tell". After each level Bit shows the character's habit, so a loss
+     teaches something.
+  3. Bit is drawn or finished by a person. The other characters may use AI assisted drafts with human cleanup,
+     under the licence and credits rules of CC-230.
 - **Consequences.** See STORY_MODE.md sections 6 and 7 for the data (`story_progress`, XP source `story`), URLs,
   private bot rooms and the build plan.
 
@@ -136,6 +250,23 @@ instant forfeits and endless short games against a friend or a second tab a free
 **Consequences.** One extra indexed query per player per match (`players.playerId, endedAt`). Old matches count.
 Limits are constants in one file, so tuning them is a one-line change with tests. Ratings (CC-042) can reuse the
 verdict.
+
+**Amended · 2026-10-17** (accepted [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D8).
+
+1. The caps stay on one server clock and do not move to the player's local time when days do (ADR-013 amendment),
+   because abuse limits need one clock. The vision words them as a rolling 24 hours per pair and the clock hour
+   per player. Today the pair cap counts per UTC day, and moving it to a rolling 24 hours is a code change for
+   CC-138.
+2. Bot rules from ADR-025 apply: each character counts as one opponent for the pair cap, bot games count toward
+   the hourly cap, and bot matches give at most 100 XP a day.
+
+### ADR-020 — Game shell: one match layout every game plugs into
+
+- **Status:** Accepted · 2026-10-17 (accepted with [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D2)
+- **Where:** [ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md) §2, from the two-browser match experience audit. Tickets
+  CC-157 to CC-178.
+- **Decision.** Accepted as designed. All three games move onto the shell in Stage 1, which closes the 6 P0 match
+  findings.
 
 ### ADR-019 — Requests between players are derived from the room view
 
@@ -326,6 +457,10 @@ score after a guest transfer is recomputed from this week's matches (scores only
 weekly entry is not lost, but a guest's quest XP from this week is not added). Leaderboards trust progression for
 XP; if progression is ever recomputed downwards, boards keep the higher value until a dedicated rebuild job exists.
 
+**Amended · 2026-10-17** (accepted [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D7). Weekly boards, and later
+leagues, reset on Monday at 00:00 India time instead of 00:00 UTC. The ISO week key ("2026-W42") stays, worked out
+in India time. Revisit if players from other regions grow. Built with CC-146. Until then the code uses UTC.
+
 ### ADR-014 — Player data follows the identity
 
 - **Status:** Accepted · 2026-10-16 (proposed in [CC-032](tickets/CC-032.md))
@@ -411,6 +546,11 @@ capped at 150 a day (see CC-089) and leaderboards are accounts-only (CC-053). A 
 
 **Alternatives.** Achievements awarding XP (rejected: feedback loops, harder to balance); computing everything on
 read from `matches` (rejected: grows with history; kept as the rebuild path for transfers instead).
+
+**Amended · 2026-10-17** (accepted [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D6). Daily streaks and daily
+quests move from the UTC day to the player's local day (CC-146). The time zone comes from the browser, a player can
+change it at most once in 7 days so it cannot be gamed, and India time is used when it is unknown. Until CC-146
+ships, days stay in UTC. The anti-farm caps stay on the server clock (ADR-021 amendment).
 
 ### ADR-011 — URL scheme: one canonical URL per screen, readable slugs, old URLs redirect
 
@@ -505,6 +645,25 @@ read from `matches` (rejected: grows with history; kept as the rebuild path for 
   - `packages/shared` — socket event names, constants, validation helpers used by both apps
     Legacy app stays at the repo root until CC-029 deletes it.
 - **Consequences:** One `npm install`, shared tooling (ESLint, Prettier, Vitest) at the root.
+
+### ADR-005 — Hosting
+
+- **Status:** Accepted · 2026-10-17 (accepted with [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D1. Built by
+  CC-028, CC-227 and CC-122)
+- **Context.** Needs WebSockets, low cost and simple ops. Render's free plan sleeps after 15 minutes without
+  traffic and takes about a minute to wake, which breaks the promise of playing within 10 seconds. Production runs
+  in Oregon on MongoDB Atlas M0, which allows 100 reads and writes a second before it throttles. Render has no
+  Indian region. It offers Oregon, Ohio, Virginia, Frankfurt and Singapore.
+- **Decision.**
+  1. Render, in the Singapore region, on an always-on paid instance.
+  2. MongoDB Atlas on a paid tier in the same region as the app, so every move does not cross an ocean.
+  3. A staging environment with its own Atlas cluster (CC-122).
+  4. Hosting in Mumbai elsewhere (for example Fly.io, or Atlas on AWS Mumbai) is the next step if the latency
+     measured from India after the move stays above 150 ms a round trip.
+  5. The app stays in a container, so a later move stays cheap.
+- **Consequences.** A monthly cost of roughly US$20 to US$75 plus staging (an estimate, check the live pricing pages
+  first). Moving region moves the database too, so the move needs a runbook in DEPLOYMENT.md. Time to first byte and
+  largest contentful paint are measured from India before and after the move.
 
 ### ADR-000 — Server-authoritative game model
 

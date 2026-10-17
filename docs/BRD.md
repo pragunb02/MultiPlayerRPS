@@ -3,8 +3,8 @@
 |              |                |
 | ------------ | -------------- |
 | Owner        | Pragun Bhutani |
-| Status       | Draft v0.1     |
-| Last updated | 2026-10-16     |
+| Status       | Draft v0.2     |
+| Last updated | 2026-10-17     |
 
 ## 1. Vision & mission
 
@@ -13,6 +13,12 @@
 
 ClassiCade is a casual, social, skill-based gaming platform: instant multiplayer, zero install, playable on any device,
 with fair competition and reasons to return daily.
+
+**Our promise: No betting. No cash. Ever.** No real money play, no coins that turn into money, no prizes paid in coins.
+
+**Product vision.** The accepted [PRODUCT_VISION.md](PRODUCT_VISION.md) (accepted by the owner on 17 October 2026)
+sets who we build for first, the order of work and the metrics. Where this document and the vision differ, the
+vision's section 10 decisions (D9, D10) have been applied here.
 
 ## 2. Problem & opportunity
 
@@ -40,20 +46,21 @@ with fair competition and reasons to return daily.
 
 ## 5. Business objectives
 
-| ID   | Objective                               | Target (12 months post-launch)                     |
-| ---- | --------------------------------------- | -------------------------------------------------- |
-| BO-1 | Launch a public, stable, secure product | Stage 1 live, 99.5% uptime                         |
-| BO-2 | Build an engaged player base            | 10k WAU; D7 retention ≥ 20%                        |
-| BO-3 | Organic growth through sharing          | Viral coefficient ≥ 0.3                            |
-| BO-4 | Validate monetization                   | ≥ 2% free→paid; revenue covers infra costs         |
-| BO-5 | Scalable game catalog                   | New game addable in ≤ 2 weeks via engine interface |
+| ID   | Objective                               | Target (12 months post-launch)                                                                                                                                                       |
+| ---- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BO-1 | Launch a public, stable, secure product | Stage 1 live, 99.5% uptime                                                                                                                                                           |
+| BO-2 | Build an engaged player base            | 10k weekly players (a Stage 3 or 4 goal). Day 7 return of 20% or more is a Stage 3 stretch goal. Stages 1 and 2 use the targets in [PRODUCT_VISION.md](PRODUCT_VISION.md) §7.2 (D10) |
+| BO-3 | Organic growth through sharing          | Viral coefficient ≥ 0.3                                                                                                                                                              |
+| BO-4 | Validate monetization                   | Revenue covers infra costs, supporter conversion measured. 2% free to paid stays a Stage 3 goal for Plus (D9)                                                                        |
+| BO-5 | Scalable game catalog                   | New game addable in ≤ 2 weeks via engine interface                                                                                                                                   |
 
 ## 6. Business model
 
 - **Free core forever** — playing is never paywalled.
-- **ClassiCade Plus (subscription):** ad-free, unlimited analysis & replays, premium bots, exclusive themes, profile cosmetics.
-- **Cosmetics store:** board skins, piece sets, emotes, avatar frames. _Cosmetic only — never pay-to-win._
-- **Ads (free tier):** light, non-intrusive; optional rewarded ads between matches; never mid-game.
+- **Supporter badge first (Stage 3):** a "Founder" frame that unlocks nothing else, as the first revenue test.
+- **ClassiCade Plus (subscription, Stage 3):** deeper chess review, extended stats, exclusive cosmetic themes and circle hosting perks. Never story chapters, early story access, score modes or any game or opponent.
+- **Cosmetics store:** board skins, piece sets, emotes, avatar frames. _Cosmetic only — never pay-to-win._ Coins buy cosmetics and name changes only, and are never cashed out, traded, wagered or given as prizes (ADR-026).
+- **No ads in Stages 1 and 2** (D9). Ad revenue per Indian player is low at our size and ads hurt first impressions. If ads ever come later, they show only at natural breaks, rewarded ads stay optional, and never mid-game.
 - **B2B:** private branded tournaments/events for companies, schools, colleges.
 - **Later:** sponsored tournaments, creator partnerships.
 
@@ -73,7 +80,7 @@ with fair competition and reasons to return daily.
 
 ## 8. Success metrics (KPIs)
 
-- **North star:** Weekly active players with ≥ 3 completed matches.
+- **North Star:** Weekly Returning Players (WRP), players with a day of real play on 3 or more different local days in a week. A day of real play means finishing a counted match (against a person or a character), the daily puzzle or a story level. Guardrails reported beside it every week: the share of WRP who played a person that week (25% in phase 1, 40% in phase 2), the share of WRP who are accounts, and bot XP per player per day. Details in [PRODUCT_VISION.md](PRODUCT_VISION.md) §7.1.
 - **Engagement:** D1 / D7 / D30 retention; matches per user per day; time-to-first-match (< 10 s).
 - **Growth:** invites sent → accepted conversion; viral coefficient; organic/SEO traffic.
 - **Monetization:** guest→registered conversion; free→paid conversion; ARPU; store revenue.
@@ -82,15 +89,15 @@ with fair competition and reasons to return daily.
 
 ## 9. Stages (business view)
 
-| Stage            | Business outcome                                                                       |
-| ---------------- | -------------------------------------------------------------------------------------- |
-| 0 — Foundation   | Codebase is secure, structured, tested, deployable. No public launch yet.              |
-| 1 — MVP launch   | Public launch: 3 polished games, invite links, guest play, bots, ratings, legal pages. |
-| 2 — Retention    | Matchmaking, friends, achievements, seasons, replays, admin & analytics.               |
-| 3 — Monetization | Plus subscription, cosmetics store, light ads.                                         |
-| 4 — Scale        | More games, tournaments, clubs, B2B, native apps, AI coach.                            |
+| Stage            | Business outcome                                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — Foundation   | Codebase is secure, structured, tested, deployable. No public launch yet.                                                                                        |
+| 1 — MVP launch   | Public launch: 3 polished games, invite links, guest play, a labelled character for each game as the main Play button, pass and play, chess rating, legal pages. |
+| 2 — Retention    | Matchmaking, friends, achievements, seasons, replays, admin & analytics.                                                                                         |
+| 3 — Monetization | Supporter badge, then Plus subscription and cosmetics store. Seasons, leagues and Ludo.                                                                          |
+| 4 — Scale        | More games, tournaments, clubs, B2B, native apps, AI coach.                                                                                                      |
 
-Detailed product scope: [PRD.md](PRD.md). Execution: [BACKLOG.md](BACKLOG.md).
+Detailed product scope: [PRD.md](PRD.md). Order of work and metrics: [PRODUCT_VISION.md](PRODUCT_VISION.md). Execution: [BACKLOG.md](BACKLOG.md).
 
 ## 10. Constraints & assumptions
 
@@ -112,4 +119,4 @@ Detailed product scope: [PRD.md](PRD.md). Execution: [BACKLOG.md](BACKLOG.md).
 
 ## 12. Out of scope (for now)
 
-Real-money gaming/betting, crypto/NFTs, user-generated games, native apps before Stage 4.
+Real-money gaming/betting (never, not just for now), crypto/NFTs, user-generated games, native apps before Stage 4.

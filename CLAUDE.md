@@ -10,18 +10,19 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 
 ## Where things are tracked
 
-| File                                         | Purpose                                                                                          | Update when                     |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------- |
-| [docs/BRD.md](docs/BRD.md)                   | Business requirements: vision, users, business model, KPIs                                       | Business direction changes      |
-| [docs/PRD.md](docs/PRD.md)                   | Product requirements per stage, with requirement IDs (`FR-*`, `NFR-*`)                           | Scope of a feature changes      |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Current vs. target architecture                                                                  | Structure changes               |
-| [docs/BACKLOG.md](docs/BACKLOG.md)           | **Ticket board** — every task as `CC-###` with type, priority, status                            | Tickets added/started/completed |
-| [docs/tickets/](docs/tickets/)               | One file per non-trivial ticket (`CC-###.md`) from `TEMPLATE.md`                                 | Ticket started / progressed     |
-| [docs/PROGRESS.md](docs/PROGRESS.md)         | Current phase, in-flight work, dated changelog                                                   | **Every working session**       |
-| [docs/DECISIONS.md](docs/DECISIONS.md)       | Architecture/product decision records (ADRs)                                                     | A decision is made or reversed  |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)     | **Production**: Render settings, env vars, pre/post-merge checks, rollback, incidents            | Deploy setup changes            |
-| [docs/ENGINEERING.md](docs/ENGINEERING.md)   | **How to write code**: layers, principles, patterns, coding/testing standards, dependency policy | Standards change                |
-| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | Audit findings (`BUG-*`, `SEC-*`, `DEBT-*`)                                                      | Issue found or fixed            |
+| File                                             | Purpose                                                                                          | Update when                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------- |
+| [docs/BRD.md](docs/BRD.md)                       | Business requirements: vision, users, business model, KPIs                                       | Business direction changes      |
+| [docs/PRD.md](docs/PRD.md)                       | Product requirements per stage, with requirement IDs (`FR-*`, `NFR-*`)                           | Scope of a feature changes      |
+| [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) | Accepted product vision: personas, loops, phases and order of work, metrics (North Star WRP)     | Direction changes               |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)     | Current vs. target architecture                                                                  | Structure changes               |
+| [docs/BACKLOG.md](docs/BACKLOG.md)               | **Ticket board** — every task as `CC-###` with type, priority, status                            | Tickets added/started/completed |
+| [docs/tickets/](docs/tickets/)                   | One file per non-trivial ticket (`CC-###.md`) from `TEMPLATE.md`                                 | Ticket started / progressed     |
+| [docs/PROGRESS.md](docs/PROGRESS.md)             | Current phase, in-flight work, dated changelog                                                   | **Every working session**       |
+| [docs/DECISIONS.md](docs/DECISIONS.md)           | Architecture/product decision records (ADRs)                                                     | A decision is made or reversed  |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)         | **Production**: Render settings, env vars, pre/post-merge checks, rollback, incidents            | Deploy setup changes            |
+| [docs/ENGINEERING.md](docs/ENGINEERING.md)       | **How to write code**: layers, principles, patterns, coding/testing standards, dependency policy | Standards change                |
+| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)     | Audit findings (`BUG-*`, `SEC-*`, `DEBT-*`)                                                      | Issue found or fixed            |
 
 ### ID scheme
 

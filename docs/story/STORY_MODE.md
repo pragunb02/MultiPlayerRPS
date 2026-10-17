@@ -1,7 +1,7 @@
 # ClassiCade Quest: story mode design (CC-179)
 
 Written 2026-10-17. Design only, no code. It builds on the bot strategies on branch `cc-038-bot-strategies`
-(`packages/games/src/bots/`), the game shell (ADR-020, proposed, see [docs/ux/MATCH_EXPERIENCE.md](../ux/MATCH_EXPERIENCE.md)),
+(`packages/games/src/bots/`), the game shell (ADR-020, accepted, see [docs/ux/MATCH_EXPERIENCE.md](../ux/MATCH_EXPERIENCE.md)),
 the visual identity (ADR-012), the gamification rules (ADR-013) and player data that follows the identity (ADR-014).
 Its decision record is ADR-024 (story mode), accepted with the owner's decisions in section 7. Tickets: CC-187 to
 CC-202.
@@ -1384,3 +1384,18 @@ These replace the open questions. ADR-024 is accepted with them.
    (no store bundle).
 3. **Story XP counts towards the player's level, but not towards the weekly leaderboard,** so a new player cannot top
    a week with one time rewards. Story matches never count on any leaderboard (bot matches, ADR-025).
+
+Added when the owner accepted [PRODUCT_VISION.md](../PRODUCT_VISION.md) on 17 October 2026 (decision D3, ADR-024
+amended):
+
+4. **A two-district slice ships first:** Paper Town levels 1 to 4 as the tutorial and The Kingdom levels 1 to 4 as
+   the real test, in Stage 2. Grid City (CC-198), the rest of The Kingdom (CC-199) and the finale (CC-200) follow in
+   Stage 3, and only after the slice meets M1, M4 and M8. If it misses them, story work stops after the slice and
+   the art budget goes to cosmetics.
+5. **Star rules reward reading the character, not luck.** Examples: "win after Rocky switches habit" and "win three
+   rounds in a row once you spot his tell". After each level Bit shows the character's habit, so a loss teaches
+   something. The Paper Town star columns in section 4 ("within 3 rounds", "lose no round") are rewritten to this
+   rule in CC-188 and CC-197.
+6. **Art for the slice:** Bit plus four characters, five poses each, about 25 assets. Bit is drawn or finished by a
+   person, because Bit is the brand. The other characters may use AI assisted drafts with human cleanup, under the
+   licence and credits rules tracked in CC-230.
