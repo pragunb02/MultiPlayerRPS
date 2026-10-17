@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
 import { GameArt } from "../../art/games/GameArt.jsx";
@@ -6,13 +6,15 @@ import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
+import { lazyBoard } from "../../games/lazyBoard.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useGames } from "../../hooks/useGames.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./HomePage.module.css";
 
-// The hero scene is the biggest picture in the app: it loads in its own chunk, after the page itself.
-const HeroArt = lazy(() => import("../../art/HeroArt.jsx").then((m) => ({ default: m.HeroArt })));
+// The hero scene is the biggest picture in the app: it loads in its own chunk, after the page itself. Like a board,
+// it waits quietly when its file fails because the page is reloading or leaving (lazyBoard.js, CC-184 F-8).
+const HeroArt = lazyBoard(() => import("../../art/HeroArt.jsx"), "HeroArt");
 
 /** Landing page: what ClassiCade is, the game catalog, and one click to start playing as a guest. */
 export function HomePage() {
