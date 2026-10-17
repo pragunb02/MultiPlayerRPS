@@ -17,7 +17,7 @@
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
 | S0 Foundation   | 🟡 In progress | 59 / 79      |
-| S1 MVP launch   | 🟡 Started     | 22 / 92      |
+| S1 MVP launch   | 🟡 Started     | 27 / 98      |
 | S2 Retention    | ⚪ Not started | 3 / 55       |
 | S3 Monetization | ⚪ Not started | 0 / 10       |
 | S4 Scale        | ⚪ Not started | 0 / 6        |
@@ -32,13 +32,14 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 1    | 1           | 17    |
-| Bugs (BUG)       | 11   | 0           | 18    |
+| Bugs (BUG)       | 11   | 0           | 26    |
 | Tech debt (DEBT) | 7    | 1           | 12    |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-18 — CC-138, CC-221, CC-225 — Play a computer character from the lobby (#61): Rocky, Pip and Queen Vee seated at once, always labelled, sealed RPS throws checked in the browser, at most 3 computer games, one chess search at a time server-wide, bot XP capped at 100 a day and kept off every board. BUG-32 to BUG-39 found and fixed along the way.
 - 2026-10-18 — Board sync — Set ✅ for tickets merged without a board update: CC-107, CC-116, CC-117 (#57), CC-162, CC-164, CC-170 (#53), CC-180 to CC-182 (#51), CC-183 (#63), CC-232 (#62), CC-233 (#64); SEC-13, SEC-15, SEC-16 and BUG-24 fixed, SEC-17 in progress (CC-245). 🟦 for the tickets builders are on: CC-036, CC-158 to CC-160, CC-207, CC-208 (#67), CC-138 (#61), CC-184, CC-203 (#65), CC-236 to CC-239, CC-241, CC-244, CC-245. New tickets CC-248 to CC-253 from the data inventory's findings (CC-241, #70).
 - 2026-10-18 — CC-233 — Owner analytics console at /admin from existing data (#64): active players, games, guests and conversion (legacy first logins counted apart), cohorts, busiest hours; admin allowlist ADMIN_ACCOUNT_IDS, groups under 5 hidden.
 - 2026-10-18 — CC-183 — Accessibility fixes from the axe audit (#63): chess grid semantics, page changes announced and focused, axe checks on every screen in CI.

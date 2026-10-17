@@ -100,6 +100,14 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | BUG-27 | 🔴     | The opponent closes the tab: only "disconnected" in the player list, no countdown and no sound                                                 | `Seats`, `RoomPage.jsx` (UX audit A6)                                  | CC-158, CC-036 |
 | BUG-28 | 🔴     | A first win fires five toasts at once, covering most of a phone screen including the result                                                    | `ProgressToasts.jsx`, `GamificationToasts.jsx` (UX audit A9)           | CC-099         |
 | BUG-29 | ✅     | Coming back just as a room closes could answer "Room not found" instead of the reason it closed (two races between closing and reading a room) | `persistence/roomDao.js` closed-room lookup, `roomComponent.js` `load` | CC-204         |
+| BUG-32 | ✅     | The three-games-against-computers limit could be passed with many starts at once and with rematches                                            | `botComponent.js` playComputer, acceptRematch                          | CC-138         |
+| BUG-33 | ✅     | Strong chess searches had no server-wide limit and could block the event loop for every player                                                 | `domain/bots/thinkingQueue.js`                                         | CC-138         |
+| BUG-34 | ✅     | A dropped computer plan was never made again until something else changed in the room                                                          | `botDriver.js` resume, housekeeping sweep                              | CC-138         |
+| BUG-35 | ✅     | Bot XP reached the all-time XP board, and quest bonuses from bot games reached both XP boards                                                  | `leaderboardComponent.js`, progress `unrankedXp`                       | CC-138         |
+| BUG-36 | ✅     | A guest's bot XP moved into an account without the account's 100 XP a day applied                                                              | `matchComponent.js` creditAfterMove                                    | CC-138         |
+| BUG-37 | ✅     | The browser's lock check did not compare the reveal with the lock shown before the round                                                       | `lib/sealCheck.js`, `useSealChecks`                                    | CC-138         |
+| BUG-38 | ✅     | Match history did not label computer opponents                                                                                                 | `matchComponent.js` listForPlayer, profile                             | CC-138         |
+| BUG-39 | ✅     | `useRoom` could replace a newer room view with an older answer                                                                                 | `useRoom.js` revision check                                            | CC-138         |
 
 ## Tech debt (`DEBT-*`)
 
