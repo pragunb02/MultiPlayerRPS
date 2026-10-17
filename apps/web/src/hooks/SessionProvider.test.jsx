@@ -285,6 +285,28 @@ describe("SessionProvider", () => {
       expect(socket.isConnected()).toBe(false);
     });
 
+    it("asks the server after this tab's own change when another tab spoke meanwhile", async () => {
+      let answerLogin;
+      const api = fakeApi({
+        getSession: vi.fn().mockResolvedValueOnce(GUEST).mockResolvedValue(undefined),
+        login: vi.fn(() => new Promise((resolve) => (answerLogin = resolve))),
+      });
+      const { sessionBroadcast } = setup(api);
+      await screen.findByText("ready");
+      const loggingIn = session.login({ email: "riya@example.com", password: "x" });
+
+      act(() => sessionBroadcast.receive());
+      const askedDuringLogin = api.getSession.mock.calls.length;
+      await act(async () => {
+        answerLogin({ identity: USER });
+        await loggingIn;
+      });
+
+      expect(askedDuringLogin).toBe(1);
+      expect(await screen.findByText("anonymous")).toBeInTheDocument();
+      expect(api.getSession).toHaveBeenCalledTimes(2);
+    });
+
     it("keeps a working socket when the session is still the same player", async () => {
       const api = fakeApi({ getSession: vi.fn().mockResolvedValue(USER) });
       const { socket, sessionBroadcast } = setup(api);

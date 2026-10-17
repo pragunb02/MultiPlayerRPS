@@ -88,6 +88,7 @@ describe("session broadcast between tabs (CC-115)", () => {
     const off = broadcast.onChange(heard);
     broadcast.announce();
     off();
+    broadcast.close();
 
     expect(heard).not.toHaveBeenCalled();
   });

@@ -4,6 +4,11 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 ## Resolution notes
 
+- **2026-10-18 — CC-115, CC-234:** BUG-20 fixed. Socket.IO does not reconnect after the server ends a socket on
+  purpose, and the web app never asked who it was after that, so other tabs and remotely signed out devices kept
+  their old screen. A tab now asks `GET /api/session` again when the server ends its socket or refuses it as signed
+  out, and after another tab of the browser says (over BroadcastChannel, with no identity in the message) that it
+  signed up, logged in, logged out or started a guest (ADR-033).
 - **2026-10-17 — CC-204:** BUG-29 fixed. Two races ended in "Room not found":
   1. The closed-room lookup read the record before the room being closed, so a close that finished between the two
      reads was missed. It now reads the closing room first. A shared DAO contract test closes a room at that moment.
@@ -85,7 +90,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | BUG-17 | 🔴     | A game starts after the host has left the waiting room                                                                                         | `roomComponent.js` join                                                | CC-112         |
 | BUG-18 | ✅     | A guest who signs up after a game cannot rematch: seats in finished rooms did not follow the identity                                          | `roomComponent.js` `transferPlayer`                                    | CC-113         |
 | BUG-19 | 🔴     | Logging out on one device gives up waiting seats held on all devices                                                                           | `server.js` session end, `roomComponent.js`                            | CC-114         |
-| BUG-20 | 🔴     | Other tabs go dead after signing in or out                                                                                                     | `SessionProvider.jsx`, `socket.js`                                     | CC-115         |
+| BUG-20 | ✅     | Other tabs go dead after signing in or out                                                                                                     | `SessionProvider.jsx`, `socket.js`                                     | CC-115         |
 | BUG-21 | 🔴     | The chess clock shows "0:010.0" just under 10 seconds                                                                                          | `useChessClocks.js` `formatClock`                                      | CC-120         |
 | BUG-22 | 🔴     | Games with an idle opponent never end                                                                                                          | `roomComponent.js`, `chessEngine.js`                                   | CC-036         |
 | BUG-23 | 🔴     | The comment says a rematch alternates who moves first, but the first mover comes from the seed                                                 | `roomComponent.js` `requestRematch`                                    | CC-091         |
