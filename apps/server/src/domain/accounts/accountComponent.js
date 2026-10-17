@@ -66,13 +66,13 @@ export function createAccountComponent({
   assertDefined(legacyPasswords, "legacyPasswords");
 
   /**
-   * Creates the account of a legacy player who just proved their password: same email, the password re-hashed
-   * with scrypt, and the first free username valid under today's rules. Legacy XP is not imported (it was
-   * client-writable, SEC-01). If a parallel login migrated the same email first, that account is used, but only
-   * when this password is also the account's: the old app could hold two rows with two passwords for one address.
+   * Creates the account of a legacy player who just proved their password: same email, the password hashed again
+   * with scrypt (the hash was made while the old password was checked), and the first free username valid under
+   * today's rules. Legacy XP is not imported (it was client-writable, SEC-01). If a parallel login migrated the
+   * same email first, that account is used, but only when this password is also the account's: the old app could
+   * hold two rows with two passwords for one address.
    */
-  async function migrateLegacyUser(legacy, { email, password }, now) {
-    const passwordHash = await passwordHasher.hash(password);
+  async function migrateLegacyUser(legacy, { email, password, passwordHash }, now) {
     for (const username of usernameCandidates(normaliseLegacyUsername(legacy.username), USERNAME_ATTEMPTS)) {
       try {
         return await accountAccessor.create({ username, email, passwordHash, createdAt: now });
@@ -93,38 +93,57 @@ export function createAccountComponent({
   }
 
   /**
-   * The first legacy row whose password matches, checked one after another. There is almost always one row. There
-   * are more only for an address the old app stored twice in different cases.
+   * The one legacy row a login checks. The old app could hold several rows for one address that differ only in
+   * case. Checking each would cost one bcrypt per row, and the extra time would tell those addresses apart. So
+   * exactly one is checked: the row written in the same capitals as the player types it, or else the oldest.
+   *
+   * @param {ReadonlyArray<Readonly<import("../../data/legacyUserAccessor.js").LegacyUser>>} legacyUsers  oldest first
+   * @param {string} typed  the email as typed, with spaces and Unicode forms folded but capitals kept
    */
-  async function legacyRowOpenedBy(legacyUsers, password) {
-    for (const legacy of legacyUsers) {
-      if (await legacyPasswords.verify(password, legacy.passwordHash)) {
-        return [legacy];
-      }
-    }
-    return [];
+  function rowToCheck(legacyUsers, typed) {
+    const exact = legacyUsers.filter((legacy) => legacy.email.normalize("NFKC").trim() === typed);
+    return [...exact, ...legacyUsers].slice(0, 1);
   }
 
   /**
-   * The email has no account yet. Whatever happens here, one bcrypt and one scrypt run, the same as for an
-   * account's email, so the time taken says nothing about who played here.
+   * The email has no account yet. Every path here runs one bcrypt and one scrypt at the same time, the same as
+   * for an account's email, so the time taken says nothing about who played here. When there is a row, the scrypt
+   * is the hash the new account will keep, which costs the same as checking one.
    *
    * @returns {Promise<Readonly<import("../../data/accountAccessor.js").Account>>}
    */
-  async function loginLegacyUser(normalised, legacyUsers, now) {
-    if (legacyUsers.length === 0) {
+  async function loginLegacyUser(normalised, legacy, typed, now) {
+    const [row] = rowToCheck(legacy.users, typed);
+    if (row === undefined) {
       await Promise.all([
         passwordHasher.verifyAgainstDummy(normalised.password),
         legacyPasswords.verifyAgainstDummy(normalised.password),
       ]);
+      throw new UnauthorizedError(INVALID_LOGIN, legacy.failure);
+    }
+    const [opened, passwordHash] = await Promise.all([
+      legacyPasswords.verify(normalised.password, row.passwordHash),
+      passwordHasher.hash(normalised.password),
+    ]);
+    if (!opened) {
       throw new UnauthorizedError(INVALID_LOGIN);
     }
-    const [opened] = await legacyRowOpenedBy(legacyUsers, normalised.password);
-    if (opened === undefined) {
-      await passwordHasher.verifyAgainstDummy(normalised.password);
-      throw new UnauthorizedError(INVALID_LOGIN);
+    return migrateLegacyUser(row, { ...normalised, passwordHash }, now);
+  }
+
+  /**
+   * The legacy rows for an email. The legacy store is needed only for an email without an account, so when it
+   * fails, an account's login goes on, and any other login answers the usual failure after the usual work. The
+   * failure travels as the cause, which the login route logs (CC-245).
+   *
+   * @returns {Promise<{ users: ReadonlyArray<Readonly<import("../../data/legacyUserAccessor.js").LegacyUser>>, failure?: { cause: unknown } }>}
+   */
+  async function legacyRowsOf(email) {
+    try {
+      return { users: await legacyUserAccessor.findByEmail(email) };
+    } catch (err) {
+      return { users: [], failure: { cause: err } };
     }
-    return migrateLegacyUser(opened, normalised, now);
   }
 
   return Object.freeze({
@@ -175,12 +194,13 @@ export function createAccountComponent({
       } catch {
         throw new UnauthorizedError(INVALID_LOGIN);
       }
-      const [[account], legacyUsers] = await Promise.all([
+      const [[account], legacy] = await Promise.all([
         accountAccessor.findByEmail(normalised.email),
-        legacyUserAccessor.findByEmail(normalised.email),
+        legacyRowsOf(normalised.email),
       ]);
       if (account === undefined) {
-        return signInOf(await loginLegacyUser(normalised, legacyUsers, now));
+        const typed = String(email).normalize("NFKC").trim();
+        return signInOf(await loginLegacyUser(normalised, legacy, typed, now));
       }
       const [matches] = await Promise.all([
         passwordHasher.verify(normalised.password, account.passwordHash),

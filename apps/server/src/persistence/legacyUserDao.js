@@ -23,7 +23,7 @@ export function createLegacyUserDao({ connection }) {
      * every row it matches, so the login can open the one whose password fits (CC-245).
      *
      * @param {string} email  normalised (see `normaliseEmail`)
-     * @returns {Promise<LegacyUserDoc[]>} the rows with a password, or an empty list
+     * @returns {Promise<LegacyUserDoc[]>} the rows with a password, oldest first, or an empty list
      */
     async listByEmail(email) {
       const docs = await users()
@@ -31,6 +31,7 @@ export function createLegacyUserDao({ connection }) {
           { email: { $regex: `^\\s*${escapeRegExp(email)}\\s*$`, $options: "i" } },
           { projection: { _id: 0, username: 1, email: 1, password: 1 } },
         )
+        .sort({ _id: 1 })
         .limit(MAX_ROWS_PER_EMAIL)
         .toArray();
       return docs

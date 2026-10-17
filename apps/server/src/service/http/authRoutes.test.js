@@ -202,6 +202,26 @@ describe("auth routes", () => {
     expect(login.status).toBe(200);
   });
 
+  // A store failing behind a login answers the usual 401, so it says nothing about the email, but it is logged
+  // as an error so it is not missed (CC-245).
+  it("logs a legacy store failure behind a login that answered the usual 401", async () => {
+    const failing = {
+      filter() {
+        throw new Error("legacy store unavailable");
+      },
+    };
+    server = await startTestServer({ legacyUsers: failing });
+    await post("/api/auth/signup", RIYA).catch(() => {});
+
+    const unknown = await post("/api/auth/login", { email: "nobody@example.com", password: RIYA.password });
+
+    expect(unknown.status).toBe(401);
+    expect(unknown.body.error.message).toBe("Invalid email or password");
+    const [logged] = server.find("a store failed behind a login, answered as a failed login");
+    expect(logged).toMatchObject({ level: 50, err: { message: "legacy store unavailable" } });
+    expect(JSON.stringify(logged)).not.toContain("nobody@example.com");
+  });
+
   it("never logs passwords or emails", async () => {
     server = await startTestServer();
 

@@ -59,7 +59,7 @@ export function runLegacyUserDaoContract(createDao) {
     ]);
   });
 
-  it("returns every row that differs only in case, so each of those players can still log in", async () => {
+  it("returns every row that differs only in case, oldest first", async () => {
     const dao = await createDao([
       ...LEGACY_USERS,
       { ...LEGACY_USERS[1], username: "riya two", email: "riya@example.com" },
@@ -67,6 +67,6 @@ export function runLegacyUserDaoContract(createDao) {
 
     const found = await dao.listByEmail("riya@example.com");
 
-    expect(found.map((user) => user.username).sort()).toEqual(["Riya Sharma", "riya two"]);
+    expect(found.map((user) => user.username)).toEqual(["Riya Sharma", "riya two"]);
   });
 }

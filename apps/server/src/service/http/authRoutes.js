@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { normaliseEmail } from "../../models/credentials.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { UnauthorizedError, ValidationError } from "../../utils/errors.js";
+import { AppError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
 import { createLoginThrottle, LOGIN_THROTTLE } from "./loginThrottle.js";
 import { clientIpKey, createRateLimit } from "./rateLimits.js";
 import { establishAccountSession, requireIdentity } from "./session.js";
@@ -163,6 +163,11 @@ export function createAuthRoutes({
       loggedIn = await accountComponent.login({ email, password, now: now() });
     } catch (err) {
       if (err instanceof UnauthorizedError) loginThrottle.failed(attempt);
+      // A store that failed behind the login answers like a wrong password, so the answer says nothing about the
+      // email. The failure itself is logged, without the email, so it is not missed (CC-245).
+      if (err instanceof UnauthorizedError && err.cause !== undefined && !(err.cause instanceof AppError)) {
+        req.log.error({ err: err.cause }, "a store failed behind a login, answered as a failed login");
+      }
       throw err;
     }
     loginThrottle.succeeded(attempt);

@@ -167,15 +167,44 @@ describe("accountComponent", () => {
 
   // The time a login takes must not say whether the email has an account, a legacy row, or nothing (CC-245).
   describe("login does the same work for every email", () => {
-    /** Counts the slow steps: scrypt (hash or verify) and bcrypt, and which stores were read. */
+    const TWINS = [
+      { ...LEGACY_SAM, email: "twin@example.com" },
+      { ...LEGACY_SAM, username: "twin two", email: "Twin@Example.com" },
+      { ...LEGACY_SAM, username: "twin three", email: "TWIN@example.com" },
+    ];
+    const ALONE_MS = 250;
+
+    /**
+     * Counts the slow steps (scrypt, hash or verify, and bcrypt) and which stores were read. Every slow step also
+     * waits until a step of the other kind has started, and fails after a moment alone. So code that runs bcrypt and
+     * then scrypt one after the other fails, and only code that runs them at the same time passes.
+     */
     function counted({
-      legacyUsers = [LEGACY_SAM, { ...LEGACY_SAM, email: "corrupt@example.com", password: "x" }],
+      legacyUsers = [LEGACY_SAM, { ...LEGACY_SAM, email: "corrupt@example.com", password: "x" }, ...TWINS],
     } = {}) {
+      let legacyFails = false;
       const accountDao = createInMemoryAccountDao();
       const hasher = createPasswordHasher({ params: FAST });
       const work = { scrypt: 0, bcrypt: 0, accountReads: 0, legacyReads: 0 };
       const accountAccessor = createAccountAccessor({ accountDao });
       const legacyUserAccessor = legacyAccessor(legacyUsers);
+      let together = Promise.withResolvers();
+      let watching = false;
+      const startedBoth = () => work.scrypt > 0 && work.bcrypt > 0;
+      const slow =
+        (kind, run) =>
+        async (...args) => {
+          if (!watching) return run(...args);
+          work[kind] += 1;
+          if (startedBoth()) together.resolve();
+          await Promise.race([
+            together.promise,
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error(`${kind} ran alone, one after the other`)), ALONE_MS);
+            }),
+          ]);
+          return run(...args);
+        };
       const accounts = createAccountComponent({
         accountAccessor: {
           ...accountAccessor,
@@ -185,42 +214,42 @@ describe("accountComponent", () => {
           },
         },
         legacyUserAccessor: {
-          findByEmail: (email) => {
+          findByEmail: async (email) => {
             work.legacyReads += 1;
+            if (legacyFails) throw new Error("legacy store unavailable");
             return legacyUserAccessor.findByEmail(email);
           },
         },
         passwordHasher: {
           ...hasher,
-          hash: (password) => {
-            work.scrypt += 1;
-            return hasher.hash(password);
-          },
-          verify: (password, encoded) => {
-            work.scrypt += 1;
-            return hasher.verify(password, encoded);
-          },
-          verifyAgainstDummy: (password) => {
-            work.scrypt += 1;
-            return hasher.verifyAgainstDummy(password);
-          },
+          hash: slow("scrypt", (...args) => hasher.hash(...args)),
+          verify: slow("scrypt", (...args) => hasher.verify(...args)),
+          verifyAgainstDummy: slow("scrypt", (...args) => hasher.verifyAgainstDummy(...args)),
         },
         legacyPasswords: {
-          verify: (password, hash) => {
-            work.bcrypt += 1;
-            return LEGACY_PASSWORDS.verify(password, hash);
-          },
-          verifyAgainstDummy: (password) => {
-            work.bcrypt += 1;
-            return LEGACY_PASSWORDS.verifyAgainstDummy(password);
-          },
+          verify: slow("bcrypt", (...args) => LEGACY_PASSWORDS.verify(...args)),
+          verifyAgainstDummy: slow("bcrypt", (...args) => LEGACY_PASSWORDS.verifyAgainstDummy(...args)),
         },
       });
-      return { accounts, work };
+      const reset = () => {
+        Object.assign(work, { scrypt: 0, bcrypt: 0, accountReads: 0, legacyReads: 0 });
+        together = Promise.withResolvers();
+        watching = true;
+      };
+      /** Makes the legacy store fail from now on, once the account exists. */
+      const breakLegacy = () => {
+        legacyFails = true;
+      };
+      return { accounts, work, reset, breakLegacy };
     }
 
-    const reset = (work) => Object.assign(work, { scrypt: 0, bcrypt: 0, accountReads: 0, legacyReads: 0 });
     const ONE_OF_EACH = { scrypt: 1, bcrypt: 1, accountReads: 1, legacyReads: 1 };
+    const signedUpRiya = async (options) => {
+      const ctx = counted(options);
+      await ctx.accounts.signup({ ...RIYA, now: NOW });
+      ctx.reset();
+      return ctx;
+    };
 
     it.each([
       ["an account's email, wrong password", RIYA.email, "wrong password!"],
@@ -229,25 +258,36 @@ describe("accountComponent", () => {
       ["a legacy email, wrong password", LEGACY_SAM.email, "wrong password!"],
       ["a legacy email, right password", LEGACY_SAM.email, LEGACY_PASSWORD],
       ["a legacy row with a corrupt hash", "corrupt@example.com", "wrong password!"],
-    ])("reads both stores and runs one scrypt and one bcrypt for %s", async (_, email, password) => {
-      const { accounts, work } = counted();
-      await accounts.signup({ ...RIYA, now: NOW });
-      reset(work);
+      ["one of three legacy rows that differ only in case", "twin@example.com", "wrong password!"],
+      ["an email typed in capitals no legacy row has", "tWIN@example.com", "wrong password!"],
+    ])(
+      "reads both stores and runs one scrypt and one bcrypt at the same time for %s",
+      async (_, email, password) => {
+        const { accounts, work } = await signedUpRiya();
 
-      await accounts.login({ email, password, now: NOW }).catch(() => {});
+        const answer = await accounts.login({ email, password, now: NOW }).catch((err) => err);
 
-      expect(work).toEqual(ONE_OF_EACH);
-    });
+        // Either signed in, or the one failure. Anything else (such as a step that ran alone) fails the test.
+        expect(answer instanceof UnauthorizedError || answer.identity !== undefined).toBe(true);
+        expect(work).toEqual(ONE_OF_EACH);
+      },
+    );
 
     it("gives every failure the same answer", async () => {
-      const { accounts } = counted();
-      await accounts.signup({ ...RIYA, now: NOW });
+      const { accounts } = await signedUpRiya();
 
-      const answers = await Promise.all(
-        [RIYA.email, "nobody@example.com", LEGACY_SAM.email, "corrupt@example.com"].map((email) =>
-          accounts.login({ email, password: "wrong password!", now: NOW }).catch((err) => err),
-        ),
-      );
+      const answers = [];
+      for (const email of [
+        RIYA.email,
+        "nobody@example.com",
+        LEGACY_SAM.email,
+        "corrupt@example.com",
+        "twin@example.com",
+      ]) {
+        answers.push(
+          await accounts.login({ email, password: "wrong password!", now: NOW }).catch((err) => err),
+        );
+      }
 
       for (const answer of answers) {
         expect(answer).toBeInstanceOf(UnauthorizedError);
@@ -256,6 +296,40 @@ describe("accountComponent", () => {
           details: {},
         });
       }
+    });
+
+    // The legacy store is only needed for an email without an account (CC-245).
+    it("lets an account log in while the legacy store fails, after the same work", async () => {
+      const { accounts, work, breakLegacy } = await signedUpRiya();
+      breakLegacy();
+
+      const signedIn = await accounts.login({ email: RIYA.email, password: RIYA.password, now: NOW });
+
+      expect(signedIn.identity.displayName).toBe("Riya");
+      expect(work).toEqual(ONE_OF_EACH);
+    });
+
+    it("answers any other email the usual failure while the legacy store fails, keeping the cause for the logs", async () => {
+      const { accounts, work, breakLegacy } = await signedUpRiya();
+      breakLegacy();
+
+      const wrong = await accounts
+        .login({ email: RIYA.email, password: "wrong password!", now: NOW })
+        .catch((err) => err);
+      const unknown = await accounts
+        .login({ email: LEGACY_SAM.email, password: LEGACY_PASSWORD, now: NOW })
+        .catch((err) => err);
+
+      for (const answer of [wrong, unknown]) {
+        expect(answer).toBeInstanceOf(UnauthorizedError);
+        expect({ message: answer.message, details: answer.details }).toEqual({
+          message: "Invalid email or password",
+          details: {},
+        });
+      }
+      expect(unknown.cause).toEqual(new Error("legacy store unavailable"));
+      expect(work.scrypt).toBe(2);
+      expect(work.bcrypt).toBe(2);
     });
   });
 
@@ -420,35 +494,71 @@ describe("accountComponent", () => {
       expect(await accounts.login(samLogin)).toEqual(first);
     });
 
-    // Before CC-003 the old app stored emails as typed, so one address can have two rows (CC-245).
-    it("opens the legacy row whose password matches when two rows differ only in case", async () => {
+    // Before CC-003 the old app stored emails as typed, so one address can have several rows (CC-245). Each login
+    // checks exactly one of them, so the time taken stays the same: the row written in the capitals the player
+    // types, or else the oldest.
+    describe("two legacy rows that differ only in case", () => {
       const twin = {
         username: "sam two",
         email: "sam@example.com",
         password: bcrypt.hashSync("second password", 4),
       };
-      const { accounts } = setup({ legacyUsers: [LEGACY_SAM, twin] });
+      const legacyUsers = [LEGACY_SAM, twin];
 
-      const { identity } = await accounts.login({ ...samLogin, password: "second password" });
+      it("opens the row written in the capitals the player types", async () => {
+        const first = setup({ legacyUsers });
+        const second = setup({ legacyUsers });
 
-      expect(identity.displayName).toBe("sam_two");
-    });
+        const sam = await first.accounts.login({
+          email: "Sam@Example.com",
+          password: LEGACY_PASSWORD,
+          now: NOW,
+        });
+        const samTwo = await second.accounts.login({
+          email: "sam@example.com",
+          password: "second password",
+          now: NOW,
+        });
 
-    it("never signs one twin into the account the other just made with a different password", async () => {
-      const twin = {
-        username: "sam two",
-        email: "sam@example.com",
-        password: bcrypt.hashSync("second password", 4),
-      };
-      const { accounts } = setup({ legacyUsers: [LEGACY_SAM, twin] });
+        expect(sam.identity.displayName).toBe("Sam_Lee");
+        expect(samTwo.identity.displayName).toBe("sam_two");
+      });
 
-      const results = await Promise.allSettled([
-        accounts.login(samLogin),
-        accounts.login({ ...samLogin, password: "second password" }),
-      ]);
+      it("checks the oldest row when no row is written the way the player types", async () => {
+        const { accounts } = setup({ legacyUsers });
 
-      expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
-      expect(results.find((result) => result.status === "rejected").reason).toBeInstanceOf(UnauthorizedError);
+        await expect(
+          accounts.login({ email: "SAM@EXAMPLE.COM", password: "second password", now: NOW }),
+        ).rejects.toThrow(UnauthorizedError);
+        expect(
+          (await accounts.login({ email: "SAM@EXAMPLE.COM", password: LEGACY_PASSWORD, now: NOW })).identity
+            .displayName,
+        ).toBe("Sam_Lee");
+      });
+
+      it("never signs one twin into the account the other just made with a different password", async () => {
+        const { accounts } = setup({ legacyUsers });
+
+        const results = await Promise.allSettled([
+          accounts.login({ email: "Sam@Example.com", password: LEGACY_PASSWORD, now: NOW }),
+          accounts.login({ email: "sam@example.com", password: "second password", now: NOW }),
+        ]);
+
+        expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+        expect(results.find((result) => result.status === "rejected").reason).toBeInstanceOf(
+          UnauthorizedError,
+        );
+      });
+
+      // A known limit, written down in CC-245: one address, one account.
+      it("keeps the address for the twin who logged in first", async () => {
+        const { accounts } = setup({ legacyUsers });
+        await accounts.login({ email: "Sam@Example.com", password: LEGACY_PASSWORD, now: NOW });
+
+        await expect(
+          accounts.login({ email: "sam@example.com", password: "second password", now: NOW }),
+        ).rejects.toThrow(UnauthorizedError);
+      });
     });
 
     it("finds a legacy email stored with spaces around it", async () => {
