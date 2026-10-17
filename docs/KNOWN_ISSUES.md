@@ -4,6 +4,17 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 ## Resolution notes
 
+- **2026-10-17 — audit findings added and fixed ones closed:** the ROADMAP audit's findings SEC-12 to SEC-19, BUG-15
+  to BUG-23 and DEBT-13 to DEBT-20, and the match experience audit's A1, A2 and A4, A5, A6 and A9
+  ([ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md)) as BUG-24 to BUG-28, are now on this list.
+  - BUG-10 was reopened by the audit (rooms were still lost on every restart) and is fixed again by CC-101: rooms are
+    stored in MongoDB with explicit lifetimes (ADR-017).
+  - BUG-15, SEC-14 (CC-106, CC-110): rate limits key on the real client address through `TRUST_PROXY_HOPS`, and one
+    budget covers all of `/api`.
+  - BUG-18 (CC-113): seats in finished rooms follow a guest who signs in.
+  - SEC-18 (CC-119): reserved names and an abuse filter for usernames, legacy names and guest names (ADR-022).
+  - SEC-19 (CC-095): games that end too soon, or pass the daily and hourly limits, give no credit (ADR-021).
+
 - **2026-10-16 — CC-029:** production runs the new stack and the legacy app (`index.js`, `client/`, `models/`, `db.js`,
   `config.js`, `hw.txt`, its dependencies) is deleted. Every finding fixed in the new stack is now closed:
   - SEC-01, SEC-03 (CC-013): identity only from the server-side session; sockets need a valid session and an allowed origin.
@@ -36,25 +47,48 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | SEC-09 | ✅     | RPS choice is sent to the opponent before the result (visible in DevTools)                                                            | `index.js` `player1ChoiceRPS`/`player2ChoiceRPS`, `client/client.js` | CC-018         |
 | SEC-10 | ✅     | Logout destroys session without `req.logout()`; session cookie not `secure`/`sameSite`                                                | `client/routes/auth.js`, `index.js` session config                   | CC-010         |
 | SEC-11 | ✅     | Login error revealed whether an email is registered ("Incorrect email" vs "Incorrect password")                                       | `client/routes/passport.js`                                          | CC-009         |
+| SEC-12 | 🔴     | The MongoDB Atlas username and password are readable in the public git history (owner must rotate them)                               | commits 1156202 and 7e27cf2, legacy `db.js` and `index.js`           | CC-105         |
+| SEC-13 | 🔴     | Room flooding: any visitor can create rooms and open sockets without a cap and crash the single instance                              | `roomComponent.js` create and join, `gateway.js`                     | CC-107         |
+| SEC-14 | ✅     | No rate limit on most API reads (gamification, matches, progress)                                                                     | `routes.js`, gamification, match and progress routes                 | CC-110         |
+| SEC-15 | 🔴     | No password change and no "sign out everywhere"                                                                                       | `authRoutes.js`, `sessionRoutes.js`, `session.js`                    | CC-116         |
+| SEC-16 | 🔴     | An attacker can lock a known email out of login                                                                                       | `authRoutes.js` failed-login limit                                   | CC-117         |
+| SEC-17 | 🔴     | Signup reveals which emails have accounts (accepted trade-off until email verification)                                               | `accountComponent.js`                                                | CC-118         |
+| SEC-18 | ✅     | No reserved-name or abuse filter on public usernames                                                                                  | `credentials.js`, `leaderboardComponent.js`                          | CC-119         |
+| SEC-19 | ✅     | Wins and XP can be farmed through instant forfeits and repeated games against the same opponent                                       | `roomComponent.js`, `progression.js`, `leaderboardComponent.js`      | CC-095         |
 
 ## Bugs (`BUG-*`)
 
-| ID     | Status | Issue                                                                                                              | Location                                                    | Ticket         |
-| ------ | ------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | -------------- |
-| BUG-01 | ✅     | RPS button sends `"Scissor"`, server checks `"Scissors"` → Scissors never wins                                     | `client/index2.ejs:63`, `index.js` `determineRPSWinner`     | CC-007         |
-| BUG-02 | ✅     | RPS: single `winner` field overwritten each round; every round counts as a played game                             | `index.js` `determineRPSWinner`                             | CC-017, CC-018 |
-| BUG-03 | ✅     | TTT: `ticTacToeRooms[id]` overwritten, losing `player1`                                                            | `index.js:264`                                              | CC-019         |
-| BUG-04 | ✅     | TTT: `checkWinner` can announce twice when two lines complete on one move                                          | `client/script.js`                                          | CC-019         |
-| BUG-05 | ✅     | Chess: `gamesPlayed` incremented on join, not on game end; result never persisted                                  | `index.js` `joinChessGame`                                  | CC-017         |
-| BUG-06 | ✅     | Chess: `currentCode` per-connection closure; `move` echoes back to sender; `joinGame` start condition wrong        | `index.js:493-512`                                          | CC-020         |
-| BUG-07 | ✅     | Chess: clocks run client-side only (drift, trivially manipulable); "Reset" only resets local board                 | `client/public/js/index.js`                                 | CC-020         |
-| BUG-08 | ✅     | `levelUp` emitted but no client sends `registerUser` → level-up popups never fire                                  | `index.js:130,146`                                          | CC-017         |
-| BUG-09 | ✅     | Orphan events: client listens for `gameOverDisconnect`, emits `CancelTicTacToe`; server has neither                | `client/public/js/index.js:429`, `client/script.js:141`     | CC-015         |
-| BUG-10 | ✅     | No disconnect handling; rooms never deleted (memory leak); all rooms lost on restart                               | `index.js`                                                  | CC-015         |
-| BUG-11 | ✅     | Signup: duplicate username → unhandled Mongo error/500; uses non-standard status `299`                             | `client/routes/auth.js:65`                                  | CC-009         |
-| BUG-12 | ✅     | Share text says "Tic Tac Toe" for every game                                                                       | `client/client.js`, `client/chessJs.js`, `client/script.js` | CC-023         |
-| BUG-13 | ✅     | `handlers` for missing rooms throw (e.g. `rpsRooms[id]` undefined) — swallowed by try/catch, user gets no feedback | `index.js`                                                  | CC-015         |
-| BUG-14 | ✅     | Joining RPS emits `playersConnectedRPS` twice to the joiner (room broadcast + direct emit)                         | `index.js` `joinRPSGame`                                    | CC-015         |
+| ID     | Status | Issue                                                                                                                                                  | Location                                                           | Ticket         |
+| ------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | -------------- |
+| BUG-01 | ✅     | RPS button sends `"Scissor"`, server checks `"Scissors"` → Scissors never wins                                                                         | `client/index2.ejs:63`, `index.js` `determineRPSWinner`            | CC-007         |
+| BUG-02 | ✅     | RPS: single `winner` field overwritten each round; every round counts as a played game                                                                 | `index.js` `determineRPSWinner`                                    | CC-017, CC-018 |
+| BUG-03 | ✅     | TTT: `ticTacToeRooms[id]` overwritten, losing `player1`                                                                                                | `index.js:264`                                                     | CC-019         |
+| BUG-04 | ✅     | TTT: `checkWinner` can announce twice when two lines complete on one move                                                                              | `client/script.js`                                                 | CC-019         |
+| BUG-05 | ✅     | Chess: `gamesPlayed` incremented on join, not on game end; result never persisted                                                                      | `index.js` `joinChessGame`                                         | CC-017         |
+| BUG-06 | ✅     | Chess: `currentCode` per-connection closure; `move` echoes back to sender; `joinGame` start condition wrong                                            | `index.js:493-512`                                                 | CC-020         |
+| BUG-07 | ✅     | Chess: clocks run client-side only (drift, trivially manipulable); "Reset" only resets local board                                                     | `client/public/js/index.js`                                        | CC-020         |
+| BUG-08 | ✅     | `levelUp` emitted but no client sends `registerUser` → level-up popups never fire                                                                      | `index.js:130,146`                                                 | CC-017         |
+| BUG-09 | ✅     | Orphan events: client listens for `gameOverDisconnect`, emits `CancelTicTacToe`; server has neither                                                    | `client/public/js/index.js:429`, `client/script.js:141`            | CC-015         |
+| BUG-10 | ✅     | No disconnect handling; rooms never deleted (memory leak); all rooms lost on restart                                                                   | `index.js`                                                         | CC-015, CC-101 |
+| BUG-11 | ✅     | Signup: duplicate username → unhandled Mongo error/500; uses non-standard status `299`                                                                 | `client/routes/auth.js:65`                                         | CC-009         |
+| BUG-12 | ✅     | Share text says "Tic Tac Toe" for every game                                                                                                           | `client/client.js`, `client/chessJs.js`, `client/script.js`        | CC-023         |
+| BUG-13 | ✅     | `handlers` for missing rooms throw (e.g. `rpsRooms[id]` undefined) — swallowed by try/catch, user gets no feedback                                     | `index.js`                                                         | CC-015         |
+| BUG-14 | ✅     | Joining RPS emits `playersConnectedRPS` twice to the joiner (room broadcast + direct emit)                                                             | `index.js` `joinRPSGame`                                           | CC-015         |
+| BUG-15 | ✅     | Per-address rate limits keyed on the proxy's address, so real players shared one small budget                                                          | `app.js` (`trust proxy 1`), auth, session and leaderboard limiters | CC-106         |
+| BUG-16 | 🔴     | A database blip during the post-game work loses the finished match                                                                                     | `server.js` post-game tasks, `backgroundTasks.js`                  | CC-111         |
+| BUG-17 | 🔴     | A game starts after the host has left the waiting room                                                                                                 | `roomComponent.js` join                                            | CC-112         |
+| BUG-18 | ✅     | A guest who signs up after a game cannot rematch: seats in finished rooms did not follow the identity                                                  | `roomComponent.js` `transferPlayer`                                | CC-113         |
+| BUG-19 | 🔴     | Logging out on one device gives up waiting seats held on all devices                                                                                   | `server.js` session end, `roomComponent.js`                        | CC-114         |
+| BUG-20 | 🔴     | Other tabs go dead after signing in or out                                                                                                             | `SessionProvider.jsx`, `socket.js`                                 | CC-115         |
+| BUG-21 | 🔴     | The chess clock shows "0:010.0" just under 10 seconds                                                                                                  | `useChessClocks.js` `formatClock`                                  | CC-120         |
+| BUG-22 | 🔴     | Games with an idle opponent never end                                                                                                                  | `roomComponent.js`, `chessEngine.js`                               | CC-036         |
+| BUG-23 | 🔴     | The comment says a rematch alternates who moves first, but the first mover comes from the seed                                                         | `roomComponent.js` `requestRematch`                                | CC-091         |
+| BUG-24 | 🔴     | After a game "Play again", the biggest button, opens the lobby: the opponent waiting for a rematch is never told                                       | `RoomPage.jsx` result (UX audit A1)                                | CC-162         |
+| BUG-25 | 🔴     | Rematch requests and the series score are easy to miss: no countdown on a request, the series hidden during play                                       | `RematchPanel.jsx`, `RoomRequests.jsx` (UX audit A2, A4)           | CC-160, CC-161 |
+| BUG-26 | 🔴     | Your own connection drops or the server restarts: clicks do nothing visible and there is no connection indicator                                       | `useRoom.js`, `RoomPage.jsx` (UX audit A5)                         | CC-158         |
+| BUG-27 | 🔴     | The opponent closes the tab: only "disconnected" in the player list, no countdown and no sound                                                         | `Seats`, `RoomPage.jsx` (UX audit A6)                              | CC-158, CC-036 |
+| BUG-28 | 🔴     | A first win fires five toasts at once, covering most of a phone screen including the result                                                            | `ProgressToasts.jsx`, `GamificationToasts.jsx` (UX audit A9)       | CC-099         |
+| BUG-29 | 🔴     | Coming back just as a room closes can answer "Room not found" instead of the reason it closed (a race between the two reads of the closed-room lookup) | `persistence/roomDao.js` `hasClosed`, `getClosed`                  | CC-204         |
 
 ## Tech debt (`DEBT-*`)
 
@@ -72,3 +106,11 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | DEBT-10 | ✅     | Outdated libs: chess.js 0.10, Mongoose 6, Font Awesome 4 & 6 beta mixed                                                                                                                               | CC-031                         |
 | DEBT-11 | ✅     | 31 known vulnerabilities in dependencies (1 critical, 11 high), via Mongoose 6 driver deps, `ws`, `connect-mongodb-session@2`, nodemon                                                                | CC-073                         |
 | DEBT-12 | ✅     | `MONGO_URI_PRODUCTION` compatibility fallback (now logs a deprecation warning)                                                                                                                        | CC-074                         |
+| DEBT-13 | 🟡     | Comments use semicolons, dashes, jargon and ticket IDs as explanations. The rule and its lint check are done (CC-125), and `packages/` is reworded. The other folders are swept in CC-126             | CC-125, CC-126                 |
+| DEBT-14 | 🔴     | Result, close-reason, log-kind and XP-source values repeated as strings, two `resultFor` and two `viewerOutcome`                                                                                      | CC-127                         |
+| DEBT-15 | 🔴     | The server and the test app wire the domain separately                                                                                                                                                | CC-128                         |
+| DEBT-16 | 🔴     | Every web data hook repeats its own loading and error handling                                                                                                                                        | CC-129                         |
+| DEBT-17 | 🔴     | Persistence and time helpers duplicated, missing JSDoc, dead code                                                                                                                                     | CC-130, CC-133                 |
+| DEBT-18 | 🔴     | `roomComponent`, `server.js`, `ChessBoard` and `RoomPage` are too large                                                                                                                               | CC-131                         |
+| DEBT-19 | 🔴     | No `RoomView` typedef and no `checkJs` in CI, so the JSDoc types are not checked                                                                                                                      | CC-132                         |
+| DEBT-20 | 🔴     | One very large integration test file and aggregate web test files                                                                                                                                     | CC-134                         |

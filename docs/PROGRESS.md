@@ -2,15 +2,15 @@
 
 ## Status
 
-|               |                                                                                                 |
-| ------------- | ----------------------------------------------------------------------------------------------- |
-| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md) |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-080`                                  |
-| Current stage | **Stage 0 — Foundation**                                                                        |
-| Stage health  | 🟢 On track                                                                                     |
-| In progress   | CC-097 save-your-progress prompts                                                               |
-| Blocked on    | —                                                                                               |
-| Next up       | CC-028 hosting decision (ADR-005) + staging — needs the owner                                   |
+|               |                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)         |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-205`                                          |
+| Current stage | **Stage 0 — Foundation**                                                                                |
+| Stage health  | 🟢 On track                                                                                             |
+| In progress   | CC-138 bots in rooms, CC-049 error tracking and alerts, CC-126 comment sweep; PR #50 story mode design  |
+| Blocked on    | —                                                                                                       |
+| Next up       | Owner: rotate the leaked Atlas password (CC-105), legal review of the Privacy and Terms drafts (CC-046) |
 
 ## Stage tracker
 
@@ -28,14 +28,27 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
-| Security (SEC)   | 0    | 0           | 11    |
-| Bugs (BUG)       | 0    | 0           | 14    |
-| Tech debt (DEBT) | 0    | 0           | 12    |
+| Security (SEC)   | 5    | 0           | 14    |
+| Bugs (BUG)       | 13   | 0           | 16    |
+| Tech debt (DEBT) | 7    | 1           | 12    |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-17 — docs (#38) — Board, findings and decisions brought up to date with the merged work: ADR-016 to ADR-019 and ADR-021 to ADR-023 accepted in DECISIONS.md, ADR-020 (game shell) and ADR-024 (story mode, PR #50) proposed, the roadmap's planned ADRs renumbered to ADR-025 to ADR-027. KNOWN_ISSUES has the roadmap audit's SEC-12 to SEC-19, BUG-15 to BUG-23 and DEBT-13 to DEBT-20, and the match experience audit's A1, A2 and A4, A5, A6 and A9 as BUG-24 to BUG-28. The comment rule is lint-enforced (ENGINEERING.md §3.14). New tickets CC-203 (slow bot strength tests to a nightly job) and CC-204 (BUG-29, "Room not found" when coming back just as a room closes). Also in this PR: the match experience audit and game shell design ([ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md), tickets CC-157 to CC-178), the cross-browser, accessibility and load investigation (CC-180 to CC-185), story mode tickets CC-179 and CC-187 to CC-202.
+- 2026-10-17 — CC-038, CC-039, CC-040, CC-138 (#47) — **Bots**: the `Bot` contract and a contract kit every bot must pass, RPS bots (random, pattern reading), Tic-Tac-Toe bots up to unbeatable minimax, and a chess bot with its own search and levels (no Stockfish), all seeded and deterministic in `packages/games/src/bots`. Seating bots in rooms, the bot identity and reward rules are still open (CC-138, ADR-025). The strength tests add about 40 s to CI (CC-203).
+- 2026-10-17 — CC-103, CC-104 (#42) — **Sound and opponent requests**: synthesised sounds for every game with a mute and volume control (ADR-018, one `localStorage` preference on an allowlist), draw offers and rematch requests as a popup above the board with Accept, Decline and Hide and a chime, decline and withdraw shown to the other side (ADR-019), "Your turn!" tab title and favicon badge in a background tab. The popup takes no focus, and draw offers are answered only there.
+- 2026-10-17 — CC-102, CC-041 (part), CC-092 (part) (#43) — **Chess like the big sites**: drag and drop, click and keyboard play, Motion slides (ADR-016), legal move hints, flip, coordinates, captured pieces and material, player strips, low time warning, move list with view-only history, promotion picker, game over panel with the reason and a PGN download. Move numbers up to "100." and long moves are never cut off.
+- 2026-10-17 — CC-097, CC-113, CC-186 (#39) — **Save your progress** prompts for guests (win card, "Save it" on level-up, streak at risk, header), one confirmation toast after sign-up or login. A guest's seat in a finished room now follows them on sign-in (CC-113). Graceful shutdown ends browser connections that never sent a request, so a deploy no longer ends with "shutdown timed out" (CC-186).
+- 2026-10-17 — CC-095 (#49) — **Anti-farming** (ADR-021, SEC-19): a game that ends before both players made two moves, or passes 10 counted games per opponent pair a day or 20 per player an hour, gives no XP, wins, quests or board credit, and the player is told why.
+- 2026-10-17 — CC-119 (#48) — **Public names** (ADR-022, SEC-18): reserved names and an abuse filter that does not refuse real names (Scunthorpe, Dickens) for usernames, legacy names and guest names. One message for every refusal, so the list is not revealed.
+- 2026-10-17 — CC-125, CC-089 (#41) — **Comment style is lint-enforced**: rule `classicade/comment-style`, a CSS comment check and a comment-only proof script; `packages/games` and `packages/shared` reworded. The rest of the codebase follows in CC-126. Also a level-up e2e test made independent of a late quest bonus.
+- 2026-10-17 — CC-108, CC-049 (part) (#45) — **Nightly encrypted backups**: `mongodump` piped through `age` to a private bucket with 30 days of retention, a read-only check before each dump, a restore runbook and a backup round trip in CI. Uptime monitoring every 10 minutes opens and closes an issue on an outage. The backup job skips until the owner sets its secrets.
+- 2026-10-17 — CC-106, CC-110 (#40) — **Rate limits by the real client address** (BUG-15): `TRUST_PROXY_HOPS` (default 1 in production), `forwardedEntries` on access log lines to find the real hop count; one budget of 300 requests a minute for all of `/api` per session or address (SEC-14).
+- 2026-10-17 — CC-046, CC-047 (#44) — **Legal pages and link previews**: Privacy and Terms pages, a cookie line in the footer instead of a banner (ADR-023), head tags per page written by the server, link preview images, `robots.txt`, `sitemap.xml` and real 404s. The Privacy and Terms texts are **drafts pending the owner's legal review**.
+- 2026-10-16 — CC-101 (#46) — **Rooms survive restarts and deploys** (ADR-017, BUG-10): rooms in MongoDB with versioned writes, explicit lifetimes (rematch window 30 minutes, an away game 2 hours), seats marked away after a restart until players rejoin by themselves, chess flags that fell while the server was down applied at startup, and closed rooms that say why.
+- 2026-10-16 — Roadmap — Five parallel audits (security, bugs, code quality, product, platform) with an adversarial check of every security and bug finding (22 confirmed, 0 refuted) → [ROADMAP.md](ROADMAP.md): fix-now list, four batches, feature catalogue (bots, matchmaking, friends and challenges, coins and unlocks, AI and ML), economy and social design, comment-style rule (in ENGINEERING.md), 48 new tickets CC-105 to CC-152. Top item: an old Atlas password readable in public git history (CC-105, owner action).
 - 2026-10-16 — CC-087 — **Arcade visual identity** (ADR-012): "neon arcade" dark and "daylight arcade" light themes, hand-drawn SVG art for every game, hero, logo and favicon, rank badges (Rookie → Legend), achievement medals, streak flame, confetti, level-up burst, XP pop, chunky game buttons; applied to every screen incl. invite chooser, quests, player console, leaderboards and rematch. Reduced motion respected; every text pair ≥ 4.5:1 (fixed a 1.9:1 focus ring); +9.5 KB JS / +5.4 KB CSS gzip. Follow-ups CC-099 (reward choreography), CC-100.
 - 2026-10-16 — CC-096 — Rolling sessions: every visit moves the session's expiry to 30 days later (was a fixed 7 days from creation, so a guest who played daily lost their session — and with it their progress — on day 8). The cookie is re-issued on each response; the stored expiry is rewritten at most hourly. Existing sessions roll on their next visit.
 - 2026-10-16 — CC-086, CC-032, CC-054, CC-089, CC-053, CC-037, CC-090 — **Gamification batch** (built by four parallel agents from one design brief, integrated one PR at a time). Invite links opened without a session ask "Play as guest / Log in / Sign up" (CC-086). A guest's XP, level, match history, achievements, streaks and quests move to the account on sign-up/login, exactly once and crash-safe (CC-032, ADR-014). 15 achievements in 4 tiers, win and daily streaks with "at risk", 3 daily quests per player with bonus XP (CC-054, CC-089, ADR-013). Accounts-only leaderboards — overall, this week, per game — with "your rank"; mutual-accept rematch with a series score (CC-053, CC-037, ADR-015). Fixed: every page 500 from a dot-folder path (CC-090). Each verified in production in a real browser. Follow-ups CC-091–CC-095.

@@ -99,6 +99,13 @@ the web app and the realtime connection are not limited by it. A 429 answer has 
 (`RATE_LIMITED`), a `Retry-After` header, and `RateLimit-Policy` / `RateLimit` headers. The end-to-end server raises
 all budgets, because every test player connects from 127.0.0.1 (`e2e/app.mjs`).
 
+## Repository protection (CC-109)
+
+`main` accepts changes only through pull requests whose three CI checks pass (lint/format/audit/unit + integration,
+browser tests, Docker); force pushes and deletion are blocked (admins can override in an emergency). Secret scanning
+with push protection blocks pushes that contain credentials. Dependabot alerts and security updates, and CodeQL code
+scanning, are on.
+
 ## Before merging any PR
 
 CI (lint, format, audit, unit + integration tests with coverage gates, browser tests) must be green. Every PR fills in
