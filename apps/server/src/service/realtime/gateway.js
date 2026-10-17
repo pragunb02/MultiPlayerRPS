@@ -243,13 +243,10 @@ export function createRealtimeGateway({
      *
      * @param {{ playerId: string, fromSessionId: string, toSessionId: string }} which
      */
-    async disconnectOtherSessions({ playerId, fromSessionId, toSessionId }) {
+    disconnectOtherSessions({ playerId, fromSessionId, toSessionId }) {
       signOuts.set(playerId, { generation: signOutGeneration(playerId) + 1, keptSessionId: toSessionId });
-      for (const socket of await io.in(sessionRoom(fromSessionId)).fetchSockets()) {
-        socket.leave(sessionRoom(fromSessionId));
-        socket.join(sessionRoom(toSessionId));
-        socket.data.sessionId = toSessionId;
-      }
+      io.in(sessionRoom(fromSessionId)).socketsJoin(sessionRoom(toSessionId));
+      io.in(sessionRoom(fromSessionId)).socketsLeave(sessionRoom(fromSessionId));
       io.in(playerRoom(playerId)).except(sessionRoom(toSessionId)).disconnectSockets(true);
     },
     /** @returns {{ connections: number, players: number }} realtime connections and connected players, for the gauge */

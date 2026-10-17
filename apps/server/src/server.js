@@ -459,11 +459,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     now,
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
-  sessionEvents.on(OTHER_SESSIONS_ENDED, (which) =>
-    gateway
-      .disconnectOtherSessions(which)
-      .catch((err) => logger.error({ err, playerId: which.playerId }, "disconnecting other sessions failed")),
-  );
+  sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
 
   const housekeeping = startHousekeeping({
     roomComponent,
