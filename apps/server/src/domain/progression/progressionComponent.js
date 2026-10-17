@@ -5,10 +5,9 @@ import { creditFor } from "../matches/fairPlay.js";
 /** Events the progression component publishes. */
 export const PROGRESSION_EVENTS = Object.freeze({
   /**
-   * { playerId, displayName, source: "match" | "quest", key, matchId, result?, xpGained, leveledUp, progress,
-   * counted, notCountedReason } —
-   * a player's progress changed: after a match (`key` = matchId), or a quest bonus (`key` = the quest key,
-   * `matchId` = ""). A match that didn't count for the player (CC-095) has `counted` false and gives no XP, and
+   * A player's progress changed: after a match (`key` = matchId), or a quest bonus (`key` = the quest key,
+   * `matchId` = ""). Payload: { playerId, displayName, source: "match" | "quest", key, matchId, result?, xpGained,
+   * leveledUp, progress, counted, notCountedReason }. A match that didn't count for the player (CC-095) has `counted` false and gives no XP, and
    * `notCountedReason` says why: a NOT_COUNTED_REASONS value, or "" when it counted.
    */
   UPDATED: "progression.updated",
@@ -157,10 +156,10 @@ export function createProgressionComponent({ progressAccessor, matchAccessor, ev
     },
 
     /**
-     * A guest's XP and totals become their account's (CC-032), added to what the account already has; the level
+     * A guest's XP and totals become their account's (CC-032), added to what the account already has. The level
      * follows from the XP. The games that stopped counting when they moved to the account (it had reached a fair
      * play limit that day, CC-095) are taken out first, so the account never gets more than the limits allow.
-     * Runs after the matches moved. Idempotent and resumable.
+     * Runs after the matches moved. Running it again, after a crash or at the same time, adds nothing twice.
      *
      * @param {{ from: string, to: Readonly<import("../../models/identity.js").Identity>, now: number }} transfer
      * @returns {Promise<{ moved: Readonly<Record<string, number>> }>} the totals added now
