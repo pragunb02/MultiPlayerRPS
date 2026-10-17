@@ -180,6 +180,19 @@ describe("SiteRequests (CC-207)", () => {
     expect(screen.getByRole("link", { name: "Back to the room" })).toBeInTheDocument();
   });
 
+  it("closes the toast with the way back when the asker presses Close", async () => {
+    const user = userEvent.setup();
+    const mine = request({ from: GUEST.id, to: BOB });
+    const { push } = await openHome();
+    push(pushed([mine]));
+    push(pushed([{ ...mine, state: "expired", endedAt: T + 1 }]));
+    expect(await screen.findByText("No answer from Bob")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(screen.queryByText("No answer from Bob")).not.toBeInTheDocument());
+  });
+
   it("says nothing about the asker's own withdrawal, and names an opponent it does not know", async () => {
     const mine = request({ from: GUEST.id, to: BOB });
     const { push } = await openHome();

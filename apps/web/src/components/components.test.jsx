@@ -2,6 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Modal } from "./Modal/Modal.jsx";
+import { RequestCountdown } from "./RequestBanner/RequestBanner.jsx";
 import { ShareRoom } from "./ShareRoom/ShareRoom.jsx";
 import { ToastProvider } from "./Toast/ToastProvider.jsx";
 import { TurnBanner } from "./TurnBanner/TurnBanner.jsx";
@@ -244,6 +245,15 @@ describe("ShareRoom", () => {
     withToasts(<ShareRoom code="AB2CD3" gameId="rps" origin="https://x" />);
 
     expect(screen.queryByRole("button", { name: "Share…" })).toBeNull();
+  });
+});
+
+describe("RequestCountdown (CC-160)", () => {
+  it("shows an empty bar and 0:00 for a request whose time is already up", () => {
+    render(<RequestCountdown request={{ createdAt: 1_000, expiresAt: 31_000 }} serverTime={40_000} />);
+
+    expect(screen.getByRole("progressbar", { name: "Time left to answer" })).toHaveAttribute("value", "0");
+    expect(screen.getByText("0:00")).toBeInTheDocument();
   });
 });
 
