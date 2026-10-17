@@ -16,7 +16,7 @@ export function PrivacyPage() {
         <p>
           ClassiCade is run by its owner as an independent project. The owner decides what is stored and is
           responsible for it. For privacy questions or requests, open an issue at{" "}
-          <a href="https://github.com/pragunb02/MultiPlayerRPS/issues">
+          <a href="https://github.com/pragunb02/MultiPlayerRPS/issues" data-cc-control="legal.contact">
             github.com/pragunb02/MultiPlayerRPS/issues
           </a>{" "}
           saying only that you have a privacy request. Do not put your email, username or anything personal in
