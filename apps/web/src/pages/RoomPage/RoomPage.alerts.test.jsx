@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
@@ -89,6 +89,9 @@ const POPUP = { name: /^(Draw offer|Rematch\?)$/ };
 const popup = () => screen.findByRole("region", POPUP);
 const noPopup = () => expect(screen.queryByRole("region", POPUP)).not.toBeInTheDocument();
 
+// The chess board is downloaded the first time a room shows it. Under a busy test run that first download took
+// longer than a query waits, so it is loaded once before the tests instead.
+beforeAll(() => import("../../games/chess/ChessBoard.jsx"));
 beforeEach(() => {
   installVisibility({ hidden: false });
 });

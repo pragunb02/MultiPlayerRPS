@@ -12,6 +12,26 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 
 ## Accepted decisions
 
+### ADR-033 — Every tab follows the session: server disconnects and a message without identity
+
+- **Status:** Accepted · 2026-10-18 (CC-234, CC-115; research in `docs/tickets/CC-115.md`)
+- **Context:** All tabs of a browser share one session cookie, and the server decides who it is. When the session
+  changes (signing in, logging out, signed out from another device), the server cuts the affected sockets, and
+  Socket.IO does not reconnect after that. Tabs without a socket hear nothing at all. Web storage may hold only
+  allowlisted preferences (CC-103).
+- **Decision:**
+  1. A tab asks `GET /api/session` again when the server ends its socket (`"io server disconnect"`) or refuses its
+     handshake with `UNAUTHORIZED`. A network drop or restart is left to Socket.IO's own reconnect.
+  2. A tab that signs up, logs in, logs out or starts a guest posts the word `"changed"` on the BroadcastChannel
+     `cc.session`. Every other tab of the origin then asks `GET /api/session` again.
+  3. The message carries no identity data. A tab takes its identity only from the server's answer.
+  4. Nothing is written to web storage, so the `storage` event is not used.
+- **Alternatives:** The `storage` event (needs a web storage write that outlives the tab). Polling the session
+  (costs a request per tab every few seconds for an event that happens rarely). A server event with the new identity
+  over the socket (does not reach tabs without a socket, and puts identity on a channel that does not need it).
+- **Consequences:** One extra `GET /api/session` per tab when the session changes. A browser without BroadcastChannel
+  (none we support) still recovers its tabs that have a socket.
+
 ### ADR-031 — Notification channels and caps
 
 - **Status:** Accepted · 2026-10-18 (from [GROWTH.md](GROWTH.md) §5)
