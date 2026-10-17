@@ -345,11 +345,17 @@ describe("games through the real composition root (integration)", () => {
         options: {},
       });
       await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
+      const finished = new Promise((resolve) =>
+        alice.socket.on(SOCKET_EVENTS.ROOM_UPDATED, (view) => view.status === "finished" && resolve(view)),
+      );
       await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code: room.code });
 
-      expect(await pushed).toEqual(
+      const update = await pushed;
+      expect(update).toEqual(
         expect.objectContaining({ xpGained: 0, counted: false, notCountedReason: "ended-too-soon" }),
       );
+      // The result on screen finds its update by this id, whichever of the two arrives first (CC-235).
+      expect((await finished).game.matchId).toBe(update.matchId);
       const [stored] = await eventually(async () => {
         const docs = await readCollection(app.config.mongoUri, "matches");
         return docs[0]?.credit === undefined ? undefined : docs;

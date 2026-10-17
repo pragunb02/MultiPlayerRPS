@@ -472,12 +472,14 @@ describe("roomComponent", () => {
       });
     });
 
-    it("includes the engine's view, whose turn it is, and the outcome once playing", async () => {
+    it("includes the match id, the engine's view, whose turn it is, and the outcome once playing", async () => {
       const { rooms, code } = await startedGame();
+      const room = await rooms.getRoom(code);
 
-      const view = rooms.viewFor(await rooms.getRoom(code), ALICE.id);
+      const view = rooms.viewFor(room, ALICE.id);
 
       expect(view.game).toEqual({
+        matchId: room.game.matchId,
         view: { count: 0, target: 3, toMove: BOB.id },
         activePlayers: [BOB.id],
         outcome: { status: "ongoing" },
