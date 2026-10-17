@@ -5,7 +5,7 @@
 |               |                                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------------- |
 | Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)         |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-204`                                          |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-205`                                          |
 | Current stage | **Stage 0 — Foundation**                                                                                |
 | Stage health  | 🟢 On track                                                                                             |
 | In progress   | CC-138 bots in rooms, CC-049 error tracking and alerts, CC-126 comment sweep; PR #50 story mode design  |
@@ -29,14 +29,14 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 5    | 0           | 14    |
-| Bugs (BUG)       | 12   | 0           | 16    |
+| Bugs (BUG)       | 13   | 0           | 16    |
 | Tech debt (DEBT) | 7    | 1           | 12    |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
-- 2026-10-17 — docs (#38) — Board, findings and decisions brought up to date with the merged work: ADR-016 to ADR-019 and ADR-021 to ADR-023 accepted in DECISIONS.md, ADR-020 (game shell) and ADR-024 (story mode, PR #50) proposed, the roadmap's planned ADRs renumbered to ADR-025 to ADR-027. KNOWN_ISSUES has the roadmap audit's SEC-12 to SEC-19, BUG-15 to BUG-23 and DEBT-13 to DEBT-20, and the match experience audit's A1, A2 and A4, A5, A6 and A9 as BUG-24 to BUG-28. The comment rule is lint-enforced (ENGINEERING.md §3.14). New ticket CC-203 (slow bot strength tests to a nightly job). Also in this PR: the match experience audit and game shell design ([ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md), tickets CC-157 to CC-178), the cross-browser, accessibility and load investigation (CC-180 to CC-185), story mode tickets CC-179 and CC-187 to CC-202.
+- 2026-10-17 — docs (#38) — Board, findings and decisions brought up to date with the merged work: ADR-016 to ADR-019 and ADR-021 to ADR-023 accepted in DECISIONS.md, ADR-020 (game shell) and ADR-024 (story mode, PR #50) proposed, the roadmap's planned ADRs renumbered to ADR-025 to ADR-027. KNOWN_ISSUES has the roadmap audit's SEC-12 to SEC-19, BUG-15 to BUG-23 and DEBT-13 to DEBT-20, and the match experience audit's A1, A2 and A4, A5, A6 and A9 as BUG-24 to BUG-28. The comment rule is lint-enforced (ENGINEERING.md §3.14). New tickets CC-203 (slow bot strength tests to a nightly job) and CC-204 (BUG-29, "Room not found" when coming back just as a room closes). Also in this PR: the match experience audit and game shell design ([ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md), tickets CC-157 to CC-178), the cross-browser, accessibility and load investigation (CC-180 to CC-185), story mode tickets CC-179 and CC-187 to CC-202.
 - 2026-10-17 — CC-038, CC-039, CC-040, CC-138 (#47) — **Bots**: the `Bot` contract and a contract kit every bot must pass, RPS bots (random, pattern reading), Tic-Tac-Toe bots up to unbeatable minimax, and a chess bot with its own search and levels (no Stockfish), all seeded and deterministic in `packages/games/src/bots`. Seating bots in rooms, the bot identity and reward rules are still open (CC-138, ADR-025). The strength tests add about 40 s to CI (CC-203).
 - 2026-10-17 — CC-103, CC-104 (#42) — **Sound and opponent requests**: synthesised sounds for every game with a mute and volume control (ADR-018, one `localStorage` preference on an allowlist), draw offers and rematch requests as a popup above the board with Accept, Decline and Hide and a chime, decline and withdraw shown to the other side (ADR-019), "Your turn!" tab title and favicon badge in a background tab. The popup takes no focus, and draw offers are answered only there.
 - 2026-10-17 — CC-102, CC-041 (part), CC-092 (part) (#43) — **Chess like the big sites**: drag and drop, click and keyboard play, Motion slides (ADR-016), legal move hints, flip, coordinates, captured pieces and material, player strips, low time warning, move list with view-only history, promotion picker, game over panel with the reason and a PGN download. Move numbers up to "100." and long moves are never cut off.
