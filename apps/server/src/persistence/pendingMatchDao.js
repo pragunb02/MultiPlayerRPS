@@ -1,4 +1,3 @@
-const DUPLICATE_KEY_CODE = 11000;
 const PENDING_MATCHES = "pending_matches";
 const WITHOUT_ID = Object.freeze({ projection: { _id: 0 } });
 
@@ -45,18 +44,14 @@ export function createPendingMatchDao({ connection }) {
      * @returns {Promise<boolean>} whether it was added now
      */
     async insertIfAbsent(doc) {
-      try {
-        const { upsertedCount } = await pending.updateOne(
-          { matchId: doc.matchId },
-          { $setOnInsert: { ...structuredClone(doc), status: "pending", done: [], attempts: 0 } },
-          { upsert: true },
-        );
-        return upsertedCount === 1;
-      } catch (err) {
-        // Two adds of the same game at the same moment: the other one stored it.
-        if (err.code === DUPLICATE_KEY_CODE) return false;
-        throw err;
-      }
+      // Two adds of the same game at the same moment cannot both insert: MongoDB retries the loser of the unique
+      // index race as an update, which then finds the record and changes nothing.
+      const { upsertedCount } = await pending.updateOne(
+        { matchId: doc.matchId },
+        { $setOnInsert: { ...structuredClone(doc), status: "pending", done: [], attempts: 0 } },
+        { upsert: true },
+      );
+      return upsertedCount === 1;
     },
 
     /**

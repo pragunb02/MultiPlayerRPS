@@ -176,6 +176,22 @@ describe("matchOutboxComponent (CC-111)", () => {
     expect(names()).toEqual(["slow"]);
   });
 
+  it("keeps the words of a failure that is not an Error", async () => {
+    const { outbox, pendingMatchAccessor } = setup(() => [
+      {
+        name: "a",
+        run: async () => {
+          throw "plain words";
+        },
+      },
+    ]);
+    await outbox.add({ match: MATCH, now: T0 });
+
+    await outbox.run({ matchId: "m1", now: T0 });
+
+    expect((await pendingMatchAccessor.get("m1")).lastError).toEqual({ step: "a", message: "plain words" });
+  });
+
   it("looks at a limited number of due games at a time, the longest waiting first", async () => {
     const { outbox } = setup((log) => [step("a", log)]);
     for (let i = 0; i < 3; i++) {

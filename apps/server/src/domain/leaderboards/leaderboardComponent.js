@@ -50,17 +50,16 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
     return info;
   }
 
+  /** Called after a counted win, so the player has at least that one win. */
   const raiseWins = async ({ player, gameId, at }) => {
     const wins = await matchAccessor.countWins({ playerId: player.playerId, gameId });
-    if (wins > 0) {
-      await leaderboardAccessor.raiseScore({
-        ...player,
-        board: winsBoard(gameId),
-        period: ALL,
-        score: wins,
-        at,
-      });
-    }
+    await leaderboardAccessor.raiseScore({
+      ...player,
+      board: winsBoard(gameId),
+      period: ALL,
+      score: wins,
+      at,
+    });
   };
 
   /** Overall XP follows the player's total; this week's XP adds what was earned, once per key. */

@@ -154,10 +154,7 @@ export function createMatchOutboxComponent({ pendingMatchAccessor, steps, policy
      * @param {{ matchId: string, now: number }} input
      * @returns {Promise<RunOutcome>}
      */
-    async run({ matchId, now }) {
-      if (running.has(matchId)) return { matchId, status: "busy" };
-      return runOnce(await pendingMatchAccessor.get(matchId), now);
-    },
+    run: async ({ matchId, now }) => runOnce(await pendingMatchAccessor.get(matchId), now),
 
     /**
      * Runs the games whose next attempt is due, one after the other.

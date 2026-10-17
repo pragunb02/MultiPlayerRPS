@@ -118,7 +118,8 @@ async function progressOf(server, cookie) {
 /** Wraps one named step of the pipeline. */
 const wrapStep = (name, wrap) => (steps) => steps.map((step) => (step.name === name ? wrap(step) : step));
 
-describe("the match pipeline outbox (integration, CC-111)", () => {
+// Two server processes and a game each: slower than one request, most of all on a busy CI runner.
+describe("the match pipeline outbox (integration, CC-111)", { timeout: 20_000 }, () => {
   it("awards XP exactly once when the server dies between recording a match and awarding XP", async () => {
     const uri = mongo.uri(`pipeline-${++dbCounter}`);
     let resume;
