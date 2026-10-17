@@ -6,6 +6,7 @@ import { createApiRateLimit, DEFAULT_API_LIMIT } from "./rateLimits.js";
 import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createRequestLogger } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
+import { createSessionGuard } from "./session.js";
 import { createWebAppRouter } from "./webApp.js";
 
 /**
@@ -23,6 +24,9 @@ import { createWebAppRouter } from "./webApp.js";
  *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
+ *   onOtherSessionsEnded: (which: { playerId: string, keepSessionId: string }) => void,  told when one session ended
+ *     every other session of its account (CC-116)
+ *   checkSession: ReturnType<typeof import("./session.js").createSessionCheck>,  whether a session may still be used
  *   onIdentityChanged: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["onIdentityChanged"],
  *   guestLimit?: { windowMs: number, limit: number },
  *   leaderboardComponent: ReturnType<typeof import("../../domain/leaderboards/leaderboardComponent.js").createLeaderboardComponent>,
@@ -43,6 +47,8 @@ export function createHttpApp({
   accountComponent,
   authLimits,
   onSessionEnded,
+  onOtherSessionsEnded,
+  checkSession,
   onIdentityChanged,
   guestLimit,
   leaderboardComponent,
@@ -82,6 +88,9 @@ export function createHttpApp({
   app.use("/api", sessionMiddleware);
   // After the session, so a signed-in or guest player is counted by session rather than by address.
   app.use("/api", createApiRateLimit(apiLimit));
+  // After the limit, so a flood of requests is refused before it costs a database read each. A session signed out
+  // elsewhere or older than 90 days goes on as no session at all (CC-116).
+  app.use("/api", createSessionGuard({ checkSession, onSessionEnded, now }));
 
   app.use(
     "/api",
@@ -93,6 +102,7 @@ export function createHttpApp({
       accountComponent,
       authLimits,
       onSessionEnded,
+      onOtherSessionsEnded,
       onIdentityChanged,
       guestLimit,
       now,

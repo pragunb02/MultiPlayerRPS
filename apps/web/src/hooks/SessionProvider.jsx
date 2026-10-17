@@ -82,6 +82,9 @@ export function SessionProvider({ children }) {
         await api.endSession();
         adopt(undefined);
       },
+      // Both keep this browser signed in as the same player and sign out every other one (CC-116).
+      changePassword: (passwords) => api.changePassword(passwords),
+      signOutOtherDevices: () => api.signOutOtherDevices(),
     };
   }, [state, api, adopt]);
 

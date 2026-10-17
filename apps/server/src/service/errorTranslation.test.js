@@ -6,6 +6,8 @@ import {
   ForbiddenError,
   GoneError,
   NotFoundError,
+  ServerBusyError,
+  TooManyRequestsError,
   UnauthorizedError,
   ValidationError,
 } from "../utils/errors.js";
@@ -19,6 +21,8 @@ describe("toClientError", () => {
     [new NotFoundError("Room not found"), 404, ERROR_CODES.NOT_FOUND],
     [new ConflictError("Room is full"), 409, ERROR_CODES.CONFLICT],
     [new GoneError("This room has closed"), 410, ERROR_CODES.GONE],
+    [new TooManyRequestsError("Slow down"), 429, ERROR_CODES.RATE_LIMITED],
+    [new ServerBusyError("Try again in a minute"), 503, ERROR_CODES.SERVER_BUSY],
   ])("maps %o to %i", (err, status, code) => {
     expect(toClientError(err)).toEqual({ status, code, message: err.message });
   });

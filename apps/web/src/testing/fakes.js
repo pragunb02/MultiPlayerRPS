@@ -92,6 +92,8 @@ export function fakeApi(overrides = {}) {
     endSession: vi.fn().mockResolvedValue({}),
     signup: vi.fn(),
     login: vi.fn(),
+    changePassword: vi.fn().mockResolvedValue(undefined),
+    signOutOtherDevices: vi.fn().mockResolvedValue(undefined),
     getProgress: vi.fn().mockResolvedValue(PROGRESS),
     getMatches: vi.fn(),
     getMatch: vi.fn(),

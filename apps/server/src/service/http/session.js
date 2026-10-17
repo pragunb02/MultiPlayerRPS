@@ -1,6 +1,8 @@
 import session from "express-session";
+import { IDENTITY_KINDS } from "@classicade/shared";
 import { createIdentity } from "../../models/identity.js";
-import { UnauthorizedError } from "../../utils/errors.js";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { NotFoundError, UnauthorizedError } from "../../utils/errors.js";
 
 export const SESSION_COOKIE_NAME = "cc.sid";
 /**
@@ -8,6 +10,22 @@ export const SESSION_COOKIE_NAME = "cc.sid";
  * to an expired cookie, and anyone who stays away for a month starts fresh.
  */
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+/**
+ * A signed-in session ends 90 days after signing in, however often it is used (CC-116). A stolen session cookie
+ * therefore stops working within three months even if the thief keeps it busy, and the player only has to type
+ * their password again about four times a year. Guest sessions have no such end: a guest has no password to sign
+ * in with again, so ending their session would lose their progress.
+ */
+export const SESSION_ABSOLUTE_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** Why the server ended a session, in the `details.reason` of the UnauthorizedError. */
+export const SESSION_END_REASONS = Object.freeze({
+  /** the password was changed or "sign out other devices" was used somewhere else */
+  SIGNED_OUT: "signed-out",
+  /** the session is older than SESSION_ABSOLUTE_LIFETIME_MS */
+  EXPIRED: "expired",
+});
 
 /**
  * Cookie-backed server-side sessions. The same middleware instance is used by HTTP and the realtime
@@ -63,16 +81,147 @@ export function requireIdentity(sessionData) {
  * @param {Readonly<import("../../models/identity.js").Identity>} identity
  * @returns {Promise<void>}
  */
-export function establishSession(req, identity) {
+export const establishSession = (req, identity) => regenerateWith(req, { identity: { ...identity } });
+
+/** A fresh session id holding exactly `fields`, saved in one write. */
+function regenerateWith(req, fields) {
   return new Promise((resolve, reject) => {
     req.session.regenerate((regenerateErr) => {
       if (regenerateErr) {
         reject(regenerateErr);
         return;
       }
-      req.session.identity = { ...identity };
+      Object.assign(req.session, fields);
       req.session.save((saveErr) => (saveErr ? reject(saveErr) : resolve()));
     });
+  });
+}
+
+/**
+ * Stores an account's identity in a fresh session id, with the account's session version and the moment of
+ * signing in, so the session can be ended later by "sign out other devices" or by its age (CC-116).
+ *
+ * @param {import("express").Request} req
+ * @param {{ identity: Readonly<import("../../models/identity.js").Identity>, sessionVersion: number, now: number }} signIn
+ * @returns {Promise<void>}
+ */
+export const establishAccountSession = (req, { identity, sessionVersion, now }) =>
+  regenerateWith(req, { identity: { ...identity }, sessionVersion, signedInAt: now });
+
+/**
+ * @param {import("express").Request} req
+ * @returns {Promise<void>}
+ */
+export function saveSession(req) {
+  return new Promise((resolve, reject) => {
+    req.session.save((err) => (err ? reject(err) : resolve()));
+  });
+}
+
+const signedOut = (cause) =>
+  new UnauthorizedError("You were signed out on this device, please log in again", {
+    details: { reason: SESSION_END_REASONS.SIGNED_OUT },
+    ...(cause !== undefined && { cause }),
+  });
+
+/**
+ * Whether a session may still be used, beyond holding a valid identity. A guest session always may. An account's
+ * session may while its session version is the account's current one and it is younger than 90 days.
+ *
+ * Sessions made before CC-116 carry no version, and every account started at version 0, so they count as version
+ * 0. They carry no sign-in time either. The HTTP check stamps the moment it first sees one, so its 90 days start
+ * then.
+ *
+ * @param {{
+ *   accountComponent: Pick<ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>, "sessionVersionOf">,
+ *   now: () => number,
+ *   absoluteLifetimeMs?: number,
+ * }} deps
+ * @returns {(sessionData: Partial<import("express-session").SessionData>) => Promise<void>}
+ *   resolves when the session may be used, and throws UnauthorizedError with `details.reason` when not
+ */
+export function createSessionCheck({
+  accountComponent,
+  now,
+  absoluteLifetimeMs = SESSION_ABSOLUTE_LIFETIME_MS,
+}) {
+  assertDefined(accountComponent, "accountComponent");
+  assertFunction(now, "now");
+  return async (sessionData) => {
+    const identity = requireIdentity(sessionData);
+    if (identity.kind !== IDENTITY_KINDS.USER) {
+      return;
+    }
+    if (sessionData.signedInAt !== undefined && now() - sessionData.signedInAt >= absoluteLifetimeMs) {
+      throw new UnauthorizedError("Your session has expired, please log in again", {
+        details: { reason: SESSION_END_REASONS.EXPIRED },
+      });
+    }
+    let current;
+    try {
+      current = await accountComponent.sessionVersionOf({ playerId: identity.id });
+    } catch (err) {
+      // The account is gone, so no session of it may be used.
+      if (err instanceof NotFoundError) throw signedOut(err);
+      throw err;
+    }
+    if ((sessionData.sessionVersion ?? 0) !== current) {
+      throw signedOut();
+    }
+  };
+}
+
+/**
+ * Runs the session check on every API request. A session that may no longer be used is replaced by an empty one,
+ * so the request goes on as a visitor without a session (GET /api/session answers `authenticated: false`), and the
+ * old session's sockets are disconnected. A session with a broken identity is left alone here, for the routes to
+ * refuse as before.
+ *
+ * @param {{
+ *   checkSession: ReturnType<typeof createSessionCheck>,
+ *   onSessionEnded: (sessionId: string) => void,
+ *   now: () => number,
+ * }} deps
+ * @returns {import("express").RequestHandler}
+ */
+export function createSessionGuard({ checkSession, onSessionEnded, now }) {
+  assertFunction(checkSession, "checkSession");
+  assertFunction(onSessionEnded, "onSessionEnded");
+  return async (req, res, next) => {
+    if (!hasValidIdentity(req.session)) {
+      next();
+      return;
+    }
+    if (req.session.identity.kind === IDENTITY_KINDS.USER && req.session.signedInAt === undefined) {
+      req.session.signedInAt = now();
+    }
+    try {
+      await checkSession(req.session);
+    } catch (err) {
+      // Anything else, such as the database being down, is a server fault: Express answers it with a 500.
+      if (!(err instanceof UnauthorizedError)) throw err;
+      const endedId = req.sessionID;
+      const playerId = req.session.identity.id;
+      await regenerateSession(req);
+      onSessionEnded(endedId);
+      req.log.info({ playerId, reason: err.details.reason }, "session ended by the server");
+    }
+    next();
+  };
+}
+
+function hasValidIdentity(sessionData) {
+  try {
+    requireIdentity(sessionData);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function regenerateSession(req) {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((err) => (err ? reject(err) : resolve()));
   });
 }
 
