@@ -69,6 +69,13 @@ export function createRealtimeGateway({
   // would only race the database closing.
   let closing = false;
 
+  // While closing, every answer also closes its connection. Node keeps serving a keep-alive connection that was
+  // busy when closing began for as long as the browser reuses it, and a reconnecting player reuses it every few
+  // seconds. The server would never finish closing, and the shutdown timeout would end the deploy with an error.
+  httpServer.prependListener("request", (_req, res) => {
+    if (closing) res.setHeader("Connection", "close");
+  });
+
   io.use((socket, next) => {
     try {
       socket.data.identity = requireIdentity(socket.request.session);

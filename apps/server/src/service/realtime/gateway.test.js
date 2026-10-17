@@ -1,3 +1,4 @@
+import http from "node:http";
 import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
@@ -146,6 +147,48 @@ describe("realtime gateway", () => {
     server.domainEvents.emit(ROOM_EVENTS.UPDATED, { room: { ...room, gameId: "no-such-game" } });
 
     await expect.poll(() => server.find("failed to broadcast room update")).toHaveLength(1);
+  });
+
+  it("finishes closing while a browser keeps reusing a connection that was busy when closing began", async () => {
+    const own = await startTestServer(); // closed here, not by afterEach
+    const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+    const get = () =>
+      new Promise((resolve) => {
+        http
+          .get(`${own.baseUrl}/api/session`, { agent }, (res) => {
+            res.resume();
+            res.on("end", () => resolve(true));
+          })
+          .on("error", () => resolve(false));
+      });
+    let closed = false;
+    // A request still being sent when closing begins keeps its connection busy.
+    const busy = http.request(`${own.baseUrl}/api/session`, {
+      method: "POST",
+      agent,
+      headers: { "content-type": "text/plain", "content-length": "2" },
+    });
+    const answered = new Promise((resolve) => busy.on("response", (res) => res.resume().on("end", resolve)));
+    const arrived = new Promise((resolve) => own.httpServer.once("request", resolve));
+    busy.write("a");
+    await arrived;
+
+    const closing = own.gateway.close().then(() => {
+      closed = true;
+    });
+    busy.end("b");
+    await answered;
+    // Like a browser polling to reconnect: the next request goes out on the same connection right away.
+    const reuse = (async () => {
+      const deadline = Date.now() + 3_000;
+      while (!closed && Date.now() < deadline && (await get()));
+    })();
+    const tooLate = new Promise((resolve) => setTimeout(resolve, 1_000, "still open"));
+
+    await expect(Promise.race([closing.then(() => "closed"), tooLate])).resolves.toBe("closed");
+    await reuse;
+    agent.destroy();
+    await own.tasks.drain();
   });
 
   it("reports closing an already closed gateway", async () => {

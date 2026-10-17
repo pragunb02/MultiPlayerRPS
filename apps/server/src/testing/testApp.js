@@ -226,6 +226,7 @@ export async function startTestServer({ rateLimit, now = Date.now, ...options } 
   return {
     ...testApp,
     gateway,
+    httpServer: server,
     baseUrl: `http://127.0.0.1:${port}`,
     close: async () => {
       await gateway.close();
