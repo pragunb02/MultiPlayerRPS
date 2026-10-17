@@ -177,7 +177,21 @@ describe("SiteRequests (CC-207)", () => {
     push(pushed([{ ...mine, createdAt: T + 4 }]));
     push(pushed([{ ...mine, createdAt: T + 4, state: "expired", endedAt: T + 5 }]));
     expect(await screen.findByText("No answer from Bob")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to the room" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Back to the room" })).toHaveLength(2);
+  });
+
+  it("gives the asker the way back to the room after a decline too", async () => {
+    const mine = request({ from: GUEST.id, to: BOB });
+    const { push } = await openHome();
+    push(pushed([mine]));
+
+    push(pushed([{ ...mine, state: "declined", endedAt: T + 1 }]));
+
+    expect(await screen.findByText("Bob declined the rematch")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to the room" })).toHaveAttribute(
+      "href",
+      "/games/chess/rooms/AB2CD3",
+    );
   });
 
   it("closes the toast with the way back when the asker presses Close", async () => {

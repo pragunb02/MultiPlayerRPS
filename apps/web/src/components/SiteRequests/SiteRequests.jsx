@@ -68,7 +68,7 @@ function useAnswerToasts({ rooms, pathname, me }) {
         if (request.state === REQUEST_STATES.ACCEPTED) {
           toast.show(texts.accepted(name), { tone: "success", category: CATEGORIES.REQUEST, action: back });
         } else if (request.state === REQUEST_STATES.DECLINED) {
-          toast.show(texts.declined(name), { tone: "info", category: CATEGORIES.REQUEST });
+          toast.show(texts.declined(name), { tone: "info", category: CATEGORIES.REQUEST, action: back });
         } else if (request.state === REQUEST_STATES.EXPIRED) {
           toast.show(`No answer from ${name}`, { tone: "info", category: CATEGORIES.REQUEST, action: back });
         }

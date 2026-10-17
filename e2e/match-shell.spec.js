@@ -97,6 +97,33 @@ async function find(state, entry) {
   );
 }
 
+/** Presses `target` and reads what the clicker's page showed in answer, and since when the other player watched. */
+async function pressAndWatch(state, entry, target) {
+  const { page } = state.clicker;
+  const armed = await arm(page);
+  const otherArmed = state.other ? await arm(state.other.page) : undefined;
+  // The browser's own download bar is the answer to Download PGN, and it can take a moment to start.
+  const downloads = await target.evaluate((element) => element.hasAttribute("download"));
+  const downloaded = downloads
+    ? page.waitForEvent("download", { timeout: 5_000 }).then(
+        () => true,
+        () => false,
+      )
+    : Promise.resolve(false);
+  await target.click({ force: entry.blocked });
+  await page.waitForTimeout(ANSWER_MS + 50);
+  const answer = await answerTo(page, armed);
+  return { answer, otherArmed, answered: (await downloaded) || answer.ms <= ANSWER_MS };
+}
+
+/** Whether a control pressed while blocked is ready now, because what blocked it was only for a moment. */
+const blockEnded = (state, entry) =>
+  state.clicker.page
+    .locator(selector({ ...entry, blocked: false }, state.scope))
+    .first()
+    .isVisible()
+    .catch(() => false);
+
 /**
  * Presses every control the clicker sees in this state and lists every press nobody could see an answer to. When
  * a press left the state, or changed the control the next press needs (stepping back through the moves makes
@@ -123,21 +150,17 @@ async function pressEverything({ players, build, name }) {
       problems.push(`${label}: on screen at first, but not when the state was built again`);
       continue;
     }
+    let press = await pressAndWatch(state, entry, target);
+    if (!press.answered && entry.blocked && (await blockEnded(state, entry))) {
+      // A short wait, such as the pause before asking again (CC-159), ran out during the press, so the press met
+      // a control that was no longer blocked. The state is built again and the blocked control pressed in time.
+      state = await enter(players, build);
+      target = await find(state, entry);
+      if (target !== undefined) press = await pressAndWatch(state, entry, target);
+    }
     const { page } = state.clicker;
-    const armed = await arm(page);
-    const otherArmed = state.other ? await arm(state.other.page) : undefined;
-    // The browser's own download bar is the answer to Download PGN, and it can take a moment to start.
-    const downloads = await target.evaluate((element) => element.hasAttribute("download"));
-    const downloaded = downloads
-      ? page.waitForEvent("download", { timeout: 5_000 }).then(
-          () => true,
-          () => false,
-        )
-      : Promise.resolve(false);
-    await target.click({ force: entry.blocked });
-    await page.waitForTimeout(ANSWER_MS + 50);
-    const answer = await answerTo(page, armed);
-    if (!(await downloaded) && !(answer.ms <= ANSWER_MS)) {
+    const { answer, otherArmed } = press;
+    if (!press.answered) {
       problems.push(
         `${label}: nothing visible within ${ANSWER_MS} ms (fastest answer: ${answer.kind} after ${answer.ms} ms)`,
       );
