@@ -23,9 +23,12 @@ export function useServerCountdown({ until, serverTime, onElapsed, now = Date.no
 
   useEffect(() => {
     const leftAt = (local) => until - (serverTime + Math.max(0, local - receivedAt));
-    if (leftAt(now()) <= 0) {
+    const start = now();
+    if (leftAt(start) <= 0) {
+      // The moment can pass between the render and this effect on a busy device, and the count must still reach 0.
+      const timer = setTimeout(() => setLocalNow(start), 0);
       elapsedRef.current();
-      return undefined;
+      return () => clearTimeout(timer);
     }
     const timer = setInterval(() => {
       const local = now();

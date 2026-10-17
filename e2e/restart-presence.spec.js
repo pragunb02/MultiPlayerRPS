@@ -97,12 +97,19 @@ test.describe("the server restarts", () => {
     alice.expectRestart();
     bob.expectRestart();
 
-    const restarting = restartServer({ crash: true });
+    // Down for a few seconds, so the second before the banner shows has passed for certain.
+    const restarting = restartServer({ crash: true, downMs: 6_000 });
     await expect(connection(alice)).toHaveText("Reconnecting…");
     const rock = choices(alice).getByRole("button", { name: /Rock/ });
     await expect(rock).toHaveAttribute("aria-disabled", "true");
     await pressAnswers(alice, rock);
-    await expect(alice.page.getByText("Reconnecting", { exact: true }).first()).toBeVisible();
+    await rock.click({ force: true });
+    await expect(
+      alice.page
+        .getByRole("main")
+        .getByRole("status")
+        .filter({ hasText: /^Reconnecting$/ }),
+    ).toBeVisible();
     await restarting;
 
     await expect(connection(alice)).toHaveCount(0, { timeout: 20_000 });

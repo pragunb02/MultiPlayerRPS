@@ -512,10 +512,14 @@ describe("an opponent who lost their connection during the game (CC-036)", () =>
     await board();
     expect(screen.queryByRole("button", { name: "Claim the win" })).not.toBeInTheDocument();
 
-    act(() => vi.advanceTimersByTime(3_000));
-    expect(
-      await screen.findByText("Bob has not come back. You can claim the win, or keep waiting."),
-    ).toBeInTheDocument();
+    // On a busy machine the countdowns can start again after the board shows (the full suite with coverage once
+    // still read 0:02 after three seconds), so the time moves on in steps until the grace period is over on screen.
+    await vi.waitFor(() => {
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(
+        screen.getByText("Bob has not come back. You can claim the win, or keep waiting."),
+      ).toBeInTheDocument();
+    }, SLOW);
     await user.click(screen.getByRole("button", { name: "Claim the win" }));
 
     expect(socket.request).toHaveBeenCalledWith("room:claim-win", { code: "AB2CD3" });
