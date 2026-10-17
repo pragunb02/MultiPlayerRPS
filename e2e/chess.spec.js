@@ -1,5 +1,8 @@
 import { readFile } from "node:fs/promises";
+import { Chess } from "chess.js";
+import mongoose from "mongoose";
 import { expect, test } from "./fixtures.js";
+import { E2E_MONGO_URI } from "./personas.js";
 
 // Two guests playing chess the way people do on the big chess sites (CC-102): dragging pieces with a mouse,
 // tapping or dragging with a finger on a phone, the keyboard, looking back through the moves, promotion, the
@@ -101,6 +104,75 @@ async function downloadedPgn(player) {
   ]);
   expect(download.suggestedFilename()).toMatch(/^classicade-[A-Z0-9]{6}-\d{4}-\d{2}-\d{2}\.pgn$/);
   return readFile(await download.path(), "utf8");
+}
+
+/**
+ * Turns the game in this room into one 210 moves long, written straight into the room the way the server stores it
+ * (CC-101), because playing that many moves by hand takes minutes. It opens with "bxc8=Q+", one of the longest
+ * kinds of move, then goes on with legal moves that never end the game. White is to move. Returns the moves.
+ */
+async function storeLongGame(roomPath) {
+  const chess = new Chess();
+  for (const san of ["e4", "d5", "exd5", "c6", "dxc6", "Qa5", "cxb7", "Nd7", "bxc8=Q+"]) chess.move(san);
+  for (let step = 0; chess.history().length < 210; step += 1) {
+    const options = chess.moves({ verbose: true });
+    const fine = options.findIndex((_, k) => {
+      chess.move(options[(step * 7 + k) % options.length]);
+      const over = chess.isGameOver();
+      chess.undo();
+      return !over;
+    });
+    chess.move(options[(step * 7 + fine) % options.length]);
+  }
+  const now = Date.now();
+  const moves = chess.history({ verbose: true }).map(({ from, to, san, promotion }, index, all) => ({
+    from,
+    to,
+    san,
+    at: now - (all.length - index) * 1000,
+    ...(promotion && { promotion }),
+  }));
+  const db = await mongoose.createConnection(E2E_MONGO_URI).asPromise();
+  try {
+    const { modifiedCount } = await db.collection("rooms").updateOne(
+      { code: roomPath.split("/").at(-1) },
+      {
+        $set: { "game.state.moves": moves, "game.state.fen": chess.fen(), "game.state.lastMoveAt": now },
+        $inc: { version: 1 },
+      },
+    );
+    expect(modifiedCount).toBe(1);
+  } finally {
+    await db.close();
+  }
+  return moves.map((move) => move.san);
+}
+
+/**
+ * Everything in the move list that is cut off or sticks out sideways: each number and move must show in full
+ * inside the list, and the list must not scroll sideways. The columns must line up from row to row.
+ */
+function moveListProblems(list) {
+  const problems = [];
+  if (list.scrollWidth > list.clientWidth) {
+    problems.push(`the list scrolls sideways: ${list.scrollWidth} > ${list.clientWidth}`);
+  }
+  const box = list.getBoundingClientRect();
+  const inner = { left: box.left + list.clientLeft, right: box.left + list.clientLeft + list.clientWidth };
+  const columns = [new Set(), new Set(), new Set()];
+  for (const row of list.querySelectorAll("li")) {
+    [...row.children].forEach((cell, column) => {
+      const { left, right } = cell.getBoundingClientRect();
+      if (cell.scrollWidth > cell.clientWidth) problems.push(`"${cell.textContent}" is cut off`);
+      if (left < inner.left - 0.5 || right > inner.right + 0.5)
+        problems.push(`"${cell.textContent}" sticks out`);
+      columns[column].add(Math.round(column === 0 ? right : left));
+    });
+  }
+  columns.forEach((edges, column) => {
+    if (edges.size > 1) problems.push(`column ${column + 1} does not line up: ${[...edges].join(", ")}`);
+  });
+  return problems;
 }
 
 test.describe("chess", () => {
@@ -387,5 +459,31 @@ test.describe("chess", () => {
     await expect(white.page.getByText("You won with White")).toBeVisible();
     await expect(blackClock).toHaveText("0:00.0");
     expect(await downloadedPgn(white)).toContain('[Termination "Time out"]');
+  });
+  test("a long game's move list shows every number and move in full, past move 100, light and dark", async ({
+    players,
+  }, testInfo) => {
+    const { white, black, roomPath } = await startChess(players);
+    const sans = await storeLongGame(roomPath);
+
+    for (const player of [white, black]) {
+      await player.page.reload();
+      const list = moveList(player);
+      await expect(list.getByRole("button").last()).toHaveText(sans.at(-1));
+      await expect(list.getByRole("listitem")).toHaveCount(105);
+      await expect(list.getByRole("listitem").nth(4)).toHaveText(/^5\.\s*bxc8=Q\+/);
+      await expect(list.getByRole("listitem").nth(9)).toHaveText(/^10\./);
+      await expect(list.getByRole("listitem").nth(99)).toHaveText(/^100\./);
+      for (const colorScheme of ["light", "dark"]) {
+        await player.page.emulateMedia({ colorScheme });
+        expect(await list.evaluate(moveListProblems), colorScheme).toEqual([]);
+      }
+    }
+    // On desktop, also where the side panel is at its narrowest: the board and the panel side by side, just over
+    // the 48rem width where they stack.
+    if (!isMobile(testInfo)) {
+      await white.page.setViewportSize({ width: 49 * 16, height: 800 });
+      expect(await moveList(white).evaluate(moveListProblems), "narrowest panel").toEqual([]);
+    }
   });
 });

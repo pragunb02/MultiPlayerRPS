@@ -103,18 +103,28 @@
   display: grid;
   gap: var(--space-2);
 }
+/*
+ * One grid for the whole list, and each row takes its columns from it (subgrid), so the numbers line up and the
+ * number column is as wide as the widest number ("100."). No column is ever narrower than what it shows, so a long
+ * move like "exd8=Q+" is never cut off.
+ */
 .moves {
   margin: 0;
   padding: 0;
   list-style: none;
+  display: grid;
+  grid-template-columns: max-content minmax(max-content, 1fr) minmax(max-content, 1fr);
+  align-content: start;
   max-height: 16rem;
   overflow-y: auto;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 .moves li {
   display: grid;
-  grid-template-columns: 3ch 1fr 1fr;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
 }
 .moves li:nth-child(odd) {
@@ -122,12 +132,15 @@
 }
 .moveNumber {
   color: var(--color-text-muted);
-  padding-left: var(--space-1);
+  text-align: right;
+  white-space: nowrap;
+  padding: 0 var(--space-1) 0 var(--space-2);
 }
 .san {
   font: inherit;
   text-align: left;
-  padding: var(--space-1) var(--space-2);
+  white-space: nowrap;
+  padding: var(--space-1);
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
