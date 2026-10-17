@@ -20,7 +20,8 @@ const nameOf = async (player) =>
     .getByRole("banner")
     .getByText(/^Guest-/)
     .textContent();
-const popup = (player) => player.page.getByRole("alertdialog");
+/** The request popup: a region named after the request, in the page above the board (CC-104). */
+const popup = (player) => player.page.getByRole("region", { name: /^(Draw offer|Rematch\?)$/ });
 
 /**
  * Alice hosts a chess game and Bob joins by the link. Colours are drawn at random, so this finds out who plays
@@ -86,6 +87,11 @@ test.describe("draw offers", () => {
     await expect(popup(alice)).toBeVisible();
     await expect(popup(alice)).toHaveAccessibleName("Draw offer");
     await expect(popup(alice)).toHaveAccessibleDescription(`${bobName} offers a draw.`);
+    // It covers no square of the board, on a phone too, and takes no focus.
+    const box = await popup(alice).boundingBox();
+    const board = await alice.page.getByRole("grid", { name: "Chess board" }).boundingBox();
+    expect(box.y + box.height).toBeLessThanOrEqual(board.y);
+    expect(await popup(alice).evaluate((element) => element.contains(document.activeElement))).toBe(false);
     await screenshot(alice, "draw-offer-popup", testInfo);
     await screenshot(bob, "draw-offer-waiting", testInfo);
 
@@ -161,11 +167,18 @@ test.describe("rematch requests", () => {
     await expect(bob.page.getByText(`${aliceName} took back the rematch request`)).toBeVisible();
 
     await alice.page.getByRole("button", { name: "Rematch", exact: true }).click();
+    await popup(bob).getByRole("button", { name: "Decline" }).click();
+    // The message about the first "no" may still be up as well.
+    const declined = alice.page.getByText(`${bobName} declined the rematch`, { exact: true });
+    await expect(declined.first()).toBeVisible();
+    await alice.page.getByRole("button", { name: "Rematch", exact: true }).click();
     await popup(bob).getByRole("button", { name: "Accept" }).click();
     for (const player of [alice, bob]) {
       await expect(player.page.getByRole("group", { name: "Your choice" })).toBeVisible();
       await expect(popup(player)).toHaveCount(0);
     }
+    // The new game has started, so the message about the last "no" is gone at once.
+    await expect(declined).toHaveCount(0, { timeout: 1_000 });
   });
 });
 

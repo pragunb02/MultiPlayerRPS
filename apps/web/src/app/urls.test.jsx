@@ -70,7 +70,8 @@ describe("old and alternative URLs lead to the canonical one", () => {
     const { url } = renderApp({ path: from, api: asGuest(), socket: roomSocket(tictactoeRoom) });
 
     expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
-    expect(url()).toBe("/games/tic-tac-toe/rooms/AB2CD3");
+    // The address is recorded after the screen is drawn (LocationProbe runs in an effect).
+    await waitFor(() => expect(url()).toBe("/games/tic-tac-toe/rooms/AB2CD3"));
     expect(document.title).toBe("Tic Tac Toe · Room AB2CD3 · ClassiCade");
   });
 
@@ -141,7 +142,8 @@ describe("account pages and `next`", () => {
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
-    expect(url()).toBe("/games/tic-tac-toe/rooms/AB2CD3");
+    // The address is recorded after the screen is drawn (LocationProbe runs in an effect).
+    await waitFor(() => expect(url()).toBe("/games/tic-tac-toe/rooms/AB2CD3"));
   });
 });
 

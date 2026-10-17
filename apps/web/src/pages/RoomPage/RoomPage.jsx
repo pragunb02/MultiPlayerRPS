@@ -85,7 +85,7 @@ export function RoomPage() {
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const gameId = room.room?.gameId ?? urlGame?.id;
   const notify = useCallback((message) => toast.show(message, { tone: "info" }), [toast]);
-  useRoomAlerts(room.room, { notify });
+  useRoomAlerts(room.room, { notify, dismiss: toast.dismiss });
 
   if (gameId !== undefined && location.pathname !== paths.room(gameId, code)) {
     return <Navigate to={paths.room(gameId, code)} replace />;

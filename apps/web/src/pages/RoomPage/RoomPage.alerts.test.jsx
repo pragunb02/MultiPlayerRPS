@@ -45,6 +45,8 @@ const chess = ({ view = {}, activePlayers = [GUEST.id], ...overrides } = {}) => 
 });
 
 const WIN = { status: "finished", result: "win", winners: [GUEST.id], reason: "reached-target" };
+// The rematch window ends half an hour after the game (CC-101).
+const UNTIL = 1_000_000 + 30 * 60 * 1000;
 const finished = (rematch = { requestedBy: [], available: true, declinedBy: "" }) => ({
   code: "AB2CD3",
   gameId: "ludo",
@@ -53,9 +55,17 @@ const finished = (rematch = { requestedBy: [], available: true, declinedBy: "" }
   players: { min: 2, max: 2 },
   seats: [ME, BOB],
   you: GUEST.id,
+  serverTime: 1_000_000,
   game: { view: {}, activePlayers: [], outcome: WIN },
-  rematch,
+  rematch: { until: UNTIL, ...rematch },
   series: { games: 1, wins: { [GUEST.id]: 1 } },
+});
+/** The rematch has started: the same room, playing again. */
+const rematchStarted = () => ({
+  ...finished(),
+  status: "playing",
+  game: { view: {}, activePlayers: [GUEST.id], outcome: { status: "ongoing" } },
+  rematch: undefined,
 });
 
 /** Opens the room. The socket answers each request with `answers[event]` (a view, or a function giving one). */
@@ -74,7 +84,10 @@ function openRoom(joined, answers = {}) {
 }
 
 const push = (socket, room) => act(() => socket.push("room:updated", room));
-const popup = () => screen.findByRole("alertdialog");
+// The popup is a region named after the request, in the page above the board (CC-104).
+const POPUP = { name: /^(Draw offer|Rematch\?)$/ };
+const popup = () => screen.findByRole("region", POPUP);
+const noPopup = () => expect(screen.queryByRole("region", POPUP)).not.toBeInTheDocument();
 
 beforeEach(() => {
   installVisibility({ hidden: false });
@@ -94,7 +107,7 @@ describe("draw offers (CC-104)", () => {
     const dialog = await popup();
     expect(dialog).toHaveAccessibleName("Draw offer");
     expect(dialog).toHaveAccessibleDescription("Bob offers a draw.");
-    expect(within(dialog).getByRole("button", { name: "Accept" })).toHaveFocus();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Bob offers a draw.");
     expect(sound.played).toEqual(["notify"]);
 
     await user.click(within(dialog).getByRole("button", { name: "Accept" }));
@@ -103,7 +116,7 @@ describe("draw offers (CC-104)", () => {
       code: "AB2CD3",
       move: { type: "accept-draw" },
     });
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(noPopup);
   });
 
   it("declines with Decline, and the game goes on", async () => {
@@ -118,7 +131,7 @@ describe("draw offers (CC-104)", () => {
       code: "AB2CD3",
       move: { type: "decline-draw" },
     });
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(noPopup);
     expect(screen.getByRole("grid", { name: "Chess board" })).toBeInTheDocument();
   });
 
@@ -127,15 +140,20 @@ describe("draw offers (CC-104)", () => {
     const { socket } = openRoom(chess({ view: { drawOfferBy: BOB.playerId } }));
 
     await user.click(within(await popup()).getByRole("button", { name: "Hide" }));
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    noPopup();
     expect(screen.getByRole("gridcell", { name: "e2, white pawn" })).toBeEnabled();
 
     // The offer ends and a new one comes: that one is shown again.
     push(socket, chess({ view: { drawAnswer: "withdrawn" } }));
     push(socket, chess({ view: { drawOfferBy: BOB.playerId } }));
-    await popup();
+    const again = await popup();
+    // Escape on the board is the board's (it puts a piece down). Inside the popup it hides the popup.
+    await user.click(screen.getByRole("gridcell", { name: "e2, white pawn" }));
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", POPUP)).toBeInTheDocument();
+    within(again).getByRole("button", { name: "Decline" }).focus();
+    await user.keyboard("{Escape}");
+    noPopup();
   });
 
   it("closes by itself when the offer is withdrawn, and says so", async () => {
@@ -144,7 +162,7 @@ describe("draw offers (CC-104)", () => {
 
     push(socket, chess({ view: { drawAnswer: "withdrawn" } }));
 
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(noPopup);
     expect(await screen.findByText("Bob withdrew the draw offer")).toBeInTheDocument();
     expect(sound.played).toEqual(["notify"]);
   });
@@ -156,7 +174,7 @@ describe("draw offers (CC-104)", () => {
 
     const card = await screen.findByRole("region", { name: "Draw offered" });
     expect(within(card).getByRole("status")).toHaveTextContent("Draw offered. Waiting for Bob…");
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    noPopup();
 
     await user.click(within(card).getByRole("button", { name: "Cancel" }));
     expect(socket.request).toHaveBeenCalledWith("game:move", {
@@ -183,19 +201,26 @@ describe("draw offers (CC-104)", () => {
     await user.click(within(await popup()).getByRole("button", { name: "Accept" }));
 
     expect(await screen.findByText("There is no draw offer to accept")).toBeInTheDocument();
-    expect(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Accept" })).toBeEnabled();
+    expect(within(screen.getByRole("region", POPUP)).getByRole("button", { name: "Accept" })).toBeEnabled();
   });
 
-  it("gives focus back to where it was when the popup closes", async () => {
-    const { socket } = openRoom(chess());
-    const leave = await screen.findByRole("button", { name: "Leave room" });
-    leave.focus();
+  it("never takes focus: a player in the middle of a move keeps the board (CC-104)", async () => {
+    const user = userEvent.setup();
+    const { socket } = openRoom(chess(), {
+      "game:move": () => chess({ view: { fen: AFTER_E4, moves: ["e4"], drawOfferBy: BOB.playerId } }),
+    });
+    const e2 = await screen.findByRole("gridcell", { name: "e2, white pawn" });
+    await user.click(e2);
 
     push(socket, chess({ view: { drawOfferBy: BOB.playerId } }));
-    expect(within(await popup()).getByRole("button", { name: "Accept" })).toHaveFocus();
-    push(socket, chess({ view: { drawAnswer: "withdrawn" } }));
+    await popup();
 
-    await waitFor(() => expect(leave).toHaveFocus());
+    expect(e2).toHaveFocus();
+    await user.keyboard("{ArrowUp}{ArrowUp}{Enter}");
+    expect(socket.request).toHaveBeenCalledWith("game:move", {
+      code: "AB2CD3",
+      move: { type: "move", from: "e2", to: "e4" },
+    });
   });
 
   it("leaves focus where the player put it while the popup was open", async () => {
@@ -208,7 +233,7 @@ describe("draw offers (CC-104)", () => {
     await user.click(screen.getByRole("gridcell", { name: "e2, white pawn" }));
     push(socket, chess({ view: { drawAnswer: "withdrawn" } }));
 
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(noPopup);
     expect(screen.getByRole("gridcell", { name: /^e2/ })).toHaveFocus();
   });
 
@@ -216,7 +241,7 @@ describe("draw offers (CC-104)", () => {
     openRoom(chess({ you: "", view: { drawOfferBy: BOB.playerId } }));
 
     await screen.findByRole("grid", { name: "Chess board" });
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    noPopup();
     expect(screen.queryByRole("region", { name: "Draw offered" })).not.toBeInTheDocument();
   });
 });
@@ -247,7 +272,7 @@ describe("rematch requests (CC-104)", () => {
     await user.click(within(await popup()).getByRole("button", { name: "Decline" }));
 
     expect(socket.request).toHaveBeenCalledWith("room:rematch-decline", { code: "AB2CD3" });
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(noPopup);
     expect(screen.getByText("You declined the rematch. Changed your mind?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
   });
@@ -266,13 +291,24 @@ describe("rematch requests (CC-104)", () => {
     expect(sound.played).toEqual(["notify"]);
   });
 
+  it("takes the decline message away once the rematch starts", async () => {
+    const { socket } = openRoom(finished({ requestedBy: [GUEST.id], available: true, declinedBy: "" }));
+    await screen.findByText("Waiting for Bob…");
+    push(socket, finished({ requestedBy: [], available: true, declinedBy: BOB.playerId }));
+    expect(await screen.findByText("Bob declined the rematch")).toBeInTheDocument();
+
+    push(socket, rematchStarted());
+
+    await waitFor(() => expect(screen.queryByText("Bob declined the rematch")).not.toBeInTheDocument());
+  });
+
   it("tells the one asked when the request is taken back, and closes the popup", async () => {
     const { socket } = openRoom(finished({ requestedBy: [BOB.playerId], available: true, declinedBy: "" }));
     await popup();
 
     push(socket, finished());
 
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(noPopup);
     expect(await screen.findByText("Bob took back the rematch request")).toBeInTheDocument();
   });
 
@@ -282,7 +318,7 @@ describe("rematch requests (CC-104)", () => {
 
     push(socket, finished({ requestedBy: [], available: false, declinedBy: "" }));
 
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await waitFor(noPopup);
     expect(screen.getByText("Opponent left — no rematch this time.")).toBeInTheDocument();
   });
 

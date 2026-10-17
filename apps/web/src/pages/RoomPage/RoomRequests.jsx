@@ -1,48 +1,30 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { Button } from "../../components/Button/Button.jsx";
 import { incomingRequests, roomRequests } from "../../games/roomUpdates.js";
 import { nameOf, opponentsOf } from "../../games/roomView.js";
 import styles from "./RoomRequests.module.css";
 
 /**
- * The question an opponent is waiting on, as a popup with Accept and Decline (CC-104). It does not cover the page
- * with a backdrop, so the board stays usable, and Hide (or Escape) puts it away until the next request. Focus moves
- * to it so keyboard and screen reader users hear the question at once, and goes back where it was afterwards.
+ * The question an opponent is waiting on, with Accept, Decline and Hide (CC-104). It sits in the page above the
+ * board, never over it, so a phone shows every rank. It takes no focus: a player in the middle of a move keeps the
+ * board, and keyboard play goes on. The question is announced when it appears, and Escape inside it puts it away
+ * like Hide does.
  */
 function RequestDialog({ request, room, onAnswer, onHide, busy }) {
-  const box = useRef(null);
   const titleId = useId();
   const questionId = useId();
 
-  useEffect(() => {
-    const previouslyFocused = document.activeElement;
-    box.current.querySelector("button").focus();
-    const onKey = (event) => event.key === "Escape" && onHide(request.key);
-    document.addEventListener("keydown", onKey);
-    const dialog = box.current;
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      // Give focus back only if it was still in the popup. A player who went back to the board keeps their place.
-      const focused = document.activeElement;
-      if (focused === null || focused === document.body || dialog.contains(focused)) {
-        previouslyFocused?.focus?.();
-      }
-    };
-  }, [request.key, onHide]);
-
   return (
-    <div
-      ref={box}
+    <section
       className={styles.dialog}
-      role="alertdialog"
-      aria-modal="false"
       aria-labelledby={titleId}
       aria-describedby={questionId}
+      onKeyDown={(event) => event.key === "Escape" && onHide(request.key)}
     >
       <h2 id={titleId} className={styles.title}>
         {request.title}
       </h2>
-      <p id={questionId} className={styles.question}>
+      <p id={questionId} className={styles.question} role="alert">
         {request.question(nameOf(room, request.from))}
       </p>
       <div className={styles.actions}>
@@ -56,7 +38,7 @@ function RequestDialog({ request, room, onAnswer, onHide, busy }) {
           Hide
         </Button>
       </div>
-    </div>
+    </section>
   );
 }
 

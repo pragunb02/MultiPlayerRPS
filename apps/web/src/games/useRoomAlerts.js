@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { ROOM_STATUS } from "@classicade/shared";
 import { useSound } from "../hooks/useSound.js";
 import { useTurnAlert } from "../hooks/useTurnAlert.js";
 import { roomNotices, roomSounds } from "./roomUpdates.js";
@@ -10,19 +11,23 @@ import { isYourTurn } from "./roomView.js";
  * are passed to `notify`. While it is the player's move and the tab is in the background, the tab title calls
  * them back.
  *
- * The first view after opening or reloading the page only becomes the starting point: a reload is not news.
+ * The first view after opening or reloading the page only becomes the starting point: a reload is not news. When a
+ * rematch starts, the messages about the last game's requests ("Bob declined the rematch") are taken away with
+ * `dismiss`: they are over.
  *
  * @param {any} room  the RoomView, undefined until joined
- * @param {{ notify: (message: string) => void }} options
+ * @param {{ notify: (message: string) => number, dismiss: (id: number) => void }} options  `notify` returns an id
+ *   that `dismiss` takes
  */
-export function useRoomAlerts(room, { notify }) {
+export function useRoomAlerts(room, { notify, dismiss }) {
   const sound = useSound();
   const previous = useRef(undefined);
-  // The latest callback, so a new function from the page on every render does not count as a room change.
-  const notifyRef = useRef(notify);
+  const shown = useRef([]);
+  // The latest callbacks, so new functions from the page on every render do not count as a room change.
+  const callbacks = useRef({ notify, dismiss });
   useEffect(() => {
-    notifyRef.current = notify;
-  }, [notify]);
+    callbacks.current = { notify, dismiss };
+  }, [notify, dismiss]);
 
   useEffect(() => {
     const before = previous.current;
@@ -34,7 +39,11 @@ export function useRoomAlerts(room, { notify }) {
     if (sounds.length > 0) {
       sound.play(sounds);
     }
-    roomNotices(before, room).forEach((message) => notifyRef.current(message));
+    if (before.status === ROOM_STATUS.FINISHED && room.status === ROOM_STATUS.PLAYING) {
+      shown.current.forEach((id) => callbacks.current.dismiss(id));
+      shown.current = [];
+    }
+    roomNotices(before, room).forEach((message) => shown.current.push(callbacks.current.notify(message)));
   }, [room, sound]);
 
   useTurnAlert(room !== undefined && isYourTurn(room));

@@ -38,11 +38,12 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
         action ? displayMs * ACTION_FACTOR : displayMs,
       );
       timers.current.add(timer);
+      return id;
     },
     [displayMs, remove],
   );
 
-  const value = useMemo(() => ({ show }), [show]);
+  const value = useMemo(() => ({ show, dismiss: remove }), [show, remove]);
 
   return (
     <ToastContext.Provider value={value}>
