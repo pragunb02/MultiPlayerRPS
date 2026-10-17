@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, nextEvent as nextUpdate, send } from "../../testing/socketClients.js";
+import { roomLimits } from "../../domain/rooms/roomLimits.js";
 import { startTestServer } from "../../testing/testApp.js";
 
 let server;
@@ -248,7 +249,9 @@ describe("rooms over sockets", () => {
   });
 
   it("rate-limits a client that floods events", async () => {
-    server = await startTestServer({ rateLimit: { capacity: 3, refillPerSecond: 0.001 } });
+    server = await startTestServer({
+      roomLimits: roomLimits({ eventBurstPerPlayer: 3, eventsPerSecondPerPlayer: 1 }),
+    });
     const alice = await player();
 
     const acks = await Promise.all(

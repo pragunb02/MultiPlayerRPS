@@ -60,6 +60,12 @@ Server-side in MongoDB (`player_sessions`), cookie `cc.sid` (HttpOnly, Secure, S
 (CC-096): every visit re-issues the cookie and moves expiry to 30 days after it; the stored copy's expiry is rewritten
 at most once an hour; MongoDB's TTL index deletes expired sessions. Changing `SESSION_SECRET` logs everyone out.
 
+A signed-in session also ends **90 days after signing in** however often it is used, and whenever the account's
+`sessionVersion` (in `accounts`) moves past the one the session was made at: changing the password and "sign out
+other devices" on the profile do that (CC-116). Accounts and sessions from before CC-116 count as version 0, and
+their 90 days start the first time the server sees them after the deploy, so nobody is logged out by it. Guest
+sessions have no 90 day end.
+
 ## Rooms
 
 Stored in MongoDB (`rooms`, and `closed_rooms` for the reason a room closed), so a deploy, a crash or the free plan's
@@ -67,6 +73,13 @@ sleep never loses a game (CC-101). Players' browsers reconnect and rejoin by the
 process marks every seat as away until its player is back, and applies chess flags that fell while no server ran.
 How long rooms live is in `apps/server/src/domain/rooms/roomLifetimes.js` (rematch window 30 minutes, an away game
 2 hours, closed room records 1 day). There are no settings for it in production.
+
+How much one player and the whole server may use is in `apps/server/src/domain/rooms/roomLimits.js` (CC-107): 3
+waiting rooms per player, 2000 open rooms in all (past that, creating a room answers "The server is busy, try again
+in a minute"), 5 realtime connections per browser session, 30 per address (found through `TRUST_PROXY_HOPS` like
+the HTTP limits), and one event budget per player for all their tabs. Every minute the server logs `room gauge` with
+the open rooms per status, the connections and the connected players. Watch it to see how close production is to
+the limits.
 
 ## Client addresses and rate limits
 

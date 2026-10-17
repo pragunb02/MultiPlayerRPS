@@ -1,3 +1,4 @@
+import { ROOM_STATUS } from "@classicade/shared";
 import { ConcurrentChangeError, ConflictError, NotFoundError } from "../utils/errors.js";
 import { assertDefined } from "../utils/assert.js";
 import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
@@ -160,5 +161,16 @@ export function createRoomAccessor({ roomDao }) {
 
     /** @param {number} now  the rooms whose lifetime has ended */
     listExpired: async (now) => toRooms(await roomDao.listExpired(now)),
+
+    /** @returns {Promise<number>} how many rooms are open, cheap enough to ask before every new room (CC-107) */
+    countOpen: () => roomDao.countOpen(),
+
+    /** @returns {Promise<Readonly<Record<"waiting" | "playing" | "finished", number>>>} open rooms per status */
+    async countByStatus() {
+      const counts = await roomDao.countByStatus();
+      return Object.freeze(
+        Object.fromEntries(Object.values(ROOM_STATUS).map((status) => [status, counts[status] ?? 0])),
+      );
+    },
   });
 }

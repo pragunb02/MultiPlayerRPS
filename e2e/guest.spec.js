@@ -2,6 +2,28 @@ import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
 
 // Two guests playing: what each one can see, and where every button leads.
 test.describe("guest players", () => {
+  test("a guest with three rooms waiting is asked to close one before opening a fourth (CC-107)", async ({
+    players,
+  }) => {
+    const alice = await players.open("alice");
+    const first = await createRoom(alice, "tic-tac-toe");
+    await createRoom(alice, "tic-tac-toe");
+    await createRoom(alice, "rock-paper-scissors");
+
+    await alice.page.goto("/games/chess");
+    await alice.page.getByRole("button", { name: "Create room" }).click();
+    await expect(alice.page.getByRole("alert")).toHaveText(
+      "You already have 3 rooms waiting; close one first",
+    );
+    await expect(alice.page).toHaveURL("/games/chess");
+
+    await alice.page.goto(first.path);
+    await alice.page.getByRole("button", { name: "Leave room" }).click();
+    await alice.page.goto("/games/chess");
+    await alice.page.getByRole("button", { name: "Create room" }).click();
+    await expect(alice.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
+  });
+
   test("play Rock Paper Scissors without seeing the other's choice before the reveal", async ({
     players,
   }) => {

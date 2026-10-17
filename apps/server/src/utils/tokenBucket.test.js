@@ -37,6 +37,17 @@ describe("createTokenBucket", () => {
     expect([1, 2, 3, 4].map(() => bucket.tryTake())).toEqual([true, true, true, false]);
   });
 
+  it("knows when it has refilled completely", () => {
+    const { bucket, advance } = setup();
+    expect(bucket.isFull()).toBe(true);
+
+    bucket.tryTake();
+    expect(bucket.isFull()).toBe(false);
+    advance(60_000);
+
+    expect(bucket.isFull()).toBe(true);
+  });
+
   it.each([
     { capacity: 0, refillPerSecond: 1 },
     { capacity: 1, refillPerSecond: 0 },

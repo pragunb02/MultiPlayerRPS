@@ -200,5 +200,22 @@ export function createRoomDao({ connection }) {
 
     /** @param {number} now  rooms whose lifetime ended at or before `now` */
     listExpired: (now) => find({ expiresAt: { $lte: now } }),
+
+    /**
+     * How many rooms are stored, read from the collection's own count, so it costs the same however many rooms
+     * there are. A room left half closed by a stopped process is still counted until it is forgotten, which only
+     * makes the count a little high for a day.
+     *
+     * @returns {Promise<number>}
+     */
+    countOpen: () => rooms.estimatedDocumentCount(),
+
+    /** @returns {Promise<Record<string, number>>} open rooms per status, only for statuses that have any */
+    async countByStatus() {
+      const groups = await rooms
+        .aggregate([{ $match: { ...OPEN } }, { $group: { _id: "$status", rooms: { $sum: 1 } } }])
+        .toArray();
+      return Object.fromEntries(groups.map((group) => [group._id, group.rooms]));
+    },
   });
 }

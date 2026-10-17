@@ -99,6 +99,18 @@ describe("roomAccessor", () => {
     expect((await rooms.listExpired(100)).map((r) => r.code)).toEqual(["ROOM22"]);
   });
 
+  it("counts open rooms, in all and per status with every status present", async () => {
+    const rooms = setup();
+    await rooms.create(room());
+    await rooms.create(room({ code: "ROOM33", status: "playing" }));
+
+    const perStatus = await rooms.countByStatus();
+
+    expect(await rooms.countOpen()).toBe(2);
+    expect(perStatus).toEqual({ waiting: 1, playing: 1, finished: 0 });
+    expect(Object.isFrozen(perStatus)).toBe(true);
+  });
+
   it("passes unexpected storage failures through unchanged", async () => {
     const failure = new Error("disk on fire");
     const fail = async () => {
