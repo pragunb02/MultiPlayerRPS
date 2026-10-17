@@ -1,6 +1,6 @@
 # Analytics event catalogue
 
-**Status: Proposed** (CC-244, 2026-10-18). Nothing here is built or recorded yet. The owner accepts, changes or cuts
+**Status: Proposed** (CC-244, 2026-10-18). The owner's answers to Q1, Q3, Q5 and Q6 are in [ADR-034](../DECISIONS.md): counts tier only, opt-out in the browser, player statuses, India days. Nothing here is built or recorded yet. The owner accepts, changes or cuts
 this list. CC-173 then records the decision as an ADR and the privacy page section, and CC-174 to CC-178 build only
 what is on the accepted list. An event that is not on this list is not sent.
 

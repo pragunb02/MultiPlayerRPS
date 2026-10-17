@@ -12,6 +12,31 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 
 ## Accepted decisions
 
+### ADR-034 — Analytics: anonymous counts, India days, player statuses, and the CC-036 time limits
+
+- **Status:** Accepted · 2026-10-18 (owner, answering the open questions in [analytics/EVENTS.md](analytics/EVENTS.md))
+- **Context.** CC-244 proposed the event catalogue with open questions. The owner was asked about the analytics
+  tier, the definition of an active player, the day boundary, where the opt-out lives, and the CC-036 timings.
+- **Decision.**
+  1. **Anonymous counts for everyone.** Every event is in the counts tier: no player, session or device id, for
+     every player. The adult tier (a keyed hash of the account id) is not built. Revisit only with a lawyer's
+     reading of the event list and after CC-152.
+  2. **India days.** Daily totals and every "day" in the console follow Asia/Kolkata.
+  3. **Opt-out in the browser.** One allowlisted web storage key, `cc.telemetry`, plus Global Privacy Control and
+     Do Not Track. Not stored on the account.
+  4. **Player statuses instead of one active number.** Worked out each India day from `matches`, for guests and
+     accounts alike, with no tracking: New (first game in the last 7 days), Casual (played 1 day of the last 7),
+     Regular (2 to 3 days), Core (4 or more days), Returning (played today after 14 or more days away), Lapsing
+     (last game 8 to 14 days ago), Dormant (15 or more days). **North Star: Regular plus Core each week.** The
+     console shows each status as a weekly trend and how players move between them (CC-255).
+  5. **CC-036 time limits.** 60 s before a win can be claimed against a disconnected player, 30 s per Rock Paper
+     Scissors throw, 60 s per Tic-Tac-Toe move, 60 s for a first move (otherwise the game is cancelled and nothing
+     is recorded).
+- **Consequences.** Counts can say how many presses, visits and waits there were, never which person made them,
+  so per-person funnels across visits are not possible; the browser works out per-visit sequences itself (rage
+  clicks, time to first move) and sends only the result. Retention, cohorts and statuses come from game records,
+  which already exist. EVENTS.md becomes Accepted with these answers; CC-173 writes the privacy page wording.
+
 ### ADR-033 — Every tab follows the session: server disconnects and a message without identity
 
 - **Status:** Accepted · 2026-10-18 (CC-234, CC-115; research in `docs/tickets/CC-115.md`)
