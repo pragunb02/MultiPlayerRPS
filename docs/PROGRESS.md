@@ -8,7 +8,7 @@
 | Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-236`                                                                                                                                                                                                                                                                     |
 | Current stage | **Stage 0 — Foundation**                                                                                                                                                                                                                                                                                                           |
 | Stage health  | 🟢 On track                                                                                                                                                                                                                                                                                                                        |
-| In progress   | CC-138 bots in rooms, CC-049 error tracking and alerts, CC-126 comment sweep; PR #50 story mode design                                                                                                                                                                                                                             |
+| In progress   | CC-138 bots in rooms, CC-049 error tracking and alerts, CC-126 comment sweep, CC-233 owner analytics console (PR #64); PR #50 story mode design                                                                                                                                                                                    |
 | Blocked on    | —                                                                                                                                                                                                                                                                                                                                  |
 | Next up       | Phase 0 of the accepted [PRODUCT_VISION.md](PRODUCT_VISION.md): CC-105 (owner rotates the leaked Atlas password), CC-107 (room flood), CC-116, CC-117 and CC-118 (SEC-15 to SEC-17), CC-122 (staging), merge PR #51 and PR #53. Then the top 10 on the board. Hosting (CC-028, CC-227) is deferred until an ADR-005 trigger is met |
 
@@ -17,12 +17,12 @@
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
 | S0 Foundation   | 🟡 In progress | 58 / 79      |
-| S1 MVP launch   | 🟡 Started     | 9 / 77       |
+| S1 MVP launch   | 🟡 Started     | 9 / 80       |
 | S2 Retention    | ⚪ Not started | 3 / 55       |
 | S3 Monetization | ⚪ Not started | 0 / 10       |
 | S4 Scale        | ⚪ Not started | 0 / 6        |
 
-Counted from the board on 2026-10-17: every ticket in a Stage section or with that Stage in its Stage column, spares
+Counted from the board on 2026-10-18: every ticket in a Stage section or with that Stage in its Stage column, spares
 left out. CC-137 will make this count automatic.
 
 ## Issue tracker

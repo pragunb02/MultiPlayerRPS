@@ -49,8 +49,8 @@ These rules come first. Where they differ from anything below, they win.
 6. **Steady, not frantic.** At most six builders run at once, and only on independent work (no shared files).
    Builders run lint, format, coverage and only their own browser tests locally; CI runs the full browser suite.
    `main` stays green: a merge waits for every check, and a red `main` is fixed before anything else merges.
-7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (`docs/GROWTH.md`) and the owner's
-   admin console are in scope.
+7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (the growth plan, `docs/GROWTH.md`,
+   added by PR #60) and the owner's admin console are in scope.
 8. **Two reviews before every merge.** Every pull request is reviewed before merge by two reviewer agents in
    parallel: a code reviewer (correctness, tests, the working agreement and comment style, regressions) and a
    security reviewer (auth, sessions, sockets, input, data exposure, secrets). Each finding is checked by a second
