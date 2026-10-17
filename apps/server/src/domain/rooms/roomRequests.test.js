@@ -72,9 +72,9 @@ describe("room requests (CC-159)", () => {
   });
 
   it("refuses an unknown kind, the wrong moment, a room without one other player and a second open request", () => {
-    expect(() => addRequest(playing, { playerId: "alice", type: "x", now: T0, rule: undefined, lifetimes })).toThrow(
-      ValidationError,
-    );
+    expect(() =>
+      addRequest(playing, { playerId: "alice", type: "x", now: T0, rule: undefined, lifetimes }),
+    ).toThrow(ValidationError);
     expect(() => ask(playing, { type: ROOM_REQUEST_TYPES.REMATCH })).toThrow(
       "A rematch is only possible after the game is over",
     );
@@ -123,8 +123,9 @@ describe("room requests (CC-159)", () => {
   });
 
   it("keeps an answer while it is shown and the cooldown runs, then forgets it", () => {
-    const room = endRequest(ask(playing), {
-      request: openRequest(ask(playing), "draw"),
+    const asked = ask(playing);
+    const room = endRequest(asked, {
+      request: openRequest(asked, "draw"),
       state: REQUEST_STATES.ACCEPTED,
       now: T0,
     });

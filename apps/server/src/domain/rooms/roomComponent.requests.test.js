@@ -36,7 +36,7 @@ function setup() {
 /** Alice hosts chess and Bob joins. With seed 42 Bob plays White and moves first. */
 async function chessGame() {
   const ctx = setup();
-  await ctx.rooms.createRoom({ host: ALICE, gameId: "chess", options: {}, now: T0 });
+  await ctx.rooms.createRoom({ network: "net-a", host: ALICE, gameId: "chess", options: {}, now: T0 });
   await ctx.rooms.joinRoom({ code: ctx.code, player: BOB, now: T0 + 1 });
   return ctx;
 }
@@ -166,7 +166,13 @@ describe("roomComponent requests of a game (CC-159)", () => {
       ValidationError,
     );
     const race = setup();
-    await race.rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 3 }, now: T0 });
+    await race.rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "race",
+      options: { target: 3 },
+      now: T0,
+    });
     await race.rooms.joinRoom({ code: race.code, player: BOB, now: T0 + 1 });
     await expect(offer(race.rooms, { code: race.code, playerId: BOB.id, now: T0 + 2 })).rejects.toThrow(
       "You cannot ask that in this game",
@@ -176,7 +182,13 @@ describe("roomComponent requests of a game (CC-159)", () => {
 
   it("needs exactly one other player to ask", async () => {
     const { rooms, code } = setup();
-    await rooms.createRoom({ host: ALICE, gameId: "trio", options: { target: 3 }, now: T0 });
+    await rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "trio",
+      options: { target: 3 },
+      now: T0,
+    });
     await rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
     await rooms.joinRoom({ code, player: CAROL, now: T0 + 2 });
     const room = await rooms.getRoom(code);

@@ -35,7 +35,7 @@ function setup() {
 
 async function started(gameId = "race", options = { target: 3 }) {
   const ctx = setup();
-  await ctx.rooms.createRoom({ host: ALICE, gameId, options, now: T0 });
+  await ctx.rooms.createRoom({ network: "net-a", host: ALICE, gameId, options, now: T0 });
   await ctx.rooms.joinRoom({ code: ctx.code, player: BOB, now: T0 + 1 });
   return ctx;
 }
