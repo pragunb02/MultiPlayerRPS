@@ -433,8 +433,12 @@ describe("the streak-at-risk line", () => {
   });
 
   it("appears when a pushed streak puts it at risk", async () => {
-    const { socket } = openRoom({ path: "/", api: { getStreaks: vi.fn().mockResolvedValue(NO_STREAKS) } });
+    const getStreaks = vi.fn().mockResolvedValue(NO_STREAKS);
+    const { socket } = openRoom({ path: "/", api: { getStreaks } });
     await screen.findByRole("region", { name: "Daily quests" });
+    // The first answer is in before the push, so a slow test machine cannot let it overwrite the pushed streak.
+    await waitFor(() => expect(getStreaks).toHaveBeenCalled());
+    await act(() => getStreaks.mock.results[0].value);
     expect(line()).toBeNull();
 
     act(() => socket.push(SOCKET_EVENTS.STREAKS_UPDATED, { streaks: AT_RISK }));
