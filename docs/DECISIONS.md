@@ -648,22 +648,32 @@ ships, days stay in UTC. The anti-farm caps stay on the server clock (ADR-021 am
 
 ### ADR-005 — Hosting
 
-- **Status:** Accepted · 2026-10-17 (accepted with [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D1. Built by
-  CC-028, CC-227 and CC-122)
-- **Context.** Needs WebSockets, low cost and simple ops. Render's free plan sleeps after 15 minutes without
-  traffic and takes about a minute to wake, which breaks the promise of playing within 10 seconds. Production runs
-  in Oregon on MongoDB Atlas M0, which allows 100 reads and writes a second before it throttles. Render has no
-  Indian region. It offers Oregon, Ohio, Virginia, Frankfurt and Singapore.
+- **Status:** Accepted · 2026-10-17 (with [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D1, which the owner
+  changed: the move to paid hosting is deferred until a trigger is met. CC-028 and CC-227 wait for the triggers)
+- **Context.** Needs WebSockets, low cost and simple ops. Production runs on Render's free plan in Oregon with
+  MongoDB Atlas M0. The free plan sleeps after 15 minutes without traffic and takes about a minute to wake. M0
+  allows 100 reads and writes a second before it throttles. Render has no Indian region, and Singapore is the
+  nearest. The vision recommended moving now to an always-on instance in Singapore with paid Atlas in the same
+  region. The owner chose to wait, because there are no players yet.
 - **Decision.**
-  1. Render, in the Singapore region, on an always-on paid instance.
-  2. MongoDB Atlas on a paid tier in the same region as the app, so every move does not cross an ocean.
-  3. A staging environment with its own Atlas cluster (CC-122).
-  4. Hosting in Mumbai elsewhere (for example Fly.io, or Atlas on AWS Mumbai) is the next step if the latency
-     measured from India after the move stays above 150 ms a round trip.
-  5. The app stays in a container, so a later move stays cheap.
-- **Consequences.** A monthly cost of roughly US$20 to US$75 plus staging (an estimate, check the live pricing pages
-  first). Moving region moves the database too, so the move needs a runbook in DEPLOYMENT.md. Time to first byte and
-  largest contentful paint are measured from India before and after the move.
+  1. Stay on Render free (Oregon) and Atlas M0 for now.
+  2. The 10 minute uptime monitor (CC-049) keeps the free instance mostly awake.
+  3. Nightly encrypted backups (CC-108) cover data safety.
+  4. A "Waking up the arcade" loading screen (CC-232) covers the cold starts that remain.
+  5. Switch only when one of these triggers is met:
+     1. **Always-on Render** when there are more than about 50 daily players, or telemetry shows real players
+        hitting cold starts.
+     2. **The Singapore region** when the 95th percentile move latency from India passes the 150 ms target (NFR-3).
+        The database moves to the same region at the same time.
+     3. **Paid Atlas** (CC-227) when the database passes 300 MB or queries are slow.
+  6. Hosting in Mumbai elsewhere (for example Fly.io, or Atlas on AWS Mumbai) is the step after Singapore, if the
+     latency measured from India still stays above 150 ms a round trip.
+  7. The app stays in a container, so a later move stays cheap.
+- **Consequences.** No hosting cost for now. Some first visits may still wait while the instance wakes, so the
+  loading screen must say what is happening. The triggers need numbers: daily players, cold start hits, move latency
+  from India and database size. Telemetry (CC-045, CC-173 to CC-177) and an India latency check give them. CC-028
+  and CC-227 sit at the end of phase 1 and start only when a trigger fires. A region move moves the database too,
+  so it needs a runbook in DEPLOYMENT.md first.
 
 ### ADR-000 — Server-authoritative game model
 
