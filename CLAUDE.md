@@ -46,8 +46,9 @@ These rules come first. Where they differ from anything below, they win.
    that section is written.
 5. **Document everything.** Decisions go in `docs/DECISIONS.md`, research in the ticket or `docs/investigations/`,
    changes in `docs/PROGRESS.md`. Nothing decided only in chat.
-6. **Steady, not frantic.** At most three builders run at once, and `main` stays green: a merge waits for every check,
-   and a red `main` is fixed before anything else merges.
+6. **Steady, not frantic.** At most six builders run at once, and only on independent work (no shared files).
+   Builders run lint, format, coverage and only their own browser tests locally; CI runs the full browser suite.
+   `main` stays green: a merge waits for every check, and a red `main` is fixed before anything else merges.
 7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (`docs/GROWTH.md`) and the owner's
    admin console are in scope.
 
