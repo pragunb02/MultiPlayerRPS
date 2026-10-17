@@ -11,6 +11,12 @@
 | Started  | YYYY-MM-DD                                                    |
 | Done     | —                                                             |
 
+## Research (written before any code)
+
+1. How our code does it today (files, behaviour, gaps).
+2. How other products do it, with sources and dates.
+3. What is best for ClassiCade, and why (our players, our rules, our constraints).
+
 ## Why
 
 What problem this solves and for whom.
