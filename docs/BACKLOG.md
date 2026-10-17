@@ -3,7 +3,7 @@
 Every unit of work is a ticket with a permanent ID **`CC-###`** (ClassiCade). IDs are sequential, never reused,
 and don't encode the stage — a ticket can move between stages without changing its ID.
 
-**Next free ID: `CC-235`** — bump this when you add a ticket.
+**Next free ID: `CC-236`** — bump this when you add a ticket.
 
 | Field  | Values                                                                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -376,3 +376,4 @@ added by the owner the same day, when hosting was deferred (ADR-005).
 | CC-232                      | "Waking up the arcade" animated loading screen while the free Render instance wakes from a cold start (ADR-005): says what is happening, shows progress, retries on its own, reduced motion respected                                                                | feature  | P1  | S1    | 1                         | ⬜ Todo        | ADR-005, ADR-012, CC-153, CC-049                                       |
 | CC-234                      | A device signed out remotely (CC-116 sign out other devices, password change) loses its socket but keeps showing its old screen until a reload or request: refresh the session when the server disconnects for that reason                                           | bug      | P1  | S1    | 1                         | ⬜ Todo        | CC-116, CC-115                                                         |
 | CC-233                      | Owner analytics console at /admin from existing data: active players per day, week and month, games by type, guest vs account and conversion, day 1 and day 7 cohorts, busiest hours, achievements and quests; admin allowlist, aggregates only, small groups hidden | feature  | P1  | S1    | 1                         | 🟦 In progress | CC-059, CC-045                                                         |
+| CC-235                      | ResultCelebration misses a progress:updated that arrives before the result renders (fairPlay e2e flake): keep the last progress update per match so the result reads it when it mounts                                                                               | bug      | P1  | S1    | 1                         | ⬜ Todo        | CC-095, CC-164                                                         |
