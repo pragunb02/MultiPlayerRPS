@@ -24,7 +24,8 @@ test.describe("visitor choosing a public name", () => {
     ]) {
       await username.fill(name);
       await page.getByRole("button", { name: "Create account" }).click();
-      await expect(username, name).toHaveAccessibleDescription(new RegExp(message.replace(/\./g, "\\.")));
+      await expect(page.getByText(message, { exact: true }), name).toBeVisible();
+      await expect(username).toHaveAccessibleDescription(`Shown to other players ${message}`);
       await expect(username).toHaveAttribute("aria-invalid", "true");
       await expect(page).toHaveURL("/signup");
     }
