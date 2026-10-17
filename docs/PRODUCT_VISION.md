@@ -1,6 +1,6 @@
 # ClassiCade product vision
 
-Owner: Pragun Bhutani. Written by: head of product. Date: 17 October 2026. Status: proposed, for the owner to accept. Revision 2 answers every point in the review (see Appendix A).
+Owner: Pragun Bhutani. Written by: head of product. Date: 17 October 2026. Status: accepted by the owner on 17 October 2026. Revision 2 answers every point in the review (see Appendix A).
 
 This document says what ClassiCade is for, who it is for, what we build first and why, and how we will know it is working. Five research tracks back it, all done on 17 October 2026: competitive classic game sites, casual web portals, gamification and social loops, the Indian market, and an audit of ClassiCade today. On the same day I fetched more pages to answer the review: the MongoDB Atlas free tier limits, Render regions and pricing, the Lichess puzzle database and Ultimate Tic Tac Toe. Claims cite their source inline. A claim that rests on general knowledge rather than a fetched page says so and gives a confidence level. Numbers marked "estimate", "target", "guess" or "assumption" are exactly that. Where a study only shows that two things go together, this document calls it a "correlation". It says "experiment" only where the source reports a controlled test.
 
@@ -102,7 +102,7 @@ If the player taps "Find a person", the search runs for at most 4 seconds (3 sec
 | Shared result card                            | 3 s                 | none      | 0.8 s into "beat their score" vs the same character | 2.5 s               | 6.5 s                        |
 | Any entry after a cold start on the free plan | about 60 s          |           |                                                     |                     | fails, so phase 0 removes it |
 
-1. Mechanic: a named character as the main action (CC-051 and proposed CC-219), a labelled bot (CC-138), a gentle starting strength (CC-150) and a parallel search for a person.
+1. Mechanic: a named character as the main action (CC-051 and proposed CC-221), a labelled bot (CC-138), a gentle starting strength (CC-150) and a parallel search for a person.
 2. Emotional payoff: "That was instant, and I won."
 3. Metrics moved: time to first move, conversion to play, and the second match rate.
 
@@ -199,7 +199,7 @@ Circle: "Hostel B4" via WhatsApp link, circle board, shared goal "the circle pla
 Share a result card to WhatsApp ─► friend taps ─► lands in the same challenge ─► new player
 ```
 
-1. Mechanic: friends (CC-052), challenges (CC-139), head-to-head (CC-140), circles (proposed CC-212), turn-based games (proposed CC-220), share cards (proposed CC-215), and later Duo Streaks (proposed CC-211).
+1. Mechanic: friends (CC-052), challenges (CC-139), head-to-head (CC-140), circles (proposed CC-214), turn-based games (proposed CC-222), share cards (proposed CC-217), and later Duo Streaks (proposed CC-213).
 2. Emotional payoff: belonging and rivalry with people you know.
 3. Metrics moved: invite to play conversion, share of weekly players with a friend, day 30 return. Wordle grew from 90 players to over 2 million in about 10 weeks, with 1.2 million results shared on Twitter in 13 days (source: https://en.wikipedia.org/wiki/Wordle, fetched 2026-10-17). Telegram posts a chat's high scores into the chat itself (source: https://core.telegram.org/bots/games, fetched 2026-10-17). That is the model for circle boards.
 
@@ -672,11 +672,11 @@ These follow the UK Children's Code: high privacy by default, no nudges to weake
 
 ## 6. Feature strategy
 
-New tickets are proposed with IDs from CC-207. The board says "Next free ID: CC-207" (source: docs/BACKLOG.md, checked 2026-10-17). PROGRESS.md still says CC-205, which is the drift CC-137 fixes. The IDs below are valid only if the owner adds these tickets before any others. Appendix A lists them all.
+New tickets are proposed with IDs from CC-209. The board says "Next free ID: CC-209" (source: docs/BACKLOG.md, checked 2026-10-17). PROGRESS.md still says CC-205, which is the drift CC-137 fixes. The IDs below are valid only if the owner adds these tickets before any others. Appendix A lists them all.
 
 ### 6.0 Liquidity gates
 
-Each feature that needs a crowd has a numeric switch-on threshold. A nightly job (CC-176) checks the thresholds, and a small flag table (proposed CC-226) switches the features on and off. A gate opens after a threshold has held for two weeks, and closes again after it has fallen below for four weeks. Every threshold here is an estimate and is tuned once data exists.
+Each feature that needs a crowd has a numeric switch-on threshold. A nightly job (CC-176) checks the thresholds, and a small flag table (proposed CC-228) switches the features on and off. A gate opens after a threshold has held for two weeks, and closes again after it has fallen below for four weeks. Every threshold here is an estimate and is tuned once data exists.
 
 | Feature                                             | Switch-on threshold                                                   | What shows before the gate opens                   |
 | --------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------- |
@@ -687,7 +687,7 @@ Each feature that needs a crowd has a numeric switch-on threshold. A nightly job
 | Top 5 on a game page                                | 50 or more accounts on that game's weekly board                       | "Your best this week"                              |
 | Any leaderboard tab                                 | 25 or more entries                                                    | "Your week"                                        |
 | Achievement rarity                                  | 500 or more accounts                                                  | Achievement without a percentage                   |
-| Weekly arena per game (proposed CC-208)             | 30 or more accounts active in that hour slot, two weeks running       | A turn-based "arena week" with friends, or nothing |
+| Weekly arena per game (proposed CC-210)             | 30 or more accounts active in that hour slot, two weeks running       | A turn-based "arena week" with friends, or nothing |
 | Circle weekly board and arena                       | 6 or more members active in that circle that week                     | The circle's shared goal only                      |
 | Leagues (CC-141)                                    | 250 or more weekly accounts (10 cohorts of 25)                        | Personal weekly goal                               |
 | Season rank (CC-055)                                | Same as leagues                                                       | The free season track only (solo, needs no crowd)  |
@@ -695,8 +695,8 @@ Each feature that needs a crowd has a numeric switch-on threshold. A nightly job
 
 Low concurrency is also designed for directly:
 
-1. **Turn-based Tic Tac Toe, Ultimate Tic Tac Toe and chess in phase 2** (proposed CC-220), with "your move" in the inbox and opt-in push. Board Game Arena's mix of real-time and turn-based play has a strong record for classic games when few people are online at once (source: https://fr.wikipedia.org/wiki/Board_Game_Arena, fetched 2026-10-17, about 10 million accounts by August 2024).
-2. **"Ping me when a person is free"** (proposed CC-224). After a character match, an opt-in toggle sends one in-app or push notice when a person starts searching in the same game, at most once a day.
+1. **Turn-based Tic Tac Toe, Ultimate Tic Tac Toe and chess in phase 2** (proposed CC-222), with "your move" in the inbox and opt-in push. Board Game Arena's mix of real-time and turn-based play has a strong record for classic games when few people are online at once (source: https://fr.wikipedia.org/wiki/Board_Game_Arena, fetched 2026-10-17, about 10 million accounts by August 2024).
+2. **"Ping me when a person is free"** (proposed CC-226). After a character match, an opt-in toggle sends one in-app or push notice when a person starts searching in the same game, at most once a day.
 3. **Evening play hours.** The site promotes 19:00 to 23:00 India time as "busy hours" in copy and in reminder timing, so that live play concentrates in those hours (estimate, to be checked against the hourly data).
 
 ### 6.1 Play: the three games and their depth
@@ -706,11 +706,11 @@ Low concurrency is also designed for directly:
 1. The game shell, with all three games moved onto it (CC-157 to CC-168), plus reconnect and idle rules (CC-036), the reward queue (CC-099) and fit at 1280×720 and 390×844 (CC-172).
 2. Fast defaults. Chess quick match at 3+2 and 10+0 only. RPS defaults to best of 3. Tic Tac Toe rounds chain with rematch, and the starter alternates (CC-091).
 3. **A depth plan for each game:**
-   1. Chess: a rating (CC-042), the daily puzzle from the Lichess database (CC-144), the replay viewer (CC-041) and turn-based games (CC-220).
-   2. Tic Tac Toe: **Ultimate Tic Tac Toe as a permanent mode** (proposed CC-222, taken out of CC-066). It has not been solved under standard rules (source: https://en.wikipedia.org/wiki/Ultimate_tic-tac-toe). Classic 3×3 stays as the quick, social entry game.
-   3. Rock Paper Scissors: characters whose habits you can learn, with a reveal of the pattern after each match, best of 5 series, and RPS Streak ("how many rounds can you beat the pattern?", part of proposed CC-207).
-4. **Pass and play on one phone** for all three games (proposed CC-221). Our engines are pure and already run in the browser, so this is cheap. Results are not counted.
-5. Rush and Streak score modes, done once a solo player wants more (CC-207, phase 2 stretch). They follow Lichess Puzzle Storm and Chess.com Puzzle Rush (source: https://en.wikipedia.org/wiki/Lichess, fetched 2026-10-17).
+   1. Chess: a rating (CC-042), the daily puzzle from the Lichess database (CC-144), the replay viewer (CC-041) and turn-based games (CC-222).
+   2. Tic Tac Toe: **Ultimate Tic Tac Toe as a permanent mode** (proposed CC-224, taken out of CC-066). It has not been solved under standard rules (source: https://en.wikipedia.org/wiki/Ultimate_tic-tac-toe). Classic 3×3 stays as the quick, social entry game.
+   3. Rock Paper Scissors: characters whose habits you can learn, with a reveal of the pattern after each match, best of 5 series, and RPS Streak ("how many rounds can you beat the pattern?", part of proposed CC-209).
+4. **Pass and play on one phone** for all three games (proposed CC-223). Our engines are pure and already run in the browser, so this is cheap. Results are not counted.
+5. Rush and Streak score modes, done once a solo player wants more (CC-209, phase 2 stretch). They follow Lichess Puzzle Storm and Chess.com Puzzle Rush (source: https://en.wikipedia.org/wiki/Lichess, fetched 2026-10-17).
 6. The clock format fix (CC-120).
 
 **Why.** Lichess's game counts are mostly blitz and bullet: 4.66 billion of 5.63 billion games (source: Lichess page). The shell fixes all 6 P0 match problems (source: docs/ux/MATCH_EXPERIENCE.md).
@@ -738,7 +738,7 @@ Low concurrency is also designed for directly:
 
    An unbeatable 3×3 Tic Tac Toe bot appears only as an opt-in "Perfect" challenge, where a draw earns the star. No default bot produces endless draws.
 
-3. **Provable fairness for Rock Paper Scissors** (proposed CC-223). Before the player chooses, the server sends a commitment: a SHA-256 hash of the character's throw plus a random salt. After the reveal, the client checks the hash and shows "Lock checked ✓". The character can no longer react to the player's throw.
+3. **Provable fairness for Rock Paper Scissors** (proposed CC-225). Before the player chooses, the server sends a commitment: a SHA-256 hash of the character's throw plus a random salt. After the reveal, the client checks the hash and shows "Lock checked ✓". The character can no longer react to the player's throw.
 4. **Adaptive difficulty with disclosure** (CC-150).
    1. In a player's first 3 sessions, characters aim for a 65 to 70% player win rate (target). After that they aim for 50 to 55%.
    2. Changes happen between matches, never inside a match.
@@ -761,8 +761,8 @@ Low concurrency is also designed for directly:
 **Build.**
 
 1. Quick match (CC-051). One pool per game, a parallel search of at most 4 seconds, a character as the main button until the section 6.0 gate opens, and a rating window that widens over time for chess.
-2. **Glicko-2 ratings for chess only** (CC-042, ADR-027 to be written). Ratings start provisional with a "?" for the first 10 games and are seeded by a one-tap level pick (proposed CC-219). The result card shows ± and the profile has a graph. Lichess uses Glicko-2 (source: Lichess page). Rock Paper Scissors is near chance and Tic Tac Toe is solved, so they get XP, series records and head to head results instead. **No rating soft reset.** The chess rating is permanent, like Lichess and Chess.com (general knowledge, high confidence). Seasons get a separate season rank that resets, the model Clash Royale uses (general knowledge, medium confidence).
-3. A weekly arena per game at a fixed evening time (proposed CC-208), switched on by its gate.
+2. **Glicko-2 ratings for chess only** (CC-042, ADR-027 to be written). Ratings start provisional with a "?" for the first 10 games and are seeded by a one-tap level pick (proposed CC-221). The result card shows ± and the profile has a graph. Lichess uses Glicko-2 (source: Lichess page). Rock Paper Scissors is near chance and Tic Tac Toe is solved, so they get XP, series records and head to head results instead. **No rating soft reset.** The chess rating is permanent, like Lichess and Chess.com (general knowledge, high confidence). Seasons get a separate season rank that resets, the model Clash Royale uses (general knowledge, medium confidence).
+3. A weekly arena per game at a fixed evening time (proposed CC-210), switched on by its gate.
 
 **Why.** A competitive player returns to see a trusted rating move (research track opinion, not a published ranking, medium confidence). A rating on a game of chance would break promise 3.
 
@@ -799,7 +799,7 @@ Grid City (CC-198), the rest of The Kingdom and the finale (CC-200) follow in ph
    2. A credits file in the repo records the tool, the date and the human edits for each asset.
    3. We avoid prompting for any living artist's style.
 3. Purely machine-made images may not be protected by copyright in some places, which is one more reason to keep Bit human made (general knowledge of the US Copyright Office position, medium confidence. Ask the lawyer about India).
-4. Proposed CC-228 tracks the art pipeline and the licence record.
+4. Proposed CC-230 tracks the art pipeline and the licence record.
 
 **Skip.** Energy, timers, paid hints, paid levels and coins from story. Voiced dialogue.
 
@@ -832,7 +832,7 @@ Grid City (CC-198), the rest of The Kingdom and the finale (CC-200) follow in ph
 **The penalties we allow (and nothing else).**
 
 1. A daily streak resets after a missed day with no freeze. The longest streak, levels, badges and items are never lost.
-2. A Duo Streak (phase 3, proposed CC-211) pauses for one grace day when either friend misses, then ends. No one is blamed by name.
+2. A Duo Streak (phase 3, proposed CC-213) pauses for one grace day when either friend misses, then ends. No one is blamed by name.
 3. A league move down is at most one tier a week (phase 3).
 4. A season rank resets at season end. The badge for the best rank is kept.
 5. Nothing ever expires that the player already earned.
@@ -867,7 +867,7 @@ Grid City (CC-198), the rest of The Kingdom and the finale (CC-200) follow in ph
 
    **Event items come back for free the next year.** That is our own rule. Fortnite returns pass items to its paid shop (source: Battle pass page), which is the opposite of what we want, so it is not our precedent.
 
-4. A weekly featured variant (proposed CC-209), for example blitz chess or best of 5 RPS.
+4. A weekly featured variant (proposed CC-211), for example blitz chess or best of 5 RPS.
 
 **Why.** Events are a cheap way to make the arcade feel alive. My view that no global portal does Diwali, Holi and cricket well is unverified opinion. I saw only Poki's "Halloween" category on 2026-10-17.
 
@@ -888,7 +888,7 @@ Grid City (CC-198), the rest of The Kingdom and the finale (CC-200) follow in ph
    2. Coins are never withdrawn, transferred, traded, wagered, given as prizes or used to buy story levels.
    3. No paid random rewards. Belgium ruled loot boxes to be gambling in 2018 (source: https://en.wikipedia.org/wiki/Loot_box, fetched 2026-10-17).
    4. Streak freezes stay free (section 6.5).
-2. A supporter badge as the first revenue test: a "Founder" frame that unlocks nothing else (proposed CC-210). Lichess patrons get wings that unlock nothing (source: https://lichess.org/patron, fetched 2026-10-17).
+2. A supporter badge as the first revenue test: a "Founder" frame that unlocks nothing else (proposed CC-212). Lichess patrons get wings that unlock nothing (source: https://lichess.org/patron, fetched 2026-10-17).
 3. The coin ledger and cosmetic unlocks (CC-142, CC-143, CC-156).
 4. Later, ClassiCade Plus (CC-062):
    1. Deeper chess review beyond a free daily quota (Stockfish in a worker, if ever).
@@ -910,8 +910,8 @@ Grid City (CC-198), the rest of The Kingdom and the finale (CC-200) follow in ph
 
 **Decision: friends first, circles second, follow last and for adults only.**
 
-1. **Friends (mutual), the core, phase 2.** Presence for friends only, direct challenge, turn-based games, head to head records and a friends filter on leaderboards (CC-052, CC-139, CC-140). Duo Streaks follow in phase 3 (proposed CC-211).
-2. **Circles (private groups of 2 to 50), phase 2** (proposed CC-212, replacing CC-068 clubs).
+1. **Friends (mutual), the core, phase 2.** Presence for friends only, direct challenge, turn-based games, head to head records and a friends filter on leaderboards (CC-052, CC-139, CC-140). Duo Streaks follow in phase 3 (proposed CC-213).
+2. **Circles (private groups of 2 to 50), phase 2** (proposed CC-214, replacing CC-068 clubs).
    1. Created and joined by a WhatsApp-friendly link.
    2. A circle board and a shared goal, with an arena behind its gate.
    3. No public directory.
@@ -923,7 +923,7 @@ Grid City (CC-198), the rest of The Kingdom and the finale (CC-200) follow in ph
    4. A minor cannot own a circle of more than 10 people.
    5. Teacher circles (phase 3) use class codes and collect no student contact details.
 4. **Follow (one way), phase 3 and adults only.** It is opt-in per profile, and private profiles are allowed. Nobody can follow a minor or an unknown-age account. CC-206 is cut down to a friends and circles feed, and public follow is added only if top adult players ask for it.
-5. **Pass and play** (CC-221) serves families with no graph at all.
+5. **Pass and play** (CC-223) serves families with no graph at all.
 
 **Why this order.** Chess.com and Lichess keep social light: friends, challenges and clubs, with no heavy feed (research track summary of both sites, medium confidence). Retention comes from people you know (principle 7).
 
@@ -944,9 +944,9 @@ Grid City (CC-198), the rest of The Kingdom and the finale (CC-200) follow in ph
    2. "Your move" and challenges arrive in real time.
    3. Quiet hours run 22:00 to 07:00, always on for minors.
    4. Wording rotates, and reminders pause after 7 ignored days. Duolingo's reminder research found that repeated messages lose effect (general knowledge of Yancey and Settles, KDD 2020, medium confidence).
-4. Notification preferences and quiet hours (proposed CC-213), and a dark pattern audit before push ships (proposed CC-227).
+4. Notification preferences and quiet hours (proposed CC-215), and a dark pattern audit before push ships (proposed CC-229).
 
-**Audit of every nudge against the CCPA 2023 dark pattern guidelines.** The pattern names are from general knowledge, high confidence. The official text must be checked in CC-227.
+**Audit of every nudge against the CCPA 2023 dark pattern guidelines.** The pattern names are from general knowledge, high confidence. The official text must be checked in CC-229.
 
 | Our nudge                       | Closest named pattern                         | Our rule                                                                                                                                               |
 | ------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -997,13 +997,13 @@ Grid City (CC-198), the rest of The Kingdom and the finale (CC-200) follow in ph
 
 **Build.**
 
-1. **Phase 0: put the app and the database in the same region, and the database on a paid tier.** Production uses MongoDB Atlas M0 (free). M0 allows 100 reads and writes a second and 500 connections, with 0.5 GB of storage and 10 GB of transfer each way a week. Above the limits, Atlas throttles the cluster with a one second cooldown (source: https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/, fetched 2026-10-17). One chess move costs 3 database round trips today (source: docs/investigations/2026-10-17-cross-browser-a11y-load.md), and gamification adds up to about 8 writes per match (ADR-013). If the app moves to Singapore while the database stays in another region, every move gets slower. Render offers Oregon, Ohio, Virginia, Frankfurt and Singapore, and no Indian region (source: https://render.com/docs/regions, fetched 2026-10-17). Proposed CC-225 moves the database to a paid tier in the app's region. ADR-005 decides the region (D1).
+1. **Phase 0: put the app and the database in the same region, and the database on a paid tier.** Production uses MongoDB Atlas M0 (free). M0 allows 100 reads and writes a second and 500 connections, with 0.5 GB of storage and 10 GB of transfer each way a week. Above the limits, Atlas throttles the cluster with a one second cooldown (source: https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/, fetched 2026-10-17). One chess move costs 3 database round trips today (source: docs/investigations/2026-10-17-cross-browser-a11y-load.md), and gamification adds up to about 8 writes per match (ADR-013). If the app moves to Singapore while the database stays in another region, every move gets slower. Render offers Oregon, Ohio, Virginia, Frankfurt and Singapore, and no Indian region (source: https://render.com/docs/regions, fetched 2026-10-17). Proposed CC-227 moves the database to a paid tier in the app's region. ADR-005 decides the region (D1).
 2. Always-on paid hosting (CC-028), staging (CC-122), the brand domain (CC-123) and edge caching of fixed assets.
 3. Merge PR #51 (CC-180, CC-181, CC-182) and PR #53 (CC-162, CC-164, CC-170).
 4. A bundle budget and lazy routes (CC-135): at most 150 KB compressed for the first route (target).
-5. Server-rendered game page content (proposed CC-214, extending CC-047).
-6. WhatsApp share cards under 300 KB, with an explicit WhatsApp button and Hinglish text (proposed CC-215). Today's preview image is 392 KB (source: curl, 2026-10-17). The research track says WhatsApp may skip large previews, but that is a community report, medium confidence.
-7. A string catalogue, with Hinglish in phase 2 (proposed CC-216). The evidence that Indian-language users outnumber English users comes from KPMG and Google in 2017 and is stale (general knowledge, medium confidence on direction).
+5. Server-rendered game page content (proposed CC-216, extending CC-047).
+6. WhatsApp share cards under 300 KB, with an explicit WhatsApp button and Hinglish text (proposed CC-217). Today's preview image is 392 KB (source: curl, 2026-10-17). The research track says WhatsApp may skip large previews, but that is a community report, medium confidence.
+7. A string catalogue, with Hinglish in phase 2 (proposed CC-218). The evidence that Indian-language users outnumber English users comes from KPMG and Google in 2017 and is stale (general knowledge, medium confidence on direction).
 8. Observability (CC-049) and the match outbox (CC-111).
 9. **Measure from India.** Time to first byte and largest contentful paint from an Indian vantage point (a free web test location in Mumbai, or a friend's phone with a test page) before and after the move. The 3.65 s figure is not a baseline.
 
@@ -1055,7 +1055,7 @@ We report guest and account WRP separately, and we trust account WRP more.
 
 | Metric                            | Definition                                                                | Launch target (phase 1 exit)                 | Phase 2 exit target                     | Instrumentation                                                       |
 | --------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------- |
-| Time to first move                | Page load or link open to first move sent, 75th percentile, by entry type | 10 s or less from every entry in section 4.1 | 7 s or less                             | `page_view` and `gameplay_start` timestamps (CC-174, proposed CC-218) |
+| Time to first move                | Page load or link open to first move sent, 75th percentile, by entry type | 10 s or less from every entry in section 4.1 | 7 s or less                             | `page_view` and `gameplay_start` timestamps (CC-174, proposed CC-220) |
 | Conversion to play                | Share of visitors with a `gameplay_start` in the session, by entry type   | 50%                                          | 65% (Poki's base target)                | CC-174 funnel, nightly (CC-176), dashboard (CC-177)                   |
 | Games per session                 | Finished matches per session                                              | 2.5                                          | 3.5                                     | `match_finished` (CC-045) joined to the session                       |
 | Session length                    | Active time per session                                                   | 4 min                                        | 5 min                                   | CC-174 heartbeat while visible                                        |
@@ -1101,7 +1101,7 @@ Phase 2 needs about 1,000 new players a week:
 
 1. School and college chess events (a light version of CC-070): about 300.
 2. Viral coefficient rising to 0.2 with circles: about 200.
-3. Long-tail search pages (CC-214), which take months to rank: 0 to 300.
+3. Long-tail search pages (CC-216), which take months to rank: 0 to 300.
 4. Repeat community posts and the Holi or New Year event: about 200.
 
 These are guesses. The plan is to measure each channel through link attribution and drop the ones that do not convert.
@@ -1127,7 +1127,7 @@ CLAUDE.md rule 8 says a stage starts only after the previous stage's exit criter
 2. CC-107 (room flood).
 3. CC-116, CC-117 and CC-118 (SEC-15 to SEC-17. For CC-118, document the trade-off now and mark it accepted until email ships).
 4. CC-122 (staging).
-5. CC-028 with proposed CC-225 (always-on app and paid database in the same region).
+5. CC-028 with proposed CC-227 (always-on app and paid database in the same region).
 6. Merge PR #51 and PR #53.
 
 Exit: every Stage 0 criterion met, and time to first byte measured from India.
@@ -1156,13 +1156,13 @@ Exit criteria (Stage 2):
 
 **Phase 2 cut list, in this order, if it slips past 10 weeks:**
 
-1. Hinglish (CC-216).
-2. Rush and Streak modes (CC-207).
+1. Hinglish (CC-218).
+2. Rush and Streak modes (CC-209).
 3. The chess part of CC-069 lite.
 4. Web push (keep the inbox).
 5. Kingdom levels 3 and 4.
 6. Arcade polish 2 (CC-153).
-7. "Ping me" (CC-224).
+7. "Ping me" (CC-226).
 
 Friends, circles, turn-based play, pass and play and the daily set are never cut.
 
@@ -1181,7 +1181,7 @@ There are 72 done tickets, marked ✅ on the board, that need no action. CC-121 
 | Group                           | Open tickets                                                                                                                                            | Phase                           | Reason                                                                                                     |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Security that blocks Stage 0    | CC-105, CC-107, CC-116, CC-117, CC-118                                                                                                                  | 0                               | Stage 0 exit needs every SEC finding closed                                                                |
-| Hosting, database, staging      | CC-028, CC-122, proposed CC-225                                                                                                                         | 0                               | Cold starts and a far-off database break the 10 second promise. Stage 0 needs a non-production environment |
+| Hosting, database, staging      | CC-028, CC-122, proposed CC-227                                                                                                                         | 0                               | Cold starts and a far-off database break the 10 second promise. Stage 0 needs a non-production environment |
 | PR #51                          | CC-180, CC-181, CC-182                                                                                                                                  | 0                               | Move speed and deploy safety before traffic                                                                |
 | PR #53                          | CC-162, CC-164, CC-170                                                                                                                                  | 0                               | Already in review, and the shell builds on it                                                              |
 | Domain                          | CC-123                                                                                                                                                  | 1                               | Links and search build on the brand from the first seeded player                                           |
@@ -1191,40 +1191,40 @@ There are 72 done tickets, marked ✅ on the board, that need no action. CC-121 
 | Chess polish                    | CC-120, CC-041                                                                                                                                          | 1                               | Small visible bugs and the replay viewer for the flagship game                                             |
 | Layout check                    | CC-154                                                                                                                                                  | 1                               | Guards the 390 px promise                                                                                  |
 | Accessibility                   | CC-048, CC-183                                                                                                                                          | 1                               | Folded into the shell and the chess move                                                                   |
-| Bots and matchmaking            | CC-138, CC-051, CC-150, CC-203, proposed CC-219, proposed CC-223                                                                                        | 1                               | Solo play, the main button and provable fairness. CC-203 keeps CI fast                                     |
-| Pass and play                   | proposed CC-221                                                                                                                                         | 1                               | Serves families with no crowd and costs little                                                             |
+| Bots and matchmaking            | CC-138, CC-051, CC-150, CC-203, proposed CC-221, proposed CC-225                                                                                        | 1                               | Solo play, the main button and provable fairness. CC-203 keeps CI fast                                     |
+| Pass and play                   | proposed CC-223                                                                                                                                         | 1                               | Serves families with no crowd and costs little                                                             |
 | Chess rating                    | CC-042                                                                                                                                                  | 1                               | Stage 1 lists ratings. Chess only, per ADR-027                                                             |
-| Telemetry                       | CC-045, CC-173, CC-174, CC-175, CC-176, CC-177, CC-178, proposed CC-218, proposed CC-226                                                                | 1                               | Nothing can be tuned or gated without it                                                                   |
+| Telemetry                       | CC-045, CC-173, CC-174, CC-175, CC-176, CC-177, CC-178, proposed CC-220, proposed CC-228                                                                | 1                               | Nothing can be tuned or gated without it                                                                   |
 | Observability and launch        | CC-049, CC-050, CC-135, CC-137                                                                                                                          | 1                               | We must see errors from the first players, the bundle budget matters for India, and counts must be real    |
-| Growth plumbing                 | proposed CC-214, proposed CC-215                                                                                                                        | 1                               | Search pages and WhatsApp cards on the existing room links                                                 |
+| Growth plumbing                 | proposed CC-216, proposed CC-217                                                                                                                        | 1                               | Search pages and WhatsApp cards on the existing room links                                                 |
 | Daily loop                      | CC-146, CC-145, CC-144, CC-088, CC-093, CC-094                                                                                                          | 2                               | Cheap protection for the strongest return mechanic, plus data correctness                                  |
-| Notifications                   | CC-147, CC-148, proposed CC-213, proposed CC-227                                                                                                        | 2                               | Inbox first, then push after value, after the dark pattern audit                                           |
+| Notifications                   | CC-147, CC-148, proposed CC-215, proposed CC-229                                                                                                        | 2                               | Inbox first, then push after value, after the dark pattern audit                                           |
 | Social foundations              | CC-034, CC-044, CC-152, CC-185                                                                                                                          | 2                               | Required before any social feature. The rename prompt comes with public profiles                           |
-| Social core                     | CC-139, CC-052, CC-140, CC-043, CC-169, proposed CC-212                                                                                                 | 2                               | People you know drive return. Emotes come after CC-152                                                     |
-| Low-crowd play                  | proposed CC-220, proposed CC-224, proposed CC-222                                                                                                       | 2                               | Turn-based play, "ping me" and Ultimate Tic Tac Toe give depth without a crowd                             |
-| Story slice                     | CC-179, CC-187, CC-188, CC-189, CC-190, CC-191, CC-192, CC-193, CC-194, CC-195, CC-196, CC-197, CC-199 (levels 1 to 4), CC-201, CC-202, proposed CC-228 | 2                               | The differentiator, tested on chess as well as RPS                                                         |
+| Social core                     | CC-139, CC-052, CC-140, CC-043, CC-169, proposed CC-214                                                                                                 | 2                               | People you know drive return. Emotes come after CC-152                                                     |
+| Low-crowd play                  | proposed CC-222, proposed CC-226, proposed CC-224                                                                                                       | 2                               | Turn-based play, "ping me" and Ultimate Tic Tac Toe give depth without a crowd                             |
+| Story slice                     | CC-179, CC-187, CC-188, CC-189, CC-190, CC-191, CC-192, CC-193, CC-194, CC-195, CC-196, CC-197, CC-199 (levels 1 to 4), CC-201, CC-202, proposed CC-230 | 2                               | The differentiator, tested on chess as well as RPS                                                         |
 | Insight lite                    | CC-069 (TTT and RPS lines, chess only when sure)                                                                                                        | 2                               | Cheap and correct where it ships                                                                           |
 | Accounts and legal              | CC-033, CC-035, CC-098, CC-114                                                                                                                          | 2                               | Email unlocks password reset. Deletion and retention for the DPDP Act                                      |
 | Polish                          | CC-153, CC-091, CC-092, CC-100, CC-155                                                                                                                  | 2                               | Gaming feel after the core works. Screenshot baselines once screens settle                                 |
 | Hygiene                         | CC-136, CC-184                                                                                                                                          | 2                               | Indexes before data grows, cross-browser CI                                                                |
-| Strings and language            | proposed CC-216                                                                                                                                         | 2                               | The catalogue now, Hinglish first, first on the cut list                                                   |
-| Solo score modes                | proposed CC-207                                                                                                                                         | 2 (stretch)                     | A solo loop that needs no crowd, second on the cut list                                                    |
+| Strings and language            | proposed CC-218                                                                                                                                         | 2                               | The catalogue now, Hinglish first, first on the cut list                                                   |
+| Solo score modes                | proposed CC-209                                                                                                                                         | 2 (stretch)                     | A solo loop that needs no crowd, second on the cut list                                                    |
 | Recommendations                 | CC-151                                                                                                                                                  | 3                               | Needs the legal answer on behavioural monitoring                                                           |
 | Leagues and seasons             | CC-141, CC-055                                                                                                                                          | 3                               | Behind the 250 weekly accounts gate                                                                        |
-| Events and variants             | CC-205, proposed CC-209                                                                                                                                 | 3                               | First event Holi 2027 or New Year 2027                                                                     |
-| Weekly arena                    | proposed CC-208                                                                                                                                         | 3, or earlier if the gate opens | Needs 30 accounts in an hour slot                                                                          |
-| Duo Streaks                     | proposed CC-211                                                                                                                                         | 3                               | After friends have proved themselves                                                                       |
+| Events and variants             | CC-205, proposed CC-211                                                                                                                                 | 3                               | First event Holi 2027 or New Year 2027                                                                     |
+| Weekly arena                    | proposed CC-210                                                                                                                                         | 3, or earlier if the gate opens | Needs 30 accounts in an hour slot                                                                          |
+| Duo Streaks                     | proposed CC-213                                                                                                                                         | 3                               | After friends have proved themselves                                                                       |
 | Feed                            | CC-206 (cut down to friends and circles)                                                                                                                | 3                               | Follow only for adults, and only if asked for                                                              |
 | Story, the rest                 | CC-198, CC-199 (rest), CC-200                                                                                                                           | 3                               | Only after the slice meets M1, M4 and M8                                                                   |
-| Economy                         | CC-142, CC-143, CC-156, proposed CC-210                                                                                                                 | 3                               | After ADR-026. Supporter badge first                                                                       |
+| Economy                         | CC-142, CC-143, CC-156, proposed CC-212                                                                                                                 | 3                               | After ADR-026. Supporter badge first                                                                       |
 | Money                           | CC-062, CC-063, CC-065                                                                                                                                  | 3                               | Plus after the supporter test. The store waits for demand                                                  |
-| Admin console                   | CC-059                                                                                                                                                  | 3                               | CC-226 covers gates until then                                                                             |
+| Admin console                   | CC-059                                                                                                                                                  | 3                               | CC-228 covers gates until then                                                                             |
 | Anti-cheat                      | CC-060                                                                                                                                                  | 3                               | Once chess ratings carry status                                                                            |
-| New games                       | CC-057 (Ludo), proposed CC-217 (hand cricket)                                                                                                           | 3                               | The key India game, and a cheap IPL mode on the RPS engine                                                 |
+| New games                       | CC-057 (Ludo), proposed CC-219 (hand cricket)                                                                                                           | 3                               | The key India game, and a cheap IPL mode on the RPS engine                                                 |
 | Schools and offices             | CC-070                                                                                                                                                  | 3                               | Grows out of teacher and office circles                                                                    |
 | Ads                             | CC-064                                                                                                                                                  | Cut for phases 1 and 2          | Little money at our scale and it hurts first impressions (D9)                                              |
 | Tournaments in full, spectating | CC-067, CC-056                                                                                                                                          | Defer                           | Need scale. The arena covers the weekly date                                                               |
-| Other games                     | CC-066 (except Ultimate TTT, which moves to CC-222)                                                                                                     | Defer                           | Depth in three games first                                                                                 |
+| Other games                     | CC-066 (except Ultimate TTT, which moves to CC-224)                                                                                                     | Defer                           | Depth in three games first                                                                                 |
 | Referrals                       | CC-149                                                                                                                                                  | Defer                           | +3% at Duolingo. Share cards do more                                                                       |
 | Social login                    | CC-058                                                                                                                                                  | Defer                           | Until sign up is a measured bottleneck                                                                     |
 | Scale                           | CC-061                                                                                                                                                  | Defer                           | Until one instance runs short                                                                              |
@@ -1236,25 +1236,25 @@ There are 72 done tickets, marked ✅ on the board, that need no action. CC-121 
 
 Phase 0 comes first because it blocks everything: CC-105, CC-107, CC-116 to CC-118, CC-122, and PRs #51 and #53. After it:
 
-1. **CC-028 with proposed CC-225 and CC-123.** An always-on app and a paid database in the same region, on the brand domain. Without them the first visit can wait a minute.
-2. **CC-138 with proposed CC-223, and ADR-025.** Labelled characters seated in rooms, with provable fairness. This unlocks solo play, quick match, story and pass-and-play opponents.
-3. **CC-051 with proposed CC-219.** "Play Rocky" as the main button and a parallel 4 second search.
+1. **CC-028 with proposed CC-227 and CC-123.** An always-on app and a paid database in the same region, on the brand domain. Without them the first visit can wait a minute.
+2. **CC-138 with proposed CC-225, and ADR-025.** Labelled characters seated in rooms, with provable fairness. This unlocks solo play, quick match, story and pass-and-play opponents.
+3. **CC-051 with proposed CC-221.** "Play Rocky" as the main button and a parallel 4 second search.
 4. **CC-157 with CC-158 to CC-161.** The shell, which fixes every P0 finding.
-5. **CC-045, CC-173 to CC-177, proposed CC-218 and CC-226.** Telemetry and liquidity gates. From here on every choice is measured.
+5. **CC-045, CC-173 to CC-177, proposed CC-220 and CC-228.** Telemetry and liquidity gates. From here on every choice is measured.
 6. **CC-099 with CC-163.** One beat at a time on the first win.
-7. **Proposed CC-215.** WhatsApp share cards on existing room links, the growth loop for seeding.
+7. **Proposed CC-217.** WhatsApp share cards on existing room links, the growth loop for seeding.
 8. **CC-146 and CC-145.** Local days and free weekly freezes.
 9. **CC-144.** The daily chess puzzle from the Lichess CC0 database.
-10. **CC-152, then CC-139, CC-052 and proposed CC-212.** Safe defaults, then challenges, friends and circles for the primary personas.
+10. **CC-152, then CC-139, CC-052 and proposed CC-214.** Safe defaults, then challenges, friends and circles for the primary personas.
 
-Just outside the ten: CC-221 (pass and play, cheap, in phase 1), CC-042 (chess rating, needed for Stage 1), CC-220 (turn-based play) and the story slice.
+Just outside the ten: CC-223 (pass and play, cheap, in phase 1), CC-042 (chess rating, needed for Stage 1), CC-222 (turn-based play) and the story slice.
 
 ## 9. Risks and open questions for the owner
 
 | #   | Risk or question                                                                                                                    | Recommendation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **Running cost with no revenue.**                                                                                                   | Budget the whole stack. Render's paid instance is often quoted at about US$7 a month, but that is **unverified**: the pricing page showed no prices on 2026-10-17. A paid Atlas tier (Flex or M10) costs roughly US$10 to US$60 a month (general knowledge, low confidence). A domain costs about ₹800 to ₹1,500 a year, and error tracking and email on free tiers cost nothing (general knowledge, medium confidence). Total: about US$20 to US$75 a month plus staging (estimate). Check the live pricing pages before committing. |
-| 2   | **The database is on Atlas M0.** 100 operations a second, then throttling with a one second cooldown (source: MongoDB limits page). | Move to a paid tier in the app's region in phase 0 (CC-225). Merge PR #51 to cut writes per move.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 2   | **The database is on Atlas M0.** 100 operations a second, then throttling with a one second cooldown (source: MongoDB limits page). | Move to a paid tier in the app's region in phase 0 (CC-227). Merge PR #51 to cut writes per move.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 3   | **Singapore or India.** Render has no Indian region (source: Render regions page).                                                  | Use Render Singapore now to avoid a migration. Record in ADR-005 that Mumbai hosting elsewhere (for example Fly.io, or Atlas in AWS Mumbai) is the next step if Indian latency measured after the move stays above 150 ms per round trip. That Fly.io and Atlas offer Mumbai is general knowledge, medium confidence.                                                                                                                                                                                                                 |
 | 4   | **Scope versus a solo owner.** Phase 1 is about 20 ticket-weeks and phase 2 about 27.                                               | Hold to the phases and use the cut list. Replace the assumed 3 ticket-weeks a week with the measured rate after two weeks, and re-plan if it is lower.                                                                                                                                                                                                                                                                                                                                                                                |
 | 5   | **Nobody is here yet.**                                                                                                             | The section 7.3 seeding plan, with a hard phase 1 gate of 300 new players in a week. No retention tuning before that.                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -1262,12 +1262,12 @@ Just outside the ten: CC-221 (pass and play, cheap, in phase 1), CC-042 (chess r
 | 7   | **Shallow games bore people.**                                                                                                      | Ultimate Tic Tac Toe, learnable RPS characters, chess puzzles and ratings. Watch the classic Tic Tac Toe draw rate.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | 8   | **Child safety and the law.**                                                                                                       | Unknown age means minor. Hold the legal review (section 6.10) before launch marketing, against the gazetted Act and Rules, the DPDP Act and the CCPA dark pattern guidelines.                                                                                                                                                                                                                                                                                                                                                         |
 | 9   | **The story bet fails.**                                                                                                            | The two-district slice tests it in about 6 weeks of phase 2 work. If M1, M4 and M8 miss, stop after the slice and spend the art budget on cosmetics.                                                                                                                                                                                                                                                                                                                                                                                  |
-| 10  | **Art cost and rights.**                                                                                                            | Bit drawn or finished by a human. AI-assisted drafts for the other characters only with a commercial-use licence and a credits file (CC-228).                                                                                                                                                                                                                                                                                                                                                                                         |
+| 10  | **Art cost and rights.**                                                                                                            | Bit drawn or finished by a human. AI-assisted drafts for the other characters only with a commercial-use licence and a credits file (CC-230).                                                                                                                                                                                                                                                                                                                                                                                         |
 | 11  | **Daily puzzle novelty fades.** Wordle's daily players halved within a year of its peak (source: Wordle page).                      | Back the daily items with friends, circles and turn-based games, which carry long-term return.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 12  | **Follow versus friends.** The owner asked for followers.                                                                           | Friends and circles first, a friends and circles feed in phase 3, public follow only for adults and only if asked for.                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 13  | **When to make money.**                                                                                                             | No ads in phases 1 and 2. Supporter badge first, then Plus without story or game access. This changes the BRD (D9).                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | 14  | **Brand.** The URL says "nocapgaming" and the product says "ClassiCade".                                                            | Move to a ClassiCade domain (CC-123) before seeding.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| 15  | **Language.**                                                                                                                       | Build the catalogue now (CC-216) and add Hinglish in phase 2. Rules lean on pictures, so the cost is low. The language evidence is stale (2017).                                                                                                                                                                                                                                                                                                                                                                                      |
+| 15  | **Language.**                                                                                                                       | Build the catalogue now (CC-218) and add Hinglish in phase 2. Rules lean on pictures, so the cost is low. The language evidence is stale (2017).                                                                                                                                                                                                                                                                                                                                                                                      |
 | 16  | **The BRD's day 7 target of 20% is a mobile top quartile figure, and web returns are lower.**                                       | Make it a Stage 3 stretch goal and use the phase targets in section 7.2 (D10).                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 17  | **Free streak freezes cut a planned coin sink.**                                                                                    | Accept it. Paying to keep a streak alive is close to a guilt mechanic. Coins still have cosmetics and name changes as sinks (D4).                                                                                                                                                                                                                                                                                                                                                                                                     |
 
@@ -1287,7 +1287,7 @@ Several recommendations above depend on decisions that are still Open or Propose
 | D8  | Amend ADR-021 (10 per pair per UTC day, 20 per hour)      | Accepted      | Do anti-farm caps move to local time?                                                                                          | No. Caps stay on one server clock (a rolling 24 hours per pair, the clock hour per player), because abuse limits need one clock. Add the bot rules from D5                                                                                                                                                                                                                     |
 | D9  | BRD §5 ads in the free tier, and BO-4 "≥ 2% free to paid" | BRD text      | Drop ads, and change BO-4?                                                                                                     | No ads in Stages 1 and 2. BO-4 becomes "revenue covers infra costs, supporter conversion measured", with 2% free to paid kept as a Stage 3 goal for Plus                                                                                                                                                                                                                       |
 | D10 | BRD day 7 target of 20% or more                           | BRD text      | Keep it as the launch target?                                                                                                  | Make it a Stage 3 stretch goal and use section 7.2 for phases 1 and 2                                                                                                                                                                                                                                                                                                          |
-| D11 | BACKLOG and PRD Stage exit criteria                       | Board text    | Amend Stage 1 and move tickets?                                                                                                | Stage 1 "ratings" reads "chess rating". Add "a labelled character for each game as the main Play button" and "pass and play". Move CC-051 from Stage 2 to Stage 1, CC-057 (Ludo) from Stage 2 to Stage 3, and CC-147, CC-139 and CC-052 into Stage 2 as listed in section 8.2. One docs ticket (proposed CC-229) makes the edits                                               |
+| D11 | BACKLOG and PRD Stage exit criteria                       | Board text    | Amend Stage 1 and move tickets?                                                                                                | Stage 1 "ratings" reads "chess rating". Add "a labelled character for each game as the main Play button" and "pass and play". Move CC-051 from Stage 2 to Stage 1, CC-057 (Ludo) from Stage 2 to Stage 3, and CC-147, CC-139 and CC-052 into Stage 2 as listed in section 8.2. One docs ticket (proposed CC-231) makes the edits                                               |
 | D12 | ADR-027 Ratings                                           | To be written | Which games, which system, and any reset?                                                                                      | Chess only, Glicko-2, provisional for 10 games, seeded by a one-tap level, never reset. A separate season rank resets                                                                                                                                                                                                                                                          |
 | D13 | New ADR-028: social graph and minors                      | None          | Friends, circles, follow, and the treatment of unknown ages?                                                                   | Section 6.8 and the unknown-age-equals-minor rule                                                                                                                                                                                                                                                                                                                              |
 | D14 | New ADR-029: liquidity gates                              | None          | Thresholds and how they switch on and off?                                                                                     | The section 6.0 table, held for 2 weeks to open and 4 weeks to close                                                                                                                                                                                                                                                                                                           |
@@ -1296,7 +1296,7 @@ Several recommendations above depend on decisions that are still Open or Propose
 ## Appendix A. Answers to review
 
 1. **The 10 second promise did not add up.** Fixed. A named character is now the main button, and "Find a person" is second and runs in parallel for at most 4 seconds, with a timeout set from measured match rates. "Nobody free" is never shown. Section 4.1 has a time budget for each entry type. See promise 1, principle 1 and sections 4.1 and 6.3.
-2. **Low player numbers were not designed for.** Fixed with the liquidity gates table (section 6.0). Turn-based play moves to phase 2 (CC-220), "ping me when a person is free" is added (CC-224), and India evening play hours are added. The home "Recent wins" row, the game page Top 5 and achievement rarity are hidden until their gates open.
+2. **Low player numbers were not designed for.** Fixed with the liquidity gates table (section 6.0). Turn-based play moves to phase 2 (CC-222), "ping me when a person is free" is added (CC-226), and India evening play hours are added. The home "Recent wins" row, the game page Top 5 and achievement rarity are hidden until their gates open.
 3. **Ratings for all three games conflicted with ADR-027.** Fixed. Chess only, the RPS and TTT ratings are removed from the mock-ups, the phase exit criteria are changed, and there is no rating soft reset. A separate season rank resets instead (sections 5.6, 6.3 and D12).
 4. **Phases conflicted with the Stage exit criteria and rule 8.** Fixed. Phases map explicitly onto Stages 0 to 3 (section 8.1). Phase 0 now closes every unmet Stage 0 criterion, including SEC-15 to SEC-17 and staging. The chess rating is back in phase 1 for Stage 1. Amendments are proposed as D11, with a docs ticket.
 5. **Open or Proposed decisions were cited as settled.** Fixed. Section 10 lists ADR-005, 020, 024, 025, 026 and 027, the amendments to ADR-013, 015 and 021, and new decisions, each with its open question. ADR-025's answers on caps and bot XP are in D5. The text now says "to be decided in ADR-025" or gives the ADR's status.
@@ -1316,23 +1316,23 @@ Several recommendations above depend on decisions that are still Open or Propose
    12. The 2 s paint and the phone price are labelled as targets and assumptions.
 8. **Wrong retention benchmark and no sample sizes.** Fixed. The web caveat is stated, the launch retention targets are lowered and marked as low confidence guesses, and the North Star targets and exit gate are made consistent through a simple model and a 300-player-per-week gate. An acquisition plan with numbers is in section 7.3. Margins of error are given, every retention gate needs cohorts of 300 or more, and guest-to-account and save prompt conversion (M8) are separate metrics with separate denominators.
 9. **The North Star could rise while the product fails.** Fixed. There is a person share guardrail, a day of real play includes the daily puzzle and story levels, measurement limits (shared phones, multiple devices, cookies) are recorded, and a bot XP cap of 100 a day is proposed in D5.
-10. **Persona priority.** Fixed. Riya, Meena and the searcher are primary, Arjun and Kabir are served, and Kabir's parental consent is no longer a phase 1 dependency. Pass and play (Meena, CC-221) is added, and the teacher persona (Ms Fernandes, CC-070) is added for phase 3. Vikram is folded into "served by chess ratings" to keep six personas.
+10. **Persona priority.** Fixed. Riya, Meena and the searcher are primary, Arjun and Kabir are served, and Kabir's parental consent is no longer a phase 1 dependency. Pass and play (Meena, CC-223) is added, and the teacher persona (Ms Fernandes, CC-070) is added for phase 3. Vikram is folded into "served by chess ratings" to keep six personas.
 11. **Shallow game boredom.** Fixed:
-    1. Ultimate Tic Tac Toe is a permanent mode (CC-222), with its unsolved status cited.
+    1. Ultimate Tic Tac Toe is a permanent mode (CC-224), with its unsolved status cited.
     2. The 3×3 daily puzzle is dropped.
     3. RPS characters have learnable habits, with star rules based on reading them.
     4. No default bot produces endless draws.
     5. The story slice now includes The Kingdom levels 1 to 4 as a fairer test.
     6. The chess puzzle source is the Lichess database (CC0, 6,157,341 puzzles, fetched).
-12. **RPS needs provable fairness.** Fixed. Commit-reveal is in section 6.2 (CC-223) and the mock-up in section 5.4. Adaptive difficulty is disclosed with an off switch and aims at 65 to 70% wins in the first 3 sessions.
-13. **Platform risks were missing.** Fixed. The Atlas M0 limits are cited from the fetched page, a same-region paid database is in phase 0 (CC-225), the Render regions are cited, the US$7 figure is marked unverified, the full stack is costed as an estimate (risk 1), and Mumbai is added as an open option in ADR-005.
+12. **RPS needs provable fairness.** Fixed. Commit-reveal is in section 6.2 (CC-225) and the mock-up in section 5.4. Adaptive difficulty is disclosed with an off switch and aims at 65 to 70% wins in the first 3 sessions.
+13. **Platform risks were missing.** Fixed. The Atlas M0 limits are cited from the fetched page, a same-region paid database is in phase 0 (CC-227), the Render regions are cited, the US$7 figure is marked unverified, the full stack is costed as an estimate (risk 1), and Mumbai is added as an open option in ADR-005.
 14. **Safety gaps.** Fixed:
     1. The minor's name is removed from the home mock-up, and the row is gated and limited to opted-in adults.
     2. Guests and unknown ages get minor defaults.
     3. Mixed-age circle rules, circle name filtering and limits on owner powers are in section 6.8.
     4. Share cards never carry a minor's or a guest's username.
     5. CC-150 and CC-151 are sent to the legal review.
-15. **India's dark pattern rules were missing.** Fixed. The CCPA 2023 guidelines are cited (general knowledge, high confidence, official text not fetched), every nudge is audited in section 6.9, and an audit ticket is added (CC-227). The PRS page is now labelled as the Bill summary, with a requirement to use the gazetted Act and Rules. I could not fetch the gazette (MeitY returned 403).
+15. **India's dark pattern rules were missing.** Fixed. The CCPA 2023 guidelines are cited (general knowledge, high confidence, official text not fetched), every nudge is audited in section 6.9, and an audit ticket is added (CC-229). The PRS page is now labelled as the Bill summary, with a requirement to use the gazetted Act and Rules. I could not fetch the gazette (MeitY returned 403).
 16. **"Never punished" conflicted with the mechanics.** Fixed. Promise 7 is softened to "we never take away what you earned", and section 6.5 lists the only penalties allowed. Demotion is at most one tier, a Duo Streak gets a grace day, and the longest streak is kept.
 17. **IA and screens got ahead of the phases.** Fixed:
     1. A per-phase IA and per-phase tabs are in section 5.1.
@@ -1345,34 +1345,34 @@ Several recommendations above depend on decisions that are still Open or Propose
 19. **Smaller fixes.** Done:
     1. The WhatsApp 2021 and KPMG 2017 figures are marked stale.
     2. Section 8.2 lists every open ticket by ID, with no ranges.
-    3. The next free ID, CC-207, was checked against BACKLOG.md, and the PROGRESS.md drift is noted.
+    3. The next free ID, CC-209, was checked against BACKLOG.md, and the PROGRESS.md drift is noted.
     4. Titled Tuesday is cited only for the fixed date idea.
 
 **Proposed new tickets** (the owner creates them in this order so the IDs hold):
 
-1. CC-207 Rush and Streak score modes.
-2. CC-208 Weekly arena per game, gated.
-3. CC-209 Weekly featured variant.
-4. CC-210 Supporter badge.
-5. CC-211 Duo Streaks.
-6. CC-212 Circles with safe-circle rules.
-7. CC-213 Notification preferences and quiet hours.
-8. CC-214 Server-rendered game page content.
-9. CC-215 WhatsApp share cards.
-10. CC-216 String catalogue and Hinglish.
-11. CC-217 Hand cricket.
-12. CC-218 `gameplay_start` event and time budget report.
-13. CC-219 One-tap level pick and a named character as the main button.
-14. CC-220 Turn-based Tic Tac Toe, Ultimate and chess with "your move".
-15. CC-221 Pass and play on one phone.
-16. CC-222 Ultimate Tic Tac Toe as a permanent mode (taken out of CC-066).
-17. CC-223 Commit-reveal for RPS characters.
-18. CC-224 "Ping me when a person is free" and evening play hours.
-19. CC-225 Paid database in the app's region.
-20. CC-226 Liquidity gate flags.
-21. CC-227 Dark pattern audit against the CCPA 2023 guidelines.
-22. CC-228 Art pipeline and licence record.
-23. CC-229 Docs edits for D9, D10 and D11.
+1. CC-209 Rush and Streak score modes.
+2. CC-210 Weekly arena per game, gated.
+3. CC-211 Weekly featured variant.
+4. CC-212 Supporter badge.
+5. CC-213 Duo Streaks.
+6. CC-214 Circles with safe-circle rules.
+7. CC-215 Notification preferences and quiet hours.
+8. CC-216 Server-rendered game page content.
+9. CC-217 WhatsApp share cards.
+10. CC-218 String catalogue and Hinglish.
+11. CC-219 Hand cricket.
+12. CC-220 `gameplay_start` event and time budget report.
+13. CC-221 One-tap level pick and a named character as the main button.
+14. CC-222 Turn-based Tic Tac Toe, Ultimate and chess with "your move".
+15. CC-223 Pass and play on one phone.
+16. CC-224 Ultimate Tic Tac Toe as a permanent mode (taken out of CC-066).
+17. CC-225 Commit-reveal for RPS characters.
+18. CC-226 "Ping me when a person is free" and evening play hours.
+19. CC-227 Paid database in the app's region.
+20. CC-228 Liquidity gate flags.
+21. CC-229 Dark pattern audit against the CCPA 2023 guidelines.
+22. CC-230 Art pipeline and licence record.
+23. CC-231 Docs edits for D9, D10 and D11.
 
 ## Appendix B. Research sources
 
