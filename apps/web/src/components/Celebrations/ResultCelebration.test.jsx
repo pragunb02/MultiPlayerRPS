@@ -84,4 +84,41 @@ describe("ResultCelebration", () => {
     expect(confetti()).toBeNull();
     expect(document.querySelector("[data-effect='xp-pop']")).toBeNull();
   });
+
+  it("says under the banner why a game didn't count, and forgets it when the next match counted (CC-095)", () => {
+    const { socket } = celebrate(finished());
+    const uncounted = { source: "match", xpGained: 0, counted: false, notCountedReason: "ended-too-soon" };
+
+    act(() => socket.push("progress:updated", { ...uncounted, progress: { level: 1 } }));
+
+    expect(screen.getByText("This game didn't count: it ended too soon")).toBeInTheDocument();
+    expect(document.querySelector("[data-effect='xp-pop']")).toBeNull();
+
+    act(() =>
+      socket.push("progress:updated", {
+        source: "match",
+        xpGained: 30,
+        counted: true,
+        progress: { level: 1 },
+      }),
+    );
+
+    expect(screen.queryByText(/didn't count/)).toBeNull();
+  });
+
+  it("keeps the reason when a quest push follows", () => {
+    const { socket } = celebrate(finished());
+
+    act(() =>
+      socket.push("progress:updated", {
+        source: "match",
+        xpGained: 0,
+        counted: false,
+        notCountedReason: "hourly-limit",
+      }),
+    );
+    act(() => socket.push("progress:updated", { source: "quest", xpGained: 20, counted: true }));
+
+    expect(screen.getByText(/didn't count: you reached the limit/)).toBeInTheDocument();
+  });
 });

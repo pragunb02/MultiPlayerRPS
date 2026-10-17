@@ -8,6 +8,7 @@ import {
 import { isAccountId } from "../../models/identity.js";
 import { assertDefined } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
+import { creditFor } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
 import { gamesWithWinsBoards, hasWinsBoard, storageFor, weekOf, winsBoard, XP_BOARD } from "./boards.js";
 
@@ -71,14 +72,16 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
     }
   };
 
-  /** XP an account earned from its recorded matches since `since` (newest first, paged). */
+  /** XP an account earned from its recorded matches that count (CC-095) since `since` (newest first, paged). */
   async function matchXpSince(playerId, since) {
     let total = 0;
     let before;
     for (;;) {
       const page = await matchAccessor.listForPlayer(playerId, { limit: HISTORY_PAGE, before });
       const recent = page.filter((match) => match.endedAt >= since);
-      total += recent.reduce((sum, match) => sum + XP_AWARDS[resultFor(match, playerId)], 0);
+      total += recent
+        .filter((match) => creditFor(match, playerId).counted)
+        .reduce((sum, match) => sum + XP_AWARDS[resultFor(match, playerId)], 0);
       if (recent.length < HISTORY_PAGE) {
         return total;
       }
@@ -142,7 +145,8 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
     },
 
     /**
-     * Pipeline step after progression and gamification: the accounts of a recorded match move up the boards.
+     * Pipeline step after progression and gamification: the accounts of a recorded match move up the boards. A
+     * match that doesn't count for an account (CC-095) moves it nowhere.
      *
      * @param {{
      *   match: Readonly<import("../../data/matchAccessor.js").Match>,
@@ -150,7 +154,10 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
      * }} input  `updates` = what progression applied (a match applied before yields none)
      */
     async applyMatch({ match, updates }) {
-      for (const update of updates.filter(({ playerId }) => isAccountId(playerId))) {
+      const listed = updates.filter(
+        ({ playerId }) => isAccountId(playerId) && creditFor(match, playerId).counted,
+      );
+      for (const update of listed) {
         const { displayName } = match.players.find(({ playerId }) => playerId === update.playerId);
         // Quest bonuses earned by this match (CC-089) may already have raised the player's XP: the board shows
         // the latest total and level, never the older ones from progression's update.

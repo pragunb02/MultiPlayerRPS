@@ -51,6 +51,8 @@ export const SOCKET_EVENTS = Object.freeze({
   /**
    * Server sends `{ source: "match" | "quest", key, matchId, xpGained, leveledUp, progress }` after XP was awarded.
    * `key` is the match id or the quest key (`quest:<day>:<questId>` or `quest:<day>:sweep`). `matchId` is "" for quests.
+   * Also `counted` and `notCountedReason` (CC-095). A match that didn't count for you gave no XP, and the reason is
+   * a NOT_COUNTED_REASONS value ("" when it counted).
    */
   PROGRESS_UPDATED: "progress:updated",
   /**

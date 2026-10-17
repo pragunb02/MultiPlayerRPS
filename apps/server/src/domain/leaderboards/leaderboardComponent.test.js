@@ -165,6 +165,26 @@ describe("leaderboardComponent", () => {
     expect(await entries("weekly")).toEqual([]);
   });
 
+  it("moves nobody up for a match that doesn't count for them, even with XP from before (CC-095)", async () => {
+    const { boards, matchAccessor, entries } = setup();
+    const recorded = await matchAccessor.record(match());
+    const judged = await matchAccessor.judgeOnce({
+      matchId: recorded.matchId,
+      credit: { notCounted: [{ playerId: ALICE.id, reason: "opponent-daily-limit" }] },
+    });
+
+    await boards.applyMatch({
+      match: judged,
+      updates: [
+        update(ALICE, { xpGained: 0, xp: 300, level: 4 }),
+        update(BOB, { result: "loss", xpGained: 10, xp: 10 }),
+      ],
+    });
+
+    expect((await entries("overall")).map((e) => e.displayName)).toEqual(["bob"]);
+    expect(await entries("rock-paper-scissors")).toEqual([]);
+  });
+
   it("ranks a tie by who reached the score first", async () => {
     const { play, entries } = setup();
     await play({ winner: BOB, loser: ALICE, endedAt: NOW - 10 }, [update(BOB, { xp: 30 })]);
@@ -304,6 +324,21 @@ describe("leaderboardComponent", () => {
       expect(await entries("overall")).toEqual([{ rank: 1, displayName: "alice", level: 5, score: 560 }]);
       expect(await entries("weekly")).toEqual([{ rank: 1, displayName: "alice", level: 5, score: 30 }]);
       expect(await entries("tic-tac-toe")).toEqual([{ rank: 1, displayName: "alice", level: 5, score: 2 }]);
+    });
+
+    it("counts only the games that count for the account this week and per game (CC-095)", async () => {
+      const { boards, matchAccessor, entries } = setup();
+      await matchAccessor.record(match({ gameId: "tictactoe", endedAt: NOW - 2 }));
+      const capped = await matchAccessor.record(match({ gameId: "tictactoe", endedAt: NOW - 1 }));
+      await matchAccessor.judgeOnce({
+        matchId: capped.matchId,
+        credit: { notCounted: [{ playerId: ALICE.id, reason: "hourly-limit", withdrawnFrom: GUEST.id }] },
+      });
+
+      await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW });
+
+      expect((await entries("weekly"))[0].score).toBe(30);
+      expect((await entries("tic-tac-toe"))[0].score).toBe(1);
     });
 
     it("is idempotent", async () => {

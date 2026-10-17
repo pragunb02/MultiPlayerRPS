@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { NOT_COUNTED_REASONS, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, nextEvent, send, startRoom } from "../../testing/socketClients.js";
 import { clockOn, startTestServer } from "../../testing/testApp.js";
 
@@ -64,6 +64,39 @@ describe("progression end to end", () => {
     expect(await levelUp).toEqual(
       expect.objectContaining({ leveledUp: true, progress: expect.objectContaining({ level: 2 }) }),
     );
+  });
+
+  it("tells both players a game left at once didn't count, and gives nobody XP (CC-095)", async () => {
+    server = await startTestServer({ now: clockOn("2026-10-16") });
+    const alice = await clients.player();
+    const bob = await clients.player();
+    const alicePush = nextEvent(alice.socket, SOCKET_EVENTS.PROGRESS_UPDATED);
+    const { code } = await startRoom(alice, bob, { gameId: "race", options: { target: 3 } });
+
+    await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code });
+
+    expect(await alicePush).toEqual(
+      expect.objectContaining({
+        source: "match",
+        xpGained: 0,
+        counted: false,
+        notCountedReason: NOT_COUNTED_REASONS.ENDED_TOO_SOON,
+      }),
+    );
+    await server.tasks.drain();
+    expect(await getProgress(alice.cookie)).toEqual(expect.objectContaining({ xp: 0, matchesPlayed: 0 }));
+    expect(await getProgress(bob.cookie)).toEqual(expect.objectContaining({ xp: 0, matchesPlayed: 0 }));
+  });
+
+  it("says a match that counted counted", async () => {
+    server = await startTestServer({ now: clockOn("2026-10-23") });
+    const alice = await clients.player();
+    const bob = await clients.player();
+    const push = nextEvent(alice.socket, SOCKET_EVENTS.PROGRESS_UPDATED);
+
+    await playRace(alice, bob);
+
+    expect(await push).toEqual(expect.objectContaining({ counted: true, notCountedReason: "" }));
   });
 
   it("reaches every open tab of the player", async () => {

@@ -85,18 +85,34 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
     await play(progress, "guest_a", "m1");
     await play(progress, "user_1", "m2");
 
-    const result = await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1 });
+    const result = await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} });
 
     expect(result).toEqual({ moved: { xp: 30, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 } });
     expect((await progress.get("user_1")).xp).toBe(60);
   });
 
+  it("leaves out what the guest earned from games that stopped counting, never going below zero", async () => {
+    const progress = setup();
+    await play(progress, "guest_a", "m1");
+    await play(progress, "user_1", "m2");
+
+    const result = await progress.mergeInto({
+      from: "guest_a",
+      to: "user_1",
+      at: 1,
+      withdraw: { xp: 20, matchesPlayed: 1, losses: 1 },
+    });
+
+    expect(result).toEqual({ moved: { xp: 10, matchesPlayed: 0, wins: 1, losses: 0, draws: 0 } });
+    expect(await progress.get("user_1")).toEqual(expect.objectContaining({ xp: 40, matchesPlayed: 1 }));
+  });
+
   it("moves nothing the second time", async () => {
     const progress = setup();
     await play(progress, "guest_a", "m1");
-    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1 });
+    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} });
 
-    const again = await progress.mergeInto({ from: "guest_a", to: "user_1", at: 2 });
+    const again = await progress.mergeInto({ from: "guest_a", to: "user_1", at: 2, withdraw: {} });
 
     expect(again.moved).toEqual({ xp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 });
     expect((await progress.get("user_1")).xp).toBe(30);
@@ -104,9 +120,11 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
 
   it("refuses to move a guest's progress to a second account", async () => {
     const progress = setup();
-    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1 });
+    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} });
 
-    await expect(progress.mergeInto({ from: "guest_a", to: "user_2", at: 2 })).rejects.toThrow(ConflictError);
+    await expect(progress.mergeInto({ from: "guest_a", to: "user_2", at: 2, withdraw: {} })).rejects.toThrow(
+      ConflictError,
+    );
   });
 
   it("passes unexpected storage failures through", async () => {
@@ -119,13 +137,15 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
       },
     });
 
-    await expect(progress.mergeInto({ from: "guest_a", to: "user_1", at: 1 })).rejects.toBe(failure);
+    await expect(progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} })).rejects.toBe(
+      failure,
+    );
   });
 
   it("counts a match that finished during the move for the account", async () => {
     const progress = setup();
     await play(progress, "user_1", "m-own");
-    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1 });
+    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} });
 
     const late = await play(progress, "guest_a", "m-late");
     const replay = await play(progress, "guest_a", "m-late");
@@ -142,7 +162,7 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
 
   it("pays a quest bonus earned during the move to the account, once (CC-089)", async () => {
     const progress = setup();
-    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1 });
+    await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} });
     const award = { playerId: "guest_a", key: "quest:2026-10-16:win-1", inc: { xp: 20 }, at: 2 };
 
     const late = await progress.applyAwardOnce(award);

@@ -144,4 +144,104 @@ export function runMatchDaoContract(createDao) {
     expect(await dao.listByPlayer("guest_a", { limit: 10 })).toEqual([]);
     expect(await dao.listByPlayer("user_1", { limit: 10 })).toHaveLength(1);
   });
+
+  it("stores how a match counts once: the first verdict stays", async () => {
+    const dao = await createDao();
+    await dao.insert(matchDoc());
+    const first = { notCounted: [{ playerId: "guest_a", reason: "ended-too-soon" }] };
+
+    const judged = await dao.judgeOnce({ matchId: matchDoc().matchId, credit: first });
+    const again = await dao.judgeOnce({ matchId: matchDoc().matchId, credit: { notCounted: [] } });
+
+    expect(judged).toEqual({ ...matchDoc(), schemaVersion: 1, credit: first });
+    expect(again.credit).toEqual(first);
+    await expect(dao.judgeOnce({ matchId: "m-none", credit: first })).rejects.toThrow(RangeError);
+  });
+
+  it("keeps a verdict through a rename", async () => {
+    const dao = await createDao();
+    await dao.insert(matchDoc());
+    const credit = { notCounted: [{ playerId: "user_1", reason: "hourly-limit", withdrawnFrom: "guest_a" }] };
+    const renamed = matchDoc({
+      players: [{ playerId: "user_1", displayName: "Riya" }, matchDoc().players[1]],
+    });
+
+    await dao.renamePlayer({ matchId: matchDoc().matchId, from: "guest_a", doc: { ...renamed, credit } });
+
+    expect((await dao.getByMatchId(matchDoc().matchId)).credit).toEqual(credit);
+  });
+
+  it("counts only the wins that count for the winner", async () => {
+    const dao = await createDao();
+    const won = (n) => matchDoc({ matchId: `m-win-${n}` });
+    await dao.insert(won(1));
+    await dao.insert(won(2));
+    await dao.insert(won(3));
+    await dao.judgeOnce({
+      matchId: "m-win-2",
+      credit: { notCounted: [{ playerId: "guest_b", reason: "ended-too-soon" }] },
+    });
+    await dao.judgeOnce({
+      matchId: "m-win-3",
+      credit: { notCounted: [{ playerId: "guest_a", reason: "hourly-limit" }] },
+    });
+
+    expect(await dao.countWins({ playerId: "guest_b", gameId: "rps" })).toBe(2);
+  });
+
+  it("lists a player's games that count in a time window, without one match, oldest first", async () => {
+    const dao = await createDao();
+    const at = (n, overrides = {}) =>
+      matchDoc({ matchId: `m-${n}`, endedAt: new Date(T0 + n * 1000), ...overrides });
+    await dao.insert(at(0));
+    await dao.insert(at(2));
+    await dao.insert(at(1));
+    await dao.insert(at(3));
+    await dao.insert(at(4));
+    await dao.insert(at(5, { players: [{ playerId: "guest_x", displayName: "X" }, matchDoc().players[1]] }));
+    await dao.insert(at(6));
+    await dao.judgeOnce({
+      matchId: "m-3",
+      credit: { notCounted: [{ playerId: "guest_a", reason: "ended-too-soon" }] },
+    });
+    await dao.judgeOnce({ matchId: "m-4", credit: { notCounted: [] } });
+
+    const listed = await dao.listCountedBetween("guest_a", {
+      from: new Date(T0 + 1000),
+      to: new Date(T0 + 6000),
+      excluding: "m-2",
+    });
+
+    expect(listed).toEqual([
+      { matchId: "m-1", players: matchDoc().players, endedAt: new Date(T0 + 1000) },
+      { matchId: "m-4", players: matchDoc().players, endedAt: new Date(T0 + 4000) },
+    ]);
+  });
+
+  it("lists the games that stopped counting when a guest's games moved to a player", async () => {
+    const dao = await createDao();
+    const withdrawn = (playerId, from) => ({
+      notCounted: [{ playerId, reason: "opponent-daily-limit", withdrawnFrom: from }],
+    });
+    const user = [{ playerId: "user_1", displayName: "Riya" }, matchDoc().players[1]];
+    await dao.insert(matchDoc({ matchId: "m-late", players: user, endedAt: new Date(T0 + 2000) }));
+    await dao.insert(matchDoc({ matchId: "m-early", players: user, endedAt: new Date(T0 + 1000) }));
+    await dao.insert(matchDoc({ matchId: "m-other-guest", players: user }));
+    await dao.insert(matchDoc({ matchId: "m-own-limit", players: user }));
+    await dao.insert(matchDoc({ matchId: "m-counted", players: user }));
+    await dao.judgeOnce({ matchId: "m-late", credit: withdrawn("user_1", "guest_a") });
+    await dao.judgeOnce({ matchId: "m-early", credit: withdrawn("user_1", "guest_a") });
+    await dao.judgeOnce({ matchId: "m-other-guest", credit: withdrawn("user_1", "guest_c") });
+    await dao.judgeOnce({
+      matchId: "m-own-limit",
+      credit: { notCounted: [{ playerId: "user_1", reason: "hourly-limit" }] },
+    });
+
+    const listed = await dao.listWithdrawn({ playerId: "user_1", from: "guest_a" });
+
+    expect(listed.map((m) => m.matchId)).toEqual(["m-early", "m-late"]);
+    expect(listed[0]).toEqual(
+      expect.objectContaining({ players: user, credit: withdrawn("user_1", "guest_a") }),
+    );
+  });
 }

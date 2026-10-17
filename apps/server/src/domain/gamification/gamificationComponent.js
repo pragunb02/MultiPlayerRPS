@@ -1,5 +1,6 @@
 import { DAILY_SWEEP_BONUS_XP } from "@classicade/shared";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { creditFor } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
 import { nextUtcMidnight, utcDay } from "./calendar.js";
 import { achievementStanding, evaluateAchievements } from "./evaluateAchievements.js";
@@ -191,12 +192,15 @@ export function createGamificationComponent({
   return Object.freeze({
     /**
      * Counts a recorded match for each of its players (after progression applied it): stats and streaks,
-     * quests and their bonus XP, then achievements. Applying the same match again changes nothing.
+     * quests and their bonus XP, then achievements. A player the match doesn't count for (CC-095) gets none of
+     * it. Applying the same match again changes nothing.
      *
      * @param {{ match: Readonly<import("../../data/matchAccessor.js").Match>, now: number }} input
      */
     async applyMatch({ match, now }) {
-      for (const { playerId, displayName } of match.players) {
+      for (const { playerId, displayName } of match.players.filter(
+        (p) => creditFor(match, p.playerId).counted,
+      )) {
         await applyForPlayer({ match, playerId, displayName, now });
       }
     },
@@ -242,7 +246,7 @@ export function createGamificationComponent({
 
     /**
      * A guest became an account (CC-032, ADR-014): unlocks move (earliest time wins), stats are rebuilt from the
-     * account's match history (already moved) plus both players' completed quests, the guest's quest days go
+     * account's match history (already moved, games that count only) plus both players' completed quests, the guest's quest days go
      * (their XP already moved with progress), and achievements are checked again. Idempotent and resumable.
      *
      * @param {{ from: string, to: { id: string }, now: number }} transfer
@@ -253,16 +257,19 @@ export function createGamificationComponent({
       const achievements = await gamificationAccessor.moveUnlocks({ from, to: playerId });
       const guest = await getStats(from);
       const history = await historyOf(playerId);
-      const rebuilt = history.reduce(
-        (stats, match) =>
-          applyMatchToStats(stats, {
-            gameId: match.gameId,
-            result: resultFor(match, playerId),
-            reason: match.result.reason,
-            endedAt: match.endedAt,
-          }),
-        emptyStats(playerId),
-      );
+      // Only the games that count for the account (CC-095), so merged stats stay within the fair play limits.
+      const rebuilt = history
+        .filter((match) => creditFor(match, playerId).counted)
+        .reduce(
+          (stats, match) =>
+            applyMatchToStats(stats, {
+              gameId: match.gameId,
+              result: resultFor(match, playerId),
+              reason: match.result.reason,
+              endedAt: match.endedAt,
+            }),
+          emptyStats(playerId),
+        );
       const stats = await gamificationAccessor.rewriteStats({
         playerId,
         at: now,

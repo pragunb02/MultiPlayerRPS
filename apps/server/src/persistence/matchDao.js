@@ -17,6 +17,11 @@ const MATCH_SCHEMA_VERSION = 1;
  * @property {Date} startedAt
  * @property {Date} endedAt
  * @property {number} schemaVersion
+ * @property {MatchCreditDoc} [credit]   set once the match was judged (CC-095)
+ *
+ * @typedef {{ notCounted: Array<{ playerId: string, reason: string, withdrawnFrom?: string }> }} MatchCreditDoc
+ *   the players the match does not count for. `withdrawnFrom` names the guest it counted for before the guest's
+ *   games moved to this player
  */
 
 const matchSchema = new mongoose.Schema(
@@ -45,13 +50,18 @@ const matchSchema = new mongoose.Schema(
     startedAt: { type: Date, required: true },
     endedAt: { type: Date, required: true },
     schemaVersion: { type: Number, required: true, default: MATCH_SCHEMA_VERSION },
+    // Absent until judged. Matches recorded before CC-095 never get one.
+    credit: { type: mongoose.Schema.Types.Mixed },
   },
   { collection: "matches", minimize: false, versionKey: false },
 );
 // History pages: "my matches, newest first".
 matchSchema.index({ "players.playerId": 1, endedAt: -1 });
 
-const FIELDS = "-_id matchId roomCode gameId options seed players log result startedAt endedAt schemaVersion";
+const FIELDS =
+  "-_id matchId roomCode gameId options seed players log result startedAt endedAt schemaVersion credit";
+// A player's games that count for them: judged without them in `notCounted`, or not judged yet.
+const countedFor = (playerId) => ({ "credit.notCounted.playerId": { $ne: playerId } });
 
 /**
  * Finished matches in MongoDB — data we own, kept for history, replays and progression.
@@ -141,6 +151,58 @@ export function createMatchDao({ connection }) {
      * @returns {Promise<number>}
      */
     countWins: ({ playerId, gameId }) =>
-      Match.countDocuments({ "players.playerId": playerId, gameId, "result.winners": playerId }),
+      Match.countDocuments({
+        "players.playerId": playerId,
+        gameId,
+        "result.winners": playerId,
+        ...countedFor(playerId),
+      }),
+
+    /**
+     * Stores how a match counts, unless it was judged already: the first verdict stays.
+     *
+     * @param {{ matchId: string, credit: MatchCreditDoc }} verdict
+     * @returns {Promise<MatchDoc>} the match as stored now
+     * @throws {RangeError} when absent
+     */
+    async judgeOnce({ matchId, credit }) {
+      await Match.updateOne({ matchId, credit: { $exists: false } }, { $set: { credit } });
+      return this.getByMatchId(matchId);
+    },
+
+    /**
+     * A player's games that count for them (or are not judged yet) and ended in `[from, to)`, without one match.
+     * Only the fields the fair play limits look at.
+     *
+     * @param {string} playerId
+     * @param {{ from: Date, to: Date, excluding: string }} window
+     * @returns {Promise<Array<{ matchId: string, players: MatchDoc["players"], endedAt: Date }>>} oldest first
+     */
+    listCountedBetween(playerId, { from, to, excluding }) {
+      const filter = {
+        "players.playerId": playerId,
+        endedAt: { $gte: from, $lt: to },
+        matchId: { $ne: excluding },
+        ...countedFor(playerId),
+      };
+      return Match.find(filter, "-_id matchId players endedAt").sort({ endedAt: 1 }).lean();
+    },
+
+    /**
+     * The games of `playerId` that counted for guest `from`, but stopped counting when they moved to `playerId`.
+     *
+     * @param {{ playerId: string, from: string }} query
+     * @returns {Promise<MatchDoc[]>} oldest first
+     */
+    listWithdrawn: ({ playerId, from }) =>
+      Match.find(
+        {
+          "players.playerId": playerId,
+          "credit.notCounted": { $elemMatch: { playerId, withdrawnFrom: from } },
+        },
+        FIELDS,
+      )
+        .sort({ endedAt: 1 })
+        .lean(),
   });
 }
