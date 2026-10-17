@@ -69,4 +69,18 @@ describe("legal pages", () => {
     expect(app.url()).toBe("/privacy");
     expect(screen.getByRole("heading", { level: 1, name: "Privacy policy" })).toBeVisible();
   });
+
+  it("says how to ask a privacy question without sharing personal details, and names the one browser setting", () => {
+    renderApp({ path: "/privacy" });
+
+    expect(screen.getByRole("link", { name: "github.com/pragunb02/MultiPlayerRPS/issues" })).toHaveAttribute(
+      "href",
+      "https://github.com/pragunb02/MultiPlayerRPS/issues",
+    );
+    expect(
+      screen.getByText(/Do not put your email, username or anything personal in it/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/cc\.sound/)).toBeInTheDocument();
+    expect(screen.queryByText(/no browser storage/)).toBeNull();
+  });
 });
