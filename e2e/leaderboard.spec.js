@@ -107,7 +107,7 @@ test.describe("leaderboards", () => {
       .getByRole("group", { name: "Your choice" })
       .getByRole("button", { name: /Scissors/ })
       .click();
-    await expect(riya.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(riya.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
 
     // Boards are updated in the background after the match is stored: reload until riya is on them.
     const yourRow = riya.page.getByRole("listitem").filter({ hasText: account.username });

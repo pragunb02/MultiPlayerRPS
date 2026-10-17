@@ -50,6 +50,7 @@ export function SoundControl() {
       <button
         type="button"
         className={styles.toggle}
+        data-cc-control="header.sound"
         aria-label={on ? "Sound on" : "Sound off"}
         title={on ? "Sound on. Press to mute." : "Sound off. Press to turn it on."}
         onClick={toggle}

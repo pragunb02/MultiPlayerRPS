@@ -33,7 +33,7 @@ async function playRound(winner, loser) {
   await choices(loser)
     .getByRole("button", { name: /Scissors/ })
     .click();
-  await expect(winner.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+  await expect(winner.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
   await expect(loser.page.getByRole("heading", { name: "You lost" })).toBeVisible();
 }
 
@@ -89,12 +89,31 @@ test.describe("rematch", () => {
     await bob.page.getByRole("button", { name: "Leave room" }).click();
     await expect(bob.page).toHaveURL("/games/rock-paper-scissors");
 
-    await expect(alice.page.getByText("Opponent left — no rematch this time.")).toBeVisible();
+    await expect(alice.page.getByText(`${bobName} left, so there is no rematch this time.`)).toBeVisible();
     await expect(alice.page.getByRole("button", { name: /rematch/i })).toHaveCount(0);
-    await alice.page.getByRole("link", { name: "New game" }).click();
+    await alice.page.getByRole("button", { name: "New opponent" }).click();
     await expect(alice.page).toHaveURL("/games/rock-paper-scissors");
+  });
+
+  test("New opponent after asking for a rematch: the asker leaves, and the other player is told at once (CC-162)", async ({
+    players,
+  }) => {
+    const { alice, bob, aliceName, roomPath } = await startRps(players);
+    await playRound(alice, bob);
+    await alice.page.getByRole("button", { name: "Rematch" }).click();
+    await expect(bob.page.getByText(`${aliceName} wants a rematch!`)).toBeVisible();
+
+    await alice.page.getByRole("button", { name: "New opponent" }).click();
+
+    await expect(alice.page).toHaveURL("/games/rock-paper-scissors");
+    await expect(bob.page.getByText(`${aliceName} left, so there is no rematch this time.`)).toBeVisible();
+    await expect(
+      bob.page.getByRole("status").filter({ hasText: `${aliceName} left the room` }),
+    ).toBeVisible();
+    await expect(bob.page.getByRole("button", { name: "Accept rematch" })).toHaveCount(0);
+    // The seat is given up: Back does not lead into the room again.
     await alice.page.goBack();
-    await expect(alice.page.getByText("Opponent left — no rematch this time.")).toBeVisible();
+    await expect(alice.page).not.toHaveURL(roomPath);
   });
 
   test("a request can be withdrawn before the opponent answers", async ({ players }) => {

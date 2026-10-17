@@ -28,3 +28,21 @@ export const networkError = (cause) =>
 
 export const isUnauthorized = (err) =>
   err instanceof AppRequestError && err.code === ERROR_CODES.UNAUTHORIZED;
+
+/** Failures where the same request can work a moment later: no answer, a timeout, a server fault, too many tries. */
+const RETRYABLE_CODES = new Set([
+  "NETWORK",
+  "TIMEOUT",
+  "UNKNOWN",
+  ERROR_CODES.INTERNAL,
+  ERROR_CODES.RATE_LIMITED,
+]);
+
+/**
+ * Whether a failed action is worth a Retry button (CC-164). A rule the server refused, such as a taken cell or a
+ * wrong password, fails the same way every time. It gets an explanation and no Retry.
+ *
+ * @param {unknown} err  what the action threw
+ */
+export const isRetryable = (err) =>
+  err instanceof AppRequestError && (RETRYABLE_CODES.has(err.code) || err.status >= 500);

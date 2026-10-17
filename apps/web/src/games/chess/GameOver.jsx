@@ -41,6 +41,7 @@ export function GameOver({ room, names, yourColour, site }) {
       </p>
       <a
         className={styles.download}
+        data-cc-control="chess.pgn"
         href={`data:application/x-chess-pgn;charset=utf-8,${encodeURIComponent(pgn)}`}
         download={pgnFileName({ code: room.code, date: room.serverTime })}
       >

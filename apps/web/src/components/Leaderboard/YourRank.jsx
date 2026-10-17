@@ -35,8 +35,11 @@ export function YourRank({ identity }) {
       </h2>
       {identity.kind === "guest" ? (
         <p className={styles.muted}>
-          Guests aren't ranked. <Link to={paths.signup(paths.profile())}>Sign up</Link> to get on the
-          leaderboard.
+          Guests aren't ranked.{" "}
+          <Link to={paths.signup(paths.profile())} data-cc-control="rank.signup">
+            Sign up
+          </Link>{" "}
+          to get on the leaderboard.
         </p>
       ) : (
         <dl className={styles.stats}>
@@ -45,7 +48,9 @@ export function YourRank({ identity }) {
           ))}
         </dl>
       )}
-      <Link to={paths.leaderboards()}>See the leaderboards</Link>
+      <Link to={paths.leaderboards()} data-cc-control="rank.leaderboards">
+        See the leaderboards
+      </Link>
     </section>
   );
 }

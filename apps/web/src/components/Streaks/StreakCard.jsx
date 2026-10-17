@@ -30,7 +30,7 @@ export function StreakCard() {
     body = (
       <div role="alert" className={styles.problem}>
         <p>Couldn't load streaks. {streaks.error.message}</p>
-        <Button variant="secondary" onClick={streaks.retry}>
+        <Button control="streaks.retry" variant="secondary" onClick={streaks.retry}>
           Try again
         </Button>
       </div>

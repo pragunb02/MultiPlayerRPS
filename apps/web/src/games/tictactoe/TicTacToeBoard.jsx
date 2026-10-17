@@ -1,6 +1,9 @@
 import { MarkO } from "../../art/tictactoe/MarkO.jsx";
 import { MarkX } from "../../art/tictactoe/MarkX.jsx";
 import { TurnBanner } from "../../components/TurnBanner/TurnBanner.jsx";
+import { useExplanation } from "../../hooks/useExplanation.js";
+import { MoveProblem, ReasonLine } from "../BoardFeedback.jsx";
+import { playReason } from "../roomView.js";
 import { useMove } from "../useMove.js";
 import styles from "./TicTacToeBoard.module.css";
 
@@ -16,17 +19,35 @@ function Mark({ mark }) {
 }
 
 /**
- * Tic-Tac-Toe: a 3×3 grid of buttons. The server decides legality and the result; the board only sends
- * `{ cell }` and shows what the server says.
+ * Tic-Tac-Toe: a 3×3 grid of buttons. The server decides legality and the result. The board only sends
+ * `{ cell }` and shows what the server says. The pressed cell shows your mark at once, faintly, until the server
+ * answers. A cell that cannot be played says why when pressed (CC-164).
  *
- * @param {{ room: any, onMove: (move: { cell: number }) => Promise<unknown> }} props
+ * @param {{ room: any, onMove: (move: { cell: number }) => Promise<unknown>, reason?: string }} props
+ *   `reason`: why the viewer cannot play now (see playReason), empty when they can
  */
-export function TicTacToeBoard({ room, onMove }) {
+export function TicTacToeBoard({ room, onMove, reason = playReason(room, { reconnecting: false }) }) {
   const { view } = room.game;
-  const move = useMove(onMove);
+  const move = useMove(onMove, { id: "ttt.cell" });
+  const explanation = useExplanation();
   const yourMark = view.marks[room.you];
-  const yourTurn = room.status === "playing" && view.turn === room.you && !move.busy;
   const winning = new Set(view.winningLine);
+
+  /** Why this cell cannot be played now, or "" when it can. */
+  function cellReason(mark) {
+    if (reason !== "") return reason;
+    if (mark !== "") return "Cell taken";
+    if (move.busy) return "Sending your move";
+    return "";
+  }
+
+  function press(index, why) {
+    if (why !== "") {
+      explanation.explain(why);
+      return;
+    }
+    move.send({ cell: index });
+  }
 
   return (
     <div className={styles.wrap}>
@@ -38,28 +59,29 @@ export function TicTacToeBoard({ room, onMove }) {
             {[0, 1, 2].map((column) => {
               const index = row * 3 + column;
               const mark = view.board[index];
+              const why = cellReason(mark);
+              const sending = move.sent?.cell === index;
               return (
                 <button
                   key={index}
                   type="button"
                   role="gridcell"
-                  className={`${styles.cell} ${mark ? styles[mark] : ""} ${winning.has(index) ? styles.win : ""}`}
-                  aria-label={`${cellName(index)}: ${mark || "empty"}`}
-                  disabled={!yourTurn || mark !== ""}
-                  onClick={() => move.send({ cell: index })}
+                  className={`${styles.cell} ${mark ? styles[mark] : ""} ${winning.has(index) ? styles.win : ""} ${sending ? `${styles[yourMark]} ${styles.sending}` : ""}`}
+                  aria-label={`${cellName(index)}: ${mark || (sending ? `${yourMark}, sending` : "empty")}`}
+                  aria-disabled={why !== "" ? "true" : undefined}
+                  aria-busy={sending && move.pending ? "true" : undefined}
+                  data-cc-control="ttt.cell"
+                  onClick={() => press(index, why)}
                 >
-                  <Mark mark={mark} />
+                  <Mark mark={mark || (sending ? yourMark : "")} />
                 </button>
               );
             })}
           </div>
         ))}
       </div>
-      {move.error !== "" && (
-        <p role="alert" className={styles.error}>
-          {move.error}
-        </p>
-      )}
+      <ReasonLine explanation={explanation} />
+      <MoveProblem move={move} />
     </div>
   );
 }

@@ -2,17 +2,22 @@ import { useCallback, useId, useState } from "react";
 import { Button } from "../../components/Button/Button.jsx";
 import { incomingRequests, roomRequests } from "../../games/roomUpdates.js";
 import { nameOf, opponentsOf } from "../../games/roomView.js";
+import { useAction } from "../../hooks/useAction.js";
 import styles from "./RoomRequests.module.css";
 
 /**
  * The question an opponent is waiting on, with Accept, Decline and Hide (CC-104). It sits in the page above the
  * board, never over it, so a phone shows every rank. It takes no focus: a player in the middle of a move keeps the
  * board, and keyboard play goes on. The question is announced when it appears, and Escape inside it puts it away
- * like Hide does.
+ * like Hide does. Accept and Decline each show their own wait and their own failure (CC-164).
  */
-function RequestDialog({ request, room, onAnswer, onHide, busy }) {
+function RequestDialog({ request, room, onAction, onHide, reason }) {
   const titleId = useId();
   const questionId = useId();
+  const accept = useAction(() => onAction(request.accept), { id: "room.request.accept" });
+  const decline = useAction(() => onAction(request.decline), { id: "room.request.decline" });
+  // While one answer is on its way the other cannot be sent as well.
+  const answering = accept.busy || decline.busy ? "Sending your answer" : "";
 
   return (
     <section
@@ -28,16 +33,42 @@ function RequestDialog({ request, room, onAnswer, onHide, busy }) {
         {request.question(nameOf(room, request.from))}
       </p>
       <div className={styles.actions}>
-        <Button busy={busy} onClick={() => onAnswer(request.accept)}>
+        <Button
+          control="room.request.accept"
+          action={accept}
+          reason={reason || (decline.busy ? answering : "")}
+        >
           Accept
         </Button>
-        <Button variant="secondary" disabled={busy} onClick={() => onAnswer(request.decline)}>
+        <Button
+          control="room.request.decline"
+          variant="secondary"
+          action={decline}
+          reason={reason || (accept.busy ? answering : "")}
+        >
           Decline
         </Button>
-        <Button variant="ghost" onClick={() => onHide(request.key)}>
+        <Button control="room.request.hide" variant="ghost" onClick={() => onHide(request.key)}>
           Hide
         </Button>
       </div>
+    </section>
+  );
+}
+
+/**
+ * The card a player sees after asking something, with Cancel (CC-104).
+ */
+function WaitingCard({ request, room, onAction, reason }) {
+  const cancel = useAction(() => onAction(request.cancel), { id: "room.request.cancel" });
+  return (
+    <section className={styles.waiting} aria-label={request.waitingTitle}>
+      <p role="status" className={styles.question}>
+        <strong>{request.waitingTitle}.</strong> Waiting for {opponentsOf(room)}…
+      </p>
+      <Button control="room.request.cancel" variant="secondary" action={cancel} reason={reason}>
+        Cancel
+      </Button>
     </section>
   );
 }
@@ -50,14 +81,14 @@ function RequestDialog({ request, room, onAnswer, onHide, busy }) {
  * @param {{
  *   room: any,
  *   onAction: (action: import("../../games/roomUpdates.js").RoomAction) => Promise<unknown>,
- *   onError: (error: Error) => void,
- * }} props  `room` is the RoomView (SOCKET_EVENTS)
+ *   reason?: string,
+ * }} props  `room` is the RoomView (SOCKET_EVENTS). `reason`: why no answer can be sent now, such as
+ *   "Reconnecting", empty when it can
  */
-export function RoomRequests({ room, onAction, onError }) {
+export function RoomRequests({ room, onAction, reason = "" }) {
   const incoming = incomingRequests(room);
   const keys = incoming.map((request) => request.key).join(" ");
   const [hidden, setHidden] = useState({ keys, list: [] });
-  const [busy, setBusy] = useState(false);
   const hide = useCallback(
     (key) => setHidden((current) => ({ ...current, list: [...current.list, key] })),
     [],
@@ -73,31 +104,20 @@ export function RoomRequests({ room, onAction, onError }) {
       ? []
       : roomRequests(room).filter((request) => request.from === room.you && request.showWaiting);
 
-  async function run(action) {
-    setBusy(true);
-    try {
-      await onAction(action);
-    } catch (error) {
-      onError(error);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <>
       {waiting.map((request) => (
-        <section key={request.key} className={styles.waiting} aria-label={request.waitingTitle}>
-          <p role="status" className={styles.question}>
-            <strong>{request.waitingTitle}.</strong> Waiting for {opponentsOf(room)}…
-          </p>
-          <Button variant="secondary" busy={busy} onClick={() => run(request.cancel)}>
-            Cancel
-          </Button>
-        </section>
+        <WaitingCard key={request.key} request={request} room={room} onAction={onAction} reason={reason} />
       ))}
       {shown && (
-        <RequestDialog key={shown.key} request={shown} room={room} busy={busy} onAnswer={run} onHide={hide} />
+        <RequestDialog
+          key={shown.key}
+          request={shown}
+          room={room}
+          reason={reason}
+          onAction={onAction}
+          onHide={hide}
+        />
       )}
     </>
   );

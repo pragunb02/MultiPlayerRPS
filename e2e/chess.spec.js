@@ -202,11 +202,12 @@ test.describe("chess", () => {
 
     for (const player of [white, black]) {
       await expect(square(player, "e1")).toHaveClass(/_check_/);
-      await expect(player.page.getByRole("heading", { name: "Checkmate" })).toBeVisible();
+      await expect(player.page.getByRole("heading", { name: "Checkmate", exact: true })).toBeVisible();
+      await expect(player.page.getByRole("heading", { name: /^You (won|lost) by checkmate$/ })).toBeVisible();
       await expect(player.page.getByText("0–1")).toBeVisible();
     }
     await expect(black.page.getByText("You won with Black")).toBeVisible();
-    await expect(black.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(black.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(white.page.getByRole("heading", { name: "You lost" })).toBeVisible();
 
     const pgn = await downloadedPgn(white);
@@ -376,7 +377,10 @@ test.describe("chess", () => {
       .click();
 
     for (const player of [white, black]) {
-      await expect(player.page.getByRole("heading", { name: "Resignation" })).toBeVisible();
+      await expect(player.page.getByRole("heading", { name: "Resignation", exact: true })).toBeVisible();
+      await expect(
+        player.page.getByRole("heading", { name: /^You (won|lost) by resignation$/ }),
+      ).toBeVisible();
       await expect(player.page.getByText("1–0")).toBeVisible();
     }
     await expect(white.page.getByText("You won with White")).toBeVisible();
@@ -391,14 +395,20 @@ test.describe("chess", () => {
     await seen([white, black], "d4");
 
     await white.page.getByRole("button", { name: "Offer draw" }).click();
-    await expect(white.page.getByRole("button", { name: "Draw offered" })).toBeDisabled();
+    await expect(white.page.getByRole("button", { name: "Draw offered" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
     // Black answers in the room's request popup (CC-104).
     const offer = black.page.getByRole("region", { name: "Draw offer" });
     await expect(offer).toContainText(/offers a draw\./);
     await offer.getByRole("button", { name: "Accept" }).click();
 
     for (const player of [white, black]) {
-      await expect(player.page.getByRole("heading", { name: "Draw by agreement" })).toBeVisible();
+      // The result headline and the chess panel both say it (CC-162).
+      await expect(player.page.getByRole("heading", { name: "Draw by agreement", exact: true })).toHaveCount(
+        2,
+      );
       await expect(player.page.getByText("½–½")).toBeVisible();
     }
     expect(await downloadedPgn(white)).toContain('[Result "1/2-1/2"]');
@@ -456,9 +466,14 @@ test.describe("chess", () => {
     await expect(white.page.getByRole("timer", { name: "black clock" }).locator("..")).toHaveClass(/_low_/);
 
     for (const player of [white, black]) {
-      await expect(player.page.getByRole("heading", { name: "Time out" })).toBeVisible({ timeout: 30_000 });
+      await expect(player.page.getByRole("heading", { name: "Time out", exact: true })).toBeVisible({
+        timeout: 30_000,
+      });
     }
     await expect(white.page.getByText("You won with White")).toBeVisible();
+    // The result headline says how it ended (CC-162).
+    await expect(white.page.getByRole("heading", { name: "You won on time" })).toBeVisible();
+    await expect(black.page.getByRole("heading", { name: "You lost on time" })).toBeVisible();
     await expect(blackClock).toHaveText("0:00.0");
     expect(await downloadedPgn(white)).toContain('[Termination "Time out"]');
   });

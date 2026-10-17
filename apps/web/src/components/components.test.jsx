@@ -121,9 +121,8 @@ describe("ShareRoom", () => {
 
     await user.click(screen.getByRole("button", { name: "Copy link" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Couldn't copy — select the link and copy it",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't copy. Select the link and copy it");
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 
   it("selects the whole link when the field is focused, ready to copy", async () => {

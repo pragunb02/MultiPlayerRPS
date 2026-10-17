@@ -19,11 +19,17 @@ export function SiteFooter() {
       </p>
       <p className={styles.cookies}>
         One cookie keeps you signed in. No ads, no trackers.{" "}
-        <Link to={paths.privacy()}>How we use your data</Link>
+        <Link to={paths.privacy()} data-cc-control="footer.data">
+          How we use your data
+        </Link>
       </p>
       <nav aria-label="Legal" className={styles.links}>
-        <Link to={paths.privacy()}>Privacy</Link>
-        <Link to={paths.terms()}>Terms</Link>
+        <Link to={paths.privacy()} data-cc-control="footer.privacy">
+          Privacy
+        </Link>
+        <Link to={paths.terms()} data-cc-control="footer.terms">
+          Terms
+        </Link>
       </nav>
     </footer>
   );

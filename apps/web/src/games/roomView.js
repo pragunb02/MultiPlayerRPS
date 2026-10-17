@@ -20,6 +20,45 @@ export const isYourTurn = (room) =>
   room.you !== "" && room.status === ROOM_STATUS.PLAYING && room.game.activePlayers.includes(room.you);
 
 /**
+ * Where the match stands for the viewer: "waiting" for an opponent, "my-turn", "their-turn", "finished", or
+ * "watching" for a spectator. The room page writes it on the page, so tests and telemetry know the state.
+ *
+ * @returns {"waiting" | "my-turn" | "their-turn" | "finished" | "watching"}
+ */
+export function matchPhase(room) {
+  if (room.you === "") return "watching";
+  if (room.status === ROOM_STATUS.WAITING) return "waiting";
+  if (room.status === ROOM_STATUS.FINISHED) return "finished";
+  return isYourTurn(room) ? "my-turn" : "their-turn";
+}
+
+/** The reasons a board can be closed to the viewer, in their words (CC-164). */
+export const PLAY_REASONS = Object.freeze({
+  RECONNECTING: "Reconnecting",
+  WATCHING: "You are watching this game",
+  WAITING: "Waiting for an opponent to join",
+  OVER: "The game is over",
+  NOT_YOUR_TURN: "Not your turn",
+});
+
+/**
+ * Why the viewer cannot play on the board right now, in their words (CC-164). Empty when they can. A board adds
+ * its own reasons on top, such as a cell that is taken.
+ *
+ * @param {any} room  RoomView
+ * @param {{ reconnecting: boolean }} connection  whether the connection to the server is being restored
+ */
+export function playReason(room, { reconnecting }) {
+  if (reconnecting) return PLAY_REASONS.RECONNECTING;
+  const phase = matchPhase(room);
+  if (phase === "watching") return PLAY_REASONS.WATCHING;
+  if (phase === "waiting") return PLAY_REASONS.WAITING;
+  if (phase === "finished") return PLAY_REASONS.OVER;
+  if (phase === "their-turn") return PLAY_REASONS.NOT_YOUR_TURN;
+  return "";
+}
+
+/**
  * Which game of the room this is: 0 for the first, and each rematch adds one. It is the same while a game is
  * played and after it finished, so it tells a rematch apart from the game before it.
  */

@@ -49,7 +49,11 @@ export function SaveProgressCard({ room, game }) {
         <h2 id={headingId} className={styles.heading}>
           Save your progress
         </h2>
-        <DismissButton label="Close: save your progress" onClick={() => save.dismiss(PROMPTS.ROOM_CARD)} />
+        <DismissButton
+          control="save.dismiss"
+          label="Close: save your progress"
+          onClick={() => save.dismiss(PROMPTS.ROOM_CARD)}
+        />
       </div>
       <p className={styles.lead}>You're playing as a guest. Sign up and keep everything you've earned:</p>
       <ul className={styles.stats} aria-label="What you'd keep">
@@ -69,10 +73,10 @@ export function SaveProgressCard({ room, game }) {
         )}
       </ul>
       <div className={styles.actions}>
-        <Link to={paths.signup(next)} className={styles.primary}>
+        <Link to={paths.signup(next)} className={styles.primary} data-cc-control="save.signup">
           Sign up — keep it
         </Link>
-        <Link to={paths.login(next)} className={styles.secondary}>
+        <Link to={paths.login(next)} className={styles.secondary} data-cc-control="save.login">
           Log in
         </Link>
       </div>

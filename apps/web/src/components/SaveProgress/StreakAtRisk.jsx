@@ -22,9 +22,11 @@ export function StreakAtRisk() {
       </span>
       <span className={styles.text}>
         Play today to keep your {atRisk.days}-day streak —{" "}
-        <Link to={paths.signup(returnPathFor(location))}>sign up so it's never lost</Link>
+        <Link to={paths.signup(returnPathFor(location))} data-cc-control="streak.signup">
+          sign up so it's never lost
+        </Link>
       </span>
-      <DismissButton label="Close: streak reminder" onClick={atRisk.dismiss} />
+      <DismissButton control="streak.dismiss" label="Close: streak reminder" onClick={atRisk.dismiss} />
     </p>
   );
 }

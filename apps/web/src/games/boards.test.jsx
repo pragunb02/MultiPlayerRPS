@@ -1,7 +1,8 @@
-import { render as renderPlain, screen, within } from "@testing-library/react";
+import { act, fireEvent, render as renderPlain, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { AppRequestError } from "../lib/errors.js";
 import { gameView } from "./registry.js";
 import { RpsBoard } from "./rps/RpsBoard.jsx";
 import { TicTacToeBoard } from "./tictactoe/TicTacToeBoard.jsx";
@@ -72,8 +73,64 @@ describe("RpsBoard", () => {
     );
 
     expect(screen.getByRole("button", { name: /rock/i })).toHaveAttribute("aria-pressed", "true");
-    screen.getAllByRole("button").forEach((button) => expect(button).toBeDisabled());
+    screen
+      .getAllByRole("button")
+      .forEach((button) => expect(button).toHaveAttribute("aria-disabled", "true"));
     expect(screen.getByText("Waiting for Riya")).toBeInTheDocument();
+  });
+
+  it("says who you are waiting for when a hand is pressed after choosing, and sends nothing (CC-164)", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    const view = rpsView({ yourChoice: "rock", hasChosen: { [ME]: true, [THEM]: false } });
+    render(
+      <RpsBoard
+        room={room(view, { game: { view, activePlayers: [THEM], outcome: { status: "ongoing" } } })}
+        onMove={onMove}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /paper/i }));
+
+    expect(onMove).not.toHaveBeenCalled();
+    expect(within(screen.getAllByRole("status").at(-1)).getByText("Waiting for Riya")).toBeInTheDocument();
+  });
+
+  it("lights up the pressed hand at once and says it is sending while the server is slow", async () => {
+    const user = userEvent.setup();
+    render(<RpsBoard room={room(rpsView())} onMove={() => new Promise(() => {})} />);
+
+    await user.click(screen.getByRole("button", { name: /paper/i }));
+    await user.click(screen.getByRole("button", { name: /rock/i }));
+
+    expect(screen.getByRole("button", { name: /paper/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Sending your choice")).toBeInTheDocument();
+  });
+
+  it("marks the pressed hand busy once the answer is slow", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<RpsBoard room={room(rpsView())} onMove={() => new Promise(() => {})} />);
+
+      await act(async () => fireEvent.click(screen.getByRole("button", { name: /paper/i })));
+      await act(async () => vi.advanceTimersByTime(200));
+
+      expect(screen.getByRole("button", { name: /paper/i })).toHaveAttribute("aria-busy", "true");
+      expect(screen.getByRole("button", { name: /rock/i })).not.toHaveAttribute("aria-busy");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows the board's own reason, such as reconnecting", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    render(<RpsBoard room={room(rpsView())} onMove={onMove} reason="Reconnecting" />);
+
+    await user.click(screen.getByRole("button", { name: /rock/i }));
+
+    expect(onMove).not.toHaveBeenCalled();
+    expect(screen.getByText("Reconnecting")).toBeInTheDocument();
   });
 
   it("shows a drawn round, a missing score as 0, and someone no longer seated as 'Opponent'", () => {
@@ -146,6 +203,24 @@ describe("RpsBoard", () => {
     await user.click(screen.getByRole("button", { name: /rock/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("You already chose");
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("offers Retry when the connection lost the choice, and sends it again", async () => {
+    const user = userEvent.setup();
+    const onMove = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new AppRequestError({ code: "TIMEOUT", message: "The server took too long to answer" }),
+      )
+      .mockResolvedValue({});
+    render(<RpsBoard room={room(rpsView())} onMove={onMove} />);
+
+    await user.click(screen.getByRole("button", { name: /scissors/i }));
+    await user.click(await screen.findByRole("button", { name: "Retry" }));
+
+    expect(onMove).toHaveBeenNthCalledWith(2, { choice: "scissors" });
+    expect(onMove).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -166,8 +241,64 @@ describe("TicTacToeBoard", () => {
     await user.click(screen.getByRole("gridcell", { name: "top right: empty" }));
 
     expect(onMove).toHaveBeenCalledWith({ cell: 2 });
-    expect(screen.getByRole("gridcell", { name: "middle centre: O" })).toBeDisabled();
+    expect(screen.getByRole("gridcell", { name: "middle centre: O" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
     expect(screen.getByText("You play X")).toBeInTheDocument();
+  });
+
+  it("shows your mark in the pressed cell at once, before the server answers (CC-164)", async () => {
+    const user = userEvent.setup();
+    render(<TicTacToeBoard room={room(tttView())} onMove={() => new Promise(() => {})} />);
+
+    await user.click(screen.getByRole("gridcell", { name: "top right: empty" }));
+
+    const cell = screen.getByRole("gridcell", { name: "top right: X, sending" });
+    expect(cell).toHaveClass("sending");
+    expect(cell.querySelector("svg")).not.toBeNull();
+  });
+
+  it("marks the sending cell busy once the answer is slow, and explains a second press", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<TicTacToeBoard room={room(tttView())} onMove={() => new Promise(() => {})} />);
+
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "top right: empty" })));
+      await act(async () => vi.advanceTimersByTime(200));
+      fireEvent.click(screen.getByRole("gridcell", { name: "bottom left: empty" }));
+
+      expect(screen.getByRole("gridcell", { name: "top right: X, sending" })).toHaveAttribute(
+        "aria-busy",
+        "true",
+      );
+      expect(screen.getByText("Sending your move")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says a used cell is taken when pressed, and sends nothing", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    render(<TicTacToeBoard room={room(tttView())} onMove={onMove} />);
+
+    await user.click(screen.getByRole("gridcell", { name: "middle centre: O" }));
+
+    expect(onMove).not.toHaveBeenCalled();
+    expect(screen.getByText("Cell taken")).toBeInTheDocument();
+  });
+
+  it("shows the reason again on every press, even when the words are the same", async () => {
+    const user = userEvent.setup();
+    render(<TicTacToeBoard room={room(tttView())} onMove={vi.fn()} />);
+    const taken = screen.getByRole("gridcell", { name: "middle centre: O" });
+
+    await user.click(taken);
+    const first = screen.getByText("Cell taken");
+    await user.click(taken);
+
+    expect(screen.getByText("Cell taken")).not.toBe(first);
   });
 
   it("disables the board when it is not your turn", () => {
@@ -179,8 +310,23 @@ describe("TicTacToeBoard", () => {
       />,
     );
 
-    screen.getAllByRole("gridcell").forEach((cell) => expect(cell).toBeDisabled());
+    screen.getAllByRole("gridcell").forEach((cell) => expect(cell).toHaveAttribute("aria-disabled", "true"));
     expect(screen.getByText("Waiting for Riya")).toBeInTheDocument();
+  });
+
+  it("says it is not your turn when a cell is pressed on the opponent's turn", async () => {
+    const user = userEvent.setup();
+    const view = tttView({ turn: THEM });
+    render(
+      <TicTacToeBoard
+        room={room(view, { game: { view, activePlayers: [THEM], outcome: { status: "ongoing" } } })}
+        onMove={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("gridcell", { name: "top right: empty" }));
+
+    expect(screen.getByText("Not your turn")).toBeInTheDocument();
   });
 
   it("shows the server's reason when a move is refused", async () => {

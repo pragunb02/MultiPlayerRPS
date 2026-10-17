@@ -75,7 +75,7 @@ test.describe("a tab from before a deploy", () => {
     await choices(bob)
       .getByRole("button", { name: /Scissors/ })
       .click();
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(bob.page.getByRole("heading", { name: "You lost" })).toBeVisible();
 
     // Back still leaves the room for the lobby Alice came from, as it would without the reload.

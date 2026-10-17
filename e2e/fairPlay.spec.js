@@ -13,7 +13,7 @@ test.describe("fair play", () => {
     await bob.page.getByRole("button", { name: "Leave and forfeit" }).click();
 
     // The game still ends with a winner, but gives the winner nothing.
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     const message = "This game didn't count: it ended too soon";
     // The toasts' live region holds only the toast, the room's own status region holds the result.
     const toasts = alice.page.getByRole("status").filter({ hasText: new RegExp(`^${message}$`) });

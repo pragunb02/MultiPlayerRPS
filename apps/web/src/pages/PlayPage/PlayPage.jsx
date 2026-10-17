@@ -7,11 +7,16 @@ import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { gameView } from "../../games/registry.js";
+import { useAction } from "../../hooks/useAction.js";
 import { useCreateRoom } from "../../hooks/useCreateRoom.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import styles from "./PlayPage.module.css";
 
-/** One game's lobby: create a room with the game's options, or join a friend's room by code. */
+/**
+ * One game's lobby: create a room with the game's options, or join a friend's room by code. Create room shows a
+ * spinner while the room is being made and explains a failure under the button. Join room says what is missing
+ * while the code is not complete (CC-164).
+ */
 export function PlayPage() {
   const { slug } = useParams();
   const location = useLocation();
@@ -20,6 +25,13 @@ export function PlayPage() {
   const createRoom = useCreateRoom();
   const [options, setOptions] = useState({});
   const [code, setCode] = useState("");
+  const create = useAction(
+    async () => {
+      const roomCode = await createRoom.create(game.id, options);
+      navigate(paths.room(game.id, roomCode));
+    },
+    { id: "lobby.create" },
+  );
 
   if (game === undefined) {
     return <NotFoundPage />;
@@ -28,13 +40,6 @@ export function PlayPage() {
     return <Navigate to={paths.game(game.id)} replace />;
   }
   const { Options } = gameView(game.id);
-
-  async function create() {
-    const roomCode = await createRoom.create(game.id, options).catch(() => undefined);
-    if (roomCode !== undefined) {
-      navigate(paths.room(game.id, roomCode));
-    }
-  }
 
   function join(event) {
     event.preventDefault();
@@ -52,14 +57,9 @@ export function PlayPage() {
         <div className={styles.panel}>
           <h2>Start a room</h2>
           {Options && <Options value={options} onChange={setOptions} />}
-          <Button size="lg" onClick={create} busy={createRoom.busy}>
+          <Button control="lobby.create" size="lg" action={create} pendingLabel="Creating…">
             Create room
           </Button>
-          {createRoom.error && (
-            <p role="alert" className={styles.error}>
-              {createRoom.error.message}
-            </p>
-          )}
         </div>
         <form className={styles.panel} onSubmit={join}>
           <h2>Join a friend</h2>
@@ -76,10 +76,15 @@ export function PlayPage() {
             />
           </label>
           <Button
+            control="lobby.join"
             type="submit"
             variant="secondary"
             size="lg"
-            disabled={code.trim().length !== ROOM_CODE_LENGTH}
+            reason={
+              code.trim().length === ROOM_CODE_LENGTH
+                ? ""
+                : `Enter the ${ROOM_CODE_LENGTH}-character room code`
+            }
           >
             Join room
           </Button>

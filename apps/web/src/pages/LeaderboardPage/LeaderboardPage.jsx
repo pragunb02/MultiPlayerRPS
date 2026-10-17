@@ -84,8 +84,11 @@ function YouRow({ you, metric, listedRanks }) {
     <p className={styles.unlisted}>
       {you.reason === "guest" ? (
         <>
-          Guests aren't ranked. <Link to={paths.signup(returnPathFor(location))}>Sign up</Link> to get on the
-          leaderboard.
+          Guests aren't ranked.{" "}
+          <Link to={paths.signup(returnPathFor(location))} data-cc-control="leaderboard.signup">
+            Sign up
+          </Link>{" "}
+          to get on the leaderboard.
         </>
       ) : (
         "You're not on this board yet. Win a match to get ranked."
@@ -103,7 +106,7 @@ function Board({ info }) {
     return (
       <div role="alert" className={styles.problem}>
         <p>Couldn't load the leaderboard. {board.error.message}</p>
-        <Button variant="secondary" onClick={board.retry}>
+        <Button control="leaderboard.retry" variant="secondary" onClick={board.retry}>
           Try again
         </Button>
       </div>
@@ -163,6 +166,7 @@ export function LeaderboardPage() {
               <Link
                 to={paths.leaderboards(tab.id)}
                 className={styles.tab}
+                data-cc-control="leaderboard.tab"
                 aria-current={tab.id === info.id ? "page" : undefined}
               >
                 <TabIcon board={tab} />

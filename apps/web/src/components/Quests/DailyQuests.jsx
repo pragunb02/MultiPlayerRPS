@@ -94,7 +94,7 @@ export function DailyQuests({ compact = false }) {
     body = (
       <div role="alert" className={styles.problem}>
         <p>Couldn't load quests. {quests.error.message}</p>
-        <Button variant="secondary" onClick={quests.retry}>
+        <Button control="quests.retry" variant="secondary" onClick={quests.retry}>
           Try again
         </Button>
       </div>
@@ -129,7 +129,11 @@ export function DailyQuests({ compact = false }) {
           </>
         )}
         <ResetsIn at={resetsAt} onElapsed={quests.retry} />
-        {compact && <Link to={paths.profile()}>Open your player console</Link>}
+        {compact && (
+          <Link to={paths.profile()} data-cc-control="quests.console">
+            Open your player console
+          </Link>
+        )}
       </>
     );
   }

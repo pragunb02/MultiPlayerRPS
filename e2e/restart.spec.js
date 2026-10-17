@@ -109,7 +109,7 @@ test.describe("the server restarts", () => {
     await cell(x, "top centre").click();
     await cell(o, "bottom left").click();
     await cell(x, "top right").click();
-    await expect(x.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(x.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(o.page.getByRole("heading", { name: "You lost" })).toBeVisible();
   });
 
@@ -149,7 +149,7 @@ test.describe("a long wait on the result screen", () => {
       await choices(bob)
         .getByRole("button", { name: /Scissors/ })
         .click();
-      await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+      await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
       await expect(bob.page.getByText(/^Rematch available for/)).toHaveText(/^Rematch available for 0:0\d$/);
 
       for (const player of [alice, bob]) {

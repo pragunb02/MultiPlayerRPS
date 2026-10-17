@@ -16,7 +16,7 @@ export function PrivacyPage() {
         <p>
           ClassiCade is run by its owner as an independent project. The owner decides what is stored and is
           responsible for it. For privacy questions or requests, open an issue at{" "}
-          <a href="https://github.com/pragunb02/MultiPlayerRPS/issues">
+          <a href="https://github.com/pragunb02/MultiPlayerRPS/issues" data-cc-control="legal.contact">
             github.com/pragunb02/MultiPlayerRPS/issues
           </a>{" "}
           saying only that you have a privacy request. Do not put your email, username or anything personal in
@@ -148,7 +148,10 @@ export function PrivacyPage() {
         <p>
           When this policy changes, the date at the top changes too. If a change affects what we store, we say
           so on the site before it takes effect. The rules for using the site are in the{" "}
-          <Link to={paths.terms()}>terms of use</Link>.
+          <Link to={paths.terms()} data-cc-control="legal.terms">
+            terms of use
+          </Link>
+          .
         </p>
       </LegalSection>
     </LegalPage>

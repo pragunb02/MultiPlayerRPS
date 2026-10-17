@@ -160,13 +160,15 @@ test.describe("history: rooms", () => {
     await friend.page.getByRole("button", { name: "Leave room" }).click();
     await friend.page.getByRole("button", { name: "Leave and forfeit" }).click();
     await at(friend.page, ...TTT);
-    await expect(host.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(host.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
 
     await friend.page.goBack();
     await expect(friend.page).not.toHaveURL(room.path);
   });
 
-  test("finished game → Play again → Back shows the result → Forward to the lobby", async ({ players }) => {
+  test("finished game → New opponent → the lobby, and Back never re-enters the room (CC-162)", async ({
+    players,
+  }) => {
     const alice = await players.open("alice");
     await alice.page.goto("/games/rock-paper-scissors");
     await alice.page.getByRole("combobox", { name: /match length/i }).selectOption("1");
@@ -180,13 +182,12 @@ test.describe("history: rooms", () => {
       .getByRole("button", { name: /Paper/ })
       .click();
     await bob.page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /Rock/ }).click();
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
 
-    await alice.page.getByRole("link", { name: "Play again" }).click();
+    await alice.page.getByRole("button", { name: "New opponent" }).click();
     await at(alice.page, ...RPS);
     await alice.page.goBack();
-    await expect(alice.page).toHaveURL(roomUrl);
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page).not.toHaveURL(roomUrl);
     await alice.page.goForward();
     await at(alice.page, ...RPS);
   });

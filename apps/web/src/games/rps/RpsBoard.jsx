@@ -3,6 +3,9 @@ import { HandPaper } from "../../art/rps/HandPaper.jsx";
 import { HandRock } from "../../art/rps/HandRock.jsx";
 import { HandScissors } from "../../art/rps/HandScissors.jsx";
 import { TurnBanner } from "../../components/TurnBanner/TurnBanner.jsx";
+import { useExplanation } from "../../hooks/useExplanation.js";
+import { MoveProblem, ReasonLine } from "../BoardFeedback.jsx";
+import { PLAY_REASONS, playReason } from "../roomView.js";
 import { useMove } from "../useMove.js";
 import styles from "./RpsBoard.module.css";
 
@@ -41,17 +44,35 @@ const nameOf = (room, playerId) =>
     : (room.seats.find((s) => s.playerId === playerId)?.displayName ?? "Opponent");
 
 /**
- * Rock Paper Scissors. Your own pending choice is shown to you; the opponent's only as "has chosen" — the
- * server never sends it before the round resolves.
- *
- * @param {{ room: any, onMove: (move: { choice: string }) => Promise<unknown> }} props
+ * Why no hand can be chosen now. Both players choose at once in each round, so "not your turn" can only mean
+ * you chose and wait for the other player, and the reason says so.
  */
-export function RpsBoard({ room, onMove }) {
+function choiceReason({ reason, opponent, busy }) {
+  if (reason === PLAY_REASONS.NOT_YOUR_TURN) {
+    return `Waiting for ${opponent.displayName}`;
+  }
+  if (reason === "" && busy) {
+    return "Sending your choice";
+  }
+  return reason;
+}
+
+/**
+ * Rock Paper Scissors. Your own pending choice is shown to you. The opponent's shows only as "has chosen",
+ * because the server never sends it before the round resolves. The pressed hand lights up at once, and a hand
+ * that cannot be chosen says why when pressed (CC-164).
+ *
+ * @param {{ room: any, onMove: (move: { choice: string }) => Promise<unknown>, reason?: string }} props
+ *   `reason`: why the viewer cannot play now (see playReason), empty when they can
+ */
+export function RpsBoard({ room, onMove, reason = playReason(room, { reconnecting: false }) }) {
   const { view } = room.game;
-  const move = useMove(onMove);
+  const move = useMove(onMove, { id: "rps.choice" });
+  const explanation = useExplanation();
   const playing = room.status === "playing";
   const opponent = room.seats.find((seat) => seat.playerId !== room.you);
-  const canChoose = playing && room.game.activePlayers.includes(room.you) && !move.busy;
+  const chosen = move.sent?.choice ?? view.yourChoice;
+  const why = choiceReason({ reason, opponent, busy: move.busy });
 
   return (
     <div className={styles.board}>
@@ -75,10 +96,12 @@ export function RpsBoard({ room, onMove }) {
               <button
                 key={choice.id}
                 type="button"
-                className={`${styles.choice} ${view.yourChoice === choice.id ? styles.picked : ""}`}
-                aria-pressed={view.yourChoice === choice.id}
-                disabled={!canChoose}
-                onClick={() => move.send({ choice: choice.id })}
+                className={`${styles.choice} ${chosen === choice.id ? styles.picked : ""}`}
+                aria-pressed={chosen === choice.id}
+                aria-disabled={why !== "" ? "true" : undefined}
+                aria-busy={move.sent?.choice === choice.id && move.pending ? "true" : undefined}
+                data-cc-control="rps.choice"
+                onClick={() => (why === "" ? move.send({ choice: choice.id }) : explanation.explain(why))}
               >
                 <choice.Hand className={styles.icon} />
                 {choice.label}
@@ -94,11 +117,8 @@ export function RpsBoard({ room, onMove }) {
           )}
         </>
       )}
-      {move.error !== "" && (
-        <p role="alert" className={styles.error}>
-          {move.error}
-        </p>
-      )}
+      {playing && <ReasonLine explanation={explanation} />}
+      <MoveProblem move={move} />
 
       {view.rounds.length > 0 && (
         <ol className={styles.history} aria-label="Rounds" reversed>

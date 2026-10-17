@@ -143,10 +143,34 @@ describe("roomComponent rematch (CC-037)", () => {
 
     const { room } = await rooms.leaveRoom({ code, playerId: BOB.id, now: T0 + 5 });
 
-    expect(room.rematch).toEqual({ requestedBy: [], available: false, declinedBy: "" });
+    expect(room.rematch).toEqual({
+      requestedBy: [],
+      available: false,
+      declinedBy: "",
+      leftName: BOB.displayName,
+    });
     await expect(rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 6 })).rejects.toThrow(
       /opponent left/,
     );
+  });
+
+  it("tells the player still there who left the finished game, though the seat is gone (CC-162)", async () => {
+    const { rooms, code } = await finishedGame();
+
+    const { room } = await rooms.leaveRoom({ code, playerId: BOB.id, now: T0 + 5 });
+
+    expect(room.seats.map((seat) => seat.playerId)).toEqual([ALICE.id]);
+    expect(rooms.viewFor(room, ALICE.id).rematch).toEqual(
+      expect.objectContaining({ available: false, leftName: BOB.displayName }),
+    );
+  });
+
+  it("names nobody in a finished game that everyone is still in", async () => {
+    const { rooms, code } = await finishedGame();
+
+    const view = rooms.viewFor(await rooms.getRoom(code), ALICE.id);
+
+    expect(view.rematch).not.toHaveProperty("leftName");
   });
 
   it("refuses a rematch before the game is over", async () => {

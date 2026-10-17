@@ -31,9 +31,11 @@ const squareOf = (target) => target.closest("[data-square]")?.dataset.square ?? 
  *   orientation: "w" | "b",
  *   interactive: boolean,
  *   onMove: (move: { from: string, to: string, promotion?: string }, how: { dragged: boolean }) => void,
- * }} input
+ *   onRefuse: (why: "closed" | "not-yours" | "illegal") => void,
+ * }} input  `onRefuse` hears about a click that cannot do anything, so the board can say why (CC-164): the
+ *   board is closed to this player now, the square holds no piece of theirs, or the move is not legal
  */
-export function useBoardInput({ chess, colour, orientation, interactive, onMove }) {
+export function useBoardInput({ chess, colour, orientation, interactive, onMove, onRefuse }) {
   const [selected, setSelected] = useState("");
   const [drag, setDrag] = useState({ from: "", over: "" });
   const [promotion, setPromotion] = useState({ from: "", to: "" });
@@ -76,6 +78,7 @@ export function useBoardInput({ chess, colour, orientation, interactive, onMove 
       return;
     }
     if (!interactive) {
+      onRefuse("closed");
       return;
     }
     if (ownPieceOn(square)) {
@@ -83,8 +86,10 @@ export function useBoardInput({ chess, colour, orientation, interactive, onMove 
       return;
     }
     setSelected("");
-    if (selected !== "") {
-      attempt(selected, square, false);
+    if (selected === "") {
+      onRefuse("not-yours");
+    } else if (!attempt(selected, square, false)) {
+      onRefuse("illegal");
     }
   }
 

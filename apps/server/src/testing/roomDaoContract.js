@@ -187,6 +187,20 @@ export function runRoomDaoContract(createDao) {
         game: { ...doc.game, state: { ...doc.game.state, score: { "guest.a": 1, $b: 2, "": 3 } } },
       }),
     ],
+    [
+      "a player left a finished room: their seat is gone and the rematch keeps their name (CC-162)",
+      (doc) => ({
+        ...doc,
+        status: "finished",
+        finishedAt: T0 + 9,
+        rematch: { requestedBy: ["guest_a"], available: true, declinedBy: "" },
+      }),
+      (doc) => ({
+        ...doc,
+        seats: doc.seats.slice(0, 1),
+        rematch: { requestedBy: [], available: false, declinedBy: "", leftName: "Bob" },
+      }),
+    ],
     ["the same values in new objects", (doc) => structuredClone(doc)],
     ["nothing at all", (doc) => doc],
   ];

@@ -254,8 +254,12 @@ export function createRoomComponent({
     }
     const hostId = room.hostId === playerId ? seats[0].playerId : room.hostId;
     const left = { ...withSeats(room, seats, now), hostId };
-    // A player left a finished game: no rematch any more, and nobody waits for one.
-    return room.status === ROOM_STATUS.FINISHED ? { ...left, rematch: NO_REMATCH } : left;
+    if (room.status !== ROOM_STATUS.FINISHED) {
+      return left;
+    }
+    // A player left a finished game: no rematch any more, and nobody waits for one. Their seat is gone, so the
+    // room keeps their name to tell the player still there who left (CC-162).
+    return { ...left, rematch: { ...NO_REMATCH, leftName: seatOf(room, playerId).displayName } };
   }
 
   /** Runs `work` for each room, skipping rooms that closed in the meantime. Answers what `work` answered. */
@@ -655,6 +659,8 @@ export function createRoomComponent({
             until: lifetimeOf(room, lifetimes).endsAt,
             // Rooms stored before declines existed (CC-104) have none: nobody declined in them.
             declinedBy: room.rematch.declinedBy ?? "",
+            // Only after a player left the finished game: who it was (CC-162).
+            ...(room.rematch.leftName !== undefined && { leftName: room.rematch.leftName }),
           },
         }),
         ...(room.series && { series: { games: room.series.games, wins: { ...room.series.wins } } }),

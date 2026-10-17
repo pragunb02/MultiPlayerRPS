@@ -33,7 +33,8 @@ export function PlayerBar({ name, colour, ms, running, live, captured, advantage
           </span>
         )}
       </div>
-      <span className={styles.time} role="timer" aria-label={`${colourName(colour)} clock`}>
+      {/* Marked as a ticker: it changes every second by itself, so it never counts as an answer to a press. */}
+      <span className={styles.time} role="timer" aria-label={`${colourName(colour)} clock`} data-cc-ticker="">
         {formatClock(ms)}
       </span>
     </div>
