@@ -98,7 +98,13 @@ export function createWebAppRouter({ distDir, siteOrigin, adminPage }) {
     }
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Robots-Tag", "noindex, nofollow");
-    res.type("html").send(page(renderPageHead({ page: ADMIN_PAGE, origin: siteOrigin })));
+    res.type("html").send(
+      page({
+        head: renderPageHead({ page: ADMIN_PAGE, origin: siteOrigin }),
+        title: ADMIN_PAGE.title,
+        description: ADMIN_PAGE.description,
+      }),
+    );
   });
 
   router.get(/.*/, (req, res, next) => {
