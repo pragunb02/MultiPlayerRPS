@@ -76,6 +76,16 @@ describe("createRequestLogger", () => {
         durationMs: 12.35,
       }),
     ]);
+    expect(find("request completed")[0]).not.toHaveProperty("forwardedEntries");
+  });
+
+  it("logs how many addresses X-Forwarded-For holds, but never the addresses", async () => {
+    const { app, find, entries } = setup();
+
+    await request(app).get("/ok").set("X-Forwarded-For", "203.0.113.7, 198.51.100.2");
+
+    expect(find("request completed")[0].forwardedEntries).toBe(2);
+    expect(JSON.stringify(entries)).not.toMatch(/203\.0\.113\.7|198\.51\.100\.2/);
   });
 
   it("logs client errors as warn with the error code, server errors as error", async () => {

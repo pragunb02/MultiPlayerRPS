@@ -8,6 +8,15 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
 const levelFor = (status) => (status >= 500 ? "error" : status >= 400 ? "warn" : "info");
 
 /**
+ * How many addresses the X-Forwarded-For header holds. Only the count is logged, never the addresses. Comparing it
+ * with TRUST_PROXY_HOPS on your own request shows whether the hop count matches the proxies in front of the server.
+ *
+ * @param {string | undefined} header
+ */
+const forwardedEntries = (header) =>
+  header === undefined ? {} : { forwardedEntries: header.split(",").length };
+
+/**
  * Assigns every request an id (propagating a well-formed incoming `X-Request-Id`), attaches a child logger
  * as `req.log`, echoes the id in the response, and writes one access-log line when the response finishes.
  *
@@ -37,6 +46,7 @@ export function createRequestLogger({ logger, generateId = randomUUID, now = () 
           path,
           status: res.statusCode,
           durationMs: Math.round((now() - startedAt) * 100) / 100,
+          ...forwardedEntries(req.get("X-Forwarded-For")),
           ...(res.locals.errorCode && { errorCode: res.locals.errorCode }),
         },
         "request completed",

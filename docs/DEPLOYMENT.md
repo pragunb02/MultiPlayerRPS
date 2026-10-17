@@ -21,15 +21,16 @@
 
 ### Environment variables (dashboard → Environment)
 
-| Variable          | Required      | Notes                                                                                                                                                                                                                                   |
-| ----------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MONGO_URI`       | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                         |
-| `SESSION_SECRET`  | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                          |
-| `NODE_ENV`        | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                               |
-| `ALLOWED_ORIGINS` | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047) |
-| `PORT`            | set by Render |                                                                                                                                                                                                                                         |
-| `WEB_DIST_DIR`    | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                               |
-| `LOG_LEVEL`       | no            | default `info`                                                                                                                                                                                                                          |
+| Variable           | Required      | Notes                                                                                                                                                                                                                                                     |
+| ------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MONGO_URI`        | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                                           |
+| `SESSION_SECRET`   | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                                            |
+| `NODE_ENV`         | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                                                 |
+| `ALLOWED_ORIGINS`  | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047)                   |
+| `PORT`             | set by Render |                                                                                                                                                                                                                                                           |
+| `WEB_DIST_DIR`     | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                                                 |
+| `LOG_LEVEL`        | no            | default `info`                                                                                                                                                                                                                                            |
+| `TRUST_PROXY_HOPS` | no            | default `1` in production, `0` elsewhere. How many proxies in front of the server add to `X-Forwarded-For`; rate limits key on the address that many entries in from the right. See [Client addresses and rate limits](#client-addresses-and-rate-limits) |
 
 Secrets live only in Render and local `.env` files — never in the repo (it is public), chat, or PR text.
 
@@ -66,6 +67,37 @@ sleep never loses a game (CC-101). Players' browsers reconnect and rejoin by the
 process marks every seat as away until its player is back, and applies chess flags that fell while no server ran.
 How long rooms live is in `apps/server/src/domain/rooms/roomLifetimes.js` (rematch window 30 minutes, an away game
 2 hours, closed room records 1 day). There are no settings for it in production.
+
+## Client addresses and rate limits
+
+Every per-address rate limit (sign-up and login, guest creation, leaderboards, and the app-wide `/api` budget) keys on
+`req.ip` (CC-106). Express finds it by counting `TRUST_PROXY_HOPS` proxies in from the right end of
+`X-Forwarded-For`. Each proxy adds one address on the right, so entries further left were written by someone we do not
+trust, and a forged entry on the left can never become the key.
+
+1. Too low (for example `1` when there are two proxies): every player is counted as the proxy's address, so players
+   share one small budget and get "too many attempts". This is the safe failure: nobody can bypass a limit.
+2. Too high: `req.ip` becomes an entry the player wrote, so a script can pick a new key for every request and bypass
+   every per-address limit. Never set it higher than the number of proxies.
+3. Production needs at least `1`: HTTPS ends at Render's proxy, and the `Secure` session cookie is only set when the
+   server trusts that proxy's `X-Forwarded-Proto`. Config refuses `0` in production.
+
+Render does not document how many proxies sit in front of a web service (it uses Cloudflare internally for DDoS
+protection, see render.com/docs/ddos-protection). The default `1` is the one value that can never be forged. To check
+the real number without logging any address:
+
+1. After a deploy, open the site in a browser and copy the `X-Request-Id` response header of one `/api` request
+   (browser dev tools, Network tab).
+2. Find that request id in the Render logs. The `request completed` line has `forwardedEntries`, the number of entries
+   in `X-Forwarded-For` (only the count, never the addresses). A browser sends none, so this is the number of proxies.
+3. Set `TRUST_PROXY_HOPS` to that number in Render (dashboard → Environment) and redeploy. At startup the server logs
+   `client addresses read through trusted proxies` with the `trustProxyHops` in effect.
+
+The app-wide `/api` budget (CC-110) is 300 requests a minute, counted per session when the player has one (guest or
+signed in) and per address otherwise. The stricter route limits still apply on top of it. `/health`, `/api/health`,
+the web app and the realtime connection are not limited by it. A 429 answer has the standard error body
+(`RATE_LIMITED`), a `Retry-After` header, and `RateLimit-Policy` / `RateLimit` headers. The end-to-end server raises
+all budgets, because every test player connects from 127.0.0.1 (`e2e/app.mjs`).
 
 ## Before merging any PR
 

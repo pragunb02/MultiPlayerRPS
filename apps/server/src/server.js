@@ -257,7 +257,7 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number } },
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number } },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
@@ -388,6 +388,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     authLimits: limits.auth,
     guestLimit: limits.guest,
     leaderboardLimit: limits.leaderboard,
+    apiLimit: limits.api,
     leaderboardComponent,
     sessionMiddleware,
     identityComponent,

@@ -1,7 +1,6 @@
 import { Router } from "express";
-import { rateLimit } from "express-rate-limit";
-import { ERROR_CODES } from "@classicade/shared";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { createRateLimit } from "./rateLimits.js";
 import { destroySession, establishSession, requireIdentity, SESSION_COOKIE_NAME } from "./session.js";
 
 // Each guest session is a stored document; cap how fast one client can create them.
@@ -34,19 +33,7 @@ export function createSessionRoutes({
   assertFunction(onIdentityChanged, "onIdentityChanged");
 
   const router = Router();
-  const guestRateLimit = rateLimit({
-    ...guestLimit,
-    standardHeaders: "draft-7",
-    legacyHeaders: false,
-    handler: (req, res) =>
-      res.status(429).json({
-        error: {
-          code: ERROR_CODES.RATE_LIMITED,
-          message: "Too many requests, try again later",
-          requestId: req.id,
-        },
-      }),
-  });
+  const guestRateLimit = createRateLimit({ ...guestLimit, message: "Too many requests, try again later" });
 
   router.get("/session", (req, res) => {
     if (req.session.identity === undefined) {

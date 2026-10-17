@@ -27,6 +27,7 @@ const limits = {
   },
   guest: { windowMs: 60_000, limit: 10_000 },
   leaderboard: { windowMs: 60_000, limit: 10_000 },
+  api: { windowMs: 60_000, limit: 10_000 },
 };
 // Standard room lifetimes, unless a test asked the next process for short ones (CC-101).
 const rooms = JSON.parse(process.env.E2E_ROOMS);
