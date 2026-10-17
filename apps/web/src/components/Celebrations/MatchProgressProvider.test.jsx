@@ -83,8 +83,9 @@ describe("MatchProgressProvider", () => {
     await act(async () => screen.getByRole("button", { name: "Sign in" }).click());
 
     expect(screen.getByText("nothing kept")).toBeInTheDocument();
-    act(() => socket.push("progress:updated", update("match-1", { xpGained: 10 })));
-    expect(screen.getByText("kept +10 XP")).toBeInTheDocument();
+    // The new player's first update must not carry the last player's updates along with it.
+    act(() => socket.push("progress:updated", update("match-2", { xpGained: 10 })));
+    expect(screen.getByText("nothing kept")).toBeInTheDocument();
   });
 
   it("needs to be inside the provider", () => {
