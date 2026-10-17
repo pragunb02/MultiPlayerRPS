@@ -8,6 +8,7 @@ import { EmptyMatches } from "../../art/illustrations/EmptyMatches.jsx";
 import { AchievementGrid } from "../../components/Achievements/AchievementGrid.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { YourRank } from "../../components/Leaderboard/YourRank.jsx";
+import { useAction } from "../../hooks/useAction.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
 import { useStreakAtRisk } from "../../components/SaveProgress/saveProgressContext.js";
@@ -69,6 +70,7 @@ function ProgressCard() {
 
 function MatchHistory({ you }) {
   const history = useMatchHistory();
+  const more = useAction(history.loadMore, { id: "profile.matches.more" });
   if (history.status === "loading") return <p>Loading matches…</p>;
   if (history.status === "error") return <p role="alert">Couldn't load matches. {history.error.message}</p>;
   if (history.matches.length === 0) {
@@ -76,7 +78,10 @@ function MatchHistory({ you }) {
       <div className={styles.empty}>
         <EmptyMatches />
         <p>
-          No games yet. <Link to={paths.home()}>Play one</Link>
+          No games yet.{" "}
+          <Link to={paths.home()} data-cc-control="profile.play">
+            Play one
+          </Link>
         </p>
       </div>
     );
@@ -106,7 +111,7 @@ function MatchHistory({ you }) {
       </ul>
       {history.moreError && <p role="alert">Couldn't load more matches. {history.moreError.message}</p>}
       {history.hasMore && (
-        <Button variant="secondary" onClick={history.loadMore}>
+        <Button control="profile.matches.more" variant="secondary" action={more} pendingLabel="Loading…">
           Load more
         </Button>
       )}
@@ -126,7 +131,9 @@ function PlayerConsole({ guest }) {
       <StreakAtRisk />
       {guest && streakAtRisk === undefined && (
         <p className={styles.muted}>
-          <Link to={paths.signup(paths.profile())}>Sign up to keep your streak and achievements</Link>
+          <Link to={paths.signup(paths.profile())} data-cc-control="profile.console.signup">
+            Sign up to keep your streak and achievements
+          </Link>
         </p>
       )}
       <StreakCard />
@@ -153,7 +160,11 @@ export function ProfilePage() {
         <PageTitle>Your profile</PageTitle>
         <h1>Your profile</h1>
         <p>
-          Play a game or <Link to={paths.login(paths.profile())}>log in</Link> to see your progress.
+          Play a game or{" "}
+          <Link to={paths.login(paths.profile())} data-cc-control="profile.login">
+            log in
+          </Link>{" "}
+          to see your progress.
         </p>
       </section>
     );
@@ -164,8 +175,11 @@ export function ProfilePage() {
       <h1>{session.identity.displayName}</h1>
       {session.identity.kind === "guest" && (
         <p className={styles.muted}>
-          You're playing as a guest. <Link to={paths.signup(paths.profile())}>Create an account</Link> to keep
-          your name.
+          You're playing as a guest.{" "}
+          <Link to={paths.signup(paths.profile())} data-cc-control="profile.signup">
+            Create an account
+          </Link>{" "}
+          to keep your name.
         </p>
       )}
       <ProgressCard />

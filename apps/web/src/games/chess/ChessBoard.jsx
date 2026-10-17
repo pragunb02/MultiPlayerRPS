@@ -5,7 +5,11 @@ import { Button } from "../../components/Button/Button.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { MotionProvider } from "../../components/Motion/MotionProvider.jsx";
 import { TurnBanner } from "../../components/TurnBanner/TurnBanner.jsx";
+import { useAction } from "../../hooks/useAction.js";
+import { useExplanation } from "../../hooks/useExplanation.js";
 import { useLowTimeTick } from "../../hooks/useSound.js";
+import { MoveProblem, ReasonLine } from "../BoardFeedback.jsx";
+import { PLAY_REASONS, playReason } from "../roomView.js";
 import { useMove } from "../useMove.js";
 import { Board } from "./Board.jsx";
 import { materialBalance, opposite, positionWithMove, replayGame } from "./chessGame.js";
@@ -67,16 +71,39 @@ function useSlide(timeline, shown, dropped) {
 }
 
 /**
+ * Why Offer draw cannot be pressed: an offer already stands, or the board is closed to the player for another
+ * reason. Empty when it can.
+ */
+function drawReason({ view, you, opponentName, reason }) {
+  if (reason !== "") return reason;
+  if (view.drawOfferBy === you) return `Waiting for ${opponentName} to answer`;
+  if (view.drawOfferBy !== "") return `${opponentName} offered a draw. Answer it above the board`;
+  return "";
+}
+
+/**
  * Chess: drag and drop or click to move, arrow keys and Enter on the keyboard, the game's history to look back
  * through, captured pieces, clocks and the result with a PGN download. chess.js runs here only to show legal
  * moves and earlier positions. The server checks every move and decides the result.
  *
- * @param {{ room: any, onMove: (move: object) => Promise<unknown>, site?: string }} props
- *   `site`: written into the PGN, defaults to this page's origin
+ * A press that cannot do anything says why (CC-164): not your turn, looking back through the history, or not
+ * one of your pieces.
+ *
+ * @param {{ room: any, onMove: (move: object) => Promise<unknown>, reason?: string, site?: string }} props
+ *   `reason`: why the viewer cannot play now (see playReason), empty when they can. `site`: written into the PGN,
+ *   defaults to this page's origin
  */
-export function ChessBoard({ room, onMove, site = window.location.origin }) {
+export function ChessBoard({
+  room,
+  onMove,
+  reason = playReason(room, { reconnecting: false }),
+  site = window.location.origin,
+}) {
   const { view } = room.game;
-  const move = useMove(onMove);
+  const move = useMove(onMove, { id: "chess.square" });
+  const offerDraw = useAction(() => onMove({ type: CHESS_ACTIONS.OFFER_DRAW }), { id: "chess.offer_draw" });
+  const resign = useAction(() => onMove({ type: CHESS_ACTIONS.RESIGN }), { id: "chess.resign" });
+  const explanation = useExplanation();
   const [pending, setPending] = useState({ fen: "", move: { from: "", to: "" } });
   const [dropped, setDropped] = useState({ from: "", to: "" });
   const [browse, setBrowse] = useState({ follow: true, ply: 0 });
@@ -94,14 +121,18 @@ export function ChessBoard({ room, onMove, site = window.location.origin }) {
   const chess = useMemo(() => new Chess(position.fen), [position.fen]);
   const slide = useSlide(timeline, shown, dropped);
 
-  const yourTurn = playing && seated && view.toMove === room.you && !move.busy;
-  const interactive = yourTurn && shown === latest;
+  // The position says whose move it is, so a board shown between two room updates never lets the wrong side play.
+  const boardReason = reason === "" && view.toMove !== room.you ? PLAY_REASONS.NOT_YOUR_TURN : reason;
+  const interactive = boardReason === "" && !move.busy && shown === latest;
+  // Offering a draw and resigning do not wait for your turn.
+  const anyTurnReason = boardReason === PLAY_REASONS.NOT_YOUR_TURN ? "" : boardReason;
 
   const byColour = (colour) => Object.keys(view.colors).find((id) => view.colors[id] === colour) ?? "";
   const seatName = (playerId) =>
     room.seats.find((seat) => seat.playerId === playerId)?.displayName ?? "Opponent";
   const names = { w: seatName(byColour("w")), b: seatName(byColour("b")) };
   const shownName = (colour) => (colour === yourColour ? "You" : names[colour]);
+  const opponentName = yourColour === "" ? "" : names[opposite(yourColour)];
 
   const running = playing && view.lastMoveAt > 0 ? view.fen.split(" ")[1] : "";
   const clocks = useChessClocks({
@@ -120,12 +151,28 @@ export function ChessBoard({ room, onMove, site = window.location.origin }) {
     setPending({ fen: "", move: { from: "", to: "" } });
   }
 
+  /** Why a press on the board did nothing, in the player's words. */
+  function refuse(why) {
+    if (why === "not-yours") {
+      explanation.explain("Pick one of your own pieces");
+    } else if (why === "illegal") {
+      explanation.explain("That move is not allowed");
+    } else if (boardReason !== "") {
+      explanation.explain(boardReason);
+    } else if (shown !== latest) {
+      explanation.explain("Go to the latest move to play");
+    } else {
+      explanation.explain("Sending your move");
+    }
+  }
+
   const input = useBoardInput({
     chess,
     colour: yourColour === "" ? "w" : yourColour,
     orientation,
     interactive,
     onMove: play,
+    onRefuse: refuse,
   });
 
   const goTo = (ply) => setBrowse({ follow: ply >= latest, ply });
@@ -178,16 +225,17 @@ export function ChessBoard({ room, onMove, site = window.location.origin }) {
             slide={slide}
           />
           {bar(orientation)}
+          <ReasonLine explanation={explanation} />
           <div className={styles.toolbar}>
-            <Button variant="ghost" onClick={() => setOrientation(opposite(orientation))}>
+            <Button
+              control="chess.flip"
+              variant="ghost"
+              onClick={() => setOrientation(opposite(orientation))}
+            >
               Flip board
             </Button>
           </div>
-          {move.error !== "" && (
-            <p role="alert" className={styles.error}>
-              {move.error}
-            </p>
-          )}
+          <MoveProblem move={move} />
           <p className="visually-hidden" aria-live="polite">
             {lastMoveText}
           </p>
@@ -205,13 +253,20 @@ export function ChessBoard({ room, onMove, site = window.location.origin }) {
             <div className={styles.actions}>
               {/* A standing offer is answered or withdrawn in the room's request popup (CC-104). */}
               <Button
+                control="chess.offer_draw"
                 variant="secondary"
-                disabled={view.drawOfferBy !== ""}
-                onClick={() => move.send({ type: CHESS_ACTIONS.OFFER_DRAW })}
+                action={offerDraw}
+                reason={drawReason({ view, you: room.you, opponentName, reason: anyTurnReason })}
               >
                 {view.drawOfferBy === room.you ? "Draw offered" : "Offer draw"}
               </Button>
-              <Button variant="ghost" onClick={() => setConfirmResign(true)}>
+              <Button
+                control="chess.resign"
+                variant="ghost"
+                action={resign}
+                reason={anyTurnReason}
+                onClick={() => setConfirmResign(true)}
+              >
                 Resign
               </Button>
             </div>
@@ -224,13 +279,14 @@ export function ChessBoard({ room, onMove, site = window.location.origin }) {
           onClose={() => setConfirmResign(false)}
           actions={
             <>
-              <Button variant="secondary" onClick={() => setConfirmResign(false)}>
+              <Button control="chess.resign.keep" variant="secondary" onClick={() => setConfirmResign(false)}>
                 Keep playing
               </Button>
               <Button
+                control="chess.resign.confirm"
                 onClick={() => {
                   setConfirmResign(false);
-                  move.send({ type: CHESS_ACTIONS.RESIGN });
+                  resign.run();
                 }}
               >
                 Resign

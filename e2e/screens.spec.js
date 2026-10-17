@@ -181,7 +181,7 @@ test.describe("profile", () => {
       .getByRole("button", { name: /Scissors/ })
       .click();
     await bob.page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /Paper/ }).click();
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
 
     await alice.page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Profile" }).click();
 

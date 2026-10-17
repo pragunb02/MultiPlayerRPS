@@ -26,10 +26,10 @@ test.describe("guest players", () => {
     await choices(bob)
       .getByRole("button", { name: /Scissors/ })
       .click();
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(bob.page.getByRole("heading", { name: "You lost" })).toBeVisible();
 
-    await bob.page.getByRole("link", { name: "Play again" }).click();
+    await bob.page.getByRole("button", { name: "New opponent" }).click();
     await expect(bob.page).toHaveURL("/games/rock-paper-scissors");
   });
 
@@ -49,7 +49,7 @@ test.describe("guest players", () => {
     await bob.page.getByRole("button", { name: "Leave and forfeit" }).click();
 
     await expect(bob.page).toHaveURL("/games/tic-tac-toe");
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
   });
 
   test("a guest who signs up from a room comes back to that room as the new user", async ({ players }) => {

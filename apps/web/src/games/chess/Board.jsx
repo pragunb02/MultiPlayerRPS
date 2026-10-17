@@ -115,6 +115,7 @@ export function Board({ chess, orientation, input, interactive, colour, lastMove
                   type="button"
                   role="gridcell"
                   data-square={square}
+                  data-cc-control="chess.square"
                   className={classes.join(" ")}
                   aria-label={`${square}${name}${target ? ", legal move" : ""}`}
                   aria-pressed={square === input.selected}

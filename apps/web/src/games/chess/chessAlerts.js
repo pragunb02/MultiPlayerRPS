@@ -1,4 +1,4 @@
-import { CHESS_ACTIONS, CHESS_DRAW_ANSWERS, ROOM_STATUS } from "@classicade/shared";
+import { CHESS_ACTIONS, CHESS_DRAW_ANSWERS, CHESS_END_REASONS as END, ROOM_STATUS } from "@classicade/shared";
 import { SOUNDS } from "../../lib/sound/sounds.js";
 import { nameOf, opponentsOf } from "../roomView.js";
 
@@ -79,3 +79,23 @@ export function chessNotices(previous, next, you) {
   }
   return [];
 }
+
+const REASON_PHRASES = Object.freeze({
+  [END.CHECKMATE]: "by checkmate",
+  [END.STALEMATE]: "by stalemate",
+  [END.INSUFFICIENT_MATERIAL]: "by insufficient material",
+  [END.THREEFOLD_REPETITION]: "by threefold repetition",
+  [END.FIFTY_MOVE_RULE]: "by the fifty-move rule",
+  [END.RESIGNATION]: "by resignation",
+  [END.AGREEMENT]: "by agreement",
+  [END.TIMEOUT]: "on time",
+  [END.TIMEOUT_VS_INSUFFICIENT_MATERIAL]: "on time with too little material to win",
+});
+
+/**
+ * How a chess game ended, as the end of the result headline (CC-162): "You won by checkmate", "You lost on time",
+ * "Draw by agreement". Empty for a reason this version does not know, so the headline still reads well.
+ *
+ * @param {string} reason  the outcome's reason (CHESS_END_REASONS)
+ */
+export const chessReasonPhrase = (reason) => REASON_PHRASES[reason] ?? "";

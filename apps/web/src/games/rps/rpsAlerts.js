@@ -22,3 +22,14 @@ export function rpsSounds(previous, next, you) {
   }
   return [SOUNDS.REVEAL, winner === you ? SOUNDS.ROUND_WON : SOUNDS.ROUND_LOST];
 }
+
+/**
+ * How a Rock Paper Scissors match ended, as the end of the result headline (CC-162): "You won the best of 3".
+ * Empty for a reason this version does not know.
+ *
+ * @param {string} reason  the outcome's reason, such as "best-of-3"
+ */
+export function rpsReasonPhrase(reason) {
+  const match = /^best-of-(\d+)$/.exec(reason);
+  return match === null ? "" : `the best of ${match[1]}`;
+}

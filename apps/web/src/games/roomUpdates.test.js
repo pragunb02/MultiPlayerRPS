@@ -226,12 +226,24 @@ describe("roomNotices (CC-104)", () => {
     expect(roomNotices(declined, { ...declined })).toEqual([]);
   });
 
-  it("says nothing when a player left, a rematch started, for spectators, or before the game finished", () => {
+  it("tells the player still there that the opponent left the finished game, by name (CC-162)", () => {
     const asked = finished({ rematch: rematch([BOB]) });
+    const gone = { requestedBy: [], available: false, declinedBy: "" };
 
-    expect(
-      roomNotices(asked, finished({ rematch: { requestedBy: [], available: false, declinedBy: "" } })),
-    ).toEqual([]);
+    expect(roomNotices(asked, finished({ rematch: { ...gone, leftName: "Bobby" } }))).toEqual([
+      "Bobby left the room",
+    ]);
+    expect(roomNotices(asked, { ...finished({ rematch: gone }), seats: [asked.seats[0]] })).toEqual([
+      `${asked.seats[1].displayName} left the room`,
+    ]);
+    expect(roomNotices(asked, finished({ rematch: gone }))).toEqual(["Your opponent left the room"]);
+  });
+
+  it("says nothing more once a rematch is off, after a rematch started, for spectators, or before the game finished", () => {
+    const asked = finished({ rematch: rematch([BOB]) });
+    const gone = finished({ rematch: { requestedBy: [], available: false, declinedBy: "" } });
+
+    expect(roomNotices(gone, gone)).toEqual([]);
     expect(roomNotices(asked, room({ series: { games: 1, wins: {} } }))).toEqual([]);
     expect(roomNotices({ ...asked, you: "" }, { ...finished(), you: "" })).toEqual([]);
     expect(roomNotices(room(), finished())).toEqual([]);

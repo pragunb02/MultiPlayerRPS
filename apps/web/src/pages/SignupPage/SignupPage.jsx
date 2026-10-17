@@ -5,6 +5,7 @@ import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { useSaveProgress } from "../../components/SaveProgress/saveProgressContext.js";
+import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "../authForms.module.css";
 
@@ -22,30 +23,33 @@ export function SignupPage() {
   const next = safeNext(params.get("next"));
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [touched, setTouched] = useState({});
-  const [state, setState] = useState({ busy: false, error: "", fieldErrors: {} });
+  const [fieldErrors, setFieldErrors] = useState({});
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
   const touch = (field) => () => setTouched((current) => ({ ...current, [field]: true }));
-  const errorFor = (field) => state.fieldErrors[field] ?? (touched[field] ? RULES[field](form[field]) : "");
+  const errorFor = (field) => fieldErrors[field] ?? (touched[field] ? RULES[field](form[field]) : "");
+  const signup = useAction(
+    async () => {
+      setFieldErrors({});
+      try {
+        const { carriedOver } = await session.signup(form);
+        // One confirmation, with the account's numbers, when guest games came along (CC-097).
+        saveProgress.confirmSaved(carriedOver);
+        // Signed in: the redirect below takes over on the next render.
+      } catch (err) {
+        // A problem with one field is shown at that field. Anything else is shown under the button.
+        const field = err.details?.field;
+        if (!(field && RULES[field])) throw err;
+        setFieldErrors({ [field]: err.message });
+      }
+    },
+    { id: "auth.signup" },
+  );
 
-  async function submit(event) {
+  function submit(event) {
     event.preventDefault();
     setTouched({ username: true, email: true, password: true });
-    if (Object.keys(RULES).some((field) => RULES[field](form[field]) !== "")) {
-      return;
-    }
-    setState({ busy: true, error: "", fieldErrors: {} });
-    try {
-      const { carriedOver } = await session.signup(form);
-      // One confirmation, with the account's numbers, when guest games came along (CC-097).
-      saveProgress.confirmSaved(carriedOver);
-      // Signed in: the redirect below takes over on the next render.
-    } catch (err) {
-      const field = err.details?.field;
-      setState({
-        busy: false,
-        error: field && RULES[field] ? "" : err.message,
-        fieldErrors: field && RULES[field] ? { [field]: err.message } : {},
-      });
+    if (Object.keys(RULES).every((field) => RULES[field](form[field]) === "")) {
+      signup.run();
     }
   }
 
@@ -93,17 +97,15 @@ export function SignupPage() {
         {session.identity?.kind === "guest" && (
           <p className={styles.note}>Your guest XP, level and match history will move to your new account.</p>
         )}
-        {state.error && (
-          <p role="alert" className={styles.alert}>
-            {state.error}
-          </p>
-        )}
-        <Button type="submit" size="lg" busy={state.busy}>
+        <Button control="auth.signup" type="submit" size="lg" action={signup}>
           Create account
         </Button>
       </form>
       <p className={styles.switch}>
-        Already have an account? <Link to={paths.login(next)}>Log in</Link>
+        Already have an account?{" "}
+        <Link to={paths.login(next)} data-cc-control="auth.to_login">
+          Log in
+        </Link>
       </p>
     </section>
   );

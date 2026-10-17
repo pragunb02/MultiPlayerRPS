@@ -1,5 +1,6 @@
 import { getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
+import { useAction } from "../../hooks/useAction.js";
 import { Button } from "../Button/Button.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import styles from "./ShareRoom.module.css";
@@ -17,22 +18,29 @@ export function ShareRoom({ code, gameId, origin = window.location.origin }) {
   const text = `Play ${gameName} with me on ClassiCade — room ${code}`;
   const canShare = typeof navigator.share === "function";
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(url);
+  const copy = useAction(
+    async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch (cause) {
+        // Shown under the button. The browser's own reason means nothing to a player.
+        throw new Error("Couldn't copy. Select the link and copy it", { cause });
+      }
       toast.show("Link copied", { tone: "success" });
-    } catch {
-      toast.show("Couldn't copy — select the link and copy it", { tone: "danger" });
-    }
-  }
+    },
+    { id: "invite.copy" },
+  );
 
-  async function share() {
-    try {
-      await navigator.share({ title: "ClassiCade", text, url });
-    } catch {
-      // The player closed the share sheet: nothing to do.
-    }
-  }
+  const share = useAction(
+    async () => {
+      try {
+        await navigator.share({ title: "ClassiCade", text, url });
+      } catch {
+        // The player closed the share sheet, so there is nothing to do.
+      }
+    },
+    { id: "invite.share" },
+  );
 
   return (
     <div className={styles.share}>
@@ -44,9 +52,11 @@ export function ShareRoom({ code, gameId, origin = window.location.origin }) {
         <input readOnly value={url} onFocus={(event) => event.target.select()} />
       </label>
       <div className={styles.buttons}>
-        <Button onClick={copy}>Copy link</Button>
+        <Button control="invite.copy" action={copy} doneLabel="Copied">
+          Copy link
+        </Button>
         {canShare && (
-          <Button variant="secondary" onClick={share}>
+          <Button control="invite.share" variant="secondary" action={share}>
             Share…
           </Button>
         )}

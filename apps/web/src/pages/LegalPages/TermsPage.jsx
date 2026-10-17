@@ -67,7 +67,11 @@ export function TermsPage() {
 
       <LegalSection title="7. Your data">
         <p>
-          How we handle your data is explained in the <Link to={paths.privacy()}>privacy policy</Link>.
+          How we handle your data is explained in the{" "}
+          <Link to={paths.privacy()} data-cc-control="legal.privacy">
+            privacy policy
+          </Link>
+          .
         </p>
       </LegalSection>
 

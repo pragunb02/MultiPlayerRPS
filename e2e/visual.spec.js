@@ -23,7 +23,7 @@ async function aliceBeatsBob(alice, bob) {
   await choices(bob)
     .getByRole("button", { name: /Scissors/ })
     .click();
-  await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+  await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
   return new URL(invite).pathname;
 }
 
@@ -60,7 +60,10 @@ const animationCount = (page) => page.evaluate(() => document.getAnimations().le
 const effect = (page, name) => page.locator(`[data-effect="${name}"]`);
 /** A toast. (The room's result panel is a status region too, and its art repeats the XP.) */
 const toast = (page, text) =>
-  page.getByRole("status").filter({ hasText: text }).filter({ hasNotText: "Play again" });
+  page
+    .getByRole("status")
+    .filter({ hasText: text })
+    .filter({ hasNotText: /You won|You lost|Draw (by|with|on)/ });
 
 for (const colorScheme of SCHEMES) {
   test(`home, lobby, profile, leaderboards, invite and 404 render in the ${colorScheme} theme`, async ({
@@ -138,14 +141,13 @@ for (const colorScheme of SCHEMES) {
     // The result survives a reload and a trip through history, as the same screen.
     await alice.page.reload();
     await expect(alice.page).toHaveURL(room);
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expectChipToFollowProgress(alice.page);
-    await alice.page.getByRole("link", { name: "Play again" }).click();
+    await alice.page.getByRole("button", { name: "New opponent" }).click();
     await expect(alice.page).toHaveURL("/games/rock-paper-scissors");
+    // New opponent gives the seat up, so Back does not show the old result again (CC-162).
     await alice.page.goBack();
-    await expect(alice.page.getByText("Victory!")).toBeVisible();
-    await alice.page.goForward();
-    await expect(alice.page).toHaveURL("/games/rock-paper-scissors");
+    await expect(alice.page).not.toHaveURL(room);
   });
 }
 
@@ -178,7 +180,7 @@ test("with reduced motion nothing animates after a win or a level-up, and the wo
   await expect(await untilLevelTwo(alice, bob)).toBeAttached();
   expect(await animationCount(alice.page)).toBe(0);
   await expect(effect(alice.page, "level-up")).toHaveCount(0);
-  await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+  await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
 });
 
 test("the game cards can be reached and opened with the keyboard, with a visible focus ring", async ({

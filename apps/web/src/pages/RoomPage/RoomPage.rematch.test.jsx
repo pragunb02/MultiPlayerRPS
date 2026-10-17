@@ -142,12 +142,25 @@ describe("RoomPage rematch (CC-037)", () => {
     await waitFor(() => expect(marks().every((mark) => mark === "empty")).toBe(true));
   });
 
-  it("says when the opponent left, and links to a new game instead", async () => {
+  it("says when the opponent left, and offers a new opponent instead", async () => {
     openRoom(finished({ rematch: { requestedBy: [], available: false, until: UNTIL }, seats: [ME] }));
 
-    expect(await screen.findByText("Opponent left — no rematch this time.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "New game" })).toHaveAttribute("href", "/games/ludo");
+    expect(
+      await screen.findByText("Your opponent left, so there is no rematch this time."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New opponent" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rematch" })).not.toBeInTheDocument();
+  });
+
+  it("names the opponent who left the finished game (CC-162)", async () => {
+    openRoom(
+      finished({
+        rematch: { requestedBy: [], available: false, until: UNTIL, leftName: "Bob" },
+        seats: [ME],
+      }),
+    );
+
+    expect(await screen.findByText("Bob left, so there is no rematch this time.")).toBeInTheDocument();
   });
 
   it("mentions an opponent who is offline", async () => {
@@ -212,7 +225,7 @@ describe("RoomPage rematch (CC-037)", () => {
   it("shows no countdown once the opponent left", async () => {
     openRoom(finished({ rematch: { requestedBy: [], available: false, until: UNTIL } }));
 
-    await screen.findByText("Opponent left — no rematch this time.");
+    await screen.findByText("Your opponent left, so there is no rematch this time.");
     expect(screen.queryByText(/Rematch available for/)).not.toBeInTheDocument();
   });
 

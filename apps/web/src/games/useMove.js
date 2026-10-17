@@ -1,25 +1,38 @@
 import { useCallback, useState } from "react";
+import { useAction } from "../hooks/useAction.js";
+
+const NOTHING_SENT = Object.freeze({ move: undefined });
 
 /**
- * Sends moves for a board and keeps the last rejection to show (e.g. "That cell is taken").
+ * Sends moves for a board, with the feedback every press gets (CC-164). `sent` is the move on its way, so the
+ * board can show it the moment it is pressed, before the server answers. `pending` turns true when the answer
+ * takes longer than 150 ms, for a spinner. The last refusal stays in `error` (for example "That cell is taken")
+ * until the next move, and `retry` sends the same move again when the failure was the connection.
  *
  * @param {(move: unknown) => Promise<unknown>} onMove
+ * @param {{ id: string }} options  `id` names the board's controls, for example "ttt.cell"
  */
-export function useMove(onMove) {
-  const [state, setState] = useState({ busy: false, error: "" });
+export function useMove(onMove, { id }) {
+  const action = useAction(onMove, { id });
+  const { run } = action;
+  const [sent, setSent] = useState(NOTHING_SENT);
 
   const send = useCallback(
     async (move) => {
-      setState({ busy: true, error: "" });
-      try {
-        await onMove(move);
-        setState({ busy: false, error: "" });
-      } catch (err) {
-        setState({ busy: false, error: err.message });
-      }
+      setSent({ move });
+      const result = await run(move);
+      setSent(NOTHING_SENT);
+      return result;
     },
-    [onMove],
+    [run],
   );
 
-  return { ...state, send };
+  return {
+    action,
+    busy: action.busy,
+    pending: action.phase === "pending",
+    sent: sent.move,
+    error: action.error?.message ?? "",
+    send,
+  };
 }

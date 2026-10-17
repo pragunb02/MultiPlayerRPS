@@ -2,6 +2,14 @@
  * Chunky arcade buttons: a solid "base" shadow under the face. Hover lifts the face, pressing pushes it down
  * onto its base (ADR-012). Reduced motion keeps the look and drops the movement.
  */
+/* The button with its reason and its failure message, stacked so both sit right under it. */
+.control {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
 .button {
   display: inline-flex;
   align-items: center;
@@ -20,16 +28,21 @@
     box-shadow var(--duration-fast) var(--ease-out),
     background-color var(--duration-fast) var(--ease-out);
 }
-.button:disabled {
+.button[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.6;
 }
-.button:not(:disabled):hover {
+.button:not([aria-disabled="true"]):hover {
   transform: translateY(-2px);
 }
-.button:not(:disabled):active {
+.button:not([aria-disabled="true"]):active {
   transform: translateY(2px);
   transition-duration: var(--duration-instant);
+}
+/* Waiting for the server: the face stays down a little and the cursor says so. */
+.button[aria-busy="true"] {
+  cursor: progress;
+  transform: translateY(1px);
 }
 .md {
   padding: var(--space-2) var(--space-4);
@@ -44,10 +57,10 @@
   color: var(--color-primary-contrast);
   box-shadow: var(--shadow-press);
 }
-.primary:not(:disabled):hover {
+.primary:not([aria-disabled="true"]):hover {
   box-shadow: var(--shadow-press), var(--glow-primary);
 }
-.primary:not(:disabled):active {
+.primary:not([aria-disabled="true"]):active {
   box-shadow: var(--shadow-press-small);
 }
 .accent {
@@ -55,7 +68,7 @@
   color: var(--color-primary-contrast);
   box-shadow: var(--shadow-press-accent);
 }
-.accent:not(:disabled):active {
+.accent:not([aria-disabled="true"]):active {
   box-shadow: var(--shadow-press-accent-small);
 }
 .secondary {
@@ -64,16 +77,94 @@
   border-color: var(--color-border);
   box-shadow: var(--shadow-press-neutral);
 }
-.secondary:not(:disabled):hover {
+.secondary:not([aria-disabled="true"]):hover {
   border-color: var(--color-primary);
 }
-.secondary:not(:disabled):active {
+.secondary:not([aria-disabled="true"]):active {
   box-shadow: var(--shadow-press-neutral-small);
 }
 .ghost {
   background: transparent;
   color: var(--color-primary);
 }
-.ghost:not(:disabled):hover {
+.ghost:not([aria-disabled="true"]):hover {
   background: var(--color-surface-raised);
+}
+/* The label and the waiting words share one place, so the button keeps the width of the wider one. */
+.stack {
+  display: inline-grid;
+}
+.layer {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.layer[aria-hidden="true"] {
+  visibility: hidden;
+}
+.spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin calc(var(--duration-slow) * 2) linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.check {
+  font-weight: 800;
+}
+/* Why the button cannot act: shown above it on hover, on focus and for a moment after a press. */
+.tip {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 50%;
+  z-index: 15;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 16rem;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-align: center;
+  white-space: normal;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.control:hover .tip,
+.control:focus-within .tip,
+.tip.shown {
+  visibility: visible;
+  opacity: 1;
+}
+.failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 22rem;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-danger);
+  white-space: normal;
+}
+.retry {
+  font: inherit;
+  padding: 0 var(--space-2);
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }

@@ -10,7 +10,10 @@ const card = (page) => page.getByRole("region", { name: "Save your progress" });
 const headerSignup = (page) => page.getByRole("banner").getByRole("link", { name: /sign up/i });
 /** A toast (the room's result panel is a status region too). */
 const toast = (page, text) =>
-  page.getByRole("status").filter({ hasText: text }).filter({ hasNotText: "Play again" });
+  page
+    .getByRole("status")
+    .filter({ hasText: text })
+    .filter({ hasNotText: /You won|You lost|Draw (by|with|on)/ });
 const readApi = async (page, path) => (await page.request.get(path)).json();
 
 async function startAsGuest(player) {
@@ -45,7 +48,7 @@ async function aliceBeatsBob(alice, bob, { inLobby = false } = {}) {
   await choices(bob)
     .getByRole("button", { name: /Scissors/ })
     .click();
-  await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+  await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
   return new URL(invite).pathname;
 }
 
@@ -97,7 +100,7 @@ test.describe("a guest who wins", () => {
     const before = await expectCardToShowStoredProgress(alice.page);
     expect(before.wins).toBe(1);
     // Under the result and the rematch offer, covering nothing.
-    const result = await alice.page.getByRole("link", { name: "Play again" }).boundingBox();
+    const result = await alice.page.getByRole("button", { name: "New opponent" }).boundingBox();
     const rematch = await alice.page.getByRole("region", { name: "Rematch" }).boundingBox();
     const offered = await card(alice.page).boundingBox();
     expect(offered.y).toBeGreaterThanOrEqual(result.y + result.height);
@@ -123,14 +126,14 @@ test.describe("a guest who wins", () => {
     await expect(
       toast(alice.page, `Your progress is now saved: Level ${progress.level} · ${progress.xp} XP · 1 match`),
     ).toBeVisible();
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(card(alice.page)).toHaveCount(0);
     await expect(headerSignup(alice.page)).toHaveCount(0);
 
     // Signing in replaced the form in history: Back stays in the room, as the account, and never shows the form.
     await alice.page.goBack();
     await expect(alice.page).toHaveURL(room);
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(card(alice.page)).toHaveCount(0);
     await alice.page.goForward();
     await expect(alice.page).toHaveURL(room);
@@ -154,10 +157,10 @@ test.describe("a guest who wins", () => {
     await alice.page.getByRole("button", { name: "Close: save your progress" }).click();
 
     await expect(card(alice.page)).toHaveCount(0);
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(headerSignup(alice.page)).toHaveText("Save progress"); // the quiet way in stays
     // Another room, another win (2 wins, 60+ XP — worth a card), but she closed it.
-    await alice.page.getByRole("link", { name: "Play again" }).click();
+    await alice.page.getByRole("button", { name: "New opponent" }).click();
     await expect(alice.page).toHaveURL("/games/rock-paper-scissors");
     const second = await aliceBeatsBob(alice, bob, { inLobby: true });
     expect(second).not.toBe(first);
@@ -168,7 +171,7 @@ test.describe("a guest who wins", () => {
 
     await alice.page.reload();
 
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(card(alice.page)).toBeVisible();
     await expectCardToShowStoredProgress(alice.page);
   });
@@ -196,7 +199,7 @@ test.describe("a guest who wins", () => {
     await expect(alice.page.getByRole("heading", { name: "Create your account" })).toBeVisible();
     await alice.page.goBack();
     await expect(alice.page).toHaveURL(room);
-    await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
   });
 
   test("can close the level-up offer; the toast goes and the game goes on", async ({ players }) => {
@@ -217,7 +220,7 @@ test.describe("a guest who wins", () => {
     await levelUp.getByRole("button", { name: "Close: save your level" }).click();
 
     await expect(alice.page.getByText("Level up! You reached level 2")).toHaveCount(0);
-    await expect(alice.page.getByRole("link", { name: "Play again" })).toBeVisible();
+    await expect(alice.page.getByRole("button", { name: "New opponent" })).toBeVisible();
   });
 });
 

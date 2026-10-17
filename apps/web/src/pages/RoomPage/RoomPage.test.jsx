@@ -97,7 +97,75 @@ describe("RoomPage", () => {
     openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
 
     expect(await screen.findByRole("heading", { name: text })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Play again" })).toHaveAttribute("href", "/games/ludo");
+    expect(screen.getByRole("button", { name: "New opponent" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Play again" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [{ result: "win", winners: [GUEST.id], reason: "three-in-a-row" }, "You won with three in a row"],
+    [{ result: "win", winners: ["guest_b"], reason: "forfeit" }, "You lost by forfeit"],
+    [{ result: "win", winners: [GUEST.id], reason: "forfeit" }, "You won by forfeit"],
+    [{ result: "draw", winners: [], reason: "board-full" }, "Draw with a full board"],
+  ])("names how the game ended in the headline (CC-162, %o)", async (outcome, text) => {
+    openRoom({
+      joined: roomView({
+        status: "finished",
+        seats: [ME, BOB],
+        game: {
+          view: { board: Array(9).fill(""), marks: { [GUEST.id]: "X" }, turn: "", winningLine: [] },
+          activePlayers: [],
+          outcome,
+        },
+      }),
+    });
+
+    expect(await screen.findByRole("heading", { name: text })).toBeInTheDocument();
+  });
+
+  it("puts the result and Rematch above the board, Rematch first (CC-162)", async () => {
+    const outcome = { result: "win", winners: [GUEST.id], reason: "three-in-a-row" };
+    openRoom({
+      joined: playing({
+        status: "finished",
+        game: { view: {}, activePlayers: [], outcome },
+        rematch: { requestedBy: [], available: true, until: Date.now() + 60_000, declinedBy: "" },
+        serverTime: Date.now(),
+      }),
+    });
+
+    const rematch = await screen.findByRole("button", { name: "Rematch" });
+    const newOpponent = screen.getByRole("button", { name: "New opponent" });
+    const board = screen.getByText(/board is not available yet/);
+    const before = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(rematch, newOpponent)).toBe(true);
+    expect(before(newOpponent, board)).toBe(true);
+    expect(rematch).toHaveAttribute("data-cc-control", "room.rematch.ask");
+  });
+
+  it("leaves the seat and opens the lobby on New opponent, so Back does not return to the room (CC-162)", async () => {
+    const user = userEvent.setup();
+    const outcome = { result: "win", winners: [GUEST.id], reason: "three-in-a-row" };
+    const { socket, url, back } = openRoom({
+      joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }),
+      history: ["/"],
+    });
+
+    await user.click(await screen.findByRole("button", { name: "New opponent" }));
+
+    expect(socket.request).toHaveBeenCalledWith("room:leave", { code: "AB2CD3" });
+    await vi.waitFor(() => expect(url()).toBe("/games/ludo"));
+    back();
+    expect(url()).toBe("/");
+  });
+
+  it("offers a spectator a game of their own instead of New opponent", async () => {
+    const outcome = { result: "win", winners: ["guest_b"], reason: "three-in-a-row" };
+    openRoom({
+      joined: playing({ you: "", status: "finished", game: { view: {}, activePlayers: [], outcome } }),
+    });
+
+    expect(await screen.findByRole("link", { name: "Play a game" })).toHaveAttribute("href", "/games/ludo");
+    expect(screen.queryByRole("button", { name: "New opponent" })).not.toBeInTheDocument();
   });
 
   it.each([
@@ -111,7 +179,7 @@ describe("RoomPage", () => {
     // The status region still says the result in words; the banner is decoration.
     const result = screen.getByRole("heading", { name: confetti ? "You won!" : "You lost" });
     // The result panel takes the outcome's colour.
-    expect(result.parentElement).toHaveClass(confetti ? "win" : "loss");
+    expect(result.closest("section")).toHaveClass(confetti ? "win" : "loss");
   });
 
   it("shows the game's icon in the room title and invite art while waiting", async () => {
@@ -291,8 +359,36 @@ describe("RoomPage: every other state and path", () => {
 
     await user.click(screen.getByRole("button", { name: "Leave room" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Can't reach ClassiCade");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach ClassiCade");
     expect(url()).toBe("/games/tic-tac-toe/rooms/AB2CD3");
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(socket.request.mock.calls.filter(([event]) => event === "room:leave")).toHaveLength(2);
+  });
+
+  it("explains every room control while the connection is being restored (CC-164)", async () => {
+    const user = userEvent.setup();
+    const { socket } = openRoom();
+    await screen.findByRole("heading", { name: "Invite a friend" });
+
+    act(() => socket.push("disconnect"));
+    const leave = screen.getByRole("button", { name: "Leave room" });
+    await user.click(leave);
+
+    expect(leave).toHaveAttribute("aria-disabled", "true");
+    expect(socket.request).not.toHaveBeenCalledWith("room:leave", expect.anything());
+    expect(screen.getAllByText("Reconnecting").length).toBeGreaterThan(0);
+
+    act(() => socket.push("connect"));
+    expect(screen.getByRole("button", { name: "Leave room" })).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("says where the match stands on the page, for tests and telemetry (CC-170)", async () => {
+    openRoom({ joined: playing() });
+
+    await screen.findByText(/board is not available yet/);
+    const page = document.querySelector("[data-cc-phase]");
+    expect(page).toHaveAttribute("data-cc-phase", "my-turn");
+    expect(page).toHaveAttribute("data-cc-request", "none");
   });
 
   it("closing the leave dialog with Escape keeps you in the game", async () => {
@@ -374,7 +470,10 @@ describe("RoomPage: every other state and path", () => {
     await user.click(screen.getByRole("gridcell", { name: "top left: empty" }));
 
     expect(socket.request).toHaveBeenCalledWith("game:move", { code: "AB2CD3", move: { cell: 0 } });
-    expect(await screen.findByRole("gridcell", { name: "top left: X" })).toBeDisabled();
+    expect(await screen.findByRole("gridcell", { name: "top left: X" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
     expect(screen.getByText("Waiting for Bob")).toBeInTheDocument();
   });
 });

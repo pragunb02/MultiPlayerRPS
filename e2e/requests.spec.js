@@ -60,7 +60,7 @@ async function finishedRps(players) {
   await choices(bob)
     .getByRole("button", { name: /Scissors/ })
     .click();
-  await expect(alice.page.getByRole("heading", { name: "You won!" })).toBeVisible();
+  await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
   await expect(bob.page.getByRole("heading", { name: "You lost" })).toBeVisible();
   return { alice, bob, aliceName: await nameOf(alice), bobName: await nameOf(bob) };
 }
@@ -112,7 +112,9 @@ test.describe("draw offers", () => {
     await popup(alice).getByRole("button", { name: "Accept" }).click();
 
     for (const player of [alice, bob]) {
-      await expect(player.page.getByRole("heading", { name: "It's a draw" })).toBeVisible();
+      await expect(player.page.getByRole("heading", { name: "Draw by agreement", exact: true })).toHaveCount(
+        2,
+      );
       await expect(popup(player)).toHaveCount(0);
     }
   });

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { useAction } from "../../hooks/useAction.js";
 import styles from "./JoinChooser.module.css";
 
 /**
@@ -20,22 +21,13 @@ import styles from "./JoinChooser.module.css";
  */
 export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
   const heading = useRef(null);
-  const [state, setState] = useState({ busy: false, error: "" });
+  // The page joins the room as soon as the guest session exists, and this chooser goes away.
+  const playAsGuest = useAction(onPlayAsGuest, { id: "join.guest" });
 
   // Announce the choice: screen readers start here, keyboard users tab on to the three ways in.
   useEffect(() => {
     heading.current.focus();
   }, []);
-
-  async function playAsGuest() {
-    setState({ busy: true, error: "" });
-    try {
-      await onPlayAsGuest();
-      // The page joins the room as soon as the guest session exists; this chooser goes away.
-    } catch (error) {
-      setState({ busy: false, error: error.message });
-    }
-  }
 
   const invitedTo = game ? `You're invited to play ${game.name}` : "You're invited to play";
   return (
@@ -52,24 +44,19 @@ export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
         </p>
         <p className={styles.lead}>How do you want to join?</p>
         <div className={styles.actions}>
-          <Button size="lg" onClick={playAsGuest} busy={state.busy}>
+          <Button control="join.guest" size="lg" action={playAsGuest}>
             Play as guest
           </Button>
-          <Link className={styles.link} to={paths.login(returnTo)}>
+          <Link className={styles.link} to={paths.login(returnTo)} data-cc-control="join.login">
             Log in
           </Link>
-          <Link className={styles.link} to={paths.signup(returnTo)}>
+          <Link className={styles.link} to={paths.signup(returnTo)} data-cc-control="join.signup">
             Sign up
           </Link>
         </div>
         <p className={styles.hint}>
           Playing as a guest? Sign up later and your XP and match history come with you.
         </p>
-        {state.error && (
-          <p role="alert" className={styles.alert}>
-            {state.error}
-          </p>
-        )}
       </div>
     </section>
   );

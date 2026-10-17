@@ -1,10 +1,10 @@
 import { GAME_IDS } from "@classicade/shared";
-import { chessNotices, chessRequests, chessSounds } from "./chess/chessAlerts.js";
+import { chessNotices, chessReasonPhrase, chessRequests, chessSounds } from "./chess/chessAlerts.js";
 import { ChessOptions } from "./chess/ChessOptions.jsx";
 import { lazyBoard } from "./lazyBoard.js";
-import { rpsSounds } from "./rps/rpsAlerts.js";
+import { rpsReasonPhrase, rpsSounds } from "./rps/rpsAlerts.js";
 import { RpsOptions } from "./rps/RpsOptions.jsx";
-import { tictactoeSounds } from "./tictactoe/tictactoeAlerts.js";
+import { tictactoeReasonPhrase, tictactoeSounds } from "./tictactoe/tictactoeAlerts.js";
 
 // Boards load on demand: a player only downloads the game they open (chess brings chess.js).
 const RpsBoard = lazyBoard(() => import("./rps/RpsBoard.jsx"), "RpsBoard");
@@ -21,6 +21,8 @@ const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard
  *   game can ask the other, such as a draw offer (CC-104)
  * @property {(previous: any, next: any, you: string) => string[]} [notices]  what to tell the viewer when such a
  *   question was answered (CC-104)
+ * @property {(reason: string) => string} [reasonPhrase]  how a game ended, worded to follow "You won" or "Draw"
+ *   in the result headline, such as "by checkmate" (CC-162)
  */
 
 /**
@@ -30,14 +32,24 @@ const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard
  * @type {Readonly<Record<string, Readonly<GameViewEntry>>>}
  */
 export const GAME_VIEWS = Object.freeze({
-  [GAME_IDS.RPS]: Object.freeze({ Options: RpsOptions, Board: RpsBoard, soundsFor: rpsSounds }),
-  [GAME_IDS.TIC_TAC_TOE]: Object.freeze({ Board: TicTacToeBoard, soundsFor: tictactoeSounds }),
+  [GAME_IDS.RPS]: Object.freeze({
+    Options: RpsOptions,
+    Board: RpsBoard,
+    soundsFor: rpsSounds,
+    reasonPhrase: rpsReasonPhrase,
+  }),
+  [GAME_IDS.TIC_TAC_TOE]: Object.freeze({
+    Board: TicTacToeBoard,
+    soundsFor: tictactoeSounds,
+    reasonPhrase: tictactoeReasonPhrase,
+  }),
   [GAME_IDS.CHESS]: Object.freeze({
     Options: ChessOptions,
     Board: ChessBoard,
     soundsFor: chessSounds,
     requests: chessRequests,
     notices: chessNotices,
+    reasonPhrase: chessReasonPhrase,
   }),
 });
 

@@ -81,16 +81,32 @@ export function incomingRequests(room) {
 }
 
 /**
+ * Who just left a finished game, by name. The server keeps the name, because the seat is already gone (CC-162).
+ */
+function leaverName(previous, next) {
+  if (next.rematch.leftName) {
+    return next.rematch.leftName;
+  }
+  const gone = previous.seats.find((seat) => !next.seats.some((s) => s.playerId === seat.playerId));
+  return gone?.displayName ?? "Your opponent";
+}
+
+/**
  * What the other side did with a rematch request: the asker hears that it was declined, the one asked hears that
- * it was taken back. Nobody is told about their own answer, and a player leaving is shown by the rematch panel.
+ * it was taken back. Nobody is told about their own answer. When the opponent leaves the finished game (New
+ * opponent, Leave room) the one still there hears it at once, so they never wait for a rematch that cannot come
+ * (CC-162).
  */
 function rematchNotices(previous, next) {
   const you = next.you;
   if (you === "" || next.status !== ROOM_STATUS.FINISHED || previous.rematch === undefined) {
     return [];
   }
-  if (next.rematch === undefined || !next.rematch.available) {
+  if (next.rematch === undefined) {
     return [];
+  }
+  if (!next.rematch.available) {
+    return previous.rematch.available ? [`${leaverName(previous, next)} left the room`] : [];
   }
   const by = declinedBy(next);
   if (by !== "" && by !== you && declinedBy(previous) !== by) {

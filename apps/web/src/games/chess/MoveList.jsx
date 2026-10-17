@@ -1,5 +1,25 @@
 import { useEffect, useRef } from "react";
+import { useExplanation } from "../../hooks/useExplanation.js";
+import { ReasonLine } from "../BoardFeedback.jsx";
 import styles from "./ChessBoard.module.css";
+
+/**
+ * One of the four buttons that step through the game. At either end of the game it cannot go further, and a press
+ * says so instead of doing nothing (CC-164).
+ */
+function Step({ control, label, symbol, reason, onGo, onRefuse }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-disabled={reason !== "" ? "true" : undefined}
+      data-cc-control={control}
+      onClick={() => (reason === "" ? onGo() : onRefuse(reason))}
+    >
+      {symbol}
+    </button>
+  );
+}
 
 /**
  * The moves in chess notation (like e4 or Nf3), two per numbered row, and buttons to look back through the
@@ -10,6 +30,9 @@ import styles from "./ChessBoard.module.css";
  */
 export function MoveList({ moves, ply, latest, onGoTo }) {
   const list = useRef(null);
+  const explanation = useExplanation();
+  const atStart = ply === 0 ? "This is the first position" : "";
+  const atEnd = ply === latest ? "This is the latest move" : "";
 
   // New moves land at the bottom of a scrolling list: keep the newest in sight.
   useEffect(() => {
@@ -24,8 +47,11 @@ export function MoveList({ moves, ply, latest, onGoTo }) {
       <button
         type="button"
         className={styles.san}
+        data-cc-control="chess.moves.go"
         aria-current={target === ply ? "step" : undefined}
-        onClick={() => onGoTo(target)}
+        onClick={() =>
+          target === ply ? explanation.explain("This move is on the board now") : onGoTo(target)
+        }
       >
         {san}
       </button>
@@ -47,29 +73,40 @@ export function MoveList({ moves, ply, latest, onGoTo }) {
         ))}
       </ol>
       <div className={styles.navigation} role="group" aria-label="Move navigation">
-        <button type="button" aria-label="First position" disabled={ply === 0} onClick={() => onGoTo(0)}>
-          «
-        </button>
-        <button type="button" aria-label="Previous move" disabled={ply === 0} onClick={() => onGoTo(ply - 1)}>
-          ‹
-        </button>
-        <button
-          type="button"
-          aria-label="Next move"
-          disabled={ply === latest}
-          onClick={() => onGoTo(ply + 1)}
-        >
-          ›
-        </button>
-        <button
-          type="button"
-          aria-label="Latest move"
-          disabled={ply === latest}
-          onClick={() => onGoTo(latest)}
-        >
-          »
-        </button>
+        <Step
+          control="chess.moves.first"
+          label="First position"
+          symbol="«"
+          reason={atStart}
+          onGo={() => onGoTo(0)}
+          onRefuse={explanation.explain}
+        />
+        <Step
+          control="chess.moves.previous"
+          label="Previous move"
+          symbol="‹"
+          reason={atStart}
+          onGo={() => onGoTo(ply - 1)}
+          onRefuse={explanation.explain}
+        />
+        <Step
+          control="chess.moves.next"
+          label="Next move"
+          symbol="›"
+          reason={atEnd}
+          onGo={() => onGoTo(ply + 1)}
+          onRefuse={explanation.explain}
+        />
+        <Step
+          control="chess.moves.latest"
+          label="Latest move"
+          symbol="»"
+          reason={atEnd}
+          onGo={() => onGoTo(latest)}
+          onRefuse={explanation.explain}
+        />
       </div>
+      <ReasonLine explanation={explanation} />
       {ply < latest && (
         <p className={styles.browsing} role="status">
           Looking at move {ply} of {latest}.

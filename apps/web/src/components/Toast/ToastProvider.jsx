@@ -62,10 +62,11 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
             {toast.message}
             {toast.action && (
               <>
-                <Link to={toast.action.to} className={styles.action}>
+                <Link to={toast.action.to} className={styles.action} data-cc-control="toast.action">
                   {toast.action.label}
                 </Link>
                 <DismissButton
+                  control="toast.dismiss"
                   label={toast.action.dismissLabel}
                   onClick={() => {
                     remove(toast.id);

@@ -53,7 +53,7 @@
   justify-items: center;
   gap: var(--space-3);
   text-align: center;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-6);
   border-radius: var(--radius-xl);
   background: var(--color-primary-soft);
   border: 2px solid var(--color-primary);
@@ -62,6 +62,12 @@
 }
 .outcome h2 {
   margin: 0;
+}
+/* The headline and its celebration, announced when the game ends. The buttons under it are not part of it. */
+.headline {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
 }
 /* The panel takes the result's colour: gold for a win, neutral for a loss (the words say which). */
 .win {

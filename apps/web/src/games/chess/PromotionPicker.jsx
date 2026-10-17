@@ -36,6 +36,7 @@ export function PromotionPicker({ colour, square, orientation, onChoose, onCance
             ref={i === 0 ? first : undefined}
             type="button"
             className={styles.promotionChoice}
+            data-cc-control="chess.promote"
             aria-label={PIECE_NAMES[piece]}
             onClick={() => onChoose(piece)}
           >

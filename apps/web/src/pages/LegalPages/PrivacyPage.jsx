@@ -148,7 +148,10 @@ export function PrivacyPage() {
         <p>
           When this policy changes, the date at the top changes too. If a change affects what we store, we say
           so on the site before it takes effect. The rules for using the site are in the{" "}
-          <Link to={paths.terms()}>terms of use</Link>.
+          <Link to={paths.terms()} data-cc-control="legal.terms">
+            terms of use
+          </Link>
+          .
         </p>
       </LegalSection>
     </LegalPage>

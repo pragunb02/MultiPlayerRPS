@@ -5,6 +5,7 @@ import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { useSaveProgress } from "../../components/SaveProgress/saveProgressContext.js";
+import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "../authForms.module.css";
 
@@ -14,20 +15,20 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
   const [form, setForm] = useState({ email: "", password: "" });
-  const [state, setState] = useState({ busy: false, error: "" });
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
-
-  async function submit(event) {
-    event.preventDefault();
-    setState({ busy: true, error: "" });
-    try {
+  const login = useAction(
+    async () => {
       const { carriedOver } = await session.login(form);
       // One confirmation, with the account's numbers, when guest games came along (CC-097).
       saveProgress.confirmSaved(carriedOver);
       // Signed in: the redirect below takes over on the next render.
-    } catch (err) {
-      setState({ busy: false, error: err.message });
-    }
+    },
+    { id: "auth.login" },
+  );
+
+  function submit(event) {
+    event.preventDefault();
+    login.run();
   }
 
   // Already signed in (or just signed in): this page has nothing to offer, go where the player was heading.
@@ -59,17 +60,15 @@ export function LoginPage() {
         {session.identity?.kind === "guest" && (
           <p className={styles.note}>Logging in adds this guest's XP and matches to your account.</p>
         )}
-        {state.error && (
-          <p role="alert" className={styles.alert}>
-            {state.error}
-          </p>
-        )}
-        <Button type="submit" size="lg" busy={state.busy}>
+        <Button control="auth.login" type="submit" size="lg" action={login}>
           Log in
         </Button>
       </form>
       <p className={styles.switch}>
-        New here? <Link to={paths.signup(next)}>Create an account</Link>
+        New here?{" "}
+        <Link to={paths.signup(next)} data-cc-control="auth.to_signup">
+          Create an account
+        </Link>
       </p>
     </section>
   );

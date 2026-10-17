@@ -12,7 +12,7 @@ export function NotFoundPage() {
       <h1>Page not found</h1>
       <p>
         That page doesn't exist.{" "}
-        <Link to={paths.home()} className={styles.home}>
+        <Link to={paths.home()} className={styles.home} data-cc-control="notfound.home">
           Back to the games
         </Link>
       </p>

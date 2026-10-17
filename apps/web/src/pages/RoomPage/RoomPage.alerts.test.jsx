@@ -316,10 +316,23 @@ describe("rematch requests (CC-104)", () => {
     const { socket } = openRoom(finished({ requestedBy: [BOB.playerId], available: true, declinedBy: "" }));
     await popup();
 
-    push(socket, finished({ requestedBy: [], available: false, declinedBy: "" }));
+    push(socket, finished({ requestedBy: [], available: false, declinedBy: "", leftName: "Bob" }));
 
     await waitFor(noPopup);
-    expect(screen.getByText("Opponent left — no rematch this time.")).toBeInTheDocument();
+    expect(screen.getByText("Bob left, so there is no rematch this time.")).toBeInTheDocument();
+  });
+
+  it("tells the player still there, with a chime, the moment the opponent leaves the finished game (CC-162)", async () => {
+    const { socket, sound } = openRoom(
+      finished({ requestedBy: [ME.playerId], available: true, declinedBy: "" }),
+    );
+    await screen.findByRole("button", { name: "Cancel rematch" });
+
+    push(socket, finished({ requestedBy: [], available: false, declinedBy: "", leftName: "Bob" }));
+
+    expect(await screen.findByText("Bob left the room")).toBeInTheDocument();
+    expect(sound.played).toEqual(["notify"]);
+    expect(screen.queryByRole("button", { name: "Cancel rematch" })).not.toBeInTheDocument();
   });
 
   it("shows a reloaded page the same question, without a chime", async () => {

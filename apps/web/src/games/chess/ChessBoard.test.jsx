@@ -114,7 +114,9 @@ describe("ChessBoard", () => {
     rerender(<ChessBoard room={room(chessView({ drawOfferBy: THEM }))} onMove={onMove} />);
     expect(screen.queryByText("Riya offers a draw.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Accept draw" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Offer draw" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Offer draw" })).toHaveAccessibleDescription(
+      "Riya offered a draw. Answer it above the board",
+    );
   });
 
   it("deselects a piece when it is clicked again or an unreachable square is clicked", async () => {
@@ -201,7 +203,9 @@ describe("ChessBoard", () => {
   it("shows your own draw offer as pending", () => {
     render(<ChessBoard room={room(chessView({ drawOfferBy: ME }))} onMove={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: "Draw offered" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Draw offered" })).toHaveAccessibleDescription(
+      "Waiting for Riya to answer",
+    );
   });
 
   it("closing the promotion dialog cancels the move", async () => {
@@ -748,19 +752,19 @@ describe("ChessBoard history", () => {
     const user = userEvent.setup();
     render(<ChessBoard room={room(viewAfter(["e4", "e5", "Nf3", "Nc6"]))} onMove={vi.fn()} />);
     const nav = within(screen.getByRole("group", { name: "Move navigation" }));
-    expect(nav.getByRole("button", { name: "Next move" })).toBeDisabled();
-    expect(nav.getByRole("button", { name: "Latest move" })).toBeDisabled();
+    expect(nav.getByRole("button", { name: "Next move" })).toHaveAttribute("aria-disabled", "true");
+    expect(nav.getByRole("button", { name: "Latest move" })).toHaveAttribute("aria-disabled", "true");
 
     await user.click(nav.getByRole("button", { name: "Previous move" }));
 
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 3 of 4.");
+    expect(screen.getByText("Looking at move 3 of 4.")).toBeInTheDocument();
     expect(cell("c6")).toHaveAccessibleName("c6");
     expect(screen.getByRole("button", { name: "Nf3" })).toHaveAttribute("aria-current", "step");
     // Even on your turn the old position cannot be played on.
     expect(cell("e2")).toHaveAttribute("aria-disabled", "true");
 
     await user.click(nav.getByRole("button", { name: "Next move" }));
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/Looking at move/)).toBeNull();
     expect(cell("e2")).toHaveAttribute("aria-disabled", "false");
   });
 
@@ -770,15 +774,15 @@ describe("ChessBoard history", () => {
     const nav = within(screen.getByRole("group", { name: "Move navigation" }));
 
     await user.click(screen.getByRole("button", { name: "e4" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 1 of 3.");
+    expect(screen.getByText("Looking at move 1 of 3.")).toBeInTheDocument();
 
     await user.click(nav.getByRole("button", { name: "First position" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 0 of 3.");
-    expect(nav.getByRole("button", { name: "Previous move" })).toBeDisabled();
-    expect(nav.getByRole("button", { name: "First position" })).toBeDisabled();
+    expect(screen.getByText("Looking at move 0 of 3.")).toBeInTheDocument();
+    expect(nav.getByRole("button", { name: "Previous move" })).toHaveAttribute("aria-disabled", "true");
+    expect(nav.getByRole("button", { name: "First position" })).toHaveAttribute("aria-disabled", "true");
 
     await user.click(nav.getByRole("button", { name: "Latest move" }));
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/Looking at move/)).toBeNull();
     expect(cell("f3")).toHaveAccessibleName("f3, white knight");
   });
 
@@ -789,7 +793,7 @@ describe("ChessBoard history", () => {
 
     rerender(<ChessBoard room={room(viewAfter(["e4", "e5", "Nf3", "Nc6"]))} onMove={vi.fn()} />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 1 of 4.");
+    expect(screen.getByText("Looking at move 1 of 4.")).toBeInTheDocument();
   });
 
   it("steps with the left and right arrow keys anywhere on the page but the board and form fields", async () => {
@@ -802,19 +806,19 @@ describe("ChessBoard history", () => {
     );
 
     await user.keyboard("{ArrowLeft}{ArrowLeft}");
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 1 of 3.");
+    expect(screen.getByText("Looking at move 1 of 3.")).toBeInTheDocument();
     await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 2 of 3.");
+    expect(screen.getByText("Looking at move 2 of 3.")).toBeInTheDocument();
     await user.keyboard("{ArrowUp}");
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 2 of 3.");
+    expect(screen.getByText("Looking at move 2 of 3.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("textbox", { name: "Chat" }));
     await user.keyboard("{ArrowLeft}");
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 2 of 3.");
+    expect(screen.getByText("Looking at move 2 of 3.")).toBeInTheDocument();
 
     cell("a1").focus();
     await user.keyboard("{ArrowLeft}");
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 2 of 3.");
+    expect(screen.getByText("Looking at move 2 of 3.")).toBeInTheDocument();
   });
 
   it("goes no further than the start or the latest move with the arrow keys", async () => {
@@ -822,9 +826,9 @@ describe("ChessBoard history", () => {
     render(<ChessBoard room={room(viewAfter(["e4"]))} onMove={vi.fn()} />);
 
     await user.keyboard("{ArrowRight}");
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/Looking at move/)).toBeNull();
     await user.keyboard("{ArrowLeft}{ArrowLeft}");
-    expect(screen.getByRole("status")).toHaveTextContent("Looking at move 0 of 1.");
+    expect(screen.getByText("Looking at move 0 of 1.")).toBeInTheDocument();
   });
 
   it("keeps the newest move in sight in a long list", () => {
@@ -1091,5 +1095,109 @@ describe("ChessBoard game over", () => {
     render(<ChessBoard room={watched} onMove={vi.fn()} />);
 
     expect(screen.getByRole("region", { name: "Time out" })).toHaveTextContent("Xu won with Black");
+  });
+});
+
+describe("ChessBoard says why a press did nothing (CC-164)", () => {
+  const reason = () =>
+    screen
+      .getAllByRole("status")
+      .map((status) => status.textContent)
+      .join(" ");
+
+  it("says it is not your turn, and picks nothing up", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(chessView({ toMove: THEM }))} onMove={vi.fn()} />);
+
+    await user.click(cell("e2"));
+
+    expect(reason()).toContain("Not your turn");
+  });
+
+  it("asks for one of your own pieces when an empty square or the opponent's piece is pressed first", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
+
+    await user.click(cell("e7"));
+
+    expect(reason()).toContain("Pick one of your own pieces");
+  });
+
+  it("says a move is not allowed when the picked piece cannot go there", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    render(<ChessBoard room={room(chessView())} onMove={onMove} />);
+
+    await user.click(cell("e2"));
+    await user.click(cell("e5"));
+
+    expect(onMove).not.toHaveBeenCalled();
+    expect(reason()).toContain("That move is not allowed");
+  });
+
+  it("sends you to the latest move when an old position is pressed", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(viewAfter(["e4", "e5"]))} onMove={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Previous move" }));
+    await user.click(cell("d2"));
+
+    expect(reason()).toContain("Go to the latest move to play");
+  });
+
+  it("says the move is on its way when the board is pressed again before the server answers", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(chessView())} onMove={() => new Promise(() => {})} />);
+
+    await user.click(cell("e2"));
+    await user.click(cell("e4"));
+    await user.click(cell("d2"));
+
+    expect(reason()).toContain("Sending your move");
+  });
+
+  it("passes the room's own reason on, such as reconnecting, and closes the draw offer for it", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn();
+    render(<ChessBoard room={room(chessView())} onMove={onMove} reason="Reconnecting" />);
+
+    await user.click(cell("e2"));
+    await user.click(screen.getByRole("button", { name: "Offer draw" }));
+
+    expect(onMove).not.toHaveBeenCalled();
+    expect(reason()).toContain("Reconnecting");
+    expect(screen.getByRole("button", { name: "Offer draw" })).toHaveAccessibleDescription("Reconnecting");
+  });
+
+  it("lets you offer a draw and resign on the opponent's turn", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn().mockResolvedValue({});
+    render(<ChessBoard room={room(chessView({ toMove: THEM }))} onMove={onMove} />);
+
+    await user.click(screen.getByRole("button", { name: "Offer draw" }));
+
+    expect(onMove).toHaveBeenCalledWith({ type: "offer-draw" });
+    expect(screen.getByRole("button", { name: "Resign" })).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("says the move is already on the board when its button in the list is pressed", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(viewAfter(["e4"]))} onMove={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "e4" }));
+
+    expect(reason()).toContain("This move is on the board now");
+  });
+
+  it("says when the history cannot step any further", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(viewAfter(["e4"]))} onMove={vi.fn()} />);
+    const nav = within(screen.getByRole("group", { name: "Move navigation" }));
+
+    await user.click(nav.getByRole("button", { name: "Latest move" }));
+    expect(reason()).toContain("This is the latest move");
+    await user.click(nav.getByRole("button", { name: "First position" }));
+    await user.click(nav.getByRole("button", { name: "Previous move" }));
+    expect(reason()).toContain("This is the first position");
   });
 });

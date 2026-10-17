@@ -18,10 +18,11 @@
  * @property {string} you             the viewer's player id ("" for spectators)
  * @property {{ view: unknown, activePlayers: string[], outcome: object } | undefined} game   present once started
  * @property {number} serverTime      server clock (ms) when the view was produced, so client timers do not drift
- * @property {{ requestedBy: string[], available: boolean, until: number, declinedBy: string } | undefined} rematch
+ * @property {{ requestedBy: string[], available: boolean, until: number, declinedBy: string, leftName?: string } | undefined} rematch
  *   present once finished (CC-037): who asked to play again, whether a rematch can still happen (false once a player
  *   left), when the rematch window ends and the room closes (server time in milliseconds, CC-101), and who last said
- *   no to a request ("" when nobody did since the last request, CC-104)
+ *   no to a request ("" when nobody did since the last request, CC-104). After a player left the finished game,
+ *   `leftName` is their display name, because their seat is gone (CC-162).
  * @property {{ games: number, wins: Record<string, number> } | undefined} series   games finished in this room
  *   and wins per player id, across rematches
  */

@@ -15,3 +15,16 @@ export function tictactoeSounds(previous, next) {
   const lined = previous.game.view.winningLine.length === 0 && next.game.view.winningLine.length > 0;
   return lined ? [...placed, SOUNDS.LINE] : placed;
 }
+
+const REASON_PHRASES = Object.freeze({
+  "three-in-a-row": "with three in a row",
+  "board-full": "with a full board",
+});
+
+/**
+ * How a Tic-Tac-Toe game ended, as the end of the result headline (CC-162): "You won with three in a row".
+ * Empty for a reason this version does not know.
+ *
+ * @param {string} reason  the outcome's reason
+ */
+export const tictactoeReasonPhrase = (reason) => REASON_PHRASES[reason] ?? "";

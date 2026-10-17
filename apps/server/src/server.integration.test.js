@@ -244,6 +244,42 @@ describe("games through the real composition root (integration)", () => {
     }
   });
 
+  it("tells the player still there who left a finished game, and keeps it in MongoDB (CC-162)", async () => {
+    const app = await start();
+    const players = [];
+    try {
+      const alice = await connectedGuest(app.url);
+      const bob = await connectedGuest(app.url);
+      players.push(alice, bob);
+      const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
+      const { data: room } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+        gameId: "rps",
+        options: { bestOf: 1 },
+      });
+      await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
+      await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "rock" } });
+      await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "scissors" } });
+      await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code: room.code });
+
+      // Bob picks a new opponent instead: he leaves the finished room.
+      const aliceHears = new Promise((resolve) => alice.socket.once(SOCKET_EVENTS.ROOM_UPDATED, resolve));
+      const left = await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code: room.code });
+      const update = await aliceHears;
+
+      expect(left).toEqual({ ok: true, data: { left: true } });
+      expect(update.seats.map((seat) => seat.playerId)).toEqual([alice.identity.id]);
+      expect(update.rematch).toEqual(
+        expect.objectContaining({ requestedBy: [], available: false, leftName: bob.identity.displayName }),
+      );
+      // Read back from MongoDB, the room still says who left.
+      const again = await send(alice.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
+      expect(again.data.rematch.leftName).toBe(bob.identity.displayName);
+    } finally {
+      players.forEach((p) => p.socket.disconnect());
+      await app.close();
+    }
+  });
+
   it("counts a match for achievements, streaks and quests in MongoDB, and pushes the unlock (CC-054, CC-089)", async () => {
     const app = await start();
     const players = [];

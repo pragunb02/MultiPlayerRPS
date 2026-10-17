@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense } from "react";
 import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
 import { GameArt } from "../../art/games/GameArt.jsx";
@@ -6,6 +6,7 @@ import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
+import { useAction } from "../../hooks/useAction.js";
 import { useGames } from "../../hooks/useGames.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./HomePage.module.css";
@@ -17,20 +18,7 @@ const HeroArt = lazy(() => import("../../art/HeroArt.jsx").then((m) => ({ defaul
 export function HomePage() {
   const games = useGames();
   const session = useSession();
-  const [starting, setStarting] = useState(false);
-  const [error, setError] = useState("");
-
-  async function start() {
-    setStarting(true);
-    setError("");
-    try {
-      await session.ensurePlayer();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setStarting(false);
-    }
-  }
+  const start = useAction(session.ensurePlayer, { id: "home.play_guest" });
 
   return (
     <>
@@ -43,19 +31,14 @@ export function HomePage() {
             <p className={styles.ready}>You're playing as {session.identity.displayName}.</p>
           ) : (
             <Button
+              control="home.play_guest"
               size="lg"
               variant="accent"
-              onClick={start}
-              busy={starting}
-              disabled={session.status === "loading"}
+              action={start}
+              reason={session.status === "loading" ? "Checking whether you are signed in" : ""}
             >
               Play as a guest
             </Button>
-          )}
-          {error !== "" && (
-            <p role="alert" className={styles.error}>
-              {error}
-            </p>
           )}
         </div>
         <div className={styles.heroArt}>
@@ -79,7 +62,7 @@ export function HomePage() {
                   <GameArt gameId={game.id} />
                 </div>
                 <h3>
-                  <Link to={paths.game(game.id)} className={styles.cardLink}>
+                  <Link to={paths.game(game.id)} className={styles.cardLink} data-cc-control="home.game">
                     {game.name}
                   </Link>
                 </h3>

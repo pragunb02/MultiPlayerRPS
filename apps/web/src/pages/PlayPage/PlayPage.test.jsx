@@ -63,12 +63,34 @@ describe("PlayPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Slow down");
   });
 
-  it("joins by code (normalised), enabling the button only for a full code", async () => {
+  it("says what is missing when Join room is pressed before the code is complete (CC-164)", async () => {
+    const user = userEvent.setup();
+    const { url } = renderApp({ path: "/games/rock-paper-scissors" });
+    const join = screen.getByRole("button", { name: "Join room" });
+    await user.type(screen.getByRole("textbox", { name: "Room code" }), "ab2");
+
+    await user.click(join);
+
+    expect(join).toHaveAttribute("aria-disabled", "true");
+    expect(join).toHaveAccessibleDescription("Enter the 6-character room code");
+    expect(screen.getAllByText("Enter the 6-character room code")).toHaveLength(2);
+    expect(url()).toBe("/games/rock-paper-scissors");
+  });
+
+  it("keeps Join room explained when Enter is pressed in a short code", async () => {
+    const user = userEvent.setup();
+    const { url } = renderApp({ path: "/games/rock-paper-scissors" });
+
+    await user.type(screen.getByRole("textbox", { name: "Room code" }), "ab2{Enter}");
+
+    expect(url()).toBe("/games/rock-paper-scissors");
+  });
+
+  it("joins by code (normalised) once the code is complete", async () => {
     const user = userEvent.setup();
     renderApp({ path: "/games/rock-paper-scissors" });
     const join = screen.getByRole("button", { name: "Join room" });
 
-    expect(join).toBeDisabled();
     await user.type(screen.getByRole("textbox", { name: "Room code" }), "ab2cd3");
     await user.click(join);
 

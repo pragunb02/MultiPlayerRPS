@@ -204,7 +204,7 @@ describe("the room card after a guest's win", () => {
     ["watching", finished({ you: "" })],
   ])("isn't offered after %s", async (_name, room) => {
     openRoom({ rooms: { AB2CD3: room } });
-    await screen.findByRole("link", { name: "Play again" });
+    await screen.findByRole("region", { name: /won|lost|draw/i });
 
     expect(card()).toBeNull();
   });

@@ -325,7 +325,7 @@ describe("header", () => {
 
     await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Log out" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Can't reach ClassiCade");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach ClassiCade");
     expect(within(screen.getByRole("banner")).getByText("Riya")).toBeInTheDocument();
     expect(url()).toBe("/games/chess");
   });

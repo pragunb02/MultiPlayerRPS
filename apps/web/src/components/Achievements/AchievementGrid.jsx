@@ -74,7 +74,7 @@ export function AchievementGrid() {
     body = (
       <div role="alert" className={styles.problem}>
         <p>Couldn't load achievements. {achievements.error.message}</p>
-        <Button variant="secondary" onClick={achievements.retry}>
+        <Button control="achievements.retry" variant="secondary" onClick={achievements.retry}>
           Try again
         </Button>
       </div>
