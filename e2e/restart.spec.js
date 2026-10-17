@@ -137,6 +137,31 @@ test.describe("the server restarts", () => {
   });
 });
 
+test.describe("a full server (CC-107)", () => {
+  test("a player who wants a new room while the server is full is told to try again in a minute", async ({
+    players,
+  }) => {
+    const alice = await players.open("alice");
+    await createRoom(alice, "tic-tac-toe");
+    const bob = await players.open("bob");
+    await asGuest(bob);
+    // One room at most, for this server process only. Alice's room is already there, so the server is full.
+    alice.expectRestart();
+    bob.expectRestart();
+    await restartServer({ rooms: { limits: { openRoomsMax: 1 } } });
+    try {
+      await bob.page.goto("/games/rock-paper-scissors");
+      await bob.page.getByRole("button", { name: "Create room" }).click();
+
+      await expect(bob.page.getByRole("alert")).toHaveText("The server is busy, try again in a minute");
+      await expect(bob.page).toHaveURL("/games/rock-paper-scissors");
+    } finally {
+      // Back to the standard limits for whatever runs next.
+      await restartServer();
+    }
+  });
+});
+
 test.describe("a long wait on the result screen", () => {
   test("the rematch window counts down, then the room closes and every way back says why", async ({
     players,

@@ -21,6 +21,7 @@ export function apiRouter({
   accountComponent,
   authLimits,
   onIdentityChanged,
+  onOtherSessionsEnded,
   now,
   ...sessionDeps
 }) {
@@ -39,7 +40,9 @@ export function apiRouter({
     createAuthRoutes({
       accountComponent,
       onSessionEnded: sessionDeps.onSessionEnded,
+      onOtherSessionsEnded,
       onIdentityChanged,
+      now,
       ...(authLimits && { limits: authLimits }),
     }),
   );

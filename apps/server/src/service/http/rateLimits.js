@@ -15,6 +15,33 @@ export const DEFAULT_API_LIMIT = Object.freeze({ windowMs: 60 * 1000, limit: 300
 export const clientIpKey = (req) => `ip:${ipKeyGenerator(/** @type {string} */ (req.ip))}`;
 
 /**
+ * The rate limit key for a network address, grouped the same way as `clientIpKey`, for realtime connections.
+ *
+ * @param {string} address
+ * @returns {string}
+ */
+export const addressKey = (address) => `ip:${ipKeyGenerator(address)}`;
+
+/**
+ * The player's address for a request that did not go through Express, such as the opening request of a realtime
+ * connection. It follows the same rule Express uses for `trust proxy` with a hop count: the connection's own
+ * address comes first, then the X-Forwarded-For entries from right to left, and the answer is the entry that many
+ * hops in, or the left-most one when the list is shorter. A test pins that both always agree.
+ *
+ * @param {{ remoteAddress: string, forwardedFor: string | undefined, trustProxyHops: number }} request
+ * @returns {string}
+ */
+export function clientAddress({ remoteAddress, forwardedFor, trustProxyHops }) {
+  const forwarded = (forwardedFor ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "")
+    .reverse();
+  const chain = [remoteAddress, ...forwarded];
+  return chain[Math.min(trustProxyHops, chain.length - 1)];
+}
+
+/**
  * The rate limit key for the app-wide limit. A player with a session gets their own budget, so players behind one
  * shared network address (a school, an office, a mobile carrier) do not use up each other's requests. Requests
  * without a session fall back to the network address.

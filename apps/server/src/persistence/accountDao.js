@@ -10,6 +10,7 @@ const DUPLICATE_KEY_CODE = 11000;
  * @property {string} email          normalised
  * @property {string} passwordHash
  * @property {Date} createdAt
+ * @property {number} sessionVersion  counted up to sign out every session made before (CC-116)
  */
 
 const accountSchema = new mongoose.Schema(
@@ -19,6 +20,7 @@ const accountSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
     createdAt: { type: Date, required: true },
+    sessionVersion: { type: Number, required: true, default: 0 },
   },
   { collection: "accounts", versionKey: false },
 );
@@ -29,6 +31,8 @@ const toDoc = (doc) => ({
   email: doc.email,
   passwordHash: doc.passwordHash,
   createdAt: doc.createdAt,
+  // Accounts made before CC-116 have no version stored. Their sessions were all made at version 0.
+  sessionVersion: doc.sessionVersion ?? 0,
 });
 
 /**
@@ -86,6 +90,45 @@ export function createAccountDao({ connection }) {
 
     async updatePasswordHash(accountId, passwordHash) {
       await Account.updateOne({ _id: accountId }, { $set: { passwordHash } });
+    },
+
+    /**
+     * Only the session version, read by id on every request of a signed-in player, so it reads nothing else.
+     *
+     * @param {string} accountId
+     * @returns {Promise<number>}
+     * @throws {RangeError} when absent
+     */
+    async getSessionVersion(accountId) {
+      const doc = mongoose.isValidObjectId(accountId)
+        ? await Account.findById(accountId, { sessionVersion: 1 }).lean()
+        : null;
+      if (doc === null) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      return doc.sessionVersion ?? 0;
+    },
+
+    /**
+     * Counts the session version up, and sets a new password hash at the same moment when one is given, in one
+     * write. Every session made before no longer matches.
+     *
+     * @param {{ accountId: string, passwordHash?: string }} change
+     * @returns {Promise<number>} the new session version
+     * @throws {RangeError} when absent
+     */
+    async bumpSessionVersion({ accountId, passwordHash }) {
+      const doc = mongoose.isValidObjectId(accountId)
+        ? await Account.findByIdAndUpdate(
+            accountId,
+            { $inc: { sessionVersion: 1 }, ...(passwordHash !== undefined && { $set: { passwordHash } }) },
+            { returnDocument: "after", projection: { sessionVersion: 1 } },
+          ).lean()
+        : null;
+      if (doc === null) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      return doc.sessionVersion;
     },
   });
 }

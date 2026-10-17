@@ -41,12 +41,13 @@ async function serve() {
   // Every player connects from the same address, so the limits per address are raised out of the way.
   const open = { windowMs: 60_000, limit: 1_000_000 };
   const limits = {
-    auth: { perIp: open, failedLoginsPerEmail: open },
+    auth: { perIp: open, signupPerIp: open },
     guest: open,
     leaderboard: open,
     api: open,
   };
-  const { close } = await startServer({ config, logger, limits });
+  const rooms = { limits: { socketsPerAddress: 1_000_000 } };
+  const { close } = await startServer({ config, logger, limits, rooms });
   handleShutdownSignals({ close, logger });
 }
 

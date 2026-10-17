@@ -3,6 +3,7 @@ import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
+import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { startTestServer } from "../../testing/testApp.js";
 
 const ALLOWED_ORIGIN = "http://localhost:5173"; // from TEST_ENV.ALLOWED_ORIGINS
@@ -64,6 +65,35 @@ describe("realtime gateway", () => {
     const [refused] = server.find("socket refused");
     expect(refused).toMatchObject({ level: 40, code: ERROR_CODES.UNAUTHORIZED, sentCookie: true });
     expect(JSON.stringify(refused)).not.toContain("forged");
+  });
+
+  it("refuses a connection, and logs it as a server fault, when the session cannot be checked (CC-116)", async () => {
+    const accounts = createInMemoryAccountDao();
+    let broken = false;
+    const accountDao = {
+      ...accounts,
+      getSessionVersion: async (accountId) => {
+        if (broken) throw new Error("database down");
+        return accounts.getSessionVersion(accountId);
+      },
+    };
+    server = await startTestServer({ accountDao });
+    const res = await fetch(`${server.baseUrl}/api/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "Riya",
+        email: "riya@example.com",
+        password: "correct horse battery",
+      }),
+    });
+    const cookie = res.headers.get("set-cookie").split(";")[0];
+    broken = true;
+
+    const error = await connected(openSocket({ cookie })).catch((err) => err);
+
+    expect(error.data).toEqual({ code: ERROR_CODES.INTERNAL });
+    expect(server.find("checking a socket's session failed")[0].err.message).toBe("database down");
   });
 
   it("binds the connection to the identity from the session", async () => {

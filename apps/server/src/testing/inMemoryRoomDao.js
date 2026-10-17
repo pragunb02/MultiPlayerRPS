@@ -79,5 +79,15 @@ export function createInMemoryRoomDao() {
     listDue: async (now) => where((doc) => doc.dueAt > 0 && doc.dueAt <= now),
 
     listExpired: async (now) => where((doc) => doc.expiresAt <= now),
+
+    countOpen: async () => rooms.size,
+
+    async countByStatus() {
+      const counts = {};
+      for (const { status } of rooms.values()) {
+        counts[status] = (counts[status] ?? 0) + 1;
+      }
+      return counts;
+    },
   });
 }

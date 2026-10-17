@@ -346,6 +346,29 @@ export function runRoomDaoContract(createDao) {
     expect(expired.map((doc) => doc.code).sort()).toEqual(["NOW222", "PAST22"]);
   });
 
+  it("counts the open rooms, and no longer counts a room once it is closed", async () => {
+    const dao = await createDao();
+    expect(await dao.countOpen()).toBe(0);
+    await dao.insert(roomDoc({ code: "ONE222" }));
+    await dao.insert(roomDoc({ code: "TWO222" }));
+
+    expect(await dao.countOpen()).toBe(2);
+    await dao.close({ code: "ONE222", version: 1, record: closedRecord({ code: "ONE222" }) });
+    expect(await dao.countOpen()).toBe(1);
+  });
+
+  it("counts the open rooms per status, leaving out statuses with none", async () => {
+    const dao = await createDao();
+    expect(await dao.countByStatus()).toEqual({});
+    await dao.insert(roomDoc({ code: "WAIT22", status: "waiting" }));
+    await dao.insert(roomDoc({ code: "PLAY22", status: "playing" }));
+    await dao.insert(roomDoc({ code: "PLAY33", status: "playing" }));
+    await dao.insert(roomDoc({ code: "GONE22", status: "waiting" }));
+    await dao.close({ code: "GONE22", version: 1, record: closedRecord({ code: "GONE22" }) });
+
+    expect(await dao.countByStatus()).toEqual({ waiting: 1, playing: 2 });
+  });
+
   it("returns copies from lists too", async () => {
     const dao = await createDao();
     await dao.insert(roomDoc());

@@ -13,6 +13,8 @@ export const ERROR_CODES = Object.freeze({
   GONE: "GONE",
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
   RATE_LIMITED: "RATE_LIMITED",
+  /** The server is full right now (for example it holds as many rooms as it can). Trying again later can work (CC-107). */
+  SERVER_BUSY: "SERVER_BUSY",
   UNSUPPORTED_MEDIA_TYPE: "UNSUPPORTED_MEDIA_TYPE",
   INTERNAL: "INTERNAL",
 });
