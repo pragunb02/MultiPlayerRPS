@@ -22,8 +22,9 @@ describe("newAccount (CC-237)", () => {
     }
   });
 
-  it("fills the 20 character limit, so two accounts differ unless made in the same millisecond", () => {
-    expect(newAccount({ now: 1_760_712_345_678, random: 42 }).username).toBe("riya_607123456780042");
+  it("is 15 characters, from the clock in ms and 4 random digits", () => {
+    expect(newAccount({ now: 1_760_712_345_678, random: 42 }).username).toBe("riya_3456780042");
+    expect(newAccount({ now: 7, random: 3 }).username).toBe("riya_0000070003");
   });
 
   it("no longer makes names like the one that failed: letters in the tag could spell a reserved word", () => {

@@ -24,15 +24,16 @@ export const LEGACY_PLAYER = Object.freeze({
 /**
  * A fresh account per test, so reruns against a reused server never collide.
  *
- * The tag is digits only: the last 11 digits of the clock and 4 random digits, which fills the 20 character limit
- * with "riya_". The public name rules read a part made only of digits as a number, so the name rules can never
- * refuse it. A tag with letters sometimes spelled a reserved or rude word, such as "cpu" in "riya_cp8um06316", and
- * sign-up refused it (CC-237). The random digits come from `node:crypto` because they are part of the password.
+ * The tag is digits only: the last 6 digits of the clock in ms and 4 random digits. The public name rules read a
+ * part made only of digits as a number, so the name rules can never refuse it. The name stays 15 characters long,
+ * as before, because a 20 character name breaks the mobile header and profile today (CC-254). A tag with letters
+ * sometimes spelled a reserved or rude word, such as "cpu" in "riya_cp8um06316", and sign-up refused it (CC-237).
+ * The random digits come from `node:crypto` because they are part of the password.
  *
  * @param {{ now?: number, random?: number }} [options]  the clock in ms, and a whole number from 0 to 9999
  * @returns {{ username: string, email: string, password: string }}
  */
 export function newAccount({ now = Date.now(), random = randomInt(10_000) } = {}) {
-  const tag = `${String(now).slice(-11)}${String(random).padStart(4, "0")}`;
+  const tag = `${String(now % 1e6).padStart(6, "0")}${String(random).padStart(4, "0")}`;
   return { username: `riya_${tag}`, email: `riya.${tag}@example.com`, password: `correct horse ${tag}` };
 }
