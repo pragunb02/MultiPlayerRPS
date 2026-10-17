@@ -121,8 +121,14 @@ export function requestsLeft(room, { viewerId, engine, lifetimes }) {
 }
 
 /**
- * When the viewer may ask each kind again after their last request of that kind ended (the cooldown), for every
- * kind they asked recently. A moment in the past means now.
+ * Whether asking the same thing again waits for the cooldown after `request`. Only an answer that was not a yes
+ * does: after an accepted rematch a quick game may well end within seconds, and asking again then is no nagging.
+ */
+const coolsDown = (request) => !isOpen(request) && request.state !== REQUEST_STATES.ACCEPTED;
+
+/**
+ * When the viewer may ask each kind again after their last request of that kind ended without a yes (the
+ * cooldown), for every kind they asked recently. A moment in the past means now.
  *
  * @param {Readonly<object>} room
  * @param {{ viewerId: string, lifetimes: { reaskCooldownMs: number } }} input
@@ -131,7 +137,7 @@ export function requestsLeft(room, { viewerId, engine, lifetimes }) {
 export function askAgainAt(room, { viewerId, lifetimes }) {
   return Object.fromEntries(
     requestsOf(room)
-      .filter((request) => !isOpen(request) && request.from === viewerId)
+      .filter((request) => coolsDown(request) && request.from === viewerId)
       .map((request) => [request.type, request.endedAt + lifetimes.reaskCooldownMs]),
   );
 }
@@ -163,7 +169,7 @@ export function addRequest(room, { playerId, type, now, rule, lifetimes }) {
     throw new ConflictError("You already asked. Wait for the answer");
   }
   const last = requestsOf(room).findLast((request) => request.type === type && request.from === playerId);
-  if (last !== undefined && now < last.endedAt + lifetimes.reaskCooldownMs) {
+  if (last !== undefined && coolsDown(last) && now < last.endedAt + lifetimes.reaskCooldownMs) {
     throw new ConflictError("Wait a few seconds before asking again", {
       details: { retryAt: last.endedAt + lifetimes.reaskCooldownMs },
     });

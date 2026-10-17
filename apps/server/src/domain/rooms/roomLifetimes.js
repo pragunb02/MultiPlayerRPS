@@ -23,8 +23,8 @@ const HOUR_MS = 60 * MINUTE_MS;
  * 6. A rematch request stays open for `rematchRequestMs`. A minute is long enough to come back from another tab,
  *    and short enough that nobody waits on a player who has gone.
  * 7. How a request ended stays in the room for `answerKeptMs`, so a player who was looking elsewhere still sees
- *    the answer. The same player may ask the same thing again only after `reaskCooldownMs`, so a "no" is not
- *    followed at once by the same question.
+ *    the answer. After an answer that was not a yes, the same player may ask the same thing again only after
+ *    `reaskCooldownMs`, so a "no" is not followed at once by the same question.
  * 8. A player who stays off the page of a finished room for `awayReleaseMs` gives up their seat. The opponent is
  *    told at once that there will be no rematch, instead of waiting for someone who has moved on.
  * 9. A player who loses their connection during a game has `reconnectGraceMs` to come back. A minute covers a

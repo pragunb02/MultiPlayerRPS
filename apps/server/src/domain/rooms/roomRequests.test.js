@@ -83,7 +83,21 @@ describe("room requests (CC-159)", () => {
     expect(() => ask(ask(playing), { playerId: "bob" })).toThrow("You already asked. Wait for the answer");
   });
 
-  it("makes the asker wait after an answer, and stops them once their offers are used up", () => {
+  it("lets the asker ask again at once after a yes, such as a rematch whose game ended in seconds", () => {
+    const asked = ask(finished, { type: ROOM_REQUEST_TYPES.REMATCH });
+    const accepted = endRequest(asked, {
+      request: openRequest(asked, ROOM_REQUEST_TYPES.REMATCH),
+      state: REQUEST_STATES.ACCEPTED,
+      now: T0 + 1_000,
+    });
+
+    expect(askAgainAt(accepted, { viewerId: "alice", lifetimes })).toEqual({});
+    expect(
+      openRequest(ask(accepted, { type: ROOM_REQUEST_TYPES.REMATCH, now: T0 + 2_000 }), "rematch"),
+    ).toEqual(expect.objectContaining({ from: "alice", createdAt: T0 + 2_000 }));
+  });
+
+  it("makes the asker wait after a no, and stops them once their offers are used up", () => {
     const declined = (room, now) =>
       endRequest(room, { request: openRequest(room, "draw"), state: REQUEST_STATES.DECLINED, now });
     let room = declined(ask(playing), T0 + 1_000);
