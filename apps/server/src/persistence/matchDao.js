@@ -19,9 +19,11 @@ const MATCH_SCHEMA_VERSION = 1;
  * @property {number} schemaVersion
  * @property {MatchCreditDoc} [credit]   set once the match was judged (CC-095)
  *
- * @typedef {{ notCounted: Array<{ playerId: string, reason: string, withdrawnFrom?: string }> }} MatchCreditDoc
+ * @typedef {{ notCounted: Array<{ playerId: string, reason: string, withdrawnFrom?: string }>, botXp?: Array<{ playerId: string, xp: number, left: number, withdrawnFrom?: string, withdrawnXp?: number }> }} MatchCreditDoc
  *   the players the match does not count for. `withdrawnFrom` names the guest it counted for before the guest's
- *   games moved to this player
+ *   games moved to this player. In a game against a computer character, `botXp` holds what it gave each person
+ *   within the day's limit and how much of the limit was left (ADR-025). When it gave the guest more than the
+ *   account had left, `withdrawnXp` is the part taken away
  */
 
 const matchSchema = new mongoose.Schema(
@@ -64,6 +66,8 @@ const FIELDS =
   "-_id matchId roomCode gameId options seed players log result startedAt endedAt schemaVersion credit";
 // A player's games that count for them: judged without them in `notCounted`, or not judged yet.
 const countedFor = (playerId) => ({ "credit.notCounted.playerId": { $ne: playerId } });
+// Computer characters' ids (ADR-025). Their games never count on a leaderboard.
+const COMPUTER_PLAYER = /^bot_/;
 
 /**
  * Finished matches in MongoDB — data we own, kept for history, replays and progression.
@@ -146,15 +150,15 @@ export function createMatchDao({ connection }) {
     },
 
     /**
-     * How many matches of one game a player won (forfeit wins included). Filtering on the player first lets the
-     * history index serve it.
+     * How many matches of one game a player won (forfeit wins included), without wins against a computer character.
+     * Filtering on the player first lets the history index serve it.
      *
      * @param {{ playerId: string, gameId: string }} query
      * @returns {Promise<number>}
      */
     countWins: ({ playerId, gameId }) =>
       Match.countDocuments({
-        "players.playerId": playerId,
+        $and: [{ "players.playerId": playerId }, { "players.playerId": { $not: COMPUTER_PLAYER } }],
         gameId,
         "result.winners": playerId,
         ...countedFor(playerId),
@@ -174,11 +178,12 @@ export function createMatchDao({ connection }) {
 
     /**
      * A player's games that count for them (or are not judged yet) and ended in `[from, to)`, without one match.
-     * Only the fields the fair play limits look at.
+     * Only the fields the fair play limits look at, the verdict included once there is one.
      *
      * @param {string} playerId
      * @param {{ from: Date, to: Date, excluding: string }} window
-     * @returns {Promise<Array<{ matchId: string, players: MatchDoc["players"], endedAt: Date }>>} oldest first
+     * @returns {Promise<Array<{ matchId: string, players: MatchDoc["players"], endedAt: Date, credit?: MatchCreditDoc }>>}
+     *   oldest first
      */
     listCountedBetween(playerId, { from, to, excluding }) {
       const filter = {
@@ -187,11 +192,12 @@ export function createMatchDao({ connection }) {
         matchId: { $ne: excluding },
         ...countedFor(playerId),
       };
-      return Match.find(filter, "-_id matchId players endedAt").sort({ endedAt: 1 }).lean();
+      return Match.find(filter, "-_id matchId players endedAt credit").sort({ endedAt: 1 }).lean();
     },
 
     /**
-     * The games of `playerId` that counted for guest `from`, but stopped counting when they moved to `playerId`.
+     * The games of `playerId` that counted for guest `from`, but stopped counting when they moved to `playerId`, or
+     * that give `playerId` less XP than they gave the guest (games against a computer character, ADR-025).
      *
      * @param {{ playerId: string, from: string }} query
      * @returns {Promise<MatchDoc[]>} oldest first
@@ -200,7 +206,10 @@ export function createMatchDao({ connection }) {
       Match.find(
         {
           "players.playerId": playerId,
-          "credit.notCounted": { $elemMatch: { playerId, withdrawnFrom: from } },
+          $or: [
+            { "credit.notCounted": { $elemMatch: { playerId, withdrawnFrom: from } } },
+            { "credit.botXp": { $elemMatch: { playerId, withdrawnFrom: from } } },
+          ],
         },
         FIELDS,
       )

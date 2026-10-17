@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import http from "node:http";
 import session from "express-session";
-import { createEngineRegistry } from "@classicade/games";
+import { BOTS, createBotRegistry, createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
@@ -14,13 +14,18 @@ import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createAccountComponent } from "../domain/accounts/accountComponent.js";
 import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
+import { createBotComponent } from "../domain/bots/botComponent.js";
+import { createBotDriver } from "../domain/bots/botDriver.js";
+import { createBotTurns } from "../domain/bots/botTurns.js";
+import { createSealMaker, sealSecretFrom } from "../domain/bots/seals.js";
+import { createThinkingQueue } from "../domain/bots/thinkingQueue.js";
 import { createGamificationComponent } from "../domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
-import { createRoomComponent } from "../domain/rooms/roomComponent.js";
+import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
 import { connectLeaderboardBonuses, connectMatchPipeline, identityFollowers } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
@@ -100,13 +105,36 @@ export function createTestApp({
     passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }), // fast for tests
   });
   const domainEvents = new EventEmitter();
+  const engineRegistry = createEngineRegistry(engines);
+  const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
+  const botTurns = createBotTurns({
+    bots: createBotRegistry(BOTS.filter((bot) => engineRegistry.has(bot.gameId))),
+    engines: engineRegistry,
+    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
+  });
   const roomComponent = createRoomComponent({
-    roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
-    engines: createEngineRegistry(engines),
+    roomAccessor,
+    engines: engineRegistry,
     events: domainEvents,
     generateSeed: () => 42,
     ...(roomLimits && { limits: roomLimits }),
+    botTurns,
   });
+  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  // Computer players act at once in tests, so a test only waits for the server, never for a pause.
+  const botDriver = createBotDriver({
+    roomComponent,
+    roomAccessor,
+    botTurns,
+    botComponent,
+    thinking: createThinkingQueue(),
+    events: domainEvents,
+    delayMs: () => 0,
+    logger: capture.logger,
+    retryMs: 10,
+    now,
+  });
+  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const matchComponent = createMatchComponent({ matchAccessor });
@@ -201,6 +229,8 @@ export function createTestApp({
     sessionMiddleware,
     domainEvents,
     roomComponent,
+    botComponent,
+    botDriver,
     matchComponent,
     progressionComponent,
     playerTransferComponent,
@@ -250,6 +280,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     networkOf: createNetworkKey({ secret: testApp.config.sessionSecret }),
     now,
     ...(options.roomLimits && { limits: options.roomLimits }),
+    botComponent: testApp.botComponent,
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));
@@ -261,6 +292,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     httpServer: server,
     baseUrl: `http://127.0.0.1:${port}`,
     close: async () => {
+      testApp.botDriver.stop();
       await gateway.close();
       await testApp.tasks.drain();
     },

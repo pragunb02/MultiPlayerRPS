@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { CHESS_ACTIONS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { chessEngine } from "../../chess/chessEngine.js";
 import { createSeededRng, randomIndex } from "../../rng.js";
@@ -104,6 +105,18 @@ describe("chessBot levels", () => {
 
     expect(strong.maxDepth).toBeGreaterThan(club.maxDepth);
     expect(strong.maxNodes).toBeGreaterThan(club.maxNodes);
+  });
+
+  it("declines a draw the opponent offers while it is their turn, and has nothing else to answer", () => {
+    const state = newGame();
+    const offered = chessEngine.applyMove(state, WHITE, { type: CHESS_ACTIONS.OFFER_DRAW }, CTX);
+    const view = (game) => chessEngine.viewFor(game, BLACK);
+
+    expect(chessBot.answer({ view: view(offered), botId: BLACK })).toEqual([
+      { type: CHESS_ACTIONS.DECLINE_DRAW },
+    ]);
+    expect(chessBot.answer({ view: view(state), botId: BLACK })).toEqual([]);
+    expect(chessBot.answer({ view: view(offered), botId: WHITE })).toEqual([]);
   });
 
   it("refuses to choose once the game is over", () => {

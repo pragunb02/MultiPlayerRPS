@@ -3,6 +3,14 @@ import { SOCKET_EVENTS } from "@classicade/shared";
 import { useServices } from "../app/servicesContext.js";
 
 /**
+ * The newer of two views of a room. An update can overtake the answer to a request: a computer player may move
+ * before the answer to the move it replies to arrives (CC-138). The revision says which is newer. A view without
+ * one (from a server before it existed) always counts as newer.
+ */
+export const newerRoom = (current, incoming) =>
+  current?.code === incoming.code && current.revision > incoming.revision ? current : incoming;
+
+/**
  * One room, kept in sync with the server. Once `enabled` — there is someone to join as — it joins, applies every
  * pushed update for this room, and rejoins after the connection drops and comes back. It never starts a session
  * itself: whoever arrives without one chooses how to join first (CC-086). Leaving the page does not leave the
@@ -34,7 +42,14 @@ export function useRoom(code, { enabled }) {
     // State changes only in the request's callbacks, after the server answered.
     const join = () =>
       socket.request(SOCKET_EVENTS.ROOM_JOIN, { code }).then(
-        (room) => active && setState({ status: "ready", room, error: undefined, closedReason: "" }),
+        (room) =>
+          active &&
+          setState((s) => ({
+            status: "ready",
+            room: newerRoom(s.room, room),
+            error: undefined,
+            closedReason: "",
+          })),
         (error) => active && setState({ status: "error", room: undefined, error, closedReason: "" }),
       );
     // Join now if connected; otherwise the "connect" handler below joins once the socket is up.
@@ -43,7 +58,8 @@ export function useRoom(code, { enabled }) {
     }
     const unsubscribers = [
       socket.on(SOCKET_EVENTS.ROOM_UPDATED, (room) => {
-        if (active && room.code === code) setState((s) => ({ ...s, status: "ready", room }));
+        if (active && room.code === code)
+          setState((s) => ({ ...s, status: "ready", room: newerRoom(s.room, room) }));
       }),
       socket.on(SOCKET_EVENTS.ROOM_CLOSED, (event) => {
         if (active && event.code === code)
@@ -61,7 +77,7 @@ export function useRoom(code, { enabled }) {
   const move = useCallback(
     async (payload) => {
       const room = await socket.request(SOCKET_EVENTS.GAME_MOVE, { code, move: payload });
-      setState((s) => ({ ...s, room }));
+      setState((s) => ({ ...s, room: newerRoom(s.room, room) }));
       return room;
     },
     [socket, code],
@@ -72,7 +88,7 @@ export function useRoom(code, { enabled }) {
   /** Asks for — or withdraws — a rematch in a finished room; once everyone asked, the new game starts here. */
   const rematch = useCallback(async () => {
     const room = await socket.request(SOCKET_EVENTS.ROOM_REMATCH, { code });
-    setState((s) => ({ ...s, room }));
+    setState((s) => ({ ...s, room: newerRoom(s.room, room) }));
     return room;
   }, [socket, code]);
 
@@ -81,7 +97,7 @@ export function useRoom(code, { enabled }) {
   /** Says no to the opponent's rematch request (CC-104). They are told, and either player may ask again. */
   const declineRematch = useCallback(async () => {
     const room = await socket.request(SOCKET_EVENTS.ROOM_REMATCH_DECLINE, { code });
-    setState((s) => ({ ...s, room }));
+    setState((s) => ({ ...s, room: newerRoom(s.room, room) }));
     return room;
   }, [socket, code]);
 

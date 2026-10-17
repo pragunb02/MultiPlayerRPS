@@ -163,6 +163,38 @@ test.describe("a full server (CC-107)", () => {
   });
 });
 
+test.describe("the server restarts during a game against the computer (CC-138)", () => {
+  const phase = (player) => player.page.locator("[data-cc-phase]");
+  const emptyCell = (player) =>
+    board(player)
+      .getByRole("gridcell", { name: /: empty$/ })
+      .first();
+  const marks = (player) => board(player).getByRole("gridcell", { name: /: [XO]$/ });
+
+  test("Pip is back with the server and plays on, and the visitor's game is kept", async ({ players }) => {
+    const visitor = await players.open("visitor");
+    await visitor.page.goto("/games/tic-tac-toe");
+    await visitor.page.getByRole("button", { name: "Play Pip" }).click();
+    await expect(phase(visitor)).toHaveAttribute("data-cc-phase", "my-turn", { timeout: 15_000 });
+    const room = visitor.url();
+    await emptyCell(visitor).click();
+    const before = await marks(visitor).count();
+
+    await restartDuring([visitor]);
+
+    // Pip's move came before or after the restart: either way it is the visitor's turn again in the same game.
+    await expect(phase(visitor)).toHaveAttribute("data-cc-phase", /my-turn|finished/, { timeout: 15_000 });
+    expect(await marks(visitor).count()).toBeGreaterThan(before);
+    await expect(seats(visitor)).toContainText("Pipcomputer");
+    expect(visitor.url()).toBe(room);
+    if ((await phase(visitor).getAttribute("data-cc-phase")) === "my-turn") {
+      const now = await marks(visitor).count();
+      await emptyCell(visitor).click();
+      await expect.poll(() => marks(visitor).count(), { timeout: 15_000 }).toBeGreaterThan(now + 1);
+    }
+  });
+});
+
 test.describe("a long wait on the result screen", () => {
   test("the rematch window counts down, then the room closes and every way back says why", async ({
     players,

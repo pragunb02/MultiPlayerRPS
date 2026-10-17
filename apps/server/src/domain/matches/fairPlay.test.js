@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { NOT_COUNTED_REASONS } from "@classicade/shared";
-import { creditFor, endedTooSoon, FAIR_PLAY_LIMITS, judgeMatch, utcDayOf } from "./fairPlay.js";
+import {
+  botXpFor,
+  botXpLeftAfter,
+  creditFor,
+  endedTooSoon,
+  FAIR_PLAY_LIMITS,
+  hasComputerPlayer,
+  judgeMatch,
+  limitWindowOf,
+  utcDayOf,
+  xpFor,
+} from "./fairPlay.js";
 
 const HOUR = 3_600_000;
 // 2026-10-16 00:00 UTC, the start of a UTC day.
@@ -108,20 +119,51 @@ describe("judgeMatch", () => {
       expect(judgeA(games(PAIR, { opponent: C }))).toEqual(COUNTED);
     });
 
-    it("starts again at UTC midnight", () => {
-      const yesterday = games(PAIR, { at: MIDNIGHT - 1 });
+    it("looks back a rolling 24 hours, not to UTC midnight (ADR-021 amendment)", () => {
+      const lateLastNight = games(PAIR, { at: MIDNIGHT - HOUR });
 
-      expect(judgeA(yesterday, { endedAt: MIDNIGHT })).toEqual(COUNTED);
-      expect(judgeA(games(PAIR, { at: MIDNIGHT }), { endedAt: MIDNIGHT + 1 })).toEqual(
+      expect(judgeA(lateLastNight, { endedAt: MIDNIGHT + HOUR })).toEqual(
         notCounted(NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT),
       );
+      expect(judgeA(lateLastNight, { endedAt: MIDNIGHT + 23 * HOUR - 1 })).toEqual(
+        notCounted(NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT),
+      );
+      expect(judgeA(lateLastNight, { endedAt: MIDNIGHT + 23 * HOUR })).toEqual(COUNTED);
     });
 
-    it("also counts the day's later games, so games judged together or moved in later never exceed it", () => {
+    it("also counts the next 24 hours' games, so games judged together or moved in later never exceed it", () => {
       expect(judgeA(games(PAIR, { at: NOON + HOUR }))).toEqual(
         notCounted(NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT),
       );
-      expect(judgeA(games(PAIR, { at: MIDNIGHT + 24 * HOUR }))).toEqual(COUNTED);
+      expect(judgeA(games(PAIR, { at: NOON + 24 * HOUR - 1 }))).toEqual(
+        notCounted(NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT),
+      );
+      expect(judgeA(games(PAIR, { at: NOON + 24 * HOUR }))).toEqual(COUNTED);
+    });
+
+    it("counts every level of a computer character as one opponent (ADR-025)", () => {
+      const easy = games(PAIR / 2, { opponent: "bot_rocky_easy" });
+      const hard = games(PAIR / 2, { opponent: "bot_rocky_hard" });
+      const vsRocky = match({
+        players: [{ playerId: A }, { playerId: "bot_rocky_hard" }],
+        log: [move(A), move("bot_rocky_hard")],
+      });
+
+      expect(judgeMatch({ match: vsRocky, playerId: A, others: [...easy, ...hard] })).toEqual(
+        notCounted(NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT),
+      );
+      expect(judgeMatch({ match: vsRocky, playerId: A, others: easy })).toEqual(COUNTED);
+    });
+
+    it("keeps different characters apart", () => {
+      const vsPip = match({
+        players: [{ playerId: A }, { playerId: "bot_pip_easy" }],
+        log: [move(A), move("bot_pip_easy")],
+      });
+
+      expect(
+        judgeMatch({ match: vsPip, playerId: A, others: games(PAIR, { opponent: "bot_rocky_easy" }) }),
+      ).toEqual(COUNTED);
     });
 
     it("ignores the match itself among the others", () => {
@@ -179,6 +221,89 @@ describe("creditFor", () => {
 
   it("returns frozen verdicts", () => {
     expect(Object.isFrozen(creditFor(match(), A))).toBe(true);
+  });
+});
+
+describe("limitWindowOf", () => {
+  it("reaches a day back and a day ahead, so it holds the UTC day, the hour and the rolling 24 hours", () => {
+    expect(limitWindowOf(NOON)).toEqual({ from: NOON - 24 * HOUR, to: NOON + 24 * HOUR });
+  });
+});
+
+describe("computer characters (ADR-025)", () => {
+  const ROCKY = "bot_rocky_easy";
+  const vsRocky = (overrides = {}) =>
+    match({
+      players: [
+        { playerId: A, displayName: "A" },
+        { playerId: ROCKY, displayName: "Rocky" },
+      ],
+      log: [move(A), move(ROCKY)],
+      ...overrides,
+    });
+  /** Another game of A against Rocky, judged with `xp` for A, or not judged yet. */
+  const judgedVsRocky = (xp, { at = NOON - HOUR, id = `m-${++gameNumber}` } = {}) => ({
+    matchId: id,
+    players: [{ playerId: A }, { playerId: ROCKY }],
+    endedAt: at,
+    ...(xp !== undefined && { credit: { notCounted: [], botXp: [{ playerId: A, xp, left: 0 }] } }),
+  });
+  const LIMIT = FAIR_PLAY_LIMITS.BOT_XP_PER_DAY;
+
+  it("knows a match with a computer character from one between people", () => {
+    expect(hasComputerPlayer(vsRocky())).toBe(true);
+    expect(hasComputerPlayer(match())).toBe(false);
+  });
+
+  it(`gives the full award while the day's ${LIMIT} XP from computer games is not used up`, () => {
+    expect(botXpFor({ match: vsRocky(), playerId: A, others: [], award: 30 })).toEqual({
+      xp: 30,
+      left: LIMIT - 30,
+    });
+  });
+
+  it("gives only what is left of the day's limit, and nothing once it is used up", () => {
+    const used = [judgedVsRocky(30), judgedVsRocky(30), judgedVsRocky(30)];
+
+    expect(botXpFor({ match: vsRocky(), playerId: A, others: used, award: 30 })).toEqual({ xp: 10, left: 0 });
+    expect(
+      botXpFor({ match: vsRocky(), playerId: A, others: [...used, judgedVsRocky(10)], award: 30 }),
+    ).toEqual({ xp: 0, left: 0 });
+  });
+
+  it("takes a computer game nobody judged yet at the most it can give, so it never gives too much", () => {
+    const others = [judgedVsRocky(undefined), judgedVsRocky(undefined), judgedVsRocky(undefined)];
+
+    expect(botXpFor({ match: vsRocky(), playerId: A, others, award: 30 })).toEqual({ xp: 10, left: 0 });
+  });
+
+  it("counts only the same UTC day, only games against computers, and never the match itself", () => {
+    const others = [
+      judgedVsRocky(30, { at: MIDNIGHT - 1 }),
+      judgedVsRocky(30, { at: MIDNIGHT + 24 * HOUR }),
+      judgedVsRocky(30, { id: "m-this" }),
+      ...games(3),
+    ];
+
+    expect(botXpFor({ match: vsRocky(), playerId: A, others, award: 30 })).toEqual({
+      xp: 30,
+      left: LIMIT - 30,
+    });
+  });
+
+  it("counts nothing for a judged computer game that gave this player no XP entry", () => {
+    const other = { ...judgedVsRocky(30), credit: { notCounted: [] } };
+
+    expect(botXpFor({ match: vsRocky(), playerId: A, others: [other], award: 30 }).left).toBe(LIMIT - 30);
+  });
+
+  it("reads the XP and what is left from the verdict, and the plain award elsewhere", () => {
+    const judged = vsRocky({ credit: { notCounted: [], botXp: [{ playerId: A, xp: 10, left: 0 }] } });
+
+    expect(xpFor(judged, A, 30)).toBe(10);
+    expect(xpFor(match(), A, 30)).toBe(30);
+    expect(botXpLeftAfter(judged, A)).toEqual([0]);
+    expect(botXpLeftAfter(match(), A)).toEqual([]);
   });
 });
 

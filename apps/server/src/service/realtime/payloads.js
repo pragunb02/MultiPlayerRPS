@@ -63,3 +63,14 @@ export function parseGameMove(raw) {
   requireSmall(move, MAX_MOVE_BYTES, "move");
   return { code: parseRoomCode(code), move };
 }
+
+const LEVEL_PATTERN = /^[a-z][a-z0-9-]{0,15}$/;
+
+/** @returns {{ gameId: string, options: Record<string, unknown>, level: string }} */
+export function parsePlayComputer(raw) {
+  const { level, ...room } = requireObject(raw, ["gameId", "options", "level"]);
+  if (typeof level !== "string" || !LEVEL_PATTERN.test(level)) {
+    throw new ValidationError("Pick a level", { details: { field: "level" } });
+  }
+  return { ...parseCreateRoom(room), level };
+}

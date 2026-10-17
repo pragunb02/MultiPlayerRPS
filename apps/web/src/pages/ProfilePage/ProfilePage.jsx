@@ -91,7 +91,10 @@ function MatchHistory({ you }) {
     <>
       <ul className={styles.matches} aria-label="Match history">
         {history.matches.map((match) => {
-          const opponents = match.players.filter((p) => p.playerId !== you).map((p) => p.displayName);
+          // A computer character is labelled as one, so it never reads as a person of the same name (ADR-025).
+          const opponents = match.players
+            .filter((p) => p.playerId !== you)
+            .map((p) => (p.computer ? `${p.displayName} (computer)` : p.displayName));
           return (
             <li key={match.matchId} className={styles.match}>
               <span className={`${styles.badge} ${styles[match.outcomeForYou]}`}>

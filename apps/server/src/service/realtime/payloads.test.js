@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../../utils/errors.js";
-import { parseCreateRoom, parseGameMove, parseRoomRef } from "./payloads.js";
+import { parseCreateRoom, parseGameMove, parsePlayComputer, parseRoomRef } from "./payloads.js";
 
 describe("socket payload validation", () => {
   describe("parseCreateRoom", () => {
@@ -53,6 +53,34 @@ describe("socket payload validation", () => {
       { code: "AB2CD3", move: {}, playerId: "someone-else" },
     ])("rejects %j", (raw) => {
       expect(() => parseGameMove(raw)).toThrow(ValidationError);
+    });
+  });
+
+  describe("parsePlayComputer", () => {
+    it("accepts a game, a level and optional options", () => {
+      expect(parsePlayComputer({ gameId: "rps", level: "easy" })).toEqual({
+        gameId: "rps",
+        options: {},
+        level: "easy",
+      });
+      expect(parsePlayComputer({ gameId: "rps", level: "hard", options: { bestOf: 5 } })).toEqual({
+        gameId: "rps",
+        options: { bestOf: 5 },
+        level: "hard",
+      });
+    });
+
+    it.each([
+      { gameId: "rps" },
+      { gameId: "rps", level: "" },
+      { gameId: "rps", level: "Easy" },
+      { gameId: "rps", level: 3 },
+      { gameId: "rps", level: "x".repeat(17) },
+      { gameId: "rps", level: "easy", seat: "bot_rocky_easy" },
+      { gameId: "RPS!", level: "easy" },
+      { gameId: "rps", level: "easy", options: [] },
+    ])("rejects %j", (raw) => {
+      expect(() => parsePlayComputer(raw)).toThrow(ValidationError);
     });
   });
 });

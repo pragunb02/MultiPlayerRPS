@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { DuplicateKey } from "../persistence/errors.js";
 
 const AT = new Date(Date.UTC(2026, 9, 16, 12));
-const WIN = { xp: 30, matchesPlayed: 1, wins: 1 };
+const WIN = { xp: 30, unrankedXp: 0, matchesPlayed: 1, wins: 1 };
 
 /**
  * Behaviour every progress DAO must have (MongoDB DAO and the in-memory double).
@@ -17,11 +17,12 @@ export function runProgressDaoContract(createDao) {
 
     expect(result).toEqual({
       applied: true,
-      before: { xp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 },
+      before: { xp: 0, unrankedXp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 },
     });
     expect(await dao.getByPlayer("guest_a")).toEqual({
       playerId: "guest_a",
       xp: 30,
+      unrankedXp: 0,
       matchesPlayed: 1,
       wins: 1,
       losses: 0,
@@ -37,7 +38,7 @@ export function runProgressDaoContract(createDao) {
     const second = await dao.applyMatchOnce({
       playerId: "guest_a",
       matchId: "m2",
-      inc: { xp: 10, matchesPlayed: 1, losses: 1 },
+      inc: { xp: 10, unrankedXp: 0, matchesPlayed: 1, losses: 1 },
       at: AT,
     });
 
@@ -62,7 +63,7 @@ export function runProgressDaoContract(createDao) {
     const other = await dao.applyMatchOnce({
       playerId: "guest_b",
       matchId: "m1",
-      inc: { xp: 10, matchesPlayed: 1 },
+      inc: { xp: 10, unrankedXp: 0, matchesPlayed: 1 },
       at: AT,
     });
 
@@ -81,11 +82,11 @@ export function runProgressDaoContract(createDao) {
     await dao.applyMatchOnce({
       playerId: "guest_a",
       matchId: "m2",
-      inc: { xp: 10, matchesPlayed: 1, losses: 1 },
+      inc: { xp: 10, unrankedXp: 0, matchesPlayed: 1, losses: 1 },
       at: AT,
     });
   }
-  const GUEST_TOTALS = { xp: 40, matchesPlayed: 2, wins: 1, losses: 1, draws: 0 };
+  const GUEST_TOTALS = { xp: 40, unrankedXp: 0, matchesPlayed: 2, wins: 1, losses: 1, draws: 0 };
   const LATER = new Date(AT.getTime() + 60_000);
 
   it("marks a guest's progress as moved and returns what it holds; marking again returns the same", async () => {
@@ -116,7 +117,7 @@ export function runProgressDaoContract(createDao) {
     const late = await dao.applyMatchOnce({ playerId: "guest_new", matchId: "m9", inc: WIN, at: LATER });
 
     expect(marked).toEqual({
-      totals: { xp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 },
+      totals: { xp: 0, unrankedXp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 },
       recentMatchIds: [],
     });
     expect(late).toEqual({ applied: false, before: marked.totals, mergedInto: "user_1" });
@@ -148,6 +149,7 @@ export function runProgressDaoContract(createDao) {
     expect(await dao.getByPlayer("user_1")).toEqual({
       playerId: "user_1",
       xp: 70,
+      unrankedXp: 0,
       matchesPlayed: 3,
       wins: 2,
       losses: 1,

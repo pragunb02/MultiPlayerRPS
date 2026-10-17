@@ -1,4 +1,4 @@
-import { NOT_COUNTED_REASONS } from "@classicade/shared";
+import { BOT_DAILY_XP, NOT_COUNTED_REASONS } from "@classicade/shared";
 
 const MESSAGES = Object.freeze({
   [NOT_COUNTED_REASONS.ENDED_TOO_SOON]: "This game didn't count: it ended too soon",
@@ -25,3 +25,25 @@ export function notCountedMessage(reason) {
  * @param {{ source: string, counted?: boolean }} update
  */
 export const isUncountedMatch = ({ source, counted }) => source === "match" && counted === false;
+
+/**
+ * Whether a `progress:updated` push is a counted game against a computer character, which says how much of the
+ * day's XP from such games is left (ADR-025).
+ *
+ * @param {{ source: string, counted?: boolean, botXpLeft?: number }} update
+ */
+export const isComputerGame = ({ source, counted, botXpLeft }) =>
+  source === "match" && counted === true && botXpLeft !== undefined;
+
+/**
+ * What a player reads after a counted game against a computer character: the XP and what is left for today, or
+ * that the game still counts once today's XP from computer games is used up.
+ *
+ * @param {{ xpGained: number, botXpLeft: number }} update
+ * @returns {string}
+ */
+export function computerXpMessage({ xpGained, botXpLeft }) {
+  return xpGained > 0
+    ? `+${xpGained} XP · ${botXpLeft} XP left today from computer games`
+    : `This game counts for your quests. You already have today's ${BOT_DAILY_XP} XP from computer games`;
+}

@@ -7,6 +7,7 @@ import { useExplanation } from "../../hooks/useExplanation.js";
 import { MoveProblem, ReasonLine } from "../BoardFeedback.jsx";
 import { PLAY_REASONS, playReason } from "../roomView.js";
 import { useMove } from "../useMove.js";
+import { FairnessLock } from "./FairnessLock.jsx";
 import styles from "./RpsBoard.module.css";
 
 const CHOICES = Object.freeze([
@@ -57,10 +58,21 @@ function choiceReason({ reason, opponent, busy }) {
   return reason;
 }
 
+/** What the opponent is doing this round. A computer that sealed its throw has chosen, whether it was sent yet. */
+function opponentStatus(room, opponent) {
+  if (room.fairness?.locked.some((lock) => lock.playerId === opponent.playerId)) {
+    return `${opponent.displayName} has locked in`;
+  }
+  return room.game.view.hasChosen[opponent.playerId]
+    ? `${opponent.displayName} has chosen`
+    : `${opponent.displayName} is choosing…`;
+}
+
 /**
  * Rock Paper Scissors. Your own pending choice is shown to you. The opponent's shows only as "has chosen",
  * because the server never sends it before the round resolves. The pressed hand lights up at once, and a hand
- * that cannot be chosen says why when pressed (CC-164).
+ * that cannot be chosen says why when pressed (CC-164). Against a computer character its lock shows above the
+ * hands, and its check after each round (CC-225).
  *
  * @param {{ room: any, onMove: (move: { choice: string }) => Promise<unknown>, reason?: string }} props
  *   `reason`: why the viewer cannot play now (see playReason), empty when they can
@@ -89,6 +101,7 @@ export function RpsBoard({ room, onMove, reason = playReason(room, { reconnectin
       {view.rounds.length > 0 && (
         <Reveal key={view.rounds.length} room={room} round={view.rounds[view.rounds.length - 1]} />
       )}
+      {room.fairness && opponent && <FairnessLock room={room} opponent={opponent} />}
 
       {playing && (
         <>
@@ -110,13 +123,7 @@ export function RpsBoard({ room, onMove, reason = playReason(room, { reconnectin
               </button>
             ))}
           </div>
-          {opponent && (
-            <p className={styles.status}>
-              {view.hasChosen[opponent.playerId]
-                ? `${opponent.displayName} has chosen`
-                : `${opponent.displayName} is choosing…`}
-            </p>
-          )}
+          {opponent && <p className={styles.status}>{opponentStatus(room, opponent)}</p>}
         </>
       )}
       {playing && <ReasonLine explanation={explanation} />}
