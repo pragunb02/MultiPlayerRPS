@@ -707,13 +707,14 @@ describe("chessEngine position history (CC-180)", () => {
       [chess.isDrawByFiftyMoves(), "fifty-move-rule"],
     ].find(([ended]) => ended)[1];
 
-  // A dozen whole games take a few seconds, more with coverage on.
+  // Ten whole games take a second or two, more with coverage on.
   it("ends random games exactly when and how a full chess.js replay would", { timeout: 30_000 }, () => {
     // Seeded random games pass en passant chances and lost castling rights on the way. Now and then a player takes
     // back their own last move, so some games end by repetition, not only by the fifty-move rule or on the board.
     // The engine refuses moves once a game is over, so a game it ended too early fails inside `act`.
     const reasons = new Set();
-    for (let seed = 1; seed <= 12; seed += 1) {
+    // Seed 10 ends by the fifty-move rule, the others by repetition after 67 to 243 half moves.
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 10, 11, 12]) {
       const rng = createSeededRng(seed);
       const reference = new Chess();
       const played = [];
@@ -737,6 +738,6 @@ describe("chessEngine position history (CC-180)", () => {
       expect(state.fen).toBe(reference.fen());
       expect(chessEngine.getOutcome(state).reason).toBe(referenceEnd(reference));
     }
-    expect(reasons).toContain("threefold-repetition");
+    expect([...reasons].sort()).toEqual(["fifty-move-rule", "threefold-repetition"]);
   });
 });

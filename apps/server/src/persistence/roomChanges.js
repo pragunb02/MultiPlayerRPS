@@ -39,9 +39,8 @@ function compare(before, after, path, changes) {
     compareArrays(before, after, path, changes);
     return;
   }
-  if (!same(before, after)) {
-    changes.$set[path] = after;
-  }
+  // Two different plain values, or a value whose kind changed, such as a list that became an object.
+  changes.$set[path] = after;
 }
 
 function compareObjects(before, after, prefix, changes) {
