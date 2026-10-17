@@ -64,13 +64,13 @@ export function PlayPage() {
         <GameArt gameId={game.id} className={styles.art} />
       </div>
       <div className={styles.panels}>
-        {character && <PlayComputer character={character} action={playComputer} />}
+        <PlayComputer character={character} action={playComputer} />
         <div className={styles.panel}>
           <h2>Play a friend</h2>
           {Options && <Options value={options} onChange={setOptions} />}
           <Button
             control="lobby.create"
-            variant={character ? "secondary" : "primary"}
+            variant="secondary"
             size="lg"
             action={create}
             pendingLabel="Creating…"

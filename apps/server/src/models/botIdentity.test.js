@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BOT_CHARACTERS, GAME_IDS } from "@classicade/shared";
 import { ValidationError } from "../utils/errors.js";
-import { botIdentity, isBotPlayerId, opponentKey } from "./botIdentity.js";
+import { BOT_ID_PREFIX, botIdentity, isBotPlayerId, opponentKey } from "./botIdentity.js";
 
 describe("botIdentity", () => {
   it("names one character at one level, labelled as a computer player", () => {
@@ -51,6 +51,9 @@ describe("opponentKey", () => {
 
   it("tells computer players from people", () => {
     expect(isBotPlayerId("bot_pip_easy")).toBe(true);
-    expect(isBotPlayerId("guest_a")).toBe(false);
+    expect(isBotPlayerId(`${BOT_ID_PREFIX}rocky_hard`)).toBe(true);
+    expect(isBotPlayerId("guest_00000000-0000-4000-8000-000000000001")).toBe(false);
+    expect(isBotPlayerId("user_aaaaaaaaaaaaaaaaaaaaaaaa")).toBe(false);
+    expect(isBotPlayerId("robot_x")).toBe(false);
   });
 });

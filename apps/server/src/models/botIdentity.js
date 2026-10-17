@@ -1,4 +1,4 @@
-import { BOT_CHARACTERS, BOT_ID_PREFIX, IDENTITY_KINDS, isBotPlayerId } from "@classicade/shared";
+import { BOT_CHARACTERS, IDENTITY_KINDS } from "@classicade/shared";
 import { ValidationError } from "../utils/errors.js";
 
 /**
@@ -12,6 +12,16 @@ import { ValidationError } from "../utils/errors.js";
  * @property {string} displayName   the character's name
  * @property {Readonly<{ character: string, level: string }>} bot   which character, and which level pick
  */
+
+/** How a computer player's id starts. People's ids start with `guest_` or `user_`. */
+export const BOT_ID_PREFIX = "bot_";
+
+/**
+ * Whether a player id belongs to a computer character.
+ *
+ * @param {string} playerId
+ */
+export const isBotPlayerId = (playerId) => playerId.startsWith(BOT_ID_PREFIX);
 
 /**
  * The identity of one character at one level pick.
@@ -45,5 +55,3 @@ export function botIdentity({ gameId, level }) {
 export function opponentKey(playerId) {
   return isBotPlayerId(playerId) ? playerId.slice(0, playerId.lastIndexOf("_")) : playerId;
 }
-
-export { isBotPlayerId };

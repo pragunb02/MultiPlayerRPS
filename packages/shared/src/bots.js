@@ -23,9 +23,6 @@ import { GAME_IDS } from "./games.js";
 /** The most XP a player earns from games against computer characters in one UTC day (ADR-025). */
 export const BOT_DAILY_XP = 100;
 
-/** How a computer player's id starts. People's ids start with `guest_` or `user_`. */
-export const BOT_ID_PREFIX = "bot_";
-
 /** @type {ReadonlyArray<Readonly<BotCharacter>>} */
 export const BOT_CHARACTERS = Object.freeze(
   [
@@ -113,10 +110,3 @@ export const BOT_CHARACTERS = Object.freeze(
 export function characterForGame(gameId) {
   return BOT_CHARACTERS.find((character) => character.gameId === gameId);
 }
-
-/**
- * Whether a player id belongs to a computer character.
- *
- * @param {string} playerId
- */
-export const isBotPlayerId = (playerId) => typeof playerId === "string" && playerId.startsWith(BOT_ID_PREFIX);

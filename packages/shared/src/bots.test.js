@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  BOT_CHARACTERS,
-  BOT_DAILY_XP,
-  BOT_ID_PREFIX,
-  characterForGame,
-  GAMES,
-  isBotPlayerId,
-} from "./index.js";
+import { BOT_CHARACTERS, BOT_DAILY_XP, characterForGame, GAMES } from "./index.js";
 
 describe("BOT_CHARACTERS", () => {
   it("has one character for every game, named for players", () => {
@@ -44,19 +37,6 @@ describe("characterForGame", () => {
   it("finds a game's character, and no character for an unknown game", () => {
     expect(characterForGame("tictactoe").name).toBe("Pip");
     expect(characterForGame("ludo")).toBeUndefined();
-  });
-});
-
-describe("isBotPlayerId", () => {
-  it.each([
-    ["bot_rocky_easy", true],
-    [`${BOT_ID_PREFIX}pip_hard`, true],
-    ["guest_00000000-0000-4000-8000-000000000001", false],
-    ["user_aaaaaaaaaaaaaaaaaaaaaaaa", false],
-    ["robot_x", false],
-    [undefined, false],
-  ])("%s → %s", (id, expected) => {
-    expect(isBotPlayerId(id)).toBe(expected);
   });
 });
 
