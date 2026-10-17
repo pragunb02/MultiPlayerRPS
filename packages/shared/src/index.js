@@ -4,7 +4,7 @@ export { ANALYTICS_MAX_RANGE_DAYS, ANALYTICS_NOT_COUNTED, ANALYTICS_NOT_KEPT } f
 export { ERROR_CODES } from "./errors.js";
 export { SOCKET_EVENTS } from "./events.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";
-export { IDENTITY_KINDS } from "./identity.js";
+export { ACCOUNT_MESSAGES, IDENTITY_KINDS } from "./identity.js";
 export {
   PRESENCE,
   REQUEST_ANSWERS,

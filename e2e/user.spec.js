@@ -77,6 +77,45 @@ test.describe("account holder", () => {
     }
   });
 
+  // CC-238: signing up again with your own email is not a dead end. One message for every email that can't be
+  // used, and "log in" takes you to the login page, keeping where you were heading, with no email in any URL.
+  test("signing up with an email that has an account says so once and links to log in", async ({
+    players,
+  }) => {
+    const account = newAccount();
+    const riya = await players.open("riya", {
+      secrets: [account.email, account.password, "another password 1"],
+    });
+    await signUp(riya, account);
+    await riya.page.getByRole("banner").getByRole("button", { name: "Log out" }).click();
+    await expect(riya.page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
+    riya.expect(409, "/api/auth/signup");
+    const { page } = riya;
+
+    await page.goto("/signup?next=%2Fgames%2Fchess");
+    await page.getByLabel("Username").fill(`${account.username.slice(0, 15)}_two`);
+    await page.getByLabel("Email").fill(` ${account.email.toUpperCase()} `);
+    await page.getByLabel("Password").fill("another password 1");
+    await page.getByRole("button", { name: "Create account" }).click();
+
+    const message = page.getByText("If it's yours");
+    await expect(message).toHaveText(
+      "That email can't be used. If it's yours, log in or reset your password.",
+    );
+    await expect(page.getByLabel("Email")).toHaveAttribute("aria-invalid", "true");
+    await expect(page).toHaveURL("/signup?next=%2Fgames%2Fchess");
+    await expect(message.getByRole("link")).toHaveCount(1);
+
+    await message.getByRole("link", { name: "log in", exact: true }).click();
+    await expect(page).toHaveURL("/login?next=%2Fgames%2Fchess");
+    await expect(page).toHaveTitle("Log in · ClassiCade");
+    await page.getByLabel("Email").fill(account.email);
+    await page.getByLabel("Password").fill(account.password);
+    await page.getByRole("button", { name: "Log in" }).click();
+    await expect(page).toHaveURL("/games/chess");
+    await expect(page.getByRole("banner")).toContainText(account.username);
+  });
+
   test("changes the password on the profile: this browser stays signed in, the other one is signed out", async ({
     players,
   }) => {

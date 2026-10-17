@@ -53,6 +53,7 @@ import { createHttpApp } from "./service/http/app.js";
 import { createSessionCheck, createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
+import { createLegacyPasswordChecker } from "./utils/legacyPassword.js";
 import { createNetworkKey, dropOldNetworkKeysEveryMidnight } from "./utils/networkKey.js";
 import { createPasswordHasher } from "./utils/passwordHasher.js";
 import { createTtlCache } from "./utils/ttlCache.js";
@@ -518,6 +519,7 @@ export async function startServer({
     accountAccessor,
     legacyUserAccessor,
     passwordHasher: createPasswordHasher(),
+    legacyPasswords: createLegacyPasswordChecker(),
   });
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({

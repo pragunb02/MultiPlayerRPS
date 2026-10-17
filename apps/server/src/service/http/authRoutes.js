@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { normaliseEmail } from "../../models/credentials.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { UnauthorizedError, ValidationError } from "../../utils/errors.js";
 import { createLoginThrottle, LOGIN_THROTTLE } from "./loginThrottle.js";
@@ -50,7 +51,6 @@ function requireNoFields(body) {
 }
 
 const TOO_MANY_ATTEMPTS = "Too many attempts, try again later";
-const normalisedEmail = (email) => (typeof email === "string" ? email.trim().toLowerCase() : "");
 
 /**
  * Accounts over HTTP. Logout is `DELETE /api/session`, "who am I" is `GET /api/session`.
@@ -156,7 +156,7 @@ export function createAuthRoutes({
 
   router.post("/auth/login", perIp, async (req, res) => {
     const { email, password } = requireFields(req.body, ["email", "password"]);
-    const attempt = { email: normalisedEmail(email), address: clientIpKey(req) };
+    const attempt = { email: normaliseEmail(email), address: clientIpKey(req) };
     await loginThrottle.before(attempt);
     let loggedIn;
     try {

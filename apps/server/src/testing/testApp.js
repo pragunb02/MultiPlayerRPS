@@ -41,6 +41,7 @@ import { createSessionCheck, createSessionMiddleware } from "../service/http/ses
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
 import { createBackgroundTasks } from "../utils/backgroundTasks.js";
 import { createNetworkKey } from "../utils/networkKey.js";
+import { createLegacyPasswordChecker } from "../utils/legacyPassword.js";
 import { createPasswordHasher } from "../utils/passwordHasher.js";
 import { createTtlCache } from "../utils/ttlCache.js";
 import { createEmptyAnalyticsDao } from "./emptyAnalyticsDao.js";
@@ -115,6 +116,7 @@ export function createTestApp({
     accountAccessor: createAccountAccessor({ accountDao }),
     legacyUserAccessor: createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao(legacyUsers) }),
     passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }), // fast for tests
+    legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
   });
   const domainEvents = new EventEmitter();
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });

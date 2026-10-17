@@ -37,9 +37,9 @@ describe("MongoDB legacy user DAO honours the legacy user DAO contract (integrat
     const { dao, database } = await createDao(LEGACY_USERS);
     const before = await database.connection.db.collection("users").find().toArray();
 
-    await dao.getByEmail("riya@example.com");
+    await dao.listByEmail("riya@example.com");
 
     expect(await database.connection.db.collection("users").find().toArray()).toEqual(before);
-    expect(Object.keys(dao)).toEqual(["getByEmail"]);
+    expect(Object.keys(dao)).toEqual(["listByEmail"]);
   });
 });

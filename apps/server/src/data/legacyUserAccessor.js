@@ -11,17 +11,12 @@ export function createLegacyUserAccessor({ legacyUserDao }) {
   return Object.freeze({
     /**
      * @param {string} email  normalised
-     * @returns {Promise<ReadonlyArray<Readonly<LegacyUser>>>} the legacy user, or an empty list
+     * @returns {Promise<ReadonlyArray<Readonly<LegacyUser>>>} every legacy user with that email, or an empty list.
+     *   The old app could hold two rows for one address that differ only in case (CC-245).
      */
     async findByEmail(email) {
-      try {
-        return [Object.freeze(await legacyUserDao.getByEmail(email))];
-      } catch (err) {
-        if (err instanceof RangeError) {
-          return [];
-        }
-        throw err;
-      }
+      const users = await legacyUserDao.listByEmail(email);
+      return Object.freeze(users.map((user) => Object.freeze({ ...user })));
     },
   });
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACCOUNT_MESSAGES,
   GAME_STATUS,
   IDENTITY_KINDS,
   MOVE_REJECTIONS,
@@ -17,6 +18,7 @@ import {
 } from "./index.js";
 
 describe.each([
+  ["ACCOUNT_MESSAGES", ACCOUNT_MESSAGES],
   ["IDENTITY_KINDS", IDENTITY_KINDS],
   ["SOCKET_EVENTS", SOCKET_EVENTS],
   ["MOVE_REJECTIONS", MOVE_REJECTIONS],

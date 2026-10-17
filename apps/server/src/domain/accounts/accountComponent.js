@@ -1,13 +1,12 @@
-import { IDENTITY_KINDS } from "@classicade/shared";
+import { ACCOUNT_MESSAGES, IDENTITY_KINDS } from "@classicade/shared";
 import { parseEmail, parsePassword, parseUsername } from "../../models/credentials.js";
 import { createIdentity, isAccountId } from "../../models/identity.js";
 import { normaliseLegacyUsername, usernameCandidates } from "../../models/legacyUsername.js";
 import { assertDefined } from "../../utils/assert.js";
 import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
-import { verifyLegacyPassword } from "../../utils/legacyPassword.js";
 
 const INVALID_LOGIN = "Invalid email or password";
-const EMAIL_UNAVAILABLE = "That email can't be used";
+const { EMAIL_UNAVAILABLE } = ACCOUNT_MESSAGES;
 const USERNAME_ATTEMPTS = 20;
 const ACCOUNT_ID_PREFIX = "user_";
 
@@ -52,17 +51,25 @@ const signInOf = (account) =>
  *   accountAccessor: ReturnType<typeof import("../../data/accountAccessor.js").createAccountAccessor>,
  *   legacyUserAccessor: ReturnType<typeof import("../../data/legacyUserAccessor.js").createLegacyUserAccessor>,
  *   passwordHasher: ReturnType<typeof import("../../utils/passwordHasher.js").createPasswordHasher>,
+ *   legacyPasswords: ReturnType<typeof import("../../utils/legacyPassword.js").createLegacyPasswordChecker>,
  * }} deps
  */
-export function createAccountComponent({ accountAccessor, legacyUserAccessor, passwordHasher }) {
+export function createAccountComponent({
+  accountAccessor,
+  legacyUserAccessor,
+  passwordHasher,
+  legacyPasswords,
+}) {
   assertDefined(accountAccessor, "accountAccessor");
   assertDefined(legacyUserAccessor, "legacyUserAccessor");
   assertDefined(passwordHasher, "passwordHasher");
+  assertDefined(legacyPasswords, "legacyPasswords");
 
   /**
    * Creates the account of a legacy player who just proved their password: same email, the password re-hashed
    * with scrypt, and the first free username valid under today's rules. Legacy XP is not imported (it was
-   * client-writable, SEC-01). If a parallel login migrated the same player first, that account is used.
+   * client-writable, SEC-01). If a parallel login migrated the same email first, that account is used, but only
+   * when this password is also the account's: the old app could hold two rows with two passwords for one address.
    */
   async function migrateLegacyUser(legacy, { email, password }, now) {
     const passwordHash = await passwordHasher.hash(password);
@@ -75,6 +82,9 @@ export function createAccountComponent({ accountAccessor, legacyUserAccessor, pa
         }
         if (err.details?.field === "email") {
           const [migrated] = await accountAccessor.findByEmail(email);
+          if (!(await passwordHasher.verify(password, migrated.passwordHash))) {
+            throw new UnauthorizedError(INVALID_LOGIN, { cause: err });
+          }
           return migrated;
         }
       }
@@ -82,25 +92,48 @@ export function createAccountComponent({ accountAccessor, legacyUserAccessor, pa
     throw new Error(`No free username for a migrated legacy account after ${USERNAME_ATTEMPTS} attempts`);
   }
 
-  /** @returns {Promise<Readonly<import("../../data/accountAccessor.js").Account>>} */
-  async function loginLegacyUser(normalised, now) {
-    const [legacy] = await legacyUserAccessor.findByEmail(normalised.email);
-    if (legacy === undefined) {
+  /**
+   * The first legacy row whose password matches, checked one after another. There is almost always one row. There
+   * are more only for an address the old app stored twice in different cases.
+   */
+  async function legacyRowOpenedBy(legacyUsers, password) {
+    for (const legacy of legacyUsers) {
+      if (await legacyPasswords.verify(password, legacy.passwordHash)) {
+        return [legacy];
+      }
+    }
+    return [];
+  }
+
+  /**
+   * The email has no account yet. Whatever happens here, one bcrypt and one scrypt run, the same as for an
+   * account's email, so the time taken says nothing about who played here.
+   *
+   * @returns {Promise<Readonly<import("../../data/accountAccessor.js").Account>>}
+   */
+  async function loginLegacyUser(normalised, legacyUsers, now) {
+    if (legacyUsers.length === 0) {
+      await Promise.all([
+        passwordHasher.verifyAgainstDummy(normalised.password),
+        legacyPasswords.verifyAgainstDummy(normalised.password),
+      ]);
+      throw new UnauthorizedError(INVALID_LOGIN);
+    }
+    const [opened] = await legacyRowOpenedBy(legacyUsers, normalised.password);
+    if (opened === undefined) {
       await passwordHasher.verifyAgainstDummy(normalised.password);
       throw new UnauthorizedError(INVALID_LOGIN);
     }
-    if (!(await verifyLegacyPassword(normalised.password, legacy.passwordHash))) {
-      throw new UnauthorizedError(INVALID_LOGIN);
-    }
-    return migrateLegacyUser(legacy, normalised, now);
+    return migrateLegacyUser(opened, normalised, now);
   }
 
   return Object.freeze({
     /**
-     * Signing up with an email that already has an account, here or in the legacy app, answers the same message
-     * after the same work (the password is hashed first in every case), so the two cannot be told apart. That the
-     * email is taken still shows, because the player has to be told why it failed. Hiding that too needs the
-     * confirmation email of CC-033 (see CC-118).
+     * Signing up with an email that already has an account, here or in the legacy app, in any spelling, answers the
+     * one `EMAIL_UNAVAILABLE` message after the same work (the password is hashed first in every case), so the cases
+     * cannot be told apart. The message points the owner to logging in (CC-238). That the email is taken still
+     * shows, because the player has to be told why it failed. Hiding that too needs the confirmation email of
+     * CC-033 (see CC-118).
      *
      * @param {{ username: unknown, email: unknown, password: unknown, now: number }} input
      * @returns {Promise<Readonly<SignIn>>}
@@ -126,8 +159,10 @@ export function createAccountComponent({ accountAccessor, legacyUserAccessor, pa
     },
 
     /**
-     * Same answer, and the same work, whether the email is unknown or the password is wrong — login cannot be
-     * used to discover who has an account. Upgrades the stored hash when its parameters are outdated.
+     * Same answer, and the same work, whether the email is unknown, belongs to an account or to a player of the old
+     * app, or the password is wrong. Every login reads both stores and runs one scrypt and one bcrypt, so neither
+     * the answer nor the time it takes shows who has an account (CC-245). Upgrades the stored hash when its
+     * parameters are outdated.
      *
      * @param {{ email: unknown, password: unknown, now: number }} input
      * @returns {Promise<Readonly<SignIn>>}
@@ -140,11 +175,18 @@ export function createAccountComponent({ accountAccessor, legacyUserAccessor, pa
       } catch {
         throw new UnauthorizedError(INVALID_LOGIN);
       }
-      const [account] = await accountAccessor.findByEmail(normalised.email);
+      const [[account], legacyUsers] = await Promise.all([
+        accountAccessor.findByEmail(normalised.email),
+        legacyUserAccessor.findByEmail(normalised.email),
+      ]);
       if (account === undefined) {
-        return signInOf(await loginLegacyUser(normalised, now));
+        return signInOf(await loginLegacyUser(normalised, legacyUsers, now));
       }
-      if (!(await passwordHasher.verify(normalised.password, account.passwordHash))) {
+      const [matches] = await Promise.all([
+        passwordHasher.verify(normalised.password, account.passwordHash),
+        legacyPasswords.verifyAgainstDummy(normalised.password),
+      ]);
+      if (!matches) {
         throw new UnauthorizedError(INVALID_LOGIN);
       }
       if (passwordHasher.needsRehash(account.passwordHash)) {

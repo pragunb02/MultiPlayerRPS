@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ERROR_CODES } from "@classicade/shared";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
@@ -16,6 +17,27 @@ const RULES = {
   password: (v) => (v.length >= 8 && v.length <= 128 && v.trim() !== "" ? "" : "8–128 characters"),
 };
 
+/**
+ * The one answer for every email that can't be used, whoever it belongs to, so sign-up never tells who plays here
+ * (CC-238). The words are `ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE`, and "log in" is a link that keeps where the player
+ * was heading. The email itself never goes into the link. Password reset does not exist yet (CC-033), so it is
+ * named but not linked.
+ *
+ * @param {{ next: string }} props  where to go after logging in
+ */
+function EmailUnavailable({ next }) {
+  return (
+    <>
+      That email can&apos;t be used. If it&apos;s yours,{" "}
+      <Link to={paths.login(next)} data-cc-control="auth.email_unavailable_login">
+        log in
+      </Link>{" "}
+      or reset your password.
+    </>
+  );
+}
+
+/** The sign-up form. Field rules are checked as the player types, and the server has the last word. */
 export function SignupPage() {
   const session = useSession();
   const saveProgress = useSaveProgress();
@@ -39,7 +61,8 @@ export function SignupPage() {
         // A problem with one field is shown at that field. Anything else is shown under the button.
         const field = err.details?.field;
         if (!(field && RULES[field])) throw err;
-        setFieldErrors({ [field]: err.message });
+        const unavailable = field === "email" && err.code === ERROR_CODES.CONFLICT;
+        setFieldErrors({ [field]: unavailable ? <EmailUnavailable next={next} /> : err.message });
       }
     },
     { id: "auth.signup" },

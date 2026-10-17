@@ -13,10 +13,25 @@ describe("legacyUserAccessor", () => {
     expect(await legacy.findByEmail("nobody@example.com")).toEqual([]);
   });
 
+  it("finds every legacy user with that email, frozen", async () => {
+    const legacy = createLegacyUserAccessor({
+      legacyUserDao: createInMemoryLegacyUserDao([
+        ...LEGACY_USERS,
+        { username: "riya two", email: "riya@example.com", password: LEGACY_USERS[0].password },
+      ]),
+    });
+
+    const found = await legacy.findByEmail("riya@example.com");
+
+    expect(found).toHaveLength(2);
+    expect(Object.isFrozen(found)).toBe(true);
+    expect(found.every((user) => Object.isFrozen(user))).toBe(true);
+  });
+
   it("passes storage failures on instead of reporting nobody", async () => {
     const legacy = createLegacyUserAccessor({
       legacyUserDao: {
-        getByEmail: async () => {
+        listByEmail: async () => {
           throw new Error("database unavailable");
         },
       },

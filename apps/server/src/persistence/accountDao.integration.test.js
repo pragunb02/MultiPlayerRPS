@@ -35,6 +35,20 @@ const createDao = async () => (await connected()).dao;
 describe("MongoDB account DAO honours the account DAO contract (integration)", () => {
   runAccountDaoContract(createDao);
 
+  // The duplicate checks rest on these two indexes, built at boot by `ensureIndexes` (CC-245).
+  it("has unique indexes on the email and on the lower-cased username in MongoDB", async () => {
+    const { database } = await connected();
+
+    const indexes = await database.connection.db.collection("accounts").indexes();
+
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: { email: 1 }, unique: true }),
+        expect.objectContaining({ key: { usernameKey: 1 }, unique: true }),
+      ]),
+    );
+  });
+
   it("passes other database errors through instead of calling them duplicates", async () => {
     const dao = await createDao();
 

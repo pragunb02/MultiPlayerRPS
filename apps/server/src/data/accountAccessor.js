@@ -1,3 +1,4 @@
+import { ACCOUNT_MESSAGES } from "@classicade/shared";
 import { DuplicateKey } from "../persistence/errors.js";
 import { assertDefined } from "../utils/assert.js";
 import { ConflictError, NotFoundError } from "../utils/errors.js";
@@ -45,7 +46,8 @@ export function createAccountAccessor({ accountDao }) {
         );
       } catch (err) {
         if (err instanceof DuplicateKey) {
-          const message = err.field === "username" ? "That username is taken" : "That email can't be used";
+          const message =
+            err.field === "username" ? "That username is taken" : ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE;
           throw new ConflictError(message, { details: { field: err.field }, cause: err });
         }
         throw err;

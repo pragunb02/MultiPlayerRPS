@@ -52,6 +52,20 @@ export function runAccountDaoContract(createDao) {
     expect(created.username).toBe("Riya");
   });
 
+  // Two sign-ups at the same moment must not both pass a check made before either was stored (CC-245).
+  it.each([
+    ["email", { username: "Other" }],
+    ["username", { username: "RIYA", email: "other@example.com" }],
+  ])("stores one of two accounts with the same %s sent at the same moment", async (field, second) => {
+    const dao = await createDao();
+
+    const results = await Promise.allSettled([dao.insert(account()), dao.insert(account(second))]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const [refused] = results.filter((result) => result.status === "rejected");
+    expect(refused.reason).toMatchObject({ constructor: DuplicateKey, field });
+  });
+
   it("throws for unknown emails and ids", async () => {
     const dao = await createDao();
 
