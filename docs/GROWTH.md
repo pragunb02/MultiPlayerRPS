@@ -1,6 +1,6 @@
 # ClassiCade growth plan
 
-Status: accepted by the owner on 18 October 2026 (ADR-031, ADR-032). Owner: growth lead. This file is meant to be saved as `docs/GROWTH.md`, which CLAUDE.md working agreement item 7 names as the home for sharing plans.
+Status: accepted by the owner on 18 October 2026 (ADR-031, ADR-032). Owner: growth lead. CLAUDE.md working agreement item 7 names this file as the home for sharing plans.
 
 This plan answers three questions from the owner:
 
