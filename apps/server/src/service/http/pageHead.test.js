@@ -50,17 +50,42 @@ describe("renderPageHead", () => {
 });
 
 describe("createPageTemplate", () => {
+  const BODY =
+    '<body><h1 data-server-body="title">Old</h1><p class="x" data-server-body="description">old</p></body>';
+  const page = (fields = {}) => ({ head: "<title>New</title>", title: "T", description: "D", ...fields });
+
   it("puts the head tags at the end of the head, after taking out the defaults", () => {
-    const page = createPageTemplate(
-      '<html><head><meta charset="UTF-8"><meta\n  name="description"\n  content="old"\n  data-server-head\n/><title data-server-head="">Old</title></head><body></body></html>',
+    const template = createPageTemplate(
+      `<html><head><meta charset="UTF-8"><meta\n  name="description"\n  content="old"\n  data-server-head\n/><title data-server-head="">Old</title></head>${BODY}</html>`,
     );
 
-    expect(page("<title>New</title>")).toBe(
-      '<html><head><meta charset="UTF-8">  <title>New</title>\n  </head><body></body></html>',
+    expect(template(page())).toBe(
+      '<html><head><meta charset="UTF-8">  <title>New</title>\n  </head><body><h1 data-server-body="title">T</h1><p class="x" data-server-body="description">D</p></body></html>',
+    );
+  });
+
+  it("puts the page's title and description in the body, escaped, whichever comes first", () => {
+    const template = createPageTemplate(
+      '<head></head><p data-server-body="description">old</p><h1 data-server-body="title">Old</h1>',
+    );
+
+    expect(template(page({ title: "<b>Chess</b>", description: "Rock & roll" }))).toContain(
+      '<p data-server-body="description">Rock &amp; roll</p><h1 data-server-body="title">&lt;b&gt;Chess&lt;/b&gt;</h1>',
     );
   });
 
   it("refuses a build without a head to write into", () => {
-    expect(() => createPageTemplate("<div id=root></div>")).toThrow(/no <\/head>/);
+    expect(() => createPageTemplate(`<div id=root></div>`)).toThrow(/no <\/head>/);
+  });
+
+  it.each([
+    ["no places in the body", "<head></head><body></body>"],
+    ["no place for the description", '<head></head><h1 data-server-body="title">Old</h1>'],
+    [
+      "two places for the title",
+      '<head></head><h1 data-server-body="title">A</h1><h1 data-server-body="title">B</h1>',
+    ],
+  ])("refuses a build with %s", (_, html) => {
+    expect(() => createPageTemplate(html)).toThrow(/data-server-body/);
   });
 });

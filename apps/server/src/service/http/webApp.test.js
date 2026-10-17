@@ -69,6 +69,15 @@ describe("page head for crawlers and link previews", () => {
     expect(res.text.indexOf("og:title")).toBeLessThan(res.text.indexOf("</head>"));
   });
 
+  it("puts the page's own title and description in the body, for crawlers that read the body text", async () => {
+    const res = await crawl("/games/chess");
+    const description = tag(res.text, "name", "description");
+
+    const body = res.text.slice(res.text.indexOf("<body>"));
+    expect(body).toContain('<h1 data-server-body="title">Play Chess with a friend on ClassiCade</h1>');
+    expect(body).toContain(`<p data-server-body="description">${description}</p>`);
+  });
+
   it("escapes what came from the URL, so a crafted link cannot add markup", async () => {
     const res = await crawl("/games/%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E/rooms/AB2CD3");
 

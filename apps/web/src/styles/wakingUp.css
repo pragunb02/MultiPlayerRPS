@@ -1,0 +1,251 @@
+/*
+ * The "Waking up the arcade" screen (CC-232). It is drawn twice from these classes. First by the HTML the server
+ * sends (index.html), before any script runs, so the classes here are global and not a CSS module. Then by the
+ * WakingUp component while the session check waits. React removes the first one when the app renders.
+ *
+ * A fast load must never flash it, so it stays hidden for a short delay and appears in one step. Its resting
+ * style is the visible one: an animation only holds it back. With reduced motion nothing moves, but the delay
+ * still applies (see the media query at the end).
+ */
+
+.wake {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  min-height: 100vh;
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  animation: wake-appear 1ms linear 600ms backwards;
+}
+
+/* Inside the app it sits above the page instead of filling the window. */
+.wake--inline {
+  min-height: auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* The page already showed the screen while the app loaded, so the app shows it at once, without a gap. */
+.wake-waited .wake--inline,
+.wake-waited .wake--inline .wake-picture {
+  animation: none;
+}
+
+/* The page had also shown its "still waking up" line, so the app's copy keeps it instead of waiting again. */
+.wake-waited-long .wake--inline .wake-later {
+  animation: none;
+}
+
+/* The page's own title and description, written by the server for crawlers. People see them as a small header. */
+.wake-page {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.wake-about {
+  margin: 0 0 var(--space-4);
+  max-width: 28rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.wake-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 800;
+}
+
+.wake-detail,
+.wake-later,
+.wake-stuck {
+  margin: 0;
+  max-width: 28rem;
+  color: var(--color-text-muted);
+}
+
+/* After ten seconds a loop alone stops reassuring people, so a second line says how long it can take. */
+.wake-later {
+  animation: wake-appear 1ms linear 10s backwards;
+}
+
+/*
+ * Half a minute after the slowest wake, the app's script most likely failed to load, and nothing on the page can
+ * fix that by itself. So a last line offers a reload, a plain link that needs no script.
+ */
+.wake-stuck {
+  animation: wake-appear 1ms linear 90s backwards;
+}
+
+/* The cabinet. All of it is decoration, hidden from screen readers in the markup. */
+.wake-cabinet {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: 9rem;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 3px solid var(--color-art-ink);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
+  background: var(--gradient-hero);
+  box-shadow: var(--shadow-press);
+}
+
+.wake--inline .wake-cabinet {
+  width: 6.5rem;
+}
+
+.wake-marquee {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-art-ink);
+}
+
+.wake-bulb {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-neon-gold);
+  animation: wake-light 240ms var(--ease-out) backwards;
+}
+
+/* The bulbs light up one after another as the cabinet powers on. */
+.wake-bulb:nth-child(1) {
+  animation-delay: 700ms;
+}
+.wake-bulb:nth-child(2) {
+  animation-delay: 800ms;
+  background: var(--color-neon-accent);
+}
+.wake-bulb:nth-child(3) {
+  animation-delay: 900ms;
+}
+.wake-bulb:nth-child(4) {
+  animation-delay: 1000ms;
+  background: var(--color-neon-accent);
+}
+.wake-bulb:nth-child(5) {
+  animation-delay: 1100ms;
+}
+
+.wake-screen {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 3px solid var(--color-art-ink);
+  border-radius: var(--radius-md);
+  background: var(--color-art-ink);
+}
+
+/* An old monitor turning on: a bright line that opens up into the picture. */
+.wake-picture {
+  display: grid;
+  place-items: center;
+  background: var(--color-primary-soft);
+  animation: wake-power-on 500ms var(--ease-out) 700ms backwards;
+}
+
+.wake-coin {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  /* About a minute of blinking, the longest a free server takes to wake, then it stays lit (ADR-012). */
+  animation: wake-blink 1.5s steps(1, end) 1.2s 40;
+}
+
+.wake-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-art-ink);
+}
+
+.wake-stick {
+  width: 0.375rem;
+  height: 1rem;
+  border-radius: var(--radius-full);
+  background: var(--color-neon-accent);
+  transform-origin: bottom center;
+}
+
+.wake-button {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+  background: var(--color-neon-gold);
+}
+
+.wake-button:last-child {
+  background: var(--color-neon-xp);
+}
+
+.wake-noscript {
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+}
+
+@keyframes wake-appear {
+  from {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes wake-light {
+  from {
+    opacity: 0.2;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes wake-power-on {
+  from {
+    opacity: 0.4;
+    transform: scale(0.9, 0.02);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1, 0.02);
+  }
+}
+
+@keyframes wake-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/*
+ * global.css switches every animation off for reduced motion, which would show the screen at once and flash it on
+ * every fast load. Appearing after a delay is not movement, so only that step comes back. Nothing else moves.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .wake {
+    animation: wake-appear 1ms linear 600ms backwards !important;
+  }
+  .wake-later {
+    animation: wake-appear 1ms linear 10s backwards !important;
+  }
+  .wake-stuck {
+    animation: wake-appear 1ms linear 90s backwards !important;
+  }
+  .wake-waited .wake--inline,
+  .wake-waited-long .wake--inline .wake-later {
+    animation: none !important;
+  }
+}

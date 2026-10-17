@@ -31,6 +31,23 @@ test.describe("crawler and link preview bot", () => {
     expect(image.headers()["content-type"]).toBe("image/png");
   });
 
+  test("reads the page's own title and description as the first words of the body, before the loading screen", async ({
+    request,
+  }) => {
+    const { html } = await crawl(request, "/leaderboards/overall");
+
+    // What a crawler that runs no scripts takes for the page's text: the body, without its tags.
+    const words = html
+      .slice(html.indexOf("<body>"))
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const title = tag(html, "property", "og:title");
+    const description = tag(html, "name", "description");
+    expect(words.startsWith(`${title} ${description}`)).toBe(true);
+    expect(html).toContain(`<h1 class="wake-page" data-server-body="title">${title}</h1>`);
+  });
+
   test("previews a friend's invite link as an invitation to that game, without joining the room", async ({
     players,
     request,

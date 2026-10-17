@@ -8,6 +8,7 @@ import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { useSaveProgress } from "../SaveProgress/saveProgressContext.js";
 import { SoundControl } from "../SoundControl/SoundControl.jsx";
+import { WakingUp } from "../WakingUp/WakingUp.jsx";
 import styles from "./Layout.module.css";
 
 /** App shell: header with brand, navigation and who you are; pages render into <Outlet />. */
@@ -92,6 +93,7 @@ export function Layout() {
         </div>
       </header>
       <main id="main" className={styles.main}>
+        <WakingUp />
         <Outlet />
       </main>
       <SiteFooter />
