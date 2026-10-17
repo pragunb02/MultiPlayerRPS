@@ -168,6 +168,7 @@ Every collection with its fields, who reads it and how long it is kept: [DATA.md
   `accounts.sessionVersion` is the current version.
 - Matches also store the fair-play verdict (`credit`, ADR-021, with `botXp` for computer games, ADR-025) and progress
   keeps `unrankedXp`.
+- `pending_matches` (implemented, CC-111, ADR-033) — the match pipeline's outbox: matchId (unique), match (the record to write), status (pending, done, failed), done (names of the steps done), attempts, nextAttemptAt, lastError{step, message}, createdAt, doneAt, expiresAt (TTL, done records only, 2 days).
 - `ratings` — userId, game, rating, rd, volatility (planned, CC-042, ADR-027)
 
 Replaces `RPSData`, `TicTacToeData`, `ChessData` (single `matches` collection keyed by `game`).

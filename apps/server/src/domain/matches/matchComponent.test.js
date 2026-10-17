@@ -37,6 +37,18 @@ const setup = () =>
   createMatchComponent({ matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }) });
 
 describe("matchComponent", () => {
+  it("turns a finished room into the match to record, without storing it, and records it once (CC-111)", async () => {
+    const matches = setup();
+    const finished = matches.finishedMatch({ room: room(), outcome: WIN_A });
+
+    const first = await matches.record(finished);
+    const again = await matches.record(finished);
+
+    expect(finished).toEqual(first);
+    expect(Object.isFrozen(finished)).toBe(true);
+    expect(again).toEqual(first);
+  });
+
   it("records a finished room as a match: players, seed, log, result and timing — not engine state", async () => {
     const matches = setup();
 

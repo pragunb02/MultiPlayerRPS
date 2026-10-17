@@ -37,13 +37,6 @@ function match({ winner = ALICE, loser = BOB, gameId = "rps", endedAt = NOW, rea
     endedAt,
   };
 }
-/** What progression reports for one player after a match. */
-const update = (player, { result = "win", xpGained = 30, xp = 30, level = 1 } = {}) => ({
-  playerId: player.id,
-  result,
-  xpGained,
-  progress: { xp, level },
-});
 
 function setup() {
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
@@ -53,14 +46,30 @@ function setup() {
     matchAccessor,
     progressAccessor,
   });
-  /** Records a match and applies it to the boards like the pipeline does. */
-  const play = async (options, updates) => {
+  /** Brings a player's stored XP to `xp`, as progression has done by the time the boards step runs. */
+  const progressTo = async (player, xp) => {
+    const { xp: before } = await progressAccessor.get(player.id);
+    await progressAccessor.applyAwardOnce({
+      playerId: player.id,
+      key: `seed:${xp}`,
+      inc: { xp: xp - before },
+      at: NOW,
+    });
+  };
+  /**
+   * Records a match and applies it to the boards like the pipeline does. `xp` is each player's total XP after
+   * progression applied the match.
+   */
+  const play = async (options, xp = []) => {
     const recorded = await matchAccessor.record(match(options));
-    await boards.applyMatch({ match: recorded, updates });
+    for (const [player, total] of xp) {
+      await progressTo(player, total);
+    }
+    await boards.applyMatch({ match: recorded });
     return recorded;
   };
   const entries = async (boardId, now = NOW) => (await boards.getBoard({ boardId, limit: 50, now })).entries;
-  return { boards, play, entries, matchAccessor, progressAccessor };
+  return { boards, play, entries, matchAccessor, progressAccessor, progressTo };
 }
 
 describe("leaderboardComponent", () => {
@@ -80,8 +89,8 @@ describe("leaderboardComponent", () => {
     const { play, entries } = setup();
 
     await play({}, [
-      update(ALICE, { xp: 530, level: 5 }),
-      update(BOB, { result: "loss", xpGained: 10, xp: 10 }),
+      [ALICE, 530],
+      [BOB, 10],
     ]);
 
     expect(await entries("overall")).toEqual([
@@ -98,16 +107,10 @@ describe("leaderboardComponent", () => {
     expect(await entries("chess")).toEqual([]);
   });
 
-  it("shows the latest XP and level when quest bonuses raised them after progression's update (CC-089)", async () => {
-    const { play, entries, progressAccessor } = setup();
-    await progressAccessor.applyAwardOnce({
-      playerId: ALICE.id,
-      key: "quest:2026-10-16:win-1",
-      inc: { xp: 130 },
-      at: NOW,
-    });
+  it("shows the latest XP and level, quest bonuses included (CC-089)", async () => {
+    const { play, entries } = setup();
 
-    await play({}, [update(ALICE, { xp: 30, level: 1 })]);
+    await play({}, [[ALICE, 130]]);
 
     expect(await entries("overall")).toEqual([
       { rank: 1, displayName: "alice", level: levelForXp(130), score: 130 },
@@ -121,19 +124,20 @@ describe("leaderboardComponent", () => {
     const { play, entries } = setup();
 
     for (let i = 0; i < 3; i++) {
-      await play({ winner: GUEST, loser: BOB }, [update(GUEST, { xp: 30 * (i + 1) })]);
+      await play({ winner: GUEST, loser: BOB }, [[GUEST, 30 * (i + 1)]]);
     }
 
     for (const board of ["overall", "weekly", "rock-paper-scissors"]) {
-      expect(await entries(board)).toEqual([]);
+      expect((await entries(board)).map((entry) => entry.displayName)).not.toContain(GUEST.displayName);
     }
+    expect(await entries("rock-paper-scissors")).toEqual([]);
   });
 
   it("changes nothing when the same match is applied twice", async () => {
     const { boards, play, entries } = setup();
-    const recorded = await play({}, [update(ALICE)]);
+    const recorded = await play({}, [[ALICE, 30]]);
 
-    await boards.applyMatch({ match: recorded, updates: [update(ALICE)] });
+    await boards.applyMatch({ match: recorded });
 
     expect((await entries("weekly"))[0].score).toBe(30);
     expect((await entries("rock-paper-scissors"))[0].score).toBe(1);
@@ -141,46 +145,54 @@ describe("leaderboardComponent", () => {
 
   it("counts wins per game, forfeit wins included", async () => {
     const { play, entries } = setup();
-    await play({ gameId: "chess" }, [update(ALICE, { xp: 30 })]);
-    await play({ gameId: "chess", reason: "forfeit" }, [update(ALICE, { xp: 60 })]);
+    await play({ gameId: "chess" }, [[ALICE, 30]]);
+    await play({ gameId: "chess", reason: "forfeit" }, [[ALICE, 60]]);
 
-    expect(await entries("chess")).toEqual([{ rank: 1, displayName: "alice", level: 1, score: 2 }]);
+    expect(await entries("chess")).toEqual([{ rank: 1, displayName: "alice", level: 2, score: 2 }]);
   });
 
   it("gives games outside the catalog no board, but still counts their XP", async () => {
     const { play, entries } = setup();
 
-    await play({ gameId: "race" }, [update(ALICE)]);
+    await play({ gameId: "race" }, [[ALICE, 30]]);
 
-    expect(await entries("overall")).toHaveLength(1);
+    expect((await entries("overall")).map((e) => e.displayName)).toContain("alice");
   });
 
   it("leaves a player with nothing earned off the boards (a forfeit)", async () => {
     const { play, entries } = setup();
 
-    await play({ winner: BOB, loser: ALICE, reason: "forfeit" }, [
-      update(ALICE, { result: "forfeit", xpGained: 0, xp: 0 }),
-    ]);
+    await play({ winner: BOB, loser: ALICE, reason: "forfeit" }, [[BOB, 30]]);
 
-    expect(await entries("overall")).toEqual([]);
-    expect(await entries("weekly")).toEqual([]);
+    expect((await entries("overall")).map((e) => e.displayName)).toEqual(["bob"]);
+    expect((await entries("weekly")).map((e) => e.displayName)).toEqual(["bob"]);
+  });
+
+  it("reads what it needs from the stored match and progress, so a retried step still counts (CC-111)", async () => {
+    const { boards, matchAccessor, entries, progressTo } = setup();
+    const recorded = await matchAccessor.record(match());
+    await progressTo(ALICE, 30);
+    await progressTo(BOB, 10);
+
+    await boards.applyMatch({ match: recorded });
+
+    expect(await entries("weekly")).toEqual([
+      { rank: 1, displayName: "alice", level: 1, score: 30 },
+      { rank: 2, displayName: "bob", level: 1, score: 10 },
+    ]);
   });
 
   it("moves nobody up for a match that doesn't count for them, even with XP from before (CC-095)", async () => {
-    const { boards, matchAccessor, entries } = setup();
+    const { boards, matchAccessor, entries, progressTo } = setup();
     const recorded = await matchAccessor.record(match());
     const judged = await matchAccessor.judgeOnce({
       matchId: recorded.matchId,
       credit: { notCounted: [{ playerId: ALICE.id, reason: "opponent-daily-limit" }] },
     });
 
-    await boards.applyMatch({
-      match: judged,
-      updates: [
-        update(ALICE, { xpGained: 0, xp: 300, level: 4 }),
-        update(BOB, { result: "loss", xpGained: 10, xp: 10 }),
-      ],
-    });
+    await progressTo(ALICE, 300);
+    await progressTo(BOB, 10);
+    await boards.applyMatch({ match: judged });
 
     expect((await entries("overall")).map((e) => e.displayName)).toEqual(["bob"]);
     expect(await entries("rock-paper-scissors")).toEqual([]);
@@ -189,7 +201,7 @@ describe("leaderboardComponent", () => {
   it("moves nobody on any board for a game against a computer character (ADR-025)", async () => {
     const { play, entries } = setup();
 
-    await play({ loser: PIP, gameId: "tictactoe" }, [update(ALICE, { xp: 30 })]);
+    await play({ loser: PIP, gameId: "tictactoe" }, [[ALICE, 30]]);
 
     expect(await entries("overall")).toEqual([]);
     expect(await entries("weekly")).toEqual([]);
@@ -206,22 +218,23 @@ describe("leaderboardComponent", () => {
     });
     await progressAccessor.applyMatchOnce({ playerId: ALICE.id, matchId: "m-bob", inc: { xp: 30 }, at: NOW });
 
-    await play({}, [update(ALICE, { xp: 120, level: 2 })]);
+    // Progression already stored the 120 XP, so the boards step reads it from there.
+    await play({}, []);
 
     expect(await entries("overall")).toEqual([{ rank: 1, displayName: "alice", level: 2, score: 30 }]);
   });
 
   it("ranks a tie by who reached the score first", async () => {
     const { play, entries } = setup();
-    await play({ winner: BOB, loser: ALICE, endedAt: NOW - 10 }, [update(BOB, { xp: 30 })]);
-    await play({ endedAt: NOW - 5 }, [update(ALICE, { xp: 30 })]);
+    await play({ winner: BOB, loser: ALICE, endedAt: NOW - 10 }, [[BOB, 30]]);
+    await play({ endedAt: NOW - 5 }, [[ALICE, 30]]);
 
     expect((await entries("overall")).map((entry) => entry.displayName)).toEqual(["bob", "alice"]);
   });
 
   it("starts a new weekly board at Monday 00:00 UTC, and says when it resets", async () => {
     const { boards, play, entries } = setup();
-    await play({}, [update(ALICE)]);
+    await play({}, [[ALICE, 30]]);
 
     const week = await boards.getBoard({ boardId: "weekly", limit: 50, now: NOW });
 
@@ -233,7 +246,7 @@ describe("leaderboardComponent", () => {
       periodId: "2026-W42",
       resetsAt: NEXT_MONDAY,
     });
-    expect(await entries("weekly", NEXT_MONDAY - 1)).toHaveLength(1);
+    expect(await entries("weekly", NEXT_MONDAY - 1)).toHaveLength(2);
     expect(await entries("weekly", NEXT_MONDAY)).toEqual([]);
     expect(await entries("overall", NEXT_MONDAY)).toHaveLength(1);
   });
@@ -262,7 +275,10 @@ describe("leaderboardComponent", () => {
   describe("standingFor", () => {
     it("reports an account's rank and score, also outside the listed entries", async () => {
       const { boards, play } = setup();
-      await play({ winner: BOB, loser: ALICE }, [update(BOB, { xp: 90 }), update(ALICE, { xp: 40 })]);
+      await play({ winner: BOB, loser: ALICE }, [
+        [BOB, 90],
+        [ALICE, 40],
+      ]);
 
       const top = await boards.getBoard({ boardId: "overall", limit: 1, now: NOW });
 

@@ -9,6 +9,7 @@ import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
+import { createPendingMatchAccessor } from "../data/pendingMatchAccessor.js";
 import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js";
 import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
@@ -24,10 +25,16 @@ import { createIdentityComponent } from "../domain/identity/identityComponent.js
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
+import { createMatchOutboxComponent } from "../domain/matches/matchOutboxComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
-import { connectLeaderboardBonuses, connectMatchPipeline, identityFollowers } from "../server.js";
+import {
+  connectLeaderboardBonuses,
+  connectMatchPipeline,
+  identityFollowers,
+  matchPipelineSteps,
+} from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionCheck, createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
@@ -46,13 +53,14 @@ import {
 import { createInMemoryLeaderboardDao } from "./inMemoryLeaderboardDao.js";
 import { createInMemoryLegacyUserDao } from "./inMemoryLegacyUserDao.js";
 import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
+import { createInMemoryPendingMatchDao } from "./inMemoryPendingMatchDao.js";
 import { createInMemoryPlayerTransferDao } from "./inMemoryPlayerTransferDao.js";
 import { createInMemoryProgressDao } from "./inMemoryProgressDao.js";
 import { testConfig } from "./testConfig.js";
 
 /**
  * Wires the app the same way the composition root does, but with in-memory stores (sessions, rooms,
- * matches), deterministic guests and seed 42 — fast tests without a database.
+ * matches, the match pipeline's outbox), deterministic guests and seed 42: fast tests without a database.
  *
  * @param {{
  *   env?: Record<string, string>,
@@ -171,13 +179,21 @@ export function createTestApp({
     matches: matchComponent,
   });
   const tasks = createBackgroundTasks({ logger: capture.logger });
-  connectMatchPipeline({
+  const matchPipeline = connectMatchPipeline({
     domainEvents,
     matchComponent,
-    playerTransferComponent,
-    progressionComponent,
-    gamificationComponent,
-    leaderboardComponent,
+    roomComponent,
+    outbox: createMatchOutboxComponent({
+      pendingMatchAccessor: createPendingMatchAccessor({ pendingMatchDao: createInMemoryPendingMatchDao() }),
+      steps: matchPipelineSteps({
+        matchComponent,
+        playerTransferComponent,
+        progressionComponent,
+        gamificationComponent,
+        leaderboardComponent,
+        logger: capture.logger,
+      }),
+    }),
     tasks,
     logger: capture.logger,
     now,
@@ -236,6 +252,7 @@ export function createTestApp({
     playerTransferComponent,
     gamificationComponent,
     leaderboardComponent,
+    matchPipeline,
     tasks,
     endedSessions,
     otherSessionsEnded,

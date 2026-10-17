@@ -155,36 +155,30 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
     },
 
     /**
-     * Pipeline step after progression and gamification: the accounts of a recorded match move up the boards. A
-     * match that doesn't count for an account (CC-095) moves it nowhere.
+     * Pipeline step after progression: the accounts of a recorded match move up the boards. A match that doesn't
+     * count for an account (CC-095) moves it nowhere. Everything is read from the stored match and progress, not
+     * from what progression just answered, so the step gives the same result when it runs again after a failure
+     * or a restart (CC-111).
      *
-     * @param {{
-     *   match: Readonly<import("../../data/matchAccessor.js").Match>,
-     *   updates: ReadonlyArray<{ playerId: string, result: string, xpGained: number, progress: { xp: number, level: number } }>,
-     * }} input  `updates` = what progression applied (a match applied before yields none)
+     * @param {{ match: Readonly<import("../../data/matchAccessor.js").Match> }} input
      */
-    async applyMatch({ match, updates }) {
+    async applyMatch({ match }) {
       // Games against a computer character never move anyone on a board (ADR-025).
       if (hasComputerPlayer(match)) {
         return;
       }
-      const listed = updates.filter(
+      const listed = match.players.filter(
         ({ playerId }) => isAccountId(playerId) && creditFor(match, playerId).counted,
       );
-      for (const update of listed) {
-        const { displayName } = match.players.find(({ playerId }) => playerId === update.playerId);
-        // Quest bonuses earned by this match (CC-089) may already have raised the player's XP: the board shows
-        // the latest total and level, never the older ones from progression's update.
-        const stored = await progressAccessor.get(update.playerId);
-        const total =
-          stored.xp > update.progress.xp
-            ? { xp: stored.xp, level: levelForXp(stored.xp) }
-            : { xp: update.progress.xp, level: update.progress.level };
-        const latest = rankedEntry(total, stored);
-        const player = { playerId: update.playerId, displayName, level: latest.level };
+      for (const { playerId, displayName } of listed) {
+        const result = resultFor(match, playerId);
+        // Progression already added this match, and any quest bonus it earned (CC-089), to the stored total.
+        const stored = await progressAccessor.get(playerId);
+        const latest = rankedEntry({ xp: stored.xp, level: levelForXp(stored.xp) }, stored);
+        const player = { playerId, displayName, level: latest.level };
         const at = match.endedAt;
-        await addXp({ player, xp: latest.xp, gained: update.xpGained, key: match.matchId, at });
-        if (update.result === "win" && hasWinsBoard(match.gameId)) {
+        await addXp({ player, xp: latest.xp, gained: XP_AWARDS[result], key: match.matchId, at });
+        if (result === "win" && hasWinsBoard(match.gameId)) {
           await raiseWins({ player, gameId: match.gameId, at });
         }
       }

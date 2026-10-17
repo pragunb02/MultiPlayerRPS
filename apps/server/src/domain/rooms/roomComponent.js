@@ -732,6 +732,21 @@ export function createRoomComponent({
     countRooms: () => roomAccessor.countByStatus(),
 
     /**
+     * The game of every stored room that is finished, as `room.gameFinished` announced it. The match pipeline adds
+     * them again at startup and now and then (CC-111): a game whose announcement was lost to a crash or a database
+     * blip still reaches it while its room waits for a rematch. Rooms whose time is up are listed too, because a
+     * game is never lost for being late.
+     *
+     * @returns {Promise<Array<{ room: Readonly<import("../../data/roomAccessor.js").Room>, outcome: object }>>}
+     */
+    async listFinishedGames() {
+      const rooms = await roomAccessor.listAll();
+      return rooms
+        .filter((room) => room.status === ROOM_STATUS.FINISHED)
+        .map((room) => ({ room, outcome: room.result }));
+    },
+
+    /**
      * What one viewer may see. Seated players get their own game view, anyone else sees the spectator view.
      *
      * @param {Readonly<import("../../data/roomAccessor.js").Room>} room
