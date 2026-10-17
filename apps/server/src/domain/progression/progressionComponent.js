@@ -1,12 +1,15 @@
 import { levelForXp, MAX_LEVEL, XP_AWARDS, xpForLevel } from "@classicade/shared";
-import { assertDefined } from "../../utils/assert.js";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { creditFor } from "../matches/fairPlay.js";
 
 /** Events the progression component publishes. */
 export const PROGRESSION_EVENTS = Object.freeze({
   /**
-   * { playerId, displayName, source: "match" | "quest", key, matchId, result?, xpGained, leveledUp, progress } —
+   * { playerId, displayName, source: "match" | "quest", key, matchId, result?, xpGained, leveledUp, progress,
+   * counted, notCountedReason } —
    * a player's progress changed: after a match (`key` = matchId), or a quest bonus (`key` = the quest key,
-   * `matchId` = "").
+   * `matchId` = ""). A match that didn't count for the player (CC-095) has `counted` false and gives no XP, and
+   * `notCountedReason` says why: a NOT_COUNTED_REASONS value, or "" when it counted.
    */
   UPDATED: "progression.updated",
 });
@@ -35,6 +38,19 @@ export function resultFor(match, playerId) {
 
 const COUNTER_FOR = Object.freeze({ win: "wins", draw: "draws", loss: "losses", forfeit: "losses" });
 
+/** What one counted match adds to a player's totals. */
+const creditOf = (result) => ({ xp: XP_AWARDS[result], matchesPlayed: 1, [COUNTER_FOR[result]]: 1 });
+const NOTHING = Object.freeze({ xp: 0 });
+
+/** Adds up totals field by field. */
+const addTotals = (total, more) =>
+  Object.fromEntries(
+    [...new Set([...Object.keys(total), ...Object.keys(more)])].map((key) => [
+      key,
+      (total[key] ?? 0) + (more[key] ?? 0),
+    ]),
+  );
+
 /** Level details derived from total XP (what the UI shows as a progress bar). */
 function describe(progress) {
   const level = levelForXp(progress.xp);
@@ -49,32 +65,37 @@ function describe(progress) {
 }
 
 /**
- * XP and levels, earned only from recorded matches (never per round or for joining).
+ * XP and levels, earned only from recorded matches that count (never per round or for joining, CC-095).
  *
  * @param {{
  *   progressAccessor: ReturnType<typeof import("../../data/progressAccessor.js").createProgressAccessor>,
+ *   matchAccessor: Pick<ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor>, "listWithdrawn">,
  *   events: { emit: (event: string, payload: unknown) => void },
  * }} deps
  */
-export function createProgressionComponent({ progressAccessor, events }) {
+export function createProgressionComponent({ progressAccessor, matchAccessor, events }) {
   assertDefined(progressAccessor, "progressAccessor");
+  assertFunction(matchAccessor?.listWithdrawn, "matchAccessor.listWithdrawn");
   assertDefined(events, "events");
 
   return Object.freeze({
     /**
-     * Awards every player of a recorded match their XP, once. Publishes one update per player.
+     * Awards every player of a recorded match their XP, once. A player the match doesn't count for gets nothing,
+     * and their update says why. Publishes one update per player.
      *
-     * @param {Readonly<import("../../data/matchAccessor.js").Match>} match
+     * @param {Readonly<import("../../data/matchAccessor.js").Match>} match  as judged by `matchComponent.judge`
      */
     async applyMatch(match) {
       const updates = [];
       for (const { playerId, displayName } of match.players) {
         const result = resultFor(match, playerId);
-        const xpGained = XP_AWARDS[result];
+        const credit = creditFor(match, playerId);
+        // Applied even when it adds nothing, so the player hears why exactly once.
+        const inc = credit.counted ? creditOf(result) : NOTHING;
         const { applied, before, after } = await progressAccessor.applyMatchOnce({
           playerId,
           matchId: match.matchId,
-          inc: { xp: xpGained, matchesPlayed: 1, [COUNTER_FOR[result]]: 1 },
+          inc,
           at: match.endedAt,
         });
         if (!applied) {
@@ -87,9 +108,11 @@ export function createProgressionComponent({ progressAccessor, events }) {
           key: match.matchId,
           matchId: match.matchId,
           result,
-          xpGained,
+          xpGained: inc.xp,
           leveledUp: levelForXp(after.xp) > levelForXp(before.xp),
           progress: describe(after),
+          counted: credit.counted,
+          notCountedReason: credit.counted ? "" : credit.reason,
         };
         events.emit(PROGRESSION_EVENTS.UPDATED, update);
         updates.push(update);
@@ -121,6 +144,8 @@ export function createProgressionComponent({ progressAccessor, events }) {
           xpGained: xp,
           leveledUp: levelForXp(after.xp) > levelForXp(before.xp),
           progress: describe(after),
+          counted: true,
+          notCountedReason: "",
         });
       }
       return Object.freeze({ applied });
@@ -133,13 +158,17 @@ export function createProgressionComponent({ progressAccessor, events }) {
 
     /**
      * A guest's XP and totals become their account's (CC-032), added to what the account already has; the level
-     * follows from the XP. Idempotent and resumable.
+     * follows from the XP. The games that stopped counting when they moved to the account (it had reached a fair
+     * play limit that day, CC-095) are taken out first, so the account never gets more than the limits allow.
+     * Runs after the matches moved. Idempotent and resumable.
      *
      * @param {{ from: string, to: Readonly<import("../../models/identity.js").Identity>, now: number }} transfer
      * @returns {Promise<{ moved: Readonly<Record<string, number>> }>} the totals added now
      */
-    transferPlayer({ from, to, now }) {
-      return progressAccessor.mergeInto({ from, to: to.id, at: now });
+    async transferPlayer({ from, to, now }) {
+      const withdrawn = await matchAccessor.listWithdrawn({ playerId: to.id, from });
+      const withdraw = withdrawn.map((match) => creditOf(resultFor(match, to.id))).reduce(addTotals, {});
+      return progressAccessor.mergeInto({ from, to: to.id, at: now, withdraw });
     },
   });
 }

@@ -14,6 +14,15 @@ import { NotFoundError } from "../utils/errors.js";
  * @property {Readonly<{ result: string, winners: string[], reason: string }>} result
  * @property {number} startedAt
  * @property {number} endedAt
+ * @property {Readonly<MatchCredit>} [credit]   how the match counts, once judged (CC-095). Matches recorded before
+ *   then have none and count for everyone
+ *
+ * @typedef {{ notCounted: ReadonlyArray<Readonly<{ playerId: string, reason: string, withdrawnFrom?: string }>> }} MatchCredit
+ *   the players the match does not count for, and why (a NOT_COUNTED_REASONS value). `withdrawnFrom` names the
+ *   guest it counted for before the guest's games moved to this player
+ *
+ * @typedef {Readonly<{ matchId: string, players: ReadonlyArray<{ playerId: string }>, endedAt: number }>} CountedGame
+ *   the little the fair play limits need to know about another game of a player
  */
 
 function deepFreeze(value) {
@@ -42,6 +51,18 @@ const toDoc = (match) => ({
 export function createMatchAccessor({ matchDao }) {
   assertDefined(matchDao, "matchDao");
 
+  /** Reads one match, turning "no such match" into NotFoundError. */
+  async function found(read) {
+    try {
+      return toMatch(await read());
+    } catch (err) {
+      if (err instanceof RangeError) {
+        throw new NotFoundError("Match not found", { cause: err });
+      }
+      throw err;
+    }
+  }
+
   return Object.freeze({
     /**
      * Records a match. Idempotent: recording the same match again returns the stored one.
@@ -65,15 +86,40 @@ export function createMatchAccessor({ matchDao }) {
      * @returns {Promise<Readonly<Match>>}
      * @throws {NotFoundError}
      */
-    async getById(matchId) {
-      try {
-        return toMatch(await matchDao.getByMatchId(matchId));
-      } catch (err) {
-        if (err instanceof RangeError) {
-          throw new NotFoundError("Match not found", { cause: err });
-        }
-        throw err;
-      }
+    getById: (matchId) => found(() => matchDao.getByMatchId(matchId)),
+
+    /**
+     * Stores how a match counts, unless it was judged already.
+     *
+     * @param {{ matchId: string, credit: MatchCredit }} verdict
+     * @returns {Promise<Readonly<Match>>} the match as stored now, with the first verdict it got
+     * @throws {NotFoundError}
+     */
+    judgeOnce: ({ matchId, credit }) => found(() => matchDao.judgeOnce({ matchId, credit })),
+
+    /**
+     * A player's games that count for them (or are not judged yet) and ended in `[from, to)`, without one match.
+     *
+     * @param {{ playerId: string, from: number, to: number, excluding: string }} window  times in ms
+     * @returns {Promise<ReadonlyArray<CountedGame>>} oldest first
+     */
+    async listCountedBetween({ playerId, from, to, excluding }) {
+      const docs = await matchDao.listCountedBetween(playerId, {
+        from: new Date(from),
+        to: new Date(to),
+        excluding,
+      });
+      return deepFreeze(docs.map(({ endedAt, ...game }) => ({ ...game, endedAt: endedAt.getTime() })));
+    },
+
+    /**
+     * The games of `playerId` that counted for guest `from`, but stopped counting when they moved to `playerId`.
+     *
+     * @param {{ playerId: string, from: string }} query
+     * @returns {Promise<ReadonlyArray<Readonly<Match>>>} oldest first
+     */
+    async listWithdrawn({ playerId, from }) {
+      return Object.freeze((await matchDao.listWithdrawn({ playerId, from })).map(toMatch));
     },
 
     /**

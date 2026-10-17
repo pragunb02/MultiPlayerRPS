@@ -99,7 +99,11 @@ export function createTestApp({
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const matchComponent = createMatchComponent({ matchAccessor });
-  const progressionComponent = createProgressionComponent({ progressAccessor, events: domainEvents });
+  const progressionComponent = createProgressionComponent({
+    progressAccessor,
+    matchAccessor,
+    events: domainEvents,
+  });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
     matchAccessor,

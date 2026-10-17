@@ -72,12 +72,13 @@ export function assertEnginesInCatalog(engines) {
  * persisted match), then count it for achievements, streaks and quests (CC-054, CC-089), then move its accounts up
  * the leaderboards (CC-053). Each step runs as a background task — a slow database never delays a game — and
  * shutdown drains them. Before progression, a match recorded for a guest who has just signed in moves to their
- * account (CC-032), so the account gets the XP, the streak, the quest progress and the board entries. The
+ * account (CC-032), so the account gets the XP, the streak, the quest progress and the board entries. Then the
+ * match is judged once for fair play (CC-095): every later step gives nothing to a player it doesn't count for. The
  * leaderboard step runs even when the gamification step failed.
  *
  * @param {{
  *   domainEvents: import("node:events").EventEmitter,
- *   matchComponent: { recordFinished: Function },
+ *   matchComponent: { recordFinished: Function, judge: Function },
  *   playerTransferComponent: { follow: Function },
  *   progressionComponent: { applyMatch: Function },
  *   gamificationComponent: { applyMatch: Function },
@@ -110,9 +111,19 @@ export function connectMatchPipeline({
         tasks.run(
           "apply progression",
           async () => {
-            const followed = await playerTransferComponent.follow({ match, now: now() });
+            // Judged after following, so the fair play limits look at the players as they are now (CC-095).
+            const followed = await matchComponent.judge(
+              await playerTransferComponent.follow({ match, now: now() }),
+            );
             const updates = await progressionComponent.applyMatch(followed);
-            logger.info({ matchId: match.matchId, players: updates.length }, "progression applied");
+            logger.info(
+              {
+                matchId: match.matchId,
+                players: updates.length,
+                notCounted: followed.credit.notCounted.map(({ reason }) => reason),
+              },
+              "progression applied",
+            );
             tasks.run(
               "apply gamification",
               async () => {
@@ -325,7 +336,11 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     lifetimes: roomLifetimes(rooms.lifetimes),
   });
   const matchComponent = createMatchComponent({ matchAccessor });
-  const progressionComponent = createProgressionComponent({ progressAccessor, events: domainEvents });
+  const progressionComponent = createProgressionComponent({
+    progressAccessor,
+    matchAccessor,
+    events: domainEvents,
+  });
   const gamificationComponent = createGamificationComponent({
     gamificationAccessor,
     matchAccessor,

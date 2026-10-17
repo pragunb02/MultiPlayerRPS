@@ -61,6 +61,48 @@ describe("matchAccessor", () => {
     expect(await matches.countWins({ playerId: "guest_b", gameId: "rps" })).toBe(0);
   });
 
+  it("stores a verdict once and returns the match with it", async () => {
+    const matches = setup();
+    await matches.record(match());
+    const credit = { notCounted: [{ playerId: "guest_b", reason: "ended-too-soon" }] };
+
+    const judged = await matches.judgeOnce({ matchId: match().matchId, credit });
+
+    expect(judged).toEqual({ ...match(), credit });
+    expect(Object.isFrozen(judged.credit.notCounted[0])).toBe(true);
+    await expect(
+      matches.judgeOnce({ matchId: "00000000-0000-4000-8000-000000000404", credit }),
+    ).rejects.toThrow(NotFoundError);
+  });
+
+  it("lists the games that count in a window with ms timestamps", async () => {
+    const matches = setup();
+    await matches.record(match({ matchId: "m-1", endedAt: T0 + 1 }));
+    await matches.record(match({ matchId: "m-2", endedAt: T0 + 2 }));
+    await matches.record(match({ matchId: "m-3", endedAt: T0 + 3 }));
+
+    const games = await matches.listCountedBetween({
+      playerId: "guest_a",
+      from: T0 + 1,
+      to: T0 + 3,
+      excluding: "m-2",
+    });
+
+    expect(games).toEqual([{ matchId: "m-1", players: match().players, endedAt: T0 + 1 }]);
+    expect(Object.isFrozen(games[0])).toBe(true);
+  });
+
+  it("lists the games withdrawn from a guest as domain models", async () => {
+    const matches = setup();
+    const credit = { notCounted: [{ playerId: "guest_a", reason: "hourly-limit", withdrawnFrom: "guest_z" }] };
+    await matches.record(match());
+    await matches.judgeOnce({ matchId: match().matchId, credit });
+
+    expect(await matches.listWithdrawn({ playerId: "guest_a", from: "guest_z" })).toEqual([
+      { ...match(), credit },
+    ]);
+  });
+
   it("passes unexpected storage failures through unchanged", async () => {
     const failure = new Error("disk on fire");
     const matches = createMatchAccessor({

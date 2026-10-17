@@ -141,7 +141,7 @@ export function createRealtimeGateway({
   // Domain → transport: progress after a recorded match goes to every tab of that player.
   domainEvents.on(
     PROGRESSION_EVENTS.UPDATED,
-    ({ playerId, source, key, matchId, xpGained, leveledUp, progress }) => {
+    ({ playerId, source, key, matchId, xpGained, leveledUp, progress, counted, notCountedReason }) => {
       io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.PROGRESS_UPDATED, {
         source,
         key,
@@ -149,6 +149,8 @@ export function createRealtimeGateway({
         xpGained,
         leveledUp,
         progress,
+        counted,
+        notCountedReason,
       });
     },
   );

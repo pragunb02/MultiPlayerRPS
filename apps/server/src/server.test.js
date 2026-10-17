@@ -106,11 +106,12 @@ describe("assertEnginesInCatalog", () => {
 
 describe("connectMatchPipeline", () => {
   const event = { room: { code: "ROOM22" }, outcome: {} };
-  const match = { matchId: "m1", gameId: "rps", result: { reason: "best-of-1" } };
+  const match = { matchId: "m1", gameId: "rps", result: { reason: "best-of-1" }, credit: { notCounted: [] } };
 
   function setup({
     recordFinished,
     applyMatch,
+    judge = async (recorded) => recorded,
     follow = async ({ match: recorded }) => recorded,
     applyGamification = vi.fn().mockResolvedValue(),
     applyToBoards = vi.fn().mockResolvedValue(),
@@ -120,7 +121,7 @@ describe("connectMatchPipeline", () => {
     const tasks = createBackgroundTasks({ logger: capture.logger });
     connectMatchPipeline({
       domainEvents,
-      matchComponent: { recordFinished },
+      matchComponent: { recordFinished, judge },
       playerTransferComponent: { follow },
       progressionComponent: { applyMatch },
       gamificationComponent: { applyMatch: applyGamification },
@@ -187,6 +188,32 @@ describe("connectMatchPipeline", () => {
     expect(applyMatch).toHaveBeenCalledWith(moved);
     expect(applyGamification).toHaveBeenCalledWith({ match: moved, updates, now: 1_234 });
     expect(applyToBoards).toHaveBeenCalledWith({ match: moved, updates });
+  });
+
+  it("judges the followed match for fair play, and every later step gets the verdict (CC-095)", async () => {
+    const moved = { ...match, players: [{ playerId: "user_1" }], credit: undefined };
+    const judged = { ...moved, credit: { notCounted: [{ playerId: "user_1", reason: "ended-too-soon" }] } };
+    const judge = vi.fn().mockResolvedValue(judged);
+    const applyMatch = vi.fn().mockResolvedValue([]);
+    const applyGamification = vi.fn().mockResolvedValue();
+    const applyToBoards = vi.fn().mockResolvedValue();
+    const { domainEvents, tasks, find } = setup({
+      recordFinished: vi.fn().mockResolvedValue(match),
+      follow: vi.fn().mockResolvedValue(moved),
+      judge,
+      applyMatch,
+      applyGamification,
+      applyToBoards,
+    });
+
+    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
+    await tasks.drain();
+
+    expect(judge).toHaveBeenCalledWith(moved);
+    expect(applyMatch).toHaveBeenCalledWith(judged);
+    expect(applyGamification).toHaveBeenCalledWith({ match: judged, updates: [], now: 1_234 });
+    expect(applyToBoards).toHaveBeenCalledWith({ match: judged, updates: [] });
+    expect(find("progression applied")[0].notCounted).toEqual(["ended-too-soon"]);
   });
 
   it("then counts the match for achievements, streaks and quests, with progression's updates", async () => {

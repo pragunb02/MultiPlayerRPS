@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { MAX_LEVEL } from "@classicade/shared";
+import { MAX_LEVEL, NOT_COUNTED_REASONS } from "@classicade/shared";
+import { createMatchAccessor } from "../../data/matchAccessor.js";
 import { createProgressAccessor } from "../../data/progressAccessor.js";
+import { createInMemoryMatchDao } from "../../testing/inMemoryMatchDao.js";
 import { createInMemoryProgressDao } from "../../testing/inMemoryProgressDao.js";
 import {
   createProgressionComponent,
@@ -33,11 +35,14 @@ const forfeitByB = () =>
 function setup() {
   const published = [];
   const progressDao = createInMemoryProgressDao();
+  const matchDao = createInMemoryMatchDao();
+  const matchAccessor = createMatchAccessor({ matchDao });
   const progression = createProgressionComponent({
     progressAccessor: createProgressAccessor({ progressDao }),
+    matchAccessor,
     events: { emit: (event, payload) => published.push({ event, payload }) },
   });
-  return { progression, published, progressDao };
+  return { progression, published, progressDao, matchAccessor };
 }
 
 describe("resultFor", () => {
@@ -152,6 +157,8 @@ describe("progressionComponent", () => {
           xpGained: 60,
           leveledUp: true,
           progress: expect.objectContaining({ xp: 60, level: 2, matchesPlayed: 0 }),
+          counted: true,
+          notCountedReason: "",
         }),
       },
     ]);
@@ -169,6 +176,53 @@ describe("progressionComponent", () => {
     });
 
     expect(published[0].payload.leveledUp).toBe(false);
+  });
+
+  it("says a match that counted counted", async () => {
+    const { progression, published } = setup();
+
+    await progression.applyMatch(match());
+
+    expect(published.map((p) => [p.payload.counted, p.payload.notCountedReason])).toEqual([
+      [true, ""],
+      [true, ""],
+    ]);
+  });
+
+  it("gives a player a match doesn't count for nothing at all, and tells them why, once (CC-095)", async () => {
+    const { progression, published } = setup();
+    const judged = match({
+      credit: { notCounted: [{ playerId: "guest_a", reason: NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT }] },
+    });
+
+    const updates = await progression.applyMatch(judged);
+    await progression.applyMatch(judged);
+
+    expect(updates[0]).toEqual(
+      expect.objectContaining({
+        playerId: "guest_a",
+        result: "win",
+        xpGained: 0,
+        leveledUp: false,
+        counted: false,
+        notCountedReason: NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT,
+      }),
+    );
+    expect(updates[1]).toEqual(expect.objectContaining({ playerId: "guest_b", xpGained: 10, counted: true }));
+    expect(await progression.getProgress("guest_a")).toEqual(
+      expect.objectContaining({ xp: 0, matchesPlayed: 0, wins: 0, losses: 0 }),
+    );
+    expect(published).toHaveLength(2);
+  });
+
+  it("refuses to start without a way to read withdrawn matches", () => {
+    expect(() =>
+      createProgressionComponent({
+        progressAccessor: createProgressAccessor({ progressDao: createInMemoryProgressDao() }),
+        matchAccessor: {},
+        events: { emit: () => {} },
+      }),
+    ).toThrow(/matchAccessor.listWithdrawn/);
   });
 
   it("starts new players at level 1 with zero XP", async () => {
@@ -212,6 +266,34 @@ describe("progressionComponent: a guest's progress moving to their account (CC-0
     expect(await progression.getProgress(ACCOUNT.id)).toEqual(
       expect.objectContaining({ xp: 60, matchesPlayed: 2, wins: 2, level: 2 }),
     );
+  });
+
+  it("leaves out the games that stopped counting when they moved to the account (CC-095)", async () => {
+    const { progression, progressDao, matchAccessor } = setup();
+    await progressDao.applyMatchOnce({
+      playerId: "guest_a",
+      matchId: "m0",
+      inc: { xp: 70, matchesPlayed: 3, wins: 2, losses: 1 },
+      at: new Date(T0),
+    });
+    const moved = (matchId, winners) =>
+      match({
+        matchId,
+        players: [{ playerId: ACCOUNT.id, displayName: "Riya" }, PLAYERS[1]],
+        result: { result: "win", winners, reason: "best-of-1" },
+      });
+    const withdrawn = {
+      notCounted: [{ playerId: ACCOUNT.id, reason: "opponent-daily-limit", withdrawnFrom: "guest_a" }],
+    };
+    await matchAccessor.record(moved("m-won", [ACCOUNT.id]));
+    await matchAccessor.record(moved("m-lost", ["guest_b"]));
+    await matchAccessor.judgeOnce({ matchId: "m-won", credit: withdrawn });
+    await matchAccessor.judgeOnce({ matchId: "m-lost", credit: withdrawn });
+
+    const { moved: carried } = await progression.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 + 5 });
+
+    expect(carried).toEqual({ xp: 30, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 });
+    expect(await progression.getProgress(ACCOUNT.id)).toEqual(expect.objectContaining({ xp: 30, wins: 1 }));
   });
 
   it("awards a match that finished during the move to the account, once", async () => {

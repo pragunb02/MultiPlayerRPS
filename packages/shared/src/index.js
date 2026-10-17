@@ -14,6 +14,7 @@ export {
   DEFAULT_CHESS_TIME_CONTROL,
 } from "./chess.js";
 export { levelForXp, MAX_LEVEL, XP_AWARDS, xpForLevel } from "./progression.js";
+export { NOT_COUNTED_REASONS } from "./fairPlay.js";
 export { DAILY_SWEEP_BONUS_XP, QUEST_COUNTS, QUEST_SLOTS, QUESTS } from "./quests.js";
 export {
   DEFAULT_LEADERBOARD_ID,

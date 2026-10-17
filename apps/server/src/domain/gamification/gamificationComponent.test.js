@@ -61,6 +61,7 @@ function setup({ staleUnlockReads = false } = {}) {
         .filter((m) => before === undefined || m.endedAt < before)
         .sort((a, b) => b.endedAt - a.endedAt)
         .slice(0, limit),
+    listWithdrawn: async () => [],
   };
   const moveMatches = ({ from, to }) =>
     recorded.forEach((m, i) => {
@@ -68,6 +69,7 @@ function setup({ staleUnlockReads = false } = {}) {
     });
   const progression = createProgressionComponent({
     progressAccessor: createProgressAccessor({ progressDao: createInMemoryProgressDao() }),
+    matchAccessor,
     events,
   });
   const accessor = createGamificationAccessor({
@@ -223,6 +225,25 @@ describe("gamificationComponent.applyMatch", () => {
     expect(quests.items.find((q) => q.id === "play-3").progress).toBe(1);
   });
 
+  it("gives a player a match doesn't count for no stats, streak, quest progress or achievement (CC-095)", async () => {
+    const { finish, gamification, pushed } = setup();
+
+    await finish(
+      match({ credit: { notCounted: [{ playerId: ALICE.playerId, reason: "opponent-daily-limit" }] } }),
+    );
+
+    const alice = await gamification.getStreaks({ playerId: ALICE.playerId, now: T });
+    expect(alice.win).toEqual({ current: 0, best: 0 });
+    expect(alice.daily.playedToday).toBe(false);
+    const quests = await gamification.getQuests({ playerId: ALICE.playerId, now: T });
+    expect(quests.items.every((q) => q.progress === 0)).toBe(true);
+    expect(
+      (await gamification.getAchievements({ playerId: ALICE.playerId })).every((a) => a.unlockedAt === null),
+    ).toBe(true);
+    expect(pushed(GAMIFICATION_EVENTS.STREAKS_UPDATED, ALICE.playerId)).toEqual([]);
+    expect(pushed(GAMIFICATION_EVENTS.STREAKS_UPDATED, BOB.playerId)).toHaveLength(1);
+  });
+
   it("keeps the win streak through a draw and unlocks Hat Trick on the third win in a row", async () => {
     const { finish, gamification, pushed } = setup();
 
@@ -351,6 +372,27 @@ describe("gamificationComponent.transferPlayer", () => {
       ["streak-3", T + 2],
     ]);
     expect(achievements.find((a) => a.id === "quests-10").progress.current).toBe(3);
+  });
+
+  it("rebuilds the account's streaks from the games that count for it only (CC-095)", async () => {
+    const { finish, gamification, moveMatches, recorded } = setup();
+    await finish(match({ at: T }));
+    await finish(match({ at: T + 1 }));
+    moveMatches({ from: ALICE.playerId, to: RIYA });
+    // The second game stopped counting when it moved: the account had reached a limit that day.
+    recorded[1] = {
+      ...recorded[1],
+      credit: {
+        notCounted: [{ playerId: RIYA.playerId, reason: "hourly-limit", withdrawnFrom: ALICE.playerId }],
+      },
+    };
+
+    await gamification.transferPlayer({ from: ALICE.playerId, to: ACCOUNT, now: T + 10 });
+
+    expect((await gamification.getStreaks({ playerId: ACCOUNT.id, now: T + 10 })).win).toEqual({
+      current: 1,
+      best: 1,
+    });
   });
 
   it("leaves nothing behind for the guest", async () => {

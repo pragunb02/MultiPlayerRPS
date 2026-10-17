@@ -73,13 +73,18 @@ export function createProgressAccessor({ progressDao }) {
      * Moves a guest's totals into an account, exactly once (CC-032). Each step is idempotent, so running it
      * again — after a crash, or concurrently — never adds anything twice.
      *
-     * @param {{ from: string, to: string, at: number }} merge
+     * @param {{ from: string, to: string, at: number, withdraw: Partial<Omit<Progress, "playerId">> }} merge
+     *   `withdraw` is left out of the guest's totals (CC-095). A total never goes below zero
      * @returns {Promise<{ moved: Readonly<Omit<Progress, "playerId">> }>} what was added now (zero when already done)
      * @throws {ConflictError} when the guest's progress already moved to a different player
      */
-    async mergeInto({ from, to, at }) {
+    async mergeInto({ from, to, at, withdraw }) {
       const when = new Date(at);
-      const { totals, recentMatchIds } = await markMerged({ from, to, at: when });
+      const marked = await markMerged({ from, to, at: when });
+      const totals = Object.fromEntries(
+        Object.entries(marked.totals).map(([field, value]) => [field, Math.max(0, value - (withdraw[field] ?? 0))]),
+      );
+      const { recentMatchIds } = marked;
       const { applied } = await progressDao.addMerged({ to, from, totals, recentMatchIds, at: when });
       return { moved: Object.freeze(applied ? { ...totals } : { ...ZERO }) };
     },
