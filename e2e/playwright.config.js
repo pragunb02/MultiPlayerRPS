@@ -16,6 +16,9 @@ export default defineConfig({
     baseURL: BASE_URL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // The app plays sounds (CC-103). Test browsers keep them to themselves instead of playing them on the
+    // machine running the tests.
+    launchOptions: { args: ["--mute-audio"] },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: RESTARTS },
