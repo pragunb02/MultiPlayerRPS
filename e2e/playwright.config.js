@@ -21,6 +21,9 @@ const ENGINES = Object.freeze({
       // and each of these tests took 3 to 6 minutes. They pass on WebKit on a laptop, and Chromium and Firefox
       // time every press on each pull request (CC-184).
       grepInvert: process.env.CI ? /every press in .* answers within 100 ms/ : undefined,
+      // Chess games that take 4 s on a laptop took over 30 s on those runners, so WebKit gets 60 s there. The
+      // other engines keep Playwright's 30 s.
+      timeout: process.env.CI ? 60_000 : undefined,
     },
   ],
 });
@@ -57,11 +60,12 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    ...targets.map(({ name, device, grepInvert }) => ({
+    ...targets.map(({ name, device, grepInvert, timeout }) => ({
       name,
       use: { ...device },
       testIgnore: RESTARTS,
       grepInvert,
+      timeout,
     })),
     ...restartProjects,
   ],

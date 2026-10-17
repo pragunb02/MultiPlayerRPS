@@ -5,13 +5,16 @@
 /**
  * The page moved on and the browser cancelled a request it no longer needed. That is not a failure. Chromium says
  * `net::ERR_ABORTED`, Firefox `NS_BINDING_ABORTED` and WebKit `cancelled`, or for a page load that another one
- * replaced, `Provisional navigation canceled.`
+ * replaced, `Provisional navigation canceled.` A test that stops a request on purpose with `route.abort()` gets the
+ * first two in Chromium and Firefox, and `Blocked by Web Inspector` in WebKit, which only Playwright causes.
  *
  * @param {string} errorText what the browser gave as the reason the request failed
  * @returns {boolean}
  */
 export const isCancelledRequest = (errorText) =>
-  /^net::ERR_ABORTED$|^NS_BINDING_ABORTED$|^cancelled$|^Provisional navigation canceled\.$/i.test(errorText);
+  /^(net::ERR_ABORTED|NS_BINDING_ABORTED|cancelled|Provisional navigation canceled\.|Blocked by Web Inspector)$/i.test(
+    errorText,
+  );
 
 /** The realtime connection failing to reach the server, one pattern per engine's wording. */
 const REALTIME_DOWN = Object.freeze([

@@ -15,6 +15,7 @@ describe("isCancelledRequest", () => {
       "NS_BINDING_ABORTED",
       "cancelled",
       "Provisional navigation canceled.",
+      "Blocked by Web Inspector",
     ]) {
       expect(isCancelledRequest(reason), reason).toBe(true);
     }

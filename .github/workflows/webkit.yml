@@ -27,13 +27,13 @@ concurrency:
 
 jobs:
   webkit:
-    name: Browser persona tests (webkit desktop, part ${{ matrix.shard }} of 2)
+    name: Browser persona tests (webkit desktop, part ${{ matrix.shard }} of 3)
     runs-on: macos-latest
     timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -48,11 +48,12 @@ jobs:
       - run: npm ci
       - name: Install WebKit
         run: npx playwright install webkit
-      # Half of the suite each. Playwright would start only one worker on these three-core machines.
-      - name: Browser tests, part ${{ matrix.shard }} of 2
+      # A third of the suite each, two at a time. Playwright would start only one worker on these three-core
+      # machines, and three at a time left too little for the server, so chess games ran past 30 seconds.
+      - name: Browser tests, part ${{ matrix.shard }} of 3
         working-directory: e2e
         timeout-minutes: 35
-        run: npx playwright test --project=webkit --shard=${{ matrix.shard }}/2 --workers=3
+        run: npx playwright test --project=webkit --shard=${{ matrix.shard }}/3 --workers=2
         env:
           CI: "true"
           E2E_BROWSER: webkit

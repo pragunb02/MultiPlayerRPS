@@ -109,11 +109,11 @@ describe("browser engines", () => {
     expect(webkit).toMatch(/permissions:\n {2}contents: read\n\n/);
   });
 
-  it("splits WebKit in two and still runs every test, the restart tests once", async () => {
+  it("splits WebKit in three and still runs every test, the restart tests once", async () => {
     const webkit = await read(".github/workflows/webkit.yml");
 
-    expect(webkit).toContain("        shard: [1, 2]\n");
-    expect(webkit).toContain("--project=webkit --shard=${{ matrix.shard }}/2");
+    expect(webkit).toContain("        shard: [1, 2, 3]\n");
+    expect(webkit).toContain("--project=webkit --shard=${{ matrix.shard }}/3");
     expect(webkit).toContain("        if: matrix.shard == 1 && !cancelled()\n");
     expect(webkit).toContain('--project="restart webkit" --no-deps');
     expect(webkit.match(/E2E_BROWSER: webkit\n/g)).toHaveLength(2);
