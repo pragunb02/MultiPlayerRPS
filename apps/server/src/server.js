@@ -25,6 +25,7 @@ import {
 } from "./domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
 import { roomLifetimes } from "./domain/rooms/roomLifetimes.js";
+import { roomLimits } from "./domain/rooms/roomLimits.js";
 import { createAccountDao } from "./persistence/accountDao.js";
 import { createAchievementDao } from "./persistence/achievementDao.js";
 import { connectDatabase } from "./persistence/database.js";
@@ -38,14 +39,17 @@ import { createRoomDao } from "./persistence/roomDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
 import { createStatsDao } from "./persistence/statsDao.js";
 import { createHttpApp } from "./service/http/app.js";
-import { createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
+import { createSessionCheck, createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
+import { createNetworkKey } from "./utils/networkKey.js";
 import { createPasswordHasher } from "./utils/passwordHasher.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_ENDED = "sessionEnded";
+const OTHER_SESSIONS_ENDED = "otherSessionsEnded";
 const ROOM_SWEEP_INTERVAL_MS = 60_000;
+const GAUGE_INTERVAL_MS = 60_000;
 const CLOCK_TICK_INTERVAL_MS = 1_000;
 const TRANSFER_RESUME_INTERVAL_MS = 60_000;
 
@@ -183,9 +187,13 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
  * moves), and finish guest → account transfers that were interrupted (CC-032). A failing run is logged and the
  * next one still happens. Timers don't keep the process alive.
  *
+ * Once a minute it also logs a gauge: how many rooms are open in each status and how many realtime connections and
+ * players there are (CC-107). Operators read it to see how close the server is to its limits (roomLimits.js).
+ *
  * @param {{
- *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "sweepExpired" | "expireDue">,
+ *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "sweepExpired" | "expireDue" | "countRooms">,
  *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "resumePending">,
+ *   connections: () => { connections: number, players: number },
  *   logger: Logger,
  *   now?: () => number,
  *   sweepIntervalMs?: number,
@@ -195,6 +203,7 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
 export function startHousekeeping({
   roomComponent,
   playerTransferComponent,
+  connections,
   logger,
   now = Date.now,
   sweepIntervalMs = ROOM_SWEEP_INTERVAL_MS,
@@ -224,6 +233,15 @@ export function startHousekeeping({
         );
       },
       "resuming guest transfers failed",
+    ),
+    every(
+      GAUGE_INTERVAL_MS,
+      async () => {
+        const rooms = await roomComponent.countRooms();
+        const open = Object.values(rooms).reduce((sum, count) => sum + count, 0);
+        logger.info({ rooms: { ...rooms, open }, ...connections() }, "room gauge");
+      },
+      "reading the room gauge failed",
     ),
   ];
   return { stop: () => timers.forEach((timer) => clearInterval(timer)) };
@@ -272,9 +290,14 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
- *   rooms?: { lifetimes?: Partial<import("./domain/rooms/roomLifetimes.js").RoomLifetimes>, sweepIntervalMs?: number },
+ *   rooms?: {
+ *     lifetimes?: Partial<import("./domain/rooms/roomLifetimes.js").RoomLifetimes>,
+ *     limits?: Partial<import("./domain/rooms/roomLimits.js").RoomLimits>,
+ *     sweepIntervalMs?: number,
+ *   },
  * }} deps  `now` and `rooms` are for tests only. Production runs on the real clock and the standard room
- *   lifetimes. Integration tests move the clock, and browser tests shorten lifetimes to watch a room close.
+ *   lifetimes and limits. Integration tests move the clock, and browser tests shorten lifetimes to watch a room
+ *   close, raise the connections per address (every test player shares one) and fill the server on purpose.
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
 export async function startServer({ config, logger, limits = {}, now = Date.now, rooms = {} }) {
@@ -329,11 +352,13 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     legacyUserAccessor,
     passwordHasher: createPasswordHasher(),
   });
+  const limitsOfRooms = roomLimits(rooms.limits);
   const roomComponent = createRoomComponent({
     roomAccessor,
     engines: createEngineRegistry(ENGINES),
     events: domainEvents,
     lifetimes: roomLifetimes(rooms.lifetimes),
+    limits: limitsOfRooms,
   });
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({
@@ -396,6 +421,8 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     secureCookies: config.isProduction,
   });
   const sessionEvents = new EventEmitter();
+  // HTTP and realtime ask the same question of every signed-in session (CC-116).
+  const checkSession = createSessionCheck({ accountComponent, now });
   const app = createHttpApp({
     config,
     logger,
@@ -413,6 +440,8 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     accountComponent,
     now,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
+    onOtherSessionsEnded: (which) => sessionEvents.emit(OTHER_SESSIONS_ENDED, which),
+    checkSession,
     onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
   });
   const server = http.createServer(app);
@@ -423,13 +452,19 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     logger,
     roomComponent,
     domainEvents,
+    checkSession,
+    trustProxyHops: config.trustProxyHops,
+    networkOf: createNetworkKey({ secret: config.sessionSecret }),
+    limits: limitsOfRooms,
     now,
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
+  sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
 
   const housekeeping = startHousekeeping({
     roomComponent,
     playerTransferComponent,
+    connections: gateway.counts,
     logger,
     now,
     sweepIntervalMs: rooms.sweepIntervalMs,

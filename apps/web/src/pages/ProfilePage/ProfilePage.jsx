@@ -17,6 +17,7 @@ import { StreakCard } from "../../components/Streaks/StreakCard.jsx";
 import { useMatchHistory } from "../../hooks/useMatchHistory.js";
 import { useProgress } from "../../hooks/useProgress.js";
 import { useSession } from "../../hooks/useSession.js";
+import { AccountSettings } from "./AccountSettings.jsx";
 import styles from "./ProfilePage.module.css";
 
 const OUTCOME_LABEL = { win: "Won", loss: "Lost", draw: "Draw" };
@@ -143,7 +144,7 @@ function PlayerConsole({ guest }) {
   );
 }
 
-/** Your level, stats and match history — for guests and account holders alike. */
+/** Your level, stats and match history, for guests and account holders alike. Account holders also get their account settings. */
 export function ProfilePage() {
   const session = useSession();
   if (session.status === "loading") {
@@ -187,6 +188,7 @@ export function ProfilePage() {
       <PlayerConsole guest={session.identity.kind === "guest"} />
       <h2>Recent matches</h2>
       <MatchHistory you={session.identity.id} />
+      {session.identity.kind === "user" && <AccountSettings />}
     </section>
   );
 }

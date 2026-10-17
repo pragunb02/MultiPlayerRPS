@@ -24,6 +24,7 @@ export function createInMemoryAccountDao() {
         email,
         passwordHash,
         createdAt: new Date(createdAt),
+        sessionVersion: 0,
       };
       accounts.set(doc.accountId, doc);
       return copy(doc);
@@ -49,6 +50,27 @@ export function createInMemoryAccountDao() {
       if (doc !== undefined) {
         accounts.set(accountId, { ...doc, passwordHash });
       }
+    },
+
+    async getSessionVersion(accountId) {
+      if (!accounts.has(accountId)) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      return accounts.get(accountId).sessionVersion;
+    },
+
+    async bumpSessionVersion({ accountId, passwordHash }) {
+      const doc = accounts.get(accountId);
+      if (doc === undefined) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      const next = {
+        ...doc,
+        sessionVersion: doc.sessionVersion + 1,
+        ...(passwordHash !== undefined && { passwordHash }),
+      };
+      accounts.set(accountId, next);
+      return next.sessionVersion;
     },
   });
 }
