@@ -174,6 +174,25 @@ describe("RpsBoard", () => {
     expect(screen.queryByText(/It doesn't count/)).not.toBeInTheDocument();
   });
 
+  it("keeps the round's number after draws, since a drawn round is played again (CC-254)", () => {
+    const draw = { choices: { [ME]: "rock", [THEM]: "rock" }, winner: "" };
+    const { rerender } = render(
+      <RpsBoard
+        room={room(rpsView({ score: { [ME]: 0, [THEM]: 0 }, round: 2, rounds: [draw] }))}
+        onMove={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Round 1" })).toBeInTheDocument();
+    rerender(
+      <RpsBoard
+        room={room(rpsView({ round: 4, rounds: [draw, ...rpsView().rounds, draw] }))}
+        onMove={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Round 2" })).toBeInTheDocument();
+  });
+
   it("shows '?' for a choice this version of the app doesn't know", () => {
     const view = rpsView({ rounds: [{ choices: { [ME]: "rock", [THEM]: "lizard" }, winner: THEM }] });
     render(<RpsBoard room={room(view)} onMove={vi.fn()} />);

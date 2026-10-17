@@ -98,6 +98,8 @@ export function RpsBoard({ room, onMove, reason = playReason(room, { reconnectin
   const opponent = room.seats.find((seat) => seat.playerId !== room.you);
   const chosen = move.sent?.choice ?? view.yourChoice;
   const why = choiceReason({ reason, opponent, busy: move.busy });
+  // A drawn round is played again, so it keeps its number. Only rounds someone won move the heading on.
+  const roundNumber = view.rounds.filter((round) => round.winner !== "").length + 1;
 
   return (
     <div className={styles.board}>
@@ -111,7 +113,7 @@ export function RpsBoard({ room, onMove, reason = playReason(room, { reconnectin
 
       {playing && (
         <>
-          <h2 className={styles.round}>Round {view.round}</h2>
+          <h2 className={styles.round}>Round {roundNumber}</h2>
           {view.rounds.at(-1)?.winner === "" && (
             <p className={styles.status}>Draw. It doesn&apos;t count, so play the round again.</p>
           )}
