@@ -12,11 +12,11 @@ export const newerRoom = (current, incoming) =>
   current?.code === incoming.code && current.revision > incoming.revision ? current : incoming;
 
 /**
- * One room, kept in sync with the server. Once `enabled` — there is someone to join as — it joins, applies every
+ * One room, kept in sync with the server. Once `enabled` (there is someone to join as) it joins, applies every
  * pushed update for this room, and rejoins after the connection drops and comes back. It never starts a session
  * itself: whoever arrives without one chooses how to join first (CC-086). Leaving the page leaves a waiting room,
  * so nobody starts a game against a player who has gone (CC-112). The seat is kept when the next page leads back
- * to this room, such as signing up from it. A game in progress or a finished game keeps the seat: only `leave()`
+ * to this room, such as signing up from it. A game in progress or a finished game keeps the seat. Only `leave()`
  * gives it up (it forfeits a game in progress). Leaving the page tells the server the player is away from the
  * room, so the opponent sees it at once and requests still reach them elsewhere (CC-207).
  *

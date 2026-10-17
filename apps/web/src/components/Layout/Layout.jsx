@@ -16,7 +16,7 @@ import { WakingUp } from "../WakingUp/WakingUp.jsx";
 import styles from "./Layout.module.css";
 
 /**
- * App shell: header with brand, navigation and who you are; pages render into <Outlet />. Under the header sit the
+ * App shell: header with brand, navigation and who you are. Pages render into <Outlet />. Under the header sit the
  * player's own connection (CC-158) and the requests other players sent them from rooms they are not looking at
  * (CC-207), so both reach them on every page.
  */

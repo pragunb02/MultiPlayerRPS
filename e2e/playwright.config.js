@@ -2,8 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL } from "./personas.js";
 
 // Browser tests of whole journeys, one file per kind of person (ENGINEERING.md §4). Run: npm run test:e2e
-// The tests that restart the server (CC-101).
-const RESTARTS = "restart.spec.js";
+// The tests that restart the server (CC-101), or run it with short room times for a while (CC-207).
+const RESTARTS = /restart[a-z-]*\.spec\.js$/;
 
 // One browser engine per run, so each engine is its own CI job (CC-184). Chromium is the default and runs on a
 // laptop and a phone. Firefox and WebKit run on a laptop: E2E_BROWSER=firefox npm run test:e2e
@@ -45,6 +45,8 @@ const restartProjects = targets.map(({ name, device }, index) => ({
   use: { ...device },
   testMatch: RESTARTS,
   fullyParallel: false,
+  // One test at a time across every file: a restart cuts off whatever else is running (CC-207).
+  workers: 1,
   dependencies: index === 0 ? targets.map((target) => target.name) : [`restart ${targets[index - 1].name}`],
 }));
 

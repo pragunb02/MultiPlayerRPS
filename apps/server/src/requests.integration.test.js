@@ -101,11 +101,11 @@ const send = async (socket, event, payload) => {
 };
 
 /**
- * Waits, for up to five seconds, until a push of `event` that passes `test` has arrived, counting only pushes after
+ * Waits, for up to twenty seconds, until a push of `event` that passes `test` has arrived, counting only pushes after
  * the first `after` the player received.
  */
 async function heard(player, event, test = () => true, { after = 0 } = {}) {
-  const deadline = Date.now() + 5_000;
+  const deadline = Date.now() + 20_000;
   for (;;) {
     const found = player.received.slice(after).find((entry) => entry.event === event && test(entry.payload));
     if (found !== undefined) return found.payload;
@@ -131,7 +131,8 @@ async function finishedGame(server) {
   return { alice, bob, code };
 }
 
-describe("requests and presence through the real composition root (integration)", () => {
+// Each test starts a server and plays a game over real sockets, which takes a while on a busy machine.
+describe("requests and presence through the real composition root (integration)", { timeout: 60_000 }, () => {
   it("reaches a player who went to the home page, and her Accept starts the next game for both", async () => {
     const server = serverProcess();
     await server.start();

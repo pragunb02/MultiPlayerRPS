@@ -130,7 +130,7 @@ function Outgoing({ request, room, onAction, onNewOpponent, reason }) {
   const where = whereabouts(room, request);
   const offline = seatOf(room, request.to)?.presence === PRESENCE.OFFLINE;
   return (
-    <section className={`${styles.request} ${styles.outgoing}`} aria-label={request.texts.title}>
+    <section className={`${styles.request} ${styles.outgoing}`} aria-label={request.texts.waitingTitle}>
       <p role="status" className={styles.text}>
         <strong>{request.texts.waiting(nameOf(room, request.to))}</strong>
         {where !== "" && <span className={styles.where}> {where}</span>}

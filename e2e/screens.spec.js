@@ -139,7 +139,7 @@ test.describe("room", () => {
     expect(turns.sort()).toEqual([0, 1]); // exactly one of them is on turn
 
     await friend.leave();
-    await expect(host.page.getByRole("list", { name: "Players" })).toContainText("disconnected");
+    await expect(host.page.getByRole("list", { name: "Players" })).toContainText(/reconnecting \d:\d\d/);
   });
 
   test("logging out inside a waiting room gives the seat up: Back doesn't seat anyone in it (CC-085, CC-086)", async ({

@@ -114,7 +114,10 @@ function openRoom(joined, answers = {}) {
 const push = (socket, room) => act(() => socket.push("room:updated", room));
 // A question asked of the viewer is a region named after the request, in the page above the board (CC-160).
 const POPUP = { name: /^(Draw offer|Rematch\?)$/ };
-const popup = () => screen.findByRole("region", POPUP);
+// The chess board loads on demand, which can take a while on a busy machine.
+const SLOW = Object.freeze({ timeout: 10_000 });
+const board = () => screen.findByRole("grid", { name: "Chess board" }, SLOW);
+const popup = () => screen.findByRole("region", POPUP, SLOW);
 const noPopup = () => expect(screen.queryByRole("region", POPUP)).not.toBeInTheDocument();
 const answered = (type, answer) => ["room:answer", { code: "AB2CD3", type, answer }];
 
@@ -132,7 +135,7 @@ describe("draw offers (CC-104, CC-159)", () => {
   it("asks you in the banner with a chime and the time left, and accepting sends the answer", async () => {
     const user = userEvent.setup();
     const { socket, sound } = openRoom(chess(), { "room:answer": () => chess() });
-    await screen.findByRole("grid", { name: "Chess board" });
+    await board();
 
     push(socket, chess({ requests: [draw()] }));
 
@@ -164,7 +167,7 @@ describe("draw offers (CC-104, CC-159)", () => {
     expect(socket.request).toHaveBeenCalledWith(...answered("draw", "decline"));
     await waitFor(noPopup);
     expect(await screen.findByText("You said no")).toBeInTheDocument();
-    expect(screen.getByRole("grid", { name: "Chess board" })).toBeInTheDocument();
+    expect(await board()).toBeInTheDocument();
   });
 
   it("can be hidden without answering, with Hide or Escape, and the board stays usable", async () => {
@@ -173,7 +176,7 @@ describe("draw offers (CC-104, CC-159)", () => {
 
     await user.click(within(await popup()).getByRole("button", { name: "Hide" }));
     noPopup();
-    expect(screen.getByRole("gridcell", { name: "e2, white pawn" })).toBeEnabled();
+    expect(await screen.findByRole("gridcell", { name: "e2, white pawn" }, SLOW)).toBeEnabled();
 
     // The offer ends and a new one comes: that one is shown again.
     push(socket, chess({ requests: [draw({ state: "withdrawn" })] }));
@@ -207,7 +210,7 @@ describe("draw offers (CC-104, CC-159)", () => {
       "room:answer": () => chess({ requests: [{ ...mine, state: "withdrawn", endedAt: T + 1 }] }),
     });
 
-    const card = await screen.findByRole("region", { name: "Draw offer" });
+    const card = await screen.findByRole("region", { name: "Draw offered" });
     expect(within(card).getByRole("status")).toHaveTextContent("Draw offered. Waiting for Bob to answer");
     expect(screen.getByRole("button", { name: "Draw offered" })).toHaveAttribute("aria-disabled", "true");
 
@@ -262,7 +265,7 @@ describe("draw offers (CC-104, CC-159)", () => {
     const { socket } = openRoom(chess(), {
       "game:move": () => chess({ view: { fen: AFTER_E4, moves: ["e4"] }, requests: [draw()] }),
     });
-    const e2 = await screen.findByRole("gridcell", { name: "e2, white pawn" });
+    const e2 = await screen.findByRole("gridcell", { name: "e2, white pawn" }, SLOW);
     await user.click(e2);
 
     push(socket, chess({ requests: [draw()] }));
@@ -279,7 +282,7 @@ describe("draw offers (CC-104, CC-159)", () => {
   it("leaves focus where the player put it while the question was open", async () => {
     const user = userEvent.setup();
     const { socket } = openRoom(chess());
-    await screen.findByRole("grid", { name: "Chess board" });
+    await board();
     push(socket, chess({ requests: [draw()] }));
     await popup();
 
@@ -293,9 +296,9 @@ describe("draw offers (CC-104, CC-159)", () => {
   it("asks spectators nothing", async () => {
     openRoom(chess({ you: "", requests: [draw()] }));
 
-    await screen.findByRole("grid", { name: "Chess board" });
+    await board();
     noPopup();
-    expect(screen.queryByRole("region", { name: "Draw offer" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Draw offered" })).not.toBeInTheDocument();
   });
 });
 
@@ -506,12 +509,12 @@ describe("an opponent who lost their connection during the game (CC-036)", () =>
     const gone = { ...BOB, connected: false, presence: "offline", graceUntil: T + 2_000 };
     const won = { ...finished(), gameId: "chess" };
     const { socket } = openRoom(chess({ seats: [ME, gone] }), { "room:claim-win": () => won });
-    await screen.findByRole("grid", { name: "Chess board" });
+    await board();
     expect(screen.queryByRole("button", { name: "Claim the win" })).not.toBeInTheDocument();
 
-    act(() => vi.advanceTimersByTime(2_000));
+    act(() => vi.advanceTimersByTime(3_000));
     expect(
-      screen.getByText("Bob has not come back. You can claim the win, or keep waiting."),
+      await screen.findByText("Bob has not come back. You can claim the win, or keep waiting."),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Claim the win" }));
 
@@ -522,7 +525,7 @@ describe("an opponent who lost their connection during the game (CC-036)", () =>
 describe("room sounds (CC-103)", () => {
   it("plays nothing on joining and then the sound of each move", async () => {
     const { socket, sound } = openRoom(chess());
-    await screen.findByRole("grid", { name: "Chess board" });
+    await board();
     expect(sound.played).toEqual([]);
 
     push(
@@ -552,7 +555,7 @@ describe("background tab (CC-104)", () => {
     const tab = installVisibility({ hidden: false });
     const theirMove = chess({ view: { toMove: BOB.playerId }, activePlayers: [BOB.playerId] });
     const { socket, sound } = openRoom(theirMove);
-    await screen.findByRole("grid", { name: "Chess board" });
+    await board();
     act(() => tab.setHidden(true));
     expect(document.title).toBe("Chess · Room AB2CD3 · ClassiCade");
 

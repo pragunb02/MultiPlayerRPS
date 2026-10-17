@@ -37,7 +37,7 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @property {string} [network]        an opaque name of the network the room was opened from, for the cap per network
  * @property {ReadonlyArray<Readonly<Seat>>} seats
  * @property {{ matchId: string, number?: number, seed: number, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry>, asked?: Record<string, Record<string, number>> }} [game]
- *   present once the game has started; `seed` + `log` reproduce the game exactly (see replayGame). `number`
+ *   present once the game has started. Its `seed` and `log` reproduce the game exactly (see replayGame). `number`
  *   counts the room's games from 1, and `asked` how often each player asked each limited request in this game
  * @property {ReadonlyArray<Readonly<RoomRequest>>} [requests]  open requests, and ended ones for a few seconds
  * @property {Readonly<{ status: string, result: string, winners: string[], reason: string }>} [result]  final outcome once finished (played out or forfeited)

@@ -1,6 +1,6 @@
 import { expect, formFactor, test } from "./fixtures.js";
 import { answerTo, arm, installProbe, otherSaw } from "./controlProbe.js";
-import { computerStatesFor, GAMES, openPair, snapshot, statesFor } from "./matchStates.js";
+import { computerStatesFor, GAMES, openPair, SITE_REQUESTS, snapshot, statesFor } from "./matchStates.js";
 
 // Every click gives a visible answer (CC-164, CC-170, docs/ux/MATCH_EXPERIENCE.md "Button feedback standard").
 // In each state of every game, two players are brought into the state and every control on the page
@@ -24,6 +24,9 @@ const REACHES_OTHER = new Set([
   "room.request.decline",
   "room.request.cancel",
   "room.new_opponent",
+  "request.new_opponent",
+  "site_request.accept",
+  "site_request.decline",
 ]);
 
 /** Presses that end the state they are pressed in, besides links to other pages. */
@@ -42,9 +45,12 @@ const NOT_PRESSED = new Map([
   ["header.skip", "shows only while it has the keyboard focus, and is checked by the keyboard tests"],
 ]);
 
-/** The distinct controls on screen: one of each name, and one blocked and one ready where both exist. */
-async function controlsOn(page) {
-  const found = await page.locator("main [data-cc-control]").evaluateAll((elements) =>
+/**
+ * The distinct controls on screen: one of each name, and one blocked and one ready where both exist. `scope` is
+ * where to look: the page's main part, or only the questions from other rooms on a page that is not a room.
+ */
+async function controlsOn(page, scope) {
+  const found = await page.locator(`${scope} [data-cc-control]`).evaluateAll((elements) =>
     elements
       .filter((element) => element.getClientRects().length > 0)
       .map((element) => ({
@@ -61,8 +67,8 @@ async function controlsOn(page) {
     .sort((a, b) => Number(leaves(a)) - Number(leaves(b)));
 }
 
-const selector = ({ id, blocked }) =>
-  `main [data-cc-control="${id}"]${blocked ? '[aria-disabled="true"]' : ':not([aria-disabled="true"])'}`;
+const selector = ({ id, blocked }, scope) =>
+  `${scope} [data-cc-control="${id}"]${blocked ? '[aria-disabled="true"]' : ':not([aria-disabled="true"])'}`;
 
 /** Closes a dialog a press opened (Leave room, Resign), so the next press finds the page as it was. */
 async function putAway(page) {
@@ -76,7 +82,7 @@ async function putAway(page) {
 async function enter(players, build) {
   const state = await build(await openPair(players));
   const room = [state.clicker, ...(state.other ? [state.other] : [])];
-  return { ...state, room, expected: await snapshot(room) };
+  return { scope: "main", ...state, room, expected: await snapshot(room) };
 }
 
 /**
@@ -84,7 +90,7 @@ async function enter(players, build) {
  * after the state itself, such as the save progress card once the win's XP has arrived, so it waits a little.
  */
 async function find(state, entry) {
-  const target = state.clicker.page.locator(selector(entry)).first();
+  const target = state.clicker.page.locator(selector(entry, state.scope)).first();
   return target.waitFor({ state: "visible", timeout: 3_000 }).then(
     () => target,
     () => undefined,
@@ -101,7 +107,7 @@ async function find(state, entry) {
 async function pressEverything({ players, build, name }) {
   let state = await enter(players, build);
   const problems = [];
-  const controls = await controlsOn(state.clicker.page);
+  const controls = await controlsOn(state.clicker.page, state.scope);
   expect(controls.length, `${name}: the page shows controls`).toBeGreaterThan(0);
 
   for (const entry of controls) {
@@ -199,6 +205,8 @@ test.describe("every press in the header and footer answers within 100 ms", () =
           `${id}: nothing visible within ${ANSWER_MS} ms (fastest: ${answer.kind} after ${answer.ms} ms)`,
         );
       }
+      // The sound settings open in a dialog, which would be in the way of the next press.
+      await putAway(guest.page);
     }
 
     expect(ids.length).toBeGreaterThan(3);
@@ -231,6 +239,16 @@ const MAIN_CONTROLS = Object.freeze({
   "rematch-declined": () => [at("room.rematch.ask"), at("room.new_opponent")],
   "request-asked": () => [at("room.request.cancel")],
   "request-asked-of-me": () => [at("room.request.accept"), at("room.request.decline")],
+  "rematch-asked-away": () => [at("room.request.cancel"), at("room.new_opponent")],
+  "rematch-asked-offline": () => [
+    at("request.copy_invite"),
+    at("request.new_opponent"),
+    at("request.play_computer"),
+  ],
+  "rematch-asked-elsewhere": () => [
+    `${SITE_REQUESTS} [data-cc-control="site_request.accept"]`,
+    `${SITE_REQUESTS} [data-cc-control="site_request.decline"]`,
+  ],
   "computer lobby": () => [at("lobby.computer_level"), at("lobby.play_computer")],
   "computer my-turn": (gameId) => BOARD[gameId],
   "computer finished": () => RESULT,

@@ -20,6 +20,7 @@ import { gameNumber, isYourTurn, nameOf } from "./roomView.js";
  *
  * @typedef {Object} RequestTexts      the words for one kind of request
  * @property {string} title            the heading the player asked sees
+ * @property {string} waitingTitle     the name of what the asker sees while they wait
  * @property {(name: string) => string} question   the question, given the asker's name
  * @property {(name: string) => string} waiting    what the asker sees, given the name of the player asked
  * @property {(name: string) => string} declined   what the asker hears when the other says no
@@ -52,6 +53,7 @@ import { gameNumber, isYourTurn, nameOf } from "./roomView.js";
 /** The words of a rematch request, the one kind every room has. */
 export const REMATCH_TEXTS = Object.freeze({
   title: "Rematch?",
+  waitingTitle: "Rematch asked",
   question: (name) => `${name} wants a rematch.`,
   waiting: (name) => `Waiting for ${name} to answer your rematch request`,
   declined: (name) => `${name} declined the rematch`,
@@ -63,6 +65,7 @@ export const REMATCH_TEXTS = Object.freeze({
 /** Words for a kind of request a game added but this version of the web app does not know yet. */
 const UNKNOWN_TEXTS = Object.freeze({
   title: "Request",
+  waitingTitle: "Request sent",
   question: (name) => `${name} is asking you something.`,
   waiting: (name) => `Waiting for ${name} to answer`,
   declined: (name) => `${name} said no`,

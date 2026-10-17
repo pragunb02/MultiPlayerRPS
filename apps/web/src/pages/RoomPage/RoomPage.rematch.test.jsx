@@ -48,7 +48,7 @@ const finished = ({ rematch = { available: true, until: UNTIL }, ...overrides } 
   ...overrides,
 });
 
-/** Opens the room; the socket answers room:join with `joined`, and room:request and room:answer with `onRequest()`. */
+/** Opens the room. The socket answers room:join with `joined`, and room:request and room:answer with `onRequest()`. */
 function openRoom(joined, onRequest = vi.fn(async () => joined)) {
   const socket = fakeSocket();
   socket.connect();

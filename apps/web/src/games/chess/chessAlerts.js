@@ -36,6 +36,7 @@ export function chessSounds(previous, next) {
 export const CHESS_REQUEST_TEXTS = Object.freeze({
   [CHESS_REQUEST_TYPES.DRAW]: Object.freeze({
     title: "Draw offer",
+    waitingTitle: "Draw offered",
     question: (name) => `${name} offers a draw.`,
     waiting: (name) => `Draw offered. Waiting for ${name} to answer`,
     declined: (name) => `${name} declined your draw offer`,
