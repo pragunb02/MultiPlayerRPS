@@ -1,7 +1,7 @@
 import { DAILY_SWEEP_BONUS_XP } from "@classicade/shared";
 import { isBotPlayerId } from "../../models/botIdentity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { creditFor } from "../matches/fairPlay.js";
+import { creditFor, hasComputerPlayer } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
 import { nextUtcMidnight, utcDay } from "./calendar.js";
 import { achievementStanding, evaluateAchievements } from "./evaluateAchievements.js";
@@ -108,8 +108,10 @@ export function createGamificationComponent({
    * Bonus XP and the quest counter for every completed quest of the day. Each is idempotent by key, so this
    * also finishes what a crash interrupted last time.
    */
-  async function rewardQuests({ playerId, displayName, questDay, at, stats: counted }) {
+  async function rewardQuests({ playerId, displayName, questDay, at, stats: counted, computerGame }) {
     let stats = counted;
+    // A bonus that this game against a computer character earned stays off the leaderboards (ADR-025).
+    const unrankedAt = (completedAt) => computerGame && completedAt === at;
     for (const item of questDay.items.filter((i) => i.completedAt !== null)) {
       const key = questKey(questDay.day, item.id);
       await progressionComponent.awardBonus({
@@ -118,6 +120,7 @@ export function createGamificationComponent({
         key,
         xp: item.bonusXp,
         at: item.completedAt,
+        unranked: unrankedAt(item.completedAt),
       });
       ({ stats } = await gamificationAccessor.applyToStatsOnce({
         playerId,
@@ -134,6 +137,7 @@ export function createGamificationComponent({
         key: questKey(questDay.day, SWEEP),
         xp: DAILY_SWEEP_BONUS_XP,
         at: questDay.sweepAt,
+        unranked: unrankedAt(questDay.sweepAt),
       });
     }
     return stats;
@@ -164,6 +168,7 @@ export function createGamificationComponent({
       questDay: quests.questDay,
       at,
       stats: counted.stats,
+      computerGame: hasComputerPlayer(match),
     });
 
     if (counted.applied) {

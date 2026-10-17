@@ -88,6 +88,64 @@ describe("botComponent.playComputer", () => {
       expect(await playing(roomAccessor)).toContain(withFriend.code);
     });
 
+    it("keeps to the limit when many games are asked for at the same moment, as from many tabs", async () => {
+      const { playComputer, roomAccessor } = botRooms();
+
+      const started = await Promise.all(
+        Array.from({ length: 6 }, (_, i) => playComputer({ gameId: GAME_IDS.RPS, now: 1_000 + i })),
+      );
+
+      expect(started.map((room) => room.status)).toEqual(Array(6).fill("playing"));
+      expect(await playing(roomAccessor)).toHaveLength(MAX_COMPUTER_GAMES);
+    });
+
+    /** A one round game against Rocky that the person wins, so a rematch is on offer. */
+    async function finishedGame({ rooms, playComputer }) {
+      const room = await playComputer({ gameId: GAME_IDS.RPS, options: { bestOf: 1 }, now: 500 });
+      const [seal] = room.game.seals;
+      const rocky = JSON.parse(seal.text);
+      await rooms.makeMove({ code: room.code, playerId: seal.playerId, move: rocky, now: 501 });
+      const beat = { rock: "paper", paper: "scissors", scissors: "rock" }[rocky.choice];
+      const over = await rooms.makeMove({
+        code: room.code,
+        playerId: PERSON.id,
+        move: { choice: beat },
+        now: 502,
+      });
+      expect(over.status).toBe("finished");
+      return { code: room.code, rocky: seal.playerId };
+    }
+
+    it("ends the oldest game when the computer accepts a rematch, so a rematch never goes past the limit", async () => {
+      const setup = botRooms();
+      const { code, rocky } = await finishedGame(setup);
+      for (let i = 0; i < MAX_COMPUTER_GAMES; i++) {
+        await setup.playComputer({ gameId: GAME_IDS.RPS, now: 1_000 + i });
+      }
+      await setup.rooms.requestRematch({ code, playerId: PERSON.id, now: 2_000 });
+
+      const rematch = await setup.botComponent.acceptRematch({ code, playerId: rocky, now: 2_001 });
+
+      expect(rematch.status).toBe("playing");
+      expect(await playing(setup.roomAccessor)).toHaveLength(MAX_COMPUTER_GAMES);
+      expect(await playing(setup.roomAccessor)).toContain(code);
+      expect((await setup.rooms.getRoom("ROOM33")).status).toBe("finished");
+    });
+
+    it("ends nothing when the computer's answer starts no game", async () => {
+      const setup = botRooms();
+      const { code, rocky } = await finishedGame(setup);
+      for (let i = 0; i < MAX_COMPUTER_GAMES; i++) {
+        await setup.playComputer({ gameId: GAME_IDS.RPS, now: 1_000 + i });
+      }
+
+      // The person did not ask, so the computer's yes only waits for theirs.
+      const room = await setup.botComponent.acceptRematch({ code, playerId: rocky, now: 2_001 });
+
+      expect(room.status).toBe("finished");
+      expect(await playing(setup.roomAccessor)).toHaveLength(MAX_COMPUTER_GAMES);
+    });
+
     /** A bot component whose room component leaves rooms as `leaveRoom` says. */
     async function withLeave(leaveRoom) {
       const base = botRooms();

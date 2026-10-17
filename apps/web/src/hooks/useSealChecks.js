@@ -2,18 +2,37 @@ import { useEffect, useState } from "react";
 import { checkSeal } from "../lib/sealCheck.js";
 
 /**
- * How each shown seal checks out in this browser (CC-225): "checking" until the hash is done, then "matched",
- * "mismatched", or "unchecked" when the browser cannot hash. Keyed by the lock, so a seal is checked once.
+ * The computer player's shown seals in a game (CC-225), each with the lock this browser showed for it before the
+ * round and how its hash checks out here. The lock is remembered the first time it is shown, by game, player and
+ * turn, so a lock the server sends again later can never replace it. `hashed` is "checking" until the hash is
+ * done, then "matched", "mismatched", or "unchecked" when the browser cannot hash. Each seal is hashed once.
  *
- * @param {ReadonlyArray<{ text: string, salt: string, commitment: string }>} checks  the RoomView's `fairness.checks`
+ * @param {{
+ *   fairness: { game: string, locked: ReadonlyArray<{ playerId: string, turn: number, commitment: string }>, checks: ReadonlyArray<{ playerId: string, turn: number, text: string, salt: string, commitment: string }> },
+ *   playerId: string,
+ * }} input  the RoomView's `fairness`, and the computer player whose seals to follow
  * @param {typeof checkSeal} [check]  given only by tests
- * @returns {Readonly<Record<string, "checking" | "matched" | "mismatched" | "unchecked">>}
+ * @returns {ReadonlyArray<{ playerId: string, turn: number, text: string, salt: string, commitment: string, lockShown: string, hashed: "checking" | "matched" | "mismatched" | "unchecked" }>}
+ *   oldest first. `lockShown` is "" when this browser never saw the lock
  */
-export function useSealChecks(checks, check = checkSeal) {
+export function useSealChecks({ fairness, playerId }, check = checkSeal) {
+  const [shown, setShown] = useState({});
   const [results, setResults] = useState({});
+  const keyOf = (entry) => `${fairness.game}:${entry.playerId}:${entry.turn}`;
+  const theirs = (entry) => entry.playerId === playerId;
+  const checks = fairness.checks.filter(theirs);
+
+  // Remembered while rendering, so a lock and its reveal in the next update can never slip past each other.
+  const fresh = fairness.locked.filter((lock) => theirs(lock) && shown[keyOf(lock)] === undefined);
+  if (fresh.length > 0) {
+    setShown((before) => ({
+      ...Object.fromEntries(fresh.map((lock) => [keyOf(lock), lock.commitment])),
+      ...before,
+    }));
+  }
+
   // The list is a new object with every room update. Its text says whether there is anything new to check.
   const listed = JSON.stringify(checks.map(({ text, salt, commitment }) => ({ text, salt, commitment })));
-
   useEffect(() => {
     let live = true;
     const record = (commitment, result) => {
@@ -30,7 +49,9 @@ export function useSealChecks(checks, check = checkSeal) {
     };
   }, [listed, check]);
 
-  return Object.fromEntries(
-    checks.map((entry) => [entry.commitment, results[entry.commitment] ?? "checking"]),
-  );
+  return checks.map((entry) => ({
+    ...entry,
+    lockShown: shown[keyOf(entry)] ?? "",
+    hashed: results[entry.commitment] ?? "checking",
+  }));
 }

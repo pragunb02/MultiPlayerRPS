@@ -16,6 +16,16 @@ const ALL = "all";
 const HISTORY_PAGE = 100;
 
 /**
+ * The XP a board shows for a player whose whole XP is `xp`: everything except the XP from games against computer
+ * characters and the quest bonuses those games earned (ADR-025). The level stays the one their whole XP gives.
+ * `stored` is read after `xp` was, so its unranked part can only be newer, and the board can only show too little.
+ *
+ * @param {{ xp: number, level: number }} total
+ * @param {{ unrankedXp: number }} stored
+ */
+const rankedEntry = ({ xp, level }, stored) => Object.freeze({ xp: xp - stored.unrankedXp, level });
+
+/**
  * Leaderboards (CC-053): overall XP, XP this ISO week, and wins per game — for accounts only; guests are never
  * stored or listed. Scores follow recorded matches and progression; every write is idempotent (totals only ever
  * rise, weekly additions are keyed by match or quest), so a match applied twice changes nothing.
@@ -165,11 +175,12 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
         const { displayName } = match.players.find(({ playerId }) => playerId === update.playerId);
         // Quest bonuses earned by this match (CC-089) may already have raised the player's XP: the board shows
         // the latest total and level, never the older ones from progression's update.
-        const { xp } = await progressAccessor.get(update.playerId);
-        const latest =
-          xp > update.progress.xp
-            ? { xp, level: levelForXp(xp) }
+        const stored = await progressAccessor.get(update.playerId);
+        const total =
+          stored.xp > update.progress.xp
+            ? { xp: stored.xp, level: levelForXp(stored.xp) }
             : { xp: update.progress.xp, level: update.progress.level };
+        const latest = rankedEntry(total, stored);
         const player = { playerId: update.playerId, displayName, level: latest.level };
         const at = match.endedAt;
         await addXp({ player, xp: latest.xp, gained: update.xpGained, key: match.matchId, at });
@@ -180,16 +191,18 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
     },
 
     /**
-     * Bonus XP outside matches (daily quests): counts for the overall and this week's boards.
+     * Bonus XP outside matches (daily quests): counts for the overall and this week's boards, unless a game against
+     * a computer character earned it (`ranked` is false, ADR-025).
      *
-     * @param {{ playerId: string, displayName: string, key: string, xpGained: number, progress: { xp: number, level: number }, at: number }} bonus
+     * @param {{ playerId: string, displayName: string, key: string, xpGained: number, ranked: boolean, progress: { xp: number, level: number }, at: number }} bonus
      */
-    async applyBonus({ playerId, displayName, key, xpGained, progress, at }) {
-      if (!isAccountId(playerId)) {
+    async applyBonus({ playerId, displayName, key, xpGained, ranked, progress, at }) {
+      if (!isAccountId(playerId) || !ranked) {
         return;
       }
-      const player = { playerId, displayName, level: progress.level };
-      await addXp({ player, xp: progress.xp, gained: xpGained, key, at });
+      const latest = rankedEntry(progress, await progressAccessor.get(playerId));
+      const player = { playerId, displayName, level: latest.level };
+      await addXp({ player, xp: latest.xp, gained: xpGained, key, at });
     },
 
     /**
@@ -200,8 +213,9 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
      * @returns {Promise<{ moved: Record<string, number> }>}  `leaderboardEntries`: account entries that rose
      */
     async transferPlayer({ to, now }) {
-      const { xp } = await progressAccessor.get(to.id);
-      const player = { playerId: to.id, displayName: to.displayName, level: levelForXp(xp) };
+      const stored = await progressAccessor.get(to.id);
+      const { xp, level } = rankedEntry({ xp: stored.xp, level: levelForXp(stored.xp) }, stored);
+      const player = { playerId: to.id, displayName: to.displayName, level };
       const { period, startsAt, expiresAt } = weekOf(now);
       // This week's XP from matches; quest XP already on the weekly entry is kept (scores only rise).
       const weekXp = await matchXpSince(to.id, startsAt);

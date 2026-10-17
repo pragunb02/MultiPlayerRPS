@@ -28,9 +28,12 @@ import { ForbiddenError } from "../../utils/errors.js";
  *   names the moment, so the driver knows whether a planned action is still the right one
  *
  * @typedef {Object} FairnessView        what every viewer may see of the seals (CC-225)
- * @property {Array<{ playerId: string, commitment: string }>} locked    sealed moves not shown yet
- * @property {Array<{ playerId: string, commitment: string, text: string, salt: string }>} checks   shown seals,
- *   oldest first, each one checkable by hashing `text:salt`
+ * @property {string} game               names the game the seals belong to, different after a rematch. It is
+ *   made from the match id, which it does not reveal. Empty when there are no seals
+ * @property {Array<{ playerId: string, turn: number, commitment: string }>} locked    sealed moves not shown yet
+ * @property {Array<{ playerId: string, turn: number, commitment: string, text: string, salt: string }>} checks
+ *   shown seals, oldest first, each one checkable by hashing `text:salt`. `turn` names the moment a move was
+ *   sealed, the same in its lock and its check, so a browser can compare the check with the lock it was shown
  */
 
 export const NO_ACTION = Object.freeze({ kind: "none" });
@@ -39,8 +42,11 @@ export const NO_ACTION = Object.freeze({ kind: "none" });
 export const NO_BOT_TURNS = Object.freeze({
   settle: (room) => room,
   checkMove: () => undefined,
-  fairness: () => Object.freeze({ locked: [], checks: [] }),
+  fairness: () => Object.freeze({ game: "", locked: [], checks: [] }),
 });
+
+/** Names a game for the fairness view without showing its match id. */
+const gameLabel = (matchId) => createHash("sha256").update(`fairness:${matchId}`).digest("hex").slice(0, 16);
 
 const seedFor = (game, botId) =>
   createHash("sha256").update(`${game.seed}:${game.log.length}:${botId}`).digest().readUInt32BE(0);
@@ -155,12 +161,19 @@ export function createBotTurns({ bots, engines, sealMaker }) {
     fairness(room) {
       const seals = sealsOf(room);
       return {
+        game: seals.length === 0 ? "" : gameLabel(room.game.matchId),
         locked: seals
           .filter((seal) => !seal.revealed)
-          .map(({ playerId, commitment }) => ({ playerId, commitment })),
+          .map(({ playerId, sealedAt, commitment }) => ({ playerId, turn: sealedAt, commitment })),
         checks: seals
           .filter((seal) => seal.revealed)
-          .map(({ playerId, commitment, text, salt }) => ({ playerId, commitment, text, salt })),
+          .map(({ playerId, sealedAt, commitment, text, salt }) => ({
+            playerId,
+            turn: sealedAt,
+            commitment,
+            text,
+            salt,
+          })),
       };
     },
 

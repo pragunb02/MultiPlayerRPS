@@ -30,16 +30,23 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  * short, human-like pause. It acts through the room component like any player, so the engine checks its moves.
  *
  * Plans live only in this process. Rooms live in storage, so after a restart `resume` looks at every stored room
- * and plans again, and a computer player whose turn it was simply moves.
+ * and plans again, and a computer player whose turn it was simply moves. The housekeeping sweep calls `resume`
+ * every minute too, so a plan dropped after the database failed three times in a row is made again.
+ *
+ * Choosing a move waits for its turn in the server's one thinking queue (see thinkingQueue.js), so computer
+ * players never hold up the people on the server. Accepting a rematch goes through the bot component, which keeps
+ * the person within their limit of games against computers.
  *
  * Before it acts it reads the room again and asks what to do once more. When the answer changed (the person moved,
  * left or the game ended) it does nothing and plans from the room as it is now, so it never acts on a finished game
  * or an old position.
  *
  * @param {{
- *   roomComponent: Pick<ReturnType<typeof import("../rooms/roomComponent.js").createRoomComponent>, "getRoom" | "makeMove" | "requestRematch">,
+ *   roomComponent: Pick<ReturnType<typeof import("../rooms/roomComponent.js").createRoomComponent>, "getRoom" | "makeMove">,
  *   roomAccessor: Pick<ReturnType<typeof import("../../data/roomAccessor.js").createRoomAccessor>, "listAll">,
  *   botTurns: Pick<ReturnType<typeof import("./botTurns.js").createBotTurns>, "nextAction" | "moveFor">,
+ *   botComponent: Pick<ReturnType<typeof import("./botComponent.js").createBotComponent>, "acceptRematch">,
+ *   thinking: ReturnType<typeof import("./thinkingQueue.js").createThinkingQueue>,
  *   events: { emit: (event: string, payload: unknown) => void },
  *   delayMs: (action: Readonly<import("./botTurns.js").BotAction>) => number,
  *   logger: Pick<import("../../utils/logger.js").Logger, "warn" | "error">,
@@ -52,6 +59,8 @@ export function createBotDriver({
   roomComponent,
   roomAccessor,
   botTurns,
+  botComponent,
+  thinking,
   events,
   delayMs,
   logger,
@@ -61,6 +70,8 @@ export function createBotDriver({
   assertDefined(roomComponent, "roomComponent");
   assertFunction(roomAccessor?.listAll, "roomAccessor.listAll");
   assertDefined(botTurns, "botTurns");
+  assertFunction(botComponent?.acceptRematch, "botComponent.acceptRematch");
+  assertFunction(thinking?.think, "thinking.think");
   assertFunction(events?.emit, "events.emit");
   assertFunction(delayMs, "delayMs");
   assertDefined(logger, "logger");
@@ -105,27 +116,41 @@ export function createBotDriver({
     plan(room.code, action.key, delayMs(action), 1);
   }
 
+  /** The room as stored now, when the computer player still has the planned thing to do there. */
+  async function stillPlanned(code, key) {
+    const room = await roomComponent.getRoom(code);
+    if (botTurns.nextAction(room).key === key) {
+      return [room];
+    }
+    watch(room);
+    return [];
+  }
+
+  /** Does the action, and answers the changed room. Answers none when the moment passed while it thought. */
   async function perform(room, action) {
     const input = { code: room.code, playerId: action.playerId, now: now() };
     if (action.kind === "rematch") {
-      return roomComponent.requestRematch(input);
+      return [await botComponent.acceptRematch(input)];
     }
-    const move = action.kind === "answer" ? action.move : botTurns.moveFor(room, action.playerId);
-    return roomComponent.makeMove({ ...input, move });
+    if (action.kind === "answer") {
+      return [await roomComponent.makeMove({ ...input, move: action.move })];
+    }
+    const move = await thinking.think(() => botTurns.moveFor(room, action.playerId));
+    // Waiting for its turn to think may take a while: the person may have left or resigned meanwhile.
+    const fresh = await stillPlanned(room.code, action.key);
+    return Promise.all(fresh.map(() => roomComponent.makeMove({ ...input, now: now(), move })));
   }
 
   async function act(code, key, attempt) {
     if (stopped) return;
     try {
-      const room = await roomComponent.getRoom(code);
-      const action = botTurns.nextAction(room);
-      if (action.key !== key) {
-        watch(room);
+      const [room] = await stillPlanned(code, key);
+      if (room === undefined) {
         return;
       }
-      const changed = await perform(room, action);
+      const changed = await perform(room, botTurns.nextAction(room));
       // The person in the room only hears about it through this: nobody's socket made the change.
-      events.emit(ROOM_EVENTS.UPDATED, { room: changed });
+      changed.forEach((after) => events.emit(ROOM_EVENTS.UPDATED, { room: after }));
     } catch (err) {
       if (isGone(err)) return;
       if (attempt >= MAX_ATTEMPTS) throw err;
@@ -142,7 +167,10 @@ export function createBotDriver({
      */
     watch,
 
-    /** Plans for every stored room. Called at start up, and now and then in case a plan was lost. */
+    /**
+     * Plans for every stored room. Called at start up, and by the housekeeping sweep every minute in case a plan
+     * was dropped. A room that already has the right plan keeps it, so calling this often changes nothing.
+     */
     async resume() {
       for (const room of await roomAccessor.listAll()) {
         watch(room);

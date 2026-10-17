@@ -163,6 +163,25 @@ describe("gamificationComponent.applyMatch", () => {
     );
   });
 
+  it("keeps a quest bonus off the leaderboards when a game against a computer completed the quest (ADR-025)", async () => {
+    const { finish, published } = setup();
+    const rocky = { playerId: "bot_rocky_easy", displayName: "Rocky" };
+
+    await finish(match({ players: [ALICE, rocky] }));
+    await finish(match({ at: T + 1 }));
+    await finish(match({ at: T + 2 }));
+
+    const bonuses = published
+      .filter((p) => p.event === PROGRESSION_EVENTS.UPDATED && p.payload.source === "quest")
+      .map(({ payload }) => [payload.key, payload.ranked]);
+    expect(bonuses).toEqual([
+      [questKey("2026-10-16", "win-1"), false],
+      [questKey("2026-10-16", "rps-win-2"), true],
+      [questKey("2026-10-16", "play-3"), true],
+      [questKey("2026-10-16", "sweep"), true],
+    ]);
+  });
+
   it("changes nothing and tells nobody when the same match is applied again", async () => {
     const { finish, gamification, progression, published } = setup();
     const m = await finish(match());

@@ -5,6 +5,7 @@ import { captureLogger } from "../../testing/captureLogger.js";
 import { GoneError } from "../../utils/errors.js";
 import { ROOM_EVENTS } from "../rooms/roomComponent.js";
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./botDriver.js";
+import { createThinkingQueue } from "./thinkingQueue.js";
 
 const PAUSE = 500;
 const ROCKY = "bot_rocky_easy";
@@ -15,7 +16,13 @@ const UNBEATABLE_PIP = "bot_pip_hard";
  * change reaches the driver, as the composition root wires it. Without, the driver only knows what a test tells
  * it. `updates` are the room views the driver announced.
  */
-function setup({ seed = 1, wrapRooms = (rooms) => rooms, delayMs = () => PAUSE, wired = true } = {}) {
+function setup({
+  seed = 1,
+  wrapRooms = (rooms) => rooms,
+  delayMs = () => PAUSE,
+  wired = true,
+  thinking = createThinkingQueue(),
+} = {}) {
   const late = {};
   const base = botRooms({ seed, onChange: (room) => wired && late.driver.watch(room) });
   const updates = [];
@@ -24,6 +31,8 @@ function setup({ seed = 1, wrapRooms = (rooms) => rooms, delayMs = () => PAUSE, 
     roomComponent: wrapRooms(base.rooms),
     roomAccessor: base.roomAccessor,
     botTurns: base.botTurns,
+    botComponent: base.botComponent,
+    thinking,
     events: { emit: (event, payload) => event === ROOM_EVENTS.UPDATED && updates.push(payload.room) },
     delayMs,
     logger: capture.logger,
@@ -147,7 +156,8 @@ describe("botDriver", () => {
     await playComputer({ gameId: GAME_IDS.RPS });
 
     await driver.resume();
-    await vi.advanceTimersByTimeAsync(PAUSE);
+    // The second computer player thinks after the first one's short rest.
+    await vi.advanceTimersByTimeAsync(PAUSE + 10);
 
     expect(updates.map((room) => room.code).sort()).toEqual(["ROOM22", "ROOM33"]);
   });
@@ -192,6 +202,83 @@ describe("botDriver", () => {
     ]);
   });
 
+  it("makes a dropped plan again when resumed, after every attempt failed", async () => {
+    let failing = true;
+    const { playComputer, driver, updates } = setup({
+      wired: false,
+      wrapRooms: (rooms) => ({
+        ...rooms,
+        makeMove: async (input) => {
+          if (failing) throw new Error("database down");
+          return rooms.makeMove(input);
+        },
+      }),
+    });
+    const room = await playComputer({ gameId: GAME_IDS.RPS });
+    driver.watch(room);
+    await vi.advanceTimersByTimeAsync(PAUSE + 100 + 100);
+    expect(updates).toEqual([]);
+
+    // The database is back. Nothing in the room changes, so only the housekeeping sweep can make the plan again.
+    failing = false;
+    await driver.resume();
+    await vi.advanceTimersByTimeAsync(PAUSE);
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0].game.state.pending[ROCKY]).toBe(JSON.parse(room.game.seals[0].text).choice);
+  });
+
+  it("does not plan twice when resumed while a plan is waiting", async () => {
+    const { playComputer, driver, updates } = setup({ wired: false });
+    driver.watch(await playComputer({ gameId: GAME_IDS.RPS }));
+
+    await driver.resume();
+    await driver.resume();
+    await vi.advanceTimersByTimeAsync(PAUSE * 4);
+
+    expect(updates).toHaveLength(1);
+  });
+
+  it("chooses every move in the server's thinking queue", async () => {
+    const queue = createThinkingQueue();
+    const thinking = { think: vi.fn((work) => queue.think(work)) };
+    const { playComputer, driver, updates } = setup({ thinking });
+
+    driver.watch(await playComputer({ gameId: GAME_IDS.CHESS, level: "easy" }));
+    driver.watch(await playComputer({ gameId: GAME_IDS.CHESS, level: "easy" }));
+    await vi.advanceTimersByTimeAsync(PAUSE * 2);
+
+    const moved = updates.filter((room) => room.game.log.length > 0);
+    expect(thinking.think).toHaveBeenCalledTimes(moved.length);
+    expect(moved.length).toBeGreaterThan(0);
+  });
+
+  it("makes no move when the person left while it waited for its turn to think", async () => {
+    let release;
+    const thinking = {
+      think: (work) =>
+        new Promise((resolve) => {
+          release = () => resolve(work());
+        }),
+    };
+    const { playComputer, driver, updates, rooms } = setup({ wired: false, thinking });
+    const room = await playComputer({ gameId: GAME_IDS.TIC_TAC_TOE, level: "easy" });
+    const pip = room.seats.find((seat) => seat.bot !== undefined).playerId;
+    const first =
+      room.game.state.turn === pip
+        ? room
+        : await rooms.makeMove({ code: room.code, playerId: PERSON.id, move: { cell: 0 }, now: 2 });
+    driver.watch(first);
+    await vi.advanceTimersByTimeAsync(PAUSE);
+
+    await rooms.leaveRoom({ code: room.code, playerId: PERSON.id, now: 3 });
+    release();
+    await vi.advanceTimersByTimeAsync(PAUSE);
+
+    expect(updates).toEqual([]);
+    expect((await rooms.getRoom(room.code)).game.log.filter((e) => e.playerId === pip)).toEqual([]);
+  });
+
   it("does nothing once stopped", async () => {
     const { playComputer, driver, updates } = setup();
     const room = await playComputer({ gameId: GAME_IDS.RPS });
@@ -223,13 +310,24 @@ describe("botDriver", () => {
       roomComponent: rooms,
       roomAccessor,
       botTurns,
+      botComponent: botRooms().botComponent,
+      thinking: createThinkingQueue(),
       events: { emit() {} },
       delayMs: () => 0,
       logger: captureLogger().logger,
     };
 
     expect(() => createBotDriver(base)).not.toThrow();
-    for (const missing of ["roomComponent", "roomAccessor", "botTurns", "events", "delayMs", "logger"]) {
+    for (const missing of [
+      "roomComponent",
+      "roomAccessor",
+      "botTurns",
+      "botComponent",
+      "thinking",
+      "events",
+      "delayMs",
+      "logger",
+    ]) {
       expect(() => createBotDriver({ ...base, [missing]: undefined })).toThrow(TypeError);
     }
   });

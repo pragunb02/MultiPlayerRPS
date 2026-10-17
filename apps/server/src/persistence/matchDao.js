@@ -19,10 +19,11 @@ const MATCH_SCHEMA_VERSION = 1;
  * @property {number} schemaVersion
  * @property {MatchCreditDoc} [credit]   set once the match was judged (CC-095)
  *
- * @typedef {{ notCounted: Array<{ playerId: string, reason: string, withdrawnFrom?: string }>, botXp?: Array<{ playerId: string, xp: number, left: number }> }} MatchCreditDoc
+ * @typedef {{ notCounted: Array<{ playerId: string, reason: string, withdrawnFrom?: string }>, botXp?: Array<{ playerId: string, xp: number, left: number, withdrawnFrom?: string, withdrawnXp?: number }> }} MatchCreditDoc
  *   the players the match does not count for. `withdrawnFrom` names the guest it counted for before the guest's
  *   games moved to this player. In a game against a computer character, `botXp` holds what it gave each person
- *   within the day's limit and how much of the limit was left (ADR-025)
+ *   within the day's limit and how much of the limit was left (ADR-025). When it gave the guest more than the
+ *   account had left, `withdrawnXp` is the part taken away
  */
 
 const matchSchema = new mongoose.Schema(
@@ -195,7 +196,8 @@ export function createMatchDao({ connection }) {
     },
 
     /**
-     * The games of `playerId` that counted for guest `from`, but stopped counting when they moved to `playerId`.
+     * The games of `playerId` that counted for guest `from`, but stopped counting when they moved to `playerId`, or
+     * that give `playerId` less XP than they gave the guest (games against a computer character, ADR-025).
      *
      * @param {{ playerId: string, from: string }} query
      * @returns {Promise<MatchDoc[]>} oldest first
@@ -204,7 +206,10 @@ export function createMatchDao({ connection }) {
       Match.find(
         {
           "players.playerId": playerId,
-          "credit.notCounted": { $elemMatch: { playerId, withdrawnFrom: from } },
+          $or: [
+            { "credit.notCounted": { $elemMatch: { playerId, withdrawnFrom: from } } },
+            { "credit.botXp": { $elemMatch: { playerId, withdrawnFrom: from } } },
+          ],
         },
         FIELDS,
       )

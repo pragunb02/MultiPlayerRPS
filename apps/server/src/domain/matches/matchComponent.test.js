@@ -97,6 +97,27 @@ describe("matchComponent", () => {
   });
 });
 
+describe("matchComponent: computer characters in history (ADR-025)", () => {
+  it("labels a computer character among the players as a computer, in the list and in the details", async () => {
+    const matches = setup();
+    const seats = [
+      { playerId: "guest_a", displayName: "Alice", connected: true },
+      { playerId: "bot_rocky_easy", displayName: "Rocky", connected: true },
+    ];
+    await matches.recordFinished({ room: room({ seats }), outcome: WIN_A });
+
+    const [listed] = await matches.listForPlayer({ playerId: "guest_a", limit: 10 });
+    const details = await matches.getForPlayer({ matchId: listed.matchId, playerId: "guest_a" });
+
+    const expected = [
+      { playerId: "guest_a", displayName: "Alice" },
+      { playerId: "bot_rocky_easy", displayName: "Rocky", computer: true },
+    ];
+    expect(listed.players).toEqual(expected);
+    expect(details.players).toEqual(expected);
+  });
+});
+
 describe("matchComponent: judging whether a match counts (CC-095)", () => {
   const ALICE = { playerId: "guest_a", displayName: "Alice", connected: true };
   const BOB = { playerId: "guest_b", displayName: "Bob", connected: true };
@@ -299,6 +320,47 @@ describe("matchComponent: a guest's history moving to their account (CC-032)", (
       expect(await countsFor("m-guest-carol")).toEqual({ counted: true });
       expect((await matches.getById("m-guest-2")).credit.notCounted).toEqual([
         { playerId: ACCOUNT.id, reason: NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT, withdrawnFrom: "guest_a" },
+      ]);
+    });
+
+    it("gives a guest's games against a computer only what the account has left of the day's limit (ADR-025)", async () => {
+      const matches = setup();
+      const rocky = { playerId: "bot_rocky_easy", displayName: "Rocky", connected: true };
+      const pip = { playerId: "bot_pip_easy", displayName: "Pip", connected: true };
+      // Nine losses give the account 90 of the day's 100 XP from computer games.
+      for (let i = 0; i < 9; i++) {
+        await played(matches, `m-own-${i}`, [accountSeat, rocky], i);
+      }
+      // The guest won both, 30 XP each as a guest.
+      await played(matches, "m-guest-1", [ALICE, rocky], 100);
+      await played(matches, "m-guest-2", [ALICE, pip], 101);
+
+      await matches.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 });
+
+      expect((await matches.getById("m-guest-1")).credit).toEqual({
+        notCounted: [],
+        botXp: [{ playerId: ACCOUNT.id, xp: 10, left: 0, withdrawnFrom: "guest_a", withdrawnXp: 20 }],
+      });
+      expect((await matches.getById("m-guest-2")).credit.botXp).toEqual([
+        { playerId: ACCOUNT.id, xp: 0, left: 0, withdrawnFrom: "guest_a", withdrawnXp: 30 },
+      ]);
+      // Both still count for the account's quests and history, only the XP is held to the limit.
+      expect(
+        (await matches.getForPlayer({ matchId: "m-guest-2", playerId: ACCOUNT.id })).countsForYou,
+      ).toEqual({
+        counted: true,
+      });
+    });
+
+    it("leaves a guest's game against a computer as it was when the account has enough of the limit left", async () => {
+      const matches = setup();
+      const rocky = { playerId: "bot_rocky_easy", displayName: "Rocky", connected: true };
+      await played(matches, "m-guest-1", [ALICE, rocky], 100);
+
+      await matches.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 });
+
+      expect((await matches.getById("m-guest-1")).credit.botXp).toEqual([
+        { playerId: ACCOUNT.id, xp: 30, left: 70 },
       ]);
     });
 

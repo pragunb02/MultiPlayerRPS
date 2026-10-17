@@ -196,6 +196,21 @@ describe("leaderboardComponent", () => {
     expect(await entries("tic-tac-toe")).toEqual([]);
   });
 
+  it("leaves the XP of earlier games against computers out of the overall board after a game between people (ADR-025)", async () => {
+    const { play, entries, progressAccessor } = setup();
+    await progressAccessor.applyMatchOnce({
+      playerId: ALICE.id,
+      matchId: "m-pip",
+      inc: { xp: 90, unrankedXp: 90 },
+      at: NOW,
+    });
+    await progressAccessor.applyMatchOnce({ playerId: ALICE.id, matchId: "m-bob", inc: { xp: 30 }, at: NOW });
+
+    await play({}, [update(ALICE, { xp: 120, level: 2 })]);
+
+    expect(await entries("overall")).toEqual([{ rank: 1, displayName: "alice", level: 2, score: 30 }]);
+  });
+
   it("ranks a tie by who reached the score first", async () => {
     const { play, entries } = setup();
     await play({ winner: BOB, loser: ALICE, endedAt: NOW - 10 }, [update(BOB, { xp: 30 })]);
@@ -298,11 +313,53 @@ describe("leaderboardComponent", () => {
       const { boards, entries } = setup();
       const bonus = { ...ALICE, playerId: ALICE.id, key: "quest:2026-10-16:win-1", xpGained: 20, at: NOW };
 
-      await boards.applyBonus({ ...bonus, progress: { xp: 20, level: 1 } });
-      await boards.applyBonus({ ...bonus, progress: { xp: 20, level: 1 } });
+      await boards.applyBonus({ ...bonus, ranked: true, progress: { xp: 20, level: 1 } });
+      await boards.applyBonus({ ...bonus, ranked: true, progress: { xp: 20, level: 1 } });
 
       expect(await entries("overall")).toEqual([{ rank: 1, displayName: "alice", level: 1, score: 20 }]);
       expect(await entries("weekly")).toEqual([{ rank: 1, displayName: "alice", level: 1, score: 20 }]);
+    });
+
+    it("keeps a bonus that a game against a computer character earned off both boards (ADR-025)", async () => {
+      const { boards, entries } = setup();
+
+      await boards.applyBonus({
+        playerId: ALICE.id,
+        displayName: ALICE.displayName,
+        key: "quest:2026-10-16:win-1",
+        xpGained: 60,
+        ranked: false,
+        progress: { xp: 60, level: 2 },
+        at: NOW,
+      });
+
+      expect(await entries("overall")).toEqual([]);
+      expect(await entries("weekly")).toEqual([]);
+    });
+
+    it("leaves the XP of earlier games against computers out of the overall board when a quest bonus posts it (ADR-025)", async () => {
+      const { boards, entries, progressAccessor } = setup();
+      // Three wins against Pip, then a quest bonus earned in a game between people.
+      await progressAccessor.applyMatchOnce({
+        playerId: ALICE.id,
+        matchId: "m-pip",
+        inc: { xp: 90, unrankedXp: 90 },
+        at: NOW,
+      });
+      await progressAccessor.applyAwardOnce({ playerId: ALICE.id, key: "quest:q", inc: { xp: 20 }, at: NOW });
+
+      await boards.applyBonus({
+        playerId: ALICE.id,
+        displayName: ALICE.displayName,
+        key: "quest:q",
+        xpGained: 20,
+        ranked: true,
+        progress: { xp: 110, level: 2 },
+        at: NOW,
+      });
+
+      expect(await entries("overall")).toEqual([{ rank: 1, displayName: "alice", level: 2, score: 20 }]);
+      expect(await entries("weekly")).toEqual([{ rank: 1, displayName: "alice", level: 2, score: 20 }]);
     });
 
     it("ignores guests", async () => {
@@ -313,6 +370,7 @@ describe("leaderboardComponent", () => {
         displayName: GUEST.displayName,
         key: "quest:2026-10-16:sweep",
         xpGained: 30,
+        ranked: true,
         progress: { xp: 30, level: 1 },
         at: NOW,
       });
@@ -361,6 +419,20 @@ describe("leaderboardComponent", () => {
 
       expect((await entries("weekly"))[0].score).toBe(30);
       expect((await entries("tic-tac-toe"))[0].score).toBe(1);
+    });
+
+    it("leaves the account's XP from games against computers out of the overall board (ADR-025)", async () => {
+      const { boards, progressAccessor, entries } = setup();
+      await progressAccessor.applyMatchOnce({
+        playerId: ALICE.id,
+        matchId: "m",
+        inc: { xp: 130, unrankedXp: 100 },
+        at: NOW,
+      });
+
+      await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW });
+
+      expect(await entries("overall")).toEqual([{ rank: 1, displayName: "alice", level: 2, score: 30 }]);
     });
 
     it("is idempotent", async () => {

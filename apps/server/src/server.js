@@ -19,6 +19,7 @@ import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botC
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
 import { createBotTurns } from "./domain/bots/botTurns.js";
 import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
+import { createThinkingQueue } from "./domain/bots/thinkingQueue.js";
 import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
@@ -194,8 +195,9 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
 
 /**
  * Periodic work: close idle rooms, apply game deadlines that have passed (a chess flag falling while nobody
- * moves), and finish guest → account transfers that were interrupted (CC-032). A failing run is logged and the
- * next one still happens. Timers don't keep the process alive.
+ * moves), and finish guest → account transfers that were interrupted (CC-032). With the room sweep, computer
+ * players plan again for every room, so one whose plan was dropped after the database kept failing still moves
+ * (CC-138). A failing run is logged and the next one still happens. Timers don't keep the process alive.
  *
  * Once a minute it also logs a gauge: how many rooms are open in each status and how many realtime connections and
  * players there are (CC-107). Operators read it to see how close the server is to its limits (roomLimits.js).
@@ -204,6 +206,7 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
  *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "sweepExpired" | "expireDue" | "countRooms">,
  *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "resumePending">,
  *   connections: () => { connections: number, players: number },
+ *   botDriver: Pick<ReturnType<typeof createBotDriver>, "resume">,
  *   logger: Logger,
  *   now?: () => number,
  *   sweepIntervalMs?: number,
@@ -214,6 +217,7 @@ export function startHousekeeping({
   roomComponent,
   playerTransferComponent,
   connections,
+  botDriver,
   logger,
   now = Date.now,
   sweepIntervalMs = ROOM_SWEEP_INTERVAL_MS,
@@ -228,6 +232,7 @@ export function startHousekeeping({
   };
   const timers = [
     every(sweepIntervalMs, () => roomComponent.sweepExpired({ now: now() }), "room sweep failed"),
+    every(sweepIntervalMs, () => botDriver.resume(), "planning for computer players failed"),
     every(
       CLOCK_TICK_INTERVAL_MS,
       () => roomComponent.expireDue({ now: now() }),
@@ -388,6 +393,8 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     roomComponent,
     roomAccessor,
     botTurns,
+    botComponent,
+    thinking: createThinkingQueue(),
     events: domainEvents,
     delayMs: pauseBetween(bots.pauseMs ?? HUMAN_PAUSE_MS),
     logger,
@@ -508,6 +515,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     roomComponent,
     playerTransferComponent,
     connections: gateway.counts,
+    botDriver,
     logger,
     now,
     sweepIntervalMs: rooms.sweepIntervalMs,

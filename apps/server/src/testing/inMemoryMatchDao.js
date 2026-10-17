@@ -60,7 +60,9 @@ export function createInMemoryMatchDao() {
       return [...matches.values()]
         .filter((m) => has(m, playerId))
         .filter((m) =>
-          (m.credit?.notCounted ?? []).some((e) => e.playerId === playerId && e.withdrawnFrom === from),
+          [...(m.credit?.notCounted ?? []), ...(m.credit?.botXp ?? [])].some(
+            (e) => e.playerId === playerId && e.withdrawnFrom === from,
+          ),
         )
         .sort((a, b) => a.endedAt - b.endedAt)
         .map(copy);

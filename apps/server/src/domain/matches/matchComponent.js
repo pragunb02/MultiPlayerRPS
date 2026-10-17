@@ -35,26 +35,47 @@ export function createMatchComponent({ matchAccessor }) {
           excluding: match.matchId,
         });
 
-  /** How a match counts for one player, against their other games as stored now. */
-  const verdictFor = async (match, playerId) =>
-    judgeMatch({ match, playerId, others: await othersFor(match, playerId) });
-
   /**
    * A guest's game, now the account's: it keeps its verdict, except that a game which counted for the guest stops
    * counting when the account's own games of that day already reached a limit. It then names the guest, so
-   * progression can take back what the guest earned from it.
+   * progression can take back what the guest earned from it. A game against a computer character that still counts
+   * may give less, see `capBotXp`.
    */
   async function creditAfterMove({ match, from, to }) {
     if (match.credit === undefined || !creditFor(match, to).counted) {
       return match;
     }
-    const verdict = await verdictFor(match, to);
-    if (verdict.counted) {
+    const others = await othersFor(match, to);
+    const verdict = judgeMatch({ match, playerId: to, others });
+    if (!verdict.counted) {
+      const withdrawn = { playerId: to, reason: verdict.reason, withdrawnFrom: from };
+      return { ...match, credit: { ...match.credit, notCounted: [...match.credit.notCounted, withdrawn] } };
+    }
+    return match.credit.botXp === undefined ? match : capBotXp({ match, from, to, others });
+  }
+
+  /**
+   * A guest's game against a computer character, now the account's, gives only what the account has left of the
+   * day's limit for such games (ADR-025). Without this a player could earn the limit again as each new guest. The
+   * part taken away names the guest, so progression can take it out of what the guest earned.
+   */
+  function capBotXp({ match, from, to, others }) {
+    const moved = match.credit.botXp.find((entry) => entry.playerId === to);
+    const { xp, left } = botXpFor({ match, playerId: to, others, award: moved.xp });
+    if (xp === moved.xp) {
       return match;
     }
-    const withdrawn = { playerId: to, reason: verdict.reason, withdrawnFrom: from };
-    return { ...match, credit: { ...match.credit, notCounted: [...match.credit.notCounted, withdrawn] } };
+    const capped = { playerId: to, xp, left, withdrawnFrom: from, withdrawnXp: moved.xp - xp };
+    const botXp = match.credit.botXp.map((entry) => (entry === moved ? capped : entry));
+    return { ...match, credit: { ...match.credit, botXp } };
   }
+
+  /**
+   * The players as history shows them. A computer character is labelled as one, so it never reads as a person
+   * with the same name (ADR-025).
+   */
+  const labelled = (players) =>
+    players.map((player) => (isBotPlayerId(player.playerId) ? { ...player, computer: true } : player));
 
   /** How the match went for one player. */
   function outcomeFor(match, playerId) {
@@ -116,7 +137,7 @@ export function createMatchComponent({ matchAccessor }) {
 
     /**
      * A player's history, newest first. `countsForYou` says whether the game counted for this player, and why
-     * not (CC-095).
+     * not (CC-095). A computer character among the players has `computer: true`.
      *
      * @param {{ playerId: string, limit: number, before?: number }} query
      */
@@ -125,7 +146,7 @@ export function createMatchComponent({ matchAccessor }) {
       return matches.map((match) => ({
         matchId: match.matchId,
         gameId: match.gameId,
-        players: match.players,
+        players: labelled(match.players),
         result: match.result,
         startedAt: match.startedAt,
         endedAt: match.endedAt,
@@ -148,6 +169,7 @@ export function createMatchComponent({ matchAccessor }) {
       }
       return {
         ...match,
+        players: labelled(match.players),
         outcomeForYou: outcomeFor(match, playerId),
         countsForYou: creditFor({ ...match, credit }, playerId),
       };

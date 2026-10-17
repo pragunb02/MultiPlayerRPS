@@ -182,6 +182,19 @@ export function xpFor(match, playerId, award) {
 }
 
 /**
+ * The XP a guest's game against a computer character no longer gives, now that it is the account's: the part past
+ * what the account's own games of that day had left of the daily limit (ADR-025). Only for a game that
+ * `listWithdrawn` found with such a part.
+ *
+ * @param {Readonly<import("../../data/matchAccessor.js").Match>} match
+ * @param {string} playerId  the account
+ * @returns {number}
+ */
+export function botXpWithdrawnFrom(match, playerId) {
+  return match.credit.botXp.find((entry) => entry.playerId === playerId).withdrawnXp;
+}
+
+/**
  * How much of the day's limit for games against computer characters was left after this match, for a player who
  * played one. Only matches against a computer character that were judged have it.
  *

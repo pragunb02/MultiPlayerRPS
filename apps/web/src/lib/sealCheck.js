@@ -19,3 +19,37 @@ export async function checkSeal({ text, salt, commitment }, subtle = globalThis.
 
 /** The start and the end of a lock, short enough to read: `7f3a…c21`. */
 export const shortLock = (commitment) => `${commitment.slice(0, 4)}…${commitment.slice(-3)}`;
+
+/** The throw a revealed move names, or "" when its text is not a move this app can read. */
+function choiceIn(text) {
+  try {
+    return JSON.parse(text).choice ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * What a shown seal proves (CC-225). A matching hash alone proves nothing: the server could make a new lock after
+ * seeing the person's throw and send a hash that fits it. So the check counts only when its lock is the very one
+ * this browser was shown before the round, and its move is the throw that decided the round.
+ *
+ * @param {{
+ *   lockShown: string,
+ *   check: { text: string, commitment: string },
+ *   played: string,
+ *   hashed: "checking" | "matched" | "mismatched" | "unchecked",
+ * }} input  `lockShown` is the lock this browser showed before the round, "" when it saw none (the page was
+ *   opened after the round). `played` is the computer's throw in the round's result, "" when no round was played
+ *   with it (the game ended first). `hashed` is how the hash of the move and the key came out
+ * @returns {"checking" | "matched" | "mismatched" | "unchecked" | "unseen"}
+ */
+export function sealVerdict({ lockShown, check, played, hashed }) {
+  if (lockShown === "") {
+    return "unseen";
+  }
+  if (lockShown !== check.commitment || (played !== "" && choiceIn(check.text) !== played)) {
+    return "mismatched";
+  }
+  return hashed;
+}

@@ -39,7 +39,8 @@ describe("botTurns: Rock Paper Scissors seals (CC-225)", () => {
     ]);
     const view = rooms.viewFor(room, PERSON.id);
     expect(view.fairness).toEqual({
-      locked: [{ playerId: ROCKY, commitment: room.game.seals[0].commitment }],
+      game: expect.stringMatching(/^[0-9a-f]{16}$/),
+      locked: [{ playerId: ROCKY, turn: 0, commitment: room.game.seals[0].commitment }],
       checks: [],
     });
     expect(JSON.stringify(view)).not.toContain(room.game.seals[0].salt);
@@ -105,7 +106,8 @@ describe("botTurns: Rock Paper Scissors seals (CC-225)", () => {
     });
 
     expect(rooms.viewFor(played, PERSON.id).fairness).toEqual({
-      locked: [{ playerId: ROCKY, commitment: started.game.seals[0].commitment }],
+      game: rooms.viewFor(started, PERSON.id).fairness.game,
+      locked: [{ playerId: ROCKY, turn: 0, commitment: started.game.seals[0].commitment }],
       checks: [],
     });
   });
@@ -200,6 +202,30 @@ describe("botTurns: rematches", () => {
     expect(botTurns.nextAction(asked)).toEqual({ kind: "rematch", playerId: ROCKY, key: "m1:rematch" });
   });
 
+  it("names the rematch's seals as another game, so a browser never mixes them up with the last game's", async () => {
+    const { playComputer, rooms } = botRooms();
+    const room = await playComputer({ gameId: GAME_IDS.RPS, options: { bestOf: 1 } });
+    const firstGame = rooms.viewFor(room, PERSON.id).fairness;
+    let current = room;
+    while (current.status === "playing") {
+      const choice = sealedChoice(current);
+      await rooms.makeMove({ code: room.code, playerId: ROCKY, move: { choice }, now: 2 });
+      current = await rooms.makeMove({
+        code: room.code,
+        playerId: PERSON.id,
+        move: { choice: OTHER_CHOICE[choice] },
+        now: 3,
+      });
+    }
+    await rooms.requestRematch({ code: room.code, playerId: PERSON.id, now: 4 });
+
+    const rematch = await rooms.requestRematch({ code: room.code, playerId: ROCKY, now: 5 });
+
+    const secondGame = rooms.viewFor(rematch, PERSON.id).fairness;
+    expect(secondGame.locked[0].turn).toBe(firstGame.locked[0].turn);
+    expect(secondGame.game).not.toBe(firstGame.game);
+  });
+
   it("does nothing in a finished game nobody can play again", async () => {
     const { playComputer, rooms, botTurns } = botRooms();
     const room = await playComputer({ gameId: GAME_IDS.RPS });
@@ -247,13 +273,13 @@ describe("botTurns: rooms without a computer player, or without a game", () => {
     expect(botTurns.settle(withBot)).toBe(withBot);
     expect(botTurns.nextAction(plain)).toBe(NO_ACTION);
     expect(botTurns.nextAction(withBot)).toBe(NO_ACTION);
-    expect(botTurns.fairness(plain)).toEqual({ locked: [], checks: [] });
+    expect(botTurns.fairness(plain)).toEqual({ game: "", locked: [], checks: [] });
   });
 
   it("has rules that change nothing for a server without computer players", () => {
     expect(NO_BOT_TURNS.settle(plain)).toBe(plain);
     expect(NO_BOT_TURNS.checkMove({ room: plain, playerId: PERSON.id, move: {} })).toBeUndefined();
-    expect(NO_BOT_TURNS.fairness(plain)).toEqual({ locked: [], checks: [] });
+    expect(NO_BOT_TURNS.fairness(plain)).toEqual({ game: "", locked: [], checks: [] });
   });
 
   it("needs its bots, engines and seal maker", async () => {

@@ -261,4 +261,30 @@ export function runMatchDaoContract(createDao) {
       expect.objectContaining({ players: user, credit: withdrawn("user_1", "guest_a") }),
     );
   });
+
+  it("also lists the games against a computer character that give a player less XP than they gave the guest", async () => {
+    const dao = await createDao();
+    const user = [
+      { playerId: "user_1", displayName: "Riya" },
+      { playerId: "bot_rocky_easy", displayName: "Rocky" },
+    ];
+    const botXp = (entry) => ({ notCounted: [], botXp: [{ playerId: "user_1", xp: 10, left: 0, ...entry }] });
+    await dao.insert(matchDoc({ matchId: "m-capped", players: user }));
+    await dao.insert(matchDoc({ matchId: "m-other-guest", players: user }));
+    await dao.insert(matchDoc({ matchId: "m-full", players: user }));
+    await dao.judgeOnce({
+      matchId: "m-capped",
+      credit: botXp({ withdrawnFrom: "guest_a", withdrawnXp: 20 }),
+    });
+    await dao.judgeOnce({
+      matchId: "m-other-guest",
+      credit: botXp({ withdrawnFrom: "guest_c", withdrawnXp: 20 }),
+    });
+    await dao.judgeOnce({ matchId: "m-full", credit: botXp({}) });
+
+    const listed = await dao.listWithdrawn({ playerId: "user_1", from: "guest_a" });
+
+    expect(listed.map((m) => m.matchId)).toEqual(["m-capped"]);
+    expect(listed[0].credit).toEqual(botXp({ withdrawnFrom: "guest_a", withdrawnXp: 20 }));
+  });
 }

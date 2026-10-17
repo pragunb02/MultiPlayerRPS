@@ -7,7 +7,7 @@ import { ROOM_EVENTS } from "../rooms/roomComponent.js";
 /**
  * How many games against computer characters one player can have going at once. Each computer move costs the server
  * a little thinking (a strong chess level up to a quarter of a second), so one player must not be able to keep many
- * going. Starting one more ends the oldest, which counts as leaving it.
+ * going. Starting one more ends the oldest, which counts as leaving it. That holds for a new game and for a rematch.
  */
 export const MAX_COMPUTER_GAMES = 3;
 
@@ -43,7 +43,7 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  * usual create and join.
  *
  * @param {{
- *   roomComponent: Pick<ReturnType<typeof import("../rooms/roomComponent.js").createRoomComponent>, "createRoom" | "joinRoom" | "leaveRoom">,
+ *   roomComponent: Pick<ReturnType<typeof import("../rooms/roomComponent.js").createRoomComponent>, "createRoom" | "joinRoom" | "leaveRoom" | "getRoom" | "requestRematch">,
  *   roomAccessor: Pick<ReturnType<typeof import("../../data/roomAccessor.js").createRoomAccessor>, "listBySeat">,
  *   events: { emit: (event: string, payload: unknown) => void },
  * }} deps
@@ -53,11 +53,37 @@ export function createBotComponent({ roomComponent, roomAccessor, events }) {
   assertFunction(roomAccessor?.listBySeat, "roomAccessor.listBySeat");
   assertFunction(events?.emit, "events.emit");
 
-  /** Ends the player's oldest games against computers, so one more fits within MAX_COMPUTER_GAMES. */
-  async function endOldestGames({ playerId, now }) {
+  /**
+   * Each person's starts, one after another. Two starts at the same moment (two tabs, or many requests sent at
+   * once) would each count the games going before either had started its own, and both would fit. In turn, each
+   * one counts the other's game. The server runs as one process, so this line is the whole truth.
+   */
+  const lines = new Map();
+
+  /** Runs `work` when the person's earlier starts are done. */
+  function inTurn(playerId, work) {
+    const turn = (lines.get(playerId) ?? Promise.resolve()).then(work);
+    const settled = turn.then(
+      () => undefined,
+      () => undefined,
+    );
+    lines.set(playerId, settled);
+    // The last start of a person also clears the line, so it does not stay in memory.
+    settled.then(() => lines.get(playerId) === settled && lines.delete(playerId));
+    return turn;
+  }
+
+  /**
+   * Ends the person's oldest games against computers, so that with the game in room `keep`, which has just
+   * started, at most MAX_COMPUTER_GAMES are going. Checked after the start, so nothing slips past while it starts.
+   */
+  async function endOldestGames({ playerId, keep, now }) {
     const going = (await roomAccessor.listBySeat(playerId))
       .filter(
-        (room) => room.status === ROOM_STATUS.PLAYING && room.seats.some((seat) => seat.bot !== undefined),
+        (room) =>
+          room.code !== keep &&
+          room.status === ROOM_STATUS.PLAYING &&
+          room.seats.some((seat) => seat.bot !== undefined),
       )
       .sort((a, b) => a.createdAt - b.createdAt);
     for (const old of going.slice(0, Math.max(0, going.length - MAX_COMPUTER_GAMES + 1))) {
@@ -81,10 +107,32 @@ export function createBotComponent({ roomComponent, roomAccessor, events }) {
      */
     async playComputer({ host, gameId, options, level, now }) {
       const bot = botIdentity({ gameId, level });
-      // The new room waits for the computer until the old games are ended, so it is never one of them.
-      const room = await roomComponent.createRoom({ host, gameId, options, now });
-      await endOldestGames({ playerId: host.id, now });
-      return roomComponent.joinRoom({ code: room.code, player: bot, now });
+      return inTurn(host.id, async () => {
+        const room = await roomComponent.createRoom({ host, gameId, options, now });
+        const started = await roomComponent.joinRoom({ code: room.code, player: bot, now });
+        await endOldestGames({ playerId: host.id, keep: room.code, now });
+        return started;
+      });
+    },
+
+    /**
+     * A computer player says yes to the rematch the person asked for. When that starts a new game, the person's
+     * oldest games against computers end as for any new one, so a rematch never takes them past
+     * MAX_COMPUTER_GAMES.
+     *
+     * @param {{ code: string, playerId: string, now: number }} input  `playerId` is the computer player's
+     * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>} the room after the answer
+     */
+    async acceptRematch({ code, playerId, now }) {
+      const asked = await roomComponent.getRoom(code);
+      const [person] = asked.seats.filter((seat) => seat.bot === undefined);
+      return inTurn(person.playerId, async () => {
+        const room = await roomComponent.requestRematch({ code, playerId, now });
+        if (room.status === ROOM_STATUS.PLAYING) {
+          await endOldestGames({ playerId: person.playerId, keep: code, now });
+        }
+        return room;
+      });
     },
   });
 }

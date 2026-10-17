@@ -18,6 +18,7 @@ import { createBotComponent } from "../domain/bots/botComponent.js";
 import { createBotDriver } from "../domain/bots/botDriver.js";
 import { createBotTurns } from "../domain/bots/botTurns.js";
 import { createSealMaker, sealSecretFrom } from "../domain/bots/seals.js";
+import { createThinkingQueue } from "../domain/bots/thinkingQueue.js";
 import { createGamificationComponent } from "../domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
@@ -125,6 +126,8 @@ export function createTestApp({
     roomComponent,
     roomAccessor,
     botTurns,
+    botComponent,
+    thinking: createThinkingQueue(),
     events: domainEvents,
     delayMs: () => 0,
     logger: capture.logger,
