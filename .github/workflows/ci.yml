@@ -81,7 +81,8 @@ jobs:
   e2e:
     name: Browser persona tests (desktop + mobile)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # About 16 to 18 minutes on GitHub's runners in October 2026, so 25 leaves room for a slow runner.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -110,22 +111,13 @@ jobs:
             e2e/test-results/
           retention-days: 14
 
-  # The same browser suite on Firefox and WebKit, on a laptop screen (CC-184). WebKit is the engine of every browser
-  # on an iPhone. Not a required check yet: the owner decides when, after they have run green for a while.
-  e2e-engines:
-    name: Browser persona tests (${{ matrix.browser }} desktop)
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - browser: firefox
-            os: ubuntu-latest
-          # WebKit on macOS is the engine Safari uses. Playwright's Linux WebKit build is a different port, and on
-          # GitHub's Linux runners it was too slow to finish the suite in 20 minutes (CC-184).
-          - browser: webkit
-            os: macos-latest
+  # The same browser suite on Firefox, on a laptop screen (CC-184). It takes about as long as the Chromium job and
+  # runs beside it, so it adds no waiting. Not a required check yet: the owner decides when, after a green streak.
+  # WebKit is much slower on GitHub's runners and has its own workflow, webkit.yml.
+  e2e-firefox:
+    name: Browser persona tests (firefox desktop)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -138,17 +130,17 @@ jobs:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npm ci
-      - name: Install ${{ matrix.browser }}
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Install Firefox
+        run: npx playwright install --with-deps firefox
       - run: npm run test:e2e
         env:
           CI: "true"
-          E2E_BROWSER: ${{ matrix.browser }}
+          E2E_BROWSER: firefox
       - name: Playwright report and failure traces
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.browser }}
+          name: playwright-report-firefox
           path: |
             e2e/playwright-report/
             e2e/test-results/

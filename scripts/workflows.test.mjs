@@ -90,14 +90,33 @@ describe("slow tests", () => {
 });
 
 describe("browser engines", () => {
-  it("runs the browser suite on Firefox and WebKit in CI, each told which engine to use (CC-184)", async () => {
+  it("runs the browser suite on Firefox on every pull request (CC-184)", async () => {
     const ci = await read(".github/workflows/ci.yml");
 
-    expect(ci).toContain("          - browser: firefox\n            os: ubuntu-latest\n");
-    // Safari's own engine, on macOS (CC-184).
-    expect(ci).toMatch(/ {10}- browser: webkit\n {12}os: macos-latest\n/);
-    expect(ci).toContain("          E2E_BROWSER: ${{ matrix.browser }}\n");
-    expect(ci).toContain("npx playwright install --with-deps ${{ matrix.browser }}");
+    expect(ci).toContain("npx playwright install --with-deps firefox");
+    expect(ci).toContain(
+      '      - run: npm run test:e2e\n        env:\n          CI: "true"\n          E2E_BROWSER: firefox\n',
+    );
+  });
+
+  it("runs WebKit on macOS, Safari's own engine, every night, on demand and when the browser's code changes", async () => {
+    const webkit = await read(".github/workflows/webkit.yml");
+
+    expect(webkit).toContain("    runs-on: macos-latest\n");
+    expect(webkit).toMatch(/on:\n {2}pull_request:\n {4}paths:\n {6}- "apps\/web\/\*\*"\n/);
+    expect(webkit).toContain('      - "e2e/**"\n');
+    expect(webkit).toMatch(/ {2}schedule:\n(?: {4}#.*\n)? {4}- cron: "[^"]+"\n {2}workflow_dispatch:\n/);
+    expect(webkit).toMatch(/permissions:\n {2}contents: read\n\n/);
+  });
+
+  it("splits WebKit in two and still runs every test, the restart tests once", async () => {
+    const webkit = await read(".github/workflows/webkit.yml");
+
+    expect(webkit).toContain("        shard: [1, 2]\n");
+    expect(webkit).toContain("--project=webkit --shard=${{ matrix.shard }}/2");
+    expect(webkit).toContain("        if: matrix.shard == 1 && !cancelled()\n");
+    expect(webkit).toContain('--project="restart webkit" --no-deps');
+    expect(webkit.match(/E2E_BROWSER: webkit\n/g)).toHaveLength(2);
   });
 
   it("keeps the Chromium job's name, which main requires before a merge", async () => {
