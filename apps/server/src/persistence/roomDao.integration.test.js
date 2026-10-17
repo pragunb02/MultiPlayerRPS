@@ -20,18 +20,18 @@ afterAll(async () => {
   await mongo?.stop();
 });
 
-async function connected() {
+async function connected(options = {}) {
   const database = await connectDatabase({
     uri: mongo.uri(`rooms-${++counter}`),
     logger: captureLogger().logger,
   });
   databases.push(database);
-  const dao = createRoomDao({ connection: database.connection });
+  const dao = createRoomDao({ connection: database.connection, ...options });
   await dao.ensureIndexes();
   return { dao, database };
 }
 
-const createDao = async () => (await connected()).dao;
+const createDao = async (options) => (await connected(options)).dao;
 
 describe("MongoDB room DAO honours the room DAO contract (integration)", () => {
   runRoomDaoContract(createDao);
