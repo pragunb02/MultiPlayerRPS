@@ -16,6 +16,7 @@ const CLOSING = Object.freeze({ closing: { $exists: true } });
  * @property {Record<string, unknown>} options
  * @property {string} status
  * @property {string} hostId
+ * @property {string} [network]        an opaque name of the network the room was opened from (rooms before CC-107 have none)
  * @property {Array<{ playerId: string, displayName: string, connected: boolean }>} seats
  * @property {Record<string, unknown>} [game]
  * @property {Record<string, unknown>} [result]
@@ -99,6 +100,8 @@ export function createRoomDao({ connection, betweenClosedReads = async () => {} 
         { key: { dueAt: 1 }, name: "due_at" },
         // Every minute: rooms whose lifetime has ended.
         { key: { expiresAt: 1 }, name: "expires_at" },
+        // Before every new room: how many rooms its host's network already has open (CC-107).
+        { key: { network: 1 }, name: "network" },
       ]);
       await closed.createIndexes([
         { key: { code: 1 }, unique: true, name: "code_unique" },
@@ -212,5 +215,25 @@ export function createRoomDao({ connection, betweenClosedReads = async () => {} 
 
     /** @param {number} now  rooms whose lifetime ended at or before `now` */
     listExpired: (now) => find({ expiresAt: { $lte: now } }),
+
+    /**
+     * How many rooms are stored, read from the collection's own count, so it costs the same however many rooms
+     * there are. A room left half closed by a stopped process is still counted until it is forgotten, which only
+     * makes the count a little high for a day.
+     *
+     * @returns {Promise<number>}
+     */
+    countOpen: () => rooms.estimatedDocumentCount(),
+
+    /** @param {string} network  open rooms opened from this network */
+    countByNetwork: (network) => rooms.countDocuments({ network, ...OPEN }),
+
+    /** @returns {Promise<Record<string, number>>} open rooms per status, only for statuses that have any */
+    async countByStatus() {
+      const groups = await rooms
+        .aggregate([{ $match: { ...OPEN } }, { $group: { _id: "$status", rooms: { $sum: 1 } } }])
+        .toArray();
+      return Object.fromEntries(groups.map((group) => [group._id, group.rooms]));
+    },
   });
 }

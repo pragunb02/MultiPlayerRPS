@@ -41,7 +41,7 @@ function setup({ codes = ["ROOM22", "ROOM33", "ROOM44"], engines = [raceEngine],
 }
 
 const createRace = (rooms, host = ALICE, now = T0) =>
-  rooms.createRoom({ host, gameId: "race", options: { target: 3 }, now });
+  rooms.createRoom({ network: "net-a", host, gameId: "race", options: { target: 3 }, now });
 
 /** A started race game: Alice hosts, Bob joins; Bob moves first. */
 async function startedGame() {
@@ -57,9 +57,9 @@ describe("roomComponent", () => {
       const { rooms } = setup();
 
       // "race" has no defaults, so it refuses; a game with defaults would apply them.
-      await expect(rooms.createRoom({ host: ALICE, gameId: "race", now: T0 })).rejects.toThrow(
-        ValidationError,
-      );
+      await expect(
+        rooms.createRoom({ network: "net-a", host: ALICE, gameId: "race", now: T0 }),
+      ).rejects.toThrow(ValidationError);
     });
 
     it("creates a waiting room with the host seated", async () => {
@@ -73,6 +73,7 @@ describe("roomComponent", () => {
         options: { target: 3 },
         status: "waiting",
         hostId: ALICE.id,
+        network: "net-a",
         seats: [{ playerId: ALICE.id, displayName: "Alice", connected: true }],
         createdAt: T0,
         lastActivityAt: T0,
@@ -88,9 +89,9 @@ describe("roomComponent", () => {
       async (gameId) => {
         const { rooms } = setup();
 
-        await expect(rooms.createRoom({ host: ALICE, gameId, options: {}, now: T0 })).rejects.toThrow(
-          ValidationError,
-        );
+        await expect(
+          rooms.createRoom({ network: "net-a", host: ALICE, gameId, options: {}, now: T0 }),
+        ).rejects.toThrow(ValidationError);
       },
     );
 
@@ -98,7 +99,7 @@ describe("roomComponent", () => {
       const { rooms } = setup();
 
       await expect(
-        rooms.createRoom({ host: ALICE, gameId: "race", options: { target: 99 }, now: T0 }),
+        rooms.createRoom({ network: "net-a", host: ALICE, gameId: "race", options: { target: 99 }, now: T0 }),
       ).rejects.toThrow(/target must be an integer/);
     });
 
@@ -240,6 +241,7 @@ describe("roomComponent", () => {
     it("hands the host role to the next player when the host leaves a waiting room", async () => {
       const { rooms } = setup({ engines: [partyEngine] });
       const { code } = await rooms.createRoom({
+        network: "net-a",
         host: ALICE,
         gameId: "party",
         options: { target: 3 },
@@ -257,6 +259,7 @@ describe("roomComponent", () => {
     it("keeps the host when another player leaves a waiting room", async () => {
       const { rooms } = setup({ engines: [partyEngine] });
       const { code } = await rooms.createRoom({
+        network: "net-a",
         host: ALICE,
         gameId: "party",
         options: { target: 3 },
@@ -300,6 +303,7 @@ describe("roomComponent", () => {
     it("frees their seat in a shared waiting room and passes the host role on", async () => {
       const { rooms } = setup({ engines: [partyEngine] });
       const { code } = await rooms.createRoom({
+        network: "net-a",
         host: ALICE,
         gameId: "party",
         options: { target: 3 },
@@ -355,6 +359,7 @@ describe("roomComponent", () => {
     it("gives the guest seat up when the account already sits in that waiting room", async () => {
       const { rooms } = setup({ engines: [partyEngine] });
       const { code } = await rooms.createRoom({
+        network: "net-a",
         host: ALICE,
         gameId: "party",
         options: { target: 3 },
@@ -370,6 +375,7 @@ describe("roomComponent", () => {
     it("keeps the host role where it was when the guest was not the host", async () => {
       const { rooms } = setup({ engines: [partyEngine] });
       const { code } = await rooms.createRoom({
+        network: "net-a",
         host: ALICE,
         gameId: "party",
         options: { target: 3 },
@@ -527,6 +533,7 @@ describe("roomComponent", () => {
     async function timedGame() {
       const ctx = setup({ engines: [timedEngine, raceEngine] });
       const { code } = await ctx.rooms.createRoom({
+        network: "net-a",
         host: ALICE,
         gameId: "timed",
         options: { target: 3 },
@@ -573,6 +580,7 @@ describe("roomComponent", () => {
       });
       const { rooms, published } = setup({ engines: [turnTimerEngine] });
       const { code } = await rooms.createRoom({
+        network: "net-a",
         host: ALICE,
         gameId: "turn-timer",
         options: { target: 3 },
@@ -661,6 +669,7 @@ describe("roomComponent", () => {
         }),
       });
       const { code } = await ctx.rooms.createRoom({
+        network: "net-a",
         host: ALICE,
         gameId: "party",
         options: { target: 3 },

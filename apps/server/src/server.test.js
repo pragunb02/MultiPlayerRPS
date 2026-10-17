@@ -348,12 +348,16 @@ describe("startHousekeeping", () => {
 
   const idleTransfers = () => ({ resumePending: vi.fn(async () => ({ completed: [], failed: [] })) });
 
-  function setup(roomComponent, playerTransferComponent = idleTransfers()) {
+  const noRooms = async () => ({ waiting: 0, playing: 0, finished: 0 });
+  const noConnections = () => ({ connections: 0, players: 0 });
+
+  function setup(roomComponent, playerTransferComponent = idleTransfers(), connections = noConnections) {
     vi.useFakeTimers();
     const capture = captureLogger();
     const housekeeping = startHousekeeping({
-      roomComponent,
+      roomComponent: { countRooms: noRooms, ...roomComponent },
       playerTransferComponent,
+      connections,
       logger: capture.logger,
       now: () => 42,
     });
@@ -422,6 +426,45 @@ describe("startHousekeeping", () => {
         err: expect.objectContaining({ message: "still down" }),
       }),
     );
+    housekeeping.stop();
+  });
+
+  it("logs a gauge of open rooms per status, connections and players every minute (CC-107)", async () => {
+    const roomComponent = {
+      sweepExpired: vi.fn(),
+      expireDue: vi.fn(),
+      countRooms: vi.fn(async () => ({ waiting: 3, playing: 2, finished: 1 })),
+    };
+    const { housekeeping, find } = setup(roomComponent, idleTransfers(), () => ({
+      connections: 7,
+      players: 5,
+    }));
+
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(find("room gauge")).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(find("room gauge")).toEqual([
+      expect.objectContaining({
+        rooms: { waiting: 3, playing: 2, finished: 1, open: 6 },
+        connections: 7,
+        players: 5,
+      }),
+    ]);
+    housekeeping.stop();
+  });
+
+  it("logs a failing gauge and keeps going", async () => {
+    const roomComponent = {
+      sweepExpired: vi.fn(),
+      expireDue: vi.fn(),
+      countRooms: vi.fn().mockRejectedValue(new Error("database down")),
+    };
+    const { housekeeping, find } = setup(roomComponent);
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(find("reading the room gauge failed")).toHaveLength(2);
     housekeeping.stop();
   });
 

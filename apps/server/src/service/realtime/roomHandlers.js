@@ -55,7 +55,13 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
   return {
     async [SOCKET_EVENTS.ROOM_CREATE](payload) {
       const { gameId, options } = parseCreateRoom(payload);
-      const room = await roomComponent.createRoom({ host: identity, gameId, options, now: now() });
+      const room = await roomComponent.createRoom({
+        host: identity,
+        network: socket.data.network,
+        gameId,
+        options,
+        now: now(),
+      });
       socket.join(roomChannel(room.code));
       logger.info({ roomCode: room.code, gameId }, "room created");
       return stampedView({ roomComponent, room, viewerId: identity.id, now });

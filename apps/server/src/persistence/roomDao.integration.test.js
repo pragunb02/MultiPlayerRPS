@@ -110,12 +110,31 @@ describe("MongoDB room DAO honours the room DAO contract (integration)", () => {
     });
   });
 
+  it("finds the rooms whose game deadline has come through the deadline index, never by reading every room (CC-107)", async () => {
+    const { dao, database } = await connected();
+    for (let i = 0; i < 40; i++) {
+      await dao.insert(roomDoc({ code: `WAIT${String(i).padStart(2, "0")}`, status: "waiting", dueAt: 0 }));
+    }
+    await dao.insert(roomDoc({ code: "FLAG22", dueAt: 5 }));
+
+    const plan = await database.connection.db
+      .collection("rooms")
+      .find({ dueAt: { $gt: 0, $lte: 10 }, closing: { $exists: false } })
+      .explain("executionStats");
+
+    expect((await dao.listDue(10)).map((doc) => doc.code)).toEqual(["FLAG22"]);
+    expect(JSON.stringify(plan.queryPlanner.winningPlan)).toContain('"indexName":"due_at"');
+    expect(plan.executionStats.totalDocsExamined).toBe(1);
+  });
+
   it("creates its indexes once and again without complaint", async () => {
     const { dao, database } = await connected();
 
     await dao.ensureIndexes();
     const names = (await database.connection.db.collection("rooms").indexes()).map((index) => index.name);
 
-    expect(names).toEqual(expect.arrayContaining(["code_unique", "seats_player", "due_at", "expires_at"]));
+    expect(names).toEqual(
+      expect.arrayContaining(["code_unique", "seats_player", "due_at", "expires_at", "network"]),
+    );
   });
 });

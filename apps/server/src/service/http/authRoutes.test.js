@@ -165,40 +165,6 @@ describe("auth routes", () => {
     );
   });
 
-  it("rate-limits failed logins per email, even across different IPs", async () => {
-    server = await startTestServer({
-      authLimits: {
-        perIp: { windowMs: 60_000, limit: 100 },
-        failedLoginsPerEmail: { windowMs: 60_000, limit: 2 },
-      },
-    });
-    await post("/api/auth/signup", RIYA);
-    const attempt = () => post("/api/auth/login", { email: RIYA.email, password: "guessing123" });
-
-    const statuses = [(await attempt()).status, (await attempt()).status, (await attempt()).status];
-    const otherAccount = await post("/api/auth/login", {
-      email: "someone@example.com",
-      password: "guessing123",
-    });
-
-    expect(statuses).toEqual([401, 401, 429]);
-    expect(otherAccount.status).toBe(401); // the limit is per email, not global
-  });
-
-  it("still limits failed logins whose email isn't text, by IP instead", async () => {
-    server = await startTestServer({
-      authLimits: {
-        perIp: { windowMs: 60_000, limit: 100 },
-        failedLoginsPerEmail: { windowMs: 60_000, limit: 2 },
-      },
-    });
-    const attempt = () => post("/api/auth/login", { email: 12345, password: "guessing123" });
-
-    const statuses = [(await attempt()).status, (await attempt()).status, (await attempt()).status];
-
-    expect(statuses).toEqual([401, 401, 429]);
-  });
-
   it("refuses a JSON body that is an array, not an object", async () => {
     server = await startTestServer();
 
@@ -210,29 +176,9 @@ describe("auth routes", () => {
     );
   });
 
-  it("does not count successful logins against the per-email limit", async () => {
-    server = await startTestServer({
-      authLimits: {
-        perIp: { windowMs: 60_000, limit: 100 },
-        failedLoginsPerEmail: { windowMs: 60_000, limit: 1 },
-      },
-    });
-    await post("/api/auth/signup", RIYA);
-
-    const results = [];
-    for (let i = 0; i < 3; i++) {
-      results.push((await post("/api/auth/login", { email: RIYA.email, password: RIYA.password })).status);
-    }
-
-    expect(results).toEqual([200, 200, 200]);
-  });
-
   it("rate-limits signups and logins per IP", async () => {
     server = await startTestServer({
-      authLimits: {
-        perIp: { windowMs: 60_000, limit: 2 },
-        failedLoginsPerEmail: { windowMs: 60_000, limit: 100 },
-      },
+      authLimits: { perIp: { windowMs: 60_000, limit: 2 } },
     });
 
     await post("/api/auth/signup", { ...RIYA, username: "one", email: "1@example.com" });
@@ -241,6 +187,19 @@ describe("auth routes", () => {
 
     expect(third.status).toBe(429);
     expect(third.body.error.code).toBe(ERROR_CODES.RATE_LIMITED);
+  });
+
+  it("limits sign-ups per address on their own, so a list of emails cannot be checked quickly (CC-118)", async () => {
+    server = await startTestServer({ authLimits: { signupPerIp: { windowMs: 60_000, limit: 2 } } });
+    await post("/api/auth/signup", { ...RIYA, username: "one", email: "1@example.com" });
+    await post("/api/auth/signup", { ...RIYA, username: "two", email: "2@example.com" });
+
+    const third = await post("/api/auth/signup", { ...RIYA, username: "three", email: "3@example.com" });
+    const login = await post("/api/auth/login", { email: "1@example.com", password: RIYA.password });
+
+    expect(third.status).toBe(429);
+    expect(third.body.error.code).toBe(ERROR_CODES.RATE_LIMITED);
+    expect(login.status).toBe(200);
   });
 
   it("never logs passwords or emails", async () => {

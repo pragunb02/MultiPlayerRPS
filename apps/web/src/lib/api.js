@@ -60,6 +60,17 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     signup: async (credentials) => signedIn(await request("POST", "/auth/signup", credentials)),
     /** @returns {Promise<{ identity: object, carriedOver?: { xp: number, matchesPlayed: number, matches: number } }>} */
     login: async (credentials) => signedIn(await request("POST", "/auth/login", credentials)),
+    /**
+     * Changes the password. This browser stays signed in and every other one is signed out (CC-116).
+     * @param {{ currentPassword: string, newPassword: string }} passwords
+     */
+    changePassword: async (passwords) => {
+      await request("POST", "/auth/password", passwords);
+    },
+    /** Signs out every other browser of this account. This one stays signed in (CC-116). */
+    signOutOtherDevices: async () => {
+      await request("POST", "/auth/sign-out-others");
+    },
     getProgress: async () => (await request("GET", "/progress")).progress,
     getMatches: (query = {}) => request("GET", `/matches${toQuery(query)}`),
     getMatch: async (matchId) => (await request("GET", `/matches/${encodeURIComponent(matchId)}`)).match,

@@ -88,3 +88,19 @@ export class GoneError extends AppError {
     super(message, { ...options, code: ERROR_CODES.GONE });
   }
 }
+
+/** The caller has used up a budget (too many attempts or requests). Waiting helps. */
+export class TooManyRequestsError extends AppError {
+  /** @param {string} message @param {ErrorOptions} [options] */
+  constructor(message, options = {}) {
+    super(message, { ...options, code: ERROR_CODES.RATE_LIMITED });
+  }
+}
+
+/** The server is full right now, for example it holds as many rooms as it can (CC-107). Trying later can work. */
+export class ServerBusyError extends AppError {
+  /** @param {string} message @param {ErrorOptions} [options] */
+  constructor(message, options = {}) {
+    super(message, { ...options, code: ERROR_CODES.SERVER_BUSY });
+  }
+}

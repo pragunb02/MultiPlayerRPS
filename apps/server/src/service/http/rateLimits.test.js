@@ -3,6 +3,8 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ERROR_CODES } from "@classicade/shared";
 import {
+  addressKey,
+  clientAddress,
   clientIpKey,
   createApiRateLimit,
   createRateLimit,
@@ -49,6 +51,47 @@ describe("clientIpKey", () => {
 
     expect(sameNetwork).toBe(first);
     expect(otherNetwork).not.toBe(first);
+  });
+});
+
+describe("clientAddress (realtime connections, CC-107)", () => {
+  /** What Express itself answers as `req.ip` for this chain and hop count. */
+  async function expressIp({ hops, forwardedFor }) {
+    const app = express();
+    app.set("trust proxy", hops === 0 ? false : hops);
+    app.get("/ip", (req, res) => res.json({ ip: req.ip, remoteAddress: req.socket.remoteAddress }));
+    const call = request(app).get("/ip");
+    const res = await (forwardedFor === undefined ? call : call.set("X-Forwarded-For", forwardedFor));
+    return res.body;
+  }
+
+  it.each([
+    [0, undefined],
+    [0, chain(PLAYER_A, PROXY)],
+    [1, undefined],
+    [1, PLAYER_A],
+    [1, chain("6.6.6.6", PLAYER_A)],
+    [2, chain(PLAYER_A, PROXY)],
+    [2, chain("6.6.6.6", PLAYER_B, PROXY)],
+    [2, PLAYER_A],
+    [3, chain("6.6.6.6", PLAYER_A, PROXY)],
+    [2, `${PLAYER_A} ,  ${PROXY}`],
+  ])("finds the same address as Express with %i trusted hops behind %o", async (hops, forwardedFor) => {
+    const { ip, remoteAddress } = await expressIp({ hops, forwardedFor });
+
+    expect(clientAddress({ remoteAddress, forwardedFor, trustProxyHops: hops })).toBe(ip);
+  });
+
+  it("cannot be moved by an entry the player wrote on the left", () => {
+    const honest = clientAddress({ remoteAddress: "10.0.0.1", forwardedFor: PLAYER_A, trustProxyHops: 1 });
+    const forged = clientAddress({
+      remoteAddress: "10.0.0.1",
+      forwardedFor: chain("1.2.3.4", PLAYER_A),
+      trustProxyHops: 1,
+    });
+
+    expect(forged).toBe(honest);
+    expect(addressKey(forged)).toBe(`ip:${PLAYER_A}`);
   });
 });
 

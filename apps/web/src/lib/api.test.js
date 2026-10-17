@@ -44,6 +44,25 @@ describe("api client", () => {
     },
   );
 
+  it("changes the password and signs out other devices through the account routes (CC-116)", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ status: 204, ok: true, json: async () => ({}) });
+    const api = createApiClient({ fetchImpl });
+
+    await expect(
+      api.changePassword({ currentPassword: "old one 1", newPassword: "new one 1" }),
+    ).resolves.toBeUndefined();
+    await expect(api.signOutOtherDevices()).resolves.toBeUndefined();
+
+    const [[passwordUrl, passwordInit], [othersUrl, othersInit]] = fetchImpl.mock.calls;
+    expect(passwordUrl).toBe("/api/auth/password");
+    expect(JSON.parse(passwordInit.body)).toEqual({ currentPassword: "old one 1", newPassword: "new one 1" });
+    expect([othersUrl, othersInit.method, othersInit.body]).toEqual([
+      "/api/auth/sign-out-others",
+      "POST",
+      undefined,
+    ]);
+  });
+
   it("sends JSON bodies", async () => {
     const fetchImpl = respond(200, { identity: { id: "user_x" } });
 

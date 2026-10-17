@@ -4,6 +4,7 @@ import {
   ROOM_CLOSE_REASONS,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
+  ROOM_LIMIT_REASONS,
   ROOM_STATUS,
 } from "@classicade/shared";
 import { createSeededRng, renamePlayer } from "@classicade/games";
@@ -14,9 +15,11 @@ import {
   ForbiddenError,
   GoneError,
   NotFoundError,
+  ServerBusyError,
   ValidationError,
 } from "../../utils/errors.js";
 import { lifetimeOf, roomLifetimes } from "./roomLifetimes.js";
+import { roomLimits } from "./roomLimits.js";
 
 /** Events the room component publishes for other parts of the system to react to. */
 export const ROOM_EVENTS = Object.freeze({
@@ -65,16 +68,18 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  *   engines: ReturnType<typeof import("@classicade/games").createEngineRegistry>,
  *   events: { emit: (event: string, payload: unknown) => void },
  *   lifetimes?: Readonly<import("./roomLifetimes.js").RoomLifetimes>,
+ *   limits?: Readonly<import("./roomLimits.js").RoomLimits>,
  *   generateCode?: () => string,
  *   generateSeed?: () => number,
  *   generateMatchId?: () => string,
- * }} deps  lifetimes and generators can be given so tests are short and exact
+ * }} deps  lifetimes, limits and generators can be given so tests are short and exact
  */
 export function createRoomComponent({
   roomAccessor,
   engines,
   events,
   lifetimes = roomLifetimes(),
+  limits = roomLimits(),
   generateCode = randomRoomCode,
   generateSeed = randomSeed,
   generateMatchId = randomUUID,
@@ -82,6 +87,7 @@ export function createRoomComponent({
   assertDefined(roomAccessor, "roomAccessor");
   assertDefined(engines, "engines");
   assertDefined(lifetimes, "lifetimes");
+  assertDefined(limits, "limits");
   assertFunction(events?.emit, "events.emit");
   assertFunction(generateCode, "generateCode");
   assertFunction(generateSeed, "generateSeed");
@@ -284,14 +290,57 @@ export function createRoomComponent({
     return results;
   }
 
+  /**
+   * Refuses a new room when the host already has as many waiting rooms as one player may have, or when the server
+   * is full (CC-107). A waiting room whose time is up counts as closed, even before the sweep removes it. Two rooms
+   * created at the very same moment can both pass, which only lets a player go one room over.
+   */
+  async function checkRoomLimits(host, network, now) {
+    const waiting = (await roomAccessor.listBySeat(host.id)).filter(
+      (room) => room.status === ROOM_STATUS.WAITING && now < lifetimeOf(room, lifetimes).endsAt,
+    );
+    if (waiting.length >= limits.waitingRoomsPerPlayer) {
+      throw new ConflictError(
+        `You already have ${limits.waitingRoomsPerPlayer} rooms waiting; close one first`,
+        {
+          details: { reason: ROOM_LIMIT_REASONS.WAITING_ROOMS, limit: limits.waitingRoomsPerPlayer },
+        },
+      );
+    }
+    // Guests cost nothing to make, so a cap per player alone would let a few networks fill the server (CC-107).
+    if ((await roomAccessor.countByNetwork(network)) >= limits.openRoomsPerAddress) {
+      throw new ConflictError("Too many rooms are open from your network. Try again later.", {
+        details: { reason: ROOM_LIMIT_REASONS.NETWORK_ROOMS, limit: limits.openRoomsPerAddress },
+      });
+    }
+    if ((await roomAccessor.countOpen()) >= limits.openRoomsMax) {
+      throw new ServerBusyError("The server is busy, try again in a minute", {
+        details: { reason: ROOM_LIMIT_REASONS.SERVER_FULL },
+      });
+    }
+  }
+
   const component = {
     /**
      * Creates a room with the host seated. Unknown games and invalid options are rejected. A code is never one
      * still in use, nor one that closed recently, so an old link never leads into a stranger's new room.
      *
-     * @param {{ host: import("../../models/identity.js").Identity, gameId: string, options: unknown, now: number }} input
+     * @param {{
+     *   host: import("../../models/identity.js").Identity,
+     *   network: string,
+     *   gameId: string,
+     *   options: unknown,
+     *   now: number,
+     * }} input  `network` names the host's network address without being it (see the gateway), so the rooms
+     *   opened from one network can be counted
+     * @throws {ConflictError} when the host already has as many waiting rooms as allowed, or their network as many
+     *   open rooms (see roomLimits.js)
+     * @throws {ServerBusyError} when the server holds as many rooms as it can
      */
-    async createRoom({ host, gameId, options, now }) {
+    async createRoom({ host, network, gameId, options, now }) {
+      if (typeof network !== "string" || network === "") {
+        throw new TypeError("createRoom needs the network the host connects from");
+      }
       if (typeof gameId !== "string" || !engines.has(gameId)) {
         throw new ValidationError("That game is not available", { details: { field: "gameId" } });
       }
@@ -299,6 +348,7 @@ export function createRoomComponent({
       if (!validated.ok) {
         throw new ValidationError(validated.message, { details: { field: "options" } });
       }
+      await checkRoomLimits(host, network, now);
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
         const code = generateCode();
         if ((await roomAccessor.exists(code)) || (await roomAccessor.wasClosed(code))) {
@@ -310,6 +360,7 @@ export function createRoomComponent({
           options: validated.value,
           status: ROOM_STATUS.WAITING,
           hostId: host.id,
+          network,
           seats: [{ playerId: host.id, displayName: host.displayName, connected: true }],
           createdAt: now,
           lastActivityAt: now,
@@ -631,6 +682,13 @@ export function createRoomComponent({
 
     /** @param {string} code */
     getRoom: (code) => read(code),
+
+    /**
+     * How many open rooms there are of each status, for the regular gauge in the logs (CC-107).
+     *
+     * @returns {Promise<Readonly<Record<"waiting" | "playing" | "finished", number>>>}
+     */
+    countRooms: () => roomAccessor.countByStatus(),
 
     /**
      * What one viewer may see. Seated players get their own game view, anyone else sees the spectator view.
