@@ -94,7 +94,9 @@ at most three draw offers per game. The series keeps a history of every game wit
    The rule: every click gives a visible response within 100 ms. A browser test enforces it. The press and the click
    sound are that response. "Sending" waits 400 ms because a usual round trip from India to the Oregon server takes
    about 250 to 350 ms, and at 150 ms it flashed on almost every press. Once shown it stays at least 300 ms, so an
-   answer just after 400 ms does not flash it either (CC-239, research and sources in docs/tickets/CC-239.md).
+   answer just after 400 ms does not flash it either. Only the words wait: a failure and its reason show at once,
+   and a board takes the next move as soon as the answer is in (CC-239, research and sources in
+   docs/tickets/CC-239.md).
 
 8. **Announcer**: one polite and one urgent screen-reader region per match. Urgent only for a request to you, your
    own connection loss and the result.
