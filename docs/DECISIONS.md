@@ -29,21 +29,27 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
   4. Across all channels, at most 1 contact a day the player did not ask for. Quiet hours in local time. Every message
      has a one tap opt out. Minors and people of unknown age get no reminders or marketing of any kind (ADR-028).
   5. Web push and email first. WhatsApp and SMS cost money per message and wait.
-- **Consequences:** Reminders reach few players at first, and that is accepted. Notification work (CC-147, CC-215,
-  CC-208) follows these rules.
+- **Consequences:** Reminders reach few players at first, and that is accepted. Notification work follows these rules:
+  CC-147 (inbox), CC-148 (PWA and web push), CC-215 (preferences and quiet hours), CC-229 (dark pattern audit before
+  push ships) and CC-208.
 
 ### ADR-032 — Launch sequence and the brand domain
 
-- **Status:** Accepted · 2026-10-18 (from [GROWTH.md](GROWTH.md) §7.3)
+- **Status:** Accepted · 2026-10-18 (from [GROWTH.md](GROWTH.md) §3.1 and §7.3)
 - **Decision:**
-  1. A friends launch by word of mouth, on a date the owner picks once Phase 0 is closed (the leaked password rotated,
-     the security batch merged, staging) and Play vs Computer and the rematch fixes are live.
-  2. A public launch (communities, Product Hunt and similar) only after 4 weeks of friends data in the owner console,
-     and only if about 15 % of new players come back on day 2.
+  1. A friends launch by word of mouth, on a date the owner picks once all of these are done: Phase 0 is closed (the
+     leaked password rotated, the security batch merged, staging), every open security P0 is closed, CC-123 is live
+     (the brand domain, with the 301 from the onrender.com address), CC-232 (the cold start loading screen) is live,
+     and Play vs Computer (CC-138) is live. The rematch fixes are already live (PR #53).
+  2. The public launch (communities, Product Hunt and similar) is a second, later owner decision, recorded in this
+     file after the friends launch has 4 weeks of data in the owner console. Its gate is the growth rule: k of 0.15 or
+     more for two weeks running. The day 2 target (about 15 % of new players come back on day 2) is a guide, not the
+     gate.
   3. Buy a short brand domain soon (about ₹800 to ₹1,500 a year), so Search Console can be verified by DNS with no
      code and search history starts early (CC-123).
-  4. Later, before any email is sent: decide whether to put a card on Render, and use a postal address that is not a
-     home address, as email law requires.
+  4. Later: a postal address that is not a home address, as email law requires, before any marketing or recap email
+     (transactional email such as password reset is exempt), and a decision on whether to put a card on Render before
+     any burst post.
 
 ### ADR-029 — Liquidity gates: crowd features switch on only when the crowd is there
 

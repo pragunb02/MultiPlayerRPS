@@ -14,7 +14,7 @@ Sources were fetched on 17 October 2026 unless a different date is shown. A clai
 >
 > 1. **What "now" means.** Only owner actions that need no code, plus work already written on a ticket's title on the board. Nothing in this plan adds scope to an existing ticket.
 > 2. **New work goes to `docs/IDEAS.md`.** Every new scope item is listed in section 7.2 by name, with no ticket number. Each one becomes a ticket only after the freeze lifts or the owner grants an exception. When that happens, it takes the next free ID on the board at that moment.
-> 3. **The board order stays as it is.** Phase 0 comes first (CC-105, CC-107, CC-116, CC-117, CC-118, CC-122 and PRs #51 and #53), then the vision §8.3 top 10. Security is P0 by default. This plan does not move any ticket.
+> 3. **The board order stays as it is.** Phase 0 comes first (CC-105, CC-107, CC-116, CC-117, CC-118, CC-122), then the vision §8.3 top 10. Security is P0 by default. This plan does not move any ticket.
 > 4. **Launch is by word of mouth among friends, when the owner decides.** Posting anywhere beyond the owner's friends needs a second, explicit owner launch decision, written in `docs/DECISIONS.md`. That decision comes after Phase 0 and every open security P0 are closed.
 
 ---
@@ -225,11 +225,11 @@ What not to build: one page per city, one page per opening, or bought links. Goo
 
 ### 3.1 Two separate launches, both owner decisions
 
-1. **The friends launch** (working agreement item 7).
-   - **When:** when the owner decides, after Phase 0, every open security P0, CC-123 and CC-232 are done. CC-217 should ideally be done too, so that every share carries a good card.
+1. **The friends launch** (working agreement item 7, decided in ADR-032.1).
+   - **When:** when the owner decides, after Phase 0, every open security P0, CC-123 (with the 301 live), CC-232 and Play vs Computer (CC-138) are done. CC-217 should ideally be done too, so that every share carries a good card.
    - **Who:** the owner's own friends and their groups.
 2. **The public launch.**
-   - **When:** a second decision, written in `docs/DECISIONS.md`, after the friends launch has 4 weeks of data and k is known.
+   - **When:** a second decision, written in `docs/DECISIONS.md`, after the friends launch has 4 weeks of data and k is known (ADR-032.2). The gate is the growth rule, k of 0.15 or more for two weeks running. The D1 target is a guide.
    - **What it covers:** community posts, college clubs beyond friends of friends, Product Hunt, Show HN and portals.
 
 ### 3.2 Ranked by expected new players per hour of owner effort
@@ -469,7 +469,7 @@ Hinglish:
 
 ## 5. Notifications and email policy
 
-This section should become a new ADR, "Notification channels and caps". It must be written and accepted before CC-147, CC-148 or CC-215 start (all phase 2). It is a decision record, not a ticket.
+This section is decided in ADR-031, "Notification channels and caps", accepted on 18 October 2026. CC-147, CC-148, CC-215 and CC-229 (all phase 2) follow it. It is a decision record, not a ticket.
 
 ### 5.1 Channels and costs
 
@@ -671,7 +671,7 @@ Telemetry follows CC-173. It is first party, anonymous, opt-out, honours GPC, an
 
 ### 7.1 Existing tickets that matter for growth, in the board's own order (no new scope)
 
-Phase 0 comes first and blocks launch: CC-105, CC-107, CC-116, CC-117, CC-118, CC-122, and PRs #51 (CC-180, CC-181, CC-182) and #53 (CC-162, CC-164, CC-170). Security is P0. Sizes below are the growth lead's estimates.
+Phase 0 comes first and blocks launch: CC-105, CC-107, CC-116, CC-117, CC-118 and CC-122. Security is P0. Sizes below are the growth lead's estimates.
 
 | Board order       | Ticket (scope as written on the board)                                                                  | Size | Owner action                                                         | Growth effect                                                                               |
 | ----------------- | ------------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -687,7 +687,7 @@ Phase 0 comes first and blocks launch: CC-105, CC-107, CC-116, CC-117, CC-118, C
 | Top 10, #10       | **CC-152**, then CC-139, CC-052, CC-214                                                                 | L    | None                                                                 | Known adults (the reminder audience), persistent challenges, friends, circles               |
 | Phase 1, P2       | **CC-216** server-rendered game page content                                                            | M    | **Write the page text (2.7)**                                        | Makes ranking possible. If the owner wants search sooner, moving it up is an owner decision |
 | Phase 1           | **CC-223** pass and play                                                                                | M    | None                                                                 | Family play for Meena                                                                       |
-| Phase 2           | **CC-147, CC-148, CC-215, CC-229** inbox, PWA and push, preferences and quiet hours, dark pattern audit | L    | **Accept the notification ADR first**                                | "Not too much, not too little", enforced in code                                            |
+| Phase 2           | **CC-147, CC-148, CC-215, CC-229** inbox, PWA and push, preferences and quiet hours, dark pattern audit | L    | **Follows ADR-031 (accepted)**                                       | "Not too much, not too little", enforced in code                                            |
 | Phase 2           | **CC-033** password reset email                                                                         | S    | **Resend account (free). SPF, DKIM, DMARC records at the registrar** | Accounts become safe to rely on                                                             |
 | Phase 2           | **CC-218** Hinglish string catalogue                                                                    | M    | Review the copy                                                      | Fits Riya and Meena                                                                         |
 | Phase 2           | **CC-222** turn-based play                                                                              | L    | None                                                                 | "Your move", a person waiting                                                               |
@@ -695,7 +695,7 @@ Phase 0 comes first and blocks launch: CC-105, CC-107, CC-116, CC-117, CC-118, C
 
 ### 7.2 Ideas for `docs/IDEAS.md` (names only, no numbers, not started)
 
-Rows to paste into the IDEAS.md table (Date 2026-10-17, From: growth plan).
+These rows are in the IDEAS.md table (Date 2026-10-17, From: growth plan).
 
 | Idea                                                                                                              | Size | Owner action                          | Expected effect                                              |
 | ----------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------- | ------------------------------------------------------------ |
@@ -713,12 +713,12 @@ Rows to paste into the IDEAS.md table (Date 2026-10-17, From: growth plan).
 
 ### 7.3 Decisions for the owner (written in `docs/DECISIONS.md`, not tickets)
 
-1. **The notification channels and caps ADR** (section 5), before any phase 2 notification work.
-2. **The friends launch date**, after Phase 0 and the security P0s.
-3. **The public launch**, after 4 weeks of friends data.
-4. **The phase 2 retention gate**, from our own 4 weeks of data and web benchmarks.
-5. **Card on Render or not**, before any burst post.
-6. **A non-home postal address**, before any recap email.
+1. **The notification channels and caps** (section 5). Decided: ADR-031.
+2. **The friends launch**, after the conditions in 3.1. Decided: ADR-032.1. The owner still picks the date.
+3. **The public launch**, after 4 weeks of friends data. Decided: ADR-032.2 makes it a second, later decision record, gated on k of 0.15 or more for two weeks running.
+4. **The phase 2 retention gate**, from our own 4 weeks of data and web benchmarks. Still open.
+5. **Card on Render or not**, before any burst post. ADR-032.4 sets when; the choice is still open.
+6. **A non-home postal address**, before any marketing or recap email (password reset is exempt). ADR-032.4 sets when; the choice is still open.
 
 ---
 
