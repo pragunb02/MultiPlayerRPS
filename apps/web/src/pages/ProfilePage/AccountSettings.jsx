@@ -1,57 +1,62 @@
 import { useState } from "react";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
+import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./AccountSettings.module.css";
 
 const NO_PASSWORDS = Object.freeze({ currentPassword: "", newPassword: "" });
-const IDLE = Object.freeze({ busy: false, error: undefined, done: false });
-
-/** The message for one field when the server named it, and the message for the whole form otherwise. */
-const fieldError = (state, field) => (state.error?.details?.field === field ? state.error.message : "");
-const formError = (state) =>
-  state.error !== undefined && !["currentPassword", "newPassword"].includes(state.error.details?.field)
-    ? state.error.message
-    : "";
+const PASSWORD_FIELDS = Object.freeze(["currentPassword", "newPassword"]);
 
 /**
  * Change password and "sign out other devices" for a signed-in player (CC-116). Both keep this browser signed in
- * and sign out every other one, and each says so when it is done.
+ * and sign out every other one, and each says so when it is done. A refusal of one password box is shown at that
+ * box. Anything else is shown under the button, as every button does (CC-164).
  */
 export function AccountSettings() {
   const session = useSession();
   const [passwords, setPasswords] = useState(NO_PASSWORDS);
-  const [changing, setChanging] = useState(IDLE);
-  const [signingOut, setSigningOut] = useState(IDLE);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [done, setDone] = useState({ password: false, others: false });
   const update = (field) => (event) =>
     setPasswords((current) => ({ ...current, [field]: event.target.value }));
 
-  async function changePassword(event) {
-    event.preventDefault();
-    setChanging({ ...IDLE, busy: true });
-    try {
-      await session.changePassword(passwords);
+  const changePassword = useAction(
+    async () => {
+      setFieldErrors({});
+      setDone((current) => ({ ...current, password: false }));
+      try {
+        await session.changePassword(passwords);
+      } catch (err) {
+        const field = err.details?.field;
+        if (!PASSWORD_FIELDS.includes(field)) throw err;
+        setFieldErrors({ [field]: err.message });
+        return;
+      }
       setPasswords(NO_PASSWORDS);
-      setChanging({ ...IDLE, done: true });
-    } catch (error) {
-      setChanging({ ...IDLE, error });
-    }
-  }
+      setDone((current) => ({ ...current, password: true }));
+    },
+    { id: "profile.account.password" },
+  );
 
-  async function signOutOthers() {
-    setSigningOut({ ...IDLE, busy: true });
-    try {
+  const signOutOthers = useAction(
+    async () => {
+      setDone((current) => ({ ...current, others: false }));
       await session.signOutOtherDevices();
-      setSigningOut({ ...IDLE, done: true });
-    } catch (error) {
-      setSigningOut({ ...IDLE, error });
-    }
+      setDone((current) => ({ ...current, others: true }));
+    },
+    { id: "profile.account.sign_out_others" },
+  );
+
+  function submit(event) {
+    event.preventDefault();
+    changePassword.run();
   }
 
   return (
     <section className={styles.account} aria-labelledby="account-settings">
       <h2 id="account-settings">Account</h2>
-      <form className={styles.part} onSubmit={changePassword} noValidate aria-labelledby="change-password">
+      <form className={styles.part} onSubmit={submit} noValidate aria-labelledby="change-password">
         <h3 id="change-password">Change password</h3>
         <Field
           label="Current password"
@@ -60,7 +65,7 @@ export function AccountSettings() {
           required
           value={passwords.currentPassword}
           onChange={update("currentPassword")}
-          error={fieldError(changing, "currentPassword")}
+          error={fieldErrors.currentPassword ?? ""}
         />
         <Field
           label="New password"
@@ -70,19 +75,14 @@ export function AccountSettings() {
           hint="8 to 128 characters"
           value={passwords.newPassword}
           onChange={update("newPassword")}
-          error={fieldError(changing, "newPassword")}
+          error={fieldErrors.newPassword ?? ""}
         />
-        {formError(changing) && (
-          <p role="alert" className={styles.alert}>
-            {formError(changing)}
-          </p>
-        )}
-        {changing.done && (
+        {done.password && (
           <p role="status" className={styles.done}>
             Password changed. Your other devices are signed out.
           </p>
         )}
-        <Button type="submit" busy={changing.busy}>
+        <Button control="profile.account.password" type="submit" action={changePassword}>
           Change password
         </Button>
       </form>
@@ -92,17 +92,12 @@ export function AccountSettings() {
           Signed in on a computer you don't use any more? Sign out everywhere else. This device stays signed
           in.
         </p>
-        {signingOut.error && (
-          <p role="alert" className={styles.alert}>
-            {signingOut.error.message}
-          </p>
-        )}
-        {signingOut.done && (
+        {done.others && (
           <p role="status" className={styles.done}>
             Your other devices are signed out.
           </p>
         )}
-        <Button variant="secondary" busy={signingOut.busy} onClick={signOutOthers}>
+        <Button control="profile.account.sign_out_others" variant="secondary" action={signOutOthers}>
           Sign out other devices
         </Button>
       </div>
