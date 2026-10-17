@@ -19,8 +19,19 @@ export const LEGACY_PLAYER = Object.freeze({
   password: "legacy password 1",
 });
 
-/** A fresh account per test run, so reruns against a reused server never collide. */
+/**
+ * A fresh account per test, so reruns against a reused server never collide.
+ *
+ * The tag is digits only: the last 11 digits of the clock and 4 random digits, which fills the 20 character limit
+ * with "riya_". The public name rules read a part made only of digits as a number, so the name rules can never
+ * refuse it. A tag with letters sometimes spelled a reserved or rude word, such as "cpu" in "riya_cp8um06316", and
+ * sign-up refused it (CC-237).
+ *
+ * @returns {{ username: string, email: string, password: string }}
+ */
 export function newAccount() {
-  const tag = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`.slice(-10);
+  const clock = String(Date.now()).slice(-11);
+  const random = String(Math.floor(Math.random() * 1e4)).padStart(4, "0");
+  const tag = `${clock}${random}`;
   return { username: `riya_${tag}`, email: `riya.${tag}@example.com`, password: `correct horse ${tag}` };
 }

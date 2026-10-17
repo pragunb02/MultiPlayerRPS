@@ -1,4 +1,5 @@
 import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
+import { newAccount } from "./personas.js";
 
 // Two guests playing: what each one can see, and where every button leads.
 test.describe("guest players", () => {
@@ -77,15 +78,14 @@ test.describe("guest players", () => {
   test("a guest who signs up from a room comes back to that room as the new user", async ({ players }) => {
     const alice = await players.open("alice");
     const room = await createRoom(alice, "chess");
-    const account = { username: `g_${Date.now().toString(36)}`, email: `g.${Date.now()}@example.com` };
-    const password = "a guest becomes a user";
-    alice.secrets.push(account.email, password);
+    const account = newAccount();
+    alice.secrets.push(account.email, account.password);
 
     await alice.page.getByRole("banner").getByRole("link", { name: "Sign up" }).click();
     await expect(alice.page).toHaveURL(`/signup?next=${encodeURIComponent(room.path)}`);
     await alice.page.getByLabel("Username").fill(account.username);
     await alice.page.getByLabel("Email").fill(account.email);
-    await alice.page.getByLabel("Password").fill(password);
+    await alice.page.getByLabel("Password").fill(account.password);
     await alice.page.getByRole("button", { name: "Create account" }).click();
 
     await expect(alice.page).toHaveURL(room.path);
