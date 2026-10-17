@@ -120,14 +120,16 @@ export function createRoomAccessor({ roomDao }) {
     },
 
     /**
-     * Saves a changed room. `room.version` must be the version that was read.
+     * Saves a changed room. `room.version` must be the version that was read, and `previous` the room as it was
+     * read, so storage only writes what changed.
      *
-     * @param {Room} room
+     * @param {{ room: Room, previous: Readonly<Room> }} change
      * @returns {Promise<Readonly<Room>>}
      * @throws {ConcurrentChangeError} when the room changed in the meantime
      * @throws {NotFoundError} when the room no longer exists
      */
-    save: async (room) => toRoom(await orConcurrentChange(() => roomDao.update(room))),
+    save: async ({ room, previous }) =>
+      toRoom(await orConcurrentChange(() => roomDao.update({ doc: room, previous }))),
 
     /**
      * Removes a room, as of the version that was read, and keeps a record of why.

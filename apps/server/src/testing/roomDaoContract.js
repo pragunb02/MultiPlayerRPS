@@ -91,11 +91,117 @@ export function runRoomDaoContract(createDao) {
     const dao = await createDao();
     const v1 = await dao.insert(roomDoc());
 
-    const v2 = await dao.update({ ...v1, status: "finished" });
+    const v2 = await dao.update({ doc: { ...v1, status: "finished" }, previous: v1 });
 
     expect(v2).toEqual({ ...roomDoc(), status: "finished", version: 2 });
-    await expect(dao.update({ ...v1, status: "waiting" })).rejects.toThrow(VersionConflict);
+    await expect(dao.update({ doc: { ...v1, status: "waiting" }, previous: v1 })).rejects.toThrow(
+      VersionConflict,
+    );
     expect(await dao.get("ROOM22")).toEqual(v2);
+  });
+
+  // Each case changes a stored room one way. Whatever was written, the stored room must read back exactly as the
+  // new room, as if it had been replaced whole (CC-182).
+  const changes = [
+    [
+      "a move added to the log",
+      (doc) => ({
+        ...doc,
+        game: {
+          ...doc.game,
+          log: [
+            ...doc.game.log,
+            { kind: "move", playerId: "guest_b", move: { choice: "paper" }, at: T0 + 2 },
+          ],
+        },
+      }),
+    ],
+    [
+      "a nested value changed",
+      (doc) => ({
+        ...doc,
+        game: { ...doc.game, state: { ...doc.game.state, pending: { guest_a: "rock", guest_b: "paper" } } },
+      }),
+    ],
+    [
+      "a seat changed in place",
+      (doc) => ({
+        ...doc,
+        seats: doc.seats.map((seat) => ({ ...seat, connected: true })),
+      }),
+    ],
+    ["a seat removed", (doc) => ({ ...doc, seats: doc.seats.slice(0, 1) })],
+    [
+      "a list replaced by a shorter one and the first item changed",
+      (doc) => ({
+        ...doc,
+        game: { ...doc.game, log: [{ kind: "expire", at: T0 + 3 }] },
+      }),
+    ],
+    [
+      "a list grown at the end with an earlier item changed",
+      (doc) => ({
+        ...doc,
+        game: {
+          ...doc.game,
+          log: [
+            { kind: "expire", at: T0 + 3 },
+            { kind: "expire", at: T0 + 4 },
+          ],
+        },
+      }),
+    ],
+    ["a field removed", ({ series, ...doc }) => doc],
+    ["a field set to undefined", (doc) => ({ ...doc, series: undefined })],
+    [
+      "a field added",
+      (doc) => ({ ...doc, result: { status: "finished", winners: ["guest_a"] }, finishedAt: T0 + 9 }),
+    ],
+    ["a nested field removed", (doc) => ({ ...doc, series: { games: 1 } })],
+    ["a value turned from an object into a list", (doc) => ({ ...doc, options: [] })],
+    [
+      "a list that was empty filled",
+      (doc) => ({ ...doc, game: { ...doc.game, log: [] } }),
+      (doc) => ({
+        ...doc,
+        game: { ...doc.game, log: [{ kind: "expire", at: T0 + 5 }] },
+      }),
+    ],
+    [
+      "a whole new game",
+      (doc) => ({
+        ...doc,
+        game: {
+          matchId: "00000000-0000-4000-8000-000000000002",
+          seed: 7,
+          startedAt: T0 + 9,
+          state: { rounds: [] },
+          log: [],
+        },
+      }),
+    ],
+    [
+      "keys a database path cannot name",
+      (doc) => ({
+        ...doc,
+        game: { ...doc.game, state: { ...doc.game.state, score: { "guest.a": 1, $b: 2, "": 3 } } },
+      }),
+    ],
+    ["the same values in new objects", (doc) => structuredClone(doc)],
+    ["nothing at all", (doc) => doc],
+  ];
+
+  it.each(changes)("stores the new room exactly after %s", async (_name, first, second = first) => {
+    const dao = await createDao();
+    const stored = await dao.insert(roomDoc());
+    const read = first === second ? stored : await dao.update({ doc: first(stored), previous: stored });
+    const next = second(read);
+
+    const updated = await dao.update({ doc: next, previous: read });
+
+    const expected = JSON.parse(JSON.stringify({ ...next, version: read.version + 1 }));
+    expect(updated).toEqual(expected);
+    expect(await dao.get("ROOM22")).toEqual(expected);
   });
 
   it("lets only one of two writers that read the same version win", async () => {
@@ -103,8 +209,8 @@ export function runRoomDaoContract(createDao) {
     const read = await dao.insert(roomDoc());
 
     const results = await Promise.allSettled([
-      dao.update({ ...read, hostId: "guest_a" }),
-      dao.update({ ...read, hostId: "guest_b" }),
+      dao.update({ doc: { ...read, hostId: "guest_a" }, previous: read }),
+      dao.update({ doc: { ...read, hostId: "guest_b" }, previous: read }),
     ]);
 
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
@@ -116,7 +222,8 @@ export function runRoomDaoContract(createDao) {
     const dao = await createDao();
 
     await expect(dao.get("NOPE22")).rejects.toThrow(RangeError);
-    await expect(dao.update({ ...roomDoc(), version: 1 })).rejects.toThrow(RangeError);
+    const missing = { ...roomDoc(), version: 1 };
+    await expect(dao.update({ doc: missing, previous: missing })).rejects.toThrow(RangeError);
     await expect(dao.close({ code: "NOPE22", version: 1, record: closedRecord() })).rejects.toThrow(
       RangeError,
     );
@@ -137,7 +244,7 @@ export function runRoomDaoContract(createDao) {
   it("closes a room only from the version that was read", async () => {
     const dao = await createDao();
     const v1 = await dao.insert(roomDoc());
-    await dao.update({ ...v1, lastActivityAt: T0 + 2 });
+    await dao.update({ doc: { ...v1, lastActivityAt: T0 + 2 }, previous: v1 });
 
     await expect(dao.close({ code: "ROOM22", version: 1, record: closedRecord() })).rejects.toThrow(
       VersionConflict,

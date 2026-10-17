@@ -652,11 +652,11 @@ describe("roomComponent", () => {
         engines: [partyEngine],
         wrap: (accessor) => ({
           ...accessor,
-          async save(room) {
+          async save(change) {
             const before = interfere;
             interfere = async () => {};
             await before();
-            return accessor.save(room);
+            return accessor.save(change);
           },
         }),
       });
@@ -681,10 +681,10 @@ describe("roomComponent", () => {
       const { rooms } = setup({
         wrap: (accessor) => ({
           ...accessor,
-          async save(room) {
+          async save(change) {
             saves++;
-            await accessor.save(room);
-            return accessor.save(room);
+            await accessor.save(change);
+            return accessor.save(change);
           },
         }),
       });

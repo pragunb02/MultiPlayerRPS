@@ -69,7 +69,8 @@ describe("MongoDB room DAO honours the room DAO contract (integration)", () => {
 
     expect(await dao.has("ROOM22")).toBe(false);
     await expect(dao.get("ROOM22")).rejects.toThrow(RangeError);
-    await expect(dao.update({ ...roomDoc(), version: 2 })).rejects.toThrow(RangeError);
+    const caught = { ...roomDoc(), version: 2 };
+    await expect(dao.update({ doc: caught, previous: caught })).rejects.toThrow(RangeError);
     await expect(dao.close({ code: "ROOM22", version: 2, record })).rejects.toThrow(RangeError);
     await expect(dao.insert(roomDoc())).rejects.toThrow(DuplicateKey);
     expect(await dao.hasClosed("ROOM22")).toBe(true);
@@ -77,6 +78,36 @@ describe("MongoDB room DAO honours the room DAO contract (integration)", () => {
     expect((await dao.list()).map((doc) => doc.code)).toEqual(["ROOM33"]);
     expect(await dao.deleteClosedBefore(1_001)).toBe(1);
     expect(await dao.hasClosed("ROOM22")).toBe(false);
+  });
+
+  it("saves a move in one round trip that sends the new log entry, not the whole room (CC-182)", async () => {
+    const connection = await mongoose
+      .createConnection(mongo.uri(`rooms-${++counter}`), { monitorCommands: true })
+      .asPromise();
+    databases.push(connection);
+    const dao = createRoomDao({ connection });
+    const longLog = Array.from({ length: 300 }, (_, i) => ({
+      kind: "move",
+      playerId: "guest_a",
+      move: { i },
+      at: i,
+    }));
+    const read = await dao.insert(roomDoc({ game: { ...roomDoc().game, log: longLog } }));
+    const entry = { kind: "move", playerId: "guest_b", move: { choice: "paper" }, at: 999 };
+    const commands = [];
+    connection.getClient().on("commandStarted", (event) => commands.push(event));
+
+    await dao.update({
+      doc: { ...read, lastActivityAt: 999, game: { ...read.game, log: [...read.game.log, entry] } },
+      previous: read,
+    });
+
+    expect(commands.map((event) => event.commandName)).toEqual(["findAndModify"]);
+    expect(commands[0].command.update).toEqual({
+      $set: { lastActivityAt: 999 },
+      $push: { "game.log": { $each: [entry] } },
+      $inc: { version: 1 },
+    });
   });
 
   it("creates its indexes once and again without complaint", async () => {

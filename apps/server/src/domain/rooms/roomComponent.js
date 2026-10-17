@@ -177,7 +177,7 @@ export function createRoomComponent({
         if (decision === room) {
           return { closed: false, changed: false, room };
         }
-        const saved = await roomAccessor.save(stamp(decision));
+        const saved = await roomAccessor.save({ room: stamp(decision), previous: room });
         if (room.status === ROOM_STATUS.PLAYING && saved.status === ROOM_STATUS.FINISHED) {
           events.emit(ROOM_EVENTS.GAME_FINISHED, { room: saved, outcome: saved.result });
         }

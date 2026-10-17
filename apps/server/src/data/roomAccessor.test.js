@@ -30,7 +30,8 @@ describe("roomAccessor", () => {
     const rooms = setup();
 
     await expect(rooms.getByCode("NOPE22")).rejects.toThrow(NotFoundError);
-    await expect(rooms.save(room({ code: "NOPE22", version: 1 }))).rejects.toThrow(NotFoundError);
+    const missing = room({ code: "NOPE22", version: 1 });
+    await expect(rooms.save({ room: missing, previous: missing })).rejects.toThrow(NotFoundError);
     await expect(
       rooms.close({ room: room({ code: "NOPE22", version: 1 }), reason: "expired", closedAt: 5 }),
     ).rejects.toThrow(NotFoundError);
@@ -46,9 +47,11 @@ describe("roomAccessor", () => {
   it("translates a concurrent change into ConcurrentChangeError, so no update is lost", async () => {
     const rooms = setup();
     const read = await rooms.create(room());
-    await rooms.save({ ...read, status: "playing" });
+    await rooms.save({ room: { ...read, status: "playing" }, previous: read });
 
-    await expect(rooms.save({ ...read, status: "finished" })).rejects.toThrow(ConcurrentChangeError);
+    await expect(rooms.save({ room: { ...read, status: "finished" }, previous: read })).rejects.toThrow(
+      ConcurrentChangeError,
+    );
     await expect(rooms.close({ room: read, reason: "expired", closedAt: 5 })).rejects.toThrow(
       ConcurrentChangeError,
     );
@@ -106,7 +109,9 @@ describe("roomAccessor", () => {
     await expect(rooms.getByCode("ROOM22")).rejects.toThrow(failure);
     await expect(rooms.getClosed("ROOM22")).rejects.toThrow(failure);
     await expect(rooms.create(room())).rejects.toThrow(failure);
-    await expect(rooms.save(room({ version: 1 }))).rejects.toThrow(failure);
+    await expect(rooms.save({ room: room({ version: 1 }), previous: room({ version: 1 }) })).rejects.toThrow(
+      failure,
+    );
   });
 
   it("fails fast without a DAO", () => {
