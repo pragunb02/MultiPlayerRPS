@@ -2,6 +2,7 @@ import { act, fireEvent, render as renderPlain, screen, within } from "@testing-
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { ACTION_TIMING } from "../hooks/useAction.js";
 import { AppRequestError } from "../lib/errors.js";
 import { gameView } from "./registry.js";
 import { RpsBoard } from "./rps/RpsBoard.jsx";
@@ -113,7 +114,7 @@ describe("RpsBoard", () => {
       render(<RpsBoard room={room(rpsView())} onMove={() => new Promise(() => {})} />);
 
       await act(async () => fireEvent.click(screen.getByRole("button", { name: /paper/i })));
-      await act(async () => vi.advanceTimersByTime(200));
+      await act(async () => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AFTER_MS));
 
       expect(screen.getByRole("button", { name: /paper/i })).toHaveAttribute("aria-busy", "true");
       expect(screen.getByRole("button", { name: /rock/i })).not.toHaveAttribute("aria-busy");
@@ -309,7 +310,7 @@ describe("TicTacToeBoard", () => {
       render(<TicTacToeBoard room={room(tttView())} onMove={() => new Promise(() => {})} />);
 
       await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "top right: empty" })));
-      await act(async () => vi.advanceTimersByTime(200));
+      await act(async () => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AFTER_MS));
       fireEvent.click(screen.getByRole("gridcell", { name: "bottom left: empty" }));
 
       expect(screen.getByRole("gridcell", { name: "top right: X, sending" })).toHaveAttribute(

@@ -61,8 +61,8 @@ function Failure({ action, control }) {
  *
  * 1. Pressed: the face goes down at once, and the subtle click sound plays (CC-103) unless `data-sound` says
  *    otherwise.
- * 2. Waiting: with an `action` (see useAction) still on its way after 150 ms, a spinner and `pendingLabel` take
- *    the label's place and the button is marked busy.
+ * 2. Waiting: with an `action` (see useAction) still on its way after 400 ms, a spinner and `pendingLabel` take
+ *    the label's place and the button is marked busy. Once shown they stay at least 300 ms, so they never flash.
  * 3. Done: the change the press made is the answer. Where nothing else changes, `doneLabel` shows with a check
  *    for a moment.
  * 4. Disabled with a reason: with a `reason` the button cannot act but stays focusable. The reason shows on

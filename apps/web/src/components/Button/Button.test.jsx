@@ -114,19 +114,40 @@ describe("Button (CC-164)", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
-  it("shows a spinner and the waiting words after 150 ms, keeping the label in place for its width", () => {
+  it("shows a spinner and the waiting words after 400 ms, keeping the label in place for its width", () => {
     vi.useFakeTimers();
     render(<WithAction fn={() => new Promise(() => {})} pendingLabel="Creating…" />);
     const button = screen.getByRole("button", { name: "Go" });
 
     fireEvent.click(button);
     expect(button).not.toHaveAttribute("aria-busy");
-    act(() => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AFTER_MS));
+    act(() => vi.advanceTimersByTime(399));
+    expect(button).not.toHaveAttribute("aria-busy");
+    expect(button).toHaveAccessibleName("Go");
+    act(() => vi.advanceTimersByTime(1));
 
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).toHaveAccessibleName("Creating…");
     expect(button.querySelector(".spinner")).not.toBeNull();
     expect(button).toHaveTextContent("Go");
+  });
+
+  it("keeps the waiting words at least 300 ms, so an answer at 410 ms does not make them flash (CC-239)", async () => {
+    vi.useFakeTimers();
+    let answer;
+    render(<WithAction fn={() => new Promise((resolve) => (answer = resolve))} doneLabel="Copied" />);
+    const button = screen.getByRole("button", { name: "Go" });
+
+    fireEvent.click(button);
+    act(() => vi.advanceTimersByTime(410));
+    await act(async () => answer("ok"));
+
+    expect(button).toHaveAccessibleName("Sending…");
+    act(() => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AT_LEAST_MS - 11));
+    expect(button).toHaveAccessibleName("Sending…");
+    act(() => vi.advanceTimersByTime(1));
+    expect(button).toHaveAccessibleName("Copied");
+    expect(button).not.toHaveAttribute("aria-busy");
   });
 
   it("shows a check with the done words where nothing else changes", async () => {
