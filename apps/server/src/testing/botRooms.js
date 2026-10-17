@@ -7,6 +7,7 @@ import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
 
 export const SEAL_SECRET = "seal-secret-for-tests-only-0123456789abcdef";
+export const NETWORK = "net-a";
 export const PERSON = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 
 /**
@@ -44,6 +45,6 @@ export function botRooms({ seed = 1, onChange = () => {} } = {}) {
   const botComponent = createBotComponent({ roomComponent: rooms, roomAccessor, events });
   /** A started game against the game's character at `level`. */
   const playComputer = ({ gameId, level = "easy", options = {}, now = 1_000 }) =>
-    botComponent.playComputer({ host: PERSON, gameId, options, level, now });
+    botComponent.playComputer({ host: PERSON, network: NETWORK, gameId, options, level, now });
   return { engines, bots, botTurns, roomAccessor, rooms, botComponent, playComputer, changes, published };
 }

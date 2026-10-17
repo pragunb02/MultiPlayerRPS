@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BOTS, createBotRegistry } from "@classicade/games";
 import { GAME_IDS } from "@classicade/shared";
-import { botRooms, PERSON } from "../../testing/botRooms.js";
+import { botRooms, NETWORK, PERSON } from "../../testing/botRooms.js";
 import { GoneError, ValidationError } from "../../utils/errors.js";
 import { ROOM_EVENTS } from "../rooms/roomComponent.js";
 import { assertCharactersPlayable, createBotComponent, MAX_COMPUTER_GAMES } from "./botComponent.js";
@@ -79,7 +79,13 @@ describe("botComponent.playComputer", () => {
 
     it("leaves games between people alone", async () => {
       const { playComputer, rooms, roomAccessor } = botRooms();
-      const withFriend = await rooms.createRoom({ host: PERSON, gameId: GAME_IDS.RPS, options: {}, now: 1 });
+      const withFriend = await rooms.createRoom({
+        host: PERSON,
+        network: NETWORK,
+        gameId: GAME_IDS.RPS,
+        options: {},
+        now: 1,
+      });
       await rooms.joinRoom({ code: withFriend.code, player: FRIEND, now: 2 });
       for (let i = 0; i <= MAX_COMPUTER_GAMES; i++) {
         await playComputer({ gameId: GAME_IDS.RPS, now: 10 + i });
@@ -161,6 +167,7 @@ describe("botComponent.playComputer", () => {
       const play = () =>
         component.playComputer({
           host: PERSON,
+          network: NETWORK,
           gameId: GAME_IDS.RPS,
           options: {},
           level: "easy",

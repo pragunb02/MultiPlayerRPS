@@ -20,7 +20,14 @@ export function createBotHandlers({ socket, botComponent, roomComponent, now, lo
   return {
     async [SOCKET_EVENTS.ROOM_PLAY_COMPUTER](payload) {
       const { gameId, options, level } = parsePlayComputer(payload);
-      const room = await botComponent.playComputer({ host: identity, gameId, options, level, now: now() });
+      const room = await botComponent.playComputer({
+        host: identity,
+        network: socket.data.network,
+        gameId,
+        options,
+        level,
+        now: now(),
+      });
       socket.join(roomChannel(room.code));
       logger.info({ roomCode: room.code, gameId, level }, "game against the computer started");
       return stampedView({ roomComponent, room, viewerId: identity.id, now });

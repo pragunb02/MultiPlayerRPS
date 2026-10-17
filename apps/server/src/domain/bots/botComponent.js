@@ -99,16 +99,17 @@ export function createBotComponent({ roomComponent, roomAccessor, events }) {
 
   return Object.freeze({
     /**
-     * @param {{ host: import("../../models/identity.js").Identity, gameId: string, options: unknown, level: string, now: number }} input
-     *   `level` is one of the character's level picks, such as "easy"
+     * @param {{ host: import("../../models/identity.js").Identity, network: string, gameId: string, options: unknown, level: string, now: number }} input
+     *   `level` is one of the character's level picks, such as "easy". `network` names the host's network, as for
+     *   any new room, so a game against a computer counts toward the rooms open from it
      * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>} the room, its game already started
      * @throws {import("../../utils/errors.js").ValidationError} for a game without a character, an unknown level or
      *   invalid options
      */
-    async playComputer({ host, gameId, options, level, now }) {
+    async playComputer({ host, network, gameId, options, level, now }) {
       const bot = botIdentity({ gameId, level });
       return inTurn(host.id, async () => {
-        const room = await roomComponent.createRoom({ host, gameId, options, now });
+        const room = await roomComponent.createRoom({ host, network, gameId, options, now });
         const started = await roomComponent.joinRoom({ code: room.code, player: bot, now });
         await endOldestGames({ playerId: host.id, keep: room.code, now });
         return started;
