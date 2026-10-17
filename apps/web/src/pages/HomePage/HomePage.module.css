@@ -48,15 +48,6 @@
   color: var(--color-on-hero);
   font-weight: 700;
 }
-.error {
-  display: inline-block;
-  margin: var(--space-3) 0 0;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-danger);
-  font-weight: 700;
-}
 
 .games {
   list-style: none;

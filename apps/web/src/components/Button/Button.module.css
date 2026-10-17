@@ -148,12 +148,16 @@
   visibility: visible;
   opacity: 1;
 }
+/* On a surface of its own, so the words stay readable on any background, the hero's gradient too. */
 .failure {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   max-width: 22rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   font-size: var(--text-sm);
   font-weight: 700;
   color: var(--color-danger);
