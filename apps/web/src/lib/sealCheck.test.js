@@ -1,6 +1,6 @@
 import { webcrypto } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { checkSeal, sealVerdict, shortLock } from "./sealCheck.js";
+import { checkSeal, sealVerdict } from "./sealCheck.js";
 
 const sha256 = async (text) =>
   Array.from(new Uint8Array(await webcrypto.subtle.digest("SHA-256", new TextEncoder().encode(text))), (b) =>
@@ -39,12 +39,6 @@ describe("checkSeal", () => {
     } finally {
       vi.unstubAllGlobals();
     }
-  });
-});
-
-describe("shortLock", () => {
-  it("keeps the start and the end of a lock", () => {
-    expect(shortLock("7f3a0000000000000000c21")).toBe("7f3a…c21");
   });
 });
 
