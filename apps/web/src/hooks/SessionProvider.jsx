@@ -29,8 +29,12 @@ export function SessionProvider({ children }) {
   // a signal that arrives meanwhile is kept until they are done.
   const ownChanges = useRef(0);
   const heardMeanwhile = useRef(false);
-  // Set by the effect below on mount, before the page can start a change of its own.
+  // The ask of the mounted app, set by the effect below. Empty once the app is gone, so nothing asks after that.
   const askAgain = useRef(undefined);
+  // At most one "who am I?" request per tab at a time. A signal that arrives while one is on its way asks once more
+  // when it is back, and that newer answer decides (CC-115). Otherwise an older "signed out" answer could land last.
+  const asks = useRef({ inFlight: false, again: false });
+  const askLatest = useCallback(() => askAgain.current?.(), []);
 
   const adopt = useCallback(
     (identity) => {
@@ -49,24 +53,41 @@ export function SessionProvider({ children }) {
     [socket],
   );
 
-  /** Asks the server who this browser is. The answer is dropped when the tab changed identity meanwhile. */
+  /**
+   * Asks the server who this browser is, unless a request is already on its way: then it asks once more after that
+   * one. An answer is dropped when the tab changed identity meanwhile, or when a newer ask is waiting behind it.
+   */
   const askServer = useCallback(
     (isGone) => {
+      if (asks.current.inFlight) {
+        asks.current.again = true;
+        return;
+      }
+      asks.current.inFlight = true;
       const before = changes.current;
-      const stale = () => isGone() || changes.current !== before;
-      api.getSession().then(
-        (identity) => !stale() && adopt(identity),
-        (err) => {
-          if (stale()) return;
-          if (isUnauthorized(err)) {
-            adopt(undefined);
-          } else {
-            setState({ status: "error", identity: undefined, error: err });
+      const stale = () => isGone() || changes.current !== before || asks.current.again;
+      api
+        .getSession()
+        .then(
+          (identity) => !stale() && adopt(identity),
+          (err) => {
+            if (stale()) return;
+            if (isUnauthorized(err)) {
+              adopt(undefined);
+            } else {
+              setState({ status: "error", identity: undefined, error: err });
+            }
+          },
+        )
+        .finally(() => {
+          asks.current.inFlight = false;
+          if (asks.current.again) {
+            asks.current.again = false;
+            askLatest();
           }
-        },
-      );
+        });
     },
-    [api, adopt],
+    [api, adopt, askLatest],
   );
 
   useEffect(() => {
@@ -93,23 +114,27 @@ export function SessionProvider({ children }) {
     ];
     return () => {
       gone = true;
+      askAgain.current = undefined;
       offs.forEach((off) => off());
     };
   }, [askServer, socket, sessionBroadcast]);
 
   /** Runs one of this tab's own identity changes, then asks the server if something was heard meanwhile. */
-  const own = useCallback(async (work) => {
-    ownChanges.current += 1;
-    try {
-      return await work();
-    } finally {
-      ownChanges.current -= 1;
-      if (ownChanges.current === 0 && (heardMeanwhile.current || socketEnded.current)) {
-        heardMeanwhile.current = false;
-        askAgain.current();
+  const own = useCallback(
+    async (work) => {
+      ownChanges.current += 1;
+      try {
+        return await work();
+      } finally {
+        ownChanges.current -= 1;
+        if (ownChanges.current === 0 && (heardMeanwhile.current || socketEnded.current)) {
+          heardMeanwhile.current = false;
+          askLatest();
+        }
       }
-    }
-  }, []);
+    },
+    [askLatest],
+  );
 
   const value = useMemo(() => {
     /** This tab became someone else: take the identity, then tell the other tabs to ask the server. */

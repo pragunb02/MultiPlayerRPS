@@ -105,6 +105,31 @@ test.describe("other tabs of the same browser (CC-115)", () => {
     expect(await wasNotReloaded(second)).toBe(true);
   });
 
+  test("a guest in a room on tab 2 becomes the account when tab 1 logs in", async ({ players }) => {
+    // The server ends tab 2's guest socket before the browser has the new cookie, so tab 2's first ask can answer
+    // "signed out". The ask after tab 1's message must win (PR #74 review).
+    const account = newAccount();
+    const owner = await players.open("account owner", { secrets: [account.email, account.password] });
+    await signUp(owner.page, account);
+    await owner.leave();
+    const person = await players.open("person", { secrets: [account.email, account.password] });
+    const second = await person.openTab();
+    await second.goto("/games/tic-tac-toe");
+    await second.getByRole("button", { name: "Create room" }).click();
+    await expect(inviteCard(second)).toBeVisible();
+    await expect(banner(second).getByTitle("Guest")).toBeVisible();
+    const roomPath = new URL(second.url()).pathname;
+    await markPage(second);
+
+    await logIn(person.page, account);
+
+    await expect(banner(second)).toContainText(account.username);
+    await expect(loginLink(second)).toHaveCount(0);
+    await expect(inviteCard(second)).toBeVisible();
+    expect(new URL(second.url()).pathname).toBe(roomPath);
+    expect(await wasNotReloaded(second)).toBe(true);
+  });
+
   test("starting a guest on tab 1 shows that guest on tab 2", async ({ players }) => {
     const person = await players.open("person");
     const second = await person.openTab();

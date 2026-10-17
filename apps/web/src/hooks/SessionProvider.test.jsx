@@ -307,6 +307,65 @@ describe("SessionProvider", () => {
       expect(api.getSession).toHaveBeenCalledTimes(2);
     });
 
+    /** A getSession whose answers after the first are given by the test, one deferred answer per request. */
+    function deferredSessions(first) {
+      const pending = [];
+      const getSession = vi
+        .fn()
+        .mockResolvedValueOnce(first)
+        .mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+      return { getSession, pending };
+    }
+
+    it("lets the newest ask decide when an older signed out answer comes back first", async () => {
+      // Another tab logs in: the server ends this tab's old socket before the browser has the new cookie, so the
+      // first ask answers "signed out". The message that follows the log in asks again and gets the account.
+      const { getSession, pending } = deferredSessions(GUEST);
+      const { socket, sessionBroadcast } = setup(fakeApi({ getSession }));
+      await screen.findByText("ready");
+
+      act(() => socket.endByServer());
+      act(() => sessionBroadcast.receive());
+      await act(async () => pending[0](undefined));
+      await waitFor(() => expect(pending).toHaveLength(2));
+      await act(async () => pending[1](USER));
+
+      await waitFor(() => expect(session.identity).toEqual(USER));
+      expect(screen.getByText("ready")).toBeInTheDocument();
+      expect(socket.isConnected()).toBe(true);
+    });
+
+    it("keeps one request on its way at a time, and asks once more for everything heard meanwhile", async () => {
+      const { getSession, pending } = deferredSessions(GUEST);
+      const { socket, sessionBroadcast } = setup(fakeApi({ getSession }));
+      await screen.findByText("ready");
+
+      act(() => sessionBroadcast.receive());
+      act(() => sessionBroadcast.receive());
+      act(() => socket.endByServer());
+      const whileWaiting = getSession.mock.calls.length;
+      await act(async () => pending[0](GUEST));
+      await waitFor(() => expect(pending).toHaveLength(2));
+      await act(async () => pending[1](GUEST));
+
+      expect(whileWaiting).toBe(2);
+      expect(getSession).toHaveBeenCalledTimes(3);
+      expect(socket.isConnected()).toBe(true);
+    });
+
+    it("asks nothing more once the app is gone", async () => {
+      const { getSession, pending } = deferredSessions(GUEST);
+      const { sessionBroadcast } = setup(fakeApi({ getSession }));
+      await screen.findByText("ready");
+      act(() => sessionBroadcast.receive());
+      act(() => sessionBroadcast.receive());
+
+      cleanup();
+      await act(async () => pending[0](undefined));
+
+      expect(getSession).toHaveBeenCalledTimes(2);
+    });
+
     it("keeps a working socket when the session is still the same player", async () => {
       const api = fakeApi({ getSession: vi.fn().mockResolvedValue(USER) });
       const { socket, sessionBroadcast } = setup(api);
