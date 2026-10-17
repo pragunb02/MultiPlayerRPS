@@ -11,6 +11,7 @@ import { DEFAULT_LEADERBOARD_ID, gameForSlug, getGame } from "@classicade/shared
  *   /profile                           your progress and match history (guests and accounts)
  *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
  *   /privacy  /terms                   the privacy policy and the terms of use
+ *   /admin  /admin/:section?from=…&to=…&bucket=…   the owner console (CC-233), not found for anyone but an admin
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
@@ -25,7 +26,12 @@ export const ROUTES = Object.freeze({
   LEADERBOARD: "leaderboards/:board",
   PRIVACY: "privacy",
   TERMS: "terms",
+  ADMIN: "admin",
+  ADMIN_SECTION: "admin/:section",
 });
+
+/** The owner console's pages after its overview, in tab order (CC-233). Each is the URL segment after /admin. */
+export const ADMIN_SECTIONS = Object.freeze(["players", "games", "retention", "conversion", "engagement"]);
 
 /** URLs that were public once and must keep working (they redirect to the canonical URL). */
 export const LEGACY_ROUTES = Object.freeze({
@@ -100,4 +106,19 @@ export const paths = Object.freeze({
   leaderboards: (boardId = DEFAULT_LEADERBOARD_ID) => `/leaderboards/${encodeURIComponent(boardId)}`,
   privacy: () => "/privacy",
   terms: () => "/terms",
+  /**
+   * The owner console: its overview, or one section, for a range. Without a range it opens on the last 30 days.
+   *
+   * @param {string} [section]  an ADMIN_SECTIONS value, or omitted for the overview
+   * @param {{ from?: string, to?: string, bucket?: string }} [range]
+   */
+  admin: (section, range = {}) => `/admin${section ? `/${section}` : ""}${rangeQuery(range)}`,
 });
+
+function rangeQuery(range) {
+  const params = new URLSearchParams(
+    ["from", "to", "bucket"].filter((key) => range[key] !== undefined).map((key) => [key, range[key]]),
+  );
+  const text = params.toString();
+  return text === "" ? "" : `?${text}`;
+}

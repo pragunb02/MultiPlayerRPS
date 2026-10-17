@@ -24,6 +24,8 @@ const accountSchema = new mongoose.Schema(
   },
   { collection: "accounts", versionKey: false },
 );
+// The owner console: "accounts created in this range" (CC-233).
+accountSchema.index({ createdAt: 1 });
 
 const toDoc = (doc) => ({
   accountId: doc._id.toHexString(),

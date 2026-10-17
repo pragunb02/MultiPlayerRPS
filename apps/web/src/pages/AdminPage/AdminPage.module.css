@@ -1,0 +1,158 @@
+/* The owner console (CC-233): the arcade look of ADR-012, with plain surfaces so the numbers read easily. */
+.page {
+  display: grid;
+  gap: var(--space-4);
+  max-width: var(--content-width);
+}
+.header h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+}
+.lede {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  max-width: 48rem;
+}
+.tabs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.tab {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-press-neutral-small);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.tab:hover {
+  border-color: var(--color-primary);
+}
+.tab:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.tab[aria-current="page"] {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-press-small);
+}
+.range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+.rangeField {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.rangeField input,
+.rangeField select {
+  font: inherit;
+  font-weight: 400;
+  padding: var(--space-2);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.rangeError {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: 700;
+}
+.rangeField input:focus-visible,
+.rangeField select:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 1px;
+}
+.presets {
+  margin: 0;
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+}
+.generated,
+.compare {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.status {
+  margin: 0;
+}
+.body {
+  display: grid;
+  gap: var(--space-4);
+}
+.tiles {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+.tile {
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.tile dd {
+  margin: 0;
+}
+.tileLabel {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.tileValue {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}
+.tileNote {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.coming {
+  padding: var(--space-4);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.comingTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+.comingNote {
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.comingList {
+  margin: 0;
+  padding-left: var(--space-6);
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}

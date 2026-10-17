@@ -8,8 +8,19 @@ import { createWebAppRouter } from "./webApp.js";
 
 const ORIGIN = "https://classicade.example";
 
+/** Nobody is an admin unless a test says so (CC-233). The session is faked by a header. */
+const ADMIN_PAGE = Object.freeze({
+  sessionMiddleware: (req, res, next) => {
+    req.session = req.get("X-Test-Admin") === "yes" ? { admin: true } : {};
+    next();
+  },
+  isAdmin: (sessionData) => sessionData.admin === true,
+});
+
 function webApp() {
-  return express().use(createWebAppRouter({ distDir: TEST_WEB_BUILD, siteOrigin: ORIGIN }));
+  return express().use(
+    createWebAppRouter({ distDir: TEST_WEB_BUILD, siteOrigin: ORIGIN, adminPage: ADMIN_PAGE }),
+  );
 }
 
 /** The raw HTML a crawler gets: it sends no cookies and runs no scripts. */
@@ -106,6 +117,41 @@ describe("page head for crawlers and link previews", () => {
     for (const path of ["/play/rps", "/room/ab2cd3", "/login-signup.html", "/u/Old%20Timer!/userprofile"]) {
       expect((await crawl(path)).status, path).toBe(200);
     }
+  });
+});
+
+describe("the owner console's pages (CC-233)", () => {
+  it.each(["/admin", "/admin/players", "/admin/retention/"])(
+    "are an unknown address, 404 with the not found page, to anyone but an admin: %s",
+    async (path) => {
+      const res = await crawl(path);
+
+      expect(res.status).toBe(404);
+      expect(res.text).toContain("<title data-server-head>Page not found · ClassiCade</title>");
+    },
+  );
+
+  it("answer an admin with the app, never cached and never listed", async () => {
+    const res = await crawl("/admin/games").set("X-Test-Admin", "yes");
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("<title data-server-head>Owner console · ClassiCade</title>");
+    expect(tag(res.text, "name", "robots")).toBe("noindex");
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.headers["x-robots-tag"]).toBe("noindex, nofollow");
+  });
+
+  it("leave a request that does not want a page to the routes after them", async () => {
+    const res = await request(webApp())
+      .get("/admin")
+      .set("Accept", "application/json")
+      .set("X-Test-Admin", "yes");
+
+    expect(res.status).toBe(404);
+  });
+
+  it("do not include deeper addresses", async () => {
+    expect((await crawl("/admin/players/extra").set("X-Test-Admin", "yes")).status).toBe(404);
   });
 });
 

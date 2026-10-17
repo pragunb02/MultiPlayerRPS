@@ -32,7 +32,28 @@
 | `LOG_LEVEL`        | no            | default `info`                                                                                                                                                                                                                                            |
 | `TRUST_PROXY_HOPS` | no            | default `1` in production, `0` elsewhere. How many proxies in front of the server add to `X-Forwarded-For`; rate limits key on the address that many entries in from the right. See [Client addresses and rate limits](#client-addresses-and-rate-limits) |
 
+| `ADMIN_ACCOUNT_IDS` | no | default empty: nobody can open the owner console. Comma separated account ids such as `user_65f0c2a1b2c3d4e5f6a7b8c9`. A guest id or a typo stops the boot. See [Owner console](#owner-console-cc-233) |
+
 Secrets live only in Render and local `.env` files — never in the repo (it is public), chat, or PR text.
+
+### Owner console (CC-233)
+
+`/admin` shows totals from the data the site already stores (matches, guest transfers, accounts, achievements,
+quests, leaderboards). For anyone whose account id is not in `ADMIN_ACCOUNT_IDS`, every `/admin` page and
+`/api/admin/*` answer is the ordinary 404, so the console's existence is not revealed.
+
+To turn it on for yourself:
+
+1. Log in to the site with your own account.
+2. Open `https://<site>/api/session` in the same browser. Copy `identity.id` (it starts with `user_`).
+3. In Render → Environment, set `ADMIN_ACCOUNT_IDS` to that id (several ids: comma separated) and save. Render
+   redeploys.
+4. Reload the site: a **Console** link appears in the header for you only.
+
+Removing an id and redeploying takes access away at once (it is checked on every request). Reports are cached for 5
+minutes per range; a full report on 50,000 matches takes about half a second to work out (CC-233 ticket). The deploy
+that ships it builds four new indexes at boot (`matches.endedAt`, `player_transfers.createdAt`, `accounts.createdAt`,
+`player_achievements.unlockedAt`); on today's data that takes well under a second.
 
 ## Cutover to the new stack (CC-029)
 

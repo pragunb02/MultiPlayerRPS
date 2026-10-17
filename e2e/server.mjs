@@ -9,6 +9,8 @@ import bcrypt from "bcryptjs";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { createLogger } from "../apps/server/src/utils/logger.js";
+import { createPasswordHasher } from "../apps/server/src/utils/passwordHasher.js";
+import { OWNER, seededWeek } from "./ownerConsole.js";
 import { E2E_MONGO_PORT, E2E_MONGO_URI, LEGACY_PLAYER } from "./personas.js";
 import { recordAppPid, resetControl, roomOptions } from "./serverControl.js";
 
@@ -25,6 +27,18 @@ await seed.db.collection("users").insertOne({
   password: bcrypt.hashSync(LEGACY_PLAYER.password, 10),
   level: 7,
 });
+// The site's owner and a week of history for the owner console (CC-233).
+await seed.db.collection("accounts").insertOne({
+  _id: new mongoose.Types.ObjectId(OWNER.accountId),
+  username: OWNER.username,
+  usernameKey: OWNER.username.toLowerCase(),
+  email: OWNER.email,
+  passwordHash: await createPasswordHasher().hash(OWNER.password),
+  createdAt: new Date("2025-01-01T00:00:00.000Z"),
+});
+const week = seededWeek();
+await seed.db.collection("matches").insertMany(week.matches);
+await seed.db.collection("player_transfers").insertMany(week.transfers);
 await seed.close();
 
 resetControl();

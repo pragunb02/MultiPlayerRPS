@@ -27,6 +27,21 @@ describe("paths", () => {
   });
 });
 
+describe("owner console paths (CC-233)", () => {
+  it("builds the overview and section URLs, with the range when given", () => {
+    expect(paths.admin()).toBe("/admin");
+    expect(paths.admin("games")).toBe("/admin/games");
+    expect(paths.admin(undefined, { from: "2025-03-03", to: undefined, bucket: "day" })).toBe(
+      "/admin?from=2025-03-03&bucket=day",
+    );
+  });
+
+  it("is not a public page", () => {
+    expect(PUBLIC_PAGE_PATHS).not.toContain("/admin");
+    expect(describePage(paths.admin("players")).found).toBe(false);
+  });
+});
+
 describe("gameForSlug", () => {
   it.each([
     ["rock-paper-scissors", "rps"],

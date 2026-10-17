@@ -5,6 +5,7 @@ import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { SaveProgressProvider } from "../components/SaveProgress/SaveProgressProvider.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
+import { AdminRoute } from "../pages/AdminPage/AdminRoute.jsx";
 import { HomePage } from "../pages/HomePage/HomePage.jsx";
 import { LeaderboardPage } from "../pages/LeaderboardPage/LeaderboardPage.jsx";
 import { PrivacyPage } from "../pages/LegalPages/PrivacyPage.jsx";
@@ -49,6 +50,8 @@ export function App({ services }) {
                   />
                   <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
                   <Route path={ROUTES.TERMS} element={<TermsPage />} />
+                  <Route path={ROUTES.ADMIN} element={<AdminRoute />} />
+                  <Route path={ROUTES.ADMIN_SECTION} element={<AdminRoute />} />
                   {/* Old URLs stay valid: each page replaces them with its canonical URL. */}
                   <Route path={LEGACY_ROUTES.GAME} element={<PlayPage />} />
                   <Route path={LEGACY_ROUTES.ROOM} element={<RoomPage />} />

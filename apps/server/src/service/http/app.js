@@ -4,6 +4,7 @@ import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
 import { createApiRateLimit, DEFAULT_API_LIMIT } from "./rateLimits.js";
 import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
+import { createAdminAccess } from "./adminAccess.js";
 import { createRequestLogger } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
 import { createSessionGuard, createSessionRenewals } from "./session.js";
@@ -32,6 +33,7 @@ import { createWebAppRouter } from "./webApp.js";
  *   leaderboardComponent: ReturnType<typeof import("../../domain/leaderboards/leaderboardComponent.js").createLeaderboardComponent>,
  *   leaderboardLimit?: { windowMs: number, limit: number },
  *   apiLimit?: { windowMs: number, limit: number },   the budget for all of /api together, per session or address
+ *   analyticsComponent: ReturnType<typeof import("../../domain/analytics/analyticsComponent.js").createAnalyticsComponent>,
  *   isDatabaseUp: () => boolean,
  *   now?: () => number,   the clock for date-dependent answers (daily quests); tests pick a day
  * }} deps
@@ -53,6 +55,7 @@ export function createHttpApp({
   guestLimit,
   leaderboardComponent,
   leaderboardLimit,
+  analyticsComponent,
   apiLimit = DEFAULT_API_LIMIT,
   isDatabaseUp,
   now = Date.now,
@@ -63,6 +66,7 @@ export function createHttpApp({
   assertDefined(sessionMiddleware, "sessionMiddleware");
 
   const app = express();
+  const adminAccess = createAdminAccess({ adminAccountIds: config.adminAccountIds });
 
   app.disable("x-powered-by");
   // Rate limits key on req.ip, and Express finds it by counting this many proxies in from the right of
@@ -110,12 +114,20 @@ export function createHttpApp({
       now,
       leaderboardComponent,
       leaderboardLimit,
+      analyticsComponent,
+      adminAccess,
     }),
   );
 
   if (config.webDistDir !== "") {
     // The first allowed origin is the site's own public address (docs/DEPLOYMENT.md).
-    app.use(createWebAppRouter({ distDir: config.webDistDir, siteOrigin: config.allowedOrigins[0] }));
+    app.use(
+      createWebAppRouter({
+        distDir: config.webDistDir,
+        siteOrigin: config.allowedOrigins[0],
+        adminPage: { sessionMiddleware, isAdmin: adminAccess.isAdmin },
+      }),
+    );
   }
 
   app.use(notFoundHandler);
