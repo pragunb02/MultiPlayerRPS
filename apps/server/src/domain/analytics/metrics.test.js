@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ACHIEVEMENTS } from "@classicade/shared";
+import { WEEKLY_RETENTION_MS } from "../leaderboards/boards.js";
+import { isoWeek } from "../leaderboards/isoWeek.js";
 import {
   activeIn,
   activeSeries,
@@ -9,6 +11,7 @@ import {
   gamePopularity,
   headline,
   hourHeatmap,
+  lastFullWeek,
   leaderboardParticipants,
   matchesPerPlayer,
   matchesSeries,
@@ -17,6 +20,7 @@ import {
   newPlayersIn,
   newPlayersSeries,
   NO_CHANGE,
+  NOT_KEPT,
   notCountedShare,
   previousRange,
   rematchRates,
@@ -152,6 +156,19 @@ describe("weeklyReturning", () => {
         accounts: FEWER_THAN_MIN,
       },
     ]);
+  });
+});
+
+describe("lastFullWeek", () => {
+  it("is the week of the range's last day once that week is over", () => {
+    expect(lastFullWeek({ to: "2026-10-07", today: "2026-10-17" })).toBe("2026-10-05");
+    expect(lastFullWeek({ to: "2026-10-11", today: "2026-10-12" })).toBe("2026-10-05");
+  });
+
+  it("is the week before today's when the range ends in the week still going on", () => {
+    // Tuesday 13 October: the week from 12 October has had two days, so the full week is the one before.
+    expect(lastFullWeek({ to: "2026-10-13", today: "2026-10-13" })).toBe("2026-10-05");
+    expect(lastFullWeek({ to: "2026-10-18", today: "2026-10-18" })).toBe("2026-10-05");
   });
 });
 
@@ -401,6 +418,9 @@ describe("topItems", () => {
 });
 
 describe("leaderboardParticipants", () => {
+  const W41 = isoWeek(Date.parse("2026-10-07T00:00:00.000Z"));
+  const W42 = isoWeek(Date.parse("2026-10-14T00:00:00.000Z"));
+
   it("counts all time entries per board and this range's weekly XP entries", () => {
     const rows = [
       { board: "xp", period: "all", entries: 30 },
@@ -408,7 +428,7 @@ describe("leaderboardParticipants", () => {
       { board: "xp", period: "2026-W41", entries: 12 },
     ];
 
-    expect(leaderboardParticipants(rows, { weeks: ["2026-W41", "2026-W42"] })).toEqual({
+    expect(leaderboardParticipants(rows, { weeks: [W41, W42], now: W42.endsAt })).toEqual({
       allTime: [
         { board: "wins:chess", entries: FEWER_THAN_MIN },
         { board: "xp", entries: 30 },
@@ -419,6 +439,19 @@ describe("leaderboardParticipants", () => {
       ],
     });
   });
+
+  it("says a week's board is no longer kept once its entries are removed, instead of showing 0", () => {
+    const weekly = (now) => leaderboardParticipants([], { weeks: [W41, W42], now }).weekly;
+
+    expect(weekly(W41.endsAt + WEEKLY_RETENTION_MS - 1)).toEqual([
+      { week: "2026-W41", entries: 0 },
+      { week: "2026-W42", entries: 0 },
+    ]);
+    expect(weekly(W41.endsAt + WEEKLY_RETENTION_MS)).toEqual([
+      { week: "2026-W41", entries: NOT_KEPT },
+      { week: "2026-W42", entries: 0 },
+    ]);
+  });
 });
 
 describe("conversion", () => {
@@ -428,12 +461,15 @@ describe("conversion", () => {
         { day: "2026-10-01", transfers: 7, withMatches: 6 },
         { day: "2026-10-02", transfers: 2, withMatches: 1 },
       ],
-      accounts: [{ day: "2026-10-01", accounts: 9 }],
+      accounts: [
+        { day: "2026-10-01", accounts: 9, legacy: 0 },
+        { day: "2026-10-02", accounts: 0, legacy: 6 },
+      ],
     };
 
     expect(conversionSeries(rows, { from: "2026-10-01", to: "2026-10-02", bucket: "day" })).toEqual([
-      { bucket: "2026-10-01", guestsConverted: 6, accountsCreated: 9 },
-      { bucket: "2026-10-02", guestsConverted: FEWER_THAN_MIN, accountsCreated: 0 },
+      { bucket: "2026-10-01", guestsConverted: 6, accountsCreated: 9, legacyReturned: 0 },
+      { bucket: "2026-10-02", guestsConverted: FEWER_THAN_MIN, accountsCreated: 0, legacyReturned: 6 },
     ]);
   });
 

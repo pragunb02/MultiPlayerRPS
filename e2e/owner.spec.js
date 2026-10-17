@@ -104,6 +104,24 @@ test.describe("owner console", () => {
     await at(page, `/admin/players?${WEEK}`, "Players");
   });
 
+  test("a range the server refuses keeps the form, so the owner can correct it", async ({ players }) => {
+    const owner = await players.open("owner", { secrets: [OWNER.password, OWNER.email] });
+    const { page } = owner;
+    await logIn(owner, OWNER);
+    owner.expect(400, "/api/admin/analytics");
+    await page.goto(`/admin?from=2024-01-01&to=${SEEDED_WEEK.to}&bucket=week`);
+
+    await expect(page.getByRole("alert")).toContainText("at most 400 days");
+    await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(0);
+    await page.getByLabel("From").fill(SEEDED_WEEK.from);
+    await page.getByRole("button", { name: "Show" }).click();
+
+    await at(page, `/admin?from=${SEEDED_WEEK.from}&to=${SEEDED_WEEK.to}&bucket=week`, "Overview");
+    await expect(tile(page, LABELS.activePlayers).locator("dd").first()).toHaveText(
+      SEEDED_TOTALS.activePlayers,
+    );
+  });
+
   test("an account that is not the owner gets the ordinary not found page and a 404 from the API", async ({
     players,
   }) => {

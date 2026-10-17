@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { SITE_NAME } from "@classicade/shared";
+import { ANALYTICS_MAX_RANGE_DAYS, SITE_NAME } from "@classicade/shared";
 import { ADMIN_SECTIONS, paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { useAnalytics } from "../../hooks/useAnalytics.js";
-import { isNotFound } from "../../lib/errors.js";
+import { useNow } from "../../hooks/useNow.js";
+import { isNotFound, isRetryable } from "../../lib/errors.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import { addDays, indiaToday } from "./format.js";
 import { Conversion, Engagement, Games, Overview, Players, Retention } from "./sections.jsx";
@@ -26,6 +27,10 @@ const TABS = Object.freeze([
   })),
 ]);
 const PRESETS = Object.freeze([7, 30, 90, 365]);
+/** The range the server reports on when the address has none: the 30 days that end today. */
+const DEFAULT_RANGE_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TOO_LONG = `A range can cover at most ${ANALYTICS_MAX_RANGE_DAYS} days.`;
 const BUCKETS = Object.freeze([
   ["day", "Days"],
   ["week", "Weeks"],
@@ -38,6 +43,16 @@ function rangeFrom(search) {
   return { from: pick("from"), to: pick("to"), bucket: pick("bucket") };
 }
 
+/** The asked range with the server's defaults filled in, for a form shown when there is no report. */
+const filledIn = (asked, today) => ({
+  from: asked.from ?? addDays(today, 1 - DEFAULT_RANGE_DAYS),
+  to: asked.to ?? today,
+  bucket: asked.bucket ?? "day",
+});
+
+/** How many days a range covers, both ends included. */
+const lengthOf = ({ from, to }) => Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS) + 1;
+
 /**
  * The form that picks a range: from, to and how to group, plus links for the last 7, 30, 90 and 365 days. Each
  * choice is a new address, so Back and Forward walk through the ranges looked at.
@@ -48,10 +63,19 @@ function rangeFrom(search) {
 function RangePicker({ section, shown, today }) {
   const navigate = useNavigate();
   const [draft, setDraft] = useState(shown);
+  const [tooLong, setTooLong] = useState(false);
 
-  const change = (key) => (event) => setDraft({ ...draft, [key]: event.target.value });
+  const change = (key) => (event) => {
+    setTooLong(false);
+    setDraft({ ...draft, [key]: event.target.value });
+  };
   const submit = (event) => {
     event.preventDefault();
+    // The server refuses longer ranges, so say so here rather than open a page that can only fail.
+    if (lengthOf(draft) > ANALYTICS_MAX_RANGE_DAYS) {
+      setTooLong(true);
+      return;
+    }
     navigate(paths.admin(section, draft));
   };
   return (
@@ -91,6 +115,11 @@ function RangePicker({ section, shown, today }) {
       <Button control="admin.range.show" type="submit" variant="primary">
         Show
       </Button>
+      {tooLong && (
+        <p className={styles.rangeError} role="alert">
+          {TOO_LONG}
+        </p>
+      )}
       <p className={styles.presets}>
         Last{" "}
         {PRESETS.map((days, index) => (
@@ -123,6 +152,7 @@ export function AdminPage() {
   const [search] = useSearchParams();
   const asked = rangeFrom(search);
   const analytics = useAnalytics(asked);
+  const now = useNow(60_000);
   const tab = TABS.find((candidate) => candidate.section === section);
 
   if (tab === undefined || (analytics.status === "error" && isNotFound(analytics.error))) {
@@ -130,6 +160,9 @@ export function AdminPage() {
   }
   const { report } = analytics;
   const query = { from: asked.from, to: asked.to, bucket: asked.bucket };
+  // Without a report the form starts from the range that was asked for, so a refused range can be corrected.
+  const today = indiaToday(report?.generatedAt ?? now);
+  const shown = report?.range ?? filledIn(asked, today);
   return (
     <section className={styles.page} aria-labelledby="admin-title">
       <title>{`${tab.name} · Owner console · ${SITE_NAME}`}</title>
@@ -165,19 +198,23 @@ export function AdminPage() {
       {analytics.status === "error" && (
         <div className={styles.status} role="alert">
           <p>{analytics.error.message}</p>
-          <Button control="admin.retry" variant="secondary" onClick={analytics.retry}>
-            Try again
-          </Button>
+          {isRetryable(analytics.error) && (
+            <Button control="admin.retry" variant="secondary" onClick={analytics.retry}>
+              Try again
+            </Button>
+          )}
         </div>
+      )}
+      {analytics.status !== "loading" && (
+        <RangePicker
+          key={`${shown.from}|${shown.to}|${shown.bucket}`}
+          section={section}
+          today={today}
+          shown={shown}
+        />
       )}
       {report !== undefined && (
         <>
-          <RangePicker
-            key={`${report.range.from}|${report.range.to}|${report.range.bucket}`}
-            section={section}
-            today={indiaToday(report.generatedAt)}
-            shown={report.range}
-          />
           <p className={styles.generated}>
             {report.range.from} to {report.range.to}, India time. Worked out at{" "}
             {new Date(report.generatedAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })},

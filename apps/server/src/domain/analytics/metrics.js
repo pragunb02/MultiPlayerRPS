@@ -1,4 +1,6 @@
+import { ANALYTICS_NOT_KEPT } from "@classicade/shared";
 import { addDays, bucketOf, bucketsOf, daysBetween, daysOf, weekOf } from "../../utils/indiaTime.js";
+import { WEEKLY_RETENTION_MS } from "../leaderboards/boards.js";
 import {
   FEWER_THAN_MIN,
   marginOfError,
@@ -184,6 +186,20 @@ export function weeklyReturning(players, { from, to, today }) {
       accounts: shareOf({ part: total.accounts, whole: total.players }),
     }),
   );
+}
+
+/**
+ * The week the North Star headline reports on: the latest week, Monday to Sunday, that is over and does not
+ * start after the range ends. A week still going on is never the headline, because early in the week nobody can
+ * have 3 days of play yet, and comparing it with a full week would show a drop every Monday.
+ *
+ * @param {{ to: string, today: string }} days  the range's last day and today, India time
+ * @returns {string} the week's Monday
+ */
+export function lastFullWeek({ to, today }) {
+  const current = weekOf(today);
+  const last = weekOf(to);
+  return last < current ? last : addDays(current, -7);
 }
 
 /**
@@ -420,13 +436,19 @@ export function topItems(rows, catalog) {
     .map(({ id, count }) => Object.freeze({ id, name: names.get(id) ?? id, count: peopleCount(count) }));
 }
 
+/** What a weekly board size says once that week's entries have been removed. */
+export const NOT_KEPT = ANALYTICS_NOT_KEPT;
+
 /**
  * How many accounts each leaderboard lists. A board needs 25 entries before its tab is worth showing (ADR-029).
+ * A week's entries are removed 28 days after it ends, so an older week says "not kept" rather than 0, which
+ * would look like a week nobody played.
  *
  * @param {ReadonlyArray<{ board: string, period: string, entries: number }>} rows
- * @param {{ weeks: ReadonlyArray<string> }} periods  the weekly board periods ("2026-W42") in the range
+ * @param {{ weeks: ReadonlyArray<{ id: string, endsAt: number }>, now: number }} periods
+ *   the weekly board periods ("2026-W42") in the range with the moment each ends, and the time now
  */
-export function leaderboardParticipants(rows, { weeks }) {
+export function leaderboardParticipants(rows, { weeks, now }) {
   const entries = (board, period) =>
     sum(
       rows.filter((row) => row.board === board && row.period === period),
@@ -438,18 +460,24 @@ export function leaderboardParticipants(rows, { weeks }) {
       boards.map((board) => Object.freeze({ board, entries: peopleCount(entries(board, "all")) })),
     ),
     weekly: Object.freeze(
-      weeks.map((week) => Object.freeze({ week, entries: peopleCount(entries("xp", week)) })),
+      weeks.map(({ id, endsAt }) =>
+        Object.freeze({
+          week: id,
+          entries: now >= endsAt + WEEKLY_RETENTION_MS ? NOT_KEPT : peopleCount(entries("xp", id)),
+        }),
+      ),
     ),
   });
 }
 
 /**
- * Sign ups per bucket: guests who made an account or logged in (their games moved, ADR-014), and accounts made
- * by people who never played as a guest.
+ * Sign ups per bucket: guests who made an account or logged in (their games moved, ADR-014), every new account,
+ * and the players of the legacy app who logged in for the first time. Those get an account at that login
+ * (CC-078) but are not sign ups, so they are counted apart, and their guest games moving is not a conversion.
  *
  * @param {{
  *   transfers: ReadonlyArray<{ day: string, transfers: number, withMatches: number }>,
- *   accounts: ReadonlyArray<{ day: string, accounts: number }>,
+ *   accounts: ReadonlyArray<{ day: string, accounts: number, legacy: number }>,
  * }} rows
  * @param {DayRange & { bucket: string }} range
  */
@@ -460,6 +488,7 @@ export function conversionSeries({ transfers, accounts }, { from, to, bucket }) 
       bucket: key,
       guestsConverted: peopleCount(sum(transfers.filter(pick), (row) => row.withMatches)),
       accountsCreated: peopleCount(sum(accounts.filter(pick), (row) => row.accounts)),
+      legacyReturned: peopleCount(sum(accounts.filter(pick), (row) => row.legacy)),
     });
   });
 }
@@ -479,12 +508,19 @@ export const NO_CHANGE = Object.freeze({ HIDDEN: "hidden", NEW: "new" });
 
 /**
  * One headline number with the same number for the period before, and the change between them as a share of
- * the earlier one. A hidden number has no change ("hidden"), and growth from zero has no share ("new").
+ * the earlier one. A hidden number has no change ("hidden"), and growth from zero has no share ("new"). A
+ * headline about one week, rather than the whole range, names that week's Monday.
  *
- * @param {{ id: string, value: number | string, previous: number | string }} headline
+ * @param {{ id: string, value: number | string, previous: number | string, week?: string }} headline
  */
-export function headline({ id, value, previous }) {
-  return Object.freeze({ id, value, previous, change: changeOf(value, previous) });
+export function headline({ id, value, previous, week }) {
+  return Object.freeze({
+    id,
+    value,
+    previous,
+    change: changeOf(value, previous),
+    ...(week !== undefined && { week }),
+  });
 }
 
 function changeOf(value, previous) {

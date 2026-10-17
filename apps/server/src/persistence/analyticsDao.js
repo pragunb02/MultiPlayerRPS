@@ -17,6 +17,29 @@ const countMatching = (regex) => ({
 const betweenDates = (field, { from, to }) => ({ [field]: { $gte: from, $lt: to } });
 const AGGREGATE_OPTIONS = Object.freeze({ allowDiskUse: true });
 
+/** The account a `user_…` player id names, or nothing for an id that is not an account's. */
+const accountIdOf = (playerIdField) => ({
+  $convert: { input: { $substrCP: [playerIdField, 5, 24] }, to: "objectId", onError: null, onNull: null },
+});
+// Marks each account whose email belongs to a player of the legacy app (its `users` collection, never written by
+// this server). Signing up with such an email is refused, so a match means the account was made at that
+// player's first login (CC-078). The legacy app stored emails as typed, so case is ignored.
+const MARK_LEGACY = Object.freeze([
+  {
+    $lookup: {
+      from: "users",
+      let: { email: "$email" },
+      pipeline: [
+        { $match: { $expr: { $eq: [{ $toLower: "$email" }, "$$email"] } } },
+        { $limit: 1 },
+        { $project: { _id: 1 } },
+      ],
+      as: "legacyUser",
+    },
+  },
+  { $project: { createdAt: 1, legacy: { $gt: [{ $size: "$legacyUser" }, 0] } } },
+]);
+
 /**
  * @typedef {{ from: Date, to: Date }} Moments  the start, included, and the end, not included
  */
@@ -182,7 +205,9 @@ export function createAnalyticsDao({ connection }) {
 
     /**
      * Guest transfers started in a range per India day, with how many of those guests had finished a match, and
-     * accounts created per India day.
+     * accounts created per India day. A player of the legacy app gets an account at their first login (CC-078),
+     * which is not a sign up: those accounts are counted apart as `legacy`, and a transfer into one of them is
+     * left out, because that player came back rather than converted.
      *
      * @param {Moments} moments
      */
@@ -190,6 +215,15 @@ export function createAnalyticsDao({ connection }) {
       const [transfers, accounts] = await Promise.all([
         aggregate("player_transfers", [
           { $match: betweenDates("createdAt", moments) },
+          {
+            $lookup: {
+              from: "accounts",
+              let: { accountId: accountIdOf("$to.id") },
+              pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$accountId"] } } }, ...MARK_LEGACY],
+              as: "account",
+            },
+          },
+          { $match: { "account.legacy": { $ne: true } } },
           {
             $group: {
               _id: dayOf("$createdAt"),
@@ -201,8 +235,15 @@ export function createAnalyticsDao({ connection }) {
         ]),
         aggregate("accounts", [
           { $match: betweenDates("createdAt", moments) },
-          { $group: { _id: dayOf("$createdAt"), accounts: { $sum: 1 } } },
-          { $project: { _id: 0, day: "$_id", accounts: 1 } },
+          ...MARK_LEGACY,
+          {
+            $group: {
+              _id: dayOf("$createdAt"),
+              accounts: { $sum: { $cond: ["$legacy", 0, 1] } },
+              legacy: { $sum: { $cond: ["$legacy", 1, 0] } },
+            },
+          },
+          { $project: { _id: 0, day: "$_id", accounts: 1, legacy: 1 } },
         ]),
       ]);
       return { transfers, accounts };

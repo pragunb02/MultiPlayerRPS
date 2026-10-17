@@ -25,7 +25,8 @@ const HEADLINES = Object.freeze({
   weeklyReturning: {
     label: "Weekly returning players",
     format: formatCount,
-    note: "North Star: real play on 3 or more days in the latest week",
+    note: ({ week }) =>
+      `North Star: real play on 3 or more days in the full week from ${week}, against the week before`,
   },
   matchesPerPlayer: {
     label: "Matches per player",
@@ -78,14 +79,15 @@ export function Overview({ report }) {
   return (
     <>
       <dl className={styles.tiles} aria-label="Headline numbers">
-        {report.overview.headlines.map(({ id, value, previous, change }) => {
+        {report.overview.headlines.map((headline) => {
+          const { id, value, previous, change } = headline;
           const info = HEADLINES[id];
           return (
             <Tile
               key={id}
               label={info.label}
               value={info.format(value)}
-              note={info.note}
+              note={typeof info.note === "function" ? info.note(headline) : info.note}
               previous={info.format(previous)}
               change={formatChange(change)}
             />
@@ -350,18 +352,24 @@ export function Conversion({ report }) {
           value={formatCount(conversion.guestsConverted)}
           note="Their games moved to an account"
         />
-        <Tile label="Accounts created" value={formatCount(conversion.accountsCreated)} note="All sign ups" />
+        <Tile label="Accounts created" value={formatCount(conversion.accountsCreated)} note="New sign ups" />
+        <Tile
+          label="Legacy players back"
+          value={formatCount(conversion.legacyReturned)}
+          note="Players of the old site who logged in for the first time, not counted as sign ups"
+        />
       </dl>
       <ChartFigure
         id="conversion"
         title="Sign ups"
-        note="Guests whose games moved to an account (they signed up or logged in), and every account created. A guest is a cookie, so one person on two devices counts twice."
+        note="Guests whose games moved to an account (they signed up or logged in), and every new account. Players of the old site get an account at their first login: they are counted apart, not as sign ups or converted guests. A guest is a cookie, so one person on two devices counts twice."
         range={range}
         rows={conversion.series}
         columns={[
           { label: bucketName[range.bucket], value: (row) => row.bucket },
           { label: "Guests who saved progress", value: (row) => row.guestsConverted, format: "count" },
           { label: "Accounts created", value: (row) => row.accountsCreated, format: "count" },
+          { label: "Legacy players back", value: (row) => row.legacyReturned, format: "count" },
         ]}
       >
         <BarChart
@@ -441,7 +449,7 @@ export function Engagement({ report }) {
       <ChartFigure
         id="leaderboards"
         title="Leaderboard participants"
-        note="Accounts on each board. A board tab is worth showing at 25 entries, and a game page's top 5 at 50 (ADR-029)."
+        note="Accounts on each board. A board tab is worth showing at 25 entries, and a game page's top 5 at 50 (ADR-029). Weekly entries are kept for 28 days after the week ends, so older weeks say no longer kept."
         range={range}
         tableOnly
         rows={[

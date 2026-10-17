@@ -40,7 +40,7 @@ function siteDao(calls = []) {
     ),
     listSignups: record("signups", () => ({
       transfers: [{ day: "2026-10-13", transfers: 6, withMatches: 5 }],
-      accounts: [{ day: "2026-10-13", accounts: 7 }],
+      accounts: [{ day: "2026-10-13", accounts: 7, legacy: 6 }],
     })),
     listAchievementUnlocks: record("achievements", () => [{ achievementId: "first-win", players: 9 }]),
     listQuestCompletions: record("quests", () => [{ questId: "play-3", completions: 3 }]),
@@ -89,10 +89,39 @@ describe("analyticsComponent", () => {
       activePlayers: { value: 10, previous: FEWER_THAN_MIN, change: "hidden" },
       matches: { value: 26, previous: 13, change: 1 },
       newPlayers: { value: 6, previous: FEWER_THAN_MIN, change: "hidden" },
-      weeklyReturning: { value: 6, previous: 0, change: "new" },
+      weeklyReturning: { value: 0, previous: 0, change: 0, week: "2026-10-05" },
       matchesPerPlayer: { value: 4.4, previous: FEWER_THAN_MIN, change: "hidden" },
       guestsConverted: { value: 5, previous: 5, change: 0 },
       conversionRate: { value: 0.4545, previous: 1, change: -0.5455 },
+    });
+  });
+
+  it("puts the last full week's returning players beside the week before, when the range ends mid-week", async () => {
+    const tuesday = Date.parse("2026-10-13T06:00:00.000Z");
+    const days = (...list) => list.map((day) => played(day));
+    const dao = createEmptyAnalyticsDao({
+      listPlayerActivity: async () => [
+        ...many(5, () => ({ kind: "guest", days: days("2026-09-28", "2026-09-29", "2026-09-30") })),
+        ...many(8, () => ({
+          kind: "user",
+          days: days("2026-10-05", "2026-10-06", "2026-10-07", "2026-10-12", "2026-10-13"),
+        })),
+      ],
+    });
+    const analytics = component(dao);
+
+    const report = await analytics.getReport({
+      range: analytics.defaultRange({ now: tuesday }),
+      now: tuesday,
+    });
+
+    // The week from 12 October has had two days, so nobody can have 3 yet. It is not the headline.
+    expect(report.overview.headlines.find(({ id }) => id === "weeklyReturning")).toEqual({
+      id: "weeklyReturning",
+      value: 8,
+      previous: 5,
+      change: 0.6,
+      week: "2026-10-05",
     });
   });
 
@@ -102,7 +131,9 @@ describe("analyticsComponent", () => {
     expect(report.players.kinds).toEqual({ guests: 6, accounts: FEWER_THAN_MIN, guestShare: 0.6 });
     expect(report.games.popularity[0]).toEqual({ gameId: "rps", matches: 26, share: 1 });
     expect(report.retention.cohorts).toEqual([expect.objectContaining({ week: "2026-10-12", players: 6 })]);
-    expect(report.conversion).toEqual(expect.objectContaining({ guestsConverted: 5, accountsCreated: 7 }));
+    expect(report.conversion).toEqual(
+      expect.objectContaining({ guestsConverted: 5, accountsCreated: 7, legacyReturned: 6 }),
+    );
     expect(report.engagement.achievements).toEqual([{ id: "first-win", name: "First Victory", count: 9 }]);
     expect(report.engagement.quests).toEqual([{ id: "play-3", name: "Warm-up", count: FEWER_THAN_MIN }]);
     expect(report.engagement.leaderboards.allTime).toEqual([{ board: "xp", entries: FEWER_THAN_MIN }]);

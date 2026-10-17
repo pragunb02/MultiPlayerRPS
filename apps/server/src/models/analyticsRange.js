@@ -1,8 +1,9 @@
+import { ANALYTICS_MAX_RANGE_DAYS } from "@classicade/shared";
 import { BUCKETS, daysBetween, isDay } from "../utils/indiaTime.js";
 import { ValidationError } from "../utils/errors.js";
 
 /** The longest range the owner console reports on, so one request cannot ask for years of work. */
-export const MAX_RANGE_DAYS = 400;
+export const MAX_RANGE_DAYS = ANALYTICS_MAX_RANGE_DAYS;
 
 /**
  * @typedef {Object} AnalyticsRange

@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { matchDoc, playerId, transferDoc } from "../testing/analyticsFixtures.js";
 import { captureLogger } from "../testing/captureLogger.js";
@@ -232,7 +233,7 @@ describe("analytics DAO (integration)", () => {
 
     // 19:00 UTC on 2 October is already 3 October in India.
     expect(signups.transfers).toEqual([{ day: "2026-10-03", transfers: 3, withMatches: 1 }]);
-    expect(signups.accounts).toEqual([{ day: "2026-10-03", accounts: 1 }]);
+    expect(signups.accounts).toEqual([{ day: "2026-10-03", accounts: 1, legacy: 0 }]);
     expect(await dao.listAchievementUnlocks(OCTOBER)).toEqual([{ achievementId: "first-win", players: 2 }]);
     expect(await dao.listQuestCompletions(OCTOBER)).toEqual([{ questId: "play-3", completions: 2 }]);
     expect(await dao.listLeaderboardSizes({ periods: ["all", "2026-W41"] })).toEqual(
@@ -241,5 +242,30 @@ describe("analytics DAO (integration)", () => {
         { board: "xp", period: "2026-W41", entries: 1 },
       ]),
     );
+  });
+
+  it("counts a legacy player's first login apart from new accounts, and not as a converted guest", async () => {
+    const { dao, insert } = await open();
+    const account = (number, email) => ({
+      _id: new Types.ObjectId(playerId("user", 900_000 + number).slice(5)),
+      username: `p${number}`,
+      usernameKey: `p${number}`,
+      email,
+      passwordHash: "h",
+      createdAt: new Date("2026-10-17T06:00:00.000Z"),
+    });
+    // The legacy app stored emails as typed. The new account keeps the email in lower case.
+    await insert("users", [{ username: "Old", email: "Old@X.in", password: "legacy-hash" }]);
+    await insert("accounts", [account(1, "new@x.in"), account(2, "old@x.in")]);
+    await insert("player_transfers", [
+      transferDoc({ number: 1, createdAt: "2026-10-17T06:00:00.000Z" }),
+      transferDoc({ number: 2, createdAt: "2026-10-17T06:00:00.000Z" }),
+    ]);
+
+    const signups = await dao.listSignups(OCTOBER);
+
+    expect(signups.accounts).toEqual([{ day: "2026-10-17", accounts: 1, legacy: 1 }]);
+    expect(signups.transfers).toEqual([{ day: "2026-10-17", transfers: 1, withMatches: 1 }]);
+    expect(JSON.stringify(signups)).not.toMatch(/@|user_|guest_/);
   });
 });

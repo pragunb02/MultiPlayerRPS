@@ -90,6 +90,9 @@ describe("owner console pages", () => {
     expect(tile("Active players")).toHaveTextContent("Before: 0 (new)");
     expect(tile("Matches finished")).toHaveTextContent("Before: 30 (−30.0%)");
     expect(tile("New players")).toHaveTextContent("Before: 16 (no change)");
+    expect(tile("Weekly returning players")).toHaveTextContent(
+      "real play on 3 or more days in the full week from 2025-03-03",
+    );
     expect(tile("Weekly returning players")).toHaveTextContent("Before: 5 (+100.0%)");
     expect(tile("Matches per player")).toHaveTextContent("2.63");
     expect(tile("Matches per player")).toHaveTextContent("Before: fewer than 5");
@@ -245,6 +248,59 @@ describe("owner console pages", () => {
     expect(await created[0].text()).toBe(
       "Achievement,Players\r\nFirst Victory,12\r\nRising Star,fewer than 5\r\n",
     );
+  });
+
+  it("counts legacy players' first logins apart from sign ups", async () => {
+    await openConsole(`/admin/conversion?${WEEK}`);
+
+    expect(within(tile("Legacy players back")).getByText("6")).toBeVisible();
+    expect(tile("Legacy players back")).toHaveTextContent("not counted as sign ups");
+    const table = screen.getByRole("table", { name: "Sign ups" });
+    expect(within(table).getByRole("columnheader", { name: "Legacy players back" })).toBeInTheDocument();
+  });
+
+  it("says a weekly board is no longer kept instead of showing it as empty", async () => {
+    await openConsole(`/admin/engagement?${WEEK}`);
+
+    const table = screen.getByRole("table", { name: "Leaderboard participants" });
+    const old = within(table).getByRole("cell", { name: "2025-W05" }).closest("tr");
+    expect(old).toHaveTextContent("no longer kept");
+    expect(screen.getByText(/kept for 28 days after the week ends/)).toBeVisible();
+  });
+
+  it("keeps the range form when the server refuses the range, without a Try again that would fail the same way", async () => {
+    const getAnalytics = vi.fn().mockRejectedValue(
+      new AppRequestError({
+        code: "VALIDATION_FAILED",
+        message: "The range must run forwards and cover at most 400 days",
+        status: 400,
+      }),
+    );
+    const view = renderApp({
+      path: "/admin?from=2025-01-01&to=2026-10-18&bucket=week",
+      api: ownerApi({ getAnalytics }),
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("at most 400 days");
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.getByLabelText("From")).toHaveValue("2025-01-01");
+    expect(screen.getByLabelText("To")).toHaveValue("2026-10-18");
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    await userEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(view.url()).toBe("/admin?from=2026-01-01&to=2026-10-18&bucket=week");
+  });
+
+  it("refuses a range longer than 400 days in the form, before asking the server", async () => {
+    const api = ownerApi();
+    const view = await openConsole(`/admin?${WEEK}`, api);
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2024-01-01" } });
+    await userEvent.click(screen.getByRole("button", { name: "Show" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("at most 400 days");
+    expect(view.url()).toBe(`/admin?${WEEK}`);
+    expect(api.getAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it("says when the numbers could not be worked out and tries again on request", async () => {

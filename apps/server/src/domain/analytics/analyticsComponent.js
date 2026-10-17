@@ -12,6 +12,7 @@ import {
   gamePopularity,
   headline,
   hourHeatmap,
+  lastFullWeek,
   leaderboardParticipants,
   matchesPerPlayer,
   matchesSeries,
@@ -59,12 +60,14 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
   async function build(range, now) {
     const today = dayOf(now);
     const previous = previousRange(range);
+    // Leaderboard weeks are UTC weeks, so each India week is matched by the board week its middle falls in.
     const weeks = [
-      ...new Set(
-        bucketsOf({ ...range, bucket: BUCKETS.WEEK }).map(
-          (week) => isoWeek(startOfDay(week) + 12 * 60 * 60 * 1000).id,
-        ),
-      ),
+      ...new Map(
+        bucketsOf({ ...range, bucket: BUCKETS.WEEK }).map((week) => {
+          const board = isoWeek(startOfDay(week) + 12 * 60 * 60 * 1000);
+          return [board.id, board];
+        }),
+      ).values(),
     ];
     const [players, facts, previousFacts, signups, previousSignups, achievements, quests, boards] =
       await Promise.all([
@@ -75,7 +78,7 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
         analyticsAccessor.listSignups(momentsOf(previous)),
         analyticsAccessor.listAchievementUnlocks(momentsOf(range)),
         analyticsAccessor.listQuestCompletions(momentsOf(range)),
-        analyticsAccessor.listLeaderboardSizes({ periods: ["all", ...weeks] }),
+        analyticsAccessor.listLeaderboardSizes({ periods: ["all", ...weeks.map((week) => week.id)] }),
       ]);
 
     const active = activeIn(players, range);
@@ -83,7 +86,12 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
     const converted = sumOf(signups.transfers, (row) => row.withMatches);
     const convertedBefore = sumOf(previousSignups.transfers, (row) => row.withMatches);
     const returning = weeklyReturning(players, { ...range, today });
-    const returningBefore = weeklyReturning(players, { ...previous, today });
+    const headlineWeek = lastFullWeek({ to: range.to, today });
+    const [weekBefore, fullWeek] = weeklyReturning(players, {
+      from: addDays(headlineWeek, -7),
+      to: headlineWeek,
+      today,
+    });
     const matches = matchMix(facts.mix);
 
     return Object.freeze({
@@ -104,8 +112,9 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
           }),
           headline({
             id: "weeklyReturning",
-            value: returning[returning.length - 1].players,
-            previous: returningBefore[returningBefore.length - 1].players,
+            value: fullWeek.players,
+            previous: weekBefore.players,
+            week: headlineWeek,
           }),
           headline({
             id: "matchesPerPlayer",
@@ -150,6 +159,7 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
         series: Object.freeze(conversionSeries(signups, range)),
         guestsConverted: peopleCount(converted),
         accountsCreated: peopleCount(sumOf(signups.accounts, (row) => row.accounts)),
+        legacyReturned: peopleCount(sumOf(signups.accounts, (row) => row.legacy)),
         rate: conversionRate({ converted, activeGuests: active.guests }),
       }),
       engagement: Object.freeze({
@@ -166,7 +176,7 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
             QUESTS,
           ),
         ),
-        leaderboards: leaderboardParticipants(boards, { weeks }),
+        leaderboards: leaderboardParticipants(boards, { weeks, now }),
       }),
     });
   }

@@ -1,9 +1,11 @@
-import { getGame } from "@classicade/shared";
+import { ANALYTICS_NOT_KEPT, getGame } from "@classicade/shared";
 
 /** What the server sends instead of a group of 1 to 4 people (CC-233). */
 export const FEWER_THAN_MIN = "<5";
 /** The same, in words, for the screen and for exported files. */
 export const FEWER_THAN_MIN_TEXT = "fewer than 5";
+/** What a total whose data has already been removed says, on screen and in exported files. */
+export const NOT_KEPT_TEXT = "no longer kept";
 
 const INDIA_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -26,12 +28,15 @@ export const addDays = (day, count) =>
   new Date(Date.parse(`${day}T00:00:00.000Z`) + count * DAY_MS).toISOString().slice(0, 10);
 
 /**
- * A count for the screen: "1,234", or "fewer than 5" for a hidden group.
+ * A count for the screen: "1,234", "fewer than 5" for a hidden group, or "no longer kept" when the data behind it
+ * has been removed.
  *
  * @param {number | string} value
  */
-export const formatCount = (value) =>
-  value === FEWER_THAN_MIN ? FEWER_THAN_MIN_TEXT : numbers.format(value);
+export function formatCount(value) {
+  if (value === FEWER_THAN_MIN) return FEWER_THAN_MIN_TEXT;
+  return value === ANALYTICS_NOT_KEPT ? NOT_KEPT_TEXT : numbers.format(value);
+}
 
 /**
  * A share from 0 to 1 as a percentage with one decimal: "45.5%".
@@ -86,11 +91,14 @@ export const FORMATS = Object.freeze({
 
 /**
  * A value as it goes into an exported file: numbers stay plain numbers so a spreadsheet can add them up, and a
- * hidden group is written in words.
+ * hidden group or a removed total is written in words.
  *
  * @param {number | string} value
  */
-export const csvValue = (value) => (value === FEWER_THAN_MIN ? FEWER_THAN_MIN_TEXT : value);
+export function csvValue(value) {
+  if (value === FEWER_THAN_MIN) return FEWER_THAN_MIN_TEXT;
+  return value === ANALYTICS_NOT_KEPT ? NOT_KEPT_TEXT : value;
+}
 
 /**
  * A game's name, or its id for a game this build does not know.

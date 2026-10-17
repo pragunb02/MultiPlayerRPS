@@ -12,7 +12,7 @@
       { "id": "activePlayers", "value": 16, "previous": 0, "change": "new" },
       { "id": "matches", "value": 21, "previous": 30, "change": -0.3 },
       { "id": "newPlayers", "value": 16, "previous": 16, "change": 0 },
-      { "id": "weeklyReturning", "value": 10, "previous": 5, "change": 1 },
+      { "id": "weeklyReturning", "value": 10, "previous": 5, "change": 1, "week": "2025-03-03" },
       { "id": "matchesPerPlayer", "value": 2.63, "previous": "<5", "change": "hidden" },
       { "id": "guestsConverted", "value": 5, "previous": 0, "change": "new" },
       { "id": "conversionRate", "value": 0.3333, "previous": "<5", "change": "hidden" }
@@ -97,16 +97,17 @@
   },
   "conversion": {
     "series": [
-      { "bucket": "2025-03-03", "guestsConverted": 0, "accountsCreated": 0 },
-      { "bucket": "2025-03-04", "guestsConverted": 0, "accountsCreated": 0 },
-      { "bucket": "2025-03-05", "guestsConverted": 0, "accountsCreated": 0 },
-      { "bucket": "2025-03-06", "guestsConverted": 5, "accountsCreated": 0 },
-      { "bucket": "2025-03-07", "guestsConverted": 0, "accountsCreated": 0 },
-      { "bucket": "2025-03-08", "guestsConverted": 0, "accountsCreated": 0 },
-      { "bucket": "2025-03-09", "guestsConverted": 0, "accountsCreated": 0 }
+      { "bucket": "2025-03-03", "guestsConverted": 0, "accountsCreated": 0, "legacyReturned": 0 },
+      { "bucket": "2025-03-04", "guestsConverted": 0, "accountsCreated": 0, "legacyReturned": 0 },
+      { "bucket": "2025-03-05", "guestsConverted": 0, "accountsCreated": 0, "legacyReturned": 0 },
+      { "bucket": "2025-03-06", "guestsConverted": 5, "accountsCreated": 0, "legacyReturned": 0 },
+      { "bucket": "2025-03-07", "guestsConverted": 0, "accountsCreated": 0, "legacyReturned": 6 },
+      { "bucket": "2025-03-08", "guestsConverted": 0, "accountsCreated": 0, "legacyReturned": 0 },
+      { "bucket": "2025-03-09", "guestsConverted": 0, "accountsCreated": 0, "legacyReturned": 0 }
     ],
     "guestsConverted": 5,
     "accountsCreated": 0,
+    "legacyReturned": 6,
     "rate": 0.3333
   },
   "engagement": {
@@ -129,7 +130,10 @@
         { "board": "wins:chess", "entries": "<5" },
         { "board": "xp", "entries": 30 }
       ],
-      "weekly": [{ "week": "2025-W10", "entries": 0 }]
+      "weekly": [
+        { "week": "2025-W05", "entries": "not kept" },
+        { "week": "2025-W10", "entries": 0 }
+      ]
     }
   }
 }

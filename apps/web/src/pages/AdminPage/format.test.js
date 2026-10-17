@@ -21,6 +21,11 @@ describe("owner console formats", () => {
     expect(drawable("<5")).toBe(0);
   });
 
+  it("writes a total whose data was removed as no longer kept, on screen and in files", () => {
+    expect(formatCount("not kept")).toBe("no longer kept");
+    expect(csvValue("not kept")).toBe("no longer kept");
+  });
+
   it("writes counts, shares, lengths and decimals for people", () => {
     expect(formatCount(123456)).toBe("1,23,456");
     expect(formatShare(0.4545)).toBe("45.5%");
