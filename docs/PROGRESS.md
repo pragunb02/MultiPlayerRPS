@@ -5,7 +5,7 @@
 |               |                                                                                                                                                                                                                                                                                                                                    |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)                                                                                                                                                                                                                                    |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-254`                                                                                                                                                                                                                                                                     |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-255`                                                                                                                                                                                                                                                                     |
 | Current stage | **Stage 0 — Foundation**                                                                                                                                                                                                                                                                                                           |
 | Stage health  | 🟢 On track                                                                                                                                                                                                                                                                                                                        |
 | In progress   | CC-138 bots in rooms, CC-049 error tracking and alerts, CC-126 comment sweep, CC-233 owner analytics console (PR #64); PR #50 story mode design                                                                                                                                                                                    |
@@ -17,7 +17,7 @@
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
 | S0 Foundation   | 🟡 In progress | 59 / 79      |
-| S1 MVP launch   | 🟡 Started     | 27 / 98      |
+| S1 MVP launch   | 🟡 Started     | 27 / 99      |
 | S2 Retention    | ⚪ Not started | 3 / 55       |
 | S3 Monetization | ⚪ Not started | 0 / 10       |
 | S4 Scale        | ⚪ Not started | 0 / 6        |
