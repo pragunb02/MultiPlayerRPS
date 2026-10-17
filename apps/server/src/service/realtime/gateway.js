@@ -8,6 +8,7 @@ import { createTokenBucket } from "../../utils/tokenBucket.js";
 import { toClientError } from "../errorTranslation.js";
 import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
+import { trackConnections } from "./connections.js";
 import { broadcastRoom, createRoomHandlers, handleSocketGone, roomChannel } from "./roomHandlers.js";
 
 // Per-socket event budget: short bursts are fine, sustained flooding is refused.
@@ -68,13 +69,7 @@ export function createRealtimeGateway({
   // reconnect to the next server, which starts by marking everyone away (CC-101). Recording each cut here
   // would only race the database closing.
   let closing = false;
-
-  // While closing, every answer also closes its connection. Node keeps serving a keep-alive connection that was
-  // busy when closing began for as long as the browser reuses it, and a reconnecting player reuses it every few
-  // seconds. The server would never finish closing, and the shutdown timeout would end the deploy with an error.
-  httpServer.prependListener("request", (_req, res) => {
-    if (closing) res.setHeader("Connection", "close");
-  });
+  const connections = trackConnections(httpServer);
 
   io.use((socket, next) => {
     try {
@@ -184,7 +179,7 @@ export function createRealtimeGateway({
       closing = true;
       return new Promise((resolve, reject) => {
         io.close((err) => (err ? reject(err) : resolve()));
-        httpServer.closeIdleConnections();
+        connections.closeIdle();
       });
     },
   });
