@@ -51,17 +51,21 @@ export function makeCertificate(dir) {
   return { key: readFileSync(keyFile, "utf8"), cert: readFileSync(certFile, "utf8") };
 }
 
-/** Passes one browser connection to the app and closes both sides together, whichever side ends first. */
+/**
+ * Passes one browser connection to the app. When the app ends the connection, the pipe ends the browser's side
+ * after the last bytes have gone, so no answer is cut short. A failure on either side drops both at once.
+ */
 function relay(client, appPort) {
   const app = net.connect({ port: appPort, host: "127.0.0.1" });
-  const closeBoth = () => {
+  const dropBoth = () => {
     client.destroy();
     app.destroy();
   };
   // While the app restarts nothing listens on its port. The browser then sees its connection close, as it would
   // behind Render while a new process starts, and the page's own reconnecting takes over.
-  client.on("error", closeBoth).on("close", closeBoth);
-  app.on("error", closeBoth).on("close", closeBoth);
+  client.on("error", dropBoth);
+  app.on("error", dropBoth);
+  client.on("close", () => app.destroy());
   client.pipe(app).pipe(client);
 }
 

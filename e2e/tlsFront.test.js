@@ -1,8 +1,10 @@
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import http from "node:http";
 import https from "node:https";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import tls from "node:tls";
 import { X509Certificate } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -88,6 +90,35 @@ describe("startTlsFront", () => {
       }
     } finally {
       await front.close();
+    }
+  });
+
+  it("delivers every byte of an answer the app sends just before it closes the connection", async () => {
+    // An app that sends a large answer and closes at once, as a server does with "Connection: close".
+    const size = 8 * 1024 * 1024;
+    const closing = net.createServer((socket) => socket.end(Buffer.alloc(size, "x"))).listen(0, "127.0.0.1");
+    await new Promise((resolve) => closing.once("listening", resolve));
+    const port = await freePort();
+    const front = await startTlsFront({ port, appPort: closing.address().port, ...certificate });
+
+    try {
+      // A slow reader, so the end of the answer is still waiting in the front when the app has already closed.
+      const received = await new Promise((resolve, reject) => {
+        let bytes = 0;
+        const socket = tls.connect({ host: "localhost", port, ca: certificate.cert });
+        socket.pause();
+        setTimeout(() => socket.resume(), 500);
+        socket
+          .on("data", (chunk) => (bytes += chunk.length))
+          .on("end", () => resolve(bytes))
+          .on("close", () => resolve(bytes))
+          .on("error", reject);
+      });
+
+      expect(received).toBe(size);
+    } finally {
+      await front.close();
+      await new Promise((resolve) => closing.close(resolve));
     }
   });
 
