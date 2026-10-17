@@ -26,7 +26,7 @@ export const ACTION_PHASES = Object.freeze({
   FAILED: "failed",
 });
 
-const IDLE = Object.freeze({ phase: ACTION_PHASES.IDLE, error: undefined });
+const IDLE = Object.freeze({ phase: ACTION_PHASES.IDLE, error: undefined, labelHeld: false });
 
 /** Starts `fn` right away, in the press itself. One that throws at once counts as a failed answer. */
 function call(fn, args) {
@@ -50,11 +50,14 @@ function call(fn, args) {
 
 /**
  * One thing a button does, with the feedback every press gets (CC-164). The press runs `fn`. While it waits
- * longer than 400 ms the phase is "pending", so the button can show a spinner, and it stays "pending" at least
- * 300 ms. An answer that comes during those 300 ms is shown when they are up, but `run` answers at once, so a
- * page can move on without waiting. A success is "done" for 600 ms.
+ * longer than 400 ms the phase is "pending", so the button can show a spinner. A success is "done" for 600 ms.
  * A failure is "failed" with the reason, and `retry` runs the same press again. A second press while the first
  * is still on its way does not run `fn` twice: it waits for the first.
+ *
+ * `phase`, `busy` and `error` always follow the answer at once, so a board can take the next move and a refusal
+ * shows straight away. Only `waitingShown`, which the button reads for its spinner and waiting words, stays true
+ * at least 300 ms once the spinner showed. A success that arrives in those 300 ms shows its check after them, and
+ * a failure ends them at once (CC-239).
  *
  * @param {(...args: any[]) => unknown} fn  may return a promise
  * @param {{ id: string }} options  `id` is the control's stable name, the same as its `data-cc-control`
@@ -62,6 +65,7 @@ function call(fn, args) {
  *   id: string,
  *   phase: string,
  *   busy: boolean,
+ *   waitingShown: boolean,
  *   error: ActionFailure | undefined,
  *   run: (...args: any[]) => Promise<ActionResult>,
  *   retry: () => Promise<ActionResult>,
@@ -72,9 +76,9 @@ export function useAction(fn, { id }) {
   const latest = useRef(fn);
   const timer = useRef(0);
   const holdTimer = useRef(0);
-  // While the spinner must stay (`holding`), an outcome that already arrived waits in `held`.
+  // `holding`: the spinner shows and its 300 ms are not up. `doneHeld`: a success came in that time.
   const holding = useRef(false);
-  const held = useRef(undefined);
+  const doneHeld = useRef(false);
   const running = useRef(undefined);
   const lastArgs = useRef([]);
   const mounted = useRef(true);
@@ -103,36 +107,45 @@ export function useAction(fn, { id }) {
     [show],
   );
 
-  // Shows the outcome of a press, or keeps it until the spinner has been seen long enough.
+  const stopHolding = useCallback(() => {
+    window.clearTimeout(holdTimer.current);
+    holding.current = false;
+    doneHeld.current = false;
+  }, []);
+
+  // Shows the answer to a press at once. Only a success keeps the waiting words until the spinner's time is up.
   const settle = useCallback(
     (outcome) => {
-      if (holding.current) {
-        held.current = outcome;
+      if (outcome.phase === ACTION_PHASES.DONE && holding.current) {
+        doneHeld.current = true;
+        show({ ...outcome, labelHeld: true });
         return;
       }
-      show(outcome);
+      stopHolding();
+      show({ ...outcome, labelHeld: false });
       if (outcome.phase === ACTION_PHASES.DONE) {
         later(ACTION_TIMING.DONE_FOR_MS, IDLE);
       } else {
         window.clearTimeout(timer.current);
       }
     },
-    [later, show],
+    [later, show, stopHolding],
   );
 
   const release = useCallback(() => {
+    const done = doneHeld.current;
     holding.current = false;
-    const outcome = held.current;
-    held.current = undefined;
-    if (outcome !== undefined) {
-      settle(outcome);
+    doneHeld.current = false;
+    if (done) {
+      show({ phase: ACTION_PHASES.DONE, error: undefined, labelHeld: false });
+      later(ACTION_TIMING.DONE_FOR_MS, IDLE);
     }
-  }, [settle]);
+  }, [later, show]);
 
   const startWaiting = useCallback(() => {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
-      show({ phase: ACTION_PHASES.PENDING, error: undefined });
+      show({ phase: ACTION_PHASES.PENDING, error: undefined, labelHeld: false });
       holding.current = true;
       holdTimer.current = window.setTimeout(release, ACTION_TIMING.PENDING_AT_LEAST_MS);
     }, ACTION_TIMING.PENDING_AFTER_MS);
@@ -144,10 +157,8 @@ export function useAction(fn, { id }) {
         return running.current;
       }
       lastArgs.current = args;
-      window.clearTimeout(holdTimer.current);
-      holding.current = false;
-      held.current = undefined;
-      show({ phase: ACTION_PHASES.SENDING, error: undefined });
+      stopHolding();
+      show({ phase: ACTION_PHASES.SENDING, error: undefined, labelHeld: false });
       startWaiting();
       const answer = call(latest.current, args);
       const attempt = (async () => {
@@ -170,12 +181,13 @@ export function useAction(fn, { id }) {
       running.current = attempt;
       return attempt;
     },
-    [settle, show, startWaiting],
+    [settle, show, startWaiting, stopHolding],
   );
 
   const run = useCallback((...args) => start(args), [start]);
   const retry = useCallback(() => start(lastArgs.current), [start]);
   const busy = state.phase === ACTION_PHASES.SENDING || state.phase === ACTION_PHASES.PENDING;
+  const waitingShown = state.phase === ACTION_PHASES.PENDING || state.labelHeld;
 
-  return { id, phase: state.phase, busy, error: state.error, run, retry };
+  return { id, phase: state.phase, busy, waitingShown, error: state.error, run, retry };
 }

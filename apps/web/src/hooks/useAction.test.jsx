@@ -46,7 +46,7 @@ describe("useAction (CC-164)", () => {
     expect(result.current.phase).toBe(ACTION_PHASES.DONE);
   });
 
-  it("keeps the spinner at least 300 ms once shown, even when the answer comes at 410 ms (CC-239)", async () => {
+  it("keeps the waiting words at least 300 ms once shown, even when the answer comes at 410 ms (CC-239)", async () => {
     const answer = later();
     const { result } = renderHook(() => useAction(() => answer.promise, { id: "x" }));
 
@@ -54,21 +54,26 @@ describe("useAction (CC-164)", () => {
     act(() => {
       outcome = result.current.run();
     });
-    act(() => vi.advanceTimersByTime(410));
+    act(() => vi.advanceTimersByTime(399));
+    expect(result.current.waitingShown).toBe(false);
+    act(() => vi.advanceTimersByTime(11));
+    expect(result.current.waitingShown).toBe(true);
     await act(async () => answer.resolve("ok"));
 
-    // The press is answered at once, only what the button shows waits.
+    // The answer itself is in at once: the press is done and nothing is busy. Only the waiting words stay.
     expect(await outcome).toEqual({ ok: true, value: "ok" });
-    expect(result.current).toMatchObject({ phase: ACTION_PHASES.PENDING, busy: true });
+    expect(result.current).toMatchObject({ phase: ACTION_PHASES.DONE, busy: false, waitingShown: true });
     act(() => vi.advanceTimersByTime(289));
-    expect(result.current.phase).toBe(ACTION_PHASES.PENDING);
+    expect(result.current.waitingShown).toBe(true);
     act(() => vi.advanceTimersByTime(1));
-    expect(result.current).toMatchObject({ phase: ACTION_PHASES.DONE, busy: false });
-    act(() => vi.advanceTimersByTime(ACTION_TIMING.DONE_FOR_MS));
+    expect(result.current).toMatchObject({ phase: ACTION_PHASES.DONE, busy: false, waitingShown: false });
+    act(() => vi.advanceTimersByTime(ACTION_TIMING.DONE_FOR_MS - 1));
+    expect(result.current.phase).toBe(ACTION_PHASES.DONE);
+    act(() => vi.advanceTimersByTime(1));
     expect(result.current.phase).toBe(ACTION_PHASES.IDLE);
   });
 
-  it("keeps the spinner at least 300 ms before a failure that comes right after it showed", async () => {
+  it("shows a failure that comes right after the spinner at once, without holding the waiting words", async () => {
     const answer = later();
     const { result } = renderHook(() => useAction(() => answer.promise, { id: "x" }));
 
@@ -78,9 +83,14 @@ describe("useAction (CC-164)", () => {
     act(() => vi.advanceTimersByTime(410));
     await act(async () => answer.reject(new Error("Cell taken")));
 
-    expect(result.current.phase).toBe(ACTION_PHASES.PENDING);
-    act(() => vi.advanceTimersByTime(290));
-    expect(result.current).toMatchObject({ phase: ACTION_PHASES.FAILED, error: { message: "Cell taken" } });
+    expect(result.current).toMatchObject({
+      phase: ACTION_PHASES.FAILED,
+      busy: false,
+      waitingShown: false,
+      error: { message: "Cell taken" },
+    });
+    act(() => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AT_LEAST_MS));
+    expect(result.current.phase).toBe(ACTION_PHASES.FAILED);
   });
 
   it("shows an answer at once when the spinner has already been seen for 300 ms", async () => {

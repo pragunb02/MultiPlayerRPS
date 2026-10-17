@@ -150,6 +150,21 @@ describe("Button (CC-164)", () => {
     expect(button).not.toHaveAttribute("aria-busy");
   });
 
+  it("explains a failure that comes at 410 ms at once, without holding the waiting words (CC-239)", async () => {
+    vi.useFakeTimers();
+    let refuse;
+    render(<WithAction fn={() => new Promise((resolve, reject) => (refuse = reject))} />);
+    const button = screen.getByRole("button", { name: "Go" });
+
+    fireEvent.click(button);
+    act(() => vi.advanceTimersByTime(410));
+    await act(async () => refuse(new Error("Nobody asked you for a rematch")));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Nobody asked you for a rematch");
+    expect(button).toHaveAccessibleName("Go");
+    expect(button).not.toHaveAttribute("aria-busy");
+  });
+
   it("shows a check with the done words where nothing else changes", async () => {
     vi.useFakeTimers();
     render(<WithAction fn={async () => "ok"} doneLabel="Copied" />);

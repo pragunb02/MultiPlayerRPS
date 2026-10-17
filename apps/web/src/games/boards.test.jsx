@@ -323,6 +323,54 @@ describe("TicTacToeBoard", () => {
     }
   });
 
+  it("shows a refusal that comes just after the spinner at once, and takes the next press (CC-239)", async () => {
+    vi.useFakeTimers();
+    try {
+      let refuse;
+      const onMove = vi
+        .fn()
+        .mockImplementationOnce(() => new Promise((resolve, reject) => (refuse = reject)))
+        .mockResolvedValue({});
+      render(<TicTacToeBoard room={room(tttView())} onMove={onMove} />);
+
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "top right: empty" })));
+      await act(async () => vi.advanceTimersByTime(410));
+      await act(async () =>
+        refuse(new AppRequestError({ code: "VALIDATION_FAILED", message: "Cell taken", status: 400 })),
+      );
+
+      // The answer is in: the refusal shows now, not when the spinner's 300 ms are up.
+      expect(screen.getByText("Cell taken")).toBeInTheDocument();
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "bottom left: empty" })));
+      expect(onMove).toHaveBeenLastCalledWith({ cell: 6 });
+      expect(screen.queryByText("Sending your move")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("takes the next press at once after a success that comes just after the spinner (CC-239)", async () => {
+    vi.useFakeTimers();
+    try {
+      let answer;
+      const onMove = vi
+        .fn()
+        .mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+        .mockResolvedValue({});
+      render(<TicTacToeBoard room={room(tttView())} onMove={onMove} />);
+
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "top right: empty" })));
+      await act(async () => vi.advanceTimersByTime(410));
+      await act(async () => answer({}));
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "bottom left: empty" })));
+
+      expect(onMove).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText("Sending your move")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("says a used cell is taken when pressed, and sends nothing", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();

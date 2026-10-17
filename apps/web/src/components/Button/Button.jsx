@@ -8,8 +8,8 @@ import styles from "./Button.module.css";
  * underneath, hidden, so the button keeps its width and nothing around it jumps.
  */
 function Layers({ action, pendingLabel, doneLabel, children }) {
-  const pending = action.phase === ACTION_PHASES.PENDING;
-  const done = action.phase === ACTION_PHASES.DONE && doneLabel !== "";
+  const pending = action.waitingShown;
+  const done = action.phase === ACTION_PHASES.DONE && !pending && doneLabel !== "";
   const hide = (hidden) => (hidden ? "true" : undefined);
   return (
     <span className={styles.stack}>
@@ -100,7 +100,7 @@ export function Button({
   const tipId = useId();
   const explanation = useExplanation();
   const blocked = reason !== "";
-  const pending = action?.phase === ACTION_PHASES.PENDING;
+  const pending = action?.waitingShown === true;
 
   function press(event) {
     if (blocked) {
