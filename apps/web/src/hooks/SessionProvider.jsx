@@ -29,7 +29,8 @@ export function SessionProvider({ children }) {
   // a signal that arrives meanwhile is kept until they are done.
   const ownChanges = useRef(0);
   const heardMeanwhile = useRef(false);
-  const askAgain = useRef(() => undefined);
+  // Set by the effect below on mount, before the page can start a change of its own.
+  const askAgain = useRef(undefined);
 
   const adopt = useCallback(
     (identity) => {
