@@ -82,7 +82,8 @@ function call(socket, event, payload) {
   return new Promise((resolve) => {
     socket.timeout(15_000).emit(event, payload, (err, ack) => {
       if (err || !ack?.ok) {
-        fail(`${event} ${err ? "timed out" : ack?.error?.code}`);
+        // Closing the sockets at the end cuts off the answers still on their way. Those are not failures.
+        if (!stopping) fail(`${event} ${err ? "timed out" : ack?.error?.code}`);
         resolve(undefined);
         return;
       }

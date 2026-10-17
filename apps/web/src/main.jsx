@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
 import { removeServerHead } from "./app/serverHead.js";
+import { recoverFromStaleBuild } from "./app/staleBuild.js";
 import { createApiClient } from "./lib/api.js";
 import { createSocketClient } from "./lib/socket.js";
 import { createSoundPlayer } from "./lib/sound/soundPlayer.js";
@@ -10,6 +11,8 @@ import { createSoundPreferences } from "./lib/sound/soundPreferences.js";
 import "./styles/global.css";
 
 // Composition root of the web app: the only place real clients are created.
+// First of all, because it may change the address before the router reads it (CC-181).
+recoverFromStaleBuild({ window, now: () => Date.now() });
 const sound = createSoundPlayer({
   // Older Safari only has the prefixed name. Without either, creating the context throws and the app stays silent.
   createContext: () => new (window.AudioContext ?? window.webkitAudioContext)(),

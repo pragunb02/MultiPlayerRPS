@@ -7,12 +7,25 @@ import { createPageTemplate, renderPageHead, renderRobots, renderSitemap } from 
 const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
 const ONE_HOUR_SECONDS = 60 * 60;
 const NOT_APP_ROUTES = /^\/(api|socket\.io)(\/|$)/;
+// What a missing build file is answered with, by its extension. Anything else gets plain text.
+const MISSING_ASSET_TYPES = Object.freeze({
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".css": "text/css",
+});
+// The same words for every missing file. Repeating the requested path would let a crafted URL write script.
+const MISSING_ASSET = "/* Not found: this file is not part of this version of the site. */\n";
 
 /**
  * Serves the built web app (single deploy with the API, ADR-002):
  * - hashed files under /assets are cached for a year (their names change on every build);
  * - everything else, and especially index.html, is revalidated on every load so a deploy takes effect at once;
  * - any other GET that is not an API route returns index.html, so deep links like /room/AB2CD3 work.
+ *
+ * A file under /assets that is not there answers a plain 404 of its own type, never the app's HTML (CC-181).
+ * That happens to an open tab after a deploy, when it asks for a file of the build it started with. The browser
+ * then reports a failed load, which the web app answers by reloading once, instead of trying to run HTML as a
+ * script. The answer is never cached, so a cache in front of the server cannot keep serving the 404.
  *
  * Each page's index.html carries that page's title, description and link preview tags (CC-047), because crawlers
  * and chat apps read the HTML without running the app. A URL where the app has no page answers 404, still with
@@ -49,6 +62,14 @@ export function createWebAppRouter({ distDir, siteOrigin }) {
       },
     }),
   );
+
+  router.use("/assets", (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res
+      .status(404)
+      .type(MISSING_ASSET_TYPES[path.extname(req.path)] ?? "text/plain")
+      .send(MISSING_ASSET);
+  });
 
   router.get(/.*/, (req, res, next) => {
     if (NOT_APP_ROUTES.test(req.path) || !req.accepts("html")) {

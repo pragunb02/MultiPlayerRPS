@@ -134,6 +134,35 @@ describe("serving the web app", () => {
     expect(icon.headers["cache-control"]).toBe("no-cache");
   });
 
+  it.each([
+    ["/assets/RpsBoard-old123.js", "text/javascript"],
+    ["/assets/worker-old123.mjs", "text/javascript"],
+    ["/assets/HeroArt-old123.css", "text/css"],
+    ["/assets/logo-old123.png", "text/plain"],
+    ["/assets/nested/RpsBoard-old123.js", "text/javascript"],
+  ])(
+    "answers a build file that is not there (%s) with a 404 of its own type, never the app (CC-181)",
+    async (url, type) => {
+      const { app } = createTestApp({ env: { WEB_DIST_DIR: fakeWebBuild() } });
+
+      const res = await request(app).get(url).set("Accept", "*/*");
+
+      expect(res.status).toBe(404);
+      expect(res.headers["content-type"]).toBe(`${type}; charset=utf-8`);
+      expect(res.headers["cache-control"]).toBe("no-store");
+      expect(res.text).toBe("/* Not found: this file is not part of this version of the site. */\n");
+    },
+  );
+
+  it("never repeats the requested path in a missing file's answer, so a URL cannot write script", async () => {
+    const { app } = createTestApp({ env: { WEB_DIST_DIR: fakeWebBuild() } });
+
+    const res = await request(app).get("/assets/x.js*/alert(1)//").set("Accept", "*/*");
+
+    expect(res.status).toBe(404);
+    expect(res.text).not.toContain("alert");
+  });
+
   it("keeps API 404s as JSON instead of returning the app", async () => {
     const { app } = createTestApp({ env: { WEB_DIST_DIR: fakeWebBuild() } });
 

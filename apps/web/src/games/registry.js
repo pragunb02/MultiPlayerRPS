@@ -1,17 +1,15 @@
-import { lazy } from "react";
 import { GAME_IDS } from "@classicade/shared";
 import { chessNotices, chessRequests, chessSounds } from "./chess/chessAlerts.js";
 import { ChessOptions } from "./chess/ChessOptions.jsx";
+import { lazyBoard } from "./lazyBoard.js";
 import { rpsSounds } from "./rps/rpsAlerts.js";
 import { RpsOptions } from "./rps/RpsOptions.jsx";
 import { tictactoeSounds } from "./tictactoe/tictactoeAlerts.js";
 
 // Boards load on demand: a player only downloads the game they open (chess brings chess.js).
-const RpsBoard = lazy(() => import("./rps/RpsBoard.jsx").then((m) => ({ default: m.RpsBoard })));
-const TicTacToeBoard = lazy(() =>
-  import("./tictactoe/TicTacToeBoard.jsx").then((m) => ({ default: m.TicTacToeBoard })),
-);
-const ChessBoard = lazy(() => import("./chess/ChessBoard.jsx").then((m) => ({ default: m.ChessBoard })));
+const RpsBoard = lazyBoard(() => import("./rps/RpsBoard.jsx"), "RpsBoard");
+const TicTacToeBoard = lazyBoard(() => import("./tictactoe/TicTacToeBoard.jsx"), "TicTacToeBoard");
+const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard");
 
 /**
  * @typedef {Object} GameViewEntry
