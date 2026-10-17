@@ -5,16 +5,34 @@
 /**
  * The page moved on and the browser cancelled a request it no longer needed. That is not a failure. Chromium says
  * `net::ERR_ABORTED`, Firefox `NS_BINDING_ABORTED` and WebKit `cancelled`, or for a page load that another one
- * replaced, `Provisional navigation canceled.` A test that stops a request on purpose with `route.abort()` gets the
- * first two in Chromium and Firefox, and `Blocked by Web Inspector` in WebKit, which only Playwright causes.
+ * replaced, `Provisional navigation canceled.` A test that stops a request on purpose with `route.abort()` gets
+ * `net::ERR_ABORTED` in Chromium, `NS_ERROR_ABORT` in Firefox and `Blocked by Web Inspector` in WebKit, which only
+ * Playwright causes.
  *
  * @param {string} errorText what the browser gave as the reason the request failed
  * @returns {boolean}
  */
 export const isCancelledRequest = (errorText) =>
-  /^(net::ERR_ABORTED|NS_BINDING_ABORTED|cancelled|Provisional navigation canceled\.|Blocked by Web Inspector)$/i.test(
+  /^(net::ERR_ABORTED|NS_BINDING_ABORTED|NS_ERROR_ABORT|cancelled|Provisional navigation canceled\.|Blocked by Web Inspector)$/i.test(
     errorText,
   );
+
+/** How each engine repeats a failed request in the console, one pattern per engine's wording. */
+const FAILED_LOAD = Object.freeze([
+  // Chromium and WebKit
+  /^Failed to load resource/,
+  // Firefox, for a script file, which it may wrap as [JavaScript Warning: "the message" {file: … line: …}]
+  /^(?:\[JavaScript Warning: ")?Loading failed for the (?:module|<script>) with source “[^”]+”\./,
+]);
+
+/**
+ * The browser repeats every failed request as a console message. The request itself is judged by its status or
+ * failure reason, so the repeat does not count a second time.
+ *
+ * @param {string} text the console message
+ * @returns {boolean}
+ */
+export const isFailedLoadMessage = (text) => FAILED_LOAD.some((pattern) => pattern.test(text));
 
 /** The realtime connection failing to reach the server, one pattern per engine's wording. */
 const REALTIME_DOWN = Object.freeze([
@@ -54,14 +72,23 @@ const WEBKIT_PRELOAD_HINT =
   /^The resource https:\/\/[^ ]+\/assets\/[\w-]+\.js was preloaded using link preload but not used within a few seconds from the window's load event\./;
 
 /**
- * A console message the browser engine writes about itself, not about the app.
+ * Firefox warns when something measures the page before its stylesheets have loaded. "debugger eval code" is the
+ * name Firefox gives to code a test runs in the page with `page.evaluate`, so this one is the test measuring, not
+ * the app. The same warning from one of the app's own files still fails.
+ */
+const FIREFOX_TEST_LAYOUT =
+  /^\[JavaScript Warning: "Layout was forced before the page was fully loaded\.[^"]*" \{file: "debugger eval code" line: \d+\}\]$/;
+
+/**
+ * A console message the browser engine writes about itself or about the test, not about the app.
  *
  * @param {string} engine the Playwright browser name: `chromium`, `firefox` or `webkit`
  * @param {string} text the console message
  * @returns {boolean}
  */
 export const isEngineOwnMessage = (engine, text) =>
-  engine === "webkit" && (text === WEBKIT_SELECT_STYLE || WEBKIT_PRELOAD_HINT.test(text));
+  (engine === "webkit" && (text === WEBKIT_SELECT_STYLE || WEBKIT_PRELOAD_HINT.test(text))) ||
+  (engine === "firefox" && FIREFOX_TEST_LAYOUT.test(text));
 
 /**
  * WebKit refuses a request the page starts while it is reloading or leaving, and reports it as a page error in the

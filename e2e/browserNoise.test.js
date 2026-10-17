@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isCancelledRequest,
   isEngineOwnMessage,
+  isFailedLoadMessage,
   isFetchRefusedWhileLeaving,
   isRealtimeDownMessage,
 } from "./browserNoise.js";
@@ -16,6 +17,7 @@ describe("isCancelledRequest", () => {
       "cancelled",
       "Provisional navigation canceled.",
       "Blocked by Web Inspector",
+      "NS_ERROR_ABORT",
     ]) {
       expect(isCancelledRequest(reason), reason).toBe(true);
     }
@@ -114,5 +116,36 @@ describe("isFetchRefusedWhileLeaving", () => {
     expect(isFetchRefusedWhileLeaving("chromium", refused(`${ORIGIN}/api/progress`), ORIGIN)).toBe(false);
     expect(isFetchRefusedWhileLeaving("webkit", "TypeError: undefined is not an object", ORIGIN)).toBe(false);
     expect(isFetchRefusedWhileLeaving("webkit", "", ORIGIN)).toBe(false);
+  });
+});
+
+describe("isFailedLoadMessage", () => {
+  it("knows each engine repeating a failed request in the console", () => {
+    for (const text of [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      '[JavaScript Warning: "Loading failed for the module with source “https://localhost:4960/assets/index-BRtbBd4p.js”." {file: "https://localhost:4960/" line: 11}]',
+      "Loading failed for the <script> with source “https://localhost:4960/assets/x.js”.",
+    ]) {
+      expect(isFailedLoadMessage(text), text).toBe(true);
+    }
+  });
+
+  it("does not pass other errors", () => {
+    expect(isFailedLoadMessage("TypeError: Load failed")).toBe(false);
+    expect(isFailedLoadMessage("Uncaught SyntaxError: Unexpected token")).toBe(false);
+  });
+});
+
+describe("isEngineOwnMessage on Firefox", () => {
+  const layout = (file) =>
+    `[JavaScript Warning: "Layout was forced before the page was fully loaded. If stylesheets are not yet loaded this may cause a flash of unstyled content." {file: "${file}" line: 400}]`;
+
+  it("passes the warning when the test itself measured the page", () => {
+    expect(isEngineOwnMessage("firefox", layout("debugger eval code"))).toBe(true);
+  });
+
+  it("still fails the warning from the app's own files, and on other engines", () => {
+    expect(isEngineOwnMessage("firefox", layout("https://localhost:4960/assets/index.js"))).toBe(false);
+    expect(isEngineOwnMessage("webkit", layout("debugger eval code"))).toBe(false);
   });
 });

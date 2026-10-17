@@ -2,6 +2,7 @@ import { test as base, expect } from "@playwright/test";
 import {
   isCancelledRequest,
   isEngineOwnMessage,
+  isFailedLoadMessage,
   isFetchRefusedWhileLeaving,
   isRealtimeDownMessage,
 } from "./browserNoise.js";
@@ -52,7 +53,7 @@ export const test = base.extend({
       page.on("console", (message) => {
         if (message.type() !== "error" && message.type() !== "warning") return;
         // The browser logs every failed request as a console error; those are judged by status below.
-        if (/Failed to load resource/.test(message.text())) return;
+        if (isFailedLoadMessage(message.text())) return;
         if (record.restarting && isRealtimeDownMessage(message.text())) return;
         if (isEngineOwnMessage(engine, message.text())) return;
         record.problems.push(`console.${message.type()}: ${message.text()}`);
