@@ -30,6 +30,27 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 - `FR-*` / `NFR-*` — requirements (PRD). `SEC-*` / `BUG-*` / `DEBT-*` — audit findings. `ADR-*` — decisions.
 - Tickets link to requirements/findings/ADRs; every finding is linked from at least one ticket.
 
+### Working agreement (owner, 17 October 2026)
+
+These rules come first. Where they differ from anything below, they win.
+
+1. **Feature freeze.** No new feature or idea tickets until every ticket already on the board is closed, across all
+   phases, in the order set by `docs/PRODUCT_VISION.md`. New ideas are written down in `docs/IDEAS.md` only, not as
+   tickets, and are not started.
+2. **Allowed new tickets:** security (always), testing (unit, integration, browser), and bugs in things that already
+   exist. These are fixes, not new ideas.
+3. **Security is P0 by default.** It drops to P1 only when a higher priority P0 is already in progress. A security
+   issue is never cut or deferred without the owner.
+4. **Research before code.** Every ticket starts with a Research section in its ticket file before any code: how our
+   code does it today, how other products do it (with sources), and what is best for ClassiCade. Coding starts after
+   that section is written.
+5. **Document everything.** Decisions go in `docs/DECISIONS.md`, research in the ticket or `docs/investigations/`,
+   changes in `docs/PROGRESS.md`. Nothing decided only in chat.
+6. **Steady, not frantic.** At most three builders run at once, and `main` stays green: a merge waits for every check,
+   and a red `main` is fixed before anything else merges.
+7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (`docs/GROWTH.md`) and the owner's
+   admin console are in scope.
+
 ### Workflow rules
 
 1. Before starting work, read `docs/PROGRESS.md` and the ticket on `docs/BACKLOG.md`.
