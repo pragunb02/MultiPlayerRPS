@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHESS_ACTIONS, GAME_IDS, RPS_CHOICES } from "@classicade/shared";
+import { CHESS_ACTIONS, GAME_IDS, REQUEST_ANSWERS, RPS_CHOICES } from "@classicade/shared";
 import { botRooms, PERSON } from "../../testing/botRooms.js";
 import { ForbiddenError } from "../../utils/errors.js";
 import { NO_ACTION, NO_BOT_TURNS } from "./botTurns.js";
@@ -158,18 +158,13 @@ describe("botTurns: turn based games", () => {
   it("declines a draw offered on the person's own turn at once, and moves when it is its turn", async () => {
     const { room, rooms, botTurns } = await startedWith(GAME_IDS.CHESS, PERSON.id);
 
-    const offered = await rooms.makeMove({
-      code: room.code,
-      playerId: PERSON.id,
-      move: { type: CHESS_ACTIONS.OFFER_DRAW },
-      now: 2,
-    });
+    const offered = await rooms.askRequest({ code: room.code, playerId: PERSON.id, type: "draw", now: 2 });
 
     expect(botTurns.nextAction(offered)).toEqual({
       kind: "answer",
       playerId: VEE,
-      move: { type: CHESS_ACTIONS.DECLINE_DRAW },
-      key: `m1:1:${VEE}`,
+      reply: { type: "draw", answer: REQUEST_ANSWERS.DECLINE },
+      key: `m1:0:${VEE}`,
     });
     const moved = await rooms.makeMove({
       code: room.code,
@@ -198,8 +193,8 @@ describe("botTurns: rematches", () => {
     }
 
     expect(botTurns.nextAction(current)).toBe(NO_ACTION);
-    const asked = await rooms.requestRematch({ code: room.code, playerId: PERSON.id, now: 4 });
-    expect(botTurns.nextAction(asked)).toEqual({ kind: "rematch", playerId: ROCKY, key: "m1:rematch" });
+    const asked = await rooms.askRequest({ code: room.code, playerId: PERSON.id, type: "rematch", now: 4 });
+    expect(botTurns.nextAction(asked)).toEqual({ kind: "rematch", playerId: ROCKY, key: "m1:rematch:4" });
   });
 
   it("names the rematch's seals as another game, so a browser never mixes them up with the last game's", async () => {
@@ -217,9 +212,15 @@ describe("botTurns: rematches", () => {
         now: 3,
       });
     }
-    await rooms.requestRematch({ code: room.code, playerId: PERSON.id, now: 4 });
+    await rooms.askRequest({ code: room.code, playerId: PERSON.id, type: "rematch", now: 4 });
 
-    const rematch = await rooms.requestRematch({ code: room.code, playerId: ROCKY, now: 5 });
+    const rematch = await rooms.answerRequest({
+      code: room.code,
+      playerId: ROCKY,
+      type: "rematch",
+      answer: REQUEST_ANSWERS.ACCEPT,
+      now: 5,
+    });
 
     const secondGame = rooms.viewFor(rematch, PERSON.id).fairness;
     expect(secondGame.locked[0].turn).toBe(firstGame.locked[0].turn);
@@ -236,7 +237,7 @@ describe("botTurns: rematches", () => {
     expect(botTurns.nextAction(forfeited)).toBe(NO_ACTION);
   });
 
-  it("does nothing once it has asked too", () => {
+  it("does nothing once the person's rematch request is no longer open", () => {
     const { botTurns } = botRooms();
     const room = {
       code: "ROOM22",
@@ -247,7 +248,18 @@ describe("botTurns: rematches", () => {
         { playerId: PIP, displayName: "Pip", connected: true, bot: { character: "pip", level: "easy" } },
       ],
       game: { matchId: "m1", seed: 1, log: [], state: {} },
-      rematch: { requestedBy: [PERSON.id, PIP], available: true, declinedBy: "" },
+      rematch: { available: true },
+      requests: [
+        {
+          type: "rematch",
+          from: PERSON.id,
+          to: PIP,
+          createdAt: 1,
+          expiresAt: 60_001,
+          state: "accepted",
+          endedAt: 2,
+        },
+      ],
     };
 
     expect(botTurns.nextAction(room)).toBe(NO_ACTION);

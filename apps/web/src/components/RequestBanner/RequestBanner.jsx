@@ -33,7 +33,8 @@ export function RequestCountdown({ request, serverTime }) {
 
 /**
  * The choices for an asker whose opponent cannot answer: send them the room's link so they come back, find a new
- * opponent, or play the computer (CC-207). The computer opens the game's lobby, where the characters are.
+ * opponent, or play the computer (CC-207). The computer opens the game's lobby, whose main button plays the
+ * game's computer character at once (CC-221).
  */
 function NoAnswerChoices({ room, onNewOpponent, reason }) {
   const toast = useToast();

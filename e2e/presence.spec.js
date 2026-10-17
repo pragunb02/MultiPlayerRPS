@@ -135,5 +135,8 @@ test.describe("a rematch asked of a player who is offline", () => {
     await expect(bob.page.getByRole("button", { name: "New opponent" }).first()).toBeVisible();
     await bob.page.getByRole("link", { name: "Play vs computer" }).click();
     await expect(bob.page).toHaveURL("/games/rock-paper-scissors");
+    // The lobby's main button plays the game's computer character at once (CC-221).
+    await bob.page.getByRole("button", { name: "Play Rocky" }).click();
+    await expect(bob.page.getByRole("list", { name: "Players" })).toContainText("computer");
   });
 });

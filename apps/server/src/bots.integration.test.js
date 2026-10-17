@@ -228,8 +228,8 @@ describe("playing computer characters on the real server (integration)", () => {
       await alice.send(SOCKET_EVENTS.GAME_MOVE, { code, move: { type: CHESS_ACTIONS.MOVE, from, to } });
     }
     const view = await updateWhere(alice, yourTurn(alice));
-    await alice.send(SOCKET_EVENTS.GAME_MOVE, { code: view.code, move: { type: CHESS_ACTIONS.OFFER_DRAW } });
-    await updateWhere(alice, (v) => v.game.view.drawAnswer === "declined");
+    await alice.send(SOCKET_EVENTS.ROOM_REQUEST, { code: view.code, type: "draw" });
+    await updateWhere(alice, (v) => v.requests.some((r) => r.type === "draw" && r.state === "declined"));
     const resigned = await alice.send(SOCKET_EVENTS.GAME_MOVE, {
       code: view.code,
       move: { type: CHESS_ACTIONS.RESIGN },

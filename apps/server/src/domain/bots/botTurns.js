@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { BOT_CHARACTERS, ROOM_STATUS } from "@classicade/shared";
+import { BOT_CHARACTERS, REQUEST_STATES, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
 import { createSeededRng } from "@classicade/games";
 import { assertDefined } from "../../utils/assert.js";
 import { ForbiddenError } from "../../utils/errors.js";
@@ -23,7 +23,7 @@ import { ForbiddenError } from "../../utils/errors.js";
  *
  * @typedef {{ kind: "none" }
  *   | { kind: "move", playerId: string, key: string }
- *   | { kind: "answer", playerId: string, move: unknown, key: string }
+ *   | { kind: "answer", playerId: string, reply: { type: string, answer: string }, key: string }
  *   | { kind: "rematch", playerId: string, key: string }} BotAction   what a computer player should do next. `key`
  *   names the moment, so the driver knows whether a planned action is still the right one
  *
@@ -191,11 +191,17 @@ export function createBotTurns({ bots, engines, sealMaker }) {
         return NO_ACTION;
       }
       const { matchId, log } = room.game;
+      // The questions a person asked a computer player that are still open (CC-159).
+      const askedOf = (playerId) =>
+        (room.requests ?? []).filter(
+          (request) => request.to === playerId && request.state === REQUEST_STATES.OPEN,
+        );
       if (room.status === ROOM_STATUS.FINISHED) {
-        const { requestedBy, available } = room.rematch;
-        const waiting = seats.find((seat) => !requestedBy.includes(seat.playerId));
-        return available && requestedBy.length > 0 && waiting !== undefined
-          ? { kind: "rematch", playerId: waiting.playerId, key: `${matchId}:rematch` }
+        const asked = seats
+          .flatMap((seat) => askedOf(seat.playerId))
+          .find((request) => request.type === ROOM_REQUEST_TYPES.REMATCH);
+        return room.rematch.available && asked !== undefined
+          ? { kind: "rematch", playerId: asked.to, key: `${matchId}:rematch:${asked.createdAt}` }
           : NO_ACTION;
       }
       const active = activeIn(room);
@@ -205,11 +211,17 @@ export function createBotTurns({ bots, engines, sealMaker }) {
         if (active.includes(seat.playerId)) {
           return { kind: "move", playerId: seat.playerId, key };
         }
-        const [answer] = bots
-          .get(room.gameId)
-          .answer({ view: engine.viewFor(room.game.state, seat.playerId), botId: seat.playerId });
-        if (answer !== undefined) {
-          return { kind: "answer", playerId: seat.playerId, move: answer, key };
+        const requests = askedOf(seat.playerId).map(({ type, from }) => ({ type, from }));
+        const [reply] =
+          requests.length === 0
+            ? []
+            : bots.get(room.gameId).answer({
+                view: engine.viewFor(room.game.state, seat.playerId),
+                botId: seat.playerId,
+                requests,
+              });
+        if (reply !== undefined) {
+          return { kind: "answer", playerId: seat.playerId, reply, key };
         }
       }
       return NO_ACTION;

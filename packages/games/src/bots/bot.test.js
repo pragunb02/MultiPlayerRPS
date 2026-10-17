@@ -31,13 +31,13 @@ describe("defineBot", () => {
   });
 
   it("answers nothing when the bot has no questions to answer", () => {
-    expect(defineBot(valid).answer({ view: {}, botId: "bot" })).toEqual([]);
+    expect(defineBot(valid).answer({ view: {}, botId: "bot", requests: [] })).toEqual([]);
   });
 
   it("passes a question to the bot's own answer, as a frozen list", () => {
     const bot = defineBot({ ...valid, answer: ({ botId }) => [{ reply: botId }] });
 
-    const answers = bot.answer({ view: {}, botId: "bot" });
+    const answers = bot.answer({ view: {}, botId: "bot", requests: [] });
 
     expect(answers).toEqual([{ reply: "bot" }]);
     expect(Object.isFrozen(answers)).toBe(true);

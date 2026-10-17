@@ -42,12 +42,15 @@ describe("playing a computer character over sockets", () => {
 
     expect(answer.ok).toBe(true);
     expect(answer.data.status).toBe("playing");
-    expect(answer.data.seats[1]).toEqual({
-      playerId: "bot_rocky_easy",
-      displayName: "Rocky",
-      connected: true,
-      bot: { character: "rocky", level: "easy" },
-    });
+    expect(answer.data.seats[1]).toEqual(
+      expect.objectContaining({
+        playerId: "bot_rocky_easy",
+        displayName: "Rocky",
+        connected: true,
+        presence: "here",
+        bot: { character: "rocky", level: "easy" },
+      }),
+    );
     expect(answer.data.fairness.locked).toEqual([
       { playerId: "bot_rocky_easy", turn: 0, commitment: expect.stringMatching(/^[0-9a-f]{64}$/) },
     ]);
@@ -137,7 +140,7 @@ describe("playing a computer character over sockets", () => {
     }
 
     const restarted = updateWhere(alice.socket, (v) => v.status === "playing");
-    await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
+    await send(alice.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
 
     expect((await restarted).series.games).toBe(1);
   });

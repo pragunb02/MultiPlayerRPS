@@ -1,6 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { fakeSocket } from "../testing/fakes.js";
+import { ServicesProvider } from "../app/ServicesProvider.jsx";
+import { fakeSocket, fakeSound } from "../testing/fakes.js";
 import { renderApp } from "../testing/render.jsx";
 import { computerSeats, isComputer, levelNameOf } from "./computer.js";
 import { ComputerNote } from "./ComputerNote/ComputerNote.jsx";
@@ -34,11 +35,15 @@ describe("computer seats", () => {
   });
 
   it("labels the computer in the list of players", () => {
-    render(<Seats room={room([PERSON, ROCKY])} />);
+    render(
+      <ServicesProvider services={{ sound: fakeSound() }}>
+        <Seats room={{ ...room([PERSON, ROCKY]), status: "finished", serverTime: 0 }} />
+      </ServicesProvider>,
+    );
 
     expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-      "Aliceyouhost",
-      "Rockycomputer · Hard",
+      "Aliceyouhostconnected",
+      "Rockycomputer · Hardconnected",
     ]);
   });
 });
