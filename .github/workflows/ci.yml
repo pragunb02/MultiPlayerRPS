@@ -114,12 +114,18 @@ jobs:
   # on an iPhone. Not a required check yet: the owner decides when, after they have run green for a while.
   e2e-engines:
     name: Browser persona tests (${{ matrix.browser }} desktop)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        browser: [firefox, webkit]
+        include:
+          - browser: firefox
+            os: ubuntu-latest
+          # WebKit on macOS is the engine Safari uses. Playwright's Linux WebKit build is a different port, and on
+          # GitHub's Linux runners it was too slow to finish the suite in 20 minutes (CC-184).
+          - browser: webkit
+            os: macos-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

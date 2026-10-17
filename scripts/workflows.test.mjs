@@ -93,7 +93,9 @@ describe("browser engines", () => {
   it("runs the browser suite on Firefox and WebKit in CI, each told which engine to use (CC-184)", async () => {
     const ci = await read(".github/workflows/ci.yml");
 
-    expect(ci).toContain("        browser: [firefox, webkit]\n");
+    expect(ci).toContain("          - browser: firefox\n            os: ubuntu-latest\n");
+    // Safari's own engine, on macOS (CC-184).
+    expect(ci).toMatch(/ {10}- browser: webkit\n {12}os: macos-latest\n/);
     expect(ci).toContain("          E2E_BROWSER: ${{ matrix.browser }}\n");
     expect(ci).toContain("npx playwright install --with-deps ${{ matrix.browser }}");
   });

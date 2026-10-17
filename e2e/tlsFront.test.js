@@ -63,8 +63,13 @@ describe("startTlsFront", () => {
 
   beforeAll(async () => {
     appPort = await freePort();
+    // The app answers with fixed words only, saying whether the request reached it exactly as it was sent.
     app = http
-      .createServer((req, res) => res.end(`app saw ${req.url} via ${req.headers["x-forwarded-proto"]}`))
+      .createServer((req, res) => {
+        const unchanged = req.url === "/hello" && req.headers["x-forwarded-proto"] === "https";
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end(unchanged ? "app saw the request unchanged" : "app saw a changed request");
+      })
       .listen(appPort, "127.0.0.1");
     await new Promise((resolve) => app.once("listening", resolve));
   });
@@ -78,7 +83,7 @@ describe("startTlsFront", () => {
       for (const host of ["localhost", ...LOOPBACK_HOSTS]) {
         expect(await get(host, port, certificate.cert), host).toEqual({
           status: 200,
-          body: "app saw /hello via https",
+          body: "app saw the request unchanged",
         });
       }
     } finally {
