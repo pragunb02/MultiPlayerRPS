@@ -31,8 +31,12 @@ const limits = {
   api: { windowMs: 60_000, limit: 10_000 },
 };
 // Standard room lifetimes and limits, unless a test asked the next process for others (CC-101, CC-107). The
-// realtime connections per address are raised for the same reason as above. Every other room limit stays real.
+// realtime connections and the open rooms per address are raised for the same reason as above. Every other room
+// limit stays real.
 const requested = JSON.parse(process.env.E2E_ROOMS);
-const rooms = { ...requested, limits: { socketsPerAddress: 10_000, ...requested.limits } };
+const rooms = {
+  ...requested,
+  limits: { socketsPerAddress: 10_000, openRoomsPerAddress: 10_000, ...requested.limits },
+};
 const { close } = await startServer({ config, logger, limits, rooms });
 handleShutdownSignals({ close, logger });

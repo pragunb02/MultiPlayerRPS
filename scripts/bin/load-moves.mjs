@@ -46,7 +46,7 @@ async function serve() {
     leaderboard: open,
     api: open,
   };
-  const rooms = { limits: { socketsPerAddress: 1_000_000 } };
+  const rooms = { limits: { socketsPerAddress: 1_000_000, openRoomsPerAddress: 1_000_000 } };
   const { close } = await startServer({ config, logger, limits, rooms });
   handleShutdownSignals({ close, logger });
 }
