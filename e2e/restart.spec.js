@@ -143,18 +143,19 @@ test.describe("a full server (CC-107)", () => {
   }) => {
     const alice = await players.open("alice");
     await createRoom(alice, "tic-tac-toe");
-    const bob = await players.open("bob");
-    await asGuest(bob);
+    // Alice closes her browser. Her room stays, and a browser that is not open sees nothing of the restarts.
+    await alice.leave();
     // One room at most, for this server process only. Alice's room is already there, so the server is full.
-    alice.expectRestart();
-    bob.expectRestart();
     await restartServer({ rooms: { limits: { openRoomsMax: 1 } } });
     try {
+      const bob = await players.open("bob");
+      await asGuest(bob);
       await bob.page.goto("/games/rock-paper-scissors");
       await bob.page.getByRole("button", { name: "Create room" }).click();
 
       await expect(bob.page.getByRole("alert")).toHaveText("The server is busy, try again in a minute");
       await expect(bob.page).toHaveURL("/games/rock-paper-scissors");
+      await bob.leave();
     } finally {
       // Back to the standard limits for whatever runs next.
       await restartServer();
