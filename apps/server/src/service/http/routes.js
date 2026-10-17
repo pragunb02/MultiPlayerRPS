@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { GAMES } from "@classicade/shared";
+import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
@@ -10,7 +11,8 @@ import { createSessionRoutes } from "./sessionRoutes.js";
 /**
  * @param {Parameters<typeof createSessionRoutes>[0] & Parameters<typeof createMatchRoutes>[0] & Parameters<typeof createProgressRoutes>[0]
  *   & Parameters<typeof createGamificationRoutes>[0]
- *   & { leaderboardComponent: Parameters<typeof createLeaderboardRoutes>[0]["leaderboardComponent"], leaderboardLimit?: { windowMs: number, limit: number } }} deps
+ *   & { leaderboardComponent: Parameters<typeof createLeaderboardRoutes>[0]["leaderboardComponent"], leaderboardLimit?: { windowMs: number, limit: number } }
+ *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }} deps
  */
 export function apiRouter({
   matchComponent,
@@ -24,6 +26,8 @@ export function apiRouter({
   onOtherSessionsEnded,
   renewals,
   now,
+  analyticsComponent,
+  adminAccess,
   ...sessionDeps
 }) {
   const router = Router();
@@ -36,7 +40,7 @@ export function apiRouter({
     res.json({ games: GAMES });
   });
 
-  router.use(createSessionRoutes({ ...sessionDeps, onIdentityChanged }));
+  router.use(createSessionRoutes({ ...sessionDeps, onIdentityChanged, isAdmin: adminAccess.isAdmin }));
   router.use(
     createAuthRoutes({
       accountComponent,
@@ -54,6 +58,8 @@ export function apiRouter({
   router.use(
     createLeaderboardRoutes({ leaderboardComponent, ...(leaderboardLimit && { limit: leaderboardLimit }) }),
   );
+
+  router.use(createAdminRoutes({ analyticsComponent, requireAdmin: adminAccess.requireAdmin, now }));
 
   return router;
 }

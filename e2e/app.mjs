@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "../apps/server/src/config/index.js";
 import { handleShutdownSignals, startServer } from "../apps/server/src/server.js";
 import { createLogger } from "../apps/server/src/utils/logger.js";
+import { OWNER_PLAYER_ID } from "./ownerConsole.js";
 import { E2E_PORT } from "./personas.js";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -17,6 +18,8 @@ const config = loadConfig({
   SESSION_SECRET: "e2e-session-secret-not-used-anywhere-else-0123456789",
   ALLOWED_ORIGINS: `http://localhost:${E2E_PORT}`,
   WEB_DIST_DIR: path.join(root, "apps/web/dist"),
+  // The seeded owner may open the owner console (CC-233, ownerConsole.js).
+  ADMIN_ACCOUNT_IDS: OWNER_PLAYER_ID,
 });
 const logger = createLogger({ level: config.logLevel });
 // Every test player connects from 127.0.0.1, so the per-IP limits would trip. The failed-login rules stay real

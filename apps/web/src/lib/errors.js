@@ -29,6 +29,9 @@ export const networkError = (cause) =>
 export const isUnauthorized = (err) =>
   err instanceof AppRequestError && err.code === ERROR_CODES.UNAUTHORIZED;
 
+/** The server has nothing at that address, or will not say that it has (the owner console, CC-233). */
+export const isNotFound = (err) => err instanceof AppRequestError && err.code === ERROR_CODES.NOT_FOUND;
+
 /** Failures where the same request can work a moment later: no answer, a timeout, a server fault, too many tries. */
 const RETRYABLE_CODES = new Set([
   "NETWORK",

@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { paths, returnPathFor } from "../../app/paths.js";
 import { Logo } from "../../art/Logo.jsx";
 import { useAction } from "../../hooks/useAction.js";
+import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
@@ -19,6 +20,7 @@ export function Layout() {
   // "Games" covers the catalog and everything inside a game (lobby, rooms).
   const inGames = location.pathname === paths.home() || location.pathname.startsWith("/games/");
   const identity = session.identity;
+  const adminAccess = useAdminAccess();
   // A guest with XP has something to lose: the same sign-up link, worded as what it does for them (CC-097).
   const save = useSaveProgress();
   const hasProgress = save.guest && (save.progress?.xp ?? 0) > 0;
@@ -55,6 +57,12 @@ export function Layout() {
           {identity && (
             <NavLink to={paths.profile()} data-cc-control="header.profile">
               Profile
+            </NavLink>
+          )}
+          {/* Shown to admins only. Everyone else never sees a sign of the console (CC-233). */}
+          {adminAccess === ADMIN_ACCESS.ADMIN && (
+            <NavLink to={paths.admin()} data-cc-control="header.admin">
+              Console
             </NavLink>
           )}
         </nav>

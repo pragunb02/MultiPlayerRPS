@@ -5,6 +5,7 @@ import http from "node:http";
 import { createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
+import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
 import { createGamificationAccessor } from "./data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "./data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "./data/legacyUserAccessor.js";
@@ -13,6 +14,7 @@ import { createPlayerTransferAccessor } from "./data/playerTransferAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createAccountComponent } from "./domain/accounts/accountComponent.js";
+import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/analyticsComponent.js";
 import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
@@ -28,6 +30,7 @@ import { roomLifetimes } from "./domain/rooms/roomLifetimes.js";
 import { roomLimits } from "./domain/rooms/roomLimits.js";
 import { createAccountDao } from "./persistence/accountDao.js";
 import { createAchievementDao } from "./persistence/achievementDao.js";
+import { createAnalyticsDao } from "./persistence/analyticsDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
@@ -44,6 +47,7 @@ import { createRealtimeGateway } from "./service/realtime/gateway.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
 import { createNetworkKey } from "./utils/networkKey.js";
 import { createPasswordHasher } from "./utils/passwordHasher.js";
+import { createTtlCache } from "./utils/ttlCache.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_ENDED = "sessionEnded";
@@ -52,6 +56,8 @@ const ROOM_SWEEP_INTERVAL_MS = 60_000;
 const GAUGE_INTERVAL_MS = 60_000;
 const CLOCK_TICK_INTERVAL_MS = 1_000;
 const TRANSFER_RESUME_INTERVAL_MS = 60_000;
+// Owner console reports kept at once: one per range the owner looked at in the last 5 minutes.
+const ANALYTICS_CACHED_REPORTS = 20;
 
 /**
  * Every playable engine must be listed in the public game catalog (and vice versa once all games exist).
@@ -319,6 +325,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
   const legacyUserDao = createLegacyUserDao({ connection: database.connection }); // read-only, CC-078
   const playerTransferDao = createPlayerTransferDao({ connection: database.connection });
   const leaderboardDao = createLeaderboardDao({ connection: database.connection });
+  const analyticsDao = createAnalyticsDao({ connection: database.connection }); // read-only, CC-233
   await Promise.all(
     [
       roomDao,
@@ -342,6 +349,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
   const playerTransferAccessor = createPlayerTransferAccessor({ playerTransferDao });
   const gamificationAccessor = createGamificationAccessor({ statsDao, questDao, achievementDao });
   const leaderboardAccessor = createLeaderboardAccessor({ leaderboardDao });
+  const analyticsAccessor = createAnalyticsAccessor({ analyticsDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -389,6 +397,10 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     ],
     matches: matchComponent,
   });
+  const analyticsComponent = createAnalyticsComponent({
+    analyticsAccessor,
+    cache: createTtlCache({ ttlMs: REPORT_TTL_MS, maxEntries: ANALYTICS_CACHED_REPORTS }),
+  });
   const tasks = createBackgroundTasks({ logger });
   connectMatchPipeline({
     domainEvents,
@@ -432,6 +444,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     leaderboardLimit: limits.leaderboard,
     apiLimit: limits.api,
     leaderboardComponent,
+    analyticsComponent,
     sessionMiddleware,
     identityComponent,
     matchComponent,

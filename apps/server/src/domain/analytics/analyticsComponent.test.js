@@ -1,0 +1,133 @@
+import { describe, expect, it } from "vitest";
+import { createAnalyticsAccessor } from "../../data/analyticsAccessor.js";
+import { createAnalyticsRange } from "../../models/analyticsRange.js";
+import { createEmptyAnalyticsDao, NO_MATCH_FACTS } from "../../testing/emptyAnalyticsDao.js";
+import { createTtlCache } from "../../utils/ttlCache.js";
+import { createAnalyticsComponent, REPORT_TTL_MS } from "./analyticsComponent.js";
+import { FEWER_THAN_MIN } from "./privacy.js";
+
+const NOW = Date.parse("2026-10-17T06:00:00.000Z"); // 11:30 India time, Saturday 17 October
+const RANGE = createAnalyticsRange({ from: "2026-10-12", to: "2026-10-17", bucket: "day" });
+
+const played = (day) => ({ day, matches: 2, counted: 2, vsPerson: 2 });
+const many = (count, make) => Array.from({ length: count }, (_, index) => make(index));
+
+/** Ten players this week (6 guests, 4 accounts) and five the week before, with fixed totals elsewhere. */
+function siteDao(calls = []) {
+  const record =
+    (name, answer) =>
+    async (...args) => {
+      calls.push({ name, args });
+      return answer(...args);
+    };
+  return createEmptyAnalyticsDao({
+    listPlayerActivity: record("players", () => [
+      ...many(6, () => ({
+        kind: "guest",
+        days: [played("2026-10-12"), played("2026-10-13"), played("2026-10-14")],
+      })),
+      ...many(4, () => ({ kind: "user", days: [played("2026-10-01"), played("2026-10-15")] })),
+      ...many(1, () => ({ kind: "user", days: [played("2026-10-08")] })),
+    ]),
+    getMatchFacts: record("facts", ({ from }) =>
+      from.getTime() === Date.parse("2026-10-11T18:30:00.000Z")
+        ? {
+            ...NO_MATCH_FACTS,
+            byDayGame: [{ day: "2026-10-12", gameId: "rps", matches: 26 }],
+            mix: [{ mix: "guests", withBot: false, matches: 26 }],
+          }
+        : { ...NO_MATCH_FACTS, mix: [{ mix: "accounts", withBot: false, matches: 13 }] },
+    ),
+    listSignups: record("signups", () => ({
+      transfers: [{ day: "2026-10-13", transfers: 6, withMatches: 5 }],
+      accounts: [{ day: "2026-10-13", accounts: 7 }],
+    })),
+    listAchievementUnlocks: record("achievements", () => [{ achievementId: "first-win", players: 9 }]),
+    listQuestCompletions: record("quests", () => [{ questId: "play-3", completions: 3 }]),
+    listLeaderboardSizes: record("boards", () => [{ board: "xp", period: "all", entries: 4 }]),
+  });
+}
+
+function component(dao = siteDao()) {
+  return createAnalyticsComponent({
+    analyticsAccessor: createAnalyticsAccessor({ analyticsDao: dao }),
+    cache: createTtlCache({ ttlMs: REPORT_TTL_MS, maxEntries: 5 }),
+  });
+}
+
+describe("analyticsComponent", () => {
+  it("opens on the last 30 India days, today included", () => {
+    expect(component().defaultRange({ now: Date.parse("2026-10-16T19:00:00.000Z") })).toEqual({
+      from: "2026-09-18",
+      to: "2026-10-17",
+      bucket: "day",
+    });
+  });
+
+  it("asks for the range and the period before it from India midnight to India midnight", async () => {
+    const calls = [];
+    await component(siteDao(calls)).getReport({ range: RANGE, now: NOW });
+
+    const facts = calls.filter((call) => call.name === "facts").map(({ args: [moments] }) => moments);
+    expect(facts).toEqual([
+      { from: new Date("2026-10-11T18:30:00.000Z"), to: new Date("2026-10-17T18:30:00.000Z") },
+      { from: new Date("2026-10-05T18:30:00.000Z"), to: new Date("2026-10-11T18:30:00.000Z") },
+    ]);
+    expect(calls.find((call) => call.name === "boards").args[0]).toEqual({ periods: ["all", "2026-W42"] });
+  });
+
+  it("puts the headline numbers beside the previous period's", async () => {
+    const report = await component().getReport({ range: RANGE, now: NOW });
+
+    expect(report.range).toEqual({
+      ...RANGE,
+      timeZone: "Asia/Kolkata",
+      previous: { from: "2026-10-06", to: "2026-10-11" },
+    });
+    expect(report.generatedAt).toBe(NOW);
+    expect(Object.fromEntries(report.overview.headlines.map(({ id, ...rest }) => [id, rest]))).toEqual({
+      activePlayers: { value: 10, previous: FEWER_THAN_MIN, change: "hidden" },
+      matches: { value: 26, previous: 13, change: 1 },
+      newPlayers: { value: 6, previous: FEWER_THAN_MIN, change: "hidden" },
+      weeklyReturning: { value: 6, previous: 0, change: "new" },
+      matchesPerPlayer: { value: 4.4, previous: FEWER_THAN_MIN, change: "hidden" },
+      guestsConverted: { value: 5, previous: 5, change: 0 },
+      conversionRate: { value: 0.4545, previous: 1, change: -0.5455 },
+    });
+  });
+
+  it("reports every page with totals only and no ids", async () => {
+    const report = await component().getReport({ range: RANGE, now: NOW });
+
+    expect(report.players.kinds).toEqual({ guests: 6, accounts: FEWER_THAN_MIN, guestShare: 0.6 });
+    expect(report.games.popularity[0]).toEqual({ gameId: "rps", matches: 26, share: 1 });
+    expect(report.retention.cohorts).toEqual([expect.objectContaining({ week: "2026-10-12", players: 6 })]);
+    expect(report.conversion).toEqual(expect.objectContaining({ guestsConverted: 5, accountsCreated: 7 }));
+    expect(report.engagement.achievements).toEqual([{ id: "first-win", name: "First Victory", count: 9 }]);
+    expect(report.engagement.quests).toEqual([{ id: "play-3", name: "Warm-up", count: FEWER_THAN_MIN }]);
+    expect(report.engagement.leaderboards.allTime).toEqual([{ board: "xp", entries: FEWER_THAN_MIN }]);
+    expect(JSON.stringify(report)).not.toMatch(/guest_|user_/);
+  });
+
+  it("works a range out once in 5 minutes, and again after that", async () => {
+    const calls = [];
+    const analytics = component(siteDao(calls));
+    const players = () => calls.filter((call) => call.name === "players").length;
+
+    const first = await analytics.getReport({ range: RANGE, now: NOW });
+    const second = await analytics.getReport({ range: RANGE, now: NOW + REPORT_TTL_MS - 1 });
+    expect(second).toBe(first);
+    expect(players()).toBe(1);
+
+    await analytics.getReport({ range: { ...RANGE, bucket: "week" }, now: NOW });
+    await analytics.getReport({ range: RANGE, now: NOW + REPORT_TTL_MS });
+    expect(players()).toBe(3);
+  });
+
+  it("needs its accessor and its cache", () => {
+    expect(() => createAnalyticsComponent({ cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }) })).toThrow(
+      TypeError,
+    );
+    expect(() => createAnalyticsComponent({ analyticsAccessor: {} })).toThrow(TypeError);
+  });
+});

@@ -4,6 +4,7 @@ import session from "express-session";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
+import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
@@ -12,6 +13,7 @@ import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js"
 import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createAccountComponent } from "../domain/accounts/accountComponent.js";
+import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
 import { createGamificationComponent } from "../domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
@@ -27,6 +29,8 @@ import { createRealtimeGateway } from "../service/realtime/gateway.js";
 import { createBackgroundTasks } from "../utils/backgroundTasks.js";
 import { createNetworkKey } from "../utils/networkKey.js";
 import { createPasswordHasher } from "../utils/passwordHasher.js";
+import { createTtlCache } from "../utils/ttlCache.js";
+import { createEmptyAnalyticsDao } from "./emptyAnalyticsDao.js";
 import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import {
@@ -59,6 +63,7 @@ import { testConfig } from "./testConfig.js";
  *   roomLimits?: Readonly<import("../domain/rooms/roomLimits.js").RoomLimits>,
  *   accountDao?: ReturnType<typeof createInMemoryAccountDao>,   lets a test make account storage fail
  *   now?: () => number,
+ *   analyticsDao?: object,   the owner console's totals (CC-233), an empty site unless a test gives its own
  * }} [options]
  */
 export function createTestApp({
@@ -74,6 +79,7 @@ export function createTestApp({
   roomLimits,
   accountDao = createInMemoryAccountDao(),
   now = Date.now,
+  analyticsDao = createEmptyAnalyticsDao(),
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -171,6 +177,10 @@ export function createTestApp({
     leaderboardComponent,
     leaderboardLimit,
     apiLimit,
+    analyticsComponent: createAnalyticsComponent({
+      analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
+      cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }),
+    }),
     onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
     onSessionEnded: (sessionId) => {
       endedSessions.push(sessionId);

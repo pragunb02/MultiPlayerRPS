@@ -1,0 +1,135 @@
+{
+  "range": {
+    "from": "2025-03-03",
+    "to": "2025-03-09",
+    "bucket": "day",
+    "timeZone": "Asia/Kolkata",
+    "previous": { "from": "2025-02-24", "to": "2025-03-02" }
+  },
+  "generatedAt": 1792260673093,
+  "overview": {
+    "headlines": [
+      { "id": "activePlayers", "value": 16, "previous": 0, "change": "new" },
+      { "id": "matches", "value": 21, "previous": 30, "change": -0.3 },
+      { "id": "newPlayers", "value": 16, "previous": 16, "change": 0 },
+      { "id": "weeklyReturning", "value": 10, "previous": 5, "change": 1 },
+      { "id": "matchesPerPlayer", "value": 2.63, "previous": "<5", "change": "hidden" },
+      { "id": "guestsConverted", "value": 5, "previous": 0, "change": "new" },
+      { "id": "conversionRate", "value": 0.3333, "previous": "<5", "change": "hidden" }
+    ]
+  },
+  "players": {
+    "summary": { "dailyAverage": 6, "weekly": 16, "monthly": 16, "stickiness": 0.0875 },
+    "active": [
+      { "bucket": "2025-03-03", "players": 10, "guests": 10, "accounts": 0 },
+      { "bucket": "2025-03-04", "players": 6, "guests": 0, "accounts": 6 },
+      { "bucket": "2025-03-05", "players": 10, "guests": 10, "accounts": 0 },
+      { "bucket": "2025-03-06", "players": 6, "guests": 0, "accounts": 6 },
+      { "bucket": "2025-03-07", "players": 10, "guests": 10, "accounts": 0 },
+      { "bucket": "2025-03-08", "players": 0, "guests": 0, "accounts": 0 },
+      { "bucket": "2025-03-09", "players": 0, "guests": 0, "accounts": 0 }
+    ],
+    "newPlayers": [
+      { "bucket": "2025-03-03", "players": 10 },
+      { "bucket": "2025-03-04", "players": 6 },
+      { "bucket": "2025-03-05", "players": 0 },
+      { "bucket": "2025-03-06", "players": 0 },
+      { "bucket": "2025-03-07", "players": 0 },
+      { "bucket": "2025-03-08", "players": 0 },
+      { "bucket": "2025-03-09", "players": 0 }
+    ],
+    "weeklyReturning": [
+      { "week": "2025-03-03", "complete": true, "players": 10, "withPerson": 1, "accounts": 0 },
+      { "week": "2025-03-10", "complete": false, "players": "<5", "withPerson": "<5", "accounts": "<5" }
+    ],
+    "kinds": { "guests": 10, "accounts": 6, "guestShare": 0.625 },
+    "matchesPerPlayer": 2.63
+  },
+  "games": {
+    "gameIds": ["rps", "tictactoe", "chess"],
+    "matches": [
+      { "bucket": "2025-03-03", "total": 5, "byGame": { "rps": 5, "tictactoe": 0, "chess": 0 } },
+      { "bucket": "2025-03-04", "total": 3, "byGame": { "rps": 0, "tictactoe": 0, "chess": 3 } },
+      { "bucket": "2025-03-05", "total": 5, "byGame": { "rps": 5, "tictactoe": 0, "chess": 0 } },
+      { "bucket": "2025-03-06", "total": 3, "byGame": { "rps": 0, "tictactoe": 3, "chess": 0 } },
+      { "bucket": "2025-03-07", "total": 5, "byGame": { "rps": 5, "tictactoe": 0, "chess": 0 } },
+      { "bucket": "2025-03-08", "total": 0, "byGame": { "rps": 0, "tictactoe": 0, "chess": 0 } },
+      { "bucket": "2025-03-09", "total": 0, "byGame": { "rps": 0, "tictactoe": 0, "chess": 0 } }
+    ],
+    "popularity": [
+      { "gameId": "rps", "matches": 15, "share": 0.7143 },
+      { "gameId": "chess", "matches": 3, "share": 0.1429 },
+      { "gameId": "tictactoe", "matches": 3, "share": 0.1429 }
+    ],
+    "mix": { "total": 21, "accountsOnly": 6, "guestsOnly": 15, "mixed": 0, "withBot": 0, "withBotShare": 0 },
+    "durations": [
+      { "gameId": "rps", "matches": 15, "medianSeconds": 45 },
+      { "gameId": "tictactoe", "matches": 3, "medianSeconds": "<5" },
+      { "gameId": "chess", "matches": 3, "medianSeconds": "<5" }
+    ],
+    "rematch": {
+      "overall": 0,
+      "byGame": [
+        { "gameId": "rps", "share": 0 },
+        { "gameId": "tictactoe", "share": 0 },
+        { "gameId": "chess", "share": 0 }
+      ]
+    },
+    "fairPlay": {
+      "judgedSeats": 42,
+      "notCounted": 2,
+      "share": 0.0476,
+      "reasons": [{ "reason": "ended-too-soon", "seats": 2, "share": 0.0476 }]
+    }
+  },
+  "retention": {
+    "cohorts": [
+      {
+        "week": "2025-03-03",
+        "players": 16,
+        "returns": [
+          { "after": 1, "eligible": 16, "share": 0, "margin": 0 },
+          { "after": 7, "eligible": 16, "share": 0, "margin": 0 },
+          { "after": 30, "eligible": 16, "share": 0, "margin": 0 }
+        ]
+      }
+    ]
+  },
+  "conversion": {
+    "series": [
+      { "bucket": "2025-03-03", "guestsConverted": 0, "accountsCreated": 0 },
+      { "bucket": "2025-03-04", "guestsConverted": 0, "accountsCreated": 0 },
+      { "bucket": "2025-03-05", "guestsConverted": 0, "accountsCreated": 0 },
+      { "bucket": "2025-03-06", "guestsConverted": 5, "accountsCreated": 0 },
+      { "bucket": "2025-03-07", "guestsConverted": 0, "accountsCreated": 0 },
+      { "bucket": "2025-03-08", "guestsConverted": 0, "accountsCreated": 0 },
+      { "bucket": "2025-03-09", "guestsConverted": 0, "accountsCreated": 0 }
+    ],
+    "guestsConverted": 5,
+    "accountsCreated": 0,
+    "rate": 0.3333
+  },
+  "engagement": {
+    "hours": [
+      { "weekday": 1, "hours": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0] },
+      { "weekday": 2, "hours": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "<5", 0, 0, 0] },
+      { "weekday": 3, "hours": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0] },
+      { "weekday": 4, "hours": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "<5", 0, 0, 0] },
+      { "weekday": 5, "hours": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0] },
+      { "weekday": 6, "hours": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+      { "weekday": 7, "hours": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
+    ],
+    "achievements": [
+      { "id": "first-win", "name": "First Victory", "count": 12 },
+      { "id": "wins-10", "name": "Rising Star", "count": "<5" }
+    ],
+    "quests": [{ "id": "play-3", "name": "Warm-up", "count": 7 }],
+    "leaderboards": {
+      "allTime": [
+        { "board": "wins:chess", "entries": "<5" },
+        { "board": "xp", "entries": 30 }
+      ],
+      "weekly": [{ "week": "2025-W10", "entries": 0 }]
+    }
+  }
+}

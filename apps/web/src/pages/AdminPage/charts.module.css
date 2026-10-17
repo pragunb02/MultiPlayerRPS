@@ -1,0 +1,196 @@
+/* Owner console charts (CC-233): arcade colours from the tokens, kept calm so the numbers stay readable. */
+.figure {
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 800;
+}
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.axis {
+  stroke: var(--color-border);
+  stroke-width: 2;
+}
+.tick {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  font-family: var(--font-sans);
+}
+.primary {
+  fill: var(--color-primary);
+}
+.accent {
+  fill: var(--color-accent);
+}
+.xp {
+  fill: var(--color-xp);
+}
+.gold {
+  fill: var(--color-gold);
+}
+.rps {
+  fill: var(--color-game-rps);
+}
+.tictactoe {
+  fill: var(--color-game-tictactoe);
+}
+.chess {
+  fill: var(--color-game-chess);
+}
+/* A hidden group: dashed, so it reads as "some, but too few to show" rather than zero. */
+.hidden {
+  fill: var(--color-surface-raised);
+  stroke: var(--color-text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+.track {
+  fill: var(--color-surface-raised);
+}
+.heat0 {
+  fill: var(--color-surface-raised);
+}
+.heat1 {
+  fill: var(--color-primary);
+  fill-opacity: 0.25;
+}
+.heat2 {
+  fill: var(--color-primary);
+  fill-opacity: 0.5;
+}
+.heat3 {
+  fill: var(--color-primary);
+  fill-opacity: 0.75;
+}
+.heat4 {
+  fill: var(--color-primary);
+}
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+.swatch.primary {
+  background: var(--color-primary);
+}
+.swatch.accent {
+  background: var(--color-accent);
+}
+.swatch.xp {
+  background: var(--color-xp);
+}
+.swatch.gold {
+  background: var(--color-gold);
+}
+.swatch.rps {
+  background: var(--color-game-rps);
+}
+.swatch.tictactoe {
+  background: var(--color-game-tictactoe);
+}
+.swatch.chess {
+  background: var(--color-game-chess);
+}
+.details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.details summary:focus-visible,
+.tableFrame:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.tableFrame {
+  overflow-x: auto;
+  margin-top: var(--space-2);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.table th,
+.table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  text-align: right;
+  white-space: nowrap;
+}
+.table th:first-child {
+  text-align: left;
+}
+.table thead th {
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+.ranks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.rank {
+  display: grid;
+  grid-template-columns: minmax(6rem, 12rem) 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+.rankLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rankBar {
+  width: 100%;
+  height: 0.75rem;
+  border-radius: var(--radius-full);
+}
+.rankValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
