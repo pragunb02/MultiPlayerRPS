@@ -44,7 +44,8 @@ export const closedRecord = (overrides = {}) => ({
  * The behaviour every room DAO must have. Run against the MongoDB DAO (integration) and the in-memory test
  * double, so the double can never drift from the real thing (ENGINEERING.md §4 rule 5).
  *
- * @param {() => Promise<ReturnType<typeof import("../persistence/roomDao.js").createRoomDao>>} createDao
+ * @param {(options?: { betweenClosedReads?: () => Promise<void> }) => Promise<ReturnType<typeof import("../persistence/roomDao.js").createRoomDao>>} createDao
+ *   `betweenClosedReads` is passed on to the DAO
  */
 export function runRoomDaoContract(createDao) {
   it("stores a new room at version 1 and reads it back unchanged", async () => {
@@ -283,6 +284,24 @@ export function runRoomDaoContract(createDao) {
       closedRecord({ gameId: "chess", reason: "empty", closedAt: T0 + 9 }),
     );
   });
+
+  it.each(["hasClosed", "getClosed"])(
+    "%s finds a close that finishes between its two reads, so the room never reads as never there",
+    async (lookup) => {
+      // Another process closes the room while this one is looking it up (CC-204).
+      let closeNow = async () => {};
+      const dao = await createDao({ betweenClosedReads: () => closeNow() });
+      const stored = await dao.insert(roomDoc());
+      closeNow = async () => {
+        closeNow = async () => {};
+        await dao.close({ code: "ROOM22", version: stored.version, record: closedRecord() });
+      };
+
+      const found = await dao[lookup]("ROOM22");
+
+      expect(found).toEqual(lookup === "hasClosed" ? true : closedRecord());
+    },
+  );
 
   it("throws for a closed record that is not there", async () => {
     const dao = await createDao();

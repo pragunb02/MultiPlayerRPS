@@ -4,8 +4,11 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * Test double with the same contract as `createRoomDao` (verified by the shared room DAO contract tests), so
  * domain and service tests run without MongoDB. Every read and write is a deep copy, so callers can never
  * change stored state by accident.
+ *
+ * @param {{ betweenClosedReads?: () => Promise<void> }} [options]  runs where the MongoDB DAO pauses between its
+ *   two reads for a closed room, so the shared contract can close a room at that moment in both
  */
-export function createInMemoryRoomDao() {
+export function createInMemoryRoomDao({ betweenClosedReads = async () => {} } = {}) {
   /** @type {Map<string, object>} */
   const rooms = new Map();
   /** @type {Map<string, object>} */
@@ -19,6 +22,12 @@ export function createInMemoryRoomDao() {
       throw new RangeError(`No room ${code}`);
     }
     return doc;
+  }
+
+  // The double closes a room in one step, so there is no closing room to read first: only the record.
+  async function closedRecordOf(code) {
+    await betweenClosedReads();
+    return closed.get(code);
   }
 
   function checkVersion(code, version) {
@@ -57,13 +66,14 @@ export function createInMemoryRoomDao() {
       closed.set(code, copy(record));
     },
 
-    hasClosed: async (code) => closed.has(code),
+    hasClosed: async (code) => (await closedRecordOf(code)) !== undefined,
 
     async getClosed(code) {
-      if (!closed.has(code)) {
+      const record = await closedRecordOf(code);
+      if (record === undefined) {
         throw new RangeError(`No closed room ${code}`);
       }
-      return copy(closed.get(code));
+      return copy(record);
     },
 
     async deleteClosedBefore(time) {

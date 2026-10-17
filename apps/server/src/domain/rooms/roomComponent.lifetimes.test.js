@@ -115,6 +115,63 @@ describe("room lifetimes in the room component (CC-101)", () => {
       expect(error.details.reason).toBe("rematch-window-ended");
     });
 
+    it("says why it closed when the sweep closes it while someone is coming back (CC-204)", async () => {
+      // The sweep closes the room right after this player's request has read it, before it closes it itself.
+      let sweepNow = false;
+      const ctx = setup({
+        wrap: (accessor) => ({
+          ...accessor,
+          async getByCode(code) {
+            const room = await accessor.getByCode(code);
+            if (sweepNow) {
+              sweepNow = false;
+              await accessor.close({ room, reason: "rematch-window-ended", closedAt: T0 + rematchWindowMs });
+            }
+            return room;
+          },
+        }),
+      });
+      await finishedGame(ctx, T0);
+      sweepNow = true;
+
+      const error = await ctx.rooms
+        .joinRoom({ code: ctx.code, player: BOB, now: T0 + rematchWindowMs })
+        .catch((err) => err);
+
+      expect(error).toBeInstanceOf(GoneError);
+      expect(error.details.reason).toBe("rematch-window-ended");
+    });
+
+    it("reads the room again when it changed before it could be closed, then closes it", async () => {
+      // Someone saves the room right after this request has read it, so closing the version it read fails.
+      let changeNow = false;
+      const ctx = setup({
+        wrap: (accessor) => ({
+          ...accessor,
+          async getByCode(code) {
+            const room = await accessor.getByCode(code);
+            if (changeNow) {
+              changeNow = false;
+              await accessor.save({
+                room: { ...room, seats: room.seats.map((seat) => ({ ...seat, connected: false })) },
+                previous: room,
+              });
+            }
+            return room;
+          },
+        }),
+      });
+      await finishedGame(ctx, T0);
+      changeNow = true;
+
+      const error = await ctx.rooms
+        .joinRoom({ code: ctx.code, player: BOB, now: T0 + rematchWindowMs })
+        .catch((err) => err);
+
+      expect(error).toBeInstanceOf(GoneError);
+      expect(ctx.closedEvents()).toEqual([{ code: ctx.code, reason: "rematch-window-ended" }]);
+    });
+
     it("can be shortened for browser tests through the lifetimes given", async () => {
       const ctx = setup({ lifetimes: roomLifetimes({ rematchWindowMs: 5_000 }) });
       await finishedGame(ctx, T0);

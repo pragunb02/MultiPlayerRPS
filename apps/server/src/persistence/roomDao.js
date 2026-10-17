@@ -40,9 +40,10 @@ const CLOSING = Object.freeze({ closing: { $exists: true } });
  * Rooms are stored as they are (nested game state included) through the driver directly: game states are
  * engine owned JSON, so a schema here would only get in the way.
  *
- * @param {{ connection: import("mongoose").Connection }} deps
+ * @param {{ connection: import("mongoose").Connection, betweenClosedReads?: () => Promise<void> }} deps
+ *   `betweenClosedReads` runs between the two reads that look for a closed room. Tests close a room there.
  */
-export function createRoomDao({ connection }) {
+export function createRoomDao({ connection, betweenClosedReads = async () => {} }) {
   // Fields that are undefined are left out, as JSON would, so a stored room reads back like the one written.
   const rooms = connection.db.collection(ROOMS, { ignoreUndefined: true });
   const closed = connection.db.collection(CLOSED_ROOMS, { ignoreUndefined: true });
@@ -56,6 +57,23 @@ export function createRoomDao({ connection }) {
   }
 
   const find = (filter) => rooms.find({ ...filter, ...OPEN }, WITHOUT_ID).toArray();
+
+  /**
+   * Why a room closed, or null when it did not. The room being closed is read before the record. A close writes
+   * the record before it deletes the room, so a close that finishes between the two reads is found by the second
+   * one. Reading the record first missed such a close and told the player the room never existed (CC-204).
+   *
+   * @param {string} code
+   * @returns {Promise<ClosedRoomDoc | null>}
+   */
+  async function closedRecordOf(code) {
+    const closing = await rooms.findOne({ code, ...CLOSING }, { projection: { _id: 0, closing: 1 } });
+    if (closing !== null) {
+      return closing.closing;
+    }
+    await betweenClosedReads();
+    return closed.findOne({ code }, WITHOUT_ID);
+  }
 
   /**
    * @param {string} code
@@ -158,9 +176,7 @@ export function createRoomDao({ connection }) {
     },
 
     /** @param {string} code */
-    hasClosed: async (code) =>
-      (await closed.countDocuments({ code }, { limit: 1 })) === 1 ||
-      (await rooms.countDocuments({ code, ...CLOSING }, { limit: 1 })) === 1,
+    hasClosed: async (code) => (await closedRecordOf(code)) !== null,
 
     /**
      * @param {string} code
@@ -168,15 +184,11 @@ export function createRoomDao({ connection }) {
      * @throws {RangeError} when there is no record
      */
     async getClosed(code) {
-      const doc = await closed.findOne({ code }, WITHOUT_ID);
-      if (doc !== null) {
-        return doc;
-      }
-      const closing = await rooms.findOne({ code, ...CLOSING }, { projection: { _id: 0, closing: 1 } });
-      if (closing === null) {
+      const record = await closedRecordOf(code);
+      if (record === null) {
         throw new RangeError(`No closed room ${code}`);
       }
-      return closing.closing;
+      return record;
     },
 
     /**

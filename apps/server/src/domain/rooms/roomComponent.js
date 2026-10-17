@@ -152,8 +152,17 @@ export function createRoomComponent({
   /** Reads a room that is still alive at `now`. One whose time is up is closed here and answers GoneError. */
   async function load(code, now) {
     const room = await read(code);
-    if (await closeIfOver(room, now)) {
-      return read(code);
+    try {
+      if (await closeIfOver(room, now)) {
+        return read(code);
+      }
+    } catch (err) {
+      // The sweep or another player closed it at this same moment. Reading it again says why it closed, instead
+      // of telling this player the room never existed (CC-204).
+      if (err instanceof NotFoundError) {
+        return read(code);
+      }
+      throw err;
     }
     return room;
   }
