@@ -228,7 +228,7 @@ test.describe("chess", () => {
 
     await expect(square(white, "e2")).toHaveAccessibleName("e2, white pawn");
     await expect(square(white, "e5")).toHaveAccessibleName("e5");
-    await expect(square(white, "e2")).toHaveAttribute("aria-pressed", "true");
+    await expect(square(white, "e2")).toHaveAttribute("aria-selected", "true");
     await expect(square(white, "e4")).toHaveAccessibleName("e4, legal move");
     await expect(moveList(white).getByRole("button")).toHaveCount(0);
 
@@ -236,7 +236,7 @@ test.describe("chess", () => {
     await dragOff(white, "e2", "e4");
     await seen([white, black], "e4");
     await expect(square(black, "e4")).toHaveAccessibleName("e4, white pawn");
-    await expect(square(white, "e2")).toHaveAttribute("aria-pressed", "false");
+    await expect(square(white, "e2")).toHaveAttribute("aria-selected", "false");
   });
 
   test("a pawn reaching the last rank asks which piece it becomes, and Escape takes the move back", async ({

@@ -6,6 +6,7 @@ import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
+import { PageAnnouncer } from "../PageAnnouncer/PageAnnouncer.jsx";
 import { useSaveProgress } from "../SaveProgress/saveProgressContext.js";
 import { SoundControl } from "../SoundControl/SoundControl.jsx";
 import styles from "./Layout.module.css";
@@ -94,6 +95,7 @@ export function Layout() {
       <main id="main" className={styles.main}>
         <Outlet />
       </main>
+      <PageAnnouncer />
       <SiteFooter />
     </div>
   );

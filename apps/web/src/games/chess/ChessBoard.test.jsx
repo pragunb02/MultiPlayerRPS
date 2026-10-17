@@ -125,13 +125,13 @@ describe("ChessBoard", () => {
     const pawn = screen.getByRole("gridcell", { name: "e2, white pawn" });
 
     await user.click(pawn);
-    expect(pawn).toHaveAttribute("aria-pressed", "true");
+    expect(pawn).toHaveAttribute("aria-selected", "true");
     await user.click(pawn);
-    expect(pawn).toHaveAttribute("aria-pressed", "false");
+    expect(pawn).toHaveAttribute("aria-selected", "false");
 
     await user.click(pawn);
     await user.click(screen.getByRole("gridcell", { name: "a5" }));
-    expect(pawn).toHaveAttribute("aria-pressed", "false");
+    expect(pawn).toHaveAttribute("aria-selected", "false");
     expect(screen.queryByRole("gridcell", { name: /legal move/ })).toBeNull();
   });
 
@@ -417,7 +417,7 @@ describe("ChessBoard by drag and drop", () => {
 
     expect(onMove).not.toHaveBeenCalled();
     expect(cell("e2")).toHaveAccessibleName("e2, white pawn");
-    expect(cell("e2")).toHaveAttribute("aria-pressed", "true");
+    expect(cell("e2")).toHaveAttribute("aria-selected", "true");
     expect(cell("e4")).toHaveAccessibleName("e4, legal move");
 
     await user.click(cell("e4"));
@@ -435,7 +435,7 @@ describe("ChessBoard by drag and drop", () => {
     dragPiece("e2", to);
 
     expect(onMove).not.toHaveBeenCalled();
-    expect(cell("e2")).toHaveAttribute("aria-pressed", "true");
+    expect(cell("e2")).toHaveAttribute("aria-selected", "true");
   });
 
   it("ignores the click some browsers send after a drop, but not the next real click", () => {
@@ -445,7 +445,7 @@ describe("ChessBoard by drag and drop", () => {
     dragPiece("e2", "e5");
 
     fireEvent.click(cell("e5"), { detail: 1 });
-    expect(cell("e2")).toHaveAttribute("aria-pressed", "true");
+    expect(cell("e2")).toHaveAttribute("aria-selected", "true");
 
     fireEvent.pointerDown(cell("e4"), { pointerId: 2, button: 0, ...point("e4") });
     fireEvent.click(cell("e4"), { detail: 1 });
@@ -469,7 +469,7 @@ describe("ChessBoard by drag and drop", () => {
 
     await user.click(cell("e2"));
 
-    expect(cell("e2")).toHaveAttribute("aria-pressed", "false");
+    expect(cell("e2")).toHaveAttribute("aria-selected", "false");
     expect(screen.queryByRole("gridcell", { name: /legal move/ })).toBeNull();
   });
 
@@ -485,7 +485,7 @@ describe("ChessBoard by drag and drop", () => {
 
     expect(board.setPointerCapture).not.toHaveBeenCalled();
     expect(board).not.toHaveClass("dragging");
-    expect(cell("e2")).toHaveAttribute("aria-pressed", "true");
+    expect(cell("e2")).toHaveAttribute("aria-selected", "true");
   });
 
   it.each([
@@ -611,7 +611,7 @@ describe("ChessBoard by keyboard", () => {
     expect(cell("e2")).toHaveFocus();
     expect(cell("e2")).toHaveAttribute("tabindex", "0");
     await user.keyboard("{Enter}");
-    expect(cell("e2")).toHaveAttribute("aria-pressed", "true");
+    expect(cell("e2")).toHaveAttribute("aria-selected", "true");
     await user.keyboard("{ArrowUp}{ArrowUp}{Enter}");
 
     expect(onMove).toHaveBeenCalledWith({ type: "move", from: "e2", to: "e4" });
@@ -635,7 +635,58 @@ describe("ChessBoard by keyboard", () => {
     await user.click(cell("e2"));
     await user.keyboard("{Escape}");
 
-    expect(cell("e2")).toHaveAttribute("aria-pressed", "false");
+    expect(cell("e2")).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("jumps to the ends of the row with Home and End, and to the corners with Ctrl", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
+    cell("a1").focus();
+
+    await user.keyboard("{ArrowUp}{ArrowUp}{ArrowUp}{End}");
+    expect(cell("h4")).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(cell("a4")).toHaveFocus();
+    await user.keyboard("{Control>}{End}{/Control}");
+    expect(cell("h1")).toHaveFocus();
+    await user.keyboard("{Meta>}{Home}{/Meta}");
+    expect(cell("a8")).toHaveFocus();
+    expect(cell("a8")).toHaveAttribute("tabindex", "0");
+  });
+
+  it("keeps the page from scrolling on the board's own keys, and only on those", () => {
+    render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
+    cell("a1").focus();
+
+    // fireEvent answers false when the page's own handling of the key was cancelled.
+    expect(fireEvent.keyDown(cell("a1"), { key: "End" })).toBe(false);
+    expect(fireEvent.keyDown(cell("h1"), { key: "PageDown" })).toBe(true);
+  });
+
+  it("picks up and puts down with Space as well as Enter", async () => {
+    const user = userEvent.setup();
+    const onMove = vi.fn().mockResolvedValue({});
+    render(<ChessBoard room={room(chessView())} onMove={onMove} />);
+    cell("a1").focus();
+
+    await user.keyboard("{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowUp}");
+    await user.keyboard(" ");
+    expect(cell("e2")).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{ArrowUp} ");
+
+    expect(onMove).toHaveBeenCalledWith({ type: "move", from: "e2", to: "e3" });
+  });
+
+  it("marks the picked square as the grid's selected cell, never as a pressed button", async () => {
+    const user = userEvent.setup();
+    render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
+
+    await user.click(cell("g1"));
+
+    const squares = screen.getAllByRole("gridcell");
+    expect(squares).toHaveLength(64);
+    expect(squares.filter((square) => square.hasAttribute("aria-pressed"))).toEqual([]);
+    expect(squares.filter((square) => square.getAttribute("aria-selected") === "true")).toEqual([cell("g1")]);
   });
 
   it("leaves other keys alone", async () => {
@@ -857,13 +908,34 @@ describe("ChessBoard around the board", () => {
     expect(screen.getAllByRole("gridcell")[0]).toHaveAccessibleName("a8, black rook");
   });
 
-  it("draws rank and file letters along the edges, hidden from screen readers", () => {
-    render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
+  it("draws rank and file letters along the edges, hidden from screen readers and outside every square", () => {
+    const { container } = render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />);
 
-    expect(cell("a8")).toHaveTextContent("8");
-    expect(cell("a1")).toHaveTextContent("1a");
-    expect(cell("h1")).toHaveTextContent("h");
-    expect(cell("a1").querySelector(".coord")).toHaveAttribute("aria-hidden", "true");
+    const layer = container.querySelector(".coords");
+    const texts = (selector) =>
+      [...layer.querySelectorAll(`${selector} .coord`)].map((node) => node.textContent);
+    expect(layer).toHaveAttribute("aria-hidden", "true");
+    expect(texts(".rankCoords")).toEqual(["8", "7", "6", "5", "4", "3", "2", "1"]);
+    expect(texts(".fileCoords")).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
+    // Each one takes the colour of the other kind of square, so it reads on the square it sits on: a8 is light.
+    expect(layer.querySelector(".rankCoords .coord")).toHaveClass("onLight");
+    expect(layer.querySelector(".fileCoords .coord")).toHaveClass("onDark");
+    // A square shows no text of its own, so what voice control users see on it is never a second label.
+    expect(screen.getAllByRole("gridcell").filter((square) => square.textContent !== "")).toEqual([]);
+  });
+
+  it("draws the coordinates from Black's side for the Black player", () => {
+    const { container } = render(
+      <ChessBoard
+        room={room(chessView({ colors: { [ME]: "b", [THEM]: "w" }, toMove: THEM }))}
+        onMove={vi.fn()}
+      />,
+    );
+
+    const texts = (selector) =>
+      [...container.querySelectorAll(`${selector} .coord`)].map((node) => node.textContent).join("");
+    expect(texts(".rankCoords")).toBe("12345678");
+    expect(texts(".fileCoords")).toBe("hgfedcba");
   });
 
   it("shows the pieces each side took and who is ahead", () => {
