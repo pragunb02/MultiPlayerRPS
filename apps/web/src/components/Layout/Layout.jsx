@@ -5,6 +5,7 @@ import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
+import { useSaveProgress } from "../SaveProgress/saveProgressContext.js";
 import { useToast } from "../Toast/toastContext.js";
 import styles from "./Layout.module.css";
 
@@ -18,6 +19,9 @@ export function Layout() {
   // "Games" covers the catalog and everything inside a game (lobby, rooms).
   const inGames = location.pathname === paths.home() || location.pathname.startsWith("/games/");
   const identity = session.identity;
+  // A guest with XP has something to lose: the same sign-up link, worded as what it does for them (CC-097).
+  const save = useSaveProgress();
+  const hasProgress = save.guest && (save.progress?.xp ?? 0) > 0;
 
   async function logout() {
     try {
@@ -55,8 +59,13 @@ export function Layout() {
             {session.status !== "loading" && identity?.kind !== "user" && (
               <>
                 <Link to={paths.login(next)}>Log in</Link>
-                <Link to={paths.signup(next)} className={styles.cta}>
-                  Sign up
+                {/* The name starts with the words on screen (label in name) and still says where it goes. */}
+                <Link
+                  to={paths.signup(next)}
+                  className={styles.cta}
+                  aria-label={hasProgress ? "Save progress — sign up" : undefined}
+                >
+                  {hasProgress ? "Save progress" : "Sign up"}
                 </Link>
               </>
             )}

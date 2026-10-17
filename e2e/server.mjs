@@ -9,13 +9,14 @@ import bcrypt from "bcryptjs";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { createLogger } from "../apps/server/src/utils/logger.js";
-import { LEGACY_PLAYER } from "./personas.js";
+import { E2E_MONGO_PORT, E2E_MONGO_URI, LEGACY_PLAYER } from "./personas.js";
 import { recordAppPid, resetControl, roomOptions } from "./serverControl.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const logger = createLogger({ level: "warn" });
-const mongo = await MongoMemoryServer.create();
-const uri = `${mongo.getUri()}e2e`;
+// On a known port, so a test can seed state the shared server's clock can't reach (a streak from yesterday).
+const mongo = await MongoMemoryServer.create({ instance: { port: E2E_MONGO_PORT, dbName: "e2e" } });
+const uri = E2E_MONGO_URI;
 
 const seed = await mongoose.createConnection(uri).asPromise();
 await seed.db.collection("users").insertOne({

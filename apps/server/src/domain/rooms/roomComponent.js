@@ -32,6 +32,8 @@ const MAX_CODE_ATTEMPTS = 10;
 // Two requests for the same room can read the same version, and only one of them can save it. The other reads
 // again and decides again on the new state. A handful of attempts is plenty: a room has at most a few players.
 const MAX_WRITE_ATTEMPTS = 5;
+// Rooms whose seats move to the account when a guest signs in (CC-083, CC-097): every room still open.
+const SEATS_FOLLOW_IDENTITY = new Set([ROOM_STATUS.WAITING, ROOM_STATUS.PLAYING, ROOM_STATUS.FINISHED]);
 const NO_REMATCH = Object.freeze({ requestedBy: Object.freeze([]), available: false });
 const CLOSED = Object.freeze({ closed: true });
 
@@ -532,10 +534,12 @@ export function createRoomComponent({
     },
 
     /**
-     * A guest just signed in: every seat they hold in a waiting or running room becomes their account's (CC-083),
-     * so they come back to their own game instead of meeting their old guest seat. The seat counts as
-     * disconnected until the account's socket rejoins. If the account already sits in the same waiting room, the
-     * guest seat is simply given up. A running game the account already plays in is left alone.
+     * A guest just signed in: every seat they hold in a waiting, running or finished room becomes their account's
+     * (CC-083), so they come back to their own game instead of meeting their old guest seat. After signing up from
+     * a won game's "Save your progress" card (CC-097) they come back to its result and the rematch offer, not to
+     * "Can't join this room". The seat counts as disconnected until the account's socket rejoins. If the account
+     * already sits in the same waiting room, the guest seat is simply given up. A running or finished game the
+     * account already plays in is left alone.
      *
      * @param {{ from: string, to: import("../../models/identity.js").Identity, now: number }} input
      * @returns {Promise<Array<Readonly<import("../../data/roomAccessor.js").Room>>>} rooms that changed
@@ -546,8 +550,7 @@ export function createRoomComponent({
           code: stored.code,
           now,
           decide(room) {
-            const active = room.status === ROOM_STATUS.WAITING || room.status === ROOM_STATUS.PLAYING;
-            if (!active || seatOf(room, from) === undefined) return room;
+            if (!SEATS_FOLLOW_IDENTITY.has(room.status) || seatOf(room, from) === undefined) return room;
             if (seatOf(room, to.id) !== undefined) {
               // The account's own seat stays, so the room never empties here.
               return room.status === ROOM_STATUS.WAITING ? leaving(room, from, now) : room;
@@ -561,6 +564,8 @@ export function createRoomComponent({
               ...withSeats(room, seats, now),
               hostId: room.hostId === from ? to.id : room.hostId,
               ...(room.series && { series: renamePlayer(room.series, from, to.id) }),
+              ...(room.result && { result: renamePlayer(room.result, from, to.id) }),
+              ...(room.rematch && { rematch: renamePlayer(room.rematch, from, to.id) }),
               ...(room.game && {
                 game: {
                   ...room.game,

@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useLocation } from "react-router";
 import { SOCKET_EVENTS } from "@classicade/shared";
+import { paths, returnPathFor } from "../app/paths.js";
 import { useServices } from "../app/servicesContext.js";
 import { LevelUpBurst } from "../art/effects/LevelUpBurst.jsx";
 import { isUncountedMatch, notCountedMessage } from "./notCounted.js";
+import { PROMPTS, useSaveProgress } from "./SaveProgress/saveProgressContext.js";
 import { useToast } from "./Toast/toastContext.js";
 
 /** How long the level-up burst stays mounted: its animation (--duration-celebrate) plus a little slack. */
@@ -13,29 +16,42 @@ export const BURST_MS = 1_500;
  * Turns `progress:updated` pushes into toasts: XP after every match, a celebration on level-up — the toast says
  * it in words, the burst shows it (and is skipped under reduced motion). Quest XP has its own toast
  * (GamificationToasts), so only its level-up shows here. A match that didn't count for the player (CC-095) says
- * why instead of showing XP.
+ * why instead of showing XP. A guest's level-up toast also offers "Save it" (sign up and come back to this page,
+ * CC-097) until they close that offer once.
  */
 export function ProgressToasts() {
   const { socket } = useServices();
   const toast = useToast();
+  const save = useSaveProgress();
+  const location = useLocation();
   const [burst, setBurst] = useState(undefined);
   const nextBurst = useRef(0);
 
-  useEffect(
-    () =>
-      socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, (update) => {
-        const { source, xpGained, leveledUp, progress } = update;
-        if (isUncountedMatch(update)) {
-          toast.show(notCountedMessage(update.notCountedReason), { tone: "info" });
-        } else if (leveledUp) {
-          toast.show(`Level up! You reached level ${progress.level}`, { tone: "success" });
-          setBurst({ id: ++nextBurst.current, level: progress.level });
-        } else if (xpGained > 0 && source !== "quest") {
-          toast.show(`+${xpGained} XP`, { tone: "info" });
+  const saveOffer = () =>
+    save.guest && !save.isDismissed(PROMPTS.LEVEL_UP)
+      ? {
+          action: {
+            label: "Save it",
+            to: paths.signup(returnPathFor(location)),
+            dismissLabel: "Close: save your level",
+            onDismiss: () => save.dismiss(PROMPTS.LEVEL_UP),
+          },
         }
-      }),
-    [socket, toast],
-  );
+      : {};
+
+  const onProgress = useEffectEvent((update) => {
+    const { source, xpGained, leveledUp, progress } = update;
+    if (isUncountedMatch(update)) {
+      toast.show(notCountedMessage(update.notCountedReason), { tone: "info" });
+    } else if (leveledUp) {
+      toast.show(`Level up! You reached level ${progress.level}`, { tone: "success", ...saveOffer() });
+      setBurst({ id: ++nextBurst.current, level: progress.level });
+    } else if (xpGained > 0 && source !== "quest") {
+      toast.show(`+${xpGained} XP`, { tone: "info" });
+    }
+  });
+
+  useEffect(() => socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, (payload) => onProgress(payload)), [socket]);
 
   useEffect(() => {
     if (burst === undefined) {

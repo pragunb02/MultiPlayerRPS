@@ -136,9 +136,11 @@ describe("SignupPage", () => {
   });
 });
 
-describe("a guest's progress moving to the account (CC-032)", () => {
+describe("a guest's progress moving to the account (CC-032, CC-097)", () => {
   const CARRIED = { xp: 70, matchesPlayed: 3, matches: 3 };
-  const WELCOME = "Welcome! We moved 70 XP and 3 matches from your guest games.";
+  // The account right after signing in: its own totals, the guest's included.
+  const ACCOUNT = { ...PROGRESS, xp: 370, level: 4, xpIntoLevel: 70, xpForNextLevel: 200, matchesPlayed: 13 };
+  const SAVED = "Your progress is now saved: Level 4 · 370 XP · 13 matches";
 
   async function fillSignup(user) {
     await user.type(screen.getByLabelText("Username"), "Riya");
@@ -161,55 +163,114 @@ describe("a guest's progress moving to the account (CC-032)", () => {
     ).toBeInTheDocument();
   });
 
-  it("welcomes a guest who signed up with what moved", async () => {
+  it.each([
+    ["signup", "/signup", fillSignup],
+    ["login", "/login", fillLogin],
+  ])(
+    "confirms once, with the account's numbers, after a guest's %s brought games along",
+    async (method, path, fill) => {
+      const user = userEvent.setup();
+      const getProgress = vi.fn().mockResolvedValue(PROGRESS);
+      renderApp({
+        path,
+        api: fakeApi({
+          getSession: async () => GUEST,
+          getProgress,
+          [method]: async () => {
+            getProgress.mockResolvedValue(ACCOUNT);
+            return { identity: USER, carriedOver: CARRIED };
+          },
+        }),
+      });
+      await screen.findByText(/new account|adds this guest's XP/);
+
+      await fill(user);
+
+      expect(await screen.findByText(SAVED)).toBeInTheDocument();
+      expect(
+        await screen.findByRole("heading", { level: 1, name: /play the classics/i }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByText(/now saved/)).toHaveLength(1);
+    },
+  );
+
+  it("says '1 match' for a single match", async () => {
     const user = userEvent.setup();
     renderApp({
       path: "/signup",
       api: fakeApi({
         getSession: async () => GUEST,
-        signup: async () => ({ identity: USER, carriedOver: CARRIED }),
+        getProgress: vi.fn().mockResolvedValue({ ...PROGRESS, xp: 30, matchesPlayed: 1 }),
+        signup: async () => ({ identity: USER, carriedOver: { xp: 30, matchesPlayed: 1, matches: 1 } }),
       }),
     });
     await screen.findByText(/will move to your new account/);
 
     await fillSignup(user);
 
-    expect(await screen.findByText(WELCOME)).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { level: 1, name: /play the classics/i })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Your progress is now saved: Level 1 · 30 XP · 1 match"),
+    ).toBeInTheDocument();
   });
 
-  it("welcomes a guest who logged in with what moved", async () => {
+  it("still confirms, without numbers, when the account's progress can't be read", async () => {
+    const user = userEvent.setup();
+    const getProgress = vi.fn().mockResolvedValue(PROGRESS);
+    renderApp({
+      path: "/signup",
+      api: fakeApi({
+        getSession: async () => GUEST,
+        getProgress,
+        signup: async () => {
+          getProgress.mockRejectedValue(new AppRequestError({ code: "NETWORK", message: "offline" }));
+          return { identity: USER, carriedOver: CARRIED };
+        },
+      }),
+    });
+    await screen.findByText(/will move to your new account/);
+
+    await fillSignup(user);
+
+    expect(await screen.findByText("Your progress is now saved.")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["signup", "/signup", fillSignup, { xp: 0, matchesPlayed: 0, matches: 0 }],
+    ["login", "/login", fillLogin, { xp: 0, matchesPlayed: 0, matches: 0 }],
+    ["signup", "/signup", fillSignup, undefined],
+  ])("stays quiet after %s when no guest games moved (%o)", async (method, path, fill, carriedOver) => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      getSession: async () => GUEST,
+      [method]: async () => ({ identity: USER, ...(carriedOver && { carriedOver }) }),
+    });
+    renderApp({ path, api });
+    await screen.findByText(/new account|adds this guest's XP/);
+    api.getProgress.mockClear();
+
+    await fill(user);
+
+    expect(await screen.findByRole("heading", { level: 1, name: /play the classics/i })).toBeInTheDocument();
+    expect(screen.queryByText(/now saved/)).toBeNull();
+  });
+
+  it("confirms for a guest whose only progress is XP (no match counted yet)", async () => {
     const user = userEvent.setup();
     renderApp({
       path: "/login",
       api: fakeApi({
         getSession: async () => GUEST,
-        login: async () => ({ identity: USER, carriedOver: CARRIED }),
+        getProgress: vi.fn().mockResolvedValue({ ...PROGRESS, xp: 20 }),
+        login: async () => ({ identity: USER, carriedOver: { xp: 20, matchesPlayed: 0, matches: 0 } }),
       }),
     });
     await screen.findByText(/adds this guest's XP/);
 
     await fillLogin(user);
 
-    expect(await screen.findByText(WELCOME)).toBeInTheDocument();
-  });
-
-  it.each([
-    ["signup", "/signup", fillSignup],
-    ["login", "/login", fillLogin],
-  ])("stays quiet after %s when no guest games moved", async (method, path, fill) => {
-    const user = userEvent.setup();
-    renderApp({
-      path,
-      api: fakeApi({
-        [method]: async () => ({ identity: USER, carriedOver: { xp: 0, matchesPlayed: 0, matches: 0 } }),
-      }),
-    });
-
-    await fill(user);
-
-    expect(await screen.findByRole("heading", { level: 1, name: /play the classics/i })).toBeInTheDocument();
-    expect(screen.queryByText(/We moved/)).toBeNull();
+    expect(
+      await screen.findByText("Your progress is now saved: Level 1 · 20 XP · 0 matches"),
+    ).toBeInTheDocument();
   });
 });
 

@@ -10,6 +10,7 @@ import { ResultCelebration } from "../../components/Celebrations/ResultCelebrati
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { RematchPanel } from "../../components/Rematch/RematchPanel.jsx";
+import { SaveProgressCard } from "../../components/SaveProgress/SaveProgressCard.jsx";
 import { Seats } from "../../components/Seats/Seats.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
@@ -208,6 +209,7 @@ export function RoomPage() {
               onWindowEnded={room.refresh}
             />
           )}
+          {view.status === ROOM_STATUS.FINISHED && <SaveProgressCard room={view} game={gameNumber(view)} />}
         </div>
         <aside className={styles.side}>
           <h2 className="visually-hidden">Players</h2>
