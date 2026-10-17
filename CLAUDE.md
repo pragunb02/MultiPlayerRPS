@@ -51,6 +51,10 @@ These rules come first. Where they differ from anything below, they win.
    `main` stays green: a merge waits for every check, and a red `main` is fixed before anything else merges.
 7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (`docs/GROWTH.md`) and the owner's
    admin console are in scope.
+8. **Two reviews before every merge.** Every pull request is reviewed before merge by two reviewer agents in
+   parallel: a code reviewer (correctness, tests, the working agreement and comment style, regressions) and a
+   security reviewer (auth, sessions, sockets, input, data exposure, secrets). Each finding is checked by a second
+   agent that tries to refute it. Confirmed findings are fixed, or written down with a reason, before the merge.
 
 ### Workflow rules
 
