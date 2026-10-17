@@ -17,7 +17,216 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 - **Options:** Render / Fly.io / Railway / AWS (ECS Fargate or Lightsail) + MongoDB Atlas.
 - **Recommendation:** Decide in Stage 0 exit; containerize first so it's portable.
 
+### ADR-020 — Game shell: one match layout every game plugs into
+
+- **Status:** Proposed · 2026-10-17
+- **Where:** [ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md) §2, from the two-browser match experience audit. Tickets
+  CC-157 to CC-178.
+
+### ADR-024 — Story mode "ClassiCade Quest"
+
+- **Status:** Proposed · 2026-10-17
+- **Where:** `docs/story/STORY_MODE.md` in PR #50 (CC-179, CC-187). It is recorded here once that PR lands.
+
+### ADR-025, ADR-026, ADR-027 — to be written
+
+- **Status:** Open. The roadmap ([ROADMAP.md](ROADMAP.md) §8) asks for these before the work starts:
+  1. ADR-025: bot identity and rewards (CC-138).
+  2. ADR-026: coin economy (CC-142).
+  3. ADR-027: ratings only for skill games (CC-042).
+- The roadmap first called them ADR-016, ADR-017 and ADR-018. Those numbers went to the decisions above.
+
 ## Accepted decisions
+
+### ADR-023 — Cookie notice: a line in the footer, not a banner
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-046](tickets/CC-046.md))
+
+- **Context.** The site sets exactly one cookie, only after the player chooses to play, and only to keep them signed
+  in. That is a strictly necessary cookie, for which the ePrivacy rules and similar laws require information but
+  not consent. At the time, the browser tests (`e2e/fixtures.js`) failed on anything in web storage.
+- **Decision.** No consent wall and no dismissible banner. Every page's footer says "One cookie keeps you signed in.
+  No ads, no trackers." with a link to `/privacy`, and the policy explains the cookie in section 3.
+- **Why.** A banner that can be closed must remember that it was closed, which needs a second cookie or web
+  storage, exactly what the notice promises we do not use. A consent wall for a necessary cookie would ask a
+  question with only one possible answer, and would get in the way of an invite link opening straight into a game.
+- **Revisit when** anything non-essential is added (analytics, ads, embeds): that needs real consent, before the
+  thing loads.
+- **Later (ADR-018, CC-103).** The browser may now keep one preference, the sound setting, in `localStorage`
+  (`cc.sound`). It is not a cookie and does not identify the player, so the footer line stays true. The Privacy and
+  Terms texts are drafts until the owner's legal review.
+
+### ADR-022 — Public names: a curated reserved list and abuse filter in the repo
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-119](tickets/CC-119.md))
+
+**Context.** Public names need a reserved list and a profanity filter. A filter that is too eager refuses real
+people (the Scunthorpe problem: "Scunthorpe", "Dickens", "Cockburn", "Therapist" all contain a rude word). A filter
+that is too loose is pointless. We have no moderation tools yet, and must not call a third-party service from
+sign-up (privacy, latency, a new failure mode).
+
+**Decision.**
+
+1. A small curated list in the repo (`models/nameLists.js`), no network calls, no new dependency.
+2. Two kinds of entry. Short or ambiguous words ("ass", "dick", "cock", "sex", "rape", "nazi") match only a
+   whole name or a whole part of a name. Parts are split at underscores, hyphens and where a capital letter
+   follows a small one, so `BigDick` is caught but `Dickens` is not. Long words that never hide inside innocent
+   words ("fuck", "cunt", "nigger") match anywhere, after known innocent words containing them ("Scunthorpe",
+   "shiitake", "snigger") are taken out. All-lowercase joined names like `bigdick` therefore pass. That is the
+   price of not refusing real names, and reports (CC-044) cover it.
+3. Before comparing, a name is lowercased, leetspeak digits and symbols are read as letters, and a listed word
+   also matches with its letters held longer (`fuuuck`). A doubled letter in the list stays at least doubled,
+   so "ass" never matches "as". A part made only of digits is read as a number, not leetspeak, so `Player_7117`
+   is not read as "tit".
+4. Each check is tried with and without digits padding the ends, so both `5hit` (leetspeak) and `Admin_1`
+   (padding) are read correctly.
+5. Reserved staff and bot words compare exactly (no held letters), because "mood" must not read as "mod" and
+   "boot" must not read as "bot". Brand words ("classicade", "nocapgaming") and the long staff words "admin" and
+   "moderator" are reserved anywhere in a name, with "badminton" allowed.
+6. Game names come from the shared `GAMES` catalog, so a new game is reserved without touching the filter.
+7. Some common profanity is left off on purpose because it is also an ordinary name in some language (Randi,
+   Lund, Lauda). The data file says so.
+8. The refusal message is the same for every reserved name and the same for every unsuitable name, so the
+   response never reveals the list or which word matched.
+9. Existing accounts are not renamed by this ticket. Existing sessions keep working, because `createIdentity`
+   does not apply the filter.
+
+**Consequences.** Cheap, deterministic and easy to change with a test per entry. It will miss creative
+spellings and joined lowercase words, and may still refuse a rare real name. When that happens, add the name to
+the allowlist with a test.
+
+### ADR-021 — Fair play: when a recorded game counts
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-095](tickets/CC-095.md))
+
+**Context.** Every reward (XP, wins, quests, achievements, streaks, boards) was paid per recorded match. That makes
+instant forfeits and endless short games against a friend or a second tab a free XP machine (SEC-19).
+
+**Decision.**
+
+1. A match is judged once for each player, right after it is recorded, and the verdict is stored on the match.
+   Every reward step reads the stored verdict, never the clock or the other games again. This keeps all steps
+   idempotent and consistent with each other and with recounts (gamification's stats rebuild, weekly board XP).
+2. **Moves, not seconds**, decide "ended too soon": a player who never moved, or a forfeit before both players made
+   two moves. Waiting costs a script nothing, so a minimum duration would only slow down honest quick games (a
+   one-round Rock Paper Scissors match takes seconds and counts). Two moves each is the smallest amount of real
+   play in all three games, and leaving before it is almost always an abort, not a contest.
+3. **Ten counted games per opponent pair per UTC day.** Friends who play each other a lot (a long evening of Tic-Tac-Toe
+   is easily more than ten games) keep playing, only the reward stops. Ten games is 300 XP at most from one
+   opponent per day, about three levels at the start and much less later, so a pair cannot climb the boards
+   together. UTC matches daily quests and streaks (ADR-013).
+4. **Twenty counted games per player per UTC clock hour.** That is one counted game every three minutes, above what
+   an honest player finishes, and caps a script that rotates many guest opponents at 480 counted games a day.
+5. The limits count every other game of the day that counts for the player or is not judged yet, before and after
+   this one. So two games judged at the same moment can only under-count, never over-count, and a guest's games
+   moved into an account later are held to the account's whole day.
+6. A guest's game that counted for the guest but would pass a limit for the account is marked `withdrawnFrom` and
+   its credit is taken out of the merged totals (ADR-014 stays exactly-once: the marks are written before progress
+   merges, and the merge recomputes them on resume).
+
+**Consequences.** One extra indexed query per player per match (`players.playerId, endedAt`). Old matches count.
+Limits are constants in one file, so tuning them is a one-line change with tests. Ratings (CC-042) can reuse the
+verdict.
+
+### ADR-019 — Requests between players are derived from the room view
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-104](tickets/CC-104.md))
+
+Context. Draw offers and rematch requests already live in server state (the chess engine's `drawOfferBy`, the room's
+`rematch.requestedBy`). Popups could be driven by new push events, but those are lost on a reload and would duplicate
+state the view already carries.
+
+Decision.
+
+1. A request is a plain object (`RoomRequest` in `games/roomUpdates.js`) computed from the current RoomView: who
+   asked, the texts, and what Accept, Decline and Cancel do (a game move, or the rematch events). Games add their own
+   requests and notices through the client game registry (`requests`, `notices`), so the room page never names a
+   game.
+2. How a request ended is part of the state: `drawAnswer` ("declined" or "withdrawn") in the chess view and
+   `rematch.declinedBy` in the RoomView. Notices are worked out by comparing the view before and after an update,
+   so they follow every kind of update and nobody is told about their own answer.
+3. Moving instead of answering still declines a draw offer, as before, and now says so to the offerer.
+
+Consequences. A reload shows the same popup with no chime. Rooms and chess games stored before this change (rooms
+live in MongoDB since CC-101) have no `declinedBy` or `drawAnswer`. The server's views read that as nobody, and so
+does the client. Declining runs through the room component's versioned `change({ decide })` like every other room
+change, and answers GONE once the rematch window has ended.
+
+### ADR-018 — Sounds are synthesised in the browser, and one preference may live in localStorage
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-103](tickets/CC-103.md))
+
+Context. We need about twenty short sounds. Audio files need a licence check, add downloads, and would need the CSP
+to allow media. Browsers also refuse to start audio before the person has touched the page, and Chrome logs a
+console warning when a page tries.
+
+Decision.
+
+1. Every sound is a few notes built with the Web Audio API (`OscillatorNode` and `GainNode`) from a recipe in
+   `lib/sound/sounds.js`. There are no audio files, nothing to license, nothing to download, and no CSP change.
+2. The audio context is created only inside a user gesture (`navigator.userActivation.isActive`). Before that `play`
+   does nothing. The player is created in `main.jsx`, injected through the services context like the API and socket
+   clients, and tests use `fakeSound()`, which records what would have played.
+3. Sounds are worked out from two RoomViews (before and after an update) by pure functions, so they come out the same
+   for every kind of update (a push, the answer to your own move, a rematch) and need no extra server events.
+4. Sound settings are a preference of this browser, not of the account, so they live in `localStorage` under the
+   single key `cc.sound` with the exact shape `{"muted":boolean,"volume":number}`. The browser tests used to demand
+   that web storage is empty. They now allow exactly the keys in `STORAGE_ALLOWLIST` (`e2e/fixtures.js`), each with a
+   checker for its value, so nothing identifying a player or a game can slip into storage that page scripts can read
+   and that outlives the session.
+
+Consequences. Sounds are tuned in code (gain values and wave shapes, with a unit test that keeps every note soft and
+short). Changing a sound is a code change. A browser without Web Audio stays silent.
+
+Why not a library (Howler, Tone.js): both are built for playing files or music and would add weight for what is
+about two hundred lines.
+
+### ADR-017 — Rooms are stored in MongoDB, with explicit lifetimes
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-101](tickets/CC-101.md))
+
+**Context.** Rooms were kept in memory (CC-015) with a note that a Redis DAO would come for scaling (CC-061). On a
+single free-plan instance that sleeps when idle, memory loses every room several times a day.
+
+**Decision.** Store rooms in the MongoDB we already run (ADR-003), one document per room, written with optimistic
+versioning. Keep lifetimes as named business rules in one module. Keep a small closed-room record for a day.
+
+**Why MongoDB and not Redis now.** No new service, no new dependency, no new cost. A room is one small document and
+changes a few times a minute. The DAO contract stays the same, so CC-061 can still swap in Redis for horizontal
+scale without touching anything above the data layer.
+
+**Consequences.** Every room action is one read and one write to MongoDB, a few milliseconds on the same region.
+The every second deadline check asks only for rooms whose stored `dueAt` has come, using an index. Two new
+collections appear in production. They are created on first use and need no migration, because there were no
+stored rooms before.
+
+### ADR-016 — Motion for interaction animation
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-102](tickets/CC-102.md))
+
+**Context.** Chess needs pieces that slide between squares, and CC-092 plans the same for toasts, dialogs and
+results. CSS transitions cannot animate a piece from one square to another when React moves the element to a new
+parent, and writing a small animation engine by hand would be code we maintain forever.
+
+**Decision.** Use `motion` (14.3.0, latest stable, MIT, no native build step), imported only from `motion/react`.
+
+1. Wrap animated parts in `components/Motion/MotionProvider.jsx`: `LazyMotion` with `strict`, so only the small
+   `m.*` components can be used, and `MotionConfig reducedMotion="user"`.
+2. The `domAnimation` features load from their own file (`motionFeatures.js`) after the board has rendered.
+   Something that would animate before they arrive simply appears in place.
+3. Components that must not move at all for a player with reduced motion also check `useReducedMotion()` (the
+   chess board skips slides entirely, as the celebrations do).
+4. Motion animates by setting `element.style` from script. The CSP (CC-030) blocks style attributes written in
+   markup, not styles set from script, so no CSP change is needed. The e2e `players` fixture would fail on any
+   CSP violation.
+
+**Cost.** Measured with `npm run build:web` (gzip): the chess chunk grew from 13.8 kB to 32.9 kB (our new board
+code plus the Motion core), and `motionFeatures` is a separate 17.9 kB file loaded only on the chess page. The
+main bundle is unchanged (118.3 kB). Pages without chess load none of it.
+
+**Alternatives.** CSS transitions and the Web Animations API with hand written measuring (no dependency, but every
+future animation needs its own measuring code). `react-spring` (heavier for the same features, less used).
+Framer Motion under its old name (the same library, now published as `motion`).
 
 ### ADR-012: visual identity — "neon arcade"
 

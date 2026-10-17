@@ -1,6 +1,6 @@
 # ClassiCade Roadmap
 
-Written 2026-10-16. Based on a read-only audit of `main` at 9560048 (security, bugs, code quality, product and platform). Every security and bug item below was checked a second time against the code. Ticket IDs start at the next free ID on the board, **CC-105**. CC-101 to CC-104 are already reserved. New finding IDs start at SEC-12, BUG-15 and DEBT-13. New ADRs start at ADR-016.
+Written 2026-10-16. Based on a read-only audit of `main` at 9560048 (security, bugs, code quality, product and platform). Every security and bug item below was checked a second time against the code. Ticket IDs start at the next free ID on the board, **CC-105**. CC-101 to CC-104 are already reserved. New finding IDs start at SEC-12, BUG-15 and DEBT-13. New ADRs start at ADR-016. (Renumbered on 2026-10-17, after ADR-016 to ADR-024 went to decisions made since: bot rewards is ADR-025, the coin economy ADR-026 and ratings ADR-027.)
 
 ## 1. Where we are
 
@@ -54,13 +54,13 @@ The tickets are CC-105 (on day one), CC-107, CC-106, CC-109, CC-108, CC-095, CC-
 
 ### Batch 2: Someone to play with (weeks 3 to 4)
 
-The tickets are CC-138 (bot identity and ADR-016 bot rewards), CC-039 (TTT bots), CC-038 (RPS bots), CC-036 extended, CC-112, CC-111, then CC-051 (quick match: a human queue grouped by level, with a labelled bot of matching strength after 10 s), CC-049 (observability), the CC-097 finish, CC-099 (reward queue) and sweep PRs 2 and 3.
+The tickets are CC-138 (bot identity and ADR-025 bot rewards), CC-039 (TTT bots), CC-038 (RPS bots), CC-036 extended, CC-112, CC-111, then CC-051 (quick match: a human queue grouped by level, with a labelled bot of matching strength after 10 s), CC-049 (observability), the CC-097 finish, CC-099 (reward queue) and sweep PRs 2 and 3.
 
 **Why this order:** nobody has finished a match on the new stack, so every retention feature already built is unreachable for a solo visitor. Bots fix that and also feed quick match. Quick match depends on CC-036, because fair abandonment rules must exist before strangers get paired. CC-099 has to be the single entry point for rewards before coins arrive. Observability turns every silent failure in Batch 1 into an alert.
 
 ### Batch 3: Launch readiness, Stage 1 exit (weeks 5 to 6)
 
-The tickets are CC-046 (privacy and terms), CC-035 (deletion and export, built from the same per-collection participants as ADR-014), CC-098, CC-123 (custom domain), CC-033 widened (needs the domain for SPF, DKIM and DMARC), CC-116, CC-119, CC-040 (chess bot: a small JS engine on the server for casual games, Stockfish in the browser for practice), CC-042 (Glicko-2 for chess only, ADR-018), CC-045 (analytics after consent), CC-047 (SEO, real 404s, invite preview cards), CC-048 (accessibility), CC-122 (staging), CC-050 (launch checklist and runbooks) and sweep PRs 4 and 5.
+The tickets are CC-046 (privacy and terms), CC-035 (deletion and export, built from the same per-collection participants as ADR-014), CC-098, CC-123 (custom domain), CC-033 widened (needs the domain for SPF, DKIM and DMARC), CC-116, CC-119, CC-040 (chess bot: a small JS engine on the server for casual games, Stockfish in the browser for practice), CC-042 (Glicko-2 for chess only, ADR-027), CC-045 (analytics after consent), CC-047 (SEO, real 404s, invite preview cards), CC-048 (accessibility), CC-122 (staging), CC-050 (launch checklist and runbooks) and sweep PRs 4 and 5.
 
 **Why here:** these are the Stage 1 exit criteria (bots for each game, ratings, legal pages, monitoring). Email needs the domain first. Analytics needs consent first. Ratings need anti-farming and abandonment rules first, both done in Batches 1 and 2. Analytics must run before any reward tuning or ML work.
 
@@ -72,7 +72,7 @@ The tickets are CC-034 (public profile `/u/:username` and preset SVG avatars), C
 
 ### After Batch 4, in this order
 
-1. **Economy (Stage 2):** CC-142 (coin ledger, ADR-017), CC-143 (unlocks), CC-145 (streak freeze), CC-144 (daily puzzle), CC-141 (weekly leagues), CC-146 (local-time days).
+1. **Economy (Stage 2):** CC-142 (coin ledger, ADR-026), CC-143 (unlocks), CC-145 (streak freeze), CC-144 (daily puzzle), CC-141 (weekly leagues), CC-146 (local-time days).
 2. **Chess depth:** CC-102, CC-041, CC-069.
 3. **More games:** CC-066, starting with Connect Four, then Ultimate TTT, Dots and Boxes and Checkers, each shipped with a bot. Then CC-057 (Ludo), CC-067 (tournaments) and CC-068 (clubs).
 4. **Scale:** CC-061 with its widened scope.
@@ -84,14 +84,14 @@ The tickets are CC-034 (public profile `/u/:username` and preset SVG avatars), C
 
 | ID              | Item                                                                                                                                                                                    | Pri | Size | Depends on                     |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------------------------------ |
-| CC-138          | Bot identity kind and server-side Bot contract `chooseMove({ view, legalMoves, rng, now })`. ADR-016 on bot rewards: reduced XP, no leaderboard wins, quests count within the daily cap | P0  | S    | none                           |
+| CC-138          | Bot identity kind and server-side Bot contract `chooseMove({ view, legalMoves, rng, now })`. ADR-025 on bot rewards: reduced XP, no leaderboard wins, quests count within the daily cap | P0  | S    | none                           |
 | CC-039          | TTT bots: easy, medium, minimax                                                                                                                                                         | P0  | S    | CC-138                         |
 | CC-038          | RPS bots: random and Markov                                                                                                                                                             | P0  | S    | CC-138                         |
 | CC-040          | Chess bot: small JS engine on the server, Stockfish WASM in the browser for unrated practice                                                                                            | P1  | M    | CC-138                         |
 | CC-036          | Reconnect grace, turn deadlines, chess first-move abort, idle limit for playing rooms, abandon rate per account                                                                         | P0  | M    | none                           |
 | CC-112          | Start a game only when every seat is connected                                                                                                                                          | P1  | S    | none                           |
 | CC-051          | "Play now" quick match with bot fallback after 10 s                                                                                                                                     | P1  | M    | CC-038, CC-039, CC-040, CC-036 |
-| CC-042          | Glicko-2 ratings, chess only (ADR-018). RPS and TTT keep XP and wins                                                                                                                    | P1  | M    | CC-095, CC-036                 |
+| CC-042          | Glicko-2 ratings, chess only (ADR-027). RPS and TTT keep XP and wins                                                                                                                    | P1  | M    | CC-095, CC-036                 |
 | CC-102          | Chess experience (already on the board)                                                                                                                                                 | P1  | L    | none                           |
 | CC-041          | Chess time controls, draw offer, PGN, replay viewer                                                                                                                                     | P1  | L    | CC-102                         |
 | CC-091          | Alternate who moves first in a rematch                                                                                                                                                  | P2  | S    | none                           |
@@ -130,7 +130,7 @@ One-way "following" (for streamers) is deliberately left out until there are str
 | CC-097          | "Save your progress" prompts (in progress)                                                                                                                              | P1  | S    | CC-113         |
 | CC-093          | Guest carry-over follow-ups (extended)                                                                                                                                  | P2  | S    | none           |
 | CC-094          | Backfill from older match history                                                                                                                                       | P2  | M    | CC-130         |
-| CC-142          | Soft-coin ledger that only grows (each entry written once, keyed like quests), cached balance, guest transfer participant, admin revoke (ADR-017)                       | P2  | L    | CC-095, CC-099 |
+| CC-142          | Soft-coin ledger that only grows (each entry written once, keyed like quests), cached balance, guest transfer participant, admin revoke (ADR-026)                       | P2  | L    | CC-095, CC-099 |
 | CC-143          | Unlocks by level, achievement or coins: board themes, piece sets, RPS hand skins, avatar frames, emotes, victory animations, game variants. Base games are never locked | P2  | M    | CC-142         |
 | CC-145          | Streak freeze (200 coins, hold at most 2) and a coin bonus for the day's first match                                                                                    | P2  | S    | CC-142         |
 | CC-146          | Days in local time (revisit ADR-013). Show the reset time in local time right away                                                                                      | P2  | M    | none           |
@@ -293,7 +293,7 @@ These rows are ready to paste into BACKLOG.md. Afterwards, set **Next free ID: `
 4. **CC-033:** retitle to "Email verification and password reset".
 5. **CC-028:** reduce to production hosting (the region choice is part of ADR-005).
 6. **CC-052:** reduce to friends graph and presence.
-7. **CC-042:** chess only (ADR-018).
+7. **CC-042:** chess only (ADR-027).
 8. **CC-061:** widen the scope.
 9. **CC-066:** raise to P2.
 10. **CC-091:** add BUG-23.
@@ -334,11 +334,11 @@ These rows are ready to paste into BACKLOG.md. Afterwards, set **Next free ID: `
 | CC-135 | Lazy-load route pages, bundle-size budget in CI                                                                                                    | infra    | P3  | S1    | CC-049                   |
 | CC-136 | `createIndexes` at boot instead of `syncIndexes`, index drops as migrations                                                                        | infra    | P3  | S1    |                          |
 | CC-137 | PROGRESS.md: remove the stale next-ID field, derive stage counts from the board                                                                    | docs     | P2  | S0    |                          |
-| CC-138 | Bot identity kind and Bot contract, bot reward rules                                                                                               | feature  | P0  | S1    | ADR-016, FR-AI-1, CC-038 |
+| CC-138 | Bot identity kind and Bot contract, bot reward rules                                                                                               | feature  | P0  | S1    | ADR-025, FR-AI-1, CC-038 |
 | CC-139 | Persistent challenges at `/challenge/:id` that survive restarts, honest expired-link page                                                          | feature  | P1  | S1    | FR-SOC-3, CC-052, CC-101 |
 | CC-140 | Friends filter on leaderboards, lifetime head-to-head records                                                                                      | feature  | P2  | S2    | CC-052                   |
 | CC-141 | Weekly leagues (20 to 30 players, tiers, up and down)                                                                                              | feature  | P2  | S2    | CC-055, CC-095           |
-| CC-142 | Soft-coin ledger and balance, guest transfer participant                                                                                           | feature  | P2  | S2    | ADR-017, CC-095, CC-099  |
+| CC-142 | Soft-coin ledger and balance, guest transfer participant                                                                                           | feature  | P2  | S2    | ADR-026, CC-095, CC-099  |
 | CC-143 | Unlocks: cosmetics and game variants by level, achievement or coins (never base games)                                                             | feature  | P2  | S2    | CC-142, CC-063           |
 | CC-144 | Daily puzzle (chess and TTT) with its own streak                                                                                                   | feature  | P2  | S2    | CC-099                   |
 | CC-145 | Streak freeze and a coin bonus for the day's first match                                                                                           | feature  | P2  | S2    | CC-142                   |
@@ -358,9 +358,9 @@ Findings to add to KNOWN_ISSUES.md:
 
 ADRs to write first:
 
-1. **ADR-016:** bot identity and rewards.
-2. **ADR-017:** coin economy.
-3. **ADR-018:** ratings only for skill games.
+1. **ADR-025:** bot identity and rewards.
+2. **ADR-026:** coin economy.
+3. **ADR-027:** ratings only for skill games.
 4. **ADR-005 (resolve):** hosting and region.
 5. **ADR-013 (revisit):** local-time days.
 6. **ADR-001 (amend):** `checkJs` in CI.

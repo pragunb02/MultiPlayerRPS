@@ -139,12 +139,16 @@ Data objects are **plain and frozen** — no methods that do work, so logic can'
 
 ---
 
-### Comment style (owner's rule, enforcement CC-125)
+### Comment style (owner's rule, enforced by lint since CC-125)
 
 **14. Comments are for people.** Write a comment where the code cannot speak for itself: a business rule, a decision that is not obvious, or an order that matters. Say why, not what. Write in plain words for a new teammate who knows JavaScript but not this codebase. Avoid jargon and shorthand such as idempotent, upsert, observer pattern, e.g., i.e., and arrows in prose. Say what happens instead, for example "running it twice changes nothing". Use short sentences that end with a full stop. Do not use semicolons. Do not use dashes as punctuation (a spaced hyphen, a double hyphen, an en dash or an em dash). Use a full stop, comma, colon or brackets instead. Hyphens inside a word are fine (best-of-3, read-only, CC-089). Write lists as numbered items or as separate sentences, not as hyphen bullets. Anything inside backticks is code and is exempt. Put a ticket or ADR ID at the end in brackets only when the reader needs the background, and never as the only explanation, for example "(see ADR-014)". Every exported function, hook and component has a JSDoc block. Parameter descriptions go after the type, never inside the braces. Checked by `npm run lint` (rule `classicade/comment-style`).
 
-Until `classicade/comment-style` lands (CC-125), reviewers check this by hand; new and changed comments must follow it
-now. The sweep of existing comments is CC-125 and CC-126 (ROADMAP.md §7).
+`npm run lint` enforces this rule (CC-125, merged). The local ESLint rule `classicade/comment-style` checks
+JavaScript comments, and `scripts/check-comments.mjs` checks CSS comments. The rule is an error in every folder listed
+in `COMMENT_STYLE_ON` (`eslint-rules/commentStyleScope.mjs`): today `packages/games`, `packages/shared`,
+`eslint-rules` and `scripts`. The other folders are reworded one pull request at a time in CC-126 (ROADMAP.md §7),
+and each moves into `COMMENT_STYLE_ON` when its pull request lands. Until then, new and changed comments in those
+folders must still follow the rule, and reviewers check them by hand.
 
 ---
 
