@@ -25,6 +25,22 @@ describe("identityComponent.createGuest", () => {
     }
   });
 
+  it("draws again when the random letters spell a rude word or a bot name", () => {
+    const draws = ["FUCK", "CPU2", "7K2Q"];
+    const component = createIdentityComponent({
+      generateId: () => UUID,
+      generateGuestSuffix: () => draws.shift(),
+    });
+
+    expect(component.createGuest().displayName).toBe("Guest-7K2Q");
+  });
+
+  it("gives up loudly instead of handing out an unsuitable name", () => {
+    const component = createIdentityComponent({ generateId: () => UUID, generateGuestSuffix: () => "CUNT" });
+
+    expect(() => component.createGuest()).toThrow("No suitable guest name");
+  });
+
   it("fails fast when a generator is not a function", () => {
     expect(() => createIdentityComponent({ generateId: "nope" })).toThrow(TypeError);
   });
