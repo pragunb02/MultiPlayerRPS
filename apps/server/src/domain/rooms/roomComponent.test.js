@@ -86,7 +86,7 @@ describe("roomComponent", () => {
         status: "waiting",
         hostId: ALICE.id,
         network: "net-a",
-        seats: [{ playerId: ALICE.id, displayName: "Alice", connected: true }],
+        seats: [{ playerId: ALICE.id, displayName: "Alice", connected: true, away: false, since: T0 }],
         createdAt: T0,
         lastActivityAt: T0,
         dueAt: 0,
@@ -416,7 +416,7 @@ describe("roomComponent", () => {
       const { rooms, code } = await startedGame();
       await rooms.makeMove({ code, playerId: BOB.id, move: { add: 1 }, now: T0 + 2 });
       await rooms.makeMove({ code, playerId: ALICE.id, move: { add: 2 }, now: T0 + 3 }); // Alice reaches 3: finished
-      await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 4 });
+      await rooms.askRequest({ code, playerId: ALICE.id, type: "rematch", now: T0 + 4 });
       const other = await createRace(rooms, CAROL);
 
       const [room] = await rooms.transferPlayer({ from: ALICE.id, to: RIYA, now: T0 + 5 });
@@ -425,10 +425,10 @@ describe("roomComponent", () => {
       expect(room.seats.map((seat) => seat.playerId)).toContain(RIYA.id);
       expect(room.result.winners).toEqual([RIYA.id]);
       expect(room.series.wins).toEqual({ [RIYA.id]: 1 });
-      expect(room.rematch.requestedBy).toEqual([RIYA.id]);
+      expect(room.requests).toEqual([expect.objectContaining({ from: RIYA.id, to: BOB.id, state: "open" })]);
       // The account sees the result as its own win, and can play again with the same opponent.
       expect(rooms.viewFor(room, RIYA.id).game.outcome.winners).toEqual([RIYA.id]);
-      const again = await rooms.requestRematch({ code, playerId: BOB.id, now: T0 + 6 });
+      const again = await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: T0 + 6 });
       expect(again.status).toBe("playing");
       expect((await rooms.getRoom(other.code)).seats[0].playerId).toBe(CAROL.id);
     });
@@ -469,8 +469,20 @@ describe("roomComponent", () => {
         status: "waiting",
         hostId: ALICE.id,
         players: { min: 2, max: 2 },
-        seats: [{ playerId: ALICE.id, displayName: "Alice", connected: true }],
+        seats: [
+          {
+            playerId: ALICE.id,
+            displayName: "Alice",
+            connected: true,
+            presence: "here",
+            since: T0,
+            graceUntil: 0,
+          },
+        ],
         you: ALICE.id,
+        requests: [],
+        requestsLeft: {},
+        askAgainAt: {},
       });
     });
 
@@ -485,6 +497,9 @@ describe("roomComponent", () => {
         view: { count: 0, target: 3, toMove: BOB.id },
         activePlayers: [BOB.id],
         outcome: { status: "ongoing" },
+        number: 1,
+        // Bob has not made a first move yet, so the first move limit runs from the start (CC-036).
+        turnEndsAt: T0 + 1 + ROOM_LIFETIMES.firstMoveMs,
       });
     });
 

@@ -1,0 +1,259 @@
+import mongoose from "mongoose";
+import { io as connect } from "socket.io-client";
+import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { SOCKET_EVENTS } from "@classicade/shared";
+import { startServer } from "./server.js";
+import { captureLogger } from "./testing/captureLogger.js";
+import { startMemoryMongo } from "./testing/memoryMongo.js";
+import { testConfig } from "./testing/testConfig.js";
+
+// Requests and presence through the real composition root, on MongoDB (CC-159, CC-207, CC-158). The owner's
+// report: two players finish a game, Alice goes to the home page without pressing Leave, Bob asks for a rematch,
+// and Alice never hears of it. Now the request reaches her on any page, and nobody waits forever.
+let mongo;
+let dbCounter = 0;
+const cleanups = [];
+const MINUTE = 60_000;
+
+beforeAll(async () => {
+  mongo = await startMemoryMongo();
+}, 120_000);
+
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0).reverse()) {
+    await cleanup();
+  }
+});
+
+afterAll(async () => {
+  await mongo?.stop();
+});
+
+/** A server on its own database whose clock the test moves. It can be restarted on the same port and data. */
+function serverProcess() {
+  let config = testConfig({ MONGO_URI: mongo.uri(`requests-${++dbCounter}`) });
+  let running;
+  const clock = { now: 1_700_000_000_000 };
+  const logs = [];
+  onTestFailed(() => logs.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)));
+
+  async function start() {
+    const capture = captureLogger();
+    logs.push(...capture.entries);
+    running = await startServer({ config, logger: capture.logger, now: () => clock.now });
+    config = testConfig({ MONGO_URI: config.mongoUri, PORT: String(running.port) });
+    return running;
+  }
+
+  /** Reads the database through a separate connection, as an outside observer of what was stored. */
+  async function read(query) {
+    const connection = await mongoose.createConnection(config.mongoUri).asPromise();
+    try {
+      return await query(connection.db);
+    } finally {
+      await connection.close();
+    }
+  }
+
+  cleanups.push(() => running?.close());
+  return {
+    clock,
+    start,
+    url: () => `http://127.0.0.1:${running.port}`,
+    async restart() {
+      const stopped = running;
+      running = undefined;
+      await stopped.close();
+      return start();
+    },
+    /** The rooms as stored, read through a separate connection. */
+    storedRooms: () => read((db) => db.collection("rooms").find().toArray()),
+    /** How many documents a collection holds. */
+    count: (name) => read((db) => db.collection(name).countDocuments()),
+  };
+}
+
+/** A guest with a socket that reconnects by itself, like a browser tab, recording every push it receives. */
+async function guest(server) {
+  const res = await fetch(`${server.url()}/api/session/guest`, { method: "POST" });
+  const cookie = res.headers.get("set-cookie").split(";")[0];
+  const { identity } = await res.json();
+  const socket = connect(server.url(), {
+    transports: ["websocket"],
+    extraHeaders: { cookie },
+    reconnectionDelay: 50,
+    reconnectionDelayMax: 100,
+  });
+  const received = [];
+  socket.onAny((event, payload) => received.push({ event, payload }));
+  cleanups.push(() => socket.disconnect());
+  await new Promise((resolve, reject) => {
+    socket.once("connect", resolve);
+    socket.once("connect_error", reject);
+  });
+  return { socket, identity, cookie, received };
+}
+
+const send = async (socket, event, payload) => {
+  const ack = await socket.timeout(3_000).emitWithAck(event, payload);
+  if (!ack.ok) throw new Error(`${event} failed: ${ack.error.message}`);
+  return ack.data;
+};
+
+/**
+ * Waits, for up to five seconds, until a push of `event` that passes `test` has arrived, counting only pushes after
+ * the first `after` the player received.
+ */
+async function heard(player, event, test = () => true, { after = 0 } = {}) {
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const found = player.received.slice(after).find((entry) => entry.event === event && test(entry.payload));
+    if (found !== undefined) return found.payload;
+    if (Date.now() > deadline) throw new Error(`no ${event} arrived`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+const seatOf = (view, player) => view.seats.find((seat) => seat.playerId === player.identity.id);
+
+/** Alice hosts best-of-1 Rock Paper Scissors, Bob joins, Alice throws rock and Bob scissors: Alice wins. */
+async function finishedGame(server) {
+  const alice = await guest(server);
+  const bob = await guest(server);
+  const { code } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+    gameId: "rps",
+    options: { bestOf: 1 },
+  });
+  await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
+  await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "rock" } });
+  const done = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "scissors" } });
+  expect(done.status).toBe("finished");
+  return { alice, bob, code };
+}
+
+describe("requests and presence through the real composition root (integration)", () => {
+  it("reaches a player who went to the home page, and her Accept starts the next game for both", async () => {
+    const server = serverProcess();
+    await server.start();
+    const { alice, bob, code } = await finishedGame(server);
+
+    // Alice opens the home page: her tab stops showing the room, and Bob sees her as away at once.
+    await send(alice.socket, SOCKET_EVENTS.ROOM_AWAY, { code });
+    await heard(bob, SOCKET_EVENTS.ROOM_UPDATED, (view) => seatOf(view, alice)?.presence === "away");
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+
+    const pushed = await heard(
+      alice,
+      SOCKET_EVENTS.REQUEST_UPDATED,
+      (payload) => payload.requests.length > 0,
+    );
+    expect(pushed).toEqual({
+      code,
+      gameId: "rps",
+      names: { [alice.identity.id]: alice.identity.displayName, [bob.identity.id]: bob.identity.displayName },
+      requests: [
+        {
+          type: "rematch",
+          from: bob.identity.id,
+          to: alice.identity.id,
+          createdAt: server.clock.now,
+          expiresAt: server.clock.now + MINUTE,
+          state: "open",
+          endedAt: 0,
+        },
+      ],
+      serverTime: server.clock.now,
+    });
+    const [stored] = await server.storedRooms();
+    expect(stored.requests).toEqual(pushed.requests);
+    expect(stored.dueAt).toBe(server.clock.now + MINUTE);
+
+    await send(alice.socket, SOCKET_EVENTS.ROOM_ANSWER, { code, type: "rematch", answer: "accept" });
+    const view = await send(alice.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
+
+    expect(view.status).toBe("playing");
+    expect(view.game.number).toBe(2);
+    expect((await heard(bob, SOCKET_EVENTS.ROOM_UPDATED, (next) => next.status === "playing")).code).toBe(
+      code,
+    );
+  });
+
+  it("expires a request nobody answers through the deadline sweep, and tells the asker", async () => {
+    const server = serverProcess();
+    await server.start();
+    const { alice, bob, code } = await finishedGame(server);
+    alice.socket.disconnect();
+    await heard(bob, SOCKET_EVENTS.ROOM_UPDATED, (view) => seatOf(view, alice)?.presence === "offline");
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+
+    server.clock.now += MINUTE;
+
+    const expired = await heard(bob, SOCKET_EVENTS.ROOM_UPDATED, (view) =>
+      view.requests.some((request) => request.state === "expired"),
+    );
+    expect(expired.status).toBe("finished");
+    await heard(bob, SOCKET_EVENTS.REQUEST_UPDATED, (payload) =>
+      payload.requests.some((request) => request.state === "expired"),
+    );
+  });
+
+  it("gives up the seat of a player who stays away from a finished room for two minutes", async () => {
+    const server = serverProcess();
+    await server.start();
+    const { alice, bob, code } = await finishedGame(server);
+    await send(alice.socket, SOCKET_EVENTS.ROOM_AWAY, { code });
+
+    server.clock.now += 2 * MINUTE;
+
+    const released = await heard(bob, SOCKET_EVENTS.ROOM_UPDATED, (view) => view.seats.length === 1);
+    expect(released.rematch).toEqual(
+      expect.objectContaining({ available: false, leftName: alice.identity.displayName }),
+    );
+    expect((await server.storedRooms())[0].seats.map((seat) => seat.playerId)).toEqual([bob.identity.id]);
+  });
+
+  it("keeps a request through a restart, warns the players first, and pushes it again on reconnecting", async () => {
+    const server = serverProcess();
+    await server.start();
+    const { alice, bob, code } = await finishedGame(server);
+    await send(alice.socket, SOCKET_EVENTS.ROOM_AWAY, { code });
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+    const before = alice.received.length;
+
+    await server.restart();
+
+    await heard(alice, SOCKET_EVENTS.SERVER_RESTARTING, () => true, { after: before });
+    const again = await heard(
+      alice,
+      SOCKET_EVENTS.REQUEST_UPDATED,
+      (payload) => payload.requests[0]?.state === "open",
+      { after: before },
+    );
+    expect(again.requests[0].from).toBe(bob.identity.id);
+    await send(alice.socket, SOCKET_EVENTS.ROOM_ANSWER, { code, type: "rematch", answer: "accept" });
+    expect((await send(alice.socket, SOCKET_EVENTS.ROOM_JOIN, { code })).status).toBe("playing");
+  });
+
+  it("aborts a game nobody starts, and records no match", async () => {
+    const server = serverProcess();
+    await server.start();
+    const alice = await guest(server);
+    const bob = await guest(server);
+    const { code } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "tictactoe",
+      options: {},
+    });
+    await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
+
+    server.clock.now += MINUTE;
+
+    const aborted = await heard(alice, SOCKET_EVENTS.ROOM_UPDATED, (view) => view.status === "finished");
+    expect(aborted.game.outcome).toEqual({
+      status: "finished",
+      result: "aborted",
+      winners: [],
+      reason: "aborted",
+    });
+    expect(await server.count("matches")).toBe(0);
+  });
+});

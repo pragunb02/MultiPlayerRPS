@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
-import { createSocketClients, nextEvent as nextUpdate, send } from "../../testing/socketClients.js";
+import {
+  createSocketClients,
+  eventWhere,
+  nextEvent as nextUpdate,
+  send,
+} from "../../testing/socketClients.js";
 import { roomLimits } from "../../domain/rooms/roomLimits.js";
 import { startTestServer } from "../../testing/testApp.js";
 
@@ -46,7 +51,14 @@ describe("rooms over sockets", () => {
         status: "waiting",
         hostId: alice.identity.id,
         you: alice.identity.id,
-        seats: [{ playerId: alice.identity.id, displayName: alice.identity.displayName, connected: true }],
+        seats: [
+          expect.objectContaining({
+            playerId: alice.identity.id,
+            displayName: alice.identity.displayName,
+            connected: true,
+            presence: "here",
+          }),
+        ],
       }),
     );
     expect(ack.data.code).toMatch(/^[A-HJKMNP-Z2-9]{6}$/);
@@ -198,14 +210,105 @@ describe("rooms over sockets", () => {
 
     bob.socket.disconnect();
     const dropped = await aliceSeesDrop;
-    expect(dropped.seats.find((s) => s.playerId === bob.identity.id).connected).toBe(false);
+    expect(dropped.seats.find((s) => s.playerId === bob.identity.id)).toEqual(
+      expect.objectContaining({ connected: false, presence: "offline" }),
+    );
 
-    const aliceSeesReturn = nextUpdate(alice.socket);
+    const aliceSeesReturn = eventWhere(alice.socket, (view) => view.seats.every((s) => s.connected));
     const bobAgain = await openSocket(bob.cookie);
     const rejoined = await send(bobAgain, SOCKET_EVENTS.ROOM_JOIN, { code });
 
     expect(rejoined.data.status).toBe("playing");
-    expect((await aliceSeesReturn).seats.every((s) => s.connected)).toBe(true);
+    expect((await aliceSeesReturn).seats.map((s) => s.presence)).toEqual(["here", "here"]);
+  });
+
+  it("shows a player who went to another page as away at once, and offline once their last tab closes (CC-207)", async () => {
+    server = await startTestServer();
+    const { alice, bob, code } = await startedRace();
+    const bobOf = (view) => view.seats.find((s) => s.playerId === bob.identity.id);
+    const aliceSeesAway = nextUpdate(alice.socket);
+
+    const ack = await send(bob.socket, SOCKET_EVENTS.ROOM_AWAY, { code });
+
+    expect(ack).toEqual({ ok: true, data: { away: true } });
+    expect(bobOf(await aliceSeesAway).presence).toBe("away");
+    const aliceSeesOffline = nextUpdate(alice.socket);
+    bob.socket.disconnect();
+    expect(bobOf(await aliceSeesOffline).presence).toBe("offline");
+    const aliceSeesOnline = nextUpdate(alice.socket);
+    await openSocket(bob.cookie);
+    expect(bobOf(await aliceSeesOnline).presence).toBe("away");
+  });
+
+  it("keeps a player here while another of their tabs still shows the room, and away once a tab elsewhere is all that is left", async () => {
+    server = await startTestServer();
+    const { alice, bob, code } = await startedRace();
+    const secondTab = await openSocket(bob.cookie);
+    await send(secondTab, SOCKET_EVENTS.ROOM_JOIN, { code });
+    const homeTab = await openSocket(bob.cookie);
+
+    await send(bob.socket, SOCKET_EVENTS.ROOM_AWAY, { code });
+    expect((await server.roomComponent.getRoom(code)).seats.every((s) => s.connected)).toBe(true);
+    const aliceSeesAway = nextUpdate(alice.socket);
+    secondTab.disconnect();
+
+    const seen = await aliceSeesAway;
+    expect(seen.seats.find((s) => s.playerId === bob.identity.id).presence).toBe("away");
+    expect(homeTab.connected).toBe(true);
+  });
+
+  it("refuses away for a room the player has no seat in", async () => {
+    server = await startTestServer();
+    const { code } = await startedRace();
+    const carol = await player();
+
+    expect((await send(carol.socket, SOCKET_EVENTS.ROOM_AWAY, { code })).error.code).toBe(
+      ERROR_CODES.FORBIDDEN,
+    );
+  });
+
+  it("tells a player who connects about the requests still open in their rooms (CC-207)", async () => {
+    server = await startTestServer();
+    const { alice, bob, code } = await startedRace();
+    await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
+    await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 2 } });
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+
+    let heard;
+    await clients.openSocket(alice.cookie, {
+      listen: (socket) => {
+        heard = nextUpdate(socket, SOCKET_EVENTS.REQUEST_UPDATED);
+      },
+    });
+    const pushed = await heard;
+
+    expect(pushed).toEqual(
+      expect.objectContaining({
+        code,
+        requests: [expect.objectContaining({ from: bob.identity.id, to: alice.identity.id, state: "open" })],
+      }),
+    );
+  });
+
+  it("lets the player still there claim the win once the opponent stayed offline too long (CC-036)", async () => {
+    let now = 1_700_000_000_000;
+    server = await startTestServer({ now: () => now });
+    const { alice, bob, code } = await startedRace();
+    const aliceSeesDrop = nextUpdate(alice.socket);
+    bob.socket.disconnect();
+    await aliceSeesDrop;
+
+    const early = await send(alice.socket, SOCKET_EVENTS.ROOM_CLAIM_WIN, { code });
+    now += 60_000;
+    const claimed = await send(alice.socket, SOCKET_EVENTS.ROOM_CLAIM_WIN, { code });
+
+    expect(early.error).toEqual(expect.objectContaining({ code: ERROR_CODES.CONFLICT }));
+    expect(claimed.data.game.outcome).toEqual({
+      status: "finished",
+      result: "win",
+      winners: [alice.identity.id],
+      reason: "forfeit",
+    });
   });
 
   it("keeps a player connected while another of their tabs is still open", async () => {

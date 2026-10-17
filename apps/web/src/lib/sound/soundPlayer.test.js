@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { CLICK_SOUND_SELECTOR, createSoundPlayer } from "./soundPlayer.js";
+import { DEFAULT_SOUND_SETTINGS } from "./soundPreferences.js";
 import { RECIPES } from "./sounds.js";
 
 /** A pretend Web Audio context that records every node it makes, as a browser's would play them. */
@@ -271,12 +272,98 @@ describe("soundPlayer (CC-103)", () => {
     const player = createSoundPlayer({
       createContext: () => audio.context,
       hasUserActivation: () => true,
-      preferences: memoryPreferences(),
+      preferences: memoryPreferences(DEFAULT_SOUND_SETTINGS),
     });
     player.unlock();
 
     expect(player.play("move")).toBe(true);
     expect(audio.oscillators).toHaveLength(RECIPES.move.length);
+  });
+
+  describe("kinds of notice (CC-208)", () => {
+    /** A player of the real sounds, on a clock the test moves. */
+    function categorised() {
+      const audio = fakeAudioContext();
+      const clock = { now: 1_000 };
+      const preferences = memoryPreferences(DEFAULT_SOUND_SETTINGS);
+      const player = createSoundPlayer({
+        createContext: () => audio.context,
+        hasUserActivation: () => true,
+        preferences,
+        now: () => clock.now,
+      });
+      player.unlock();
+      return { player, audio, clock, preferences };
+    }
+    const peakOf = (gain) => gain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
+
+    it("plays a kind of notice at its own volume next to the main one", () => {
+      const { player, audio } = categorised();
+      player.setCategory("turn", { volume: 0.5 });
+
+      player.play("move");
+
+      // The first gain node is the main volume, then one per note.
+      expect(peakOf(audio.gains[1])).toBeCloseTo(RECIPES.move[0].gain * 0.5);
+    });
+
+    it("stays silent for a kind that is off, and plays the others in the same call", () => {
+      const { player, audio } = categorised();
+      player.setCategory("result", { on: false });
+
+      expect(player.play("win")).toBe(false);
+      expect(player.play(["win", "move"])).toBe(true);
+      expect(audio.oscillators).toHaveLength(RECIPES.move.length);
+    });
+
+    it("plays a kind's sound at most once within its rate limit", () => {
+      const { player, clock } = categorised();
+
+      expect(player.play("notify")).toBe(true);
+      clock.now += 1_999;
+      expect(player.play("notify")).toBe(false);
+      clock.now += 1;
+      expect(player.play("notify")).toBe(true);
+    });
+
+    it("lets several sounds of one kind play together in one call, such as a move and the game start", () => {
+      const { player, audio } = categorised();
+
+      expect(player.play(["move", "game-start"])).toBe(true);
+      expect(audio.oscillators).toHaveLength(RECIPES.move.length + RECIPES["game-start"].length);
+    });
+
+    it("plays the click of a button whatever the kinds of notice are set to", () => {
+      const { player } = categorised();
+      for (const id of ["request", "turn", "result", "reward", "social", "system"]) {
+        player.setCategory(id, { on: false });
+      }
+
+      expect(player.play("click")).toBe(true);
+    });
+
+    it("saves each change to a kind and tells subscribers", () => {
+      const { player, preferences } = categorised();
+      const listener = vi.fn();
+      player.subscribe(listener);
+
+      player.setCategory("reward", { on: false });
+      player.setCategory("reward", { volume: 0.2 });
+
+      expect(player.settings().categories.reward).toEqual({ on: false, volume: 0.2 });
+      expect(preferences.saved.at(-1).categories.reward).toEqual({ on: false, volume: 0.2 });
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ["an unknown kind", "ads", { on: true }, Error],
+      ["a switch that is not true or false", "turn", { on: "yes" }, TypeError],
+      ["a volume out of range", "turn", { volume: 2 }, RangeError],
+    ])("refuses %s", (_name, id, change, type) => {
+      const { player } = categorised();
+
+      expect(() => player.setCategory(id, change)).toThrow(type);
+    });
   });
 
   describe("listen", () => {

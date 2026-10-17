@@ -7,11 +7,26 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @typedef {Object} Seat
  * @property {string} playerId
  * @property {string} displayName
- * @property {boolean} connected
+ * @property {boolean} connected        the room page is open (CC-158)
+ * @property {boolean} [away]          on another page of the site (CC-207). Older seats leave it out
+ * @property {number} [since]          when the presence last changed. Older seats leave it out
  *
  * @typedef {{ kind: "move", playerId: string, move: unknown, at: number }
  *   | { kind: "forfeit", playerId: string, at: number }
- *   | { kind: "expire", at: number }} LogEntry   every state change, in order, with server time
+ *   | { kind: "expire", at: number }
+ *   | { kind: "agree", type: string, from: string, playerId: string, at: number }
+ *   | { kind: "idle", playerIds: string[], at: number }} LogEntry   every state change, in order, with server
+ *   time. `agree` is a request of the game accepted by `playerId` (CC-159), `idle` the players who did not move in
+ *   time (CC-036)
+ *
+ * @typedef {Object} RoomRequest       something one player asked the other (CC-159, see roomRequests.js)
+ * @property {string} type
+ * @property {string} from
+ * @property {string} to
+ * @property {number} createdAt
+ * @property {number} expiresAt
+ * @property {string} state            a REQUEST_STATES value
+ * @property {number} endedAt          0 while open
  *
  * @typedef {Object} Room              a domain model: deeply frozen, changed only by producing a new room
  * @property {string} code
@@ -21,19 +36,23 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @property {string} hostId
  * @property {string} [network]        an opaque name of the network the room was opened from, for the cap per network
  * @property {ReadonlyArray<Readonly<Seat>>} seats
- * @property {{ matchId: string, seed: number, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry> }} [game]
- *   present once the game has started; `seed` + `log` reproduce the game exactly (see replayGame)
+ * @property {{ matchId: string, number?: number, seed: number, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry>, asked?: Record<string, Record<string, number>> }} [game]
+ *   present once the game has started; `seed` + `log` reproduce the game exactly (see replayGame). `number`
+ *   counts the room's games from 1, and `asked` how often each player asked each limited request in this game
+ * @property {ReadonlyArray<Readonly<RoomRequest>>} [requests]  open requests, and ended ones for a few seconds
  * @property {Readonly<{ status: string, result: string, winners: string[], reason: string }>} [result]  final outcome once finished (played out or forfeited)
  * @property {number} [finishedAt]      when the last game ended, the rematch window counts from here (CC-101)
- * @property {Readonly<{ requestedBy: ReadonlyArray<string>, available: boolean, declinedBy: string, leftName?: string }>} [rematch]
- *   once finished: who asked to play again, whether that is still possible (CC-037), who last declined (CC-104),
- *   and the name of a player who left the finished game (CC-162)
+ * @property {Readonly<{ available: boolean, leftName?: string }>} [rematch]
+ *   once finished: whether playing again is still possible (CC-037), and the name of a player who left the
+ *   finished game (CC-162). Who asked is a request (CC-159). Rooms stored before that may still carry the old
+ *   `requestedBy` and `declinedBy`, which nothing reads
  * @property {Readonly<{ games: number, wins: Readonly<Record<string, number>> }>} [series]  games finished in this room
  *   and wins per player, across rematches
  * @property {number} createdAt
  * @property {number} lastActivityAt
- * @property {number} dueAt              when the running game's next deadline falls, 0 for none (kept so the
- *   every second check asks storage for due rooms only)
+ * @property {number} dueAt              when something next happens in the room by itself (a chess flag, an idle
+ *   limit, a request expiring, a seat given up), 0 for none (kept so the every second check asks storage for due
+ *   rooms only)
  * @property {number} expiresAt          when the room's lifetime ends (see roomLifetimes.js)
  * @property {number} version            optimistic-concurrency token owned by the store
  *

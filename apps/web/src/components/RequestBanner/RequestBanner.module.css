@@ -1,0 +1,76 @@
+/*
+ * The request banner (CC-160) is the first thing in a room, under the site header. It stays in view at the top
+ * of the window while the page scrolls, and in its resting place it sits above the board, never over it, so a
+ * phone still shows every square. Nothing behind it is blocked while the player decides.
+ */
+.banner {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  gap: var(--space-2);
+}
+.request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  animation: slide-in var(--duration-slow) var(--ease-spring);
+}
+.incoming {
+  box-shadow: var(--shadow-md), var(--glow-primary);
+}
+.outgoing {
+  border-style: dashed;
+}
+.answer {
+  border-color: var(--color-border);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+.text {
+  margin: 0;
+  flex: 1 1 14rem;
+}
+.where {
+  color: var(--color-text-muted);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* The time left: a slim bar with the minutes and seconds beside it, which keep their width as they count. */
+.countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.bar {
+  width: 6rem;
+  height: var(--space-2);
+  accent-color: var(--color-primary);
+}
+.time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.link {
+  font-weight: 700;
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}

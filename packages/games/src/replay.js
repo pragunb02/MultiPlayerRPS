@@ -39,8 +39,17 @@ export function replayGame(engine, { players, options, seed, log }) {
         }
         state = engine.expire(state, ctx);
         break;
+      case "agree":
+        // The opponent accepted a request of the game, such as a draw offer (CC-159).
+        if (engine.acceptRequest === undefined || !Object.hasOwn(engine.requestTypes, entry.type)) {
+          throw new Error(`Log entry ${index}: ${engine.id} has no request type "${entry.type}"`);
+        }
+        state = engine.acceptRequest(state, { type: entry.type, from: entry.from, to: entry.playerId }, ctx);
+        break;
       case "forfeit":
-        // A forfeit ends the match outside the rules of the game. The board itself stays as it was.
+      case "idle":
+        // The room ended the match outside the rules of the game: a player left, or did not move in time
+        // (CC-036). The board itself stays as it was.
         break;
       default:
         throw new Error(`Log entry ${index} has unknown kind "${entry.kind}"`);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { useServices } from "../../app/servicesContext.js";
 import { useSession } from "../../hooks/useSession.js";
+import { CATEGORIES } from "../../lib/notify/categories.js";
 import { useToast } from "../Toast/toastContext.js";
 import { SaveProgressContext } from "./saveProgressContext.js";
 import { movedAnything, SAVED_WITHOUT_NUMBERS, savedMessage } from "./savedMessage.js";
@@ -84,9 +85,9 @@ export function SaveProgressProvider({ children }) {
         return;
       }
       try {
-        toast.show(savedMessage(await api.getProgress()), { tone: "success" });
+        toast.show(savedMessage(await api.getProgress()), { tone: "success", category: CATEGORIES.REWARD });
       } catch {
-        toast.show(SAVED_WITHOUT_NUMBERS, { tone: "success" });
+        toast.show(SAVED_WITHOUT_NUMBERS, { tone: "success", category: CATEGORIES.REWARD });
       }
     },
     [api, toast],

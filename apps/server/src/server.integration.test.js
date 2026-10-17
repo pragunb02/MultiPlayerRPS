@@ -259,7 +259,7 @@ describe("games through the real composition root (integration)", () => {
       await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
       await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "rock" } });
       await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "scissors" } });
-      await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code: room.code });
+      await send(alice.socket, SOCKET_EVENTS.ROOM_REQUEST, { code: room.code, type: "rematch" });
 
       // Bob picks a new opponent instead: he leaves the finished room.
       const aliceHears = new Promise((resolve) => alice.socket.once(SOCKET_EVENTS.ROOM_UPDATED, resolve));
@@ -269,8 +269,10 @@ describe("games through the real composition root (integration)", () => {
       expect(left).toEqual({ ok: true, data: { left: true } });
       expect(update.seats.map((seat) => seat.playerId)).toEqual([alice.identity.id]);
       expect(update.rematch).toEqual(
-        expect.objectContaining({ requestedBy: [], available: false, leftName: bob.identity.displayName }),
+        expect.objectContaining({ available: false, leftName: bob.identity.displayName }),
       );
+      // The rematch Alice asked for went with him.
+      expect(update.requests).toEqual([]);
       // Read back from MongoDB, the room still says who left.
       const again = await send(alice.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
       expect(again.data.rematch.leftName).toBe(bob.identity.displayName);
@@ -783,8 +785,8 @@ describe("leaderboards and rematches through the real composition root (integrat
 
       const code = await newRoom(riya, sam);
       await playRound(code, riya, sam);
-      await send(sam.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
-      const rematch = await send(riya.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
+      await send(sam.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+      const rematch = await send(riya.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
       expect(rematch.data.status).toBe("playing");
       expect(rematch.data.seats.map((seat) => seat.playerId)).toEqual([sam.identity.id, riya.identity.id]);
       const second = await playRound(code, sam, riya);

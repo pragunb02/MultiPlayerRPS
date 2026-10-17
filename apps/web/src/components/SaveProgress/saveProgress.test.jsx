@@ -40,15 +40,20 @@ const finished = ({ code = "AB2CD3", outcome = outcomes.win, games = 1, ...overr
   players: { min: 2, max: 2 },
   seats: [ME, BOB],
   you: GUEST.id,
-  game: { view: {}, activePlayers: [], outcome },
-  rematch: { requestedBy: [], available: true },
+  game: { view: {}, activePlayers: [], outcome, number: games },
+  rematch: { available: true },
   series: { games, wins: {} },
   ...overrides,
 });
 const playing = (overrides = {}) =>
   finished({
     status: "playing",
-    game: { view: {}, activePlayers: [GUEST.id], outcome: { status: "ongoing" } },
+    game: {
+      view: {},
+      activePlayers: [GUEST.id],
+      outcome: { status: "ongoing" },
+      number: overrides.series?.games ?? 1,
+    },
     ...overrides,
   });
 

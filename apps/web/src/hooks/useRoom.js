@@ -17,7 +17,8 @@ export const newerRoom = (current, incoming) =>
  * itself: whoever arrives without one chooses how to join first (CC-086). Leaving the page leaves a waiting room,
  * so nobody starts a game against a player who has gone (CC-112). The seat is kept when the next page leads back
  * to this room, such as signing up from it. A game in progress or a finished game keeps the seat: only `leave()`
- * gives it up (it forfeits a game in progress).
+ * gives it up (it forfeits a game in progress). Leaving the page tells the server the player is away from the
+ * room, so the opponent sees it at once and requests still reach them elsewhere (CC-207).
  *
  * `refresh()` joins again, to learn whether the room is still there when a deadline it showed has passed. A room
  * that has closed answers with a GONE error saying why (CC-101).
@@ -59,6 +60,8 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
     },
     [socket, code],
   );
+  // Whether this page holds a seat it has not left, so closing the page should tell the server it is away.
+  const seated = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
@@ -68,14 +71,18 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
     // State changes only in the request's callbacks, after the server answered.
     const join = () =>
       socket.request(SOCKET_EVENTS.ROOM_JOIN, { code }).then(
-        (room) =>
-          active &&
-          setState((s) => ({
-            status: "ready",
-            room: newerRoom(s.room, room),
-            error: undefined,
-            closedReason: "",
-          })),
+        (room) => {
+          seated.current = room.you !== "";
+          return (
+            active &&
+            setState((s) => ({
+              status: "ready",
+              room: newerRoom(s.room, room),
+              error: undefined,
+              closedReason: "",
+            }))
+          );
+        },
         (error) => active && setState({ status: "error", room: undefined, error, closedReason: "" }),
       );
     // Join now if connected; otherwise the "connect" handler below joins once the socket is up.
@@ -100,37 +107,52 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
     };
   }, [socket, code, enabled, joins]);
 
-  const move = useCallback(
-    async (payload) => {
-      const room = await socket.request(SOCKET_EVENTS.GAME_MOVE, { code, move: payload });
+  useEffect(
+    () => () => {
+      if (!seated.current) return;
+      seated.current = false;
+      // Nothing waits for this answer: the page is already gone, and a room that closed meanwhile has no seat.
+      socket.request(SOCKET_EVENTS.ROOM_AWAY, { code }).catch(() => undefined);
+    },
+    [socket, code],
+  );
+
+  /** Sends something that changes the room and shows the room the server answers with. */
+  const send = useCallback(
+    async (event, payload) => {
+      const room = await socket.request(event, { code, ...payload });
       setState((s) => ({ ...s, room: newerRoom(s.room, room) }));
       return room;
     },
     [socket, code],
   );
 
-  const leave = useCallback(() => {
+  const move = useCallback((payload) => send(SOCKET_EVENTS.GAME_MOVE, { move: payload }), [send]);
+
+  const leave = useCallback(async () => {
+    seated.current = false;
     waitingSeat.current = false;
     return socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code });
   }, [socket, code]);
 
-  /** Asks for — or withdraws — a rematch in a finished room; once everyone asked, the new game starts here. */
-  const rematch = useCallback(async () => {
-    const room = await socket.request(SOCKET_EVENTS.ROOM_REMATCH, { code });
-    setState((s) => ({ ...s, room: newerRoom(s.room, room) }));
-    return room;
-  }, [socket, code]);
+  /**
+   * Asks the other player something (CC-159): a rematch, or what the game adds such as a draw offer. Asking for
+   * what they already asked you accepts it.
+   */
+  const ask = useCallback((type) => send(SOCKET_EVENTS.ROOM_REQUEST, { type }), [send]);
+
+  /** Accepts, declines or withdraws an open request (a REQUEST_ANSWERS value). */
+  const answer = useCallback(
+    (type, reply) => send(SOCKET_EVENTS.ROOM_ANSWER, { type, answer: reply }),
+    [send],
+  );
+
+  /** Claims the win of a game whose opponent stayed offline past the grace period (CC-036). */
+  const claimWin = useCallback(() => send(SOCKET_EVENTS.ROOM_CLAIM_WIN, {}), [send]);
 
   const refresh = useCallback(() => setJoins((n) => n + 1), []);
 
-  /** Says no to the opponent's rematch request (CC-104). They are told, and either player may ask again. */
-  const declineRematch = useCallback(async () => {
-    const room = await socket.request(SOCKET_EVENTS.ROOM_REMATCH_DECLINE, { code });
-    setState((s) => ({ ...s, room: newerRoom(s.room, room) }));
-    return room;
-  }, [socket, code]);
-
-  return { ...state, move, leave, rematch, declineRematch, refresh };
+  return { ...state, move, leave, ask, answer, claimWin, refresh };
 }
 
 /** The path and query the browser shows now. */

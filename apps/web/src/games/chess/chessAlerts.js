@@ -1,6 +1,5 @@
-import { CHESS_ACTIONS, CHESS_DRAW_ANSWERS, CHESS_END_REASONS as END, ROOM_STATUS } from "@classicade/shared";
+import { CHESS_END_REASONS as END, CHESS_REQUEST_TYPES } from "@classicade/shared";
 import { SOUNDS } from "../../lib/sound/sounds.js";
-import { nameOf, opponentsOf } from "../roomView.js";
 
 /**
  * The sound a chess move makes, read from its notation: a check ("+") is announced over everything else, then
@@ -29,56 +28,22 @@ export function chessSounds(previous, next) {
 }
 
 /**
- * A standing draw offer, as a request the other player answers (CC-104). An offer stays the same request through
- * the offerer's own moves, so the opponent is not alerted twice for one offer.
+ * The words of the chess requests (CC-159): a draw offer, which the room keeps like every other request. Moving
+ * instead of answering declines it, so the offerer hears "declined" then as well.
  *
- * @param {any} room  RoomView
- * @returns {import("../roomUpdates.js").RoomRequest[]}
+ * @type {Readonly<Record<string, import("../roomUpdates.js").RequestTexts>>}
  */
-export function chessRequests(room) {
-  const by = room.game.view.drawOfferBy;
-  if (room.status !== ROOM_STATUS.PLAYING || by === "") {
-    return [];
-  }
-  return [
-    {
-      key: `draw:${by}`,
-      from: by,
-      title: "Draw offer",
-      question: (name) => `${name} offers a draw.`,
-      waitingTitle: "Draw offered",
-      showWaiting: true,
-      accept: { type: "move", move: { type: CHESS_ACTIONS.ACCEPT_DRAW } },
-      decline: { type: "move", move: { type: CHESS_ACTIONS.DECLINE_DRAW } },
-      cancel: { type: "move", move: { type: CHESS_ACTIONS.WITHDRAW_DRAW } },
-    },
-  ];
-}
-
-/**
- * What the other side should be told when a draw offer ends without a draw (CC-104): the offerer hears that it
- * was declined (also when the opponent simply moved), the opponent hears that it was withdrawn. Whoever ended the
- * offer is not told about their own action.
- *
- * @param {any} previous  RoomView before the update
- * @param {any} next      RoomView after it
- * @param {string} you    the viewer ("" for spectators)
- * @returns {string[]}
- */
-export function chessNotices(previous, next, you) {
-  const offeredBy = previous.game.view.drawOfferBy;
-  const { drawOfferBy, drawAnswer } = next.game.view;
-  if (you === "" || next.status !== ROOM_STATUS.PLAYING || offeredBy === "" || drawOfferBy !== "") {
-    return [];
-  }
-  if (drawAnswer === CHESS_DRAW_ANSWERS.DECLINED && offeredBy === you) {
-    return [`${opponentsOf(next)} declined your draw offer`];
-  }
-  if (drawAnswer === CHESS_DRAW_ANSWERS.WITHDRAWN && offeredBy !== you) {
-    return [`${nameOf(next, offeredBy)} withdrew the draw offer`];
-  }
-  return [];
-}
+export const CHESS_REQUEST_TEXTS = Object.freeze({
+  [CHESS_REQUEST_TYPES.DRAW]: Object.freeze({
+    title: "Draw offer",
+    question: (name) => `${name} offers a draw.`,
+    waiting: (name) => `Draw offered. Waiting for ${name} to answer`,
+    declined: (name) => `${name} declined your draw offer`,
+    withdrawn: (name) => `${name} withdrew the draw offer`,
+    accepted: (name) => `${name} accepted the draw`,
+    site: (game) => `offers a draw at ${game}`,
+  }),
+});
 
 const REASON_PHRASES = Object.freeze({
   [END.CHECKMATE]: "by checkmate",

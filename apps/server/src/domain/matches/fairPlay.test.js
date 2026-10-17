@@ -79,6 +79,22 @@ describe("endedTooSoon", () => {
       true,
     ],
     ["left after two moves each", leftBy(B, [move(A), move(B), move(A), move(B)]), false],
+    [
+      "stopped playing after one move each until the idle limit ended it (CC-036)",
+      match({
+        log: [move(A), move(B), { kind: "idle", playerIds: [B], at: NOON }],
+        result: { result: "win", winners: [A], reason: "idle" },
+      }),
+      true,
+    ],
+    [
+      "stopped playing after two moves each",
+      match({
+        log: [move(A), move(B), move(A), move(B), { kind: "idle", playerIds: [B], at: NOON }],
+        result: { result: "win", winners: [A], reason: "idle" },
+      }),
+      false,
+    ],
   ])("%s: %s", (_case, m, expected) => {
     expect(endedTooSoon(m)).toBe(expected);
   });

@@ -5,15 +5,32 @@ import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
 
-const ME = { playerId: GUEST.id, displayName: GUEST.displayName, connected: true };
-const BOB = { playerId: "guest_b", displayName: "Bob", connected: true };
+const ME = {
+  playerId: GUEST.id,
+  displayName: GUEST.displayName,
+  connected: true,
+  presence: "here",
+  graceUntil: 0,
+};
+const BOB = { playerId: "guest_b", displayName: "Bob", connected: true, presence: "here", graceUntil: 0 };
 const WIN = { status: "finished", result: "win", winners: [GUEST.id], reason: "reached-target" };
 
-/** A finished game of a board-less game (generic room page), from the guest's seat. */
 // The server's clock when it sent the view, and the end of the rematch window 12 min 34 s later.
 const SERVER_T = 7_000_000;
 const UNTIL = SERVER_T + 12 * 60_000 + 34_000;
-const finished = ({ rematch = { requestedBy: [], available: true, until: UNTIL }, ...overrides } = {}) => ({
+const rematchRequest = ({ from = BOB.playerId, to = GUEST.id, state = "open" } = {}) => ({
+  type: "rematch",
+  from,
+  to,
+  createdAt: SERVER_T,
+  expiresAt: SERVER_T + 60_000,
+  state,
+  endedAt: state === "open" ? 0 : SERVER_T + 1,
+});
+const MINE = rematchRequest({ from: GUEST.id, to: BOB.playerId });
+
+/** A finished game of a board-less game (generic room page), from the guest's seat. */
+const finished = ({ rematch = { available: true, until: UNTIL }, ...overrides } = {}) => ({
   code: "AB2CD3",
   gameId: "ludo",
   status: "finished",
@@ -21,20 +38,23 @@ const finished = ({ rematch = { requestedBy: [], available: true, until: UNTIL }
   players: { min: 2, max: 2 },
   seats: [ME, BOB],
   you: GUEST.id,
-  game: { view: {}, activePlayers: [], outcome: WIN },
+  requests: [],
+  requestsLeft: {},
+  askAgainAt: {},
+  game: { view: {}, activePlayers: [], outcome: WIN, number: 1, turnEndsAt: 0 },
   ...(rematch && { rematch }),
   series: { games: 1, wins: { [GUEST.id]: 1 } },
   serverTime: SERVER_T,
   ...overrides,
 });
 
-/** Opens the room; the socket answers room:join with `joined` and room:rematch with `onRematch()`. */
-function openRoom(joined, onRematch = vi.fn(async () => joined)) {
+/** Opens the room; the socket answers room:join with `joined`, and room:request and room:answer with `onRequest()`. */
+function openRoom(joined, onRequest = vi.fn(async () => joined)) {
   const socket = fakeSocket();
   socket.connect();
-  socket.request.mockImplementation(async (event) => {
+  socket.request.mockImplementation(async (event, payload) => {
     if (event === "room:join") return joined;
-    if (event === "room:rematch") return onRematch();
+    if (event === "room:request" || event === "room:answer") return onRequest(event, payload);
     return { left: true };
   });
   const view = renderApp({
@@ -42,36 +62,40 @@ function openRoom(joined, onRematch = vi.fn(async () => joined)) {
     socket,
     api: fakeApi({ getSession: async () => GUEST }),
   });
-  return { ...view, socket, onRematch };
+  return { ...view, socket, onRequest };
 }
 
-describe("RoomPage rematch (CC-037)", () => {
+describe("RoomPage rematch (CC-037, CC-159)", () => {
   it("offers a rematch after the game, and waits for the opponent once asked", async () => {
     const user = userEvent.setup();
-    const asked = finished({ rematch: { requestedBy: [GUEST.id], available: true, until: UNTIL } });
-    const { socket, onRematch } = openRoom(
+    const { socket, onRequest } = openRoom(
       finished(),
-      vi.fn(async () => asked),
+      vi.fn(async () => finished({ requests: [MINE] })),
     );
 
     await user.click(await screen.findByRole("button", { name: "Rematch" }));
 
-    expect(socket.request).toHaveBeenCalledWith("room:rematch", { code: "AB2CD3" });
-    expect(onRematch).toHaveBeenCalledOnce();
+    expect(socket.request).toHaveBeenCalledWith("room:request", { code: "AB2CD3", type: "rematch" });
+    expect(onRequest).toHaveBeenCalledOnce();
     expect(await screen.findByText("Waiting for Bob…")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel rematch" })).toBeInTheDocument();
+    expect(screen.getByText("Waiting for Bob to answer your rematch request")).toBeInTheDocument();
   });
 
   it("withdraws the request on cancel", async () => {
     const user = userEvent.setup();
-    const { onRematch } = openRoom(
-      finished({ rematch: { requestedBy: [GUEST.id], available: true, until: UNTIL } }),
-      vi.fn(async () => finished()),
+    const { socket } = openRoom(
+      finished({ requests: [MINE] }),
+      vi.fn(async () => finished({ requests: [{ ...MINE, state: "withdrawn", endedAt: SERVER_T + 1 }] })),
     );
 
     await user.click(await screen.findByRole("button", { name: "Cancel rematch" }));
 
-    expect(onRematch).toHaveBeenCalledOnce();
+    expect(socket.request).toHaveBeenCalledWith("room:answer", {
+      code: "AB2CD3",
+      type: "rematch",
+      answer: "withdraw",
+    });
     expect(await screen.findByRole("button", { name: "Rematch" })).toBeInTheDocument();
   });
 
@@ -81,7 +105,7 @@ describe("RoomPage rematch (CC-037)", () => {
       status: "playing",
       rematch: undefined,
       seats: [BOB, ME],
-      game: { view: {}, activePlayers: [GUEST.id], outcome: { status: "ongoing" } },
+      game: { view: {}, activePlayers: [GUEST.id], outcome: { status: "ongoing" }, number: 2, turnEndsAt: 0 },
     });
     const view = openRoom(
       finished(),
@@ -89,15 +113,15 @@ describe("RoomPage rematch (CC-037)", () => {
     );
     await screen.findByRole("heading", { name: "You won!" });
 
-    act(() =>
-      view.socket.push(
-        "room:updated",
-        finished({ rematch: { requestedBy: [BOB.playerId], available: true, until: UNTIL } }),
-      ),
-    );
+    act(() => view.socket.push("room:updated", finished({ requests: [rematchRequest()] })));
     expect(await screen.findByText("Bob wants a rematch!")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Accept rematch" }));
 
+    expect(view.socket.request).toHaveBeenCalledWith("room:answer", {
+      code: "AB2CD3",
+      type: "rematch",
+      answer: "accept",
+    });
     await waitFor(() => expect(screen.queryByRole("heading", { name: "You won!" })).not.toBeInTheDocument());
     expect(screen.getByText(/board is not available yet/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /rematch/i })).not.toBeInTheDocument();
@@ -114,7 +138,13 @@ describe("RoomPage rematch (CC-037)", () => {
     });
     const won = finished({
       gameId: "tictactoe",
-      game: { view: board(["X", "X", "X", "O", "O", "", "", "", ""], ""), activePlayers: [], outcome: WIN },
+      game: {
+        view: board(["X", "X", "X", "O", "O", "", "", "", ""], ""),
+        activePlayers: [],
+        outcome: WIN,
+        number: 1,
+        turnEndsAt: 0,
+      },
     });
     const rematch = finished({
       gameId: "tictactoe",
@@ -125,6 +155,8 @@ describe("RoomPage rematch (CC-037)", () => {
         view: board(Array(9).fill(""), BOB.playerId),
         activePlayers: [BOB.playerId],
         outcome: { status: "ongoing" },
+        number: 2,
+        turnEndsAt: 0,
       },
     });
     openRoom(
@@ -143,7 +175,7 @@ describe("RoomPage rematch (CC-037)", () => {
   });
 
   it("says when the opponent left, and offers a new opponent instead", async () => {
-    openRoom(finished({ rematch: { requestedBy: [], available: false, until: UNTIL }, seats: [ME] }));
+    openRoom(finished({ rematch: { available: false, until: UNTIL }, seats: [ME] }));
 
     expect(
       await screen.findByText("Your opponent left, so there is no rematch this time."),
@@ -153,20 +185,32 @@ describe("RoomPage rematch (CC-037)", () => {
   });
 
   it("names the opponent who left the finished game (CC-162)", async () => {
-    openRoom(
-      finished({
-        rematch: { requestedBy: [], available: false, until: UNTIL, leftName: "Bob" },
-        seats: [ME],
-      }),
-    );
+    openRoom(finished({ rematch: { available: false, until: UNTIL, leftName: "Bob" }, seats: [ME] }));
 
     expect(await screen.findByText("Bob left, so there is no rematch this time.")).toBeInTheDocument();
   });
 
   it("mentions an opponent who is offline", async () => {
-    openRoom(finished({ seats: [ME, { ...BOB, connected: false }] }));
+    openRoom(finished({ seats: [ME, { ...BOB, connected: false, presence: "offline" }] }));
 
     expect(await screen.findByText("Bob is offline right now.")).toBeInTheDocument();
+  });
+
+  it("says when the last request got no answer, and asking again stays possible", async () => {
+    openRoom(finished({ requests: [{ ...MINE, state: "expired", endedAt: SERVER_T + 60_000 }] }));
+
+    expect(await screen.findByText("No answer from Bob.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
+  });
+
+  it("says a game was aborted, calmly, and still offers a rematch (CC-036)", async () => {
+    const aborted = { status: "finished", result: "aborted", winners: [], reason: "aborted" };
+    openRoom(finished({ game: { view: {}, activePlayers: [], outcome: aborted, number: 1, turnEndsAt: 0 } }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Game aborted: the first move did not come in time" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
   });
 
   it("shows the series score once there was a rematch", async () => {
@@ -223,7 +267,7 @@ describe("RoomPage rematch (CC-037)", () => {
   });
 
   it("shows no countdown once the opponent left", async () => {
-    openRoom(finished({ rematch: { requestedBy: [], available: false, until: UNTIL } }));
+    openRoom(finished({ rematch: { available: false, until: UNTIL } }));
 
     await screen.findByText("Your opponent left, so there is no rematch this time.");
     expect(screen.queryByText(/Rematch available for/)).not.toBeInTheDocument();
@@ -236,8 +280,7 @@ describe("RoomPage rematch (CC-037)", () => {
     socket.request.mockImplementation(async (event) => {
       if (event !== "room:join") return { left: true };
       joins++;
-      if (joins === 1)
-        return finished({ rematch: { requestedBy: [], available: true, until: SERVER_T + 1_000 } });
+      if (joins === 1) return finished({ rematch: { available: true, until: SERVER_T + 1_000 } });
       throw new AppRequestError({
         code: "GONE",
         message: "This room has closed",
@@ -252,5 +295,57 @@ describe("RoomPage rematch (CC-037)", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Start a new Tic Tac Toe game" })).toBeInTheDocument();
     expect(joins).toBe(2);
+  });
+
+  it("tells the server the player went to another page, so the opponent sees them away (CC-207)", async () => {
+    const user = userEvent.setup();
+    const view = openRoom(finished());
+    await screen.findByRole("heading", { name: "You won!" });
+
+    await user.click(screen.getByRole("link", { name: "ClassiCade home" }));
+
+    await waitFor(() => expect(view.url()).toBe("/"));
+    expect(view.socket.request).toHaveBeenCalledWith("room:away", { code: "AB2CD3" });
+  });
+
+  it("does not report away after leaving the seat, or from a page that never held one", async () => {
+    const user = userEvent.setup();
+    const view = openRoom(finished());
+    await user.click(await screen.findByRole("button", { name: "New opponent" }));
+    await waitFor(() => expect(view.url()).toBe("/games/ludo"));
+
+    expect(view.socket.request).not.toHaveBeenCalledWith("room:away", expect.anything());
+  });
+
+  it("does not report away for a spectator", async () => {
+    const user = userEvent.setup();
+    const view = openRoom(finished({ you: "" }));
+    await screen.findByRole("heading", { name: "Guest-T001 won" });
+
+    await user.click(screen.getByRole("link", { name: "ClassiCade home" }));
+
+    await waitFor(() => expect(view.url()).toBe("/"));
+    expect(view.socket.request).not.toHaveBeenCalledWith("room:away", expect.anything());
+  });
+
+  it("ignores a refused away, because the page that sent it is gone", async () => {
+    const user = userEvent.setup();
+    const socket = fakeSocket();
+    socket.connect();
+    socket.request.mockImplementation(async (event) => {
+      if (event === "room:join") return finished();
+      throw new AppRequestError({ code: "GONE", message: "This room has closed" });
+    });
+    const view = renderApp({
+      path: "/games/ludo/rooms/AB2CD3",
+      socket,
+      api: fakeApi({ getSession: async () => GUEST }),
+    });
+    await screen.findByRole("heading", { name: "You won!" });
+
+    await user.click(screen.getByRole("link", { name: "ClassiCade home" }));
+
+    await waitFor(() => expect(view.url()).toBe("/"));
+    expect(socket.request).toHaveBeenCalledWith("room:away", { code: "AB2CD3" });
   });
 });

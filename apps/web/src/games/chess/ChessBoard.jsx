@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import { useEffect, useMemo, useState } from "react";
-import { CHESS_ACTIONS } from "@classicade/shared";
+import { CHESS_ACTIONS, CHESS_REQUEST_TYPES } from "@classicade/shared";
 import { Button } from "../../components/Button/Button.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { MotionProvider } from "../../components/Motion/MotionProvider.jsx";
@@ -9,7 +9,9 @@ import { useAction } from "../../hooks/useAction.js";
 import { useExplanation } from "../../hooks/useExplanation.js";
 import { useLowTimeTick } from "../../hooks/useSound.js";
 import { MoveProblem, ReasonLine } from "../BoardFeedback.jsx";
+import { outgoingRequests } from "../roomUpdates.js";
 import { PLAY_REASONS, playReason } from "../roomView.js";
+import { useAskReason } from "../useAskReason.js";
 import { useMove } from "../useMove.js";
 import { Board } from "./Board.jsx";
 import { materialBalance, opposite, positionWithMove, replayGame } from "./chessGame.js";
@@ -71,17 +73,6 @@ function useSlide(timeline, shown, dropped) {
 }
 
 /**
- * Why Offer draw cannot be pressed: an offer already stands, or the board is closed to the player for another
- * reason. Empty when it can.
- */
-function drawReason({ view, you, opponentName, reason }) {
-  if (reason !== "") return reason;
-  if (view.drawOfferBy === you) return `Waiting for ${opponentName} to answer`;
-  if (view.drawOfferBy !== "") return `${opponentName} offered a draw. Answer it above the board`;
-  return "";
-}
-
-/**
  * Chess: drag and drop or click to move, arrow keys and Enter on the keyboard, the game's history to look back
  * through, captured pieces, clocks and the result with a PGN download. chess.js runs here only to show legal
  * moves and earlier positions. The server checks every move and decides the result.
@@ -89,19 +80,25 @@ function drawReason({ view, you, opponentName, reason }) {
  * A press that cannot do anything says why (CC-164): not your turn, looking back through the history, or not
  * one of your pieces.
  *
- * @param {{ room: any, onMove: (move: object) => Promise<unknown>, reason?: string, site?: string }} props
+ * A draw offer is a room request (CC-159): Offer draw asks through `onAsk`, and the offer is answered or withdrawn
+ * in the request banner above the board.
+ *
+ * @param {{ room: any, onMove: (move: object) => Promise<unknown>, onAsk: (type: string) => Promise<unknown>, reason?: string, site?: string }} props
  *   `reason`: why the viewer cannot play now (see playReason), empty when they can. `site`: written into the PGN,
  *   defaults to this page's origin
  */
 export function ChessBoard({
   room,
   onMove,
+  onAsk,
   reason = playReason(room, { reconnecting: false }),
   site = window.location.origin,
 }) {
   const { view } = room.game;
   const move = useMove(onMove, { id: "chess.square" });
-  const offerDraw = useAction(() => onMove({ type: CHESS_ACTIONS.OFFER_DRAW }), { id: "chess.offer_draw" });
+  const offerDraw = useAction(() => onAsk(CHESS_REQUEST_TYPES.DRAW), { id: "chess.offer_draw" });
+  const drawReason = useAskReason(room, CHESS_REQUEST_TYPES.DRAW);
+  const drawOffered = outgoingRequests(room).some((request) => request.type === CHESS_REQUEST_TYPES.DRAW);
   const resign = useAction(() => onMove({ type: CHESS_ACTIONS.RESIGN }), { id: "chess.resign" });
   const explanation = useExplanation();
   const [pending, setPending] = useState({ fen: "", move: { from: "", to: "" } });
@@ -132,7 +129,6 @@ export function ChessBoard({
     room.seats.find((seat) => seat.playerId === playerId)?.displayName ?? "Opponent";
   const names = { w: seatName(byColour("w")), b: seatName(byColour("b")) };
   const shownName = (colour) => (colour === yourColour ? "You" : names[colour]);
-  const opponentName = yourColour === "" ? "" : names[opposite(yourColour)];
 
   const running = playing && view.lastMoveAt > 0 ? view.fen.split(" ")[1] : "";
   const clocks = useChessClocks({
@@ -251,14 +247,14 @@ export function ChessBoard({
           <MoveList moves={timeline.slice(1).map((p) => p.san)} ply={shown} latest={latest} onGoTo={goTo} />
           {playing && seated && (
             <div className={styles.actions}>
-              {/* A standing offer is answered or withdrawn in the room's request popup (CC-104). */}
+              {/* A standing offer is answered or withdrawn in the room's request banner (CC-160). */}
               <Button
                 control="chess.offer_draw"
                 variant="secondary"
                 action={offerDraw}
-                reason={drawReason({ view, you: room.you, opponentName, reason: anyTurnReason })}
+                reason={anyTurnReason || drawReason}
               >
-                {view.drawOfferBy === room.you ? "Draw offered" : "Offer draw"}
+                {drawOffered ? "Draw offered" : "Offer draw"}
               </Button>
               <Button
                 control="chess.resign"

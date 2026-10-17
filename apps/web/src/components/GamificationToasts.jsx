@@ -6,6 +6,7 @@ import { AchievementIcon } from "../art/achievements/AchievementIcon.jsx";
 import { Confetti } from "../art/effects/Confetti.jsx";
 import { XpPop } from "../art/effects/XpPop.jsx";
 import { useSound } from "../hooks/useSound.js";
+import { CATEGORIES } from "../lib/notify/categories.js";
 import { SOUNDS } from "../lib/sound/sounds.js";
 import styles from "./GamificationToasts.module.css";
 import { useToast } from "./Toast/toastContext.js";
@@ -34,6 +35,7 @@ export function GamificationToasts() {
       achievements.forEach((achievement) =>
         toast.show(`Achievement unlocked: ${achievement.name}`, {
           tone: "success",
+          category: CATEGORIES.REWARD,
           art: (
             <AchievementIcon
               name={achievement.icon}
@@ -51,7 +53,7 @@ export function GamificationToasts() {
       if (source !== "quest") return;
       toast.show(
         key.endsWith(SWEEP_SUFFIX) ? `Daily sweep! +${xpGained} XP` : `Quest complete! +${xpGained} XP`,
-        { tone: "success", art: <AchievementIcon name="scroll" tier="gold" /> },
+        { tone: "success", category: CATEGORIES.REWARD, art: <AchievementIcon name="scroll" tier="gold" /> },
       );
       setCelebration({ id: ++next.current, kind: "quest", xp: xpGained });
       sound.play(SOUNDS.ACHIEVEMENT);

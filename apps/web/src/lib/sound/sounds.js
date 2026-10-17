@@ -22,6 +22,8 @@ export const SOUNDS = Object.freeze({
   NOTIFY: "notify",
   ACHIEVEMENT: "achievement",
   LEVEL_UP: "level-up",
+  PRESENCE: "presence",
+  CONNECTION: "connection",
   CLICK: "click",
 });
 
@@ -124,6 +126,13 @@ export const RECIPES = Object.freeze({
     note(0.16, G5, 0.1, "triangle", 0.28),
     note(0.24, C6, 0.4, "triangle", 0.3),
     note(0.24, E6, 0.4, "sine", 0.16),
+  ]),
+  // Another player came, went away or came back: one soft, round note (CC-158).
+  [SOUNDS.PRESENCE]: Object.freeze([note(0, G5, 0.16, "sine", 0.22)]),
+  // Your own connection dropped or came back: two low notes, clearly not part of the game (CC-158).
+  [SOUNDS.CONNECTION]: Object.freeze([
+    note(0, A4, 0.12, "triangle", 0.25),
+    note(0.12, E4, 0.2, "triangle", 0.22),
   ]),
   // Buttons: barely audible, so it never gets in the way.
   [SOUNDS.CLICK]: Object.freeze([note(0, 1200, 0.02, "triangle", 0.12)]),

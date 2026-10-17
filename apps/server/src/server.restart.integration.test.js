@@ -133,7 +133,7 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
     await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "rock" } });
     await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "scissors" } });
-    await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code: room.code });
+    await send(alice.socket, SOCKET_EVENTS.ROOM_REQUEST, { code: room.code, type: "rematch" });
 
     const bobBack = rejoinOnReconnect(bob.socket, room.code);
     const aliceBack = rejoinOnReconnect(alice.socket, room.code);
@@ -142,10 +142,15 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     await aliceBack;
 
     expect(bobJoin.data.status).toBe("finished");
-    expect(bobJoin.data.rematch).toEqual(
-      expect.objectContaining({ requestedBy: [alice.identity.id], available: true }),
-    );
-    const accepted = await send(bob.socket, SOCKET_EVENTS.ROOM_REMATCH, { code: room.code });
+    expect(bobJoin.data.rematch).toEqual(expect.objectContaining({ available: true }));
+    expect(bobJoin.data.requests).toEqual([
+      expect.objectContaining({ type: "rematch", from: alice.identity.id, state: "open" }),
+    ]);
+    const accepted = await send(bob.socket, SOCKET_EVENTS.ROOM_ANSWER, {
+      code: room.code,
+      type: "rematch",
+      answer: "accept",
+    });
     expect(accepted.data.status).toBe("playing");
     expect(accepted.data.series).toEqual({ games: 1, wins: { [alice.identity.id]: 1 } });
   });

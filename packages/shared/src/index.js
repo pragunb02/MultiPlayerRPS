@@ -6,19 +6,24 @@ export { SOCKET_EVENTS } from "./events.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";
 export { IDENTITY_KINDS } from "./identity.js";
 export {
+  PRESENCE,
+  REQUEST_ANSWERS,
+  REQUEST_STATES,
   ROOM_CLOSE_REASONS,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
+  ROOM_END_REASONS,
   ROOM_LIMIT_REASONS,
+  ROOM_REQUEST_TYPES,
   ROOM_STATUS,
 } from "./rooms.js";
 export { RPS_BEST_OF, RPS_CHOICES } from "./rps.js";
 export { TTT_CELLS, TTT_MARKS } from "./tictactoe.js";
 export {
   CHESS_ACTIONS,
-  CHESS_DRAW_ANSWERS,
   CHESS_END_REASONS,
   CHESS_PROMOTIONS,
+  CHESS_REQUEST_TYPES,
   CHESS_TIME_CONTROLS,
   DEFAULT_CHESS_TIME_CONTROL,
 } from "./chess.js";

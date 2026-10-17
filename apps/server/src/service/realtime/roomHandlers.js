@@ -1,8 +1,17 @@
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { ForbiddenError, GoneError, NotFoundError } from "../../utils/errors.js";
-import { parseCreateRoom, parseGameMove, parseLeaveRoom, parseRoomRef } from "./payloads.js";
+import {
+  parseCreateRoom,
+  parseGameMove,
+  parseLeaveRoom,
+  parseRoomAnswer,
+  parseRoomRef,
+  parseRoomRequest,
+} from "./payloads.js";
 
 export const roomChannel = (code) => `room:${code}`;
+/** Every socket of one player (all their tabs), for pushes to that player on whatever page they are. */
+export const playerChannel = (playerId) => `player:${playerId}`;
 const codeFromChannel = (channel) => channel.slice("room:".length);
 
 /**
@@ -55,6 +64,15 @@ async function playerSockets(io, code, playerId) {
 export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
   const identity = socket.data.identity;
 
+  /** This tab left the room's page. Another tab of the player may still show the room: then they are still here. */
+  async function goAway(code) {
+    socket.leave(roomChannel(code));
+    if ((await playerSockets(io, code, identity.id)).length === 0) {
+      const room = await roomComponent.playerAway({ code, playerId: identity.id, now: now() });
+      await broadcastRoom({ io, roomComponent, room, now });
+    }
+  }
+
   return {
     async [SOCKET_EVENTS.ROOM_CREATE](payload) {
       const { gameId, options } = parseCreateRoom(payload);
@@ -92,18 +110,38 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
       return { left: true };
     },
 
-    async [SOCKET_EVENTS.ROOM_REMATCH](payload) {
+    async [SOCKET_EVENTS.ROOM_AWAY](payload) {
       const { code } = parseRoomRef(payload);
-      const room = await roomComponent.requestRematch({ code, playerId: identity.id, now: now() });
-      logger.info({ roomCode: code, status: room.status }, "rematch requested");
+      await goAway(code);
+      return { away: true };
+    },
+
+    async [SOCKET_EVENTS.ROOM_REQUEST](payload) {
+      const { code, type } = parseRoomRequest(payload);
+      const room = await roomComponent.askRequest({ code, playerId: identity.id, type, now: now() });
+      logger.info({ roomCode: code, type, status: room.status }, "request asked");
       await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
       return stampedView({ roomComponent, room, viewerId: identity.id, now });
     },
 
-    async [SOCKET_EVENTS.ROOM_REMATCH_DECLINE](payload) {
+    async [SOCKET_EVENTS.ROOM_ANSWER](payload) {
+      const { code, type, answer } = parseRoomAnswer(payload);
+      const room = await roomComponent.answerRequest({
+        code,
+        playerId: identity.id,
+        type,
+        answer,
+        now: now(),
+      });
+      logger.info({ roomCode: code, type, answer }, "request answered");
+      await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
+      return stampedView({ roomComponent, room, viewerId: identity.id, now });
+    },
+
+    async [SOCKET_EVENTS.ROOM_CLAIM_WIN](payload) {
       const { code } = parseRoomRef(payload);
-      const room = await roomComponent.declineRematch({ code, playerId: identity.id, now: now() });
-      logger.info({ roomCode: code }, "rematch declined");
+      const room = await roomComponent.claimWin({ code, playerId: identity.id, now: now() });
+      logger.info({ roomCode: code }, "win claimed");
       await broadcastRoom({ io, roomComponent, room, now, exceptSocketId: socket.id });
       return stampedView({ roomComponent, room, viewerId: identity.id, now });
     },
@@ -118,19 +156,24 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
 }
 
 /**
- * Marks the player disconnected in each room this socket was in — unless another of their sockets
- * (another tab) is still connected there.
+ * A socket closed. In each room it showed, the player is now away when another tab of theirs is still open on
+ * the site, and offline when none is, unless another tab still shows that room. Once their last tab is gone,
+ * the rooms where they were away count them as offline too (CC-158, CC-207).
  *
  * @param {{ io: import("socket.io").Server, roomComponent: any, playerId: string, channels: string[], now: () => number, logger: any }} args
  */
 export async function handleSocketGone({ io, roomComponent, playerId, channels, now, logger }) {
+  const online = (await io.in(playerChannel(playerId)).fetchSockets()).length > 0;
   for (const channel of channels) {
     const code = codeFromChannel(channel);
     if ((await playerSockets(io, code, playerId)).length > 0) {
       continue;
     }
     try {
-      const room = await roomComponent.playerDisconnected({ code, playerId, now: now() });
+      const input = { code, playerId, now: now() };
+      const room = online
+        ? await roomComponent.playerAway(input)
+        : await roomComponent.playerDisconnected(input);
       await broadcastRoom({ io, roomComponent, room, now });
     } catch (err) {
       // The room may have closed or the seat been given up meanwhile. Then there is nothing left to record.
@@ -138,5 +181,42 @@ export async function handleSocketGone({ io, roomComponent, playerId, channels, 
         logger.error({ err, roomCode: code }, "failed to record disconnect");
       }
     }
+  }
+  if (!online) {
+    // The rooms that changed are announced by the room component and pushed by the gateway.
+    await roomComponent
+      .playerOffline({ playerId, now: now() })
+      .catch((err) => logger.error({ err }, "failed to record that the player went offline"));
+  }
+}
+
+/**
+ * A player's socket connected: rooms where they were offline now count them as away, and this tab hears about
+ * every request still open in their rooms, so a question reaches them on whatever page they opened (CC-207).
+ *
+ * @param {{ socket: import("socket.io").Socket, roomComponent: any, now: () => number, logger: any }} args
+ */
+export async function handleSocketOnline({ socket, roomComponent, now, logger }) {
+  const playerId = socket.data.identity.id;
+  try {
+    await roomComponent.playerOnline({ playerId, now: now() });
+    for (const room of await roomComponent.roomsWithOpenRequests({ playerId, now: now() })) {
+      socket.emit(SOCKET_EVENTS.REQUEST_UPDATED, { ...roomComponent.requestsView(room), serverTime: now() });
+    }
+  } catch (err) {
+    logger.error({ err }, "failed to record that the player came online");
+  }
+}
+
+/**
+ * Tells every tab of a room's players about its requests whenever they open or end, on whatever page those tabs
+ * are (CC-207).
+ *
+ * @param {{ io: import("socket.io").Server, roomComponent: any, room: any, now: () => number }} args
+ */
+export function pushRequests({ io, roomComponent, room, now }) {
+  const payload = { ...roomComponent.requestsView(room), serverTime: now() };
+  for (const seat of room.seats) {
+    io.to(playerChannel(seat.playerId)).emit(SOCKET_EVENTS.REQUEST_UPDATED, payload);
   }
 }

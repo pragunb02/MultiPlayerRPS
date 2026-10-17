@@ -94,30 +94,55 @@ describe("Chess over sockets", () => {
     expect(ack.data.serverTime).toBe(now); // views carry server time, so clients can show drift-free clocks
   });
 
-  it("tells the offerer when the opponent declines a draw, and the game goes on (CC-104)", async () => {
+  it("tells the offerer when the opponent declines a draw, and the game goes on (CC-104, CC-159)", async () => {
     const { alice, bob, code } = await chessGame();
     const aliceSeesOffer = nextEvent(alice.socket);
-    await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "offer-draw" } });
-    expect((await aliceSeesOffer).game.view.drawOfferBy).toBe(bob.identity.id);
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "draw" });
+    expect((await aliceSeesOffer).requests).toEqual([
+      expect.objectContaining({ type: "draw", from: bob.identity.id, state: "open" }),
+    ]);
 
     const bobSeesAnswer = nextEvent(bob.socket);
-    await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "decline-draw" } });
+    await send(alice.socket, SOCKET_EVENTS.ROOM_ANSWER, { code, type: "draw", answer: "decline" });
 
     const answer = await bobSeesAnswer;
     expect(answer.status).toBe("playing");
-    expect(answer.game.view).toEqual(expect.objectContaining({ drawOfferBy: "", drawAnswer: "declined" }));
+    expect(answer.requests).toEqual([expect.objectContaining({ state: "declined" })]);
+    expect(answer.requestsLeft).toEqual({ draw: 2 });
     expect((await move(bob, code, "e2", "e4")).ok).toBe(true);
   });
 
-  it("tells the opponent when the offerer withdraws, and refuses accepting afterwards (CC-104)", async () => {
+  it("tells the opponent when the offerer withdraws, and refuses accepting afterwards (CC-104, CC-159)", async () => {
     const { alice, bob, code } = await chessGame();
-    await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "offer-draw" } });
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "draw" });
     const aliceSeesWithdrawal = nextEvent(alice.socket);
 
-    await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "withdraw-draw" } });
+    await send(bob.socket, SOCKET_EVENTS.ROOM_ANSWER, { code, type: "draw", answer: "withdraw" });
 
-    expect((await aliceSeesWithdrawal).game.view.drawAnswer).toBe("withdrawn");
-    const late = await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "accept-draw" } });
-    expect(late.error.details).toEqual({ reason: "ILLEGAL_MOVE" });
+    expect((await aliceSeesWithdrawal).requests).toEqual([expect.objectContaining({ state: "withdrawn" })]);
+    const late = await send(alice.socket, SOCKET_EVENTS.ROOM_ANSWER, {
+      code,
+      type: "draw",
+      answer: "accept",
+    });
+    expect(late.error.message).toBe("That request is no longer open");
+  });
+
+  it("ends the game in a draw by agreement once accepted", async () => {
+    const { alice, bob, code } = await chessGame();
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "draw" });
+
+    const accepted = await send(alice.socket, SOCKET_EVENTS.ROOM_ANSWER, {
+      code,
+      type: "draw",
+      answer: "accept",
+    });
+
+    expect(accepted.data.game.outcome).toEqual({
+      status: "finished",
+      result: "draw",
+      winners: [],
+      reason: "agreement",
+    });
   });
 });

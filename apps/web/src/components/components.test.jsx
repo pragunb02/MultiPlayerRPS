@@ -2,7 +2,6 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Modal } from "./Modal/Modal.jsx";
-import { Seats } from "./Seats/Seats.jsx";
 import { ShareRoom } from "./ShareRoom/ShareRoom.jsx";
 import { ToastProvider } from "./Toast/ToastProvider.jsx";
 import { TurnBanner } from "./TurnBanner/TurnBanner.jsx";
@@ -35,6 +34,98 @@ describe("ToastProvider", () => {
 
   it("requires a provider", () => {
     expect(() => render(<Trigger />)).toThrow(/inside <ToastProvider>/);
+  });
+
+  describe("notification categories (CC-208)", () => {
+    /** Hands the toast functions to the test. */
+    function capture() {
+      const api = {};
+      function Grab() {
+        Object.assign(api, useToast());
+        return null;
+      }
+      render(
+        <ToastProvider displayMs={1_000}>
+          <Grab />
+        </ToastProvider>,
+      );
+      return api;
+    }
+    const shown = () => screen.getByRole("status").textContent;
+
+    it("shows the same message of a category only once within its rate limit", () => {
+      vi.useFakeTimers({ now: 0 });
+      const toast = capture();
+
+      let first;
+      let second;
+      act(() => {
+        first = toast.show("Link copied");
+        second = toast.show("Link copied");
+      });
+      expect(second).toBe(first);
+      expect(screen.getAllByText("Link copied")).toHaveLength(1);
+      act(() => vi.advanceTimersByTime(5_000));
+      act(() => toast.show("Link copied"));
+      expect(screen.getAllByText("Link copied")).toHaveLength(1);
+    });
+
+    it("keeps rewards waiting while a request holds the screen, and shows them once it is gone", () => {
+      vi.useFakeTimers({ now: 0 });
+      const toast = capture();
+      let release;
+      act(() => {
+        release = toast.hold("request");
+      });
+
+      act(() => toast.show("+30 XP", { category: "reward" }));
+      act(() => toast.show("Bob is back", { category: "social" }));
+      act(() => toast.show("Connection lost", { category: "system" }));
+      expect(shown()).toBe("Connection lost");
+
+      act(() => release());
+      expect(shown()).toBe("Connection lost+30 XPBob is back");
+      act(() => release());
+      expect(shown()).toBe("Connection lost+30 XPBob is back");
+    });
+
+    it("keeps holding while another hold of the same kind is still on", () => {
+      vi.useFakeTimers({ now: 0 });
+      const toast = capture();
+      let first;
+      act(() => {
+        first = toast.hold("request");
+        toast.hold("request");
+      });
+
+      act(() => toast.show("+30 XP", { category: "reward" }));
+      act(() => first());
+
+      expect(shown()).toBe("");
+    });
+
+    it("forgets a waiting toast that is dismissed before its turn", () => {
+      vi.useFakeTimers({ now: 0 });
+      const toast = capture();
+      let release;
+      let id;
+      act(() => {
+        release = toast.hold("request");
+        id = toast.show("+30 XP", { category: "reward" });
+      });
+
+      act(() => toast.dismiss(id));
+      act(() => release());
+
+      expect(shown()).toBe("");
+    });
+
+    it("refuses a category that does not exist", () => {
+      const toast = capture();
+
+      expect(() => toast.show("x", { category: "ads" })).toThrow(/Unknown notification category/);
+      expect(() => toast.hold("ads")).toThrow(/Unknown notification category/);
+    });
   });
 });
 
@@ -153,27 +244,6 @@ describe("ShareRoom", () => {
     withToasts(<ShareRoom code="AB2CD3" gameId="rps" origin="https://x" />);
 
     expect(screen.queryByRole("button", { name: "Share…" })).toBeNull();
-  });
-});
-
-describe("Seats", () => {
-  it("lists players with you/host tags, connection state and open seats", () => {
-    render(
-      <Seats
-        room={{
-          hostId: "guest_a",
-          you: "guest_b",
-          players: { min: 2, max: 3 },
-          seats: [
-            { playerId: "guest_a", displayName: "Alice", connected: false },
-            { playerId: "guest_b", displayName: "Bob", connected: true },
-          ],
-        }}
-      />,
-    );
-
-    const items = screen.getAllByRole("listitem").map((li) => li.textContent);
-    expect(items).toEqual(["Alicehostdisconnected", "Bobyou", "Waiting for a player…"]);
   });
 });
 

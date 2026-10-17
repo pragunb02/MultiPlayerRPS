@@ -1,3 +1,5 @@
+import { ROOM_REQUEST_TYPES } from "@classicade/shared";
+
 /**
  * The contract every game implements. The server decides what happens in a game: it calls these pure functions
  * and never trusts a client's idea of the game. To add a game, implement this contract and register the engine.
@@ -33,9 +35,44 @@
  *   sets the timer, the engine never does.
  * @property {(state: State, ctx: MoveContext) => State} [expire]
  *   Optional, but required together with `deadline`. Applies the timed event once `ctx.now >= deadline(state)`.
+ * @property {number} [turnLimitMs]
+ *   Optional idle limit (CC-036): how long a player due to move may take once they have made their first move.
+ *   The room ends the game when it passes. Games with their own clock (chess) leave it out.
+ * @property {Readonly<Record<string, RequestType>>} [requestTypes]
+ *   Optional requests a player of this game may send the other during play (CC-159), such as a draw offer. The
+ *   room keeps them, so they expire, cool down and are answered the same way in every game.
+ * @property {(state: State, request: { type: string, from: PlayerId, to: PlayerId }, ctx: MoveContext) => State} [acceptRequest]
+ *   Optional, but required together with `requestTypes`. What accepting one of those requests does to the game.
+ *
+ * @typedef {Object} RequestType
+ * @property {number} lifetimeMs       how long the request stays open without an answer
+ * @property {number} limitPerPlayer   how many times one player may ask in one game
  */
 
 const OPTIONAL_TIME_HOOKS = ["deadline", "expire"];
+/** Request types the room itself offers. A game may not add one with the same name. */
+const ROOM_REQUEST_NAMES = new Set(Object.values(ROOM_REQUEST_TYPES));
+
+const isPositiveInteger = (value) => Number.isSafeInteger(value) && value > 0;
+
+/** What is wrong with an engine's optional request hooks, as a list of problems. */
+function requestProblems(engine) {
+  const { requestTypes, acceptRequest } = engine;
+  if (requestTypes === undefined && acceptRequest === undefined) {
+    return [];
+  }
+  if (typeof acceptRequest !== "function" || requestTypes === null || typeof requestTypes !== "object") {
+    return ["requestTypes and acceptRequest must be provided together"];
+  }
+  return Object.entries(requestTypes).flatMap(([type, rule]) => {
+    if (ROOM_REQUEST_NAMES.has(type)) {
+      return [`request type ${type} belongs to the room`];
+    }
+    return isPositiveInteger(rule?.lifetimeMs) && isPositiveInteger(rule?.limitPerPlayer)
+      ? []
+      : [`request type ${type} needs a positive lifetimeMs and limitPerPlayer`];
+  });
+}
 
 const REQUIRED_FUNCTIONS = [
   "validateOptions",
@@ -74,8 +111,22 @@ export function defineEngine(engine) {
   if (timeHooks.length > 0 && !OPTIONAL_TIME_HOOKS.every((name) => typeof engine[name] === "function")) {
     problems.push("deadline and expire must be provided together, as functions");
   }
+  if (engine?.turnLimitMs !== undefined && !isPositiveInteger(engine.turnLimitMs)) {
+    problems.push("turnLimitMs must be a positive number of milliseconds");
+  }
+  problems.push(...requestProblems(engine ?? {}));
   if (problems.length > 0) {
     throw new TypeError(`Invalid game engine "${engine?.id}": ${problems.join("; ")}`);
   }
-  return Object.freeze({ ...engine, players: Object.freeze({ min, max }) });
+  const requestTypes =
+    engine.requestTypes === undefined
+      ? {}
+      : {
+          requestTypes: Object.freeze(
+            Object.fromEntries(
+              Object.entries(engine.requestTypes).map(([type, rule]) => [type, Object.freeze({ ...rule })]),
+            ),
+          ),
+        };
+  return Object.freeze({ ...engine, ...requestTypes, players: Object.freeze({ min, max }) });
 }

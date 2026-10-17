@@ -9,6 +9,29 @@
  * @typedef {{ code: string, move: unknown }} GameMovePayload
  * @typedef {{ gameId: string, level: string, options?: Record<string, unknown> }} PlayComputerPayload   `level` is
  *   a level pick id of the game's character in BOT_CHARACTERS, such as "easy"
+ * @typedef {{ code: string, type: string }} RoomRequestPayload   `type` is ROOM_REQUEST_TYPES.REMATCH or a type
+ *   the game adds, such as CHESS_REQUEST_TYPES.DRAW
+ * @typedef {{ code: string, type: string, answer: string }} RoomAnswerPayload   `answer` is a REQUEST_ANSWERS value
+ *
+ * @typedef {Object} RoomRequest      something one player asked the other in a room (CC-159)
+ * @property {string} type            ROOM_REQUEST_TYPES or a type the game adds
+ * @property {string} from            the player id who asked
+ * @property {string} to              the player id who was asked
+ * @property {number} createdAt       server time in milliseconds
+ * @property {number} expiresAt       when an open request expires, server time
+ * @property {string} state           a REQUEST_STATES value
+ * @property {number} endedAt         when it stopped being open, 0 while open. Ended requests are kept for 10 s
+ *
+ * @typedef {Object} SeatView
+ * @property {string} playerId
+ * @property {string} displayName
+ * @property {boolean} connected      on the room page right now
+ * @property {string} presence        a PRESENCE value: here, away on another page of the site, or offline (CC-158)
+ * @property {number} since           server time when the presence last changed
+ * @property {{ character: string, level: string } | undefined} bot   marks a computer character (ADR-025), with
+ *   its character id and level pick from BOT_CHARACTERS
+ * @property {number} graceUntil      for an offline player in a game still on: when the opponent may claim the win
+ *   (CC-036). 0 otherwise
  *
  * @typedef {Object} RoomView        what one viewer may see of a room (personalised: hidden info stays hidden)
  * @property {string} code
@@ -16,24 +39,37 @@
  * @property {"waiting" | "playing" | "finished"} status
  * @property {string} hostId
  * @property {{ min: number, max: number }} players
- * @property {Array<{ playerId: string, displayName: string, connected: boolean, bot?: { character: string, level: string } }>} seats
- *   `bot` marks a computer character (ADR-025), with its character id and level pick from BOT_CHARACTERS
+ * @property {SeatView[]} seats
  * @property {{ locked: Array<{ playerId: string, commitment: string }>, checks: Array<{ playerId: string, commitment: string, text: string, salt: string }> } | undefined} fairness
  *   present in a game where a computer player sealed a move (CC-225). `locked` are moves chosen but not shown yet,
  *   each as its lock. `checks` are the shown ones: SHA-256 of `text:salt` in lowercase hexadecimal equals `commitment`
  * @property {string} you             the viewer's player id ("" for spectators)
- * @property {{ matchId: string, view: unknown, activePlayers: string[], outcome: object } | undefined} game   present
- *   once started. `matchId` names this game's match, the same id as in `progress:updated` (CC-235)
+ * @property {RoomRequest[]} requests open requests, and ended ones for 10 s so both players see the answer
+ * @property {Record<string, number>} requestsLeft   for each request type with a limit, how many more times the
+ *   viewer may ask in this game (the chess draw offer: 3 a game)
+ * @property {Record<string, number>} askAgainAt     for each request type the viewer asked recently, when they may
+ *   ask again (server time). Asking sooner is refused, so a "no" is not followed at once by the same question
+ * @property {{ matchId: string, view: unknown, activePlayers: string[], outcome: object, number: number, turnEndsAt: number } | undefined} game
+ *   present once started. `matchId` names this game's match, the same id as in `progress:updated` (CC-235).
+ *   `number` counts the games of the room from 1. `turnEndsAt` is when a player who has
+ *   not moved by then loses or the game is aborted (CC-036), 0 when no such limit runs
  * @property {number} serverTime      server clock (ms) when the view was produced, so client timers do not drift
  * @property {number} revision        counts the room's saved changes. A view with a lower revision than one already
  *   shown is older, because an update can overtake the answer to a request (CC-138)
- * @property {{ requestedBy: string[], available: boolean, until: number, declinedBy: string, leftName?: string } | undefined} rematch
- *   present once finished (CC-037): who asked to play again, whether a rematch can still happen (false once a player
- *   left), when the rematch window ends and the room closes (server time in milliseconds, CC-101), and who last said
- *   no to a request ("" when nobody did since the last request, CC-104). After a player left the finished game,
- *   `leftName` is their display name, because their seat is gone (CC-162).
+ * @property {{ available: boolean, until: number, leftName?: string } | undefined} rematch   present once finished
+ *   (CC-037): whether a rematch can still happen (false once a player left), and when the rematch window ends and
+ *   the room closes (server time in milliseconds, CC-101). After a player left the finished game, `leftName` is
+ *   their display name, because their seat is gone (CC-162).
  * @property {{ games: number, wins: Record<string, number> } | undefined} series   games finished in this room
  *   and wins per player id, across rematches
+ *
+ * @typedef {Object} SiteRequests     the requests of one room, pushed to every tab of its players whatever page
+ *   they are on (CC-207). It replaces whatever the tab knew about that room's requests
+ * @property {string} code            the room
+ * @property {string} gameId
+ * @property {Record<string, string>} names   display name of each seated player, by player id
+ * @property {RoomRequest[]} requests open requests, and ended ones for 10 s
+ * @property {number} serverTime
  */
 export const SOCKET_EVENTS = Object.freeze({
   /** Client sends, no payload. Answer: the identity bound to this connection's session. */
@@ -54,21 +90,36 @@ export const SOCKET_EVENTS = Object.freeze({
   /** Client sends `RoomCodePayload`. Answer: `{ left: true }`. Leaving forfeits a game in progress. */
   ROOM_LEAVE: "room:leave",
   /**
-   * Client sends `RoomCodePayload`. Answer: `RoomView`. Turns your rematch request in a finished room on or off.
-   * Once every seated player has asked, a new game starts in the same room with the seats reversed (CC-037).
+   * Client sends `RoomCodePayload` when it stops showing the room, because the player went to another page
+   * (CC-207). The seat stays theirs and the opponent sees them as away. Answer: `{ away: true }`.
    */
-  ROOM_REMATCH: "room:rematch",
+  ROOM_AWAY: "room:away",
   /**
-   * Client sends `RoomCodePayload`. Answer: `RoomView`. Says no to the opponent's rematch request (CC-104). Their
-   * request is dropped and they see who declined, and either player may still ask again later.
+   * Client sends `RoomRequestPayload`. Answer: `RoomView`. Asks the other player something (CC-159): a rematch
+   * after a finished game, or what the game adds, such as a draw offer. Asking for what the other player already
+   * asked you accepts it.
    */
-  ROOM_REMATCH_DECLINE: "room:rematch-decline",
+  ROOM_REQUEST: "room:request",
+  /** Client sends `RoomAnswerPayload`. Answer: `RoomView`. Accepts, declines or withdraws an open request. */
+  ROOM_ANSWER: "room:answer",
+  /**
+   * Client sends `RoomCodePayload`. Answer: `RoomView`. Claims the win of a game still on whose opponent has been
+   * offline for longer than the grace period (CC-036).
+   */
+  ROOM_CLAIM_WIN: "room:claim-win",
   /** Client sends `GameMovePayload`. Answer: `RoomView`. */
   GAME_MOVE: "game:move",
   /** Server sends a `RoomView` after any change in a room you are in. */
   ROOM_UPDATED: "room:updated",
   /** Server sends `{ code, reason }` when a room is closed. The `reason` is a ROOM_CLOSE_REASONS value. */
   ROOM_CLOSED: "room:closed",
+  /**
+   * Server sends `SiteRequests` to every tab of a room's players whenever a request between them opens or ends,
+   * and on connecting for every room with a request still open (CC-207).
+   */
+  REQUEST_UPDATED: "request:updated",
+  /** Server sends `{}` to everyone just before it stops for a restart (CC-158). Rooms are kept and rejoined. */
+  SERVER_RESTARTING: "server:restarting",
   /**
    * Server sends `{ source: "match" | "quest", key, matchId, xpGained, leveledUp, progress }` after XP was awarded.
    * `key` is the match id or the quest key (`quest:<day>:<questId>` or `quest:<day>:sweep`). `matchId` is "" for quests.

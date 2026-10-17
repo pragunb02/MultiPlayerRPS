@@ -1,5 +1,5 @@
 import { GAME_IDS } from "@classicade/shared";
-import { chessNotices, chessReasonPhrase, chessRequests, chessSounds } from "./chess/chessAlerts.js";
+import { CHESS_REQUEST_TEXTS, chessReasonPhrase, chessSounds } from "./chess/chessAlerts.js";
 import { ChessOptions } from "./chess/ChessOptions.jsx";
 import { lazyBoard } from "./lazyBoard.js";
 import { rpsReasonPhrase, rpsSounds } from "./rps/rpsAlerts.js";
@@ -17,10 +17,8 @@ const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard
  * @property {import("react").ComponentType<any>} [Board]    the board in a room
  * @property {(previous: any, next: any, you: string) => string[]} [soundsFor]  the sounds a change of the game
  *   makes, as ids from SOUNDS (CC-103)
- * @property {(room: any) => import("./roomUpdates.js").RoomRequest[]} [requests]  questions a player of this
- *   game can ask the other, such as a draw offer (CC-104)
- * @property {(previous: any, next: any, you: string) => string[]} [notices]  what to tell the viewer when such a
- *   question was answered (CC-104)
+ * @property {Readonly<Record<string, import("./roomUpdates.js").RequestTexts>>} [requestTexts]  the words for
+ *   the requests a player of this game can send the other during play, such as a draw offer (CC-159)
  * @property {(reason: string) => string} [reasonPhrase]  how a game ended, worded to follow "You won" or "Draw"
  *   in the result headline, such as "by checkmate" (CC-162)
  */
@@ -47,8 +45,7 @@ export const GAME_VIEWS = Object.freeze({
     Options: ChessOptions,
     Board: ChessBoard,
     soundsFor: chessSounds,
-    requests: chessRequests,
-    notices: chessNotices,
+    requestTexts: CHESS_REQUEST_TEXTS,
     reasonPhrase: chessReasonPhrase,
   }),
 });

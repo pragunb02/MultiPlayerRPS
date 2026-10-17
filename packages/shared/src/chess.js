@@ -10,26 +10,16 @@ export const CHESS_TIME_CONTROLS = Object.freeze({
 });
 export const DEFAULT_CHESS_TIME_CONTROL = "blitz-5+0";
 
-/** Actions a chess player can send as `move.type`. */
+/** Actions a chess player can send as `move.type`. Draw offers are room requests (CHESS_REQUEST_TYPES). */
 export const CHESS_ACTIONS = Object.freeze({
   MOVE: "move",
   RESIGN: "resign",
-  OFFER_DRAW: "offer-draw",
-  ACCEPT_DRAW: "accept-draw",
-  /** the opponent says no to a standing draw offer (CC-104) */
-  DECLINE_DRAW: "decline-draw",
-  /** the player who offered a draw takes the offer back (CC-104) */
-  WITHDRAW_DRAW: "withdraw-draw",
 });
 
-/**
- * How the last draw offer ended without a draw (the chess view's `drawAnswer`, CC-104): "" while an offer stands or
- * none was made, "declined" by the opponent (pressing Decline or simply moving), or "withdrawn" by the offerer.
- */
-export const CHESS_DRAW_ANSWERS = Object.freeze({
-  NONE: "",
-  DECLINED: "declined",
-  WITHDRAWN: "withdrawn",
+/** Requests a chess player can send the other through the room (CC-159). */
+export const CHESS_REQUEST_TYPES = Object.freeze({
+  /** the game ends in a draw by agreement once the opponent accepts */
+  DRAW: "draw",
 });
 
 export const CHESS_PROMOTIONS = Object.freeze(["q", "r", "b", "n"]);

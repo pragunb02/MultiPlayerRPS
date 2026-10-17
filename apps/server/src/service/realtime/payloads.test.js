@@ -5,7 +5,9 @@ import {
   parseGameMove,
   parseLeaveRoom,
   parsePlayComputer,
+  parseRoomAnswer,
   parseRoomRef,
+  parseRoomRequest,
 } from "./payloads.js";
 
 describe("socket payload validation", () => {
@@ -104,6 +106,45 @@ describe("socket payload validation", () => {
       { gameId: "rps", level: "easy", options: [] },
     ])("rejects %j", (raw) => {
       expect(() => parsePlayComputer(raw)).toThrow(ValidationError);
+    });
+  });
+
+  describe("parseRoomRequest (CC-159)", () => {
+    it("normalises the room code and keeps the type for the domain to judge", () => {
+      expect(parseRoomRequest({ code: "ab2cd3", type: "rematch" })).toEqual({
+        code: "AB2CD3",
+        type: "rematch",
+      });
+    });
+
+    it.each([
+      { code: "AB2CD3" },
+      { code: "AB2CD3", type: 7 },
+      { code: "AB2CD3", type: "Rematch" },
+      { code: "AB2CD3", type: "x".repeat(40) },
+      { code: "AB2CD3", type: "draw", playerId: "guest_x" },
+      { code: "bad", type: "draw" },
+    ])("rejects %j", (raw) => {
+      expect(() => parseRoomRequest(raw)).toThrow(ValidationError);
+    });
+  });
+
+  describe("parseRoomAnswer (CC-159)", () => {
+    it.each(["accept", "decline", "withdraw"])("accepts the answer %s", (answer) => {
+      expect(parseRoomAnswer({ code: "AB2CD3", type: "draw", answer })).toEqual({
+        code: "AB2CD3",
+        type: "draw",
+        answer,
+      });
+    });
+
+    it.each([
+      { code: "AB2CD3", type: "draw" },
+      { code: "AB2CD3", type: "draw", answer: "maybe" },
+      { code: "AB2CD3", type: "draw", answer: "accept", from: "guest_x" },
+      { code: "AB2CD3", type: "Draw", answer: "accept" },
+    ])("rejects %j", (raw) => {
+      expect(() => parseRoomAnswer(raw)).toThrow(ValidationError);
     });
   });
 });

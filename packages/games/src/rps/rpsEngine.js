@@ -40,6 +40,8 @@ const fill = (players, value) => Object.fromEntries(players.map((p) => [p, value
 export const rpsEngine = defineEngine({
   id: GAME_IDS.RPS,
   players: { min: 2, max: 2 },
+  // Choosing a hand takes a moment, so half a minute without a choice means the player has gone (CC-036).
+  turnLimitMs: 30_000,
 
   validateOptions(raw) {
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
