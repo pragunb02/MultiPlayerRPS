@@ -290,7 +290,11 @@ describe("progressionComponent: a guest's progress moving to their account (CC-0
     await matchAccessor.judgeOnce({ matchId: "m-won", credit: withdrawn });
     await matchAccessor.judgeOnce({ matchId: "m-lost", credit: withdrawn });
 
-    const { moved: carried } = await progression.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 + 5 });
+    const { moved: carried } = await progression.transferPlayer({
+      from: "guest_a",
+      to: ACCOUNT,
+      now: T0 + 5,
+    });
 
     expect(carried).toEqual({ xp: 30, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 });
     expect(await progression.getProgress(ACCOUNT.id)).toEqual(expect.objectContaining({ xp: 30, wins: 1 }));

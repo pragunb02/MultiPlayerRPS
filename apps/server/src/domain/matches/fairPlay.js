@@ -53,7 +53,8 @@ export function utcDayOf(at) {
  */
 export function endedTooSoon(match) {
   const moves = match.players.map(
-    ({ playerId }) => match.log.filter((entry) => entry.kind === "move" && entry.playerId === playerId).length,
+    ({ playerId }) =>
+      match.log.filter((entry) => entry.kind === "move" && entry.playerId === playerId).length,
   );
   const someoneNeverMoved = moves.some((count) => count === 0);
   const leftEarly =

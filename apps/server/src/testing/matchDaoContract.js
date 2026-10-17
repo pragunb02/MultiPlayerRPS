@@ -162,7 +162,9 @@ export function runMatchDaoContract(createDao) {
     const dao = await createDao();
     await dao.insert(matchDoc());
     const credit = { notCounted: [{ playerId: "user_1", reason: "hourly-limit", withdrawnFrom: "guest_a" }] };
-    const renamed = matchDoc({ players: [{ playerId: "user_1", displayName: "Riya" }, matchDoc().players[1]] });
+    const renamed = matchDoc({
+      players: [{ playerId: "user_1", displayName: "Riya" }, matchDoc().players[1]],
+    });
 
     await dao.renamePlayer({ matchId: matchDoc().matchId, from: "guest_a", doc: { ...renamed, credit } });
 

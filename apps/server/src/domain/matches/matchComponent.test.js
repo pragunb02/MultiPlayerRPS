@@ -106,7 +106,11 @@ describe("matchComponent: judging whether a match counts (CC-095)", () => {
     move: {},
     at: T0,
   }));
-  const finished = (matches, matchId, { log = twoMovesEach, endedAt = T0 + 9_000, seats = [ALICE, BOB] } = {}) =>
+  const finished = (
+    matches,
+    matchId,
+    { log = twoMovesEach, endedAt = T0 + 9_000, seats = [ALICE, BOB] } = {},
+  ) =>
     matches.recordFinished({
       room: room({ seats, lastActivityAt: endedAt, game: { ...room().game, matchId, log } }),
       outcome: WIN_A,

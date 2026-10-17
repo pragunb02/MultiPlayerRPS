@@ -54,14 +54,14 @@ async function eventually(probe, timeoutMs = 5_000) {
 
 const freshConfig = () => testConfig({ MONGO_URI: mongo.uri(`it-${++dbCounter}`) });
 
-async function start(config = freshConfig()) {
+async function start(config = freshConfig(), { now } = {}) {
   const capture = captureLogger();
   // A failing test shows what the server saw (refused sockets, session lookups) — rare flakes explain themselves.
   onTestFailed(() => {
     process.stderr.write(`\n--- server log (${config.mongoUri.split("/").pop()}) ---\n`);
     capture.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`));
   });
-  const app = await startServer({ config, logger: capture.logger });
+  const app = await startServer({ config, logger: capture.logger, ...(now === undefined ? {} : { now }) });
   return { ...app, ...capture, config, url: `http://127.0.0.1:${app.port}` };
 }
 
@@ -287,6 +287,54 @@ describe("games through the real composition root (integration)", () => {
       expect(stored.filter((u) => u.playerId === alice.identity.id)).toHaveLength(2);
       expect(await readCollection(app.config.mongoUri, "player_stats")).toHaveLength(2);
       expect(await readCollection(app.config.mongoUri, "player_quests")).toHaveLength(2);
+    } finally {
+      players.forEach((p) => p.socket.disconnect());
+      await app.close();
+    }
+  });
+  it("records a game left before anyone played, and gives nobody XP, a win or an achievement for it (CC-095)", async () => {
+    const app = await start();
+    const players = [];
+    try {
+      const alice = await connectedGuest(app.url);
+      const bob = await connectedGuest(app.url);
+      players.push(alice, bob);
+      const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
+      const pushed = new Promise((resolve) => alice.socket.once(SOCKET_EVENTS.PROGRESS_UPDATED, resolve));
+      const api = async (path) =>
+        await (await fetch(`${app.url}/api${path}`, { headers: { cookie: alice.cookie } })).json();
+
+      const { data: room } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+        gameId: "tictactoe",
+        options: {},
+      });
+      await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
+      await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code: room.code });
+
+      expect(await pushed).toEqual(
+        expect.objectContaining({ xpGained: 0, counted: false, notCountedReason: "ended-too-soon" }),
+      );
+      const [stored] = await eventually(async () => {
+        const docs = await readCollection(app.config.mongoUri, "matches");
+        return docs[0]?.credit === undefined ? undefined : docs;
+      });
+      expect(stored.result.winners).toEqual([alice.identity.id]);
+      expect(stored.credit.notCounted.map((entry) => entry.reason)).toEqual([
+        "ended-too-soon",
+        "ended-too-soon",
+      ]);
+      expect((await api("/progress")).progress).toEqual(
+        expect.objectContaining({ xp: 0, wins: 0, matchesPlayed: 0 }),
+      );
+      const [summary] = (await api("/matches")).matches;
+      expect(summary).toEqual(
+        expect.objectContaining({
+          outcomeForYou: "win",
+          countsForYou: { counted: false, reason: "ended-too-soon" },
+        }),
+      );
+      const { achievements } = await api("/achievements");
+      expect(achievements.filter((a) => a.unlockedAt !== null)).toEqual([]);
     } finally {
       players.forEach((p) => p.socket.disconnect());
       await app.close();
@@ -582,6 +630,66 @@ describe("a guest's progress moving to their account through the real compositio
       await app.close();
     }
   });
+  it("stops counting the guest's games past the daily limit with one opponent once they join the account (CC-095)", async () => {
+    // Half past ten UTC, moving on in real time: every game falls in one hour and one day.
+    const startedAt = Date.now();
+    const app = await start(freshConfig(), {
+      now: () => Date.parse("2026-10-16T10:30:00Z") + Date.now() - startedAt,
+    });
+    const sockets = [];
+    const pause = () => new Promise((resolve) => setTimeout(resolve, 150));
+    try {
+      const signup = await fetch(`${app.url}/api/auth/signup`, {
+        method: "POST",
+        headers: json,
+        body: JSON.stringify(RIYA),
+      });
+      const accountCookie = signup.headers.get("set-cookie").split(";")[0];
+      const account = connect(app.url, {
+        transports: ["websocket"],
+        extraHeaders: { cookie: accountCookie },
+        reconnection: false,
+      });
+      await new Promise((resolve) => account.once("connect", resolve));
+      const rival = await guest(app.url);
+      const visitor = await guest(app.url);
+      sockets.push(account, rival.socket, visitor.socket);
+      for (let game = 0; game < 6; game += 1) {
+        await play({ socket: account }, rival);
+        await pause();
+      }
+      await progressOf(app.url, accountCookie, 6);
+      for (let game = 0; game < 6; game += 1) {
+        await play(visitor, rival);
+        await pause();
+      }
+      await progressOf(app.url, visitor.cookie, 6);
+
+      const login = await fetch(`${app.url}/api/auth/login`, {
+        method: "POST",
+        headers: { ...json, cookie: visitor.cookie },
+        body: JSON.stringify({ email: RIYA.email, password: RIYA.password }),
+      });
+      const cookie = login.headers.get("set-cookie").split(";")[0];
+      const { matches } = await api(app.url, "/matches?limit=50", cookie);
+
+      // Ten counted games with that opponent today, never twelve. All twelve stay in the history.
+      expect((await login.json()).carriedOver).toEqual(
+        expect.objectContaining({ matchesPlayed: 4, matches: 6 }),
+      );
+      expect((await api(app.url, "/progress", cookie)).progress).toEqual(
+        expect.objectContaining({ matchesPlayed: 10, wins: 10 }),
+      );
+      expect(matches).toHaveLength(12);
+      expect(matches.filter((m) => !m.countsForYou.counted).map((m) => m.countsForYou.reason)).toEqual([
+        "opponent-daily-limit",
+        "opponent-daily-limit",
+      ]);
+    } finally {
+      sockets.forEach((socket) => socket.disconnect());
+      await app.close();
+    }
+  }, 20_000);
 });
 
 describe("leaderboards and rematches through the real composition root (integration, CC-053, CC-037)", () => {

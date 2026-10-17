@@ -94,7 +94,9 @@ describe("matchAccessor", () => {
 
   it("lists the games withdrawn from a guest as domain models", async () => {
     const matches = setup();
-    const credit = { notCounted: [{ playerId: "guest_a", reason: "hourly-limit", withdrawnFrom: "guest_z" }] };
+    const credit = {
+      notCounted: [{ playerId: "guest_a", reason: "hourly-limit", withdrawnFrom: "guest_z" }],
+    };
     await matches.record(match());
     await matches.judgeOnce({ matchId: match().matchId, credit });
 

@@ -82,7 +82,10 @@ export function createProgressAccessor({ progressDao }) {
       const when = new Date(at);
       const marked = await markMerged({ from, to, at: when });
       const totals = Object.fromEntries(
-        Object.entries(marked.totals).map(([field, value]) => [field, Math.max(0, value - (withdraw[field] ?? 0))]),
+        Object.entries(marked.totals).map(([field, value]) => [
+          field,
+          Math.max(0, value - (withdraw[field] ?? 0)),
+        ]),
       );
       const { recentMatchIds } = marked;
       const { applied } = await progressDao.addMerged({ to, from, totals, recentMatchIds, at: when });

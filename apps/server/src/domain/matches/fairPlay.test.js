@@ -62,7 +62,11 @@ describe("endedTooSoon", () => {
     ["nobody moved", match({ log: [] }), true],
     ["left before moving", leftBy(B, [move(A)]), true],
     ["left after one move each", leftBy(B, [move(A), move(B)]), true],
-    ["left once the leaver made two moves but the other only one", leftBy(B, [move(A), move(B), move(B)]), true],
+    [
+      "left once the leaver made two moves but the other only one",
+      leftBy(B, [move(A), move(B), move(B)]),
+      true,
+    ],
     ["left after two moves each", leftBy(B, [move(A), move(B), move(A), move(B)]), false],
   ])("%s: %s", (_case, m, expected) => {
     expect(endedTooSoon(m)).toBe(expected);

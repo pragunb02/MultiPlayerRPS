@@ -198,7 +198,9 @@ export function createGamificationComponent({
      * @param {{ match: Readonly<import("../../data/matchAccessor.js").Match>, now: number }} input
      */
     async applyMatch({ match, now }) {
-      for (const { playerId, displayName } of match.players.filter((p) => creditFor(match, p.playerId).counted)) {
+      for (const { playerId, displayName } of match.players.filter(
+        (p) => creditFor(match, p.playerId).counted,
+      )) {
         await applyForPlayer({ match, playerId, displayName, now });
       }
     },
@@ -256,16 +258,18 @@ export function createGamificationComponent({
       const guest = await getStats(from);
       const history = await historyOf(playerId);
       // Only the games that count for the account (CC-095), so merged stats stay within the fair play limits.
-      const rebuilt = history.filter((match) => creditFor(match, playerId).counted).reduce(
-        (stats, match) =>
-          applyMatchToStats(stats, {
-            gameId: match.gameId,
-            result: resultFor(match, playerId),
-            reason: match.result.reason,
-            endedAt: match.endedAt,
-          }),
-        emptyStats(playerId),
-      );
+      const rebuilt = history
+        .filter((match) => creditFor(match, playerId).counted)
+        .reduce(
+          (stats, match) =>
+            applyMatchToStats(stats, {
+              gameId: match.gameId,
+              result: resultFor(match, playerId),
+              reason: match.result.reason,
+              endedAt: match.endedAt,
+            }),
+          emptyStats(playerId),
+        );
       const stats = await gamificationAccessor.rewriteStats({
         playerId,
         at: now,

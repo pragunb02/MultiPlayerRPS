@@ -122,7 +122,9 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
     const progress = setup();
     await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} });
 
-    await expect(progress.mergeInto({ from: "guest_a", to: "user_2", at: 2, withdraw: {} })).rejects.toThrow(ConflictError);
+    await expect(progress.mergeInto({ from: "guest_a", to: "user_2", at: 2, withdraw: {} })).rejects.toThrow(
+      ConflictError,
+    );
   });
 
   it("passes unexpected storage failures through", async () => {
@@ -135,7 +137,9 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
       },
     });
 
-    await expect(progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} })).rejects.toBe(failure);
+    await expect(progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} })).rejects.toBe(
+      failure,
+    );
   });
 
   it("counts a match that finished during the move for the account", async () => {

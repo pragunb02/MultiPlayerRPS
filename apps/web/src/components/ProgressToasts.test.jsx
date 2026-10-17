@@ -58,4 +58,26 @@ describe("ProgressToasts level-up burst", () => {
 
     expect(burst()).toBeNull();
   });
+
+  it("says why a match didn't count, instead of XP (CC-095)", async () => {
+    const socket = fakeSocket();
+    renderApp({ socket });
+    await screen.findByRole("heading", { name: /Play the classics/ });
+
+    act(() =>
+      socket.push("progress:updated", {
+        source: "match",
+        xpGained: 0,
+        leveledUp: false,
+        progress: { level: 1 },
+        counted: false,
+        notCountedReason: "opponent-daily-limit",
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "This game didn't count: daily limit with this opponent reached",
+    );
+    expect(screen.getByRole("status")).not.toHaveTextContent("XP");
+  });
 });
