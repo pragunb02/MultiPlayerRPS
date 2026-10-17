@@ -41,19 +41,19 @@ async function expectChipToFollowProgress(page) {
 }
 
 /**
- * After Alice's first win, waits for her level-up — or wins once more for it. Level 2 starts at 50 XP and a win is
- * 30, so the second win always gets there; a quest bonus on the first win can get there sooner.
+ * After Alice's first win, waits for her level-up, or wins once more for it. Level 2 starts at 50 XP and a win is
+ * 30, so the second win always gets there. A quest bonus on the first win can get there sooner. Whether it did is
+ * only known once the server has finished the first win's work: its match XP and its quests reached the browser.
+ * The quest bonus XP is sent before the quests, so by then any level-up from the first win has arrived too.
  */
 async function untilLevelTwo(alice, bob) {
-  const levelUp = toast(alice.page, "Level up! You reached level 2");
-  const already = await levelUp
-    .waitFor({ state: "attached", timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!already) {
+  const frames = (text) => alice.record.socketFrames.filter((frame) => frame.includes(text));
+  const firstWinDone = () => frames('"progress:updated"').length > 0 && frames('"quests:updated"').length > 0;
+  await expect.poll(firstWinDone, { timeout: 15_000 }).toBe(true);
+  if (frames('"leveledUp":true').length === 0) {
     await aliceBeatsBob(alice, bob);
   }
-  return levelUp;
+  return toast(alice.page, "Level up! You reached level 2");
 }
 
 const animationCount = (page) => page.evaluate(() => document.getAnimations().length);

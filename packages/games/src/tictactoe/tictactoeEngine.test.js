@@ -65,7 +65,7 @@ describe("tictactoeEngine rules", () => {
     expect(bobStarts).toBeLessThan(600);
   });
 
-  // X (bob) completes `line`; O plays the two `blockers`, which never form a line or block X.
+  // X (bob) completes `line`. O plays the two `blockers`, which never form a line or block X.
   it.each([
     [
       [0, 1, 2],

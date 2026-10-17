@@ -1,7 +1,8 @@
 /**
  * Socket.IO event contracts shared by server and web. Never use string literals for events.
  *
- * Client → server events are acknowledged with `{ ok: true, data } | { ok: false, error: { code, message, details? } }`.
+ * The server answers every event a client sends with `{ ok: true, data } | { ok: false, error: { code, message, details? } }`.
+ * Below, "client sends" names the payload and the `data` of the answer. "Server sends" names what the client receives.
  *
  * @typedef {{ gameId: string, options?: Record<string, unknown> }} RoomCreatePayload
  * @typedef {{ code: string }} RoomCodePayload
@@ -16,7 +17,7 @@
  * @property {Array<{ playerId: string, displayName: string, connected: boolean }>} seats
  * @property {string} you             the viewer's player id ("" for spectators)
  * @property {{ view: unknown, activePlayers: string[], outcome: object } | undefined} game   present once started
- * @property {number} serverTime      server clock (ms) when the view was produced — for drift-free timers
+ * @property {number} serverTime      server clock (ms) when the view was produced, so client timers do not drift
  * @property {{ requestedBy: string[], available: boolean, until: number } | undefined} rematch   present once
  *   finished (CC-037): who asked to play again, whether a rematch can still happen (false once a player left), and
  *   when the rematch window ends and the room closes (server time in milliseconds, CC-101)
@@ -24,38 +25,41 @@
  *   and wins per player id, across rematches
  */
 export const SOCKET_EVENTS = Object.freeze({
-  /** client → server: returns the identity bound to this connection's session */
+  /** Client sends, no payload. Answer: the identity bound to this connection's session. */
   IDENTITY_GET: "identity:get",
-  /** client → server, RoomCreatePayload → RoomView */
+  /** Client sends `RoomCreatePayload`. Answer: `RoomView`. */
   ROOM_CREATE: "room:create",
   /**
-   * client to server: sends RoomCodePayload and answers RoomView. Also used to rejoin after a reconnect. For a day
-   * after a room closed, joining it answers GONE with details `{ reason, gameId, closedAt }`, where `reason` is a
+   * Client sends `RoomCodePayload`. Answer: `RoomView`. Also used to rejoin after a reconnect. For a day after a
+   * room closed, joining it answers GONE with details `{ reason, gameId, closedAt }`, where `reason` is a
    * ROOM_CLOSE_REASONS value (CC-101).
    */
   ROOM_JOIN: "room:join",
-  /** client → server, RoomCodePayload → { left: true } (forfeits a game in progress) */
+  /** Client sends `RoomCodePayload`. Answer: `{ left: true }`. Leaving forfeits a game in progress. */
   ROOM_LEAVE: "room:leave",
   /**
-   * client → server, RoomCodePayload → RoomView: toggles your rematch request in a finished room; once every
-   * seated player asked, a new game starts in the same room with the seats reversed (CC-037)
+   * Client sends `RoomCodePayload`. Answer: `RoomView`. Turns your rematch request in a finished room on or off.
+   * Once every seated player has asked, a new game starts in the same room with the seats reversed (CC-037).
    */
   ROOM_REMATCH: "room:rematch",
-  /** client → server, GameMovePayload → RoomView */
+  /** Client sends `GameMovePayload`. Answer: `RoomView`. */
   GAME_MOVE: "game:move",
-  /** server → client: RoomView after any change in a room you are in */
+  /** Server sends a `RoomView` after any change in a room you are in. */
   ROOM_UPDATED: "room:updated",
-  /** server to client: `{ code, reason }` when a room is closed. The `reason` is a ROOM_CLOSE_REASONS value. */
+  /** Server sends `{ code, reason }` when a room is closed. The `reason` is a ROOM_CLOSE_REASONS value. */
   ROOM_CLOSED: "room:closed",
   /**
-   * server → client, after XP was awarded: { source: "match" | "quest", key, matchId, xpGained, leveledUp, progress }.
-   * `key` is the match id or the quest key (`quest:<day>:<questId>` / `quest:<day>:sweep`); `matchId` is "" for quests.
+   * Server sends `{ source: "match" | "quest", key, matchId, xpGained, leveledUp, progress }` after XP was awarded.
+   * `key` is the match id or the quest key (`quest:<day>:<questId>` or `quest:<day>:sweep`). `matchId` is "" for quests.
    */
   PROGRESS_UPDATED: "progress:updated",
-  /** server → client: { achievements: Achievement[] } — newly unlocked only (same shape as GET /api/achievements items) */
+  /**
+   * Server sends `{ achievements: Achievement[] }` with only the newly unlocked achievements. Each item is shaped
+   * like an item of `GET /api/achievements`.
+   */
   ACHIEVEMENTS_UNLOCKED: "achievements:unlocked",
-  /** server → client: { quests: QuestsView } after any quest progress (same shape as GET /api/quests) */
+  /** Server sends `{ quests: QuestsView }` after any quest progress (shaped like `GET /api/quests`). */
   QUESTS_UPDATED: "quests:updated",
-  /** server → client: { streaks: StreaksView } after a counted match (same shape as GET /api/streaks) */
+  /** Server sends `{ streaks: StreaksView }` after a counted match (shaped like `GET /api/streaks`). */
   STREAKS_UPDATED: "streaks:updated",
 });

@@ -18,7 +18,7 @@ const BEATS = Object.freeze({
  * @property {number} bestOf
  * @property {number} winsNeeded
  * @property {Record<string, string>} pending   this round's secret choices ("" = not chosen yet)
- * @property {Array<{ choices: Record<string, string>, winner: string }>} rounds  resolved rounds; winner "" = draw
+ * @property {Array<{ choices: Record<string, string>, winner: string }>} rounds  finished rounds. winner is "" for a draw.
  * @property {Record<string, number>} score
  * @property {string} winner                     "" until someone reaches winsNeeded
  */
@@ -34,7 +34,7 @@ function roundWinner([a, b], choices) {
 const fill = (players, value) => Object.fromEntries(players.map((p) => [p, value]));
 
 /**
- * Rock Paper Scissors, best of N. Both players choose simultaneously; a choice stays secret until both
+ * Rock Paper Scissors, best of N. Both players choose at the same time, and a choice stays secret until both
  * have chosen. Drawn rounds are replayed and do not count towards the match.
  */
 export const rpsEngine = defineEngine({
@@ -109,7 +109,7 @@ export const rpsEngine = defineEngine({
         };
   },
 
-  /** Your own pending choice is visible to you; anyone else's only as "has chosen". */
+  /** You see your own choice for this round. For anyone else you only see that they have chosen. */
   viewFor(state, viewer) {
     return {
       bestOf: state.bestOf,

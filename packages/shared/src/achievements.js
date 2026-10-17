@@ -1,7 +1,7 @@
 import { GAME_IDS, GAMES } from "./games.js";
 import { xpForLevel } from "./progression.js";
 
-/** How rare an achievement is; the UI colours badges by tier. */
+/** How rare an achievement is. The UI colours badges by tier. */
 export const ACHIEVEMENT_TIERS = Object.freeze({
   BRONZE: "bronze",
   SILVER: "silver",
@@ -34,7 +34,7 @@ export const winsOfMetric = (gameId) => `winsByGame.${gameId}`;
 
 /**
  * @typedef {Object} AchievementInfo
- * @property {string} id           stable, stored with every unlock — never reused
+ * @property {string} id           stable and stored with every unlock, so it is never reused
  * @property {string} name
  * @property {string} description
  * @property {string} icon         icon name the web app draws (unknown names fall back to a star)

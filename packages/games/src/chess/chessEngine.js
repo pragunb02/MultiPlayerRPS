@@ -28,11 +28,11 @@ const FLAG = "flag";
  * @property {string} timeControl
  * @property {number} incrementMs
  * @property {Record<Color, number>} clocks       remaining ms per side, as of `lastMoveAt`
- * @property {number} lastMoveAt                  time of the last move; 0 until White's first move (clocks not running)
+ * @property {number} lastMoveAt                  time of the last move, or 0 before White's first move (the clocks start then)
  * @property {Array<{ from: string, to: string, san: string, at: number, promotion?: string }>} moves
  * @property {string} fen                         current position (derived from `moves`, kept for fast validation)
  * @property {string} drawOfferBy                 player id with a standing draw offer, or ""
- * @property {{ reason: string, winner: string }} end   reason "" while the game is on; winner "" for draws
+ * @property {{ reason: string, winner: string }} end   reason is "" while the game is on. winner is "" for a draw.
  */
 
 const opposite = (color) => (color === "w" ? "b" : "w");
@@ -116,8 +116,8 @@ function validateBoardMove(state, raw) {
 }
 
 /**
- * Chess with server-side clocks. Rules come from chess.js; clocks, resignation and draw offers are
- * handled here. Running out of time is detected both when a late move arrives and via the `deadline`
+ * Chess with server-side clocks. The rules of the board come from chess.js. Clocks, resignation and draw offers
+ * are handled here. Running out of time is detected both when a late move arrives and via the `deadline`
  * hook, so a player who stops moving still loses on time.
  */
 export const chessEngine = defineEngine({
@@ -225,7 +225,7 @@ export const chessEngine = defineEngine({
           lastMoveAt: now,
           moves: [...state.moves, { ...played, san, at: now }],
           fen: chess.fen(),
-          // Moving instead of answering declines the opponent's offer; your own offer stands.
+          // Moving instead of answering declines the opponent's draw offer. Your own offer stays open.
           drawOfferBy: state.drawOfferBy === opponent ? "" : state.drawOfferBy,
           end: boardEnd(chess, playerId),
         };
@@ -247,7 +247,7 @@ export const chessEngine = defineEngine({
         };
   },
 
-  /** Everything is public in chess; clients run the visible clock from `clocks`, `lastMoveAt` and `toMove`. */
+  /** Nothing is secret in chess. Clients run the visible clock from `clocks`, `lastMoveAt` and `toMove`. */
   viewFor(state) {
     const last = state.moves.at(-1);
     return {

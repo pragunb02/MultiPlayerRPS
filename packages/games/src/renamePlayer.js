@@ -1,5 +1,5 @@
 /**
- * Replaces a player id everywhere in a game's state — as a value and as an object key — and returns a new value.
+ * Replaces a player id everywhere in a game's state, both as a value and as an object key, and returns a new value.
  * Used when a guest signs in mid-game and their seat becomes their account's (CC-083). Safe because engine state
  * is plain JSON (a contract check) and player ids are unique, unguessable strings, so an id can't collide with any
  * other value. Every engine must keep working after a rename: the contract kit plays a game with one.

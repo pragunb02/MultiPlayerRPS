@@ -45,7 +45,7 @@ export function gameForSlug(segment) {
 /**
  * @typedef {Object} PageInfo
  * @property {boolean} found        false when no page lives at this URL (the server answers 404)
- * @property {string} title         the page's name in a link preview, e.g. "Join my Chess game on ClassiCade"
+ * @property {string} title         the page's name in a link preview, such as "Join my Chess game on ClassiCade"
  * @property {string} description   one or two plain sentences for search results and previews
  * @property {string} path          the page's own URL path, the one previews and search results should link to
  * @property {boolean} indexable    whether search engines should list it (rooms, accounts and old URLs are not)

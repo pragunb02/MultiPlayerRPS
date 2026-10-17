@@ -16,11 +16,11 @@ describeEngineContract(
     invalidOptions: [{ bestOf: 2 }, { bestOf: 0 }, { bestOf: "3" }, { bestOf: 9 }, null, "x", []],
     playthrough: [
       { player: A, move: { choice: "rock" } },
-      { player: B, move: { choice: "scissors" } }, // A 1–0
+      { player: B, move: { choice: "scissors" } }, // A leads 1 to 0
       { player: A, move: { choice: "paper" } },
       { player: B, move: { choice: "paper" } }, // draw, replayed
       { player: B, move: { choice: "rock" } },
-      { player: A, move: { choice: "paper" } }, // A 2–0 → wins best of 3
+      { player: A, move: { choice: "paper" } }, // A leads 2 to 0 and wins the best of 3
     ],
     expectedOutcome: { status: "finished", result: "win", winners: [A], reason: "best-of-3" },
     rejectedMoves: [

@@ -4,11 +4,11 @@ import { GAME_IDS } from "./games.js";
 export const QUEST_SLOTS = Object.freeze({ PLAY: "play", WIN: "win", GAME: "game" });
 
 /**
- * What a quest counts, per counted match (a player's own forfeit never counts):
- * - `play`: finished matches;
- * - `win`: wins;
- * - `distinct-games`: different games played;
- * - `wins-in-a-row`: consecutive wins today (a draw keeps the run, a loss ends it).
+ * What a quest counts in each counted match. A player's own forfeit never counts.
+ * 1. `play`: finished matches.
+ * 2. `win`: wins.
+ * 3. `distinct-games`: different games played.
+ * 4. `wins-in-a-row`: wins in a row today. A draw keeps the run going, a loss ends it.
  */
 export const QUEST_COUNTS = Object.freeze({
   PLAY: "play",
@@ -22,12 +22,12 @@ export const DAILY_SWEEP_BONUS_XP = 30;
 
 /**
  * @typedef {Object} QuestInfo
- * @property {string} id             stable, stored in each day's snapshot — never reused
+ * @property {string} id             stable and stored in each day's snapshot, so it is never reused
  * @property {string} slot           QUEST_SLOTS value
  * @property {string} name
  * @property {string} description
  * @property {string} counts         QUEST_COUNTS value
- * @property {string | null} gameId  only matches of this game count; null = any game
+ * @property {string | null} gameId  only matches of this game count. null means any game.
  * @property {number} target
  * @property {number} bonusXp        awarded once, when the quest is completed
  */
@@ -40,7 +40,7 @@ const { RPS, TIC_TAC_TOE, CHESS } = GAME_IDS;
 
 /**
  * The daily quest catalog. At most 150 XP a day comes from quests (the richest quest of each slot plus the
- * sweep), which caps farming (ADR-013).
+ * sweep), so playing more matches cannot earn unlimited quest XP (ADR-013).
  *
  * @type {ReadonlyArray<Readonly<QuestInfo>>}
  */

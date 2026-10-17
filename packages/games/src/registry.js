@@ -1,6 +1,6 @@
 /**
- * Looks engines up by game id. This is the plug-in point: rooms, matches and sockets only ever ask the
- * registry, so a new game needs no changes anywhere else (open/closed).
+ * Looks engines up by game id. This is where games plug in: rooms, matches and sockets only ever ask the
+ * registry, so a new game needs no changes anywhere else.
  *
  * @param {ReadonlyArray<Readonly<import("./engine.js").GameEngine<any, any, any>>>} engines
  */
@@ -17,7 +17,7 @@ export function createEngineRegistry(engines) {
     /** @param {string} id */
     has: (id) => byId.has(id),
     /**
-     * @param {string} id  must be a registered id — check `has` (or validate against the catalog) first
+     * @param {string} id  must be a registered id. Check `has` (or validate against the catalog) first.
      */
     get(id) {
       const engine = byId.get(id);

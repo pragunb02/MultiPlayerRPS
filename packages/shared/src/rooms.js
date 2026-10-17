@@ -1,4 +1,7 @@
-/** Room lifecycle: waiting → playing → finished; closed rooms are removed and announced via ROOM_CLOSED. */
+/**
+ * A room goes from waiting to playing to finished. A closed room is removed, and the players in it are told with
+ * ROOM_CLOSED.
+ */
 export const ROOM_STATUS = Object.freeze({
   WAITING: "waiting",
   PLAYING: "playing",
