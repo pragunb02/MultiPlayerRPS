@@ -1,0 +1,34 @@
+/* The computer's lock and its check, above the throws (CC-225). */
+.lock {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  text-align: center;
+}
+.line {
+  margin: 0;
+}
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.good {
+  color: var(--color-success);
+  font-weight: 700;
+}
+.bad {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+.proof {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-4) 0 0;
+}
+.proof dt {
+  font-weight: 700;
+}
+.proof dd {
+  margin: 0 0 var(--space-2);
+}

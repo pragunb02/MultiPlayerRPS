@@ -1,7 +1,17 @@
 import { renamePlayer } from "@classicade/games";
+import { XP_AWARDS } from "@classicade/shared";
+import { isBotPlayerId } from "../../models/botIdentity.js";
 import { assertDefined } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
-import { creditFor, endedTooSoon, judgeMatch, utcDayOf } from "./fairPlay.js";
+import { resultFor } from "../progression/progressionComponent.js";
+import {
+  botXpFor,
+  creditFor,
+  endedTooSoon,
+  hasComputerPlayer,
+  judgeMatch,
+  limitWindowOf,
+} from "./fairPlay.js";
 
 /**
  * Match history: turns finished rooms into permanent match records and answers "what did I play?". Also judges
@@ -14,18 +24,20 @@ export function createMatchComponent({ matchAccessor }) {
 
   const isPlayer = (match, playerId) => match.players.some((p) => p.playerId === playerId);
 
-  /** How a match counts for one player, against their other games of that day as stored now. */
-  async function verdictFor(match, playerId) {
+  /** The player's other games the limits look at, as stored now. */
+  const othersFor = (match, playerId) =>
     // A game that ended too soon counts for nobody, whatever else they played.
-    const others = endedTooSoon(match)
+    endedTooSoon(match)
       ? []
-      : await matchAccessor.listCountedBetween({
+      : matchAccessor.listCountedBetween({
           playerId,
-          ...utcDayOf(match.endedAt),
+          ...limitWindowOf(match.endedAt),
           excluding: match.matchId,
         });
-    return judgeMatch({ match, playerId, others });
-  }
+
+  /** How a match counts for one player, against their other games as stored now. */
+  const verdictFor = async (match, playerId) =>
+    judgeMatch({ match, playerId, others: await othersFor(match, playerId) });
 
   /**
    * A guest's game, now the account's: it keeps its verdict, except that a game which counted for the guest stops
@@ -41,7 +53,7 @@ export function createMatchComponent({ matchAccessor }) {
       return match;
     }
     const withdrawn = { playerId: to, reason: verdict.reason, withdrawnFrom: from };
-    return { ...match, credit: { notCounted: [...match.credit.notCounted, withdrawn] } };
+    return { ...match, credit: { ...match.credit, notCounted: [...match.credit.notCounted, withdrawn] } };
   }
 
   /** How the match went for one player. */
@@ -76,7 +88,8 @@ export function createMatchComponent({ matchAccessor }) {
     /**
      * Decides once whether a recorded match counts for each of its players, and stores it with the match.
      * Progression, quests, achievements and leaderboards then read that verdict. Judging again returns the
-     * first verdict.
+     * first verdict. A computer character is never judged: it earns nothing. In a game against one, each person
+     * it counts for also gets the XP it gives them within the day's limit for such games (ADR-025).
      *
      * @param {Readonly<import("../../data/matchAccessor.js").Match>} match
      * @returns {Promise<Readonly<import("../../data/matchAccessor.js").Match>>} the match with its verdict
@@ -86,13 +99,19 @@ export function createMatchComponent({ matchAccessor }) {
         return match;
       }
       const notCounted = [];
-      for (const { playerId } of match.players) {
-        const verdict = await verdictFor(match, playerId);
+      const botXp = [];
+      for (const { playerId } of match.players.filter((p) => !isBotPlayerId(p.playerId))) {
+        const others = await othersFor(match, playerId);
+        const verdict = judgeMatch({ match, playerId, others });
         if (!verdict.counted) {
           notCounted.push({ playerId, reason: verdict.reason });
+        } else if (hasComputerPlayer(match)) {
+          const award = XP_AWARDS[resultFor(match, playerId)];
+          botXp.push({ playerId, ...botXpFor({ match, playerId, others, award }) });
         }
       }
-      return matchAccessor.judgeOnce({ matchId: match.matchId, credit: { notCounted } });
+      const credit = { notCounted, ...(botXp.length > 0 && { botXp }) };
+      return matchAccessor.judgeOnce({ matchId: match.matchId, credit });
     },
 
     /**

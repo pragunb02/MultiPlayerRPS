@@ -140,7 +140,7 @@ describe("matchComponent: judging whether a match counts (CC-095)", () => {
     expect(mine).not.toHaveProperty("credit");
   });
 
-  it("stops counting games between the same two players after the daily limit, and the next day counts again", async () => {
+  it("stops counting games between the same two players after the limit, and 24 hours later counts again", async () => {
     const matches = setup();
     const limit = FAIR_PLAY_LIMITS.GAMES_PER_OPPONENT_PER_DAY;
     for (let i = 0; i < limit; i++) {
@@ -148,13 +148,62 @@ describe("matchComponent: judging whether a match counts (CC-095)", () => {
     }
 
     const over = await matches.judge(await finished(matches, "m-over", { endedAt: T0 + limit }));
-    const tomorrow = await matches.judge(await finished(matches, "m-tomorrow", { endedAt: T0 + DAY }));
+    const tomorrow = await matches.judge(
+      await finished(matches, "m-tomorrow", { endedAt: T0 + limit + DAY }),
+    );
 
     expect(over.credit.notCounted.map((e) => e.reason)).toEqual([
       NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT,
       NOT_COUNTED_REASONS.OPPONENT_DAILY_LIMIT,
     ]);
     expect(tomorrow.credit.notCounted).toEqual([]);
+  });
+
+  describe("games against a computer character (ADR-025)", () => {
+    const ROCKY = { playerId: "bot_rocky_easy", displayName: "Rocky", connected: true };
+    const vsRocky = [ALICE, ROCKY, ALICE, ROCKY].map(({ playerId }) => ({
+      kind: "move",
+      playerId,
+      move: {},
+      at: T0,
+    }));
+    const againstRocky = (matches, matchId, endedAt = T0 + 9_000) =>
+      finished(matches, matchId, { seats: [ALICE, ROCKY], log: vsRocky, endedAt });
+
+    it("judges only the person, and stores the XP the game gives them and what is left of the day's limit", async () => {
+      const matches = setup();
+
+      const judged = await matches.judge(await againstRocky(matches, "m1"));
+
+      expect(judged.credit).toEqual({
+        notCounted: [],
+        botXp: [{ playerId: "guest_a", xp: 30, left: FAIR_PLAY_LIMITS.BOT_XP_PER_DAY - 30 }],
+      });
+    });
+
+    it("gives no more XP once the day's limit from computer games is used up, but the game still counts", async () => {
+      const matches = setup();
+      for (let i = 0; i < 3; i++) {
+        await matches.judge(await againstRocky(matches, `m-${i}`, T0 + i));
+      }
+
+      const fourth = await matches.judge(await againstRocky(matches, "m-4", T0 + 3));
+      const fifth = await matches.judge(await againstRocky(matches, "m-5", T0 + 4));
+
+      expect(fourth.credit.botXp).toEqual([{ playerId: "guest_a", xp: 10, left: 0 }]);
+      expect(fifth.credit).toEqual({ notCounted: [], botXp: [{ playerId: "guest_a", xp: 0, left: 0 }] });
+    });
+
+    it("stores no XP for a person the game does not count for", async () => {
+      const matches = setup();
+      const short = await finished(matches, "m1", { seats: [ALICE, ROCKY], log: room().game.log });
+
+      const judged = await matches.judge(short);
+
+      expect(judged.credit).toEqual({
+        notCounted: [{ playerId: "guest_a", reason: NOT_COUNTED_REASONS.ENDED_TOO_SOON }],
+      });
+    });
   });
 
   it("keeps the first verdict when the same match is judged again", async () => {

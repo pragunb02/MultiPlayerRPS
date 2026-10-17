@@ -48,6 +48,28 @@ tests live next to code: *.test.js (unit), *.integration.test.js
 
 Status: composition root, config, `service/http/` (sessions, matches), `service/realtime/` (gateway, rooms), `domain/` (identity, rooms, matches), `data/` (room + match accessors), `persistence/` (database, session store, MongoDB room DAO so rooms survive restarts (CC-101), MongoDB match DAO), `models/`, `utils/` exist (CC-011…CC-020, CC-016).
 
+### Computer players (CC-138, CC-221, CC-225, ADR-025)
+
+```
+lobby "Play Rocky" ──room:play-computer──► botComponent.playComputer ─► roomComponent (create, seat the bot)
+                                                                              │ every saved change: room.changed
+                                                                              ▼
+                       botDriver.watch ─► botTurns.nextAction ─► pause ─► roomComponent.makeMove / requestRematch
+                                                                              │ room.updated ─► gateway broadcast
+```
+
+- `domain/bots/botTurns.js`: pure decisions on a stored room. What a computer player does next, its move from its
+  own seat's view with an RNG seeded from the game, and the seals of simultaneous moves (commit and reveal for Rock
+  Paper Scissors, `seals.js`). The room component calls `settle` on every change it saves and `checkMove` before
+  every move.
+- `domain/bots/botDriver.js`: plans and carries out those actions after a human-like pause (400 to 900 ms, zero in
+  tests). Plans live in the process. Rooms live in MongoDB, so `resume` at start up plans again for every stored room.
+- `models/botIdentity.js`: `bot_<character>_<level>` ids for the characters in `@classicade/shared` `BOT_CHARACTERS`.
+- Rewards: `domain/matches/fairPlay.js` counts each character as one opponent (rolling 24 hours) and limits XP from
+  computer games to `BOT_DAILY_XP` a day. The verdict stores it in `credit.botXp`. Computer games never reach a
+  leaderboard.
+- Room views carry `revision`, so the web app keeps the newest view when a computer's update overtakes an answer.
+
 ### Game engine contract (implemented — `packages/games/src/engine.js`, CC-014)
 
 ```js

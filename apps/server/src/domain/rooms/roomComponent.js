@@ -18,11 +18,14 @@ import {
   ServerBusyError,
   ValidationError,
 } from "../../utils/errors.js";
+import { NO_BOT_TURNS } from "../bots/botTurns.js";
 import { lifetimeOf, roomLifetimes } from "./roomLifetimes.js";
 import { roomLimits } from "./roomLimits.js";
 
 /** Events the room component publishes for other parts of the system to react to. */
 export const ROOM_EVENTS = Object.freeze({
+  /** `{ room }`: a room was saved with a change, whoever made it. The bot driver plans its next action from it */
+  CHANGED: "room.changed",
   /** `{ code, reason }`: a room was closed, `reason` is a ROOM_CLOSE_REASONS value */
   CLOSED: "room.closed",
   /** `{ room, outcome }`: a game ended (played to the end or forfeited), recorded by matches and progression */
@@ -72,7 +75,9 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  *   generateCode?: () => string,
  *   generateSeed?: () => number,
  *   generateMatchId?: () => string,
- * }} deps  lifetimes, limits and generators can be given so tests are short and exact
+ *   botTurns?: Pick<ReturnType<typeof import("../bots/botTurns.js").createBotTurns>, "settle" | "checkMove" | "fairness">,
+ * }} deps  lifetimes, limits and generators can be given so tests are short and exact. `botTurns` are the rules for
+ *   computer players (CC-138, CC-225). Without them no room ever seats one
  */
 export function createRoomComponent({
   roomAccessor,
@@ -83,6 +88,7 @@ export function createRoomComponent({
   generateCode = randomRoomCode,
   generateSeed = randomSeed,
   generateMatchId = randomUUID,
+  botTurns = NO_BOT_TURNS,
 }) {
   assertDefined(roomAccessor, "roomAccessor");
   assertDefined(engines, "engines");
@@ -184,11 +190,14 @@ export function createRoomComponent({
     for (let attempt = 1; ; attempt++) {
       try {
         const room = await load(code, now);
-        const decision = decide(room);
-        if (isClosing(decision)) {
-          await close(room, decision.closeAs, now);
+        const decided = decide(room);
+        if (isClosing(decided)) {
+          await close(room, decided.closeAs, now);
           return CLOSED;
         }
+        // A computer player that must choose at the same moment as a person seals its choice in the same save
+        // that starts the round, so nobody ever sees the round without the lock (CC-225).
+        const decision = decided === room ? room : botTurns.settle(decided);
         if (decision === room) {
           return { closed: false, changed: false, room };
         }
@@ -196,6 +205,7 @@ export function createRoomComponent({
         if (room.status === ROOM_STATUS.PLAYING && saved.status === ROOM_STATUS.FINISHED) {
           events.emit(ROOM_EVENTS.GAME_FINISHED, { room: saved, outcome: saved.result });
         }
+        events.emit(ROOM_EVENTS.CHANGED, { room: saved });
         return { closed: false, changed: true, room: saved };
       } catch (err) {
         if (!(err instanceof ConcurrentChangeError) || attempt === MAX_WRITE_ATTEMPTS) {
@@ -264,7 +274,8 @@ export function createRoomComponent({
       return finish(logged, forfeitOutcome(room, playerId), now);
     }
     const seats = room.seats.filter((seat) => seat.playerId !== playerId);
-    if (seats.length === 0) {
+    // A computer player never plays alone, so a room with nobody else left is empty (CC-138).
+    if (seats.every((seat) => seat.bot !== undefined)) {
       return closeAs(ROOM_CLOSE_REASONS.EMPTY);
     }
     const hostId = room.hostId === playerId ? seats[0].playerId : room.hostId;
@@ -376,9 +387,10 @@ export function createRoomComponent({
     },
 
     /**
-     * Seats a player (starting the game once enough players have joined), or reconnects a seated player.
+     * Seats a player (starting the game once enough players have joined), or reconnects a seated player. A computer
+     * player (CC-138) keeps its `bot` label on the seat, so every view shows it as one.
      *
-     * @param {{ code: string, player: import("../../models/identity.js").Identity, now: number }} input
+     * @param {{ code: string, player: import("../../models/identity.js").Identity | import("../../models/botIdentity.js").BotIdentity, now: number }} input
      * @throws {GoneError} when the room has closed, with the reason in `details`
      */
     joinRoom: ({ code, player, now }) =>
@@ -395,7 +407,15 @@ export function createRoomComponent({
           // A waiting room always has a free seat: the game starts the moment the last one is taken.
           const seated = withSeats(
             room,
-            [...room.seats, { playerId: player.id, displayName: player.displayName, connected: true }],
+            [
+              ...room.seats,
+              {
+                playerId: player.id,
+                displayName: player.displayName,
+                connected: true,
+                ...("bot" in player && { bot: player.bot }),
+              },
+            ],
             now,
           );
           return seated.seats.length === engineFor(room).players.max ? start(seated, now) : seated;
@@ -418,6 +438,7 @@ export function createRoomComponent({
               room.status === ROOM_STATUS.WAITING ? "The game has not started yet" : "The game is over",
             );
           }
+          botTurns.checkMove({ room, playerId, move });
           const engine = engineFor(room);
           const ctx = { now };
           const validated = engine.validateMove(room.game.state, playerId, move, ctx);
@@ -538,18 +559,23 @@ export function createRoomComponent({
      * After a restart nobody is connected yet, whatever storage says: the old process could not record the
      * disconnects when it stopped or crashed. Each player is shown as connected again when their browser
      * rejoins, which it does by itself. The last activity time stays, so an away room is not kept any longer.
+     * A computer player lives in the server and is back with it, so it stays connected.
      *
      * @param {{ now: number }} input
      * @returns {Promise<string[]>} codes of rooms that changed
      */
     async markEveryoneAway({ now }) {
+      const away = (seat) => seat.connected && seat.bot === undefined;
       const results = await eachRoom(await roomAccessor.listAll(), (stored) =>
         change({
           code: stored.code,
           now,
           decide: (room) =>
-            room.seats.some((seat) => seat.connected)
-              ? { ...room, seats: room.seats.map((seat) => ({ ...seat, connected: false })) }
+            room.seats.some(away)
+              ? {
+                  ...room,
+                  seats: room.seats.map((seat) => (away(seat) ? { ...seat, connected: false } : seat)),
+                }
               : room,
         }),
       );
@@ -705,10 +731,12 @@ export function createRoomComponent({
         status: room.status,
         hostId: room.hostId,
         players: { min: engine.players.min, max: engine.players.max },
-        seats: room.seats.map(({ playerId, displayName, connected }) => ({
+        seats: room.seats.map(({ playerId, displayName, connected, bot }) => ({
           playerId,
           displayName,
           connected,
+          // A computer player is labelled in every view, so nobody takes it for a person (ADR-025).
+          ...(bot !== undefined && { bot: { character: bot.character, level: bot.level } }),
         })),
         you: seated ? viewerId : "",
       };
@@ -731,6 +759,7 @@ export function createRoomComponent({
           },
         }),
         ...(room.series && { series: { games: room.series.games, wins: { ...room.series.wins } } }),
+        ...(room.game.seals?.length > 0 && { fairness: botTurns.fairness(room) }),
         game: {
           view: engine.viewFor(room.game.state, seated ? viewerId : "spectator"),
           activePlayers: room.status === ROOM_STATUS.PLAYING ? engine.activePlayers(room.game.state) : [],

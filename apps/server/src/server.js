@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import http from "node:http";
-import { createEngineRegistry, ENGINES } from "@classicade/games";
+import { BOTS, createBotRegistry, createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
@@ -15,6 +15,10 @@ import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createAccountComponent } from "./domain/accounts/accountComponent.js";
 import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/analyticsComponent.js";
+import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botComponent.js";
+import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
+import { createBotTurns } from "./domain/bots/botTurns.js";
+import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
 import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
@@ -301,12 +305,14 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
  *     limits?: Partial<import("./domain/rooms/roomLimits.js").RoomLimits>,
  *     sweepIntervalMs?: number,
  *   },
- * }} deps  `now` and `rooms` are for tests only. Production runs on the real clock and the standard room
- *   lifetimes and limits. Integration tests move the clock, and browser tests shorten lifetimes to watch a room
- *   close, raise the connections per address (every test player shares one) and fill the server on purpose.
+ *   bots?: { pauseMs?: { min: number, max: number } },
+ * }} deps  `now`, `rooms` and `bots` are for tests only. Production runs on the real clock, the standard room
+ *   lifetimes and limits, and a human-like pause before each computer move. Integration tests move the clock and
+ *   let computer players act at once, and browser tests shorten lifetimes to watch a room close, raise the
+ *   connections per address (every test player shares one) and fill the server on purpose.
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
-export async function startServer({ config, logger, limits = {}, now = Date.now, rooms = {} }) {
+export async function startServer({ config, logger, limits = {}, now = Date.now, rooms = {}, bots = {} }) {
   if (config.webDistDir !== "" && !existsSync(path.join(config.webDistDir, "index.html"))) {
     throw new Error(`WEB_DIST_DIR has no index.html: ${config.webDistDir} (run npm run build:web)`);
   }
@@ -361,13 +367,33 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     passwordHasher: createPasswordHasher(),
   });
   const limitsOfRooms = roomLimits(rooms.limits);
+  const engines = createEngineRegistry(ENGINES);
+  const botRegistry = createBotRegistry(BOTS);
+  assertCharactersPlayable(botRegistry);
+  const botTurns = createBotTurns({
+    bots: botRegistry,
+    engines,
+    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
+  });
   const roomComponent = createRoomComponent({
     roomAccessor,
-    engines: createEngineRegistry(ENGINES),
+    engines,
     events: domainEvents,
     lifetimes: roomLifetimes(rooms.lifetimes),
     limits: limitsOfRooms,
+    botTurns,
   });
+  const botComponent = createBotComponent({ roomComponent });
+  const botDriver = createBotDriver({
+    roomComponent,
+    roomAccessor,
+    botTurns,
+    events: domainEvents,
+    delayMs: pauseBetween(bots.pauseMs ?? HUMAN_PAUSE_MS),
+    logger,
+    now,
+  });
+  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -417,11 +443,14 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
 
   // Rooms are stored, so they outlive this process (CC-101). Nobody is connected to a process that has only
   // just started, and a chess flag may have fallen while no server was running: settle both before anyone
-  // can join. A game that ends here is recorded through the match pipeline above.
+  // can join. A game that ends here is recorded through the match pipeline above. Then a computer player whose
+  // turn it was when the last process stopped gets to move again (CC-138).
   try {
     await roomComponent.markEveryoneAway({ now: now() });
     await roomComponent.expireDue({ now: now() });
+    await botDriver.resume();
   } catch (err) {
+    botDriver.stop();
     await database.close();
     throw err;
   }
@@ -470,6 +499,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     networkOf: createNetworkKey({ secret: config.sessionSecret }),
     limits: limitsOfRooms,
     now,
+    botComponent,
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
   sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
@@ -485,6 +515,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
 
   const close = async () => {
     housekeeping.stop();
+    botDriver.stop();
     await gateway.close();
     await tasks.drain();
     await database.close();
@@ -494,6 +525,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     const port = await listen(server, config.port);
     return { server, port, close };
   } catch (err) {
+    botDriver.stop();
     await database.close();
     throw err;
   }

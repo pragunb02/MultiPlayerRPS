@@ -10,6 +10,7 @@ import { toClientError } from "../errorTranslation.js";
 import { addressKey, clientAddress } from "../http/rateLimits.js";
 import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
+import { createBotHandlers } from "./botHandlers.js";
 import { trackConnections } from "./connections.js";
 import { broadcastRoom, createRoomHandlers, handleSocketGone, roomChannel } from "./roomHandlers.js";
 import { createSocketAdmission } from "./socketAdmission.js";
@@ -40,7 +41,8 @@ const playerRoom = (playerId) => `player:${playerId}`;
  *   networkOf: (address: string) => string,   names an address without being it, for the rooms per network
  *   limits?: Readonly<import("../../domain/rooms/roomLimits.js").RoomLimits>,
  *   now?: () => number,
- * }} deps
+ *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
+ * }} deps  without `botComponent` nobody can start a game against a computer character (CC-138)
  */
 export function createRealtimeGateway({
   httpServer,
@@ -54,6 +56,7 @@ export function createRealtimeGateway({
   networkOf,
   limits = roomLimits(),
   now = Date.now,
+  botComponent,
 }) {
   assertDefined(httpServer, "httpServer");
   assertDefined(sessionMiddleware, "sessionMiddleware");
@@ -182,6 +185,8 @@ export function createRealtimeGateway({
       {
         [SOCKET_EVENTS.IDENTITY_GET]: () => socket.data.identity,
         ...createRoomHandlers({ io, socket, roomComponent, now, logger: socketLogger }),
+        ...(botComponent &&
+          createBotHandlers({ socket, botComponent, roomComponent, now, logger: socketLogger })),
       },
       socketLogger,
       { allow: () => admission.allowEvent(identity.id) },
@@ -198,7 +203,18 @@ export function createRealtimeGateway({
   // Domain → transport: progress after a recorded match goes to every tab of that player.
   domainEvents.on(
     PROGRESSION_EVENTS.UPDATED,
-    ({ playerId, source, key, matchId, xpGained, leveledUp, progress, counted, notCountedReason }) => {
+    ({
+      playerId,
+      source,
+      key,
+      matchId,
+      xpGained,
+      leveledUp,
+      progress,
+      counted,
+      notCountedReason,
+      botXpLeft,
+    }) => {
       io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.PROGRESS_UPDATED, {
         source,
         key,
@@ -208,6 +224,7 @@ export function createRealtimeGateway({
         progress,
         counted,
         notCountedReason,
+        ...(botXpLeft !== undefined && { botXpLeft }),
       });
     },
   );

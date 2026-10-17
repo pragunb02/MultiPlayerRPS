@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures.js";
 import { answerTo, arm, installProbe, otherSaw } from "./controlProbe.js";
-import { GAMES, openPair, snapshot, statesFor } from "./matchStates.js";
+import { computerStatesFor, GAMES, openPair, snapshot, statesFor } from "./matchStates.js";
 
 // Every click gives a visible answer (CC-164, CC-170, docs/ux/MATCH_EXPERIENCE.md "Button feedback standard").
 // In each state of every game, two players are brought into the state and every control on the page
@@ -27,7 +27,14 @@ const REACHES_OTHER = new Set([
 ]);
 
 /** Presses that end the state they are pressed in, besides links to other pages. */
-const LEAVES_STATE = new Set([...REACHES_OTHER, "room.leave", "room.leave.confirm", "chess.resign.confirm"]);
+const LEAVES_STATE = new Set([
+  ...REACHES_OTHER,
+  "room.leave",
+  "room.leave.confirm",
+  "chess.resign.confirm",
+  "lobby.play_computer",
+  "lobby.create",
+]);
 
 /** Controls not pressed here, with the reason. */
 const NOT_PRESSED = new Map([
@@ -147,9 +154,12 @@ async function pressEverything({ players, build, name }) {
   return problems;
 }
 
+/** Every state of a game, between two people and against the game's computer character (CC-221). */
+const allStatesFor = (gameId) => ({ ...statesFor(gameId), ...computerStatesFor(gameId) });
+
 for (const gameId of Object.keys(GAMES)) {
   test.describe(`every press in ${gameId} answers within 100 ms`, () => {
-    for (const [name, build] of Object.entries(statesFor(gameId))) {
+    for (const [name, build] of Object.entries(allStatesFor(gameId))) {
       test(`${name}`, async ({ players }) => {
         test.setTimeout(360_000);
 
@@ -221,6 +231,9 @@ const MAIN_CONTROLS = Object.freeze({
   "rematch-declined": () => [at("room.rematch.ask"), at("room.new_opponent")],
   "request-asked": () => [at("room.request.cancel")],
   "request-asked-of-me": () => [at("room.request.accept"), at("room.request.decline")],
+  "computer lobby": () => [at("lobby.computer_level"), at("lobby.play_computer")],
+  "computer my-turn": (gameId) => BOARD[gameId],
+  "computer finished": () => RESULT,
 });
 
 /**
@@ -234,6 +247,8 @@ const BELOW_THE_FOLD = new Map([
   ["desktop chess their-turn", CHESS_LAPTOP],
   ["mobile chess my-turn", CHESS_PHONE],
   ["mobile chess their-turn", CHESS_PHONE],
+  ["desktop chess computer my-turn", CHESS_LAPTOP],
+  ["mobile chess computer my-turn", CHESS_PHONE],
 ]);
 
 /** Every element of `selectors` that is not wholly on screen at the top of the page, with where it is. */
@@ -266,7 +281,7 @@ async function offScreen(page, selectors) {
 
 for (const gameId of Object.keys(GAMES)) {
   test.describe(`${gameId}: every state's main controls are on screen without scrolling`, () => {
-    for (const [name, build] of Object.entries(statesFor(gameId))) {
+    for (const [name, build] of Object.entries(allStatesFor(gameId))) {
       test(name, async ({ players }, testInfo) => {
         test.setTimeout(90_000);
         const project = testInfo.project.name;

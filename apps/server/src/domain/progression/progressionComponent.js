@@ -1,6 +1,7 @@
 import { levelForXp, MAX_LEVEL, XP_AWARDS, xpForLevel } from "@classicade/shared";
+import { isBotPlayerId } from "../../models/botIdentity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { creditFor } from "../matches/fairPlay.js";
+import { botXpLeftAfter, creditFor, xpFor } from "../matches/fairPlay.js";
 
 /** Events the progression component publishes. */
 export const PROGRESSION_EVENTS = Object.freeze({
@@ -8,7 +9,8 @@ export const PROGRESSION_EVENTS = Object.freeze({
    * A player's progress changed: after a match (`key` = matchId), or a quest bonus (`key` = the quest key,
    * `matchId` = ""). Payload: { playerId, displayName, source: "match" | "quest", key, matchId, result?, xpGained,
    * leveledUp, progress, counted, notCountedReason }. A match that didn't count for the player (CC-095) has `counted` false and gives no XP, and
-   * `notCountedReason` says why: a NOT_COUNTED_REASONS value, or "" when it counted.
+   * `notCountedReason` says why: a NOT_COUNTED_REASONS value, or "" when it counted. After a counted game against
+   * a computer character, `botXpLeft` says how much of the day's XP from such games is left (ADR-025).
    */
   UPDATED: "progression.updated",
 });
@@ -37,8 +39,8 @@ export function resultFor(match, playerId) {
 
 const COUNTER_FOR = Object.freeze({ win: "wins", draw: "draws", loss: "losses", forfeit: "losses" });
 
-/** What one counted match adds to a player's totals. */
-const creditOf = (result) => ({ xp: XP_AWARDS[result], matchesPlayed: 1, [COUNTER_FOR[result]]: 1 });
+/** What one counted match adds to a player's totals. `xp` is less than the award past a daily limit (ADR-025). */
+const creditOf = (result, xp) => ({ xp, matchesPlayed: 1, [COUNTER_FOR[result]]: 1 });
 const NOTHING = Object.freeze({ xp: 0 });
 
 /** Adds up totals field by field. */
@@ -86,11 +88,12 @@ export function createProgressionComponent({ progressAccessor, matchAccessor, ev
      */
     async applyMatch(match) {
       const updates = [];
-      for (const { playerId, displayName } of match.players) {
+      // A computer character has no progress of its own (ADR-025).
+      for (const { playerId, displayName } of match.players.filter((p) => !isBotPlayerId(p.playerId))) {
         const result = resultFor(match, playerId);
         const credit = creditFor(match, playerId);
         // Applied even when it adds nothing, so the player hears why exactly once.
-        const inc = credit.counted ? creditOf(result) : NOTHING;
+        const inc = credit.counted ? creditOf(result, xpFor(match, playerId, XP_AWARDS[result])) : NOTHING;
         const { applied, before, after } = await progressAccessor.applyMatchOnce({
           playerId,
           matchId: match.matchId,
@@ -112,6 +115,8 @@ export function createProgressionComponent({ progressAccessor, matchAccessor, ev
           progress: describe(after),
           counted: credit.counted,
           notCountedReason: credit.counted ? "" : credit.reason,
+          // Only after a game against a computer character: what is left of the day's XP from such games.
+          ...Object.fromEntries(botXpLeftAfter(match, playerId).map((left) => ["botXpLeft", left])),
         };
         events.emit(PROGRESSION_EVENTS.UPDATED, update);
         updates.push(update);
@@ -166,7 +171,12 @@ export function createProgressionComponent({ progressAccessor, matchAccessor, ev
      */
     async transferPlayer({ from, to, now }) {
       const withdrawn = await matchAccessor.listWithdrawn({ playerId: to.id, from });
-      const withdraw = withdrawn.map((match) => creditOf(resultFor(match, to.id))).reduce(addTotals, {});
+      const withdraw = withdrawn
+        .map((match) => {
+          const result = resultFor(match, to.id);
+          return creditOf(result, xpFor(match, to.id, XP_AWARDS[result]));
+        })
+        .reduce(addTotals, {});
       return progressAccessor.mergeInto({ from, to: to.id, at: now, withdraw });
     },
   });

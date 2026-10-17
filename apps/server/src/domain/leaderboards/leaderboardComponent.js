@@ -8,7 +8,7 @@ import {
 import { isAccountId } from "../../models/identity.js";
 import { assertDefined } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
-import { creditFor } from "../matches/fairPlay.js";
+import { creditFor, hasComputerPlayer } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
 import { gamesWithWinsBoards, hasWinsBoard, storageFor, weekOf, winsBoard, XP_BOARD } from "./boards.js";
 
@@ -80,7 +80,7 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
       const page = await matchAccessor.listForPlayer(playerId, { limit: HISTORY_PAGE, before });
       const recent = page.filter((match) => match.endedAt >= since);
       total += recent
-        .filter((match) => creditFor(match, playerId).counted)
+        .filter((match) => creditFor(match, playerId).counted && !hasComputerPlayer(match))
         .reduce((sum, match) => sum + XP_AWARDS[resultFor(match, playerId)], 0);
       if (recent.length < HISTORY_PAGE) {
         return total;
@@ -154,6 +154,10 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
      * }} input  `updates` = what progression applied (a match applied before yields none)
      */
     async applyMatch({ match, updates }) {
+      // Games against a computer character never move anyone on a board (ADR-025).
+      if (hasComputerPlayer(match)) {
+        return;
+      }
       const listed = updates.filter(
         ({ playerId }) => isAccountId(playerId) && creditFor(match, playerId).counted,
       );

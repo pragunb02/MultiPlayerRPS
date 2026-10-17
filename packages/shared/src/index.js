@@ -1,3 +1,4 @@
+export { BOT_CHARACTERS, BOT_DAILY_XP, BOT_ID_PREFIX, characterForGame, isBotPlayerId } from "./bots.js";
 export { ACHIEVEMENT_METRICS, ACHIEVEMENT_TIERS, ACHIEVEMENTS, winsOfMetric } from "./achievements.js";
 export { ANALYTICS_MAX_RANGE_DAYS, ANALYTICS_NOT_KEPT } from "./analytics.js";
 export { ERROR_CODES } from "./errors.js";

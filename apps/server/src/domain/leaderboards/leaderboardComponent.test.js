@@ -18,6 +18,7 @@ const GUEST = Object.freeze({
   id: "guest_00000000-0000-4000-8000-000000000001",
   displayName: "Guest-T001",
 });
+const PIP = Object.freeze({ kind: "bot", id: "bot_pip_easy", displayName: "Pip" });
 
 let matchNumber = 0;
 /** A recorded match: `winner` beats `loser` at `endedAt`. */
@@ -185,6 +186,16 @@ describe("leaderboardComponent", () => {
     expect(await entries("rock-paper-scissors")).toEqual([]);
   });
 
+  it("moves nobody on any board for a game against a computer character (ADR-025)", async () => {
+    const { play, entries } = setup();
+
+    await play({ loser: PIP, gameId: "tictactoe" }, [update(ALICE, { xp: 30 })]);
+
+    expect(await entries("overall")).toEqual([]);
+    expect(await entries("weekly")).toEqual([]);
+    expect(await entries("tic-tac-toe")).toEqual([]);
+  });
+
   it("ranks a tie by who reached the score first", async () => {
     const { play, entries } = setup();
     await play({ winner: BOB, loser: ALICE, endedAt: NOW - 10 }, [update(BOB, { xp: 30 })]);
@@ -334,6 +345,17 @@ describe("leaderboardComponent", () => {
         matchId: capped.matchId,
         credit: { notCounted: [{ playerId: ALICE.id, reason: "hourly-limit", withdrawnFrom: GUEST.id }] },
       });
+
+      await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW });
+
+      expect((await entries("weekly"))[0].score).toBe(30);
+      expect((await entries("tic-tac-toe"))[0].score).toBe(1);
+    });
+
+    it("leaves games against a computer character out of this week's XP and the wins (ADR-025)", async () => {
+      const { boards, matchAccessor, entries } = setup();
+      await matchAccessor.record(match({ gameId: "tictactoe", endedAt: NOW - 2 }));
+      await matchAccessor.record(match({ gameId: "tictactoe", endedAt: NOW - 1, loser: PIP }));
 
       await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW });
 

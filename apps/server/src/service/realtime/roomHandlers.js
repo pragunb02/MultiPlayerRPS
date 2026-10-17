@@ -7,10 +7,13 @@ const codeFromChannel = (channel) => channel.slice("room:".length);
 
 /**
  * A viewer's room view, stamped with the server's clock so clients can show timers (e.g. chess clocks) in
- * server time regardless of their own clock's drift.
+ * server time regardless of their own clock's drift. `revision` counts the room's saved changes, so a client can
+ * tell an answer that arrives late from a newer update that overtook it: a computer player may move before the
+ * answer to the move it replies to has left the server (CC-138).
  */
 export const stampedView = ({ roomComponent, room, viewerId, now }) => ({
   ...roomComponent.viewFor(room, viewerId),
+  revision: room.version,
   serverTime: now(),
 });
 

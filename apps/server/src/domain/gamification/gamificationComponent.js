@@ -1,4 +1,5 @@
 import { DAILY_SWEEP_BONUS_XP } from "@classicade/shared";
+import { isBotPlayerId } from "../../models/botIdentity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { creditFor } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
@@ -193,13 +194,13 @@ export function createGamificationComponent({
     /**
      * Counts a recorded match for each of its players (after progression applied it): stats and streaks,
      * quests and their bonus XP, then achievements. A player the match doesn't count for (CC-095) gets none of
-     * it. Applying the same match again changes nothing.
+     * it, and neither does a computer character (ADR-025). Applying the same match again changes nothing.
      *
      * @param {{ match: Readonly<import("../../data/matchAccessor.js").Match>, now: number }} input
      */
     async applyMatch({ match, now }) {
       for (const { playerId, displayName } of match.players.filter(
-        (p) => creditFor(match, p.playerId).counted,
+        (p) => !isBotPlayerId(p.playerId) && creditFor(match, p.playerId).counted,
       )) {
         await applyForPlayer({ match, playerId, displayName, now });
       }
