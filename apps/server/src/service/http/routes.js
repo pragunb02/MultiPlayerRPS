@@ -22,6 +22,7 @@ export function apiRouter({
   authLimits,
   onIdentityChanged,
   onOtherSessionsEnded,
+  renewals,
   now,
   ...sessionDeps
 }) {
@@ -41,6 +42,7 @@ export function apiRouter({
       accountComponent,
       onSessionEnded: sessionDeps.onSessionEnded,
       onOtherSessionsEnded,
+      renewals,
       onIdentityChanged,
       now,
       ...(authLimits && { limits: authLimits }),

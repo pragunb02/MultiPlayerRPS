@@ -19,6 +19,7 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @property {Readonly<Record<string, unknown>>} options
  * @property {"waiting" | "playing" | "finished"} status
  * @property {string} hostId
+ * @property {string} [network]        an opaque name of the network the room was opened from, for the cap per network
  * @property {ReadonlyArray<Readonly<Seat>>} seats
  * @property {{ matchId: string, seed: number, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry> }} [game]
  *   present once the game has started; `seed` + `log` reproduce the game exactly (see replayGame)
@@ -165,6 +166,9 @@ export function createRoomAccessor({ roomDao }) {
 
     /** @returns {Promise<number>} how many rooms are open, cheap enough to ask before every new room (CC-107) */
     countOpen: () => roomDao.countOpen(),
+
+    /** @param {string} network  how many open rooms were opened from this network (CC-107) */
+    countByNetwork: (network) => roomDao.countByNetwork(network),
 
     /** @returns {Promise<Readonly<Record<"waiting" | "playing" | "finished", number>>>} open rooms per status */
     async countByStatus() {

@@ -107,6 +107,7 @@ describe("roomAccessor", () => {
     const perStatus = await rooms.countByStatus();
 
     expect(await rooms.countOpen()).toBe(2);
+    expect(await rooms.countByNetwork("net-a")).toBe(0);
     expect(perStatus).toEqual({ waiting: 1, playing: 1, finished: 0 });
     expect(Object.isFrozen(perStatus)).toBe(true);
   });

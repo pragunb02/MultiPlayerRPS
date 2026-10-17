@@ -26,6 +26,8 @@ export const ROOM_CLOSE_REASONS = Object.freeze({
 export const ROOM_LIMIT_REASONS = Object.freeze({
   /** the player already has as many waiting rooms as one player may have */
   WAITING_ROOMS: "waiting-rooms",
+  /** the player's network address has opened as many rooms as one network may have open */
+  NETWORK_ROOMS: "network-rooms",
   /** the server holds as many rooms as it can */
   SERVER_FULL: "server-full",
 });

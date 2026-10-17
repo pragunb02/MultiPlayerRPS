@@ -27,8 +27,9 @@ function setup(limits = {}) {
   return rooms;
 }
 
-const create = (rooms, host = ALICE, now = T0) =>
-  rooms.createRoom({ host, gameId: "race", options: { target: 3 }, now });
+const create = (rooms, host = ALICE, now = T0, network = "net-a") =>
+  rooms.createRoom({ network, host, gameId: "race", options: { target: 3 }, now });
+const guest = (n) => Object.freeze({ kind: "guest", id: `guest_${n}`, displayName: `Guest${n}` });
 
 describe("room limits (CC-107)", () => {
   describe("waiting rooms per player", () => {
@@ -90,6 +91,48 @@ describe("room limits (CC-107)", () => {
 
       await expect(create(rooms)).rejects.toThrow("You already have 1 rooms waiting; close one first");
     });
+  });
+
+  describe("rooms per network (CC-107)", () => {
+    it("refuses a room once the host's network has as many open rooms as allowed, whoever the guests are", async () => {
+      const rooms = setup({ openRoomsPerAddress: 3 });
+      for (let i = 0; i < 3; i++) await create(rooms, guest(i));
+
+      const refused = await create(rooms, guest(9)).catch((err) => err);
+
+      expect(refused).toBeInstanceOf(ConflictError);
+      expect(refused.message).toBe("Too many rooms are open from your network. Try again later.");
+      expect(refused.details).toEqual({ reason: ROOM_LIMIT_REASONS.NETWORK_ROOMS, limit: 3 });
+      await expect(create(rooms, guest(9), T0, "net-b")).resolves.toMatchObject({ network: "net-b" });
+    });
+
+    it("counts rooms of every status, so joining one's own rooms does not get around it", async () => {
+      const rooms = setup({ openRoomsPerAddress: 2 });
+      const first = await create(rooms, guest(1));
+      await rooms.joinRoom({ code: first.code, player: guest(2), now: T0 + 1 });
+      await create(rooms, guest(3));
+
+      await expect(create(rooms, guest(4))).rejects.toThrow("Too many rooms are open from your network");
+    });
+
+    it("gives the place back when one of those rooms closes", async () => {
+      const rooms = setup({ openRoomsPerAddress: 1 });
+      const only = await create(rooms, guest(1));
+      await rooms.leaveRoom({ code: only.code, playerId: guest(1).id, now: T0 + 1 });
+
+      await expect(create(rooms, guest(2), T0 + 2)).resolves.toMatchObject({ status: "waiting" });
+    });
+
+    it.each([[undefined], [""], [42]])(
+      "refuses to create a room without the host's network (%o)",
+      async (network) => {
+        const rooms = setup();
+
+        await expect(
+          rooms.createRoom({ network, host: ALICE, gameId: "race", options: { target: 3 }, now: T0 }),
+        ).rejects.toThrow(TypeError);
+      },
+    );
   });
 
   describe("rooms on the whole server", () => {

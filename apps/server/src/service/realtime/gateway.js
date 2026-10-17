@@ -37,6 +37,7 @@ const playerRoom = (playerId) => `player:${playerId}`;
  *   checkSession: (sessionData: object) => Promise<void>,   throws UnauthorizedError for a session that may no
  *     longer be used (see createSessionCheck)
  *   trustProxyHops: number,   how many proxies to look through for the player's address, as for HTTP
+ *   networkOf: (address: string) => string,   names an address without being it, for the rooms per network
  *   limits?: Readonly<import("../../domain/rooms/roomLimits.js").RoomLimits>,
  *   now?: () => number,
  * }} deps
@@ -50,6 +51,7 @@ export function createRealtimeGateway({
   domainEvents,
   checkSession,
   trustProxyHops,
+  networkOf,
   limits = roomLimits(),
   now = Date.now,
 }) {
@@ -61,6 +63,7 @@ export function createRealtimeGateway({
   assertFunction(domainEvents?.on, "domainEvents.on");
   assertFunction(checkSession, "checkSession");
   assertDefined(trustProxyHops, "trustProxyHops");
+  assertFunction(networkOf, "networkOf");
 
   const io = new Server(httpServer, {
     serveClient: false,
@@ -81,11 +84,21 @@ export function createRealtimeGateway({
   let closing = false;
   const connections = trackConnections(httpServer);
   const admission = createSocketAdmission({ limits, now });
+  /**
+   * How often each player has signed out their other devices, and which session stayed (CC-116). A handshake that
+   * was being checked while that happened had not joined the player's channel yet, so it was missed. It is
+   * disconnected as soon as it connects instead.
+   *
+   * @type {Map<string, { generation: number, keptSessionId: string }>}
+   */
+  const signOuts = new Map();
+  const signOutGeneration = (playerId) => signOuts.get(playerId)?.generation ?? 0;
 
   io.use(async (socket, next) => {
     try {
       socket.data.identity = requireIdentity(socket.request.session);
       socket.data.sessionId = socket.request.sessionID;
+      socket.data.signOutGeneration = signOutGeneration(socket.data.identity.id);
       await checkSession(socket.request.session);
       const address = clientAddress({
         remoteAddress: socket.request.socket.remoteAddress,
@@ -101,6 +114,14 @@ export function createRealtimeGateway({
         throw new TooManyRequestsError(admitted.message);
       }
       socket.data.release = admitted.release;
+      socket.data.network = networkOf(addressKey(address));
+      // The browser may have gone while its session was checked. Socket.IO then drops the socket without any
+      // event, so the place is given back when the connection itself closes, or now if it already has.
+      if (socket.conn.readyState === "open") {
+        socket.conn.once("close", admitted.release);
+      } else {
+        admitted.release();
+      }
       next();
     } catch (err) {
       const { status, code, message } = toClientError(err);
@@ -125,6 +146,17 @@ export function createRealtimeGateway({
   io.on("connection", (socket) => {
     const { identity, sessionId } = socket.data;
     const socketLogger = logger.child({ socketId: socket.id, playerId: identity.id });
+    const signOut = signOuts.get(identity.id);
+    if (
+      signOut !== undefined &&
+      signOut.generation !== socket.data.signOutGeneration &&
+      signOut.keptSessionId !== sessionId
+    ) {
+      socketLogger.info("socket of a session signed out during its handshake disconnected");
+      socket.data.release();
+      socket.disconnect(true);
+      return;
+    }
     socket.join([sessionRoom(sessionId), playerRoom(identity.id)]);
     socketLogger.info("socket connected");
     let roomChannels = [];
@@ -205,13 +237,20 @@ export function createRealtimeGateway({
       io.in(sessionRoom(sessionId)).disconnectSockets(true);
     },
     /**
-     * Disconnects every socket of a player except those of one session: the device that changed the password or
-     * asked to sign out its other devices stays connected (CC-116).
+     * The device that changed the password or asked to sign out its other devices got a new session id (CC-116).
+     * Its sockets move from the old id to the new one and stay connected. Every other socket of the player is
+     * disconnected, and so is any handshake of the player that is being checked right now.
      *
-     * @param {{ playerId: string, keepSessionId: string }} which
+     * @param {{ playerId: string, fromSessionId: string, toSessionId: string }} which
      */
-    disconnectOtherSessions({ playerId, keepSessionId }) {
-      io.in(playerRoom(playerId)).except(sessionRoom(keepSessionId)).disconnectSockets(true);
+    async disconnectOtherSessions({ playerId, fromSessionId, toSessionId }) {
+      signOuts.set(playerId, { generation: signOutGeneration(playerId) + 1, keptSessionId: toSessionId });
+      for (const socket of await io.in(sessionRoom(fromSessionId)).fetchSockets()) {
+        socket.leave(sessionRoom(fromSessionId));
+        socket.join(sessionRoom(toSessionId));
+        socket.data.sessionId = toSessionId;
+      }
+      io.in(playerRoom(playerId)).except(sessionRoom(toSessionId)).disconnectSockets(true);
     },
     /** @returns {{ connections: number, players: number }} realtime connections and connected players, for the gauge */
     counts: () => admission.counts(),

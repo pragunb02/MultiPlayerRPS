@@ -16,6 +16,7 @@ const CLOSING = Object.freeze({ closing: { $exists: true } });
  * @property {Record<string, unknown>} options
  * @property {string} status
  * @property {string} hostId
+ * @property {string} [network]        an opaque name of the network the room was opened from (rooms before CC-107 have none)
  * @property {Array<{ playerId: string, displayName: string, connected: boolean }>} seats
  * @property {Record<string, unknown>} [game]
  * @property {Record<string, unknown>} [result]
@@ -99,6 +100,8 @@ export function createRoomDao({ connection, betweenClosedReads = async () => {} 
         { key: { dueAt: 1 }, name: "due_at" },
         // Every minute: rooms whose lifetime has ended.
         { key: { expiresAt: 1 }, name: "expires_at" },
+        // Before every new room: how many rooms its host's network already has open (CC-107).
+        { key: { network: 1 }, name: "network" },
       ]);
       await closed.createIndexes([
         { key: { code: 1 }, unique: true, name: "code_unique" },
@@ -221,6 +224,9 @@ export function createRoomDao({ connection, betweenClosedReads = async () => {} 
      * @returns {Promise<number>}
      */
     countOpen: () => rooms.estimatedDocumentCount(),
+
+    /** @param {string} network  open rooms opened from this network */
+    countByNetwork: (network) => rooms.countDocuments({ network, ...OPEN }),
 
     /** @returns {Promise<Record<string, number>>} open rooms per status, only for statuses that have any */
     async countByStatus() {

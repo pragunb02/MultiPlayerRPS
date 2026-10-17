@@ -3,7 +3,7 @@ import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { UnauthorizedError, ValidationError } from "../../utils/errors.js";
 import { createLoginThrottle, LOGIN_THROTTLE } from "./loginThrottle.js";
 import { clientIpKey, createRateLimit } from "./rateLimits.js";
-import { establishAccountSession, requireIdentity, saveSession } from "./session.js";
+import { establishAccountSession, requireIdentity } from "./session.js";
 
 const MINUTE_MS = 60 * 1000;
 
@@ -66,13 +66,15 @@ const normalisedEmail = (email) => (typeof email === "string" ? email.trim().toL
  * this request. Moving them never fails a sign-in: a failure is logged and finished later by housekeeping.
  *
  * Changing the password and signing out other devices end every other session of the account (CC-116). This
- * session takes the new session version, so it stays signed in, and `onOtherSessionsEnded` disconnects the
+ * session takes the new session version under a new id, so it stays signed in while a stolen copy of its old
+ * cookie stops working, and `onOtherSessionsEnded` moves this browser's sockets to the new id and disconnects the
  * sockets of the others.
  *
  * @param {{
  *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
  *   onSessionEnded: (sessionId: string) => void,
- *   onOtherSessionsEnded: (which: { playerId: string, keepSessionId: string }) => void,
+ *   onOtherSessionsEnded: (which: { playerId: string, fromSessionId: string, toSessionId: string }) => void,
+ *   renewals: ReturnType<typeof import("./session.js").createSessionRenewals>,
  *   onIdentityChanged: (change: { previous: import("../../models/identity.js").Identity | undefined, identity: import("../../models/identity.js").Identity }) => Promise<{ carriedOver?: { xp: number, matchesPlayed: number, matches: number } }>,
  *   now?: () => number,
  *   limits?: Partial<typeof DEFAULT_LIMITS>,   any limit not given keeps its standard value
@@ -82,6 +84,7 @@ export function createAuthRoutes({
   accountComponent,
   onSessionEnded,
   onOtherSessionsEnded,
+  renewals,
   onIdentityChanged,
   now = Date.now,
   limits = {},
@@ -89,6 +92,7 @@ export function createAuthRoutes({
   assertDefined(accountComponent, "accountComponent");
   assertFunction(onSessionEnded, "onSessionEnded");
   assertFunction(onOtherSessionsEnded, "onOtherSessionsEnded");
+  assertDefined(renewals, "renewals");
   assertFunction(onIdentityChanged, "onIdentityChanged");
   const rules = { ...DEFAULT_LIMITS, ...limits };
   const router = Router();
@@ -108,7 +112,7 @@ export function createAuthRoutes({
   async function signIn(req, res, { identity, sessionVersion }, status) {
     const previous = req.session.identity;
     const previousSessionId = previous === undefined ? "" : req.sessionID;
-    await establishAccountSession(req, { identity, sessionVersion, now: now() });
+    await establishAccountSession(req, { identity, sessionVersion, signedInAt: now() });
     const { carriedOver } = await followIdentity(req, { previous, identity });
     if (previousSessionId !== "") {
       onSessionEnded(previousSessionId);
@@ -129,11 +133,18 @@ export function createAuthRoutes({
     }
   }
 
-  /** This session takes the account's new version and stays signed in. Every other one is ended. */
-  async function keepOnlyThisSession(req, sessionVersion) {
-    req.session.sessionVersion = sessionVersion;
-    await saveSession(req);
-    onOtherSessionsEnded({ playerId: req.session.identity.id, keepSessionId: req.sessionID });
+  /**
+   * `bump` counts the account's version up. This session then takes the new version under a new id and stays
+   * signed in, and every other session is ended. The old id is marked as renewing first, so a request of this
+   * browser that is on its way meanwhile is not signed out (see createSessionRenewals).
+   */
+  async function keepOnlyThisSession(req, { bump, signedInAt }) {
+    const identity = requireIdentity(req.session);
+    const fromSessionId = req.sessionID;
+    renewals.begin(fromSessionId);
+    const sessionVersion = await bump();
+    await establishAccountSession(req, { identity, sessionVersion, signedInAt });
+    onOtherSessionsEnded({ playerId: identity.id, fromSessionId, toSessionId: req.sessionID });
   }
 
   router.post("/auth/signup", perIp, signupPerIp, async (req, res) => {
@@ -162,8 +173,11 @@ export function createAuthRoutes({
   router.post("/auth/password", perIp, failedPasswordChanges, async (req, res) => {
     const { currentPassword, newPassword } = requireFields(req.body, ["currentPassword", "newPassword"]);
     const { id: playerId } = requireIdentity(req.session);
-    const sessionVersion = await accountComponent.changePassword({ playerId, currentPassword, newPassword });
-    await keepOnlyThisSession(req, sessionVersion);
+    // Knowing the password is a new sign-in, so the 90 days start again.
+    await keepOnlyThisSession(req, {
+      bump: () => accountComponent.changePassword({ playerId, currentPassword, newPassword }),
+      signedInAt: now(),
+    });
     req.log.info({ playerId }, "password changed, other sessions signed out");
     res.status(204).end();
   });
@@ -171,8 +185,11 @@ export function createAuthRoutes({
   router.post("/auth/sign-out-others", perIp, async (req, res) => {
     requireNoFields(req.body);
     const { id: playerId } = requireIdentity(req.session);
-    const sessionVersion = await accountComponent.signOutOtherDevices({ playerId });
-    await keepOnlyThisSession(req, sessionVersion);
+    // No password was given, so the session keeps its 90 days instead of starting them again.
+    await keepOnlyThisSession(req, {
+      bump: () => accountComponent.signOutOtherDevices({ playerId }),
+      signedInAt: req.session.signedInAt,
+    });
     req.log.info({ playerId }, "other sessions signed out");
     res.status(204).end();
   });

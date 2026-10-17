@@ -8,16 +8,20 @@
  * 2. The server holds at most `openRoomsMax` open rooms of any kind. Past that, creating a room answers "server
  *    busy, try again in a minute". Rooms close by themselves (see roomLifetimes.js), so space comes back quickly.
  *    Two thousand rooms is about four thousand players, far above what one small instance is sized for.
- * 3. One browser session may hold at most `socketsPerSession` realtime connections. That is one per open tab, and
+ * 3. One network address may have opened at most `openRoomsPerAddress` rooms that are still open, of any status.
+ *    Guests cost nothing to make, so without this a dozen addresses with throwaway guests could hold the whole
+ *    server ceiling. Thirty is a school computer room where every pair of pupils starts a game.
+ * 4. One browser session may hold at most `socketsPerSession` realtime connections. That is one per open tab, and
  *    five tabs of the same game is already more than anyone plays.
- * 4. One network address may hold at most `socketsPerAddress` connections. A school or office behind one address
+ * 5. One network address may hold at most `socketsPerAddress` connections. A school or office behind one address
  *    stays well inside it, and a script on one machine cannot open thousands.
- * 5. Each player gets one budget of realtime events shared by all their tabs: bursts of up to
+ * 6. Each player gets one budget of realtime events shared by all their tabs: bursts of up to
  *    `eventBurstPerPlayer`, refilled at `eventsPerSecondPerPlayer`. Opening more tabs does not buy more events.
  */
 export const ROOM_LIMITS = Object.freeze({
   waitingRoomsPerPlayer: 3,
   openRoomsMax: 2000,
+  openRoomsPerAddress: 30,
   socketsPerSession: 5,
   socketsPerAddress: 30,
   eventBurstPerPlayer: 20,

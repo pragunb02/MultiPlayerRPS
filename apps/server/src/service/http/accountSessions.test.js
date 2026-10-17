@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, send } from "../../testing/socketClients.js";
+import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { startTestServer } from "../../testing/testApp.js";
 import { SESSION_ABSOLUTE_LIFETIME_MS } from "./session.js";
 
@@ -59,10 +60,56 @@ describe("POST /api/auth/password (CC-116)", () => {
     const changed = await changePassword(laptop);
 
     expect(changed.status).toBe(204);
-    expect((await whoAmI(laptop)).authenticated).toBe(true);
+    expect((await whoAmI(changed.cookie)).authenticated).toBe(true);
     expect(await whoAmI(phone)).toEqual({ authenticated: false });
     expect((await login(RIYA.password)).status).toBe(401);
     expect((await login(NEW_PASSWORD)).status).toBe(200);
+  });
+
+  it("gives this device a new session id, so a copy of its old cookie stops working", async () => {
+    const { laptop } = await twoDevices();
+    const stolenCopy = laptop;
+
+    const changed = await changePassword(laptop);
+
+    expect(changed.cookie).not.toBe(laptop);
+    expect(await whoAmI(stolenCopy)).toEqual({ authenticated: false });
+    expect((await whoAmI(changed.cookie)).authenticated).toBe(true);
+    const refused = await clients.openSocket(stolenCopy).catch((err) => err);
+    expect(refused.data).toEqual({ code: ERROR_CODES.UNAUTHORIZED });
+  });
+
+  it("keeps a request of this browser that was on its way during the change signed in", async () => {
+    const accounts = createInMemoryAccountDao();
+    let releaseBump;
+    let bumping;
+    const accountDao = {
+      ...accounts,
+      bumpSessionVersion: async (change) => {
+        const result = await accounts.bumpSessionVersion(change);
+        bumping?.();
+        await new Promise((resolve) => {
+          releaseBump = resolve;
+        });
+        return result;
+      },
+    };
+    server = await startTestServer({ accountDao });
+    const laptop = (await call("POST", "/api/auth/signup", { body: RIYA })).cookie;
+    const bumped = new Promise((resolve) => {
+      bumping = resolve;
+    });
+
+    const change = changePassword(laptop);
+    await bumped;
+    const meanwhile = await whoAmI(laptop);
+    releaseBump();
+    const changed = await change;
+
+    expect(meanwhile.authenticated).toBe(true);
+    expect(changed.status).toBe(204);
+    expect((await whoAmI(changed.cookie)).authenticated).toBe(true);
+    expect(server.endedSessions).toEqual([]);
   });
 
   it("disconnects the other device's sockets at once and leaves this device's connected", async () => {
@@ -71,13 +118,21 @@ describe("POST /api/auth/password (CC-116)", () => {
     const phoneSocket = await clients.openSocket(phone);
     const phoneCut = new Promise((resolve) => phoneSocket.once("disconnect", resolve));
 
-    await changePassword(laptop);
+    const changed = await changePassword(laptop);
 
     expect(await phoneCut).toBe("io server disconnect");
     expect((await send(laptopSocket, SOCKET_EVENTS.IDENTITY_GET)).ok).toBe(true);
     expect(server.otherSessionsEnded).toEqual([
-      { playerId: expect.stringMatching(/^user_/), keepSessionId: expect.any(String) },
+      {
+        playerId: expect.stringMatching(/^user_/),
+        fromSessionId: expect.any(String),
+        toSessionId: expect.any(String),
+      },
     ]);
+    // The laptop's socket now belongs to the new session: signing out there reaches it.
+    const laptopCut = new Promise((resolve) => laptopSocket.once("disconnect", resolve));
+    await call("DELETE", "/api/session", { cookie: changed.cookie });
+    expect(await laptopCut).toBe("io server disconnect");
   });
 
   it("refuses a wrong current password on its field and changes nothing", async () => {
@@ -172,7 +227,8 @@ describe("POST /api/auth/sign-out-others (CC-116)", () => {
     const res = await call("POST", "/api/auth/sign-out-others", { cookie: laptop });
 
     expect(res.status).toBe(204);
-    expect((await whoAmI(laptop)).authenticated).toBe(true);
+    expect((await whoAmI(res.cookie)).authenticated).toBe(true);
+    expect(await whoAmI(laptop)).toEqual({ authenticated: false }); // the old id of this device is gone too
     expect(await whoAmI(phone)).toEqual({ authenticated: false });
     expect(await whoAmI(tablet)).toEqual({ authenticated: false });
     expect((await login()).status).toBe(200); // the password still works
@@ -192,11 +248,11 @@ describe("POST /api/auth/sign-out-others (CC-116)", () => {
   it("can be used twice in a row", async () => {
     const { laptop } = await twoDevices();
 
-    await call("POST", "/api/auth/sign-out-others", { cookie: laptop });
-    const again = await call("POST", "/api/auth/sign-out-others", { cookie: laptop });
+    const first = await call("POST", "/api/auth/sign-out-others", { cookie: laptop });
+    const again = await call("POST", "/api/auth/sign-out-others", { cookie: first.cookie });
 
     expect(again.status).toBe(204);
-    expect((await whoAmI(laptop)).authenticated).toBe(true);
+    expect((await whoAmI(again.cookie)).authenticated).toBe(true);
   });
 
   it("accepts an empty JSON object, but nothing in it", async () => {
@@ -231,6 +287,28 @@ describe("the 90 day session lifetime (CC-116)", () => {
         (entry) => entry.msg === "session ended by the server" && entry.reason === "expired",
       ),
     ).toBe(true);
+  });
+
+  it("does not start the 90 days again on sign out others, because no password was given", async () => {
+    let time = Date.UTC(2026, 9, 17);
+    const { laptop } = await twoDevices({ now: () => time });
+    time += SESSION_ABSOLUTE_LIFETIME_MS - 2000;
+
+    const renewed = (await call("POST", "/api/auth/sign-out-others", { cookie: laptop })).cookie;
+    time += 2000;
+
+    expect(await whoAmI(renewed)).toEqual({ authenticated: false });
+  });
+
+  it("starts the 90 days again on a password change, because the password was given", async () => {
+    let time = Date.UTC(2026, 9, 17);
+    const { laptop } = await twoDevices({ now: () => time });
+    time += SESSION_ABSOLUTE_LIFETIME_MS - 2000;
+
+    const renewed = (await changePassword(laptop)).cookie;
+    time += 2000;
+
+    expect((await whoAmI(renewed)).authenticated).toBe(true);
   });
 
   it("keeps a guest session however old it is", async () => {

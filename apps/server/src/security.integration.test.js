@@ -79,7 +79,8 @@ function openSocket(cookie) {
   });
 }
 
-describe("sessions of an account (integration, CC-116)", () => {
+// Production-strength password hashing takes a while, more so on a busy CI machine.
+describe("sessions of an account (integration, CC-116)", { timeout: 20_000 }, () => {
   it("signs out the other device everywhere: its session, its socket and its next connection", async () => {
     await start();
     const laptop = (await call("POST", "/api/auth/signup", { body: RIYA })).cookie;
@@ -89,13 +90,16 @@ describe("sessions of an account (integration, CC-116)", () => {
     const phoneSocket = await openSocket(phone);
     const phoneCut = new Promise((resolve) => phoneSocket.once("disconnect", resolve));
 
-    expect((await call("POST", "/api/auth/sign-out-others", { cookie: laptop })).status).toBe(204);
+    const signedOut = await call("POST", "/api/auth/sign-out-others", { cookie: laptop });
+    expect(signedOut.status).toBe(204);
 
     expect(await phoneCut).toBe("io server disconnect");
     const refused = await openSocket(phone).catch((err) => err);
     expect(refused.data).toEqual({ code: ERROR_CODES.UNAUTHORIZED });
     expect(await whoAmI(phone)).toEqual({ authenticated: false });
-    expect((await whoAmI(laptop)).authenticated).toBe(true);
+    expect((await whoAmI(signedOut.cookie)).authenticated).toBe(true);
+    // This device got a new session id. Its old one is gone from MongoDB, so a copy of the old cookie is useless.
+    expect(await whoAmI(laptop)).toEqual({ authenticated: false });
     const [account] = await withDatabase((db) => db.collection("accounts").find().toArray());
     expect(account.sessionVersion).toBe(1);
   });
@@ -122,7 +126,8 @@ describe("sessions of an account (integration, CC-116)", () => {
       body: { email: RIYA.email, password: "a brand new password" },
     });
     expect([oldLogin.status, newLogin.status]).toEqual([401, 200]);
-    expect((await whoAmI(laptop)).authenticated).toBe(true);
+    expect((await whoAmI(changed.cookie)).authenticated).toBe(true);
+    expect(await whoAmI(laptop)).toEqual({ authenticated: false });
   });
 
   it("keeps accounts and sessions made before CC-116 signed in, and starts their 90 days now", async () => {
@@ -144,7 +149,7 @@ describe("sessions of an account (integration, CC-116)", () => {
   });
 });
 
-describe("room flood limits with rooms in MongoDB (integration, CC-107)", () => {
+describe("room flood limits with rooms in MongoDB (integration, CC-107)", { timeout: 20_000 }, () => {
   const createRace = (socket) =>
     socket.timeout(2_000).emitWithAck(SOCKET_EVENTS.ROOM_CREATE, { gameId: "rps", options: { bestOf: 1 } });
   const guest = async () => (await call("POST", "/api/session/guest")).cookie;

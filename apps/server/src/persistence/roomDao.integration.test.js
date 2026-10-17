@@ -133,6 +133,8 @@ describe("MongoDB room DAO honours the room DAO contract (integration)", () => {
     await dao.ensureIndexes();
     const names = (await database.connection.db.collection("rooms").indexes()).map((index) => index.name);
 
-    expect(names).toEqual(expect.arrayContaining(["code_unique", "seats_player", "due_at", "expires_at"]));
+    expect(names).toEqual(
+      expect.arrayContaining(["code_unique", "seats_player", "due_at", "expires_at", "network"]),
+    );
   });
 });

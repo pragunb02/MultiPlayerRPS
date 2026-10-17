@@ -6,7 +6,7 @@ import { createApiRateLimit, DEFAULT_API_LIMIT } from "./rateLimits.js";
 import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createRequestLogger } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
-import { createSessionGuard } from "./session.js";
+import { createSessionGuard, createSessionRenewals } from "./session.js";
 import { createWebAppRouter } from "./webApp.js";
 
 /**
@@ -24,8 +24,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
- *   onOtherSessionsEnded: (which: { playerId: string, keepSessionId: string }) => void,  told when one session ended
- *     every other session of its account (CC-116)
+ *   onOtherSessionsEnded: (which: { playerId: string, fromSessionId: string, toSessionId: string }) => void,  told
+ *     when one session ended every other session of its account and took a new id (CC-116)
  *   checkSession: ReturnType<typeof import("./session.js").createSessionCheck>,  whether a session may still be used
  *   onIdentityChanged: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["onIdentityChanged"],
  *   guestLimit?: { windowMs: number, limit: number },
@@ -90,7 +90,8 @@ export function createHttpApp({
   app.use("/api", createApiRateLimit(apiLimit));
   // After the limit, so a flood of requests is refused before it costs a database read each. A session signed out
   // elsewhere or older than 90 days goes on as no session at all (CC-116).
-  app.use("/api", createSessionGuard({ checkSession, onSessionEnded, now }));
+  const renewals = createSessionRenewals({ now });
+  app.use("/api", createSessionGuard({ checkSession, onSessionEnded, renewals, now }));
 
   app.use(
     "/api",
@@ -103,6 +104,7 @@ export function createHttpApp({
       authLimits,
       onSessionEnded,
       onOtherSessionsEnded,
+      renewals,
       onIdentityChanged,
       guestLimit,
       now,

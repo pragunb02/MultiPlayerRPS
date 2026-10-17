@@ -75,7 +75,7 @@ How long rooms live is in `apps/server/src/domain/rooms/roomLifetimes.js` (remat
 2 hours, closed room records 1 day). There are no settings for it in production.
 
 How much one player and the whole server may use is in `apps/server/src/domain/rooms/roomLimits.js` (CC-107): 3
-waiting rooms per player, 2000 open rooms in all (past that, creating a room answers "The server is busy, try again
+waiting rooms per player, 30 open rooms per network address, 2000 open rooms in all (past that, creating a room answers "The server is busy, try again
 in a minute"), 5 realtime connections per browser session, 30 per address (found through `TRUST_PROXY_HOPS` like
 the HTTP limits), and one event budget per player for all their tabs. Every minute the server logs `room gauge` with
 the open rooms per status, the connections and the connected players. Watch it to see how close production is to

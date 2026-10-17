@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ROOM_LIMITS, roomLimits } from "./roomLimits.js";
 
 describe("room limits", () => {
-  it("allows three waiting rooms per player, two thousand rooms in all, five tabs and thirty connections per address", () => {
+  it("allows three waiting rooms per player, two thousand rooms in all and thirty per address, five tabs and thirty connections per address", () => {
     expect(ROOM_LIMITS).toEqual({
       waitingRoomsPerPlayer: 3,
       openRoomsMax: 2000,
+      openRoomsPerAddress: 30,
       socketsPerSession: 5,
       socketsPerAddress: 30,
       eventBurstPerPlayer: 20,

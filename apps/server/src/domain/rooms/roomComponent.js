@@ -295,7 +295,7 @@ export function createRoomComponent({
    * is full (CC-107). A waiting room whose time is up counts as closed, even before the sweep removes it. Two rooms
    * created at the very same moment can both pass, which only lets a player go one room over.
    */
-  async function checkRoomLimits(host, now) {
+  async function checkRoomLimits(host, network, now) {
     const waiting = (await roomAccessor.listBySeat(host.id)).filter(
       (room) => room.status === ROOM_STATUS.WAITING && now < lifetimeOf(room, lifetimes).endsAt,
     );
@@ -306,6 +306,12 @@ export function createRoomComponent({
           details: { reason: ROOM_LIMIT_REASONS.WAITING_ROOMS, limit: limits.waitingRoomsPerPlayer },
         },
       );
+    }
+    // Guests cost nothing to make, so a cap per player alone would let a few networks fill the server (CC-107).
+    if ((await roomAccessor.countByNetwork(network)) >= limits.openRoomsPerAddress) {
+      throw new ConflictError("Too many rooms are open from your network. Try again later.", {
+        details: { reason: ROOM_LIMIT_REASONS.NETWORK_ROOMS, limit: limits.openRoomsPerAddress },
+      });
     }
     if ((await roomAccessor.countOpen()) >= limits.openRoomsMax) {
       throw new ServerBusyError("The server is busy, try again in a minute", {
@@ -319,11 +325,22 @@ export function createRoomComponent({
      * Creates a room with the host seated. Unknown games and invalid options are rejected. A code is never one
      * still in use, nor one that closed recently, so an old link never leads into a stranger's new room.
      *
-     * @param {{ host: import("../../models/identity.js").Identity, gameId: string, options: unknown, now: number }} input
-     * @throws {ConflictError} when the host already has as many waiting rooms as allowed (see roomLimits.js)
+     * @param {{
+     *   host: import("../../models/identity.js").Identity,
+     *   network: string,
+     *   gameId: string,
+     *   options: unknown,
+     *   now: number,
+     * }} input  `network` names the host's network address without being it (see the gateway), so the rooms
+     *   opened from one network can be counted
+     * @throws {ConflictError} when the host already has as many waiting rooms as allowed, or their network as many
+     *   open rooms (see roomLimits.js)
      * @throws {ServerBusyError} when the server holds as many rooms as it can
      */
-    async createRoom({ host, gameId, options, now }) {
+    async createRoom({ host, network, gameId, options, now }) {
+      if (typeof network !== "string" || network === "") {
+        throw new TypeError("createRoom needs the network the host connects from");
+      }
       if (typeof gameId !== "string" || !engines.has(gameId)) {
         throw new ValidationError("That game is not available", { details: { field: "gameId" } });
       }
@@ -331,7 +348,7 @@ export function createRoomComponent({
       if (!validated.ok) {
         throw new ValidationError(validated.message, { details: { field: "options" } });
       }
-      await checkRoomLimits(host, now);
+      await checkRoomLimits(host, network, now);
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
         const code = generateCode();
         if ((await roomAccessor.exists(code)) || (await roomAccessor.wasClosed(code))) {
@@ -343,6 +360,7 @@ export function createRoomComponent({
           options: validated.value,
           status: ROOM_STATUS.WAITING,
           hostId: host.id,
+          network,
           seats: [{ playerId: host.id, displayName: host.displayName, connected: true }],
           createdAt: now,
           lastActivityAt: now,

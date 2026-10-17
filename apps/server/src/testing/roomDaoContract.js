@@ -376,6 +376,19 @@ export function runRoomDaoContract(createDao) {
     expect(await dao.countOpen()).toBe(1);
   });
 
+  it("counts the open rooms opened from one network, and no longer counts one once it is closed", async () => {
+    const dao = await createDao();
+    await dao.insert(roomDoc({ code: "ONE222", network: "net-a" }));
+    await dao.insert(roomDoc({ code: "TWO222", network: "net-a", status: "waiting" }));
+    await dao.insert(roomDoc({ code: "OTH222", network: "net-b" }));
+    await dao.insert(roomDoc({ code: "OLD222" }));
+    await dao.close({ code: "ONE222", version: 1, record: closedRecord({ code: "ONE222" }) });
+
+    expect(await dao.countByNetwork("net-a")).toBe(1);
+    expect(await dao.countByNetwork("net-b")).toBe(1);
+    expect(await dao.countByNetwork("net-c")).toBe(0);
+  });
+
   it("counts the open rooms per status, leaving out statuses with none", async () => {
     const dao = await createDao();
     expect(await dao.countByStatus()).toEqual({});

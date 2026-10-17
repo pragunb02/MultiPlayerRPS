@@ -25,6 +25,7 @@ import { createHttpApp } from "../service/http/app.js";
 import { createSessionCheck, createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
 import { createBackgroundTasks } from "../utils/backgroundTasks.js";
+import { createNetworkKey } from "../utils/networkKey.js";
 import { createPasswordHasher } from "../utils/passwordHasher.js";
 import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
@@ -236,6 +237,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     domainEvents: testApp.domainEvents,
     checkSession: testApp.checkSession,
     trustProxyHops: testApp.config.trustProxyHops,
+    networkOf: createNetworkKey({ secret: testApp.config.sessionSecret }),
     now,
     ...(options.roomLimits && { limits: options.roomLimits }),
   });

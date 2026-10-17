@@ -99,22 +99,43 @@ function regenerateWith(req, fields) {
 
 /**
  * Stores an account's identity in a fresh session id, with the account's session version and the moment of
- * signing in, so the session can be ended later by "sign out other devices" or by its age (CC-116).
+ * signing in, so the session can be ended later by "sign out other devices" or by its age (CC-116). The old id is
+ * destroyed, so a copy of the old cookie no longer works.
  *
  * @param {import("express").Request} req
- * @param {{ identity: Readonly<import("../../models/identity.js").Identity>, sessionVersion: number, now: number }} signIn
+ * @param {{
+ *   identity: Readonly<import("../../models/identity.js").Identity>,
+ *   sessionVersion: number,
+ *   signedInAt: number,
+ * }} signIn
  * @returns {Promise<void>}
  */
-export const establishAccountSession = (req, { identity, sessionVersion, now }) =>
-  regenerateWith(req, { identity: { ...identity }, sessionVersion, signedInAt: now });
+export const establishAccountSession = (req, { identity, sessionVersion, signedInAt }) =>
+  regenerateWith(req, { identity: { ...identity }, sessionVersion, signedInAt });
+
+/** How long requests that were already on their way with a session id that was just renewed still pass. */
+export const RENEWAL_GRACE_MS = 5_000;
 
 /**
- * @param {import("express").Request} req
- * @returns {Promise<void>}
+ * Session ids being renewed by their own player (a password change or "sign out other devices", CC-116). Another
+ * request of the same browser can be on its way while the account's version moves on and the session gets its new
+ * id. It still carries the old id and the old version, so the check would sign the browser out that just asked to
+ * stay. For a few seconds such a request passes instead. The old id is already destroyed by then, so it cannot be
+ * used again after that.
+ *
+ * @param {{ now: () => number, graceMs?: number }} deps
  */
-export function saveSession(req) {
-  return new Promise((resolve, reject) => {
-    req.session.save((err) => (err ? reject(err) : resolve()));
+export function createSessionRenewals({ now, graceMs = RENEWAL_GRACE_MS }) {
+  /** @type {Map<string, number>} session id to the moment its grace ends */
+  const renewing = new Map();
+  return Object.freeze({
+    /** @param {string} sessionId  about to get a new id */
+    begin(sessionId) {
+      for (const [id, until] of renewing) if (now() >= until) renewing.delete(id);
+      renewing.set(sessionId, now() + graceMs);
+    },
+    /** @param {string} sessionId */
+    isRenewing: (sessionId) => (renewing.get(sessionId) ?? 0) > now(),
   });
 }
 
@@ -180,13 +201,15 @@ export function createSessionCheck({
  * @param {{
  *   checkSession: ReturnType<typeof createSessionCheck>,
  *   onSessionEnded: (sessionId: string) => void,
+ *   renewals: ReturnType<typeof createSessionRenewals>,
  *   now: () => number,
  * }} deps
  * @returns {import("express").RequestHandler}
  */
-export function createSessionGuard({ checkSession, onSessionEnded, now }) {
+export function createSessionGuard({ checkSession, onSessionEnded, renewals, now }) {
   assertFunction(checkSession, "checkSession");
   assertFunction(onSessionEnded, "onSessionEnded");
+  assertDefined(renewals, "renewals");
   return async (req, res, next) => {
     if (!hasValidIdentity(req.session)) {
       next();
@@ -200,6 +223,10 @@ export function createSessionGuard({ checkSession, onSessionEnded, now }) {
     } catch (err) {
       // Anything else, such as the database being down, is a server fault: Express answers it with a 500.
       if (!(err instanceof UnauthorizedError)) throw err;
+      if (err.details.reason === SESSION_END_REASONS.SIGNED_OUT && renewals.isRenewing(req.sessionID)) {
+        next();
+        return;
+      }
       const endedId = req.sessionID;
       const playerId = req.session.identity.id;
       await regenerateSession(req);

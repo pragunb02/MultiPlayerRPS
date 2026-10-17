@@ -7,7 +7,7 @@ import {
   establishAccountSession,
   establishSession,
   requireIdentity,
-  saveSession,
+  createSessionRenewals,
   SESSION_ABSOLUTE_LIFETIME_MS,
   SESSION_END_REASONS,
 } from "./session.js";
@@ -73,18 +73,35 @@ describe("establishAccountSession (CC-116)", () => {
   it("stores the identity with the account's session version and the moment of signing in", async () => {
     const req = requestWithStore();
 
-    await establishAccountSession(req, { identity: USER, sessionVersion: 3, now: T0 });
+    await establishAccountSession(req, { identity: USER, sessionVersion: 3, signedInAt: T0 });
 
     expect(req.session).toMatchObject({ identity: USER, sessionVersion: 3, signedInAt: T0 });
   });
 });
 
-describe("saveSession", () => {
-  it("saves the session, or reports the store's failure", async () => {
-    await expect(saveSession(requestWithStore())).resolves.toBeUndefined();
-    await expect(saveSession(requestWithStore({ save: new Error("store down") }))).rejects.toThrow(
-      "store down",
-    );
+describe("createSessionRenewals (CC-116)", () => {
+  it("lets a renewing session id pass for five seconds, then never again", () => {
+    let time = T0;
+    const renewals = createSessionRenewals({ now: () => time });
+
+    renewals.begin("old-session");
+    time += 4_999;
+    expect(renewals.isRenewing("old-session")).toBe(true);
+    expect(renewals.isRenewing("other-session")).toBe(false);
+    time += 1;
+
+    expect(renewals.isRenewing("old-session")).toBe(false);
+  });
+
+  it("forgets ids whose grace has ended when a new one begins", () => {
+    let time = T0;
+    const renewals = createSessionRenewals({ now: () => time, graceMs: 10 });
+    renewals.begin("first");
+    time += 20;
+
+    renewals.begin("second");
+
+    expect([renewals.isRenewing("first"), renewals.isRenewing("second")]).toEqual([false, true]);
   });
 });
 
@@ -199,9 +216,37 @@ describe("createSessionGuard (CC-116)", () => {
 
   function guard(check) {
     const onSessionEnded = vi.fn();
-    const middleware = createSessionGuard({ checkSession: check, onSessionEnded, now: () => T0 });
-    return { middleware, onSessionEnded };
+    const renewals = createSessionRenewals({ now: () => T0 });
+    const middleware = createSessionGuard({ checkSession: check, onSessionEnded, renewals, now: () => T0 });
+    return { middleware, onSessionEnded, renewals };
   }
+  const signedOutCheck = async () => {
+    throw new UnauthorizedError("signed out", { details: { reason: SESSION_END_REASONS.SIGNED_OUT } });
+  };
+
+  it("lets a request of a session that is being renewed by its own player through, without ending it", async () => {
+    const { middleware, onSessionEnded, renewals } = guard(signedOutCheck);
+    renewals.begin("old-session");
+    const req = request({ identity: USER, sessionVersion: 0 });
+    const next = vi.fn();
+
+    await middleware(req, {}, next);
+
+    expect(next).toHaveBeenCalledWith();
+    expect(req.session.identity).toEqual(USER);
+    expect(onSessionEnded).not.toHaveBeenCalled();
+  });
+
+  it("still ends a renewing session that is too old", async () => {
+    const { middleware, onSessionEnded, renewals } = guard(async () => {
+      throw new UnauthorizedError("expired", { details: { reason: SESSION_END_REASONS.EXPIRED } });
+    });
+    renewals.begin("old-session");
+
+    await middleware(request({ identity: USER }), {}, vi.fn());
+
+    expect(onSessionEnded).toHaveBeenCalledWith("old-session");
+  });
 
   it("lets a session that may be used through unchanged", async () => {
     const { middleware, onSessionEnded } = guard(async () => {});

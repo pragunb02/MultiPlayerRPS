@@ -42,6 +42,7 @@ import { createHttpApp } from "./service/http/app.js";
 import { createSessionCheck, createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
+import { createNetworkKey } from "./utils/networkKey.js";
 import { createPasswordHasher } from "./utils/passwordHasher.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -453,11 +454,16 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     domainEvents,
     checkSession,
     trustProxyHops: config.trustProxyHops,
+    networkOf: createNetworkKey({ secret: config.sessionSecret }),
     limits: limitsOfRooms,
     now,
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
-  sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
+  sessionEvents.on(OTHER_SESSIONS_ENDED, (which) =>
+    gateway
+      .disconnectOtherSessions(which)
+      .catch((err) => logger.error({ err, playerId: which.playerId }, "disconnecting other sessions failed")),
+  );
 
   const housekeeping = startHousekeeping({
     roomComponent,
