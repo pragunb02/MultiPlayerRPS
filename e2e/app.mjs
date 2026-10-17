@@ -5,17 +5,18 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "../apps/server/src/config/index.js";
 import { handleShutdownSignals, startServer } from "../apps/server/src/server.js";
 import { createLogger } from "../apps/server/src/utils/logger.js";
-import { E2E_PORT } from "./personas.js";
+import { APP_PORT, BASE_URL } from "./personas.js";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const config = loadConfig({
-  // Secure cookies and proxy trust, as on Render. The tests send X-Forwarded-Proto: https.
+  // Secure cookies and proxy trust, as on Render. server.mjs ends TLS in front of this process, and the tests send
+  // X-Forwarded-Proto: https as Render's proxy does.
   NODE_ENV: "production",
-  PORT: String(E2E_PORT),
+  PORT: String(APP_PORT),
   LOG_LEVEL: "warn",
   MONGO_URI: process.env.E2E_MONGO_URI,
   SESSION_SECRET: "e2e-session-secret-not-used-anywhere-else-0123456789",
-  ALLOWED_ORIGINS: `http://localhost:${E2E_PORT}`,
+  ALLOWED_ORIGINS: BASE_URL,
   WEB_DIST_DIR: path.join(root, "apps/web/dist"),
 });
 const logger = createLogger({ level: config.logLevel });

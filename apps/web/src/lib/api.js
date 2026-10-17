@@ -22,7 +22,18 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     if (res.status === 204) {
       return {};
     }
-    const payload = await res.json().catch(() => ({}));
+    let payload;
+    try {
+      payload = await res.json();
+    } catch (err) {
+      // A success whose answer never fully arrived is a failed request, not an empty answer. WebKit cuts the
+      // answer off when the player leaves the page while it is still arriving, and an empty answer made the
+      // page read data that was not there (CC-184).
+      if (res.ok) {
+        throw networkError(err);
+      }
+      payload = {};
+    }
     if (!res.ok) {
       throw new AppRequestError({
         ...(payload.error ?? { code: "UNKNOWN", message: "Something went wrong" }),

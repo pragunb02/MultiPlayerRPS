@@ -1,14 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { Chess } from "chess.js";
 import mongoose from "mongoose";
-import { expect, test } from "./fixtures.js";
+import { expect, formFactor, test } from "./fixtures.js";
 import { E2E_MONGO_URI } from "./personas.js";
 
 // Two guests playing chess the way people do on the big chess sites (CC-102): dragging pieces with a mouse,
 // tapping or dragging with a finger on a phone, the keyboard, looking back through the moves, promotion, the
 // result and the PGN download. The desktop project plays with the mouse, the mobile project with touch.
 
-const isMobile = (testInfo) => testInfo.project.name === "mobile";
+const isMobile = (testInfo) => formFactor(testInfo) === "mobile";
 
 /** Alice hosts a chess room with the given time control, Bob joins by the invite link. */
 async function startChess(players, { timeControl = "blitz-5+0" } = {}) {

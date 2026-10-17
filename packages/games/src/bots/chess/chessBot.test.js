@@ -11,19 +11,32 @@ const BLACK = "black-player";
 const CTX = { now: 0 };
 const SLOW = 180_000;
 
-describeBotContract(
-  chessBot,
-  {
-    engine: chessEngine,
-    options: { timeControl: "rapid-10+0" },
-    games: { [BEGINNER]: 4, [CLUB]: 2, [STRONG]: 1 },
-    maxMoves: 1_000,
-    replayMoves: 24,
-    seed: 21,
-    timeoutMs: SLOW,
-  },
-  { describe, it },
-);
+const CONTRACT = {
+  engine: chessEngine,
+  options: { timeControl: "rapid-10+0" },
+  maxMoves: 1_000,
+  replayMoves: 24,
+  seed: 21,
+  timeoutMs: SLOW,
+};
+
+// One whole game per level on every pull request, so each level is still shown to play only legal moves, finish
+// and repeat itself from a seed. The nightly run plays more games per level (CC-203).
+describe("on every pull request", () => {
+  describeBotContract(
+    chessBot,
+    { ...CONTRACT, games: { [BEGINNER]: 1, [CLUB]: 1, [STRONG]: 1 }, replayMoves: 12 },
+    { describe, it },
+  );
+});
+
+describe("nightly", { tags: ["slow"] }, () => {
+  describeBotContract(
+    chessBot,
+    { ...CONTRACT, games: { [BEGINNER]: 4, [CLUB]: 2, [STRONG]: 1 } },
+    { describe, it },
+  );
+});
 
 /** A new game where WHITE has the white pieces. Seed 1 gives White to the second listed player. */
 const newGame = () =>
@@ -94,6 +107,34 @@ const winnersOf = (stronger, weaker, games) =>
       : match({ white: weaker, black: stronger, seed }),
   );
 
+/**
+ * Walks `games` random games of up to `plies` half moves and asks Beginner and Club for a move in every position on
+ * the way, failing on the first one the engine refuses. Returns how many positions were checked.
+ */
+function legalAlongRandomGames({ games, plies }) {
+  const rng = createSeededRng(404);
+  let positions = 0;
+  for (let game = 0; game < games; game += 1) {
+    const chess = new Chess();
+    let state = newGame();
+    while (!chess.isGameOver() && state.moves.length < plies) {
+      for (const level of [BEGINNER, CLUB]) {
+        const raw = choose(state, level, positions);
+        expect(chessEngine.validateMove(state, toMove(state), raw, CTX).ok).toBe(true);
+      }
+      positions += 1;
+      const options = chess.moves({ verbose: true });
+      const { from, to, promotion } = chess.move(options[randomIndex(rng, options.length)]);
+      state = apply(
+        state,
+        toMove(state),
+        promotion ? { type: "move", from, to, promotion } : { type: "move", from, to },
+      );
+    }
+  }
+  return positions;
+}
+
 describe("chessBot levels", () => {
   it("names its levels for players, weakest first", () => {
     expect(chessBot.levels.map((level) => level.name)).toEqual(["Beginner", "Club player", "Strong"]);
@@ -122,33 +163,13 @@ describe("chessBot levels", () => {
     expect(squares(choose(state, STRONG))).toMatch(/^e7(d8|f8)q$/);
   });
 
-  it(
-    "only ever plays moves the engine accepts, in hundreds of random positions",
-    () => {
-      const rng = createSeededRng(404);
-      let positions = 0;
-      for (let game = 0; game < 5; game += 1) {
-        const chess = new Chess();
-        let state = newGame();
-        while (!chess.isGameOver() && state.moves.length < 60) {
-          for (const level of [BEGINNER, CLUB]) {
-            const raw = choose(state, level, positions);
-            expect(chessEngine.validateMove(state, toMove(state), raw, CTX).ok).toBe(true);
-          }
-          positions += 1;
-          const options = chess.moves({ verbose: true });
-          const { from, to, promotion } = chess.move(options[randomIndex(rng, options.length)]);
-          state = apply(
-            state,
-            toMove(state),
-            promotion ? { type: "move", from, to, promotion } : { type: "move", from, to },
-          );
-        }
-      }
-      expect(positions).toBeGreaterThan(250);
-    },
-    SLOW,
-  );
+  it("only ever plays moves the engine accepts, in dozens of random positions", { timeout: SLOW }, () => {
+    expect(legalAlongRandomGames({ games: 1, plies: 30 })).toBe(30);
+  });
+
+  it("only ever plays moves the engine accepts, in hundreds of random positions", { tags: ["slow"] }, () => {
+    expect(legalAlongRandomGames({ games: 5, plies: 60 })).toBeGreaterThan(250);
+  });
 });
 
 describe("chessBot finds mates", () => {
@@ -189,19 +210,16 @@ describe("chessBot finds mates", () => {
 describe("chessBot strength", () => {
   // Longer runs with more seeds, and the measured move times, are in docs/tickets/CC-040.md. Tests do not
   // time moves: the budget counts positions, so time depends only on the machine (see search.test.js).
-  it(
-    "Strong beats Beginner in every seeded game",
-    () => {
-      expect(winnersOf(STRONG, BEGINNER, 3)).toEqual([STRONG, STRONG, STRONG]);
-    },
-    SLOW,
-  );
+  // One short game is the strength check on every pull request. The full series runs nightly (CC-203).
+  it("Club beats Beginner in a seeded game", { timeout: SLOW }, () => {
+    expect(winnersOf(CLUB, BEGINNER, 1)).toEqual([CLUB]);
+  });
 
-  it(
-    "Club beats Beginner in every seeded game",
-    () => {
-      expect(winnersOf(CLUB, BEGINNER, 4)).toEqual([CLUB, CLUB, CLUB, CLUB]);
-    },
-    SLOW,
-  );
+  it("Strong beats Beginner in every seeded game", { tags: ["slow"] }, () => {
+    expect(winnersOf(STRONG, BEGINNER, 3)).toEqual([STRONG, STRONG, STRONG]);
+  });
+
+  it("Club beats Beginner in every seeded game", { tags: ["slow"] }, () => {
+    expect(winnersOf(CLUB, BEGINNER, 4)).toEqual([CLUB, CLUB, CLUB, CLUB]);
+  });
 });

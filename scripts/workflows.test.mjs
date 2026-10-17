@@ -59,3 +59,48 @@ describe("backup workflow", () => {
     expect(await read("scripts/backup/dump-and-encrypt.sh")).toMatch(/mongodump [^\n]*--quiet/);
   });
 });
+
+// Pull requests leave out the tests tagged slow and the nightly run includes them (CC-203). These checks keep the
+// npm scripts, the Vitest tag and both workflows in step, so no test can drop out of both by accident.
+describe("slow tests", () => {
+  const scripts = async () => JSON.parse(await read("package.json")).scripts;
+
+  it("are declared as a Vitest tag, so a misspelt tag fails instead of hiding a test", async () => {
+    expect(await read("vitest.config.mjs")).toMatch(/tags: \[\s*\{\s*name: "slow",/);
+  });
+
+  it("are left out of every pull request command and nowhere else", async () => {
+    const { test, "test:coverage": coverage, "test:all": all } = await scripts();
+
+    expect(test).toBe('vitest run --tags-filter="not slow"');
+    expect(coverage).toBe('vitest run --coverage --tags-filter="not slow"');
+    expect(all).toBe("vitest run --coverage");
+    expect(await read(".github/workflows/ci.yml")).toContain("      - run: npm run test:coverage\n");
+  });
+
+  it("run every night and on the Run workflow button, with coverage", async () => {
+    const nightly = await read(".github/workflows/nightly.yml");
+
+    expect(nightly).toMatch(
+      /on:\n {2}schedule:\n(?: {4}#.*\n)? {4}- cron: "[^"]+"\n {2}workflow_dispatch:\n/,
+    );
+    expect(nightly).toContain("      - run: npm run test:all\n");
+    expect(nightly).toMatch(/permissions:\n {2}contents: read\n\n/);
+  });
+});
+
+describe("browser engines", () => {
+  it("runs the browser suite on Firefox and WebKit in CI, each told which engine to use (CC-184)", async () => {
+    const ci = await read(".github/workflows/ci.yml");
+
+    expect(ci).toContain("        browser: [firefox, webkit]\n");
+    expect(ci).toContain("          E2E_BROWSER: ${{ matrix.browser }}\n");
+    expect(ci).toContain("npx playwright install --with-deps ${{ matrix.browser }}");
+  });
+
+  it("keeps the Chromium job's name, which main requires before a merge", async () => {
+    expect(await read(".github/workflows/ci.yml")).toContain(
+      "name: Browser persona tests (desktop + mobile)\n",
+    );
+  });
+});
