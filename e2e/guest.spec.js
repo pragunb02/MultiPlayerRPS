@@ -20,6 +20,8 @@ test.describe("guest players", () => {
 
     await alice.page.goto(first.path);
     await alice.page.getByRole("button", { name: "Leave room" }).click();
+    // Leaving opens the lobby once the server has answered. Going on earlier could stop the leave (CC-237).
+    await expect(alice.page).toHaveURL("/games/tic-tac-toe");
     await alice.page.goto("/games/chess");
     await alice.page.getByRole("button", { name: "Create room" }).click();
     await expect(alice.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
