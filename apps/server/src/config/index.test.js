@@ -20,7 +20,29 @@ describe("loadConfig", () => {
       allowedOrigins: ["http://localhost:4000", "http://localhost:5173"],
       webDistDir: "",
       trustProxyHops: 0,
+      adminAccountIds: [],
     });
+  });
+
+  it("reads the owner console's account ids, trimmed and without repeats", () => {
+    const { adminAccountIds } = loadConfig({
+      ...REQUIRED,
+      ADMIN_ACCOUNT_IDS:
+        " user_65f0c2a1b2c3d4e5f6a7b8c9 ,user_000000000000000000000001,user_65f0c2a1b2c3d4e5f6a7b8c9,",
+    });
+
+    expect(adminAccountIds).toEqual(["user_65f0c2a1b2c3d4e5f6a7b8c9", "user_000000000000000000000001"]);
+    expect(Object.isFrozen(adminAccountIds)).toBe(true);
+    expect(loadConfig({ ...REQUIRED, ADMIN_ACCOUNT_IDS: "" }).adminAccountIds).toEqual([]);
+  });
+
+  it("refuses an admin id that is not an account id, such as a guest or a bare hex id", () => {
+    expect(() =>
+      loadConfig({ ...REQUIRED, ADMIN_ACCOUNT_IDS: "guest_00000000-0000-4000-8000-000000000001" }),
+    ).toThrow(/ADMIN_ACCOUNT_IDS must be a comma separated list of account ids/);
+    expect(() => loadConfig({ ...REQUIRED, ADMIN_ACCOUNT_IDS: "65f0c2a1b2c3d4e5f6a7b8c9" })).toThrow(
+      /got "65f0c2a1b2c3d4e5f6a7b8c9"/,
+    );
   });
 
   it("reads every value from the environment", () => {

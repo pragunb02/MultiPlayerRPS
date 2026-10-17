@@ -1,4 +1,5 @@
 export { ACHIEVEMENT_METRICS, ACHIEVEMENT_TIERS, ACHIEVEMENTS, winsOfMetric } from "./achievements.js";
+export { ANALYTICS_MAX_RANGE_DAYS, ANALYTICS_NOT_KEPT } from "./analytics.js";
 export { ERROR_CODES } from "./errors.js";
 export { SOCKET_EVENTS } from "./events.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";

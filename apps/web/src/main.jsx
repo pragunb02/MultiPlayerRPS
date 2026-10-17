@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
 import { removeServerHead } from "./app/serverHead.js";
 import { recoverFromStaleBuild } from "./app/staleBuild.js";
+import { noteWaitingScreen } from "./app/wakingUp.js";
 import { createApiClient } from "./lib/api.js";
 import { createSocketClient } from "./lib/socket.js";
 import { createSoundPlayer } from "./lib/sound/soundPlayer.js";
@@ -23,6 +24,8 @@ const sound = createSoundPlayer({
 sound.listen(window);
 const services = { api: createApiClient(), socket: createSocketClient(), sound };
 removeServerHead(document);
+// Before the first render, which takes the waking up screen of index.html away (CC-232).
+noteWaitingScreen({ document, window });
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

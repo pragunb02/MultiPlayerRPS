@@ -5,6 +5,7 @@ const NODE_ENVS = ["development", "test", "production"];
 const MIN_SESSION_SECRET_LENGTH = 32;
 const DEV_ALLOWED_ORIGINS = ["http://localhost:4000", "http://localhost:5173"];
 const MAX_TRUST_PROXY_HOPS = 5;
+const ADMIN_ACCOUNT_ID = /^user_[0-9a-f]{24}$/;
 
 /**
  * @typedef {Object} Config
@@ -17,6 +18,7 @@ const MAX_TRUST_PROXY_HOPS = 5;
  * @property {ReadonlyArray<string>} allowedOrigins  browser origins allowed to open realtime connections and send state-changing requests
  * @property {string} webDistDir      absolute path of the built web app to serve ("" = API only, e.g. in development with Vite)
  * @property {number} trustProxyHops  how many proxies in front of the server add to X-Forwarded-For (0 = none, trust no header)
+ * @property {ReadonlyArray<string>} adminAccountIds  the player ids (`user_` and 24 hex digits) that may open the owner console. Empty means nobody can (CC-233)
  */
 
 /**
@@ -26,7 +28,8 @@ const MAX_TRUST_PROXY_HOPS = 5;
  * Required: MONGO_URI, SESSION_SECRET (≥ 32 chars); ALLOWED_ORIGINS in production.
  * Documented defaults: NODE_ENV=development, PORT=4000, LOG_LEVEL=info (silent when NODE_ENV=test),
  * ALLOWED_ORIGINS=http://localhost:4000,http://localhost:5173 outside production,
- * TRUST_PROXY_HOPS=1 in production and 0 elsewhere. Optional: WEB_DIST_DIR (serve the built web app).
+ * TRUST_PROXY_HOPS=1 in production and 0 elsewhere. Optional: WEB_DIST_DIR (serve the built web app),
+ * ADMIN_ACCOUNT_IDS (who may open the owner console, empty by default).
  *
  * @param {Record<string, string | undefined>} env
  * @returns {Readonly<Config>}
@@ -71,6 +74,7 @@ export function loadConfig(env) {
   }
 
   const trustProxyHops = parseTrustProxyHops(env.TRUST_PROXY_HOPS, { isProduction, errors });
+  const adminAccountIds = parseAdminAccountIds(env.ADMIN_ACCOUNT_IDS, { errors });
 
   if (errors.length > 0) {
     throw new Error(`Invalid configuration:\n  - ${errors.join("\n  - ")}`);
@@ -87,7 +91,31 @@ export function loadConfig(env) {
     // Relative paths are taken from the working directory; Express can only send files by absolute path.
     webDistDir: webDistDir === "" ? "" : path.resolve(webDistDir),
     trustProxyHops,
+    adminAccountIds,
   });
+}
+
+/**
+ * The accounts that may open the owner console (CC-233). Each id is the `identity.id` an account sees at
+ * /api/session, so the owner can copy their own. A typo fails the boot instead of silently locking the owner out.
+ * Guests can never be admins, because a guest id lives only in a cookie that anyone can throw away.
+ *
+ * @param {string | undefined} raw  comma separated, for example "user_65f0c2a1b2c3d4e5f6a7b8c9"
+ * @param {{ errors: string[] }} context
+ * @returns {ReadonlyArray<string>}
+ */
+function parseAdminAccountIds(raw, { errors }) {
+  const ids = (raw ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const invalid = ids.filter((id) => !ADMIN_ACCOUNT_ID.test(id));
+  if (invalid.length > 0) {
+    errors.push(
+      `ADMIN_ACCOUNT_IDS must be a comma separated list of account ids like user_65f0c2a1b2c3d4e5f6a7b8c9 (got "${invalid.join(",")}")`,
+    );
+  }
+  return Object.freeze([...new Set(ids)]);
 }
 
 /**

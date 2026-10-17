@@ -217,7 +217,7 @@ describe("HTTP app", () => {
       mkdirSync(path.join(dist, "assets"));
       writeFileSync(
         path.join(dist, "index.html"),
-        "<!doctype html><head><title data-server-head>ClassiCade</title></head><div id=root></div>",
+        '<!doctype html><head><title data-server-head>ClassiCade</title></head><div id=root><h1 data-server-body="title"></h1><p data-server-body="description"></p></div>',
       );
       const { app } = tight(1, { WEB_DIST_DIR: dist });
       await request(app).get("/api/games");

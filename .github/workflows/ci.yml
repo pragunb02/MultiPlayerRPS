@@ -81,8 +81,8 @@ jobs:
   e2e:
     name: Browser persona tests (desktop + mobile)
     runs-on: ubuntu-latest
-    # About 16 to 18 minutes on GitHub's runners in October 2026, so 25 leaves room for a slow runner.
-    timeout-minutes: 25
+    # The suite takes about 18 minutes today, so 20 cancels it as tests are added. 30 until CC-236 makes it fast.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

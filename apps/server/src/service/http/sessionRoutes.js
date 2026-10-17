@@ -10,7 +10,7 @@ const DEFAULT_GUEST_LIMIT = Object.freeze({ windowMs: 15 * 60 * 1000, limit: 30 
  * Session endpoints. Identity is created and read only here, on the server; nothing a client sends
  * can choose or change who they are.
  *
- *   GET    /session        → 200 { authenticated: true, identity } | 200 { authenticated: false } (no session yet —
+ *   GET    /session        → 200 { authenticated: true, identity, admin? } | 200 { authenticated: false } (no session yet —
  *                             a normal state for a first visit, not an error) | 401 (a session with a corrupt identity)
  *   POST   /session/guest  → 201 { identity } (new guest) | 200 { identity } (already has one)
  *   DELETE /session        → 204 (ends the session and disconnects its sockets)
@@ -20,6 +20,8 @@ const DEFAULT_GUEST_LIMIT = Object.freeze({ windowMs: 15 * 60 * 1000, limit: 30 
  *   onSessionEnded: (sessionId: string) => void,
  *   onIdentityChanged: (change: { previous: object | undefined, identity: object | undefined }) => Promise<unknown>,  told about logouts
  *   guestLimit?: { windowMs: number, limit: number },
+ *   isAdmin: (sessionData: object) => boolean,   whether the owner console is open to this session. Only then does
+ *     the answer carry `admin: true`, so nobody else learns that a console exists (CC-233)
  * }} deps
  */
 export function createSessionRoutes({
@@ -27,10 +29,12 @@ export function createSessionRoutes({
   onSessionEnded,
   onIdentityChanged,
   guestLimit = DEFAULT_GUEST_LIMIT,
+  isAdmin,
 }) {
   assertDefined(identityComponent, "identityComponent");
   assertFunction(onSessionEnded, "onSessionEnded");
   assertFunction(onIdentityChanged, "onIdentityChanged");
+  assertFunction(isAdmin, "isAdmin");
 
   const router = Router();
   const guestRateLimit = createRateLimit({ ...guestLimit, message: "Too many requests, try again later" });
@@ -40,7 +44,8 @@ export function createSessionRoutes({
       res.json({ authenticated: false });
       return;
     }
-    res.json({ authenticated: true, identity: requireIdentity(req.session) });
+    const identity = requireIdentity(req.session);
+    res.json({ authenticated: true, identity, ...(isAdmin(req.session) && { admin: true }) });
   });
 
   router.post("/session/guest", guestRateLimit, async (req, res) => {

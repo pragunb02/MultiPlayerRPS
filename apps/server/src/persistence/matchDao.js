@@ -57,6 +57,8 @@ const matchSchema = new mongoose.Schema(
 );
 // History pages: "my matches, newest first".
 matchSchema.index({ "players.playerId": 1, endedAt: -1 });
+// The owner console: "matches that ended in this range" (CC-233).
+matchSchema.index({ endedAt: 1 });
 
 const FIELDS =
   "-_id matchId roomCode gameId options seed players log result startedAt endedAt schemaVersion credit";

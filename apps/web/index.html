@@ -14,7 +14,44 @@
     <title data-server-head>ClassiCade</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Shown before any script runs, while the app downloads. React replaces it on its first render (CC-232).
+         The server writes the page's own title and description into the tags marked data-server-body, so crawlers
+         that run no scripts read what the page is about before the words of the loading screen. -->
+    <div id="root">
+      <div class="wake" role="status" data-wake="page">
+        <h1 class="wake-page" data-server-body="title">ClassiCade</h1>
+        <p class="wake-about" data-server-body="description">
+          Play classic games with anyone, anywhere, in one click.
+        </p>
+        <div class="wake-cabinet" aria-hidden="true">
+          <div class="wake-marquee">
+            <span class="wake-bulb"></span>
+            <span class="wake-bulb"></span>
+            <span class="wake-bulb"></span>
+            <span class="wake-bulb"></span>
+            <span class="wake-bulb"></span>
+          </div>
+          <div class="wake-screen">
+            <div class="wake-picture"><span class="wake-coin">Insert coin</span></div>
+          </div>
+          <div class="wake-panel">
+            <span class="wake-stick"></span>
+            <span class="wake-button"></span>
+            <span class="wake-button"></span>
+          </div>
+        </div>
+        <p class="wake-title">Waking up the arcade…</p>
+        <p class="wake-detail">Getting the games ready.</p>
+        <p class="wake-later">
+          Still waking up. This can take up to a minute, and the page carries on by itself.
+        </p>
+        <!-- Long after the slowest wake, the app most likely failed to load, and only a reload helps. -->
+        <p class="wake-stuck">Still nothing after all this time? <a href="">Reload the page</a></p>
+      </div>
+    </div>
+    <noscript>
+      <p class="wake-noscript">ClassiCade needs JavaScript. Turn it on and reload the page.</p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

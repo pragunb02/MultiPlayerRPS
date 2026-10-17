@@ -34,6 +34,8 @@ const transferSchema = new mongoose.Schema(
 );
 // Housekeeping: "pending transfers older than …".
 transferSchema.index({ status: 1, createdAt: 1 });
+// The owner console: "guests who signed in during this range" (CC-233).
+transferSchema.index({ createdAt: 1 });
 
 const FIELDS = "-_id from to status createdAt completedAt carriedOver";
 

@@ -84,6 +84,19 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     /** @returns {Promise<{ board: object, entries: object[], you?: object }>} */
     getLeaderboard: (boardId, query = {}) =>
       request("GET", `/leaderboards/${encodeURIComponent(boardId)}${toQuery(query)}`),
+    /**
+     * Whether this session may open the owner console (CC-233). The server says so only to an admin, so for
+     * everyone else nothing on the page or in the answer mentions a console.
+     *
+     * @returns {Promise<boolean>}
+     */
+    getAdminStatus: async () => (await request("GET", "/session")).admin === true,
+    /**
+     * The owner console's report for a range (CC-233). Without one, the last 30 days.
+     *
+     * @param {{ from?: string, to?: string, bucket?: string }} [range]
+     */
+    getAnalytics: async (range = {}) => (await request("GET", `/admin/analytics${toQuery(range)}`)).report,
   });
 }
 

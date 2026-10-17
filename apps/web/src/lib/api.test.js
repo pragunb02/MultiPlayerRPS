@@ -6,6 +6,29 @@ const respond = (status, body) =>
   vi.fn().mockResolvedValue({ status, ok: status >= 200 && status < 300, json: async () => body });
 
 describe("api client", () => {
+  it.each([
+    [{ authenticated: true, identity: {}, admin: true }, true],
+    [{ authenticated: true, identity: {} }, false],
+    [{ authenticated: false }, false],
+  ])("reads whether the session may open the owner console (%o)", async (body, expected) => {
+    expect(await createApiClient({ fetchImpl: respond(200, body) }).getAdminStatus()).toBe(expected);
+  });
+
+  it("asks for the owner console's report for a range, or the default range", async () => {
+    const fetchImpl = respond(200, { report: { range: {} } });
+    const api = createApiClient({ fetchImpl });
+
+    expect(await api.getAnalytics({ from: "2025-03-03", to: "2025-03-09", bucket: "week" })).toEqual({
+      range: {},
+    });
+    await api.getAnalytics();
+
+    expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
+      "/api/admin/analytics?from=2025-03-03&to=2025-03-09&bucket=week",
+      "/api/admin/analytics",
+    ]);
+  });
+
   it("calls same-origin /api paths with the session cookie and unwraps the payload", async () => {
     const fetchImpl = respond(200, { games: [{ id: "rps" }] });
 

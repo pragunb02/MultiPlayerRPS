@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import express from "express";
-import { describePage } from "@classicade/shared";
+import { describePage, SITE_NAME, SITE_PREVIEW_IMAGE } from "@classicade/shared";
 import { createPageTemplate, renderPageHead, renderRobots, renderSitemap } from "./pageHead.js";
 
 const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
@@ -15,6 +15,18 @@ const MISSING_ASSET_TYPES = Object.freeze({
 });
 // The same words for every missing file. Repeating the requested path would let a crafted URL write script.
 const MISSING_ASSET = "/* Not found: this file is not part of this version of the site. */\n";
+// The owner console and its sections (CC-233). Not in the shared page list, because to everyone but an admin
+// these addresses do not exist.
+const ADMIN_PAGES = /^\/admin(\/[a-z]+)?\/?$/;
+const ADMIN_PAGE = Object.freeze({
+  found: true,
+  title: `Owner console · ${SITE_NAME}`,
+  description: `How ${SITE_NAME} is played, in totals.`,
+  path: "/admin",
+  indexable: false,
+  image: SITE_PREVIEW_IMAGE,
+  imageAlt: `The ${SITE_NAME} logo`,
+});
 
 /**
  * Serves the built web app (single deploy with the API, ADR-002):
@@ -28,14 +40,22 @@ const MISSING_ASSET = "/* Not found: this file is not part of this version of th
  * script. The answer is never cached, so a cache in front of the server cannot keep serving the 404.
  *
  * Each page's index.html carries that page's title, description and link preview tags (CC-047), because crawlers
- * and chat apps read the HTML without running the app. A URL where the app has no page answers 404, still with
- * the app, which then shows its own "not found" page.
+ * and chat apps read the HTML without running the app. Its body carries the same title and description, so a
+ * crawler that reads the body text does not take the loading screen for the page (CC-232). A URL where the app has
+ * no page answers 404, still with the app, which then shows its own "not found" page.
  *
- * @param {{ distDir: string, siteOrigin: string }} options
+ * The owner console's pages answer 200 only to an admin (CC-233). For everyone else they are an unknown address
+ * like any other, a 404 with the app, which shows its "not found" page.
+ *
+ * @param {{
+ *   distDir: string,
+ *   siteOrigin: string,
+ *   adminPage: { sessionMiddleware: import("express").RequestHandler, isAdmin: (sessionData: object) => boolean },
+ * }} options
  *   siteOrigin: the site's public address, for the absolute URLs in previews, the sitemap and robots.txt
  * @returns {import("express").Router}
  */
-export function createWebAppRouter({ distDir, siteOrigin }) {
+export function createWebAppRouter({ distDir, siteOrigin, adminPage }) {
   const router = express.Router();
   const page = createPageTemplate(readFileSync(path.join(distDir, "index.html"), "utf8"));
   const robots = renderRobots({ origin: siteOrigin });
@@ -71,6 +91,22 @@ export function createWebAppRouter({ distDir, siteOrigin }) {
       .send(MISSING_ASSET);
   });
 
+  router.get(ADMIN_PAGES, adminPage.sessionMiddleware, (req, res, next) => {
+    if (!req.accepts("html") || !adminPage.isAdmin(req.session)) {
+      next();
+      return;
+    }
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    res.type("html").send(
+      page({
+        head: renderPageHead({ page: ADMIN_PAGE, origin: siteOrigin }),
+        title: ADMIN_PAGE.title,
+        description: ADMIN_PAGE.description,
+      }),
+    );
+  });
+
   router.get(/.*/, (req, res, next) => {
     if (NOT_APP_ROUTES.test(req.path) || !req.accepts("html")) {
       next();
@@ -81,7 +117,13 @@ export function createWebAppRouter({ distDir, siteOrigin }) {
     res
       .status(info.found ? 200 : 404)
       .type("html")
-      .send(page(renderPageHead({ page: info, origin: siteOrigin })));
+      .send(
+        page({
+          head: renderPageHead({ page: info, origin: siteOrigin }),
+          title: info.title,
+          description: info.description,
+        }),
+      );
   });
 
   return router;

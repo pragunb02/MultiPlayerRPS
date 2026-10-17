@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { isArrowKey, squareAtPoint, squareInDirection } from "./chessGame.js";
+import { squareAtPoint, squareForKey } from "./chessGame.js";
 
 /** How far (in CSS pixels) a pointer must travel before a press becomes a drag, so a shaky click stays a click. */
 const DRAG_THRESHOLD_PX = 4;
@@ -19,7 +19,8 @@ const squareOf = (target) => target.closest("[data-square]")?.dataset.square ?? 
 
 /**
  * Everything a player does with the board: click (or tap) a piece then a square, drag a piece and drop it, or
- * walk the board with the arrow keys and press Enter. All three end in `onMove`, and only with a legal move.
+ * walk the board with the arrow keys, Home and End, and press Enter or Space. All three end in `onMove`, and only
+ * with a legal move.
  *
  * Clicks, taps and Enter all arrive as `click` events on the square buttons. A drag is tracked with pointer
  * events on the board. Once it has really moved, the board captures the pointer, so the button under the drop
@@ -185,11 +186,17 @@ export function useBoardInput({ chess, colour, orientation, interactive, onMove,
       setSelected("");
       return;
     }
-    if (!isArrowKey(event.key)) {
+    const next = squareForKey({
+      square: cursor,
+      key: event.key,
+      ctrl: event.ctrlKey || event.metaKey,
+      orientation,
+    });
+    if (next === "") {
       return;
     }
+    // These keys would scroll the page. On the board they only move the cursor.
     event.preventDefault();
-    const next = squareInDirection(cursor, event.key, orientation);
     setCursor(next);
     boardRef.current.querySelector(`[data-square="${next}"]`).focus();
   }

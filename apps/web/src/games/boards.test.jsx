@@ -52,7 +52,7 @@ describe("RpsBoard", () => {
     await user.click(screen.getByRole("button", { name: /paper/i }));
 
     expect(onMove).toHaveBeenCalledWith({ choice: "paper" });
-    expect(screen.getByLabelText("Score")).toHaveTextContent("You 1 — Riya 0");
+    expect(screen.getByText("Score:").closest("p")).toHaveTextContent(/^Score: You 1 — Riya 0Best of/);
     expect(screen.getByRole("heading", { name: "Round 2" })).toBeInTheDocument();
     expect(within(screen.getByRole("list", { name: "Rounds" })).getByText("You won")).toBeInTheDocument();
   });
@@ -143,7 +143,7 @@ describe("RpsBoard", () => {
     });
     render(<RpsBoard room={room(view)} onMove={vi.fn()} />);
 
-    expect(screen.getByLabelText("Score")).toHaveTextContent("You 1 — Riya 0");
+    expect(screen.getByText("Score:").closest("p")).toHaveTextContent(/^Score: You 1 — Riya 0Best of/);
     const rounds = within(screen.getByRole("list", { name: "Rounds" }));
     expect(rounds.getByText("Draw")).toBeInTheDocument();
     expect(rounds.getByText("Opponent won")).toBeInTheDocument();

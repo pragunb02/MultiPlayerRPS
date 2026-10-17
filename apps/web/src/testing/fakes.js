@@ -105,6 +105,8 @@ export function fakeApi(overrides = {}) {
       board: { id: "overall", name: "Overall XP", metric: "xp", period: "all", periodId: "all" },
       entries: [],
     }),
+    getAdminStatus: vi.fn().mockResolvedValue(false),
+    getAnalytics: vi.fn(() => new Promise(() => {})),
     ...overrides,
   };
 }

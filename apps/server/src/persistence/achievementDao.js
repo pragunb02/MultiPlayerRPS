@@ -16,6 +16,8 @@ const unlockSchema = new mongoose.Schema(
   { collection: "player_achievements", versionKey: false },
 );
 unlockSchema.index({ playerId: 1, achievementId: 1 }, { unique: true });
+// The owner console: "achievements unlocked in this range" (CC-233).
+unlockSchema.index({ unlockedAt: 1 });
 
 /**
  * Unlocked achievements in MongoDB (CC-054): one document per player and achievement, so an achievement can

@@ -5,7 +5,7 @@
 |               |                                                                                                                                                                                                                                                                                                                                    |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)                                                                                                                                                                                                                                    |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-236`                                                                                                                                                                                                                                                                     |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-248`                                                                                                                                                                                                                                                                     |
 | Current stage | **Stage 0 — Foundation**                                                                                                                                                                                                                                                                                                           |
 | Stage health  | 🟢 On track                                                                                                                                                                                                                                                                                                                        |
 | In progress   | CC-138 bots in rooms, CC-049 error tracking and alerts, CC-126 comment sweep, CC-233 owner analytics console (PR #64); PR #50 story mode design                                                                                                                                                                                    |
@@ -17,7 +17,7 @@
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
 | S0 Foundation   | 🟡 In progress | 58 / 79      |
-| S1 MVP launch   | 🟡 Started     | 9 / 80       |
+| S1 MVP launch   | 🟡 Started     | 9 / 91       |
 | S2 Retention    | ⚪ Not started | 3 / 55       |
 | S3 Monetization | ⚪ Not started | 0 / 10       |
 | S4 Scale        | ⚪ Not started | 0 / 6        |
@@ -39,6 +39,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-18 — CC-247 — main was red after #62 (CC-232) and #64 (CC-233) merged: the owner console page still called the page template the old way and rendered "undefined". Fixed the call; production was not affected for players (the console is off until ADMIN_ACCOUNT_IDS is set). Each PR had passed CI against an older main, so Render should deploy only after CI passes on main, and PRs should be up to date before merging.
 - 2026-10-18 — Growth plan accepted — [GROWTH.md](GROWTH.md): friends launch first, public launch after 4 weeks of data, notification caps (ADR-031), launch sequence and brand domain (ADR-032). Its new ideas wait in docs/IDEAS.md under the feature freeze.
 - 2026-10-18 — Working agreement, rule 8 — Two reviews before every merge: a code reviewer and a security reviewer agent look at every pull request in parallel, a second agent tries to refute each finding, and confirmed findings are fixed or written down with a reason before the merge.
 - 2026-10-17 — Working agreement — Feature freeze until the board is closed across all phases (new ideas go to docs/IDEAS.md); only security (P0 by default), testing and bug tickets may be added; research before code in every ticket; everything documented; at most six builders at once, only on independent work (no shared files), running lint, format, coverage and their own browser tests locally while CI runs the full browser suite; a green main.
