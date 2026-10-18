@@ -151,4 +151,63 @@ export function runAccountDaoContract(createDao) {
     );
     await expect(dao.bumpSessionVersion({ accountId: "not-an-id" })).rejects.toThrow(RangeError);
   });
+
+  it("stores a stated birth year as a number, and leaves it out when none was given (CC-152)", async () => {
+    const dao = await createDao();
+
+    const stated = await dao.insert(account({ birthYear: 2001 }));
+    const unstated = await dao.insert(account({ username: "Arjun", email: "arjun@example.com" }));
+
+    expect(stated.birthYear).toBe(2001);
+    expect((await dao.getById(stated.accountId)).birthYear).toBe(2001);
+    expect(unstated).not.toHaveProperty("birthYear");
+    expect(await dao.getByEmail("arjun@example.com")).not.toHaveProperty("birthYear");
+  });
+
+  it("sets a birth year once, and never changes one that is set", async () => {
+    const dao = await createDao();
+    const { accountId } = await dao.insert(account());
+
+    expect(await dao.setBirthYear({ accountId, birthYear: 1999 })).toEqual({ set: true });
+    expect(await dao.setBirthYear({ accountId, birthYear: 2012 })).toEqual({ set: false });
+
+    expect((await dao.getById(accountId)).birthYear).toBe(1999);
+  });
+
+  it("refuses to set the birth year of an account that is not there", async () => {
+    const dao = await createDao();
+
+    await expect(
+      dao.setBirthYear({ accountId: "0123456789abcdef01234567", birthYear: 1999 }),
+    ).rejects.toThrow(RangeError);
+    await expect(dao.setBirthYear({ accountId: "not-an-id", birthYear: 1999 })).rejects.toThrow(RangeError);
+  });
+
+  it("lists the birth years of the accounts asked for that have one", async () => {
+    const dao = await createDao();
+    const stated = await dao.insert(account({ birthYear: 1990 }));
+    const unstated = await dao.insert(account({ username: "Arjun", email: "arjun@example.com" }));
+    const other = await dao.insert(
+      account({ username: "Meera", email: "meera@example.com", birthYear: 1980 }),
+    );
+
+    const years = await dao.listBirthYears([stated.accountId, unstated.accountId, "not-an-id"]);
+
+    expect(years).toEqual([{ accountId: stated.accountId, birthYear: 1990 }]);
+    expect(await dao.listBirthYears([])).toEqual([]);
+    expect(other.birthYear).toBe(1980);
+  });
+
+  it("deletes an account by id, and deleting again changes nothing (CC-035)", async () => {
+    const dao = await createDao();
+    const { accountId } = await dao.insert(account());
+
+    expect(await dao.deleteById(accountId)).toEqual({ deleted: true });
+    expect(await dao.deleteById(accountId)).toEqual({ deleted: false });
+    expect(await dao.deleteById("not-an-id")).toEqual({ deleted: false });
+
+    await expect(dao.getById(accountId)).rejects.toThrow(RangeError);
+    await expect(dao.getByEmail("riya@example.com")).rejects.toThrow(RangeError);
+    expect((await dao.insert(account())).accountId).not.toBe(accountId);
+  });
 }

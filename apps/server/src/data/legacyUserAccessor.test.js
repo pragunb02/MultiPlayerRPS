@@ -59,4 +59,12 @@ describe("legacyUserAccessor", () => {
   it("fails fast without its DAO", () => {
     expect(() => createLegacyUserAccessor({})).toThrow(TypeError);
   });
+
+  it("names the legacy row by its id, so a closed row can be recognised (CC-035)", async () => {
+    const legacy = createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao(LEGACY_USERS) });
+
+    const [found] = await legacy.findByEmail("riya@example.com");
+
+    expect(found.legacyId).toBe("legacy-0");
+  });
 });

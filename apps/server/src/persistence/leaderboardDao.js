@@ -141,5 +141,25 @@ export function createLeaderboardDao({ connection }) {
           { score, updatedAt, playerId: { $lt: playerId } },
         ],
       }),
+
+    /**
+     * Every entry of one player, on every board and period, for their data export (CC-035).
+     *
+     * @param {string} playerId
+     * @returns {Promise<Array<LeaderboardEntryDoc & BoardRef>>}
+     */
+    listByPlayer: (playerId) =>
+      Entry.find({ playerId }, `${FIELDS} board period`).sort({ board: 1, period: 1 }).lean(),
+
+    /**
+     * Deletes every entry of one player (CC-035).
+     *
+     * @param {string} playerId
+     * @returns {Promise<number>} entries removed
+     */
+    async deleteByPlayer(playerId) {
+      const { deletedCount } = await Entry.deleteMany({ playerId });
+      return deletedCount;
+    },
   });
 }

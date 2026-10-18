@@ -66,4 +66,15 @@ describe("playerTransferAccessor", () => {
   it("fails fast without a DAO", () => {
     expect(() => createPlayerTransferAccessor({})).toThrow(TypeError);
   });
+
+  it("lists and removes the transfers into one account (CC-035)", async () => {
+    const transfers = setup();
+    await transfers.start({ from: "guest_a", to: ACCOUNT, at: T0 });
+
+    expect(await transfers.listTo(ACCOUNT.id)).toEqual([
+      { from: "guest_a", to: ACCOUNT, status: "pending", createdAt: T0 },
+    ]);
+    expect(await transfers.removeTo(ACCOUNT.id)).toBe(1);
+    expect(await transfers.listTo(ACCOUNT.id)).toEqual([]);
+  });
 });

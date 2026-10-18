@@ -13,6 +13,7 @@ export function createInMemoryLegacyUserDao(users = []) {
           username: String(user.username ?? ""),
           email: user.email,
           passwordHash: user.password,
+          legacyId: `legacy-${users.indexOf(user)}`,
         }));
     },
 

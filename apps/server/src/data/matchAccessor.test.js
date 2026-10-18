@@ -121,4 +121,13 @@ describe("matchAccessor", () => {
     await expect(matches.record(match())).rejects.toBe(failure);
     await expect(matches.getById("x")).rejects.toBe(failure);
   });
+
+  it("deletes a match only while the player still plays in it (CC-035)", async () => {
+    const matches = setup();
+    await matches.record(match());
+
+    expect(await matches.deleteForPlayer({ matchId: match().matchId, playerId: "guest_c" })).toBe(false);
+    expect(await matches.deleteForPlayer({ matchId: match().matchId, playerId: "guest_a" })).toBe(true);
+    await expect(matches.getById(match().matchId)).rejects.toThrow(NotFoundError);
+  });
 });

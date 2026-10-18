@@ -163,5 +163,13 @@ export function createMatchAccessor({ matchDao }) {
     replaceRenamed({ from, match }) {
       return matchDao.renamePlayer({ matchId: match.matchId, from, doc: toDoc(match) });
     },
+
+    /**
+     * Deletes a match only while `playerId` still plays in it (CC-035).
+     *
+     * @param {{ matchId: string, playerId: string }} which
+     * @returns {Promise<boolean>} whether it was deleted now
+     */
+    deleteForPlayer: (which) => matchDao.deleteForPlayer(which),
   });
 }

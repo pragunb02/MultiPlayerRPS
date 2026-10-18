@@ -287,4 +287,15 @@ export function runMatchDaoContract(createDao) {
     expect(listed.map((m) => m.matchId)).toEqual(["m-capped"]);
     expect(listed[0].credit).toEqual(botXp({ withdrawnFrom: "guest_a", withdrawnXp: 20 }));
   });
+
+  it("deletes a match only while the player is still in it (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insert(matchDoc());
+
+    expect(await dao.deleteForPlayer({ matchId: matchDoc().matchId, playerId: "guest_c" })).toBe(false);
+    expect(await dao.deleteForPlayer({ matchId: matchDoc().matchId, playerId: "guest_a" })).toBe(true);
+    expect(await dao.deleteForPlayer({ matchId: matchDoc().matchId, playerId: "guest_a" })).toBe(false);
+
+    await expect(dao.getByMatchId(matchDoc().matchId)).rejects.toThrow(RangeError);
+  });
 }

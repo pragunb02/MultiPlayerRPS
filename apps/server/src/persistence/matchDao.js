@@ -215,5 +215,16 @@ export function createMatchDao({ connection }) {
       )
         .sort({ endedAt: 1 })
         .lean(),
+
+    /**
+     * Deletes a match, only while `playerId` is still one of its players, so deleting twice changes nothing (CC-035).
+     *
+     * @param {{ matchId: string, playerId: string }} which
+     * @returns {Promise<boolean>} whether the match was deleted now
+     */
+    async deleteForPlayer({ matchId, playerId }) {
+      const { deletedCount } = await Match.deleteOne({ matchId, "players.playerId": playerId });
+      return deletedCount === 1;
+    },
   });
 }

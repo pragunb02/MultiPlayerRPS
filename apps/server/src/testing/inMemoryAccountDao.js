@@ -9,7 +9,7 @@ export function createInMemoryAccountDao() {
   return Object.freeze({
     ensureIndexes: async () => {},
 
-    async insert({ username, email, passwordHash, createdAt }) {
+    async insert({ username, email, passwordHash, createdAt, birthYear }) {
       for (const existing of accounts.values()) {
         if (existing.email === email) {
           throw Object.assign(new DuplicateKey("email already registered"), { field: "email" });
@@ -25,6 +25,7 @@ export function createInMemoryAccountDao() {
         passwordHash,
         createdAt: new Date(createdAt),
         sessionVersion: 0,
+        ...(birthYear !== undefined && { birthYear }),
       };
       accounts.set(doc.accountId, doc);
       return copy(doc);
@@ -93,6 +94,29 @@ export function createInMemoryAccountDao() {
       };
       accounts.set(accountId, next);
       return next.sessionVersion;
+    },
+
+    async setBirthYear({ accountId, birthYear }) {
+      const doc = accounts.get(accountId);
+      if (doc === undefined) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      if (doc.birthYear !== undefined) {
+        return { set: false };
+      }
+      accounts.set(accountId, { ...doc, birthYear });
+      return { set: true };
+    },
+
+    async listBirthYears(accountIds) {
+      return accountIds
+        .map((accountId) => accounts.get(accountId))
+        .filter((doc) => doc?.birthYear !== undefined)
+        .map(({ accountId, birthYear }) => ({ accountId, birthYear }));
+    },
+
+    async deleteById(accountId) {
+      return { deleted: accounts.delete(accountId) };
     },
   });
 }

@@ -238,5 +238,16 @@ export function createGamificationAccessor({ statsDao, questDao, achievementDao 
       await achievementDao.deleteByPlayer(from);
       return docs.length;
     },
+
+    /** @param {string} playerId @returns {Promise<number>} unlocks removed (CC-035) */
+    removeUnlocks: (playerId) => achievementDao.deleteByPlayer(playerId),
+
+    /**
+     * Every quest day still stored for a player, oldest first, for their data export (CC-035).
+     *
+     * @param {string} playerId
+     * @returns {Promise<ReadonlyArray<Readonly<object>>>}
+     */
+    listQuestDays: async (playerId) => deepFreeze(await questDao.listByPlayer(playerId)),
   });
 }

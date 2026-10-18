@@ -172,5 +172,16 @@ export function createProgressDao({ connection }) {
       }
       return { playerId, ...totalsOf(doc), updatedAt: doc.updatedAt };
     },
+
+    /**
+     * Deletes a player's progress and the markers of guests who moved into them (CC-035).
+     *
+     * @param {string} playerId
+     * @returns {Promise<number>} documents removed
+     */
+    async deleteByPlayer(playerId) {
+      const { deletedCount } = await Progress.deleteMany({ $or: [{ playerId }, { mergedInto: playerId }] });
+      return deletedCount;
+    },
   });
 }

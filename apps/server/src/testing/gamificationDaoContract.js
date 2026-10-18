@@ -149,6 +149,19 @@ export function runQuestDaoContract(createDao) {
 
       expect((await dao.findDay({ playerId: "guest_b", day: "2026-10-16" })).playerId).toBe("guest_b");
     });
+
+    it("lists every day of one player, oldest first (CC-035)", async () => {
+      const dao = await createDao();
+      await dao.save({ doc: questDay({ day: "2026-10-17" }), expectedVersion: 0 });
+      await dao.save({ doc: questDay(), expectedVersion: 0 });
+      await dao.save({ doc: questDay({ playerId: "guest_b" }), expectedVersion: 0 });
+
+      const days = await dao.listByPlayer("guest_a");
+
+      expect(days.map((day) => day.day)).toEqual(["2026-10-16", "2026-10-17"]);
+      expect(days[0]).toEqual({ ...questDay(), version: 1 });
+      expect(await dao.listByPlayer("guest_nobody")).toEqual([]);
+    });
   });
 }
 

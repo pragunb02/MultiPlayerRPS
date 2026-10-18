@@ -72,5 +72,17 @@ export function createInMemoryLeaderboardDao() {
         (e) => e.board === board && e.period === period && ranksAbove(e, entry),
       ).length;
     },
+
+    async listByPlayer(playerId) {
+      return [...entries.values()]
+        .filter((entry) => entry.playerId === playerId)
+        .map((entry) => ({ board: entry.board, period: entry.period, ...publicFields(entry) }));
+    },
+
+    async deleteByPlayer(playerId) {
+      const gone = [...entries.entries()].filter(([, entry]) => entry.playerId === playerId);
+      gone.forEach(([key]) => entries.delete(key));
+      return gone.length;
+    },
   });
 }

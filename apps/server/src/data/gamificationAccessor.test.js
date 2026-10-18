@@ -247,4 +247,27 @@ describe("gamificationAccessor: achievements", () => {
     expect(() => createGamificationAccessor({ statsDao: {} })).toThrow(TypeError);
     expect(() => createGamificationAccessor({ statsDao: {}, questDao: {} })).toThrow(TypeError);
   });
+
+  it("lists every quest day of a player and removes every unlock of a player (CC-035)", async () => {
+    const achievementDao = createInMemoryAchievementDao();
+    const questDao = createInMemoryQuestDao();
+    const gamification = createGamificationAccessor({
+      statsDao: createInMemoryStatsDao(),
+      questDao,
+      achievementDao,
+    });
+    await gamification.getQuestDay({ playerId: "guest_a", day: "2026-10-16", create: () => questDay() });
+    await gamification.unlock({
+      playerId: "guest_a",
+      achievementId: "first-win",
+      unlockedAt: AT,
+      matchId: "m1",
+    });
+
+    const days = await gamification.listQuestDays("guest_a");
+    expect(days).toEqual([expect.objectContaining({ playerId: "guest_a", day: "2026-10-16" })]);
+    expect(Object.isFrozen(days[0])).toBe(true);
+    expect(await gamification.removeUnlocks("guest_a")).toBe(1);
+    expect(await gamification.listUnlocks("guest_a")).toEqual([]);
+  });
 });

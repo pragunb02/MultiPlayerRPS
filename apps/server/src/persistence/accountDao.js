@@ -13,6 +13,7 @@ const NON_ASCII = "[^\\x00-\\x7F]";
  * @property {string} passwordHash
  * @property {Date} createdAt
  * @property {number} sessionVersion  counted up to sign out every session made before (CC-116)
+ * @property {number} [birthYear]    only when the player stated one, a four digit year and never a date (CC-152)
  */
 
 const accountSchema = new mongoose.Schema(
@@ -23,6 +24,8 @@ const accountSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     createdAt: { type: Date, required: true },
     sessionVersion: { type: Number, required: true, default: 0 },
+    // Left out when the player did not say. An unknown age counts as a minor (ADR-028).
+    birthYear: { type: Number },
   },
   { collection: "accounts", versionKey: false },
 );
@@ -37,7 +40,10 @@ const toDoc = (doc) => ({
   createdAt: doc.createdAt,
   // Accounts made before CC-116 have no version stored. Their sessions were all made at version 0.
   sessionVersion: doc.sessionVersion ?? 0,
+  ...(doc.birthYear !== undefined && doc.birthYear !== null && { birthYear: doc.birthYear }),
 });
+
+const isId = (accountId) => mongoose.isValidObjectId(accountId);
 
 /**
  * Player accounts in MongoDB.
@@ -51,11 +57,11 @@ export function createAccountDao({ connection }) {
     ensureIndexes: () => Account.syncIndexes(),
 
     /**
-     * @param {{ username: string, email: string, passwordHash: string, createdAt: Date }} account
+     * @param {{ username: string, email: string, passwordHash: string, createdAt: Date, birthYear?: number }} account
      * @returns {Promise<AccountDoc>}
      * @throws {DuplicateKey} with `field` "username" or "email"
      */
-    async insert({ username, email, passwordHash, createdAt }) {
+    async insert({ username, email, passwordHash, createdAt, birthYear }) {
       try {
         const created = await Account.create({
           username,
@@ -63,6 +69,7 @@ export function createAccountDao({ connection }) {
           email,
           passwordHash,
           createdAt,
+          ...(birthYear !== undefined && { birthYear }),
         });
         return toDoc(created);
       } catch (err) {
@@ -179,6 +186,62 @@ export function createAccountDao({ connection }) {
         throw new RangeError(`No account ${accountId}`);
       }
       return doc.sessionVersion;
+    },
+
+    /**
+     * Sets the birth year of an account that has none. A year once set is never changed here (CC-152).
+     *
+     * @param {{ accountId: string, birthYear: number }} change
+     * @returns {Promise<{ set: boolean }>} false when the account already had a year
+     * @throws {RangeError} when absent
+     */
+    async setBirthYear({ accountId, birthYear }) {
+      if (!isId(accountId)) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      const updated = await Account.updateOne(
+        { _id: accountId, birthYear: { $exists: false } },
+        { $set: { birthYear } },
+      );
+      if (updated.modifiedCount === 1) {
+        return { set: true };
+      }
+      if ((await Account.countDocuments({ _id: accountId }, { limit: 1 })) === 0) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      return { set: false };
+    },
+
+    /**
+     * The birth years of the given accounts, for those that stated one. Ids that are not accounts are skipped.
+     *
+     * @param {ReadonlyArray<string>} accountIds
+     * @returns {Promise<Array<{ accountId: string, birthYear: number }>>}
+     */
+    async listBirthYears(accountIds) {
+      const ids = accountIds.filter(isId);
+      if (ids.length === 0) {
+        return [];
+      }
+      const docs = await Account.find(
+        { _id: { $in: ids }, birthYear: { $type: "number" } },
+        { birthYear: 1 },
+      ).lean();
+      return docs.map((doc) => ({ accountId: doc._id.toHexString(), birthYear: doc.birthYear }));
+    },
+
+    /**
+     * Deletes the account (CC-035). Running it again changes nothing.
+     *
+     * @param {string} accountId
+     * @returns {Promise<{ deleted: boolean }>}
+     */
+    async deleteById(accountId) {
+      if (!isId(accountId)) {
+        return { deleted: false };
+      }
+      const { deletedCount } = await Account.deleteOne({ _id: accountId });
+      return { deleted: deletedCount === 1 };
     },
   });
 }

@@ -61,6 +61,12 @@ export function createInMemoryQuestDao() {
       keys.forEach((key) => store.docs.delete(key));
       return keys.length;
     },
+    async listByPlayer(playerId) {
+      return [...store.docs.values()]
+        .filter((doc) => doc.playerId === playerId)
+        .sort((a, b) => a.day.localeCompare(b.day))
+        .map(copy);
+    },
   });
 }
 

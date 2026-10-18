@@ -92,5 +92,13 @@ export function createInMemoryMatchDao() {
       matches.set(matchId, copy({ ...doc, matchId, schemaVersion: 1 }));
       return true;
     },
+
+    async deleteForPlayer({ matchId, playerId }) {
+      const stored = matches.get(matchId);
+      if (stored === undefined || !has(stored, playerId)) {
+        return false;
+      }
+      return matches.delete(matchId);
+    },
   });
 }

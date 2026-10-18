@@ -12,6 +12,7 @@ import { ConflictError, NotFoundError } from "../utils/errors.js";
  * @property {string} passwordHash
  * @property {number} createdAt
  * @property {number} sessionVersion   sessions made at an older version are signed out (CC-116)
+ * @property {number} [birthYear]      only when the player stated one (CC-152). Unknown counts as a minor
  */
 
 const toAccount = (doc) => Object.freeze({ ...doc, createdAt: doc.createdAt.getTime() });
@@ -59,17 +60,23 @@ export function createAccountAccessor({ accountDao }) {
     /**
      * Refuses an email that an account already has in any spelling, also one stored before the one spelling.
      *
-     * @param {{ username: string, email: string, passwordHash: string, createdAt: number }} account
+     * @param {{ username: string, email: string, passwordHash: string, createdAt: number, birthYear?: number }} account
      * @returns {Promise<Readonly<Account>>}
      * @throws {ConflictError} with `details.field` "username" or "email"
      */
-    async create({ username, email, passwordHash, createdAt }) {
+    async create({ username, email, passwordHash, createdAt, birthYear }) {
       if (aliases.has(email)) {
         throw emailTaken();
       }
       try {
         return toAccount(
-          await accountDao.insert({ username, email, passwordHash, createdAt: new Date(createdAt) }),
+          await accountDao.insert({
+            username,
+            email,
+            passwordHash,
+            createdAt: new Date(createdAt),
+            ...(birthYear !== undefined && { birthYear }),
+          }),
         );
       } catch (err) {
         if (err instanceof DuplicateKey) {
@@ -141,5 +148,29 @@ export function createAccountAccessor({ accountDao }) {
      * @throws {NotFoundError}
      */
     bumpSessionVersion: (change) => orNotFound(() => accountDao.bumpSessionVersion(change)),
+
+    /**
+     * Sets the birth year of an account that has none (CC-152).
+     *
+     * @param {{ accountId: string, birthYear: number }} change
+     * @returns {Promise<{ set: boolean }>} false when the account already had one
+     * @throws {NotFoundError}
+     */
+    setBirthYear: (change) => orNotFound(() => accountDao.setBirthYear(change)),
+
+    /**
+     * @param {ReadonlyArray<string>} accountIds
+     * @returns {Promise<ReadonlyArray<Readonly<{ accountId: string, birthYear: number }>>>} those with a stated year
+     */
+    listBirthYears: async (accountIds) =>
+      Object.freeze((await accountDao.listBirthYears([...accountIds])).map((entry) => Object.freeze(entry))),
+
+    /**
+     * Deletes the account (CC-035). Deleting again changes nothing.
+     *
+     * @param {string} accountId
+     * @returns {Promise<{ deleted: boolean }>}
+     */
+    delete: (accountId) => accountDao.deleteById(accountId),
   });
 }

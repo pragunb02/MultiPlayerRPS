@@ -103,4 +103,38 @@ export function runLeaderboardDaoContract(createDao) {
       "user_c",
     ]);
   });
+
+  it("lists every entry of one player, on every board and period (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.raiseScore({ ...XP, ...player("user_a", "alice", 2), score: 80, at: at() });
+    await dao.addOnce({ ...WEEK, ...player("user_a", "alice", 2), key: "m1", inc: 30, at: at(1) });
+    await dao.raiseScore({ ...XP, ...player("user_b", "bob"), score: 10, at: at() });
+
+    const entries = await dao.listByPlayer("user_a");
+
+    expect(entries.map(({ board, period, score }) => ({ board, period, score }))).toEqual(
+      expect.arrayContaining([
+        { board: "xp", period: "all", score: 80 },
+        { board: "xp", period: "2026-W42", score: 30 },
+      ]),
+    );
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ displayName: "alice", level: 2 });
+    expect(entries[0]).not.toHaveProperty("recentKeys");
+    expect(await dao.listByPlayer("user_nobody")).toEqual([]);
+  });
+
+  it("deletes every entry of one player and nobody else's (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.raiseScore({ ...XP, ...player("user_a", "alice", 2), score: 80, at: at() });
+    await dao.addOnce({ ...WEEK, ...player("user_a", "alice", 2), key: "m1", inc: 30, at: at(1) });
+    await dao.raiseScore({ ...XP, ...player("user_b", "bob"), score: 10, at: at() });
+
+    expect(await dao.deleteByPlayer("user_a")).toBe(2);
+    expect(await dao.deleteByPlayer("user_a")).toBe(0);
+
+    expect(await dao.top({ ...XP, limit: 10 })).toEqual([
+      expect.objectContaining({ playerId: "user_b", score: 10 }),
+    ]);
+  });
 }

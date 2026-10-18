@@ -71,5 +71,18 @@ export function createPlayerTransferAccessor({ playerTransferDao }) {
     async listFrom(playerIds) {
       return Object.freeze((await playerTransferDao.listByFrom([...playerIds])).map(toTransfer));
     },
+
+    /**
+     * The transfers into one account, oldest first (CC-035).
+     *
+     * @param {string} playerId  the account's player id
+     * @returns {Promise<ReadonlyArray<Readonly<PlayerTransfer>>>}
+     */
+    async listTo(playerId) {
+      return Object.freeze((await playerTransferDao.listByTo(playerId)).map(toTransfer));
+    },
+
+    /** @param {string} playerId  the account's player id @returns {Promise<number>} transfers removed (CC-035) */
+    removeTo: (playerId) => playerTransferDao.deleteByTo(playerId),
   });
 }

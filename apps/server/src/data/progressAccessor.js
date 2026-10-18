@@ -93,6 +93,14 @@ export function createProgressAccessor({ progressDao }) {
       const { applied } = await progressDao.addMerged({ to, from, totals, recentMatchIds, at: when });
       return { moved: Object.freeze(applied ? { ...totals } : { ...ZERO }) };
     },
+
+    /**
+     * Removes a player's progress and the markers of guests who moved into them (CC-035).
+     *
+     * @param {string} playerId
+     * @returns {Promise<number>} documents removed
+     */
+    removePlayer: (playerId) => progressDao.deleteByPlayer(playerId),
   });
 
   /** Applies `inc` once per `key`; a guest whose progress moved to an account (CC-032) credits that account. */

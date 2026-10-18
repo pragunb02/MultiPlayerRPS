@@ -65,4 +65,26 @@ describe("leaderboardAccessor", () => {
   it("fails fast without a DAO", () => {
     expect(() => createLeaderboardAccessor({})).toThrow(TypeError);
   });
+
+  it("lists every entry of a player with ms times, and removes them (CC-035)", async () => {
+    const boards = setup();
+    await boards.raiseScore(write("user_a", 40));
+
+    const entries = await boards.listForPlayer("user_a");
+
+    expect(entries).toEqual([
+      {
+        board: "xp",
+        period: "all",
+        playerId: "user_a",
+        displayName: "user_a",
+        level: 2,
+        score: 40,
+        updatedAt: T0,
+      },
+    ]);
+    expect(Object.isFrozen(entries)).toBe(true);
+    expect(await boards.removePlayer("user_a")).toBe(1);
+    expect(await boards.listForPlayer("user_a")).toEqual([]);
+  });
 });
