@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
 import { SessionProvider } from "../../hooks/SessionProvider.jsx";
-import { fakeApi, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
+import { fakeApi, fakeSessionBroadcast, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
 import { installMatchMedia } from "../../testing/matchMedia.js";
 import { MatchProgressProvider } from "./MatchProgressProvider.jsx";
 import { outcomeFor } from "./outcome.js";
@@ -34,7 +34,12 @@ const questUpdate = (overrides = {}) => ({
 async function celebrate(room, socket = fakeSocket()) {
   const view = render(
     <ServicesProvider
-      services={{ api: fakeApi({ getSession: async () => GUEST }), socket, sound: fakeSound() }}
+      services={{
+        api: fakeApi({ getSession: async () => GUEST }),
+        socket,
+        sound: fakeSound(),
+        sessionBroadcast: fakeSessionBroadcast(),
+      }}
     >
       <SessionProvider>
         <MatchProgressProvider>

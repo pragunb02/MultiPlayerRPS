@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
 import { SessionProvider } from "../../hooks/SessionProvider.jsx";
 import { useSession } from "../../hooks/useSession.js";
-import { fakeApi, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
+import { fakeApi, fakeSessionBroadcast, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
 import { KEPT_MATCHES, keepMatchUpdate, useMatchProgress } from "./matchProgressContext.js";
 import { MatchProgressProvider } from "./MatchProgressProvider.jsx";
 import { ResultCelebration } from "./ResultCelebration.jsx";
@@ -47,6 +47,7 @@ async function renderKept(children) {
     api: fakeApi({ getSession: async () => GUEST, login: async () => ({ identity: ACCOUNT }) }),
     socket,
     sound: fakeSound(),
+    sessionBroadcast: fakeSessionBroadcast(),
   };
   const providers = (inside) => (
     <ServicesProvider services={services}>
