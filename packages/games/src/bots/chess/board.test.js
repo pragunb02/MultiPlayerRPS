@@ -30,6 +30,11 @@ function perft(board, depth) {
 
 // Generous limits: these walk thousands of positions with chess.js, which is slow under a full parallel run.
 const SLOW = 60_000;
+// The same random walks at two sizes: a short one for every pull request and the long one for the nightly run.
+const RANDOM_WALKS = [
+  { games: 3, atLeast: 250, tags: [] },
+  { games: 12, atLeast: 1000, tags: ["slow"] },
+];
 
 const uci = (move) =>
   `${squareName(move.from)}${squareName(move.to)}${move.promotion === 0 ? "" : " pnbrqk"[move.promotion]}`;
@@ -101,20 +106,23 @@ describe("chess bot board: move generation", () => {
     );
   }
 
-  it(
-    "lists exactly the legal moves chess.js lists, all through many random games",
-    () => {
-      const positions = randomGames({ seed: 2024, games: 12, plies: 160 }).flat();
+  // A few games on every pull request, many more nightly (CC-203).
+  for (const { games, atLeast, tags } of RANDOM_WALKS) {
+    it(
+      `lists exactly the legal moves chess.js lists, all through ${games} random games`,
+      { timeout: SLOW, tags },
+      () => {
+        const positions = randomGames({ seed: 2024, games, plies: 160 }).flat();
 
-      for (const { fen, legal, check } of positions) {
-        const board = parseFen(fen);
-        expect(legalMoves(board).map(uci).sort()).toEqual(legal);
-        expect(inCheck(board)).toBe(check);
-      }
-      expect(positions.length).toBeGreaterThan(1000);
-    },
-    SLOW,
-  );
+        for (const { fen, legal, check } of positions) {
+          const board = parseFen(fen);
+          expect(legalMoves(board).map(uci).sort()).toEqual(legal);
+          expect(inCheck(board)).toBe(check);
+        }
+        expect(positions.length).toBeGreaterThan(atLeast);
+      },
+    );
+  }
 
   it("puts every position back exactly as it was after a move is taken back", () => {
     const board = parseFen(PERFT[1].fen);
@@ -152,19 +160,21 @@ describe("chess bot board: position fingerprints", () => {
     expect(viaKnights.hash).toBe(parseFen(START_FEN).hash);
   });
 
-  it(
-    "matches the fingerprint of the same position read from its FEN after every kind of move",
-    () => {
-      for (const game of randomGames({ seed: 7, games: 12, plies: 160 })) {
-        const board = parseFen(START_FEN);
-        for (const { san, after } of game) {
-          makeMove(board, moveFromSan(board, san));
-          expect(board.hash).toBe(parseFen(after).hash);
+  for (const { games, tags } of RANDOM_WALKS) {
+    it(
+      `matches the fingerprint of the same position read from its FEN after every move of ${games} random games`,
+      { timeout: SLOW, tags },
+      () => {
+        for (const game of randomGames({ seed: 7, games, plies: 160 })) {
+          const board = parseFen(START_FEN);
+          for (const { san, after } of game) {
+            makeMove(board, moveFromSan(board, san));
+            expect(board.hash).toBe(parseFen(after).hash);
+          }
         }
-      }
-    },
-    SLOW,
-  );
+      },
+    );
+  }
 
   it("tells apart positions that differ only in castling rights or whose turn it is", () => {
     const base = parseFen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");

@@ -187,6 +187,18 @@ Rules:
 12. **History is behaviour.** Every screen's browser tests cover arriving by link, Back, Forward, Back/Forward chains,
     reload, and Back after redirects and after actions that change who you are or where you sit (`e2e/navigation.spec.js`).
     Actions that end a place — leaving a room, signing in — replace the history entry, so Back never re-enters it.
+13. **Slow tests are tagged, never dropped** (CC-203). A test that plays many whole games (bot strength, long random
+    walks) gets `{ tags: ["slow"] }`. Pull requests leave those out (`npm test`, `npm run test:coverage`), and
+    `.github/workflows/nightly.yml` runs everything with coverage every night and on demand (`npm run test:all`).
+    Keep a fast check of the same behaviour untagged beside it (fewer games, a shorter walk), so the PR gates still
+    reach every line without the slow ones.
+14. **Every browser engine** (CC-184). The suite runs on Chromium (laptop and phone) as the required check, and on
+    Firefox (laptop) beside it on every pull request. WebKit (laptop, on macOS) is much slower on GitHub's runners,
+    so `.github/workflows/webkit.yml` runs it nightly, on demand and on pull requests that change `apps/web`,
+    `packages/shared` or `e2e`. `E2E_BROWSER=firefox|webkit npm run test:e2e` runs one engine locally. The e2e server serves HTTPS with a certificate made for each run (`e2e/tlsFront.js`), so every engine
+    sees the production headers and the `Secure` cookie unchanged. Branch on `formFactor(testInfo)`, never on the
+    project name. Engine wording the `players` fixture lets pass lives in `e2e/browserNoise.js`, each rule as
+    narrow as the words allow and unit tested.
 
 ---
 

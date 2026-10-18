@@ -10,4 +10,6 @@ dist
 .claude/settings.local.json
 test-results/
 playwright-report/
+test-results-restart/
+playwright-report-restart/
 .claude/worktrees/

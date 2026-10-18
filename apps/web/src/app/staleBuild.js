@@ -11,6 +11,15 @@ export const RELOAD_GUARD_MS = 30_000;
 /** Vite tells the page through this event when a file of a lazily loaded part, such as a game board, failed. */
 const PRELOAD_ERROR = "vite:preloadError";
 
+/** The page has started to leave: the player typed an address, followed a link to another page or reloaded. */
+const LEAVING = "beforeunload";
+
+/**
+ * Signs that the player is still on this page after all: they came back to it, or pressed something. A page that
+ * started to leave and then did not, such as a link that only started a download, recovers again from then on.
+ */
+const STAYING = Object.freeze(["pageshow", "pointerdown", "keydown"]);
+
 const pathOf = (url) => `${url.pathname}${url.search}${url.hash}`;
 
 /**
@@ -22,6 +31,11 @@ const pathOf = (url) => `${url.pathname}${url.search}${url.hash}`;
  * The reload marks the address. The next page removes the mark at once, before the router reads the address, and
  * remembers it only in memory. Nothing is kept in web storage. While a reload is under way the failure is
  * swallowed, so the board keeps showing its loading state instead of the error page.
+ *
+ * A page that is leaving never reloads. Leaving cancels the files still on their way, and Firefox and Safari report
+ * that as a failed load. Reloading then would replace the player's own navigation, and they would land back on
+ * this page instead of where they were going (CC-184, finding F-8). The failure is still swallowed, so nothing
+ * flashes an error while the next page loads.
  *
  * Call it first in the browser entry point.
  *
@@ -40,6 +54,13 @@ export function recoverFromStaleBuild({ window, now }) {
   }
   const startedAt = now();
   let reloading = false;
+  let leaving = false;
+  const onLeaving = () => {
+    leaving = true;
+  };
+  const onStaying = () => {
+    leaving = false;
+  };
 
   /** @param {Event} event */
   function onPreloadError(event) {
@@ -47,7 +68,7 @@ export function recoverFromStaleBuild({ window, now }) {
       return;
     }
     event.preventDefault();
-    if (reloading) {
+    if (reloading || leaving) {
       return;
     }
     reloading = true;
@@ -59,5 +80,11 @@ export function recoverFromStaleBuild({ window, now }) {
   }
 
   window.addEventListener(PRELOAD_ERROR, onPreloadError);
-  return () => window.removeEventListener(PRELOAD_ERROR, onPreloadError);
+  window.addEventListener(LEAVING, onLeaving);
+  STAYING.forEach((type) => window.addEventListener(type, onStaying));
+  return () => {
+    window.removeEventListener(PRELOAD_ERROR, onPreloadError);
+    window.removeEventListener(LEAVING, onLeaving);
+    STAYING.forEach((type) => window.removeEventListener(type, onStaying));
+  };
 }

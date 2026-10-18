@@ -1,7 +1,8 @@
 // The server for end-to-end tests, started by Playwright (playwright.config.js, webServer). It owns a throwaway
 // MongoDB seeded with one player from the legacy app, and runs the app (app.mjs) in a child process. When the
 // app stops, because a test restarted it like a deploy or a crash would (serverControl.js), a new app process
-// starts on the same port with the same database, as the hosting platform does (CC-101).
+// starts on the same port with the same database, as the hosting platform does (CC-101). Browsers reach it over
+// HTTPS through tlsFront.js, which stands in for the platform's proxy (CC-184).
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,8 +12,9 @@ import mongoose from "mongoose";
 import { createLogger } from "../apps/server/src/utils/logger.js";
 import { createPasswordHasher } from "../apps/server/src/utils/passwordHasher.js";
 import { OWNER, seededWeek } from "./ownerConsole.js";
-import { E2E_MONGO_PORT, E2E_MONGO_URI, LEGACY_PLAYER } from "./personas.js";
-import { recordAppPid, resetControl, roomOptions } from "./serverControl.js";
+import { APP_PORT, E2E_MONGO_PORT, E2E_MONGO_URI, E2E_PORT, LEGACY_PLAYER } from "./personas.js";
+import { recordAppPid, resetControl, roomOptions, TLS_DIR } from "./serverControl.js";
+import { makeCertificate, startTlsFront } from "./tlsFront.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const logger = createLogger({ level: "warn" });
@@ -42,6 +44,7 @@ await seed.db.collection("player_transfers").insertMany(week.transfers);
 await seed.close();
 
 resetControl();
+const front = await startTlsFront({ port: E2E_PORT, appPort: APP_PORT, ...makeCertificate(TLS_DIR) });
 let stopping = false;
 let app;
 
@@ -71,6 +74,7 @@ async function stop(exitCode) {
     app.kill("SIGTERM");
     await exited;
   }
+  await front.close();
   await mongo.stop();
   process.exit(exitCode);
 }
