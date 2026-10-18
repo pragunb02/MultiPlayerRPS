@@ -78,6 +78,11 @@ async function guest(server) {
   const res = await fetch(`${server.url()}/api/session/guest`, { method: "POST" });
   const cookie = res.headers.get("set-cookie").split(";")[0];
   const { identity } = await res.json();
+  return anotherTab(server, { identity, cookie });
+}
+
+/** One more tab of a player, on a page that is not a room. */
+async function anotherTab(server, { identity, cookie }) {
   const socket = connect(server.url(), {
     transports: ["websocket"],
     extraHeaders: { cookie },
@@ -211,6 +216,64 @@ describe("requests and presence through the real composition root (integration)"
       expect.objectContaining({ available: false, leftName: alice.identity.displayName }),
     );
     expect((await server.storedRooms())[0].seats.map((seat) => seat.playerId)).toEqual([bob.identity.id]);
+  });
+
+  // PR #67 review: a popup about a request could stay open forever when no push told the player it had ended.
+  const noneOpen = (code) => (payload) =>
+    payload.code === code && payload.requests.every((request) => request.state !== "open");
+
+  it("tells a player whose seat was given up that the request to her has gone", async () => {
+    const server = serverProcess();
+    await server.start();
+    const { alice, bob, code } = await finishedGame(server);
+    await send(alice.socket, SOCKET_EVENTS.ROOM_AWAY, { code });
+    server.clock.now += 1.5 * MINUTE;
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+    await heard(alice, SOCKET_EVENTS.REQUEST_UPDATED, (payload) => payload.requests.length > 0);
+    const before = alice.received.length;
+
+    server.clock.now += 0.5 * MINUTE;
+
+    await heard(alice, SOCKET_EVENTS.REQUEST_UPDATED, noneOpen(code), { after: before });
+    expect((await server.storedRooms())[0].seats.map((seat) => seat.playerId)).toEqual([bob.identity.id]);
+  });
+
+  it("tells every tab of the players that the requests of a room that closed have gone", async () => {
+    const server = serverProcess();
+    await server.start();
+    const { alice, bob, code } = await finishedGame(server);
+    // Alice keeps the room open in one tab, so her seat stays, and has the home page open in another.
+    const homeTab = await anotherTab(server, alice);
+    server.clock.now += 30 * MINUTE - 30_000;
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+    await heard(homeTab, SOCKET_EVENTS.REQUEST_UPDATED, (payload) => payload.requests.length > 0);
+    const before = homeTab.received.length;
+
+    server.clock.now += 30_000;
+    const join = await bob.socket.timeout(3_000).emitWithAck(SOCKET_EVENTS.ROOM_JOIN, { code });
+
+    expect(join.error.code).toBe("GONE");
+    const cleared = await heard(homeTab, SOCKET_EVENTS.REQUEST_UPDATED, noneOpen(code), { after: before });
+    expect(cleared.requests).toEqual([]);
+  });
+
+  it("tells a tab that reconnects that a request which ended while it was offline has gone", async () => {
+    const server = serverProcess();
+    await server.start();
+    const { alice, bob, code } = await finishedGame(server);
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+    await heard(alice, SOCKET_EVENTS.REQUEST_UPDATED, (payload) => payload.requests.length > 0);
+    alice.socket.disconnect();
+    await heard(bob, SOCKET_EVENTS.ROOM_UPDATED, (view) => seatOf(view, alice)?.presence === "offline");
+    server.clock.now += MINUTE;
+    await heard(bob, SOCKET_EVENTS.REQUEST_UPDATED, (payload) =>
+      payload.requests.some((request) => request.state === "expired"),
+    );
+    const before = alice.received.length;
+
+    alice.socket.connect();
+
+    await heard(alice, SOCKET_EVENTS.REQUEST_UPDATED, noneOpen(code), { after: before });
   });
 
   it("keeps a request through a restart, warns the players first, and pushes it again on reconnecting", async () => {

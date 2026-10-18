@@ -66,6 +66,31 @@ describe("SiteRequests (CC-207)", () => {
     expect(sound.played).toEqual(["notify"]);
   });
 
+  it("forgets what it knew on reconnecting, and shows only what the server tells it again (PR #67 review)", async () => {
+    const { push, socket } = await openHome();
+    push(pushed([request()]));
+    expect(question()).toBeInTheDocument();
+
+    // The request ended while the tab was offline: the server tells it about the room again, without it open.
+    act(() => socket.push("connect"));
+    expect(question()).not.toBeInTheDocument();
+    push(pushed([request({ state: "expired", endedAt: T + 60_000 })]));
+
+    expect(question()).not.toBeInTheDocument();
+    push(pushed([request({ createdAt: T + 70_000, expiresAt: T + 130_000 })]));
+    expect(question()).toBeInTheDocument();
+  });
+
+  it("closes the question when the room tells it no requests are left, as when the room closed", async () => {
+    const { push } = await openHome();
+    push(pushed([request()]));
+
+    push(pushed([], { names: {} }));
+
+    expect(question()).not.toBeInTheDocument();
+    expect(document.title).not.toMatch(/Rematch/);
+  });
+
   it("accepts and goes to the room on Accept and go", async () => {
     const user = userEvent.setup();
     const { push, socket, url } = await openHome();

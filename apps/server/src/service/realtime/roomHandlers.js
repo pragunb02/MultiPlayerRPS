@@ -197,8 +197,9 @@ export async function handleSocketGone({ io, roomComponent, playerId, channels, 
 }
 
 /**
- * A player's socket connected: rooms where they were offline now count them as away, and this tab hears about
- * every request still open in their rooms, so a question reaches them on whatever page they opened (CC-207).
+ * A player's socket connected: rooms where they were offline now count them as away, and this tab hears about the
+ * requests of every room they sit in. A question reaches them on whatever page they opened, and one that ended
+ * while the tab was offline goes away there (CC-207).
  *
  * @param {{ socket: import("socket.io").Socket, roomComponent: any, now: () => number, logger: any }} args
  */
@@ -206,7 +207,7 @@ export async function handleSocketOnline({ socket, roomComponent, now, logger })
   const playerId = socket.data.identity.id;
   try {
     await roomComponent.playerOnline({ playerId, now: now() });
-    for (const room of await roomComponent.roomsWithOpenRequests({ playerId, now: now() })) {
+    for (const room of await roomComponent.seatedRooms({ playerId })) {
       socket.emit(SOCKET_EVENTS.REQUEST_UPDATED, { ...roomComponent.requestsView(room), serverTime: now() });
     }
   } catch (err) {
@@ -215,14 +216,14 @@ export async function handleSocketOnline({ socket, roomComponent, now, logger })
 }
 
 /**
- * Tells every tab of a room's players about its requests whenever they open or end, on whatever page those tabs
- * are (CC-207).
+ * Tells every tab of the players named about a room's requests whenever they open or end, on whatever page those
+ * tabs are (CC-207). The room component names them, including a player whose seat the change gave up.
  *
- * @param {{ io: import("socket.io").Server, roomComponent: any, room: any, now: () => number }} args
+ * @param {{ io: import("socket.io").Server, roomComponent: any, room: any, playerIds: string[], now: () => number }} args
  */
-export function pushRequests({ io, roomComponent, room, now }) {
+export function pushRequests({ io, roomComponent, room, playerIds, now }) {
   const payload = { ...roomComponent.requestsView(room), serverTime: now() };
-  for (const seat of room.seats) {
-    io.to(playerChannel(seat.playerId)).emit(SOCKET_EVENTS.REQUEST_UPDATED, payload);
+  for (const playerId of playerIds) {
+    io.to(playerChannel(playerId)).emit(SOCKET_EVENTS.REQUEST_UPDATED, payload);
   }
 }

@@ -14,7 +14,7 @@ import { ROOM_LIFETIMES } from "./roomLifetimes.js";
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 const BOB = Object.freeze({ kind: "guest", id: "guest_b", displayName: "Bob" });
 const T0 = 1_000_000;
-const { awayReleaseMs, reconnectGraceMs, firstMoveMs, rematchRequestMs } = ROOM_LIFETIMES;
+const { awayReleaseMs, reconnectGraceMs, firstMoveMs } = ROOM_LIFETIMES;
 // The race with a thirty second limit per move, like the real games have.
 const timedRace = defineEngine({ ...raceEngine, id: "timed-race", turnLimitMs: 30_000 });
 const rpsEngine = ENGINES.find((engine) => engine.id === "rps");
@@ -333,21 +333,58 @@ describe("roomComponent idle limits (CC-036)", () => {
 });
 
 describe("roomComponent requests for every page (CC-207)", () => {
-  it("lists the rooms with a request still open for a player, and what to tell them about it", async () => {
+  it("lists every room a player sits in, with or without a request, and what to tell them about it", async () => {
     const { rooms, code } = await finished();
-    expect(await rooms.roomsWithOpenRequests({ playerId: ALICE.id, now: T0 + 4 })).toEqual([]);
+    expect(await rooms.seatedRooms({ playerId: ALICE.id })).toEqual([await rooms.getRoom(code)]);
     const asked = await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: T0 + 4 });
 
-    expect(await rooms.roomsWithOpenRequests({ playerId: ALICE.id, now: T0 + 5 })).toEqual([asked]);
-    expect(await rooms.roomsWithOpenRequests({ playerId: ALICE.id, now: T0 + 4 + rematchRequestMs })).toEqual(
-      [],
-    );
+    expect(await rooms.seatedRooms({ playerId: ALICE.id })).toEqual([asked]);
+    expect(await rooms.seatedRooms({ playerId: "guest_x" })).toEqual([]);
     expect(rooms.requestsView(asked)).toEqual({
       code,
       gameId: "race",
       names: { [ALICE.id]: "Alice", [BOB.id]: "Bob" },
       requests: asked.requests,
     });
+  });
+
+  const requestPushes = (published) =>
+    published.filter(({ event }) => event === ROOM_EVENTS.REQUESTS_CHANGED).map(({ payload }) => payload);
+
+  it("names the players to tell about a change of requests, as well as one whose seat it gave up", async () => {
+    const { rooms, code, published } = await finished();
+    await rooms.playerAway({ code, playerId: ALICE.id, now: T0 + 3 });
+    await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: T0 + 4 });
+    expect(requestPushes(published).at(-1).playerIds).toEqual([ALICE.id, BOB.id]);
+
+    await rooms.expireDue({ now: T0 + 3 + awayReleaseMs });
+
+    const released = requestPushes(published).at(-1);
+    expect(released.room.seats.map((seat) => seat.playerId)).toEqual([BOB.id]);
+    expect(released.room.requests).toEqual([]);
+    expect(released.playerIds).toEqual([ALICE.id, BOB.id]);
+  });
+
+  it("tells the players of a room that closes with a request that its requests have gone", async () => {
+    const { rooms, code, published } = await finished();
+    await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: T0 + 4 });
+
+    expect(await rooms.sweepExpired({ now: T0 + 3 + ROOM_LIFETIMES.rematchWindowMs })).toEqual([code]);
+
+    const closed = requestPushes(published).at(-1);
+    expect(closed.room.code).toBe(code);
+    expect(closed.room.requests).toEqual([]);
+    expect(closed.playerIds).toEqual([ALICE.id, BOB.id]);
+  });
+
+  it("says nothing about requests when a room without any closes", async () => {
+    const { rooms, code, published } = await finished();
+    const before = requestPushes(published).length;
+
+    await rooms.sweepExpired({ now: T0 + 3 + ROOM_LIFETIMES.rematchWindowMs });
+
+    expect(requestPushes(published)).toHaveLength(before);
+    expect(published.at(-1).payload.code).toBe(code);
   });
 
   it("names nothing for rooms stored before requests existed", async () => {

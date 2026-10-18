@@ -41,7 +41,6 @@ import {
   declineByMoving,
   endRequest,
   openRequest,
-  openRequests,
   requestsLeft,
   requireAnswerer,
   ruleFor,
@@ -60,8 +59,9 @@ export const ROOM_EVENTS = Object.freeze({
   /** `{ room }`: a room changed without a player asking (a clock ran out), so clients need the new view */
   UPDATED: "room.updated",
   /**
-   * `{ room }`: a request between the players opened or ended (CC-159). Both players hear about it on whatever
-   * page they are (CC-207).
+   * `{ room, playerIds }`: a request between the players opened or ended (CC-159). The players in `playerIds` hear
+   * about it on whatever page they are (CC-207): those seated before or after the change, so a player whose seat
+   * was given up is told too. When a room with requests closes, `room` is the room as it was, with none left.
    */
   REQUESTS_CHANGED: "room.requestsChanged",
 });
@@ -81,6 +81,12 @@ const ABORTED = Object.freeze({
   reason: ROOM_END_REASONS.ABORTED,
 });
 const isAborted = (room) => room.result?.result === ROOM_END_REASONS.ABORTED;
+/** The people seated in a room before or after a change, each once. A computer player hears nothing. */
+const playersOf = (before, after) => [
+  ...new Set(
+    [...before.seats, ...after.seats].filter((seat) => seat.bot === undefined).map((seat) => seat.playerId),
+  ),
+];
 
 const randomRoomCode = () =>
   Array.from(
@@ -206,6 +212,13 @@ export function createRoomComponent({
     await keepGameOf(room);
     await roomAccessor.close({ room, reason, closedAt: now });
     events.emit(ROOM_EVENTS.CLOSED, { code: room.code, reason });
+    // A player on another page is not in the room's channel, so only this tells them its requests have gone.
+    if ((room.requests ?? []).length > 0) {
+      events.emit(ROOM_EVENTS.REQUESTS_CHANGED, {
+        room: { ...room, requests: [] },
+        playerIds: playersOf(room, room),
+      });
+    }
   }
 
   /** Closes the room if its lifetime is over. Answers whether it did. */
@@ -272,7 +285,8 @@ export function createRoomComponent({
         }
         events.emit(ROOM_EVENTS.CHANGED, { room: saved });
         if (!sameRequests(room.requests, saved.requests)) {
-          events.emit(ROOM_EVENTS.REQUESTS_CHANGED, { room: saved });
+          // A player whose seat this change gave up still has to hear that the requests to them have gone.
+          events.emit(ROOM_EVENTS.REQUESTS_CHANGED, { room: saved, playerIds: playersOf(room, saved) });
         }
         return { closed: false, changed: true, room: saved };
       } catch (err) {
@@ -828,16 +842,13 @@ export function createRoomComponent({
       }),
 
     /**
-     * The rooms where the player has a seat and a request is still open. Their requests are sent to a player who
-     * connects, so a question reaches them on any page (CC-207).
+     * Every room where the player has a seat. Their requests are sent to a tab that connects, so a question reaches
+     * it on any page, and a question that ended while the tab was offline goes away there (CC-207).
      *
-     * @param {{ playerId: string, now: number }} input
+     * @param {{ playerId: string }} input
      * @returns {Promise<ReadonlyArray<Readonly<import("../../data/roomAccessor.js").Room>>>}
      */
-    async roomsWithOpenRequests({ playerId, now }) {
-      const rooms = await roomAccessor.listBySeat(playerId);
-      return rooms.filter((room) => openRequests(room).some((request) => request.expiresAt > now));
-    },
+    seatedRooms: ({ playerId }) => roomAccessor.listBySeat(playerId),
 
     /**
      * What the players of a room are told about its requests on any page of the site (CC-207): the requests, and

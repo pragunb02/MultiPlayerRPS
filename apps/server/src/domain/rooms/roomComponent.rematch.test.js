@@ -79,7 +79,10 @@ describe("roomComponent rematch (CC-037, CC-159)", () => {
     expect(room.status).toBe("finished");
     expect(rooms.viewFor(room, ALICE.id).requests).toEqual([rematchRequest()]);
     expect(rooms.viewFor(room, ALICE.id).rematch.until).toBe(UNTIL);
-    expect(published.at(-1)).toEqual({ event: ROOM_EVENTS.REQUESTS_CHANGED, payload: { room } });
+    expect(published.at(-1)).toEqual({
+      event: ROOM_EVENTS.REQUESTS_CHANGED,
+      payload: { room, playerIds: [ALICE.id, BOB.id] },
+    });
     expect(room.dueAt).toBe(T0 + 4 + ROOM_LIFETIMES.rematchRequestMs);
     expect(await rooms.sweepExpired({ now: UNTIL })).toEqual([code]);
   });

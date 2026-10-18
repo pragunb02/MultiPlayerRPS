@@ -250,7 +250,9 @@ export function createRealtimeGateway({
   });
 
   // Domain to transport: a request opened or ended, so both players hear about it on any page (CC-207).
-  domainEvents.on(ROOM_EVENTS.REQUESTS_CHANGED, ({ room }) => pushRequests({ io, roomComponent, room, now }));
+  domainEvents.on(ROOM_EVENTS.REQUESTS_CHANGED, ({ room, playerIds }) =>
+    pushRequests({ io, roomComponent, room, playerIds, now }),
+  );
 
   // Domain → transport: a room changed on its own (e.g. a clock ran out) — push everyone their new view.
   domainEvents.on(ROOM_EVENTS.UPDATED, ({ room }) => {
