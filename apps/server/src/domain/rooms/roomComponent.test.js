@@ -845,12 +845,23 @@ describe("roomComponent", () => {
       expect(room.lastActivityAt).toBe(T0 + 1);
     });
 
-    it("changes nothing when nobody was shown as connected", async () => {
-      const { rooms, code } = await startedGame();
+    it("changes nothing in a waiting room when nobody was shown as connected", async () => {
+      const { rooms } = setup();
+      const waiting = await createRace(rooms, CAROL, T0);
       await rooms.markEveryoneAway({ now: T0 + 2 });
 
       expect(await rooms.markEveryoneAway({ now: T0 + 3 })).toEqual([]);
-      expect((await rooms.getRoom(code)).version).toBe(3);
+      expect((await rooms.getRoom(waiting.code)).version).toBe(2);
+    });
+
+    it("resumes every game in progress, even when nobody was shown as connected (PR #67 review)", async () => {
+      const { rooms, code } = await startedGame();
+      await rooms.markEveryoneAway({ now: T0 + 2 });
+
+      expect(await rooms.markEveryoneAway({ now: T0 + 3 })).toEqual([code]);
+      const room = await rooms.getRoom(code);
+      expect(room.game.resumedAt).toBe(T0 + 3);
+      expect(room.seats.map((seat) => seat.since)).toEqual([T0 + 2, T0 + 2]);
     });
   });
 });

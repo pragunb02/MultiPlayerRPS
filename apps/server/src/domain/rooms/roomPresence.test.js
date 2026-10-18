@@ -9,6 +9,7 @@ import {
   releaseAt,
   turnLimit,
   withPresence,
+  withTurnCredit,
 } from "./roomPresence.js";
 
 const T0 = Date.UTC(2026, 9, 18, 12, 0, 0);
@@ -94,6 +95,102 @@ describe("room idle limits (CC-036)", () => {
       endsAt: 0,
       firstMove: false,
       due: ["alice"],
+    });
+  });
+
+  // PR #67 review: the limit ran on through a server restart and while a player was reconnecting.
+  describe("over a restart and reconnects", () => {
+    const timed = turnOf(["alice"], { turnLimitMs: 30_000 });
+    const offline = (playerId, since) => ({ ...here(playerId), connected: false, since });
+    /** Alice due to move since Bob moved at T0 + 2s, both having moved once. */
+    const aliceToMove = (overrides = {}) =>
+      room({
+        game: {
+          startedAt: T0,
+          state: {},
+          log: [
+            { kind: "move", playerId: "alice", at: T0 + 1_000 },
+            { kind: "move", playerId: "bob", at: T0 + 2_000 },
+          ],
+          ...overrides.game,
+        },
+        ...(overrides.seats && { seats: overrides.seats }),
+      });
+
+    it("counts the turn again from when the game resumed after a restart", () => {
+      const resumed = aliceToMove({ game: { resumedAt: T0 + 600_000 } });
+
+      expect(turnLimit(resumed, { engine: timed, lifetimes }).endsAt).toBe(T0 + 630_000);
+    });
+
+    it("holds the limit of a due player who is offline until their reconnect grace could be used up", () => {
+      const away = aliceToMove({ seats: [offline("alice", T0 + 10_000), here("bob")] });
+
+      expect(turnLimit(away, { engine: timed, lifetimes }).endsAt).toBe(
+        T0 + 32_000 + lifetimes.reconnectGraceMs,
+      );
+    });
+
+    it("gives a due player back the time they were offline during their turn, at most the reconnect grace", () => {
+      const back = (offlineSince, backAt) => {
+        const before = aliceToMove({ seats: [offline("alice", offlineSince), here("bob")] });
+        const after = withPresence(before, { playerId: "alice", presence: PRESENCE.HERE, now: backAt });
+        return withTurnCredit(before, after, { playerId: "alice", now: backAt, engine: timed, lifetimes });
+      };
+
+      expect(turnLimit(back(T0 + 20_000, T0 + 40_000), { engine: timed, lifetimes }).endsAt).toBe(
+        T0 + 52_000,
+      );
+      // Time offline before the turn started is not the turn's.
+      expect(turnLimit(back(T0 - 5_000, T0 + 12_000), { engine: timed, lifetimes }).endsAt).toBe(T0 + 42_000);
+      expect(turnLimit(back(T0 + 20_000, T0 + 500_000), { engine: timed, lifetimes }).endsAt).toBe(
+        T0 + 32_000 + lifetimes.reconnectGraceMs,
+      );
+    });
+
+    it("adds up the time back over several reconnects in one turn, never past the reconnect grace", () => {
+      const before = aliceToMove({ seats: [offline("alice", T0 + 10_000), here("bob")] });
+      const once = withTurnCredit(
+        before,
+        withPresence(before, { playerId: "alice", presence: PRESENCE.HERE, now: T0 + 50_000 }),
+        { playerId: "alice", now: T0 + 50_000, engine: timed, lifetimes },
+      );
+      const gone = withPresence(once, { playerId: "alice", presence: PRESENCE.OFFLINE, now: T0 + 55_000 });
+      const twice = withTurnCredit(
+        gone,
+        withPresence(gone, { playerId: "alice", presence: PRESENCE.HERE, now: T0 + 85_000 }),
+        { playerId: "alice", now: T0 + 85_000, engine: timed, lifetimes },
+      );
+
+      expect(turnLimit(once, { engine: timed, lifetimes }).endsAt).toBe(T0 + 72_000);
+      expect(turnLimit(twice, { engine: timed, lifetimes }).endsAt).toBe(
+        T0 + 32_000 + lifetimes.reconnectGraceMs,
+      );
+    });
+
+    it("gives nothing back to a player not due, to one who was not offline, or once the turn has passed", () => {
+      const before = aliceToMove({ seats: [here("alice"), offline("bob", T0 + 10_000)] });
+      const bobBack = withPresence(before, { playerId: "bob", presence: PRESENCE.HERE, now: T0 + 20_000 });
+      const awayBack = aliceToMove({
+        seats: [{ ...here("alice"), connected: false, away: true }, here("bob")],
+      });
+
+      expect(
+        withTurnCredit(before, bobBack, { playerId: "bob", now: T0 + 20_000, engine: timed, lifetimes }),
+      ).toBe(bobBack);
+      const hereAgain = withPresence(awayBack, {
+        playerId: "alice",
+        presence: PRESENCE.HERE,
+        now: T0 + 9_000,
+      });
+      expect(
+        withTurnCredit(awayBack, hereAgain, { playerId: "alice", now: T0 + 9_000, engine: timed, lifetimes }),
+      ).toBe(hereAgain);
+      const credited = {
+        ...aliceToMove(),
+        game: { ...aliceToMove().game, turnCredit: { entries: 1, ms: 9_000 } },
+      };
+      expect(turnLimit(credited, { engine: timed, lifetimes }).endsAt).toBe(T0 + 32_000);
     });
   });
 

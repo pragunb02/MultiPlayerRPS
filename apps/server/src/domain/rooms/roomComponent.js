@@ -34,6 +34,7 @@ import {
   releaseAt,
   turnLimit,
   withPresence,
+  withTurnCredit,
 } from "./roomPresence.js";
 import {
   addRequest,
@@ -159,7 +160,14 @@ export function createRoomComponent({
     return seat;
   };
   const withSeats = (room, seats, now) => ({ ...room, seats, lastActivityAt: now });
-  const present = (room, playerId, presence, now) => withPresence(room, { playerId, presence, now });
+  // A player due to move who comes back from offline gets that time back for the turn (see `turnLimit`).
+  const present = (room, playerId, presence, now) =>
+    withTurnCredit(room, withPresence(room, { playerId, presence, now }), {
+      playerId,
+      now,
+      engine: engineFor(room),
+      lifetimes,
+    });
   const rulesOf = (room) => (type) => ruleFor({ type, engine: engineFor(room), lifetimes });
   const settled = (room, now) => settleRequests(room, { now, rules: rulesOf(room), lifetimes });
 
@@ -867,7 +875,9 @@ export function createRoomComponent({
      * After a restart nobody is connected yet, whatever storage says: the old process could not record the
      * disconnects when it stopped or crashed. Each player is shown as offline until their browser connects again,
      * which it does by itself. The last activity time stays, so an away room is not kept any longer. A computer
-     * player lives in the server and is back with it, so it stays connected.
+     * player lives in the server and is back with it, so it stays connected. Every game in progress resumes now:
+     * nobody could move while the server was down, so the idle limit of the current turn starts again (see
+     * `turnLimit`). A chess clock is the game's own, and keeps the time it stored (CC-036, PR #67 review).
      *
      * @param {{ now: number }} input
      * @returns {Promise<string[]>} codes of rooms that changed
@@ -878,15 +888,19 @@ export function createRoomComponent({
         change({
           code: stored.code,
           now,
-          decide: (room) =>
-            room.seats.some(away)
-              ? {
-                  ...room,
-                  seats: room.seats.map((seat) =>
-                    away(seat) ? { ...seat, connected: false, away: false, since: now } : seat,
-                  ),
-                }
-              : room,
+          decide(room) {
+            const playing = room.status === ROOM_STATUS.PLAYING;
+            if (!playing && !room.seats.some(away)) {
+              return room;
+            }
+            return {
+              ...room,
+              seats: room.seats.map((seat) =>
+                away(seat) ? { ...seat, connected: false, away: false, since: now } : seat,
+              ),
+              ...(playing && { game: { ...room.game, resumedAt: now } }),
+            };
+          },
         }),
       );
       return results.filter((result) => !result.closed && result.changed).map((result) => result.room.code);

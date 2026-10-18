@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
-import { createSocketClients, nextEvent as nextUpdate, send } from "../../testing/socketClients.js";
+import {
+  createSocketClients,
+  eventWhere,
+  nextEvent as nextUpdate,
+  send,
+} from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
 
 let server;
@@ -74,7 +79,12 @@ describe("rematch over sockets (CC-037, CC-159)", () => {
     server = await startTestServer();
     const { alice, bob, code } = await finishedRace();
     const homeTab = await clients.openSocket(alice.cookie);
-    const homeTabHears = nextUpdate(homeTab, SOCKET_EVENTS.REQUEST_UPDATED);
+    // Connecting tells the tab about the room first, with no request yet.
+    const homeTabHears = eventWhere(
+      homeTab,
+      (payload) => payload.requests.length > 0,
+      SOCKET_EVENTS.REQUEST_UPDATED,
+    );
     const bobHears = nextUpdate(bob.socket, SOCKET_EVENTS.REQUEST_UPDATED);
 
     await ask(bob, code);

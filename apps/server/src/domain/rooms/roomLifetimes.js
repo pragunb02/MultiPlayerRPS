@@ -31,7 +31,9 @@ const HOUR_MS = 60 * MINUTE_MS;
  *    phone lock screen, a switch from mobile data to wifi and a server restart. After it the opponent may claim
  *    the win.
  * 10. A player who has not made their first move of a game within `firstMoveMs` of their turn starting aborts it,
- *     and nothing is recorded. Later moves have each game's own limit (the engine's `turnLimitMs`).
+ *     and nothing is recorded. Later moves have each game's own limit (the engine's `turnLimitMs`). A server
+ *     restart starts the current turn again, and a player due to move who was offline gets that time back, up to
+ *     `reconnectGraceMs` in one turn, so nobody loses a game for time they could not play (roomPresence.js).
  */
 export const ROOM_LIFETIMES = Object.freeze({
   waitingMs: 30 * MINUTE_MS,

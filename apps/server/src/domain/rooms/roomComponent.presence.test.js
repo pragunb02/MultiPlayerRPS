@@ -143,7 +143,8 @@ describe("roomComponent presence (CC-158, CC-207)", () => {
       expect.objectContaining({ presence: "offline", since: T0 + 6 }),
     ]);
     expect(room.lastActivityAt).toBe(T0 + 6);
-    expect(await rooms.markEveryoneAway({ now: T0 + 11 })).toEqual([]);
+    // Nobody is shown as connected any more, but the game resumes after every restart.
+    expect(await rooms.markEveryoneAway({ now: T0 + 11 })).toEqual([code]);
   });
 
   it("reads seats stored before presence existed by whether they are connected", async () => {
@@ -304,6 +305,39 @@ describe("roomComponent idle limits (CC-036)", () => {
     expect(room.game.log.at(-1)).toEqual({ kind: "idle", playerIds: [BOB.id], at: T0 + 3 + 30_000 });
     expect(room.rematch).toEqual({ available: true });
     expect(published.filter(({ event }) => event === ROOM_EVENTS.GAME_FINISHED)).toHaveLength(1);
+  });
+
+  // PR #67 review: the limit ran on through a server restart and while a player was reconnecting.
+  it("starts the turn again after a restart, so time the server was down never ends a game", async () => {
+    const { rooms, code } = await started("timed-race");
+    await rooms.makeMove({ code, playerId: BOB.id, move: { add: 1 }, now: T0 + 2 });
+    await rooms.makeMove({ code, playerId: ALICE.id, move: { add: 1 }, now: T0 + 3 });
+    const resumed = T0 + 3 + 10 * 60_000; // the server was down for ten minutes, with Bob due to move
+
+    await rooms.markEveryoneAway({ now: resumed });
+
+    expect(await rooms.expireDue({ now: resumed })).toEqual([]);
+    expect((await rooms.getRoom(code)).status).toBe("playing");
+    await rooms.joinRoom({ code, player: ALICE, now: resumed + 1_000 });
+    await rooms.joinRoom({ code, player: BOB, now: resumed + 2_000 });
+    // Bob gets a whole turn from the restart, and the two seconds it took him to reconnect.
+    expect((await rooms.getRoom(code)).dueAt).toBe(resumed + 30_000 + 2_000);
+    expect(await rooms.expireDue({ now: resumed + 32_000 })).toEqual([code]);
+    expect((await rooms.getRoom(code)).result.reason).toBe("idle");
+  });
+
+  it("gives a player due to move the time they were reconnecting back, at most the reconnect grace", async () => {
+    const { rooms, code } = await started("timed-race");
+    await rooms.makeMove({ code, playerId: BOB.id, move: { add: 1 }, now: T0 + 2 });
+    await rooms.makeMove({ code, playerId: ALICE.id, move: { add: 1 }, now: T0 + 3 });
+    await rooms.playerDisconnected({ code, playerId: BOB.id, now: T0 + 10_000 });
+
+    expect(await rooms.expireDue({ now: T0 + 3 + 30_000 })).toEqual([]);
+    await rooms.joinRoom({ code, player: BOB, now: T0 + 40_000 });
+
+    expect((await rooms.getRoom(code)).dueAt).toBe(T0 + 3 + 30_000 + 30_000);
+    expect(await rooms.expireDue({ now: T0 + 60_002 })).toEqual([]);
+    expect(await rooms.expireDue({ now: T0 + 60_003 })).toEqual([code]);
   });
 
   it("is a draw when every player is due and none of them moves", async () => {
