@@ -19,6 +19,8 @@ const listed = {
           file: "a.spec.js",
           specs: [spec("a2", "plays", [test("desktop", [], "skipped")])],
         },
+        // A describe block that holds only other describe blocks has no specs of its own.
+        { title: "nothing here", file: "a.spec.js", suites: [] },
       ],
     },
     { title: "b.spec.js", file: "b.spec.js", specs: [spec("b1", "waits", [test("desktop", [], "skipped")])] },
