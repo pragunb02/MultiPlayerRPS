@@ -203,4 +203,26 @@ export async function createRoom(player, gameSlug) {
  */
 export const formFactor = (testInfo) => (testInfo.project.use.isMobile ? "mobile" : "desktop");
 
+/** The widest screen, in CSS pixels, that gets the phone header: 40rem in Layout.module.css. */
+export const PHONE_HEADER_MAX_WIDTH = 640;
+
+/**
+ * The header, with the player's controls on screen (sound, level, name, Log in, Sign up, Log out). On a phone they
+ * sit in the header's menu (CC-259), so this opens it first when it is closed. The menu closes on every new page,
+ * so call this again after the page changes.
+ *
+ * @param {import("@playwright/test").Page} page
+ */
+export async function header(page) {
+  const banner = page.getByRole("banner");
+  if (page.viewportSize().width <= PHONE_HEADER_MAX_WIDTH) {
+    const toggle = banner.getByRole("button", { name: "Menu" });
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+      await toggle.click();
+    }
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  }
+  return banner;
+}
+
 export { expect };

@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
+import { createRoom, expect, header, joinAsGuest, test } from "./fixtures.js";
 
 // Two people in a room asking each other things (CC-104): a draw offer in chess and a rematch in any game. The one
 // asked gets a popup with Accept and Decline, the asker waits with Cancel, and every answer is shown to the other
@@ -210,18 +210,18 @@ test.describe("sound switch", () => {
   test("muting survives a reload and is the only thing kept in storage", async ({ players }) => {
     const riya = await players.open("riya");
     await riya.page.goto("/");
-    const banner = riya.page.getByRole("banner");
+    const banner = await header(riya.page);
 
     await banner.getByRole("button", { name: "Sound on" }).click();
     await expect(banner.getByRole("button", { name: "Sound off" })).toBeVisible();
     await riya.page.reload();
 
-    await expect(banner.getByRole("button", { name: "Sound off" })).toBeVisible();
+    await expect((await header(riya.page)).getByRole("button", { name: "Sound off" })).toBeVisible();
     const stored = await riya.page.evaluate(() => Object.entries(localStorage));
     expect(stored).toEqual([["cc.sound", '{"muted":true,"volume":0.6}']]);
 
     await banner.getByRole("button", { name: "Sound off" }).click();
     await riya.page.reload();
-    await expect(banner.getByRole("button", { name: "Sound on" })).toBeVisible();
+    await expect((await header(riya.page)).getByRole("button", { name: "Sound on" })).toBeVisible();
   });
 });

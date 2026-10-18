@@ -1,4 +1,4 @@
-import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
+import { createRoom, expect, header, joinAsGuest, test } from "./fixtures.js";
 
 // Two guests playing: what each one can see, and where every button leads.
 test.describe("guest players", () => {
@@ -81,7 +81,7 @@ test.describe("guest players", () => {
     const password = "a guest becomes a user";
     alice.secrets.push(account.email, password);
 
-    await alice.page.getByRole("banner").getByRole("link", { name: "Sign up" }).click();
+    await (await header(alice.page)).getByRole("link", { name: "Sign up" }).click();
     await expect(alice.page).toHaveURL(`/signup?next=${encodeURIComponent(room.path)}`);
     await alice.page.getByLabel("Username").fill(account.username);
     await alice.page.getByLabel("Email").fill(account.email);

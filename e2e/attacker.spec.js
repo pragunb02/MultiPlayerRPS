@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.js";
+import { expect, header, test } from "./fixtures.js";
 import { BASE_URL, newAccount } from "./personas.js";
 
 // Someone trying to misuse links, inputs and the API. Each attempt must fail quietly and safely.
@@ -16,8 +16,8 @@ test.describe("attacker", () => {
     await page.getByLabel("Password").fill(account.password);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page).toHaveURL("/");
-    await page.getByRole("banner").getByRole("button", { name: "Log out" }).click();
-    await expect(page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
+    await (await header(page)).getByRole("button", { name: "Log out" }).click();
+    await expect((await header(page)).getByRole("link", { name: "Log in" })).toBeVisible();
 
     for (const next of [
       "https://evil.example/",
@@ -30,8 +30,8 @@ test.describe("attacker", () => {
       await page.getByLabel("Password").fill(account.password);
       await page.getByRole("button", { name: "Log in" }).click();
       await expect(page, `next=${next}`).toHaveURL(`${BASE_URL}/`);
-      await page.getByRole("banner").getByRole("button", { name: "Log out" }).click();
-      await expect(page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
+      await (await header(page)).getByRole("button", { name: "Log out" }).click();
+      await expect((await header(page)).getByRole("link", { name: "Log in" })).toBeVisible();
     }
   });
 

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.js";
+import { expect, header, test } from "./fixtures.js";
 
 // Two guests who just finished a game and want another one (CC-037): the rematch starts in the same room, with
 // the same URL, and history keeps working around it.
@@ -7,7 +7,7 @@ import { expect, test } from "./fixtures.js";
 async function asGuest(player) {
   await player.page.goto("/");
   await player.page.getByRole("button", { name: "Play as a guest" }).click();
-  const name = player.page.getByRole("banner").getByText(/^Guest-/);
+  const name = (await header(player.page)).getByText(/^Guest-/);
   await expect(name).toBeVisible();
   return name.textContent();
 }

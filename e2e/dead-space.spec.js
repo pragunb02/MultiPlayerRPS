@@ -152,6 +152,38 @@ for (const form of Object.keys(SIZES)) {
           }
         },
       );
+
+      screen("header: one row, with Log in and Sign up in the menu on a phone", async ({ page }) => {
+        await page.goto("/");
+        const banner = page.getByRole("banner");
+        const toggle = banner.getByRole("button", { name: "Menu" });
+        const login = banner.getByRole("link", { name: "Log in" });
+        await expect(banner.getByRole("navigation", { name: "Main" })).toBeVisible();
+
+        if (form === "desktop") {
+          await expect(toggle).toBeHidden();
+          await expect(login).toBeVisible();
+          await expect(banner.getByRole("link", { name: "Sign up" })).toBeVisible();
+          return;
+        }
+        // One row: the header is no taller than its tallest item plus its padding.
+        expect((await banner.boundingBox()).height).toBeLessThanOrEqual(64);
+        await expect(login).toBeHidden();
+        const nav = await banner.getByRole("navigation", { name: "Main" }).boundingBox();
+        expect(nav.x + nav.width).toBeLessThanOrEqual((await toggle.boundingBox()).x);
+
+        await toggle.click();
+        await expect(toggle).toHaveAttribute("aria-expanded", "true");
+        await expect(banner.getByRole("button", { name: /^Sound o/ })).toBeFocused();
+        await expect(login).toBeVisible();
+        await expect(banner.getByRole("link", { name: "Sign up" })).toBeVisible();
+        await expect(banner.getByRole("slider", { name: "Volume" })).toBeVisible();
+
+        await page.keyboard.press("Escape");
+        await expect(toggle).toHaveAttribute("aria-expanded", "false");
+        await expect(toggle).toBeFocused();
+        await expect(login).toBeHidden();
+      });
     });
   }
 }

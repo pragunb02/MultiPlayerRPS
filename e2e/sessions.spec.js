@@ -1,4 +1,4 @@
-import { createRoom, expect, test } from "./fixtures.js";
+import { createRoom, expect, header, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
 // A person with several tabs and devices (CC-234, CC-115, ADR-033). Every tab and device shows who the server says
@@ -6,7 +6,7 @@ import { newAccount } from "./personas.js";
 // tab of the same browser.
 
 const banner = (page) => page.getByRole("banner");
-const loginLink = (page) => banner(page).getByRole("link", { name: "Log in" });
+const loginLink = async (page) => (await header(page)).getByRole("link", { name: "Log in" });
 const chooser = (page) => page.getByRole("heading", { name: "You're invited to play Tic Tac Toe" });
 const inviteCard = (page) => page.getByRole("heading", { name: "Invite a friend" });
 
@@ -53,7 +53,7 @@ test.describe("signed out from another device (CC-234)", () => {
     await settings.getByRole("button", { name: "Sign out other devices" }).click();
     await expect(settings.getByRole("status")).toHaveText("Your other devices are signed out.");
 
-    await expect(loginLink(phone.page)).toBeVisible();
+    await expect(await loginLink(phone.page)).toBeVisible();
     await expect(chooser(phone.page)).toBeVisible();
     await expect(inviteCard(phone.page)).toHaveCount(0);
     await expect(banner(phone.page)).not.toContainText(account.username);
@@ -82,7 +82,7 @@ test.describe("signed out from another device (CC-234)", () => {
       "Password changed. Your other devices are signed out.",
     );
 
-    await expect(loginLink(phone.page)).toBeVisible();
+    await expect(await loginLink(phone.page)).toBeVisible();
     await expect(banner(phone.page)).not.toContainText(account.username);
     expect(await wasNotReloaded(phone.page)).toBe(true);
   });
@@ -95,13 +95,13 @@ test.describe("other tabs of the same browser (CC-115)", () => {
     const first = person.page;
     const second = await person.openTab();
     await second.goto("/");
-    await expect(loginLink(second)).toBeVisible();
+    await expect(await loginLink(second)).toBeVisible();
     await markPage(second);
 
     await signUp(first, account);
 
     await expect(banner(second)).toContainText(account.username);
-    await expect(loginLink(second)).toHaveCount(0);
+    await expect(await loginLink(second)).toHaveCount(0);
     expect(await wasNotReloaded(second)).toBe(true);
   });
 
@@ -117,14 +117,14 @@ test.describe("other tabs of the same browser (CC-115)", () => {
     await second.goto("/games/tic-tac-toe");
     await second.getByRole("button", { name: "Create room" }).click();
     await expect(inviteCard(second)).toBeVisible();
-    await expect(banner(second).getByTitle("Guest")).toBeVisible();
+    await expect((await header(second)).getByTitle("Guest")).toBeVisible();
     const roomPath = new URL(second.url()).pathname;
     await markPage(second);
 
     await logIn(person.page, account);
 
     await expect(banner(second)).toContainText(account.username);
-    await expect(loginLink(second)).toHaveCount(0);
+    await expect(await loginLink(second)).toHaveCount(0);
     await expect(inviteCard(second)).toBeVisible();
     expect(new URL(second.url()).pathname).toBe(roomPath);
     expect(await wasNotReloaded(second)).toBe(true);
@@ -155,10 +155,10 @@ test.describe("other tabs of the same browser (CC-115)", () => {
     const roomPath = new URL(second.url()).pathname;
     await markPage(second);
 
-    await banner(first).getByRole("button", { name: "Log out" }).click();
-    await expect(loginLink(first)).toBeVisible();
+    await (await header(first)).getByRole("button", { name: "Log out" }).click();
+    await expect(await loginLink(first)).toBeVisible();
 
-    await expect(loginLink(second)).toBeVisible();
+    await expect(await loginLink(second)).toBeVisible();
     await expect(chooser(second)).toBeVisible();
     await expect(inviteCard(second)).toHaveCount(0);
     await expect(banner(second)).not.toContainText(account.username);

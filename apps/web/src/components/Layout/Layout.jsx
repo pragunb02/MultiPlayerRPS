@@ -1,8 +1,10 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { paths, returnPathFor } from "../../app/paths.js";
-import { Logo } from "../../art/Logo.jsx";
+import { Logo, LogoMark } from "../../art/Logo.jsx";
+import { Svg } from "../../art/Svg.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
+import { useDisclosureMenu } from "../../hooks/useDisclosureMenu.js";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
@@ -13,7 +15,20 @@ import { SoundControl } from "../SoundControl/SoundControl.jsx";
 import { WakingUp } from "../WakingUp/WakingUp.jsx";
 import styles from "./Layout.module.css";
 
-/** App shell: header with brand, navigation and who you are; pages render into <Outlet />. */
+/** Three bars: the menu button's picture. */
+function MenuIcon() {
+  return (
+    <Svg viewBox="0 0 24 24" width={22} height={22} className={styles.menuIcon}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </Svg>
+  );
+}
+
+/**
+ * App shell: header with brand, navigation and who you are. Pages render into <Outlet />. On a phone the header
+ * is one row (CC-259): the sound controls, your level and name, Log in and Sign up move into a menu behind one
+ * button. On a wider screen the same controls sit in the row and the button is not shown.
+ */
 export function Layout() {
   const session = useSession();
   const navigate = useNavigate();
@@ -26,6 +41,7 @@ export function Layout() {
   // A guest with XP has something to lose: the same sign-up link, worded as what it does for them (CC-097).
   const save = useSaveProgress();
   const hasProgress = save.guest && (save.progress?.xp ?? 0) > 0;
+  const { open: menuOpen, toggle: toggleMenu, buttonRef, panelRef } = useDisclosureMenu();
 
   const logout = useAction(
     async () => {
@@ -47,7 +63,8 @@ export function Layout() {
           aria-label="ClassiCade home"
           data-cc-control="header.home"
         >
-          <Logo />
+          <Logo className={styles.wordmark} />
+          <LogoMark className={styles.mark} />
         </Link>
         <nav aria-label="Main" className={styles.nav}>
           <Link to={paths.home()} aria-current={inGames ? "page" : undefined} data-cc-control="header.games">
@@ -68,7 +85,19 @@ export function Layout() {
             </NavLink>
           )}
         </nav>
-        <div className={styles.player}>
+        <button
+          type="button"
+          ref={buttonRef}
+          className={styles.menuButton}
+          aria-label="Menu"
+          aria-expanded={menuOpen}
+          aria-controls="header-menu"
+          data-cc-control="header.menu"
+          onClick={toggleMenu}
+        >
+          <MenuIcon />
+        </button>
+        <div id="header-menu" ref={panelRef} className={`${styles.player} ${menuOpen ? styles.open : ""}`}>
           <SoundControl />
           {identity && <LevelChip key={identity.id} />}
           <div className={styles.identity} aria-live="polite">

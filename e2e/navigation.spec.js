@@ -1,4 +1,4 @@
-import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
+import { createRoom, expect, header, joinAsGuest, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
 // Browser history on every screen (CC-084): links forward, Back, Forward, long Back/Forward chains, reload, and
@@ -210,10 +210,10 @@ test.describe("history: signing in and out", () => {
     await page.getByLabel("Password").fill(account.password);
     await page.getByRole("button", { name: "Create account" }).click();
     await at(page, ...HOME);
-    await page.getByRole("banner").getByRole("button", { name: "Log out" }).click();
+    await (await header(page)).getByRole("button", { name: "Log out" }).click();
 
     await page.goto("/games/chess");
-    await page.getByRole("banner").getByRole("link", { name: "Log in" }).click();
+    await (await header(page)).getByRole("link", { name: "Log in" }).click();
     await at(page, "/login?next=%2Fgames%2Fchess", "Log in · ClassiCade", "Log in");
     await page.getByLabel("Email").fill(account.email);
     await page.getByLabel("Password").fill(account.password);
@@ -235,7 +235,7 @@ test.describe("history: signing in and out", () => {
   }) => {
     const { page } = await players.open("visitor");
     await page.goto("/games/tic-tac-toe");
-    await page.getByRole("banner").getByRole("link", { name: "Sign up" }).click();
+    await (await header(page)).getByRole("link", { name: "Sign up" }).click();
     await at(page, "/signup?next=%2Fgames%2Ftic-tac-toe", "Sign up · ClassiCade", "Create your account");
     await page.getByRole("link", { name: "Log in", exact: true }).last().click();
     await at(page, "/login?next=%2Fgames%2Ftic-tac-toe", "Log in · ClassiCade", "Log in");
@@ -266,7 +266,7 @@ test.describe("history: signing in and out", () => {
     await page.getByRole("button", { name: "Create account" }).click();
     await at(page, "/profile", `${account.username} · ClassiCade`, account.username);
 
-    await page.getByRole("banner").getByRole("button", { name: "Log out" }).click();
+    await (await header(page)).getByRole("button", { name: "Log out" }).click();
     await at(page, ...HOME);
     await page.goBack();
 
@@ -283,7 +283,7 @@ test.describe("history: signing in and out", () => {
     const account = newAccount();
     const alice = await players.open("alice", { secrets: [account.email, account.password] });
     const room = await createRoom(alice, "chess");
-    await alice.page.getByRole("banner").getByRole("link", { name: "Sign up" }).click();
+    await (await header(alice.page)).getByRole("link", { name: "Sign up" }).click();
     await alice.page.getByLabel("Username").fill(account.username);
     await alice.page.getByLabel("Email").fill(account.email);
     await alice.page.getByLabel("Password").fill(account.password);

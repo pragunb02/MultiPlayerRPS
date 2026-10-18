@@ -78,7 +78,7 @@ test.describe("first-time visitor", () => {
     const { page } = await players.open("visitor");
 
     await page.goto("/profile");
-    await page.getByRole("link", { name: "log in", exact: true }).click();
+    await page.getByRole("main").getByRole("link", { name: "Log in", exact: true }).click();
 
     await expect(page).toHaveURL("/login?next=%2Fprofile");
     await page.getByRole("link", { name: "Create an account" }).click();

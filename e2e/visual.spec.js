@@ -1,4 +1,4 @@
-import { expect, formFactor, joinAsGuest, test } from "./fixtures.js";
+import { expect, formFactor, header, joinAsGuest, test } from "./fixtures.js";
 
 // The arcade look (CC-087, ADR-012): every themed screen renders in light and dark with no CSP violations or
 // console errors (the players fixture checks), celebrations play, and with reduced motion nothing moves while
@@ -36,7 +36,7 @@ async function expectChipToFollowProgress(page) {
     const { progress } = await (await page.request.get("/api/progress")).json();
     expect(progress.xp).toBeGreaterThanOrEqual(30);
     const name = `Level ${progress.level}: ${progress.xpIntoLevel} of ${progress.xpForNextLevel} XP`;
-    await expect(page.getByRole("banner").getByRole("progressbar", { name })).toBeVisible({ timeout: 1_000 });
+    await expect((await header(page)).getByRole("progressbar", { name })).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 10_000 });
 }
 
@@ -83,11 +83,12 @@ for (const colorScheme of SCHEMES) {
     await expect(
       page.getByRole("heading", { name: "Play the classics with anyone, in one click." }),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: "ClassiCade home" }).locator("svg")).toBeVisible();
+    // The wordmark on a laptop, the square glyph on a phone (CC-259).
+    await expect(page.getByRole("link", { name: "ClassiCade home" }).locator("svg:visible")).toHaveCount(1);
     await expect(page.locator("main li svg")).toHaveCount(3); // every game card is illustrated
     await page.getByRole("button", { name: "Play as a guest" }).click();
     await expect(
-      page.getByRole("banner").getByRole("progressbar", { name: /^Level 1: 0 of 50 XP/ }),
+      (await header(page)).getByRole("progressbar", { name: /^Level 1: 0 of 50 XP/ }),
     ).toBeVisible();
 
     await page.getByRole("link", { name: "Chess", exact: true }).click();
@@ -160,7 +161,7 @@ test("a level-up bursts behind the new badge", async ({ players }) => {
   await expect(levelUp).toBeAttached();
   await expect(effect(alice.page, "level-up")).toBeAttached();
   await expect(effect(alice.page, "level-up")).toHaveCount(0, { timeout: 5_000 }); // and clears itself
-  await expect(alice.page.getByRole("banner").getByRole("progressbar", { name: /^Level 2:/ })).toBeVisible();
+  await expect((await header(alice.page)).getByRole("progressbar", { name: /^Level 2:/ })).toBeVisible();
 });
 
 test("with reduced motion nothing animates after a win or a level-up, and the words are all there", async ({

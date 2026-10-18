@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { expect, joinAsGuest, test } from "./fixtures.js";
+import { expect, header, joinAsGuest, test } from "./fixtures.js";
 import { E2E_MONGO_URI, newAccount } from "./personas.js";
 
 // Guests are asked to save their progress when they have something to lose (CC-097): a card after a win, "Save it"
@@ -7,7 +7,7 @@ import { E2E_MONGO_URI, newAccount } from "./personas.js";
 // closed for the rest of the visit, nothing blocks play, and account holders and visitors never see any of it.
 
 const card = (page) => page.getByRole("region", { name: "Save your progress" });
-const headerSignup = (page) => page.getByRole("banner").getByRole("link", { name: /sign up/i });
+const headerSignup = async (page) => (await header(page)).getByRole("link", { name: /sign up/i });
 /** A toast (the room's result panel is a status region too). */
 const toast = (page, text) =>
   page
@@ -91,7 +91,7 @@ test.describe("a guest who wins", () => {
     const alice = await players.open("alice", { secrets: [account.email, account.password] });
     const bob = await players.open("bob");
     await startAsGuest(alice);
-    await expect(headerSignup(alice.page)).toHaveText("Sign up"); // nothing to save yet
+    await expect(await headerSignup(alice.page)).toHaveText("Sign up"); // nothing to save yet
 
     const room = await aliceBeatsBob(alice, bob);
 
@@ -110,9 +110,9 @@ test.describe("a guest who wins", () => {
       `/login?next=${encodeURIComponent(room)}`,
     );
     // The header's sign-up says what it does for her now.
-    await expect(headerSignup(alice.page)).toHaveText("Save progress");
+    await expect(await headerSignup(alice.page)).toHaveText("Save progress");
     await expect(
-      alice.page.getByRole("banner").getByRole("link", { name: "Save progress — sign up" }),
+      (await header(alice.page)).getByRole("link", { name: "Save progress — sign up" }),
     ).toHaveAttribute("href", `/signup?next=${encodeURIComponent(room)}`);
 
     await card(alice.page).getByRole("link", { name: "Sign up — keep it" }).click();
@@ -128,7 +128,7 @@ test.describe("a guest who wins", () => {
     ).toBeVisible();
     await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(card(alice.page)).toHaveCount(0);
-    await expect(headerSignup(alice.page)).toHaveCount(0);
+    await expect(await headerSignup(alice.page)).toHaveCount(0);
 
     // Signing in replaced the form in history: Back stays in the room, as the account, and never shows the form.
     await alice.page.goBack();
@@ -158,14 +158,14 @@ test.describe("a guest who wins", () => {
 
     await expect(card(alice.page)).toHaveCount(0);
     await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
-    await expect(headerSignup(alice.page)).toHaveText("Save progress"); // the quiet way in stays
+    await expect(await headerSignup(alice.page)).toHaveText("Save progress"); // the quiet way in stays
     // Another room, another win (2 wins, 60+ XP — worth a card), but she closed it.
     await alice.page.getByRole("button", { name: "New opponent" }).click();
     await expect(alice.page).toHaveURL("/games/rock-paper-scissors");
     const second = await aliceBeatsBob(alice, bob, { inLobby: true });
     expect(second).not.toBe(first);
     await expect.poll(async () => (await readApi(alice.page, "/api/progress")).progress.wins).toBe(2);
-    await expect(headerSignup(alice.page)).toHaveText("Save progress");
+    await expect(await headerSignup(alice.page)).toHaveText("Save progress");
     await expect(card(alice.page)).toHaveCount(0);
     await waitForWinsToSettle(alice, { wins: 2 });
 
@@ -274,7 +274,7 @@ test.describe("a guest whose streak is at risk", () => {
       "href",
       "/signup",
     );
-    await expect(headerSignup(guest.page)).toHaveText("Sign up"); // a streak, but no XP yet
+    await expect(await headerSignup(guest.page)).toHaveText("Sign up"); // a streak, but no XP yet
 
     await quests.getByRole("link", { name: "Open your player console" }).click();
     await expect(guest.page).toHaveURL("/profile");
@@ -328,14 +328,14 @@ test.describe("never shown to", () => {
     await expect(levelUp.getByRole("link")).toHaveCount(0);
     await expect(levelUp.getByRole("button")).toHaveCount(0);
     await expect(card(alice.page)).toHaveCount(0);
-    await expect(headerSignup(alice.page)).toHaveCount(0);
+    await expect(await headerSignup(alice.page)).toHaveCount(0);
     await alice.page.goto("/");
     await expect(alice.page.getByRole("region", { name: "Daily quests" })).toBeVisible();
     await expect(alice.page.getByText(/sign up so it's never lost/)).toHaveCount(0);
     // Bob, the guest who lost, isn't offered the card either: it follows a win.
     await expect(bob.page.getByRole("heading", { name: "You lost" })).toBeVisible();
     await expect(card(bob.page)).toHaveCount(0);
-    await expect(headerSignup(bob.page)).toHaveText("Save progress");
+    await expect(await headerSignup(bob.page)).toHaveText("Save progress");
   });
 
   test("a visitor without a session: a plain 'Sign up', and no progress is even asked for", async ({
@@ -344,7 +344,7 @@ test.describe("never shown to", () => {
     const visitor = await players.open("visitor");
 
     await visitor.page.goto("/");
-    await expect(headerSignup(visitor.page)).toHaveText("Sign up");
+    await expect(await headerSignup(visitor.page)).toHaveText("Sign up");
     await visitor.page.goto("/profile");
     await expect(visitor.page.getByRole("heading", { name: "Your profile" })).toBeVisible();
     await visitor.page.goto("/games/tic-tac-toe/rooms/AB2CD3");
