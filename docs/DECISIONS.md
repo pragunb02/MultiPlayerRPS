@@ -1,8 +1,30 @@
 # Decision Log (ADRs)
 
-Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`), date, context, decision, consequences.
+Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
+`Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
+reused; the next free ID is **ADR-047**. A later change to a decision is a dated **Amended** paragraph under it.
+"Accepted by default" means the builders chose and the owner has not decided yet; the owner may change it.
 
 ## Open decisions
+
+### ADR-046 — Our own screen in front of Render's cold start page
+
+- **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)
+- **Context.** On a true cold start the browser first gets Render's own loading page, before our process can send
+  any HTML, and Render offers no way to brand it. The "Waking up the arcade" screen (CC-232) shows only once our
+  server answers.
+- **Options.** (1) Leave it as it is. (2) Serve the web app from static hosting or a CDN (with CC-028 or CC-123), so
+  our screen loads at once and waits for the API. (3) A service worker that shows the screen on repeat visits.
+- **Recommendation.** Decide with CC-123 (brand domain and CDN). Until then option 1.
+
+### ADR-045 — Keep the previous build's files online after a deploy
+
+- **Status:** Open · 2026-10-17 (from [CC-181](tickets/CC-181.md), owner to decide)
+- **Context.** Render builds every deploy from scratch, so a tab opened before a deploy asks for script files that
+  no longer exist. Since CC-181 such a tab reloads once instead of showing an error, so nobody is stuck.
+- **Options.** (1) Leave it: the reload is enough. (2) Keep the old files for a while (storage for old files, for
+  example a bucket or a CDN, and a rule for when to drop them).
+- **Recommendation.** Option 1 until a CDN exists (CC-123), then revisit.
 
 ### ADR-003 — Database: stay on MongoDB vs move to PostgreSQL
 
@@ -11,6 +33,247 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 - **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
 
 ## Accepted decisions
+
+### ADR-044 — Backups: age-encrypted mongodump to an S3-compatible bucket, from GitHub Actions
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-108](tickets/CC-108.md), merged in PR #45. Runbook:
+  [runbooks/backup-restore.md](runbooks/backup-restore.md))
+- **Context.** The repository and its Actions logs and artifacts are public. The database is a free Atlas cluster,
+  which has no Atlas backups. We have no servers of our own and want no paid services.
+- **Decision.**
+  1. The backup runs in GitHub Actions on a nightly schedule. It is free, already trusted with the code, and the
+     secrets stay in GitHub.
+  2. `mongodump --gzip --archive` is piped into `age`, so there is one file per night and it is never on disk
+     unencrypted. A restore uses the standard `mongorestore`.
+  3. age, not gpg: one small public key as the secret, no keyring, modern defaults, and a spare key as a second
+     recipient. Only the owner's private key decrypts.
+  4. Any S3-compatible bucket, chosen by the owner through secrets. Cloudflare R2 is the suggested default (10 GB
+     free, no egress fees).
+  5. Old backups are removed by the bucket's lifecycle rule, not by the workflow. The workflow's key has no delete
+     right, so a leaked key can add junk but cannot wipe the history.
+  6. Each run checks the database user's real privileges and refuses to dump with a user that can write.
+- **Alternatives.** Atlas cloud backups (paid tier). Encrypted dumps in a private repository (git is a poor store for
+  large files, and it is another credential). Actions artifacts (public on this repository). A cron job on Render
+  (free instances sleep and have no disk).
+- **Consequences.** The owner must keep the private key in two safe places, or every backup is unreadable. If the
+  nightly runs stop for 30 days, the lifecycle rule leaves no backup, so failed-run emails must be acted on. The
+  Atlas access list must let GitHub's runners in. The job skips until the owner sets its secrets.
+
+### ADR-043 — Uptime monitoring: a GitHub Actions schedule, incidents as GitHub issues
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-049](tickets/CC-049.md), merged in PR #45)
+- **Decision.** A scheduled workflow checks the site every 10 minutes and can be run by hand. It needs no secrets
+  and rides out a cold start (retries with backoff for up to about 90 seconds). It keeps no state of its own: it
+  reads whether the previous run failed from that run's "Site is down" step. Two failed checks in a row open an
+  issue labelled `incident` (or update the open one), and the issue closes when the site is healthy again. Only
+  issues carrying the monitor's hidden marker are ever edited or closed.
+- **Alternatives.** An outside free monitor such as UptimeRobot (another account, and incidents would live outside
+  the repository). State in the Actions cache or a repository variable (a new cache entry every 10 minutes, or a
+  token with admin rights). Failing the run while the site is down (an email every 10 minutes for the whole outage).
+- **Consequences.** GitHub's schedule is best effort, often a few minutes late and sometimes skipped. A test pins
+  the step name, because renaming it would break the "twice in a row" rule. The pings also keep the free Render
+  instance awake (ADR-005). The owner watches the repository's issues to be told of an incident. Error tracking,
+  metrics and alerts are still open in CC-049.
+
+### ADR-042 — Head tags and link previews: one page list, written into index.html by the server
+
+- **Status:** Accepted · 2026-10-16 (proposed in [CC-047](tickets/CC-047.md), merged in PR #44)
+- **Context.** Crawlers and link-preview bots do not run JavaScript, but the server sent the same HTML for every
+  address.
+- **Decision.**
+  1. Page titles and descriptions live once, in `@classicade/shared` (`describePage`). At boot the server reads the
+     built `index.html`, removes its default tags, and writes each page's own tags into every answer. The same list
+     decides the status code, so an address the app has no page for is a real 404. The web app renders its tags from
+     the same list.
+  2. A room preview names the game from the address alone. It never looks the room up, so a preview says nothing
+     about whether a room exists or who is in it. Rooms are `noindex` and never in the sitemap, but they are not
+     blocked in `robots.txt`, because some preview bots obey it and would then show no preview for an invite.
+  3. The site's public address (for canonical links, previews and the sitemap) is the first `ALLOWED_ORIGINS` entry,
+     not a new setting. Revisit if the site ever serves several public hosts.
+  4. Preview images are PNGs drawn from the app's own art by a script (Vite and the Playwright Chromium the browser
+     tests already install), and committed. The production build needs no browser and no image library. A test fails
+     if a game has no image or an image has the wrong size.
+- **Alternatives.** A server-side rendering framework (a large change for a few tags). A second copy of the texts
+  on the server (they would drift apart).
+- **Consequences.** `site.js` must agree with the URL shapes in `paths.js` (ADR-011), and a test checks that they
+  do. The PNGs are about 300 KB each, which some apps find large; compressing them is a follow-up.
+
+### ADR-041 — Our own small chess engine for the bots; chess.js stays the referee
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-040](tickets/CC-040.md), merged in PR #47)
+- **Context.** The board title assumed Stockfish. Our levels top out at "Strong", and a bot must be pure and give
+  the same moves for the same seed (ADR-040). chess.js is already a dependency, but it lists moves too slowly for a
+  search (about 0.5 ms per position).
+- **Options.** (1) Stockfish in WebAssembly: far stronger than needed, a large binary, worker plumbing, and not
+  deterministic with threads. (2) A search over chess.js: too slow for anything above Beginner. (3) A small board
+  and search of our own, checked against chess.js.
+- **Decision.** Option 3. About 800 lines (`board.js`, `search.js`) and no new dependency. chess.js remains the
+  referee: the chess engine still decides whether every move is legal. Tests prove the bot's board agrees with
+  chess.js (published move counts for six positions, legal move lists and check status in over 1,000 random
+  positions, and replays of random games).
+- **Budgets count positions, not milliseconds**, so a level plays the same on every machine and every replay:
+  Club looks at most 3 moves deep and 20,000 positions, Strong at most 8 deep and 60,000 positions. On an Apple M4
+  Pro, Strong averages about 140 ms a move and stays under the 300 ms target.
+- **Consequences.** Fast enough for three levels with no binary. The strength is limited (no transposition table,
+  a simple evaluation). If players want more than Strong, Stockfish can be added later behind the same bot contract
+  without touching rooms. Bot moves run on the server's event loop, limited by ADR-025's thinking queue.
+
+### ADR-040 — Bots are pure strategies that see only their own seat's view
+
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-038](tickets/CC-038.md), merged in PR #47. Seated in rooms by
+  CC-138, PR #61)
+- **Context.** FR-AI-1 asks for a server-side bot with `chooseMove`. Some game states hold secrets: in Rock Paper
+  Scissors the state has the opponent's pending choice.
+- **Decision.**
+  1. A bot's decision is a pure function in `packages/games`, next to the engines and under the same purity lint
+     rules: `chooseMove({ view, botId, rng, difficulty, history })`. The server decides when and where a bot plays,
+     never how.
+  2. Bots get `engine.viewFor(state, botId)`, never the state. A bot cannot cheat, even by accident, and it sees
+     exactly what a person's browser sees.
+  3. One bot per game with named levels, rather than one bot per level. Levels of one game share code.
+  4. A bot answers with a raw move that the engine validates like any other. There is no trusted path for bots.
+  5. Determinism comes from the injected random number generator and, for chess, from position budgets instead of
+     clocks (ADR-041).
+  6. Every bot passes the contract kit: always legal, the same moves for the same seed, never throws over many random
+     games, finishes games, and refuses unknown levels.
+- **Consequences.** Bots are unit-testable without a server, replayable from a seed and fair by construction. A bot
+  that legitimately needs hidden information (none is planned) would need a contract change. How the bots play, in
+  plain words: [games/BOTS.md](games/BOTS.md).
+
+### ADR-039 — Working agreement and CI policy
+
+- **Status:** Accepted · 2026-10-17 and 2026-10-18 (owner. The binding text is the working agreement and workflow
+  rule 7 in [CLAUDE.md](../CLAUDE.md); this record keeps the reasons)
+- **Context.** Many builder agents work at the same time and merging to `main` deploys to production. The browser
+  suite grew to 20 to 30 minutes (CC-236), so every merge waited half an hour, and `main` went red twice in one day
+  after pairs of PRs that were each green (CC-247, CC-257).
+- **Decision.**
+  1. **Feature freeze** until every ticket on the board is closed. New ideas go to [IDEAS.md](IDEAS.md), not to the
+     board. Only security (P0 by default), testing and bug tickets may be added.
+  2. **Research before code** in every ticket, and everything decided goes in this file, never only in chat.
+  3. **At most six builders** at once, only on work that shares no files. Builders run lint, format, coverage and
+     their own browser tests locally. CI runs the whole browser suite.
+  4. **Two reviewers on every PR**, in parallel: a code reviewer and a security reviewer. A third agent, the
+     skeptic, tries to refute each finding. Confirmed findings are fixed, or written down with a reason, before the
+     merge.
+  5. **Required checks:** lint, format, audit, unit and integration tests with coverage gates, and the Docker build.
+     Since 2026-10-18 the browser tests still run on every PR and on `main` but are not a required check, until
+     CC-236 brings the suite under 6 minutes.
+  6. **Every 10th merge, or at once when `main` is red**, merging stops until `main`, browser tests included, is
+     green again.
+- **Why.** A 30-minute required check made builders queue up and rebase again and again. Six builders keep
+  reviews and rebases manageable. The skeptic cuts false findings (in PR #61, 12 findings survived it). The stop
+  every 10th merge bounds how long a browser test failure can sit on `main` unnoticed.
+- **Consequences.** A merge can break a browser test without being blocked. The 10th-merge stop and the red-`main`
+  rule catch it. The browser tests become required again with CC-236.
+- **Amended · 2026-10-18 (lesson of CC-247 and CC-257).** Twice in one day two PRs that were each green broke
+  `main` together. CC-247: #62 changed the page template's call and #64 still used the old one. CC-257: #74 made
+  `SessionProvider` need a `sessionBroadcast` service, and #75's celebration tests built their services without
+  it, so 13 tests failed. Branch protection does not require a PR to be up to date with `main`, so a green check
+  can be a check against an older `main`. **Rule:** before each merge, when another PR has merged since the PR's
+  last run, the coordinator runs the fast checks again against the current `main` (update the branch, or re-run
+  on the merge result) and merges only when they pass. Requiring "up to date before merging" in branch protection
+  would do the same automatically but makes every PR rebase after every merge; the owner may choose it instead.
+
+### ADR-038 — Button feedback: every press answers, waiting says so
+
+- **Status:** Accepted · 2026-10-17 (CC-164, PR #53, merged behaviour. Design in
+  [ux/MATCH_EXPERIENCE.md](ux/MATCH_EXPERIENCE.md) §2 ("What the shell provides", item 7) and [ENGINEERING.md](ENGINEERING.md))
+- **Decision.** Every control is the app's `Button`, and work that waits for the server goes through `useAction`.
+  1. Pressed: a visible press within 100 ms and the click sound.
+  2. Waiting: a spinner and "Sending…", the button keeps its width, `aria-busy` is set.
+  3. Done: the change itself, or a check mark with a word such as "Copied" for 600 ms.
+  4. Cannot act: `aria-disabled` with a reason shown on hover, focus and press, never a silent `disabled`.
+  5. Failed: the reason under the button, with Retry only for network, timeout and server errors.
+  6. Every control has a stable `data-cc-control` name, and the browser tests press each one in every state (CC-170).
+- **Amended · 2026-10-18** (CC-239, PR #71. **Accepted by default (owner may change); takes effect when #71
+  merges.** Until then the code shows "Sending…" after 150 ms). "Sending…" appears after 400 ms, above the 250 to
+  350 ms round trip from India to the Oregon server, so a normal answer never flashes it. Once shown, it stays at
+  least 300 ms. An answer that arrives during that hold is shown when the hold ends, but the action itself resolves
+  at once, so pages navigate without waiting. The values follow the Epic Stack's `useDelayedIsPending` (400/300),
+  `spin-delay` and Nielsen's response-time limits; sources in the CC-239 ticket file (PR #71).
+
+### ADR-037 — Email identity: one spelling, equal work on every login
+
+- **Status:** Accepted by default (owner may change) · 2026-10-18 · **pending PR #69** (CC-245, CC-238). Nothing
+  below is on `main` until #69 merges.
+- **Context.** Emails were only trimmed and lower-cased (SEC-21), login time told kinds of email apart (SEC-20), and
+  legacy rows stored with spaces or in two cases could be squatted or locked out (SEC-22, BUG-30).
+- **Decision.**
+  1. **One spelling.** `normaliseEmail` applies NFKC, trim, lower-case and NFKC again. It is the one spelling for
+     sign-up, login, the legacy lookup and the login limits (ADR-035). Control and invisible characters (`\p{C}`)
+     are refused.
+  2. **Gmail dots and plus are not folded.** Folding is right only for some providers, nobody can tell a Google
+     Workspace domain from its address, plus addresses are how people keep accounts apart on purpose, and without
+     email verification anyone can type any address anyway. Revisit with CC-033.
+  3. **Equal login work.** Every login reads the account and legacy stores at the same time and runs exactly one
+     scrypt and one bcrypt (cost 10) at the same time, with dummy hashes where a real one is missing, so the time
+     taken does not say whether an email has an account.
+  4. **Legacy lookup** ignores case and spaces around the stored email and returns every matching row. The login
+     checks exactly one: the row in the capitals the player types, otherwise the oldest.
+  5. **One message** for every email that cannot be used: "That email can't be used. If it's yours, log in or reset
+     your password.", with "log in" linking to `/login` and keeping `next` (CC-238).
+- **Known limit.** Legacy case twins: one address gets one account. Once either twin has opened it, the other twin's
+  old row can no longer be used, because checking every row would cost one bcrypt per row and bring back the timing
+  leak. A twin who is really a different person is helped by hand, and by password reset once CC-033 exists.
+- **Consequences.** About 50 to 100 ms more CPU per account login. Every login scans the small, frozen legacy
+  `users` collection with a case-insensitive match (it may not get an index, CC-078). SEC-17 (sign-up says an email
+  cannot be used) stays open until CC-033 sends email.
+
+### ADR-036 — Owner console: allowlist access, small groups hidden, no new tracking
+
+- **Status:** Accepted · 2026-10-18 (draft in [CC-233](tickets/CC-233.md), merged in PR #64. Owner steps:
+  [DEPLOYMENT.md](DEPLOYMENT.md#owner-console-cc-233))
+- **Context.** The owner needs to see how the site is played (PRODUCT_VISION.md §7). Accounts have no roles, the
+  console must not be visible or even detectable to anyone else, and totals of small groups can point at one person.
+- **Decision.**
+  1. **Access by allowlist, not roles.** `ADMIN_ACCOUNT_IDS` lists the account ids (`user_…`) that may use the
+     console. It is validated at boot (a malformed or guest id stops the boot), and empty means nobody. The server
+     checks it on every `/api/admin/*` request and every `/admin` page. Everyone else gets the same 404 as any
+     unknown address. `GET /api/session` says `admin: true` only to an admin. Pages and API answer
+     `Cache-Control: no-store` and `noindex, nofollow`.
+  2. **Small groups hidden.** Any count of 1 to 4 people, and any share or median of fewer than 5, becomes `"<5"` on
+     the server and never leaves it. Heatmap cells of 1 to 4 matches are hidden too.
+  3. **Differencing accepted.** A total next to its hidden parts could in theory reveal a hidden cell. That is
+     accepted because only admins see the console and no id, name, email or room code leaves the database. Revisit
+     before any of these numbers is shown to players or shared.
+  4. **No new tracking.** The console reads only what gameplay already stores. Reports are cached in memory for 5
+     minutes per range, and nothing about who looked is logged.
+- **Why not roles.** One owner today, so a role model, an admin table and screens to manage it would be work with no
+  user. Changing who is an admin is a setting and a restart. Revisit when moderators (CC-059) need access.
+- **Consequences.** Adding an admin is a Render setting change. Telemetry (CC-173 to CC-178) follows ADR-034 and
+  rule 2 when its numbers join the console. The per-player read scans every match by design and should move to the
+  nightly rollup (CC-176) at about 500,000 matches.
+
+### ADR-035 — Abuse limits: rooms, connections, sign-ups and failed logins
+
+- **Status:** Accepted · 2026-10-17 (CC-107, CC-117, CC-118, merged in PR #57. The values are named rules in
+  `domain/rooms/roomLimits.js`, `service/http/loginThrottle.js` and `service/http/authRoutes.js`)
+- **Context.** One small free instance serves everyone. Guests cost nothing to make, so a single visitor could open
+  rooms and connections until it fell over (SEC-13). The old per-email login limit let anyone lock a known email out
+  (SEC-16).
+- **Decision.**
+  1. **Rooms.** At most 3 waiting rooms per player ("You already have 3 rooms waiting; close one first"), 2000 open
+     rooms on the server ("The server is busy, try again in a minute", `SERVER_BUSY`), and 30 open rooms per network.
+  2. **Network** means a keyed hash of the rate-limit key (the client address found like Express `req.ip` with
+     `TRUST_PROXY_HOPS`). The room stores only that opaque hash, never an address.
+  3. **Connections.** At most 5 realtime connections per session and 30 per address. Each player has one budget of
+     events shared by all their tabs (bursts of 20, refilled at 10 a second), so more tabs buy no more events.
+  4. **Sign-ups.** At most 10 an hour per address, on top of 20 sign-up and login requests per 15 minutes per address.
+     Sign-up hashes the password first, so a legacy email and an account email are refused with the same answer
+     after the same work.
+  5. **Failed logins.** 5 wrong passwords for one email from one address in 15 minutes block that address for that
+     email, even with the right password. Other addresses are not affected, so the real player can still sign in
+     from home. When one email gets 10 wrong passwords in 15 minutes from all addresses together, addresses that
+     have not signed in to it in the last 30 days wait 2 seconds per attempt. Nobody else is refused.
+  6. A `room gauge` log line every minute (rooms per status, connections, players).
+- **Why these numbers.** Three waiting rooms is one invite each for a few friends. Thirty rooms or connections per
+  address is a school computer room. Two thousand rooms is about four thousand players, far above what one small
+  instance is sized for.
+- **Consequences.** If `TRUST_PROXY_HOPS` is too low, every player behind Render's proxy shares the per-address
+  limits ([DEPLOYMENT.md](DEPLOYMENT.md#client-addresses-and-rate-limits)). Login counts live in the process and a restart forgets
+  them, so a second instance (CC-061) needs shared counters. Rooms stored before the change have no network and do
+  not count. SEC-17 (sign-up says an email cannot be used) is an accepted trade-off until CC-033 sends email.
 
 ### ADR-034 — Analytics: anonymous counts, India days, player statuses, and the CC-036 time limits
 
@@ -57,6 +320,24 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 - **Consequences:** One extra `GET /api/session` per tab when the session changes. A browser without BroadcastChannel
   (none we support) still recovers its tabs that have a socket.
 
+### ADR-032 — Launch sequence and the brand domain
+
+- **Status:** Accepted · 2026-10-18 (from [GROWTH.md](GROWTH.md) §3.1 and §7.3)
+- **Decision:**
+  1. A friends launch by word of mouth, on a date the owner picks once all of these are done: Phase 0 is closed (the
+     leaked password rotated, the security batch merged, staging), every open security P0 is closed, CC-123 is live
+     (the brand domain, with the 301 from the onrender.com address), CC-232 (the cold start loading screen) is live,
+     and Play vs Computer (CC-138) is live. The rematch fixes are already live (PR #53).
+  2. The public launch (communities, Product Hunt and similar) is a second, later owner decision, recorded in this
+     file after the friends launch has 4 weeks of data in the owner console. Its gate is the growth rule: k of 0.15 or
+     more for two weeks running. The day 2 target (about 15 % of new players come back on day 2) is a guide, not the
+     gate.
+  3. Buy a short brand domain soon (about ₹800 to ₹1,500 a year), so Search Console can be verified by DNS with no
+     code and search history starts early (CC-123).
+  4. Later: a postal address that is not a home address, as email law requires, before any marketing or recap email
+     (transactional email such as password reset is exempt), and a decision on whether to put a card on Render before
+     any burst post.
+
 ### ADR-031 — Notification channels and caps
 
 - **Status:** Accepted · 2026-10-18 (from [GROWTH.md](GROWTH.md) §5)
@@ -78,23 +359,40 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
   CC-147 (inbox), CC-148 (PWA and web push), CC-215 (preferences and quiet hours), CC-229 (dark pattern audit before
   push ships) and CC-208.
 
-### ADR-032 — Launch sequence and the brand domain
+### ADR-030 — Session lifetime and revocation
 
-- **Status:** Accepted · 2026-10-18 (from [GROWTH.md](GROWTH.md) §3.1 and §7.3)
-- **Decision:**
-  1. A friends launch by word of mouth, on a date the owner picks once all of these are done: Phase 0 is closed (the
-     leaked password rotated, the security batch merged, staging), every open security P0 is closed, CC-123 is live
-     (the brand domain, with the 301 from the onrender.com address), CC-232 (the cold start loading screen) is live,
-     and Play vs Computer (CC-138) is live. The rematch fixes are already live (PR #53).
-  2. The public launch (communities, Product Hunt and similar) is a second, later owner decision, recorded in this
-     file after the friends launch has 4 weeks of data in the owner console. Its gate is the growth rule: k of 0.15 or
-     more for two weeks running. The day 2 target (about 15 % of new players come back on day 2) is a guide, not the
-     gate.
-  3. Buy a short brand domain soon (about ₹800 to ₹1,500 a year), so Search Console can be verified by DNS with no
-     code and search history starts early (CC-123).
-  4. Later: a postal address that is not a home address, as email law requires, before any marketing or recap email
-     (transactional email such as password reset is exempt), and a decision on whether to put a card on Render before
-     any burst post.
+- **Status:** Accepted · 2026-10-17 (proposed in [CC-116](tickets/CC-116.md), merged in PR #57. The owner decided on
+  2026-10-17 that guests have no 90-day limit. The rest is merged behaviour. The rolling 30 days came from CC-096,
+  PR #36)
+- **Context.** Sessions live in MongoDB (`player_sessions`) and nothing could end one except logging out on that
+  device. A stolen session cookie stayed valid for as long as it was used (SEC-15), and a player could neither
+  change their password nor sign out a lost phone.
+- **Decision.**
+  1. **Rolling 30 days for everyone.** Every visit moves the session's end to 30 days later (the stored end is
+     rewritten at most once an hour). A session nobody uses for 30 days ends.
+  2. **90 days absolute for accounts.** A signed-in session ends 90 days after signing in, however often it is
+     used. That bounds a stolen cookie to three months and asks for the password about four times a year. A
+     password change starts the 90 days again; signing out other devices does not.
+  3. **Guests have no absolute end.** A guest has no password to sign in with again, so ending the session would
+     lose their progress. Their rolling 30 days stay.
+  4. **Session versions.** Each account has a `sessionVersion`, and a session stores the version it was made at
+     and when it signed in. Every `/api` request (after the app-wide rate limit) and every socket handshake checks
+     it with one primary-key read. A session whose version is old is replaced by an empty one (the request goes on
+     as a visitor) and its sockets are disconnected. A refused handshake answers `UNAUTHORIZED`.
+  5. **Password change and "Sign out other devices"** count the version up (password reset will too, CC-033). The
+     browser that asked stays signed in under a **new session id** with the new version, so a copy of its old cookie
+     stops working. Its sockets stay connected, and every other socket of the account is disconnected.
+  6. **5 seconds of grace for the renewing id.** A request from the same browser that is already on its way while
+     the version moves on still carries the old id. For 5 seconds such a request passes (`RENEWAL_GRACE_MS`), so the
+     browser that asked to stay is not signed out by its own other tab. The old id is destroyed in the store at the
+     same moment, so it cannot be used after that.
+  7. Sessions and accounts from before this change count as version 0, and their 90 days start when first seen.
+- **Alternatives.** Deleting every session of an account from the store (needs an index on the session data, and
+  misses sessions being written at that moment). Short-lived tokens with refresh (a new client protocol, for no gain
+  on a same-origin app).
+- **Consequences.** One small read per signed-in request. Other tabs and devices learn of the change through
+  ADR-033. A list of signed-in devices is not built (it needs a session index per account). Ended sessions stay in
+  the store until its TTL removes them; they are refused on their next request.
 
 ### ADR-029 — Liquidity gates: crowd features switch on only when the crowd is there
 
@@ -222,6 +520,35 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 - **Consequences.** The owner dashboard reports bot XP per player per day as a North Star guardrail. Whether
   adaptive difficulty counts as behavioural monitoring under the DPDP Act goes to the lawyer's review.
 
+**Amended · 2026-10-18** (built by CC-138, CC-221 and CC-225 in PR #61, with the fixes from its review. Merged
+behaviour, so Accepted. How the bots play, in plain words: [games/BOTS.md](games/BOTS.md)).
+
+1. **Characters.** Rocky plays Rock Paper Scissors, Pip plays Tic-Tac-Toe and Queen Vee plays chess. Their ids are
+   `bot_<character>_<level>` and every level of a character counts as one opponent for the pair cap.
+2. **At most 3 games against computers** going per player. Starting a fourth ends the oldest. New games and the
+   rematches a computer accepts both count, and the count is taken again after every start, so many starts at once
+   cannot pass it (BUG-32).
+3. **One computer move is chosen at a time on the whole server**, and after each the server rests as long as the
+   search took (`thinkingQueue.js`). Computer players therefore use at most half of the event loop (BUG-33).
+4. **100 bot XP a day** (`BOT_DAILY_XP`, per UTC day like the other fair-play caps), stored in the verdict as
+   `credit.botXp`. When a guest's computer games move into an account (ADR-014), only what the account has left of
+   that day's 100 XP moves; the rest is stored as `withdrawnXp` and taken out before the merge (BUG-36).
+5. **`unrankedXp` is kept off every board.** Progress keeps `unrankedXp`: XP from computer games and the quest
+   bonuses they earned. Every XP board shows `xp - unrankedXp`, and computer games never move anyone on any
+   leaderboard (BUG-35). Computer players themselves get no progress, stats or quests.
+6. **The sealed throw.** The seal is SHA-256 of `move JSON:salt`, and the salt is an HMAC of the turn under a
+   secret derived from `SESSION_SECRET` (no new setting). A computer move that differs from its seal is refused.
+   The browser **remembers the first lock it shows** for each game and turn, and says the round was fair only when
+   the reveal's lock is that remembered one, the throw is the one in the round's result and the hash matches. A page
+   opened after the lock was shown says it cannot check (BUG-37). Plain wording for players: CC-254.
+7. **Behaviour.** A human-like pause of 400 to 900 ms before every action. Computers decline a chess draw offer,
+   accept a person's rematch and never ask for one. A room where only computers are still connected closes after
+   the 2-hour away lifetime. Plans are made again for every stored room at start-up and every minute, so a restart
+   mid-game resumes.
+8. **Accepted by default (owner may change):** Rocky offers two levels (Easy, random, and Hard, the pattern reader),
+   not three, because the RPS bot has two. The pattern reader sees only the current game of a room, not earlier
+   games of the series, until CC-190.
+
 ### ADR-024 — Story mode "ClassiCade Quest"
 
 - **Status:** Accepted · 2026-10-17, amended 2026-10-17 (design in [story/STORY_MODE.md](story/STORY_MODE.md), CC-179; built from CC-187)
@@ -262,6 +589,10 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
 - **Later (ADR-018, CC-103).** The browser may now keep one preference, the sound setting, in `localStorage`
   (`cc.sound`). It is not a cookie and does not identify the player, so the footer line stays true. The Privacy and
   Terms texts are drafts until the owner's legal review.
+- **Amended · 2026-10-17** (owner, PR #52). The owner kept the cookie line of PR #44. Privacy questions go to a
+  GitHub issue that says only that it is a privacy request, with no personal details, and the owner replies
+  privately. This is replaced by an email address once the owner has one for the site. The policy names the one
+  browser setting (`cc.sound`) instead of saying "no browser storage".
 
 ### ADR-022 — Public names: a curated reserved list and abuse filter in the repo
 
@@ -344,6 +675,17 @@ verdict.
 2. Bot rules from ADR-025 apply: each character counts as one opponent for the pair cap, bot games count toward
    the hourly cap, and bot matches give at most 100 XP a day.
 
+**Amended · 2026-10-18** (PR #61, merged behaviour). The pair cap now counts **any 24 hours** instead of the UTC
+day, as the 2026-10-17 amendment planned. The hourly cap per player still counts the UTC clock hour.
+
+**Open questions from CC-095, accepted by default (owner may change):**
+
+1. When a guest moves into an account, the guest's opponent is not judged again. If Bob played 10 games with guest
+   Riya and 10 with account Riya on one day, Riya ends with 10 counted games and Bob keeps 20. Judging Bob again
+   would take XP from a player who did nothing wrong.
+2. Quest bonus XP a guest earned from games later withdrawn in a merge stays in the totals. The quest was completed
+   and paid that day, and it is at most one day's quest bonus.
+
 ### ADR-020 — Game shell: one match layout every game plugs into
 
 - **Status:** Accepted · 2026-10-17 (accepted with [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D2)
@@ -376,6 +718,14 @@ live in MongoDB since CC-101) have no `declinedBy` or `drawAnswer`. The server's
 does the client. Declining runs through the room component's versioned `change({ decide })` like every other room
 change, and answers GONE once the rematch window has ended.
 
+**Amended · 2026-10-18** (owner decision recorded in PR #67, CC-159. **Takes effect when #67 merges**; until then
+the rules above are what runs). Requests come from a server-side `room.requests` list instead of being worked out
+from the view. Each request has a type, who asked, who is asked, times and a state (open, accepted, declined,
+withdrawn or expired), and the last answer stays for 10 s. A rematch request lasts 60 s and a chess draw offer 30 s,
+and both expire through the existing deadline sweep. Only one request of a type is open at a time, asking again
+after a no waits 10 s, and each player can offer at most 3 draws a game. Two socket events, `room:request` and
+`room:answer`, replace the old rematch events and chess draw actions.
+
 ### ADR-018 — Sounds are synthesised in the browser, and one preference may live in localStorage
 
 - **Status:** Accepted · 2026-10-17 (proposed in [CC-103](tickets/CC-103.md))
@@ -404,6 +754,11 @@ short). Changing a sound is a code change. A browser without Web Audio stays sil
 
 Why not a library (Howler, Tone.js): both are built for playing files or music and would add weight for what is
 about two hundred lines.
+
+**Amended · 2026-10-18** (owner decision recorded in PR #67, CC-208. **Takes effect when #67 merges**). Point 4:
+`cc.sound` stays the one key and gets an extended shape: `muted` and `volume` as before, plus `categories`, an
+on or off switch and a volume for each of the six notification categories. Old values without `categories` still
+read. The checker in the storage allowlist (`e2e/fixtures.js`) follows the new shape, and no new key is added.
 
 ### ADR-017 — Rooms are stored in MongoDB, with explicit lifetimes
 
@@ -452,60 +807,14 @@ main bundle is unchanged (118.3 kB). Pages without chess load none of it.
 future animation needs its own measuring code). `react-spring` (heavier for the same features, less used).
 Framer Motion under its old name (the same library, now published as `motion`).
 
-### ADR-012: visual identity — "neon arcade"
+**Amended · 2026-10-18** (owner). **Stay on Motion** for all interaction animation.
 
-- **Status:** Accepted · 2026-10-16 (proposed in [CC-087](tickets/CC-087.md))
-  **Decision.** The web app's look is a self-contained arcade theme built only from what the CSP already allows:
-
-1. **Tokens are the single source of colour, size and motion.** Every existing token name is kept (values may
-   change), so B's and C's components restyle automatically. New tokens: display font stack (system fonts only, no
-   `@font-face`), `--text-3xl`, `--radius-xl`, accent / XP / gold / streak / per-game / tier / locked colours,
-   hero and XP gradients, the background grid line, glows, chunky press shadows, five durations and three easings.
-   Art-only inks (`--color-art-ink`, `--color-art-white`, `--color-on-tier`, `--color-neon-*`), chess-square colours
-   and the backdrop moved into tokens too, so components hold no raw colours.
-2. **Art is hand-drawn SVG in React components** (`apps/web/src/art/`), painted with SVG presentation attributes and
-   CSS-module classes over tokens — never a `style` attribute or `<style>` element. Variation without inline styles:
-   confetti pieces get their position, drift, spin and colour from `:nth-child` rules; bars are `<progress>`.
-   Glyphs are `<g>` groups so scenes, icons and medals reuse one drawing.
-3. **Motion is decoration, never information.** Only `transform` and `opacity` animate (two documented exceptions
-   below); nothing loops forever (sparkles 3 twinkles, flame 3 flickers); celebrations are `pointer-events: none`,
-   `aria-hidden`, portalled to `<body>`, and finish within 1.5 s. The meaning is always also text: the room's
-   "You won!" status, the "+30 XP" and "Level up! …" toasts.
-4. **Reduced motion** sets every duration to 0, `global.css` turns off all animations and transitions, and
-   `useReducedMotion()` (a `useSyncExternalStore` over `matchMedia`) makes `Confetti`, `LevelUpBurst` and `XpPop`
-   render nothing. States that animate in are drawn so their resting (un-animated) style is the final one.
-5. **Registries for extension.** `GAME_ART` maps game id → `{ Art, Glyph, tone }`; a new game adds one entry and
-   falls back to the joystick until it does. Achievement icons fall back to a star.
-6. **Lint guard.** `no-restricted-syntax` on `JSXAttribute[name.name='style']` ("inline styles violate CSP; use a
-   CSS module") in `apps/web/src`, no new dependency.
-
-**Alternatives considered.** An icon font or an icon library (new dependency, external assets, copyright);
-a web font for the display face (a font file and a CSP change for little gain — `ui-rounded` and fallbacks look
-right on all major platforms); a motion library (bundle cost; CSS keyframes do everything needed); inline style
-variables for confetti (blocked by the CSP).
-
-**Consequences.** Initial JS grows by about 9.5 KB gzip against main after the gamification batch (112.1 → 121.7 KB,
-including the 3.4 KB `jsx-runtime` chunk Vite now splits out because the hero art is lazy), CSS by about 5.4 KB gzip
-(4.6 → 10.0 KB); the hero scene is its own 1.2 KB chunk.
-New screens must use tokens and the art registry; a style attribute fails `npm run lint`.
-
-### Where the brief and the repo rules differ
-
-- **Animated properties.** The brief allows only `transform`/`opacity` but also asks for a press shadow that
-  shrinks and a stroke draw-in for X/O. Both are kept: `box-shadow` changes on press (80 ms) and
-  `stroke-dashoffset` draws marks in (200 ms) — both paint-only, no layout.
-- **XP bar shimmer.** A `<progress>` has no reliable `::after`, so the header chip's bar pulses once
-  (`transform: scaleY`) when XP arrives instead of a gradient sweep.
-- **Toasts** moved to the top right as the brief asks; the region is `pointer-events: none`, so a toast can never
-  cover a button (relevant for the e2e suite and for people).
-- **Focus colour.** `--color-focus` in light was `#f0a400` (1.9:1 on the background). It is now `#b45309`
-  (4.6:1 on bg, 5.0:1 on surface); on the hero gradient the ring is `--color-focus-on-hero` `#ffe08a`
-  (4.4:1 light, 8.4:1+ dark). Cells of the coloured TTT grid and chess squares draw the ring inside the cell.
-- **Primary on primary-soft** is 4.49:1 (light) / 4.26:1 (dark), just under AA for small text, so the active nav
-  pill, seat tags and ghost-button hover use text colour (14:1 / 12:1) or the raised surface instead.
-- **Header chip.** The brief says "using the existing `useProgress`". It does, plus it follows `progress:updated`
-  pushes so the level is live; it is mounted per identity (`key`), and only when there is a session, so visitors
-  never request `/api/progress`.
+1. No GSAP, no react-spring, no AutoAnimate, and no canvas-heavy React Bits backgrounds. Each would be a second
+   animation system, and full-screen canvas effects drain batteries and stutter on the low-end phones many of our
+   players use.
+2. Lottie only if a designer makes real After Effects art for the characters (CC-194, CC-230). Not for effects that
+   Motion or CSS already do.
+3. Video (a "how to play" clip or a trailer) is an idea in [IDEAS.md](IDEAS.md), not part of this decision.
 
 ### ADR-015 — Leaderboards and rematch
 
@@ -636,6 +945,61 @@ quests move from the UTC day to the player's local day (CC-146). The time zone c
 change it at most once in 7 days so it cannot be gamed, and India time is used when it is unknown. Until CC-146
 ships, days stay in UTC. The anti-farm caps stay on the server clock (ADR-021 amendment).
 
+### ADR-012 — Visual identity: "neon arcade"
+
+- **Status:** Accepted · 2026-10-16 (proposed in [CC-087](tickets/CC-087.md))
+  **Decision.** The web app's look is a self-contained arcade theme built only from what the CSP already allows:
+
+1. **Tokens are the single source of colour, size and motion.** Every existing token name is kept (values may
+   change), so B's and C's components restyle automatically. New tokens: display font stack (system fonts only, no
+   `@font-face`), `--text-3xl`, `--radius-xl`, accent / XP / gold / streak / per-game / tier / locked colours,
+   hero and XP gradients, the background grid line, glows, chunky press shadows, five durations and three easings.
+   Art-only inks (`--color-art-ink`, `--color-art-white`, `--color-on-tier`, `--color-neon-*`), chess-square colours
+   and the backdrop moved into tokens too, so components hold no raw colours.
+2. **Art is hand-drawn SVG in React components** (`apps/web/src/art/`), painted with SVG presentation attributes and
+   CSS-module classes over tokens — never a `style` attribute or `<style>` element. Variation without inline styles:
+   confetti pieces get their position, drift, spin and colour from `:nth-child` rules; bars are `<progress>`.
+   Glyphs are `<g>` groups so scenes, icons and medals reuse one drawing.
+3. **Motion is decoration, never information.** Only `transform` and `opacity` animate (two documented exceptions
+   below); nothing loops forever (sparkles 3 twinkles, flame 3 flickers); celebrations are `pointer-events: none`,
+   `aria-hidden`, portalled to `<body>`, and finish within 1.5 s. The meaning is always also text: the room's
+   "You won!" status, the "+30 XP" and "Level up! …" toasts.
+4. **Reduced motion** sets every duration to 0, `global.css` turns off all animations and transitions, and
+   `useReducedMotion()` (a `useSyncExternalStore` over `matchMedia`) makes `Confetti`, `LevelUpBurst` and `XpPop`
+   render nothing. States that animate in are drawn so their resting (un-animated) style is the final one.
+5. **Registries for extension.** `GAME_ART` maps game id → `{ Art, Glyph, tone }`; a new game adds one entry and
+   falls back to the joystick until it does. Achievement icons fall back to a star.
+6. **Lint guard.** `no-restricted-syntax` on `JSXAttribute[name.name='style']` ("inline styles violate CSP; use a
+   CSS module") in `apps/web/src`, no new dependency.
+
+**Alternatives considered.** An icon font or an icon library (new dependency, external assets, copyright);
+a web font for the display face (a font file and a CSP change for little gain — `ui-rounded` and fallbacks look
+right on all major platforms); a motion library (bundle cost; CSS keyframes do everything needed); inline style
+variables for confetti (blocked by the CSP).
+
+**Consequences.** Initial JS grows by about 9.5 KB gzip against main after the gamification batch (112.1 → 121.7 KB,
+including the 3.4 KB `jsx-runtime` chunk Vite now splits out because the hero art is lazy), CSS by about 5.4 KB gzip
+(4.6 → 10.0 KB); the hero scene is its own 1.2 KB chunk.
+New screens must use tokens and the art registry; a style attribute fails `npm run lint`.
+
+#### Where the brief and the repo rules differ
+
+- **Animated properties.** The brief allows only `transform`/`opacity` but also asks for a press shadow that
+  shrinks and a stroke draw-in for X/O. Both are kept: `box-shadow` changes on press (80 ms) and
+  `stroke-dashoffset` draws marks in (200 ms) — both paint-only, no layout.
+- **XP bar shimmer.** A `<progress>` has no reliable `::after`, so the header chip's bar pulses once
+  (`transform: scaleY`) when XP arrives instead of a gradient sweep.
+- **Toasts** moved to the top right as the brief asks; the region is `pointer-events: none`, so a toast can never
+  cover a button (relevant for the e2e suite and for people).
+- **Focus colour.** `--color-focus` in light was `#f0a400` (1.9:1 on the background). It is now `#b45309`
+  (4.6:1 on bg, 5.0:1 on surface); on the hero gradient the ring is `--color-focus-on-hero` `#ffe08a`
+  (4.4:1 light, 8.4:1+ dark). Cells of the coloured TTT grid and chess squares draw the ring inside the cell.
+- **Primary on primary-soft** is 4.49:1 (light) / 4.26:1 (dark), just under AA for small text, so the active nav
+  pill, seat tags and ghost-button hover use text colour (14:1 / 12:1) or the raised surface instead.
+- **Header chip.** The brief says "using the existing `useProgress`". It does, plus it follows `progress:updated`
+  pushes so the level is live; it is mounted per identity (`key`), and only when there is a session, so visitors
+  never request `/api/progress`.
+
 ### ADR-011 — URL scheme: one canonical URL per screen, readable slugs, old URLs redirect
 
 - **Status:** Accepted · 2026-10-16
@@ -685,39 +1049,18 @@ ships, days stay in UTC. The anti-farm caps stay on the server clock (ADR-021 am
 - **Consequences:** No CSS framework to learn or upgrade; tests never touch the network; swapping transport or adding
   caching happens in `src/lib` only.
 
-### ADR-007 — Layered server architecture, design patterns and engineering standards
-
-- **Status:** Accepted · 2026-10-16
-- **Context:** The legacy server mixed transport, rules and storage in one file, which caused most audit findings. The product must grow (more games, bots, storage changes, new APIs) without rewrites.
-- **Decision:** Five layers (service → domain logic → domain data → persistence | dependency) plus shared immutable models and utils, wired in a single composition root. Adjacent, top-down, request/response interactions only — enforced by ESLint and pinned by `architecture.test.js`. Patterns, principles, coding and testing standards in [ENGINEERING.md](ENGINEERING.md).
-- **Consequences:** More files per feature, but each change touches one layer; everything is unit-testable with fakes; games/bots/storage are plug-ins (open/closed).
-
 ### ADR-008 — Dependency policy: latest stable, minimal, zero known vulnerabilities
 
 - **Status:** Accepted · 2026-10-16
 - **Decision:** Latest stable releases only (no pre-releases), Node Active LTS, prefer built-ins over packages, `npm audit` 0 high/critical before merge, majors upgraded via their own ticket. Details: [ENGINEERING.md §5](ENGINEERING.md).
 - **Consequences:** Replaced nodemon with `node --watch`; upgraded `connect-mongodb-session` 2 → 5; applied same-major legacy updates. Audit went from 31 vulnerabilities (1 critical, 11 high) to 0.
 
-### ADR-001 — Language: JavaScript
+### ADR-007 — Layered server architecture, design patterns and engineering standards
 
 - **Status:** Accepted · 2026-10-16
-- **Context:** Rewrite of server, game engines and shared event contracts.
-- **Decision:** Plain JavaScript (owner's choice). New code uses ES modules. Types and contracts are documented with JSDoc
-  (`@typedef`, `@param`) so editors still give autocomplete; event names live in one shared constants module, never as string literals.
-- **Consequences:** No build step for the server. Protocol safety comes from shared constants + tests instead of a compiler.
-
-### ADR-002 — Frontend: React SPA (Vite)
-
-- **Status:** Accepted · 2026-10-16
-- **Context:** Current UI is EJS + jQuery with duplicated scripts; target needs a rich realtime, mobile-first UI.
-- **Decision:** React, built with Vite, served by the same Node server in production (single deploy). Styling approach decided at CC-022.
-- **Consequences:** EJS views are retired as each game is ported. Legacy CSP stays relaxed until the React app replaces inline scripts.
-
-### ADR-004 — Rewrite strategy: new code alongside legacy
-
-- **Status:** Accepted · 2026-10-16
-- **Decision:** Build the new structure next to the legacy app, port game by game, delete legacy files once each game reaches parity.
-  Legacy app stays runnable throughout. Only security/bug quick-fixes (CC-007..CC-010) touch legacy code.
+- **Context:** The legacy server mixed transport, rules and storage in one file, which caused most audit findings. The product must grow (more games, bots, storage changes, new APIs) without rewrites.
+- **Decision:** Five layers (service → domain logic → domain data → persistence | dependency) plus shared immutable models and utils, wired in a single composition root. Adjacent, top-down, request/response interactions only — enforced by ESLint and pinned by `architecture.test.js`. Patterns, principles, coding and testing standards in [ENGINEERING.md](ENGINEERING.md).
+- **Consequences:** More files per feature, but each change touches one layer; everything is unit-testable with fakes; games/bots/storage are plug-ins (open/closed).
 
 ### ADR-006 — Repository layout: npm workspaces monorepo
 
@@ -758,6 +1101,31 @@ ships, days stay in UTC. The anti-farm caps stay on the server clock (ADR-021 am
   from India and database size. Telemetry (CC-045, CC-173 to CC-177) and an India latency check give them. CC-028
   and CC-227 sit at the end of phase 1 and start only when a trigger fires. A region move moves the database too,
   so it needs a runbook in DEPLOYMENT.md first.
+- **Checked · 2026-10-18.** Still current, with no change. The uptime monitor (ADR-043) and the "Waking up the
+  arcade" screen (CC-232, PR #62) are live, and the nightly backup job (ADR-044) is built and waits for the owner's
+  secrets. No trigger has fired. Daily players can now be read in the owner console (ADR-036). Cold-start hits and
+  move latency from India still need telemetry (CC-173 to CC-177), so those two triggers cannot be measured yet.
+
+### ADR-004 — Rewrite strategy: new code alongside legacy
+
+- **Status:** Accepted · 2026-10-16
+- **Decision:** Build the new structure next to the legacy app, port game by game, delete legacy files once each game reaches parity.
+  Legacy app stays runnable throughout. Only security/bug quick-fixes (CC-007..CC-010) touch legacy code.
+
+### ADR-002 — Frontend: React SPA (Vite)
+
+- **Status:** Accepted · 2026-10-16
+- **Context:** Current UI is EJS + jQuery with duplicated scripts; target needs a rich realtime, mobile-first UI.
+- **Decision:** React, built with Vite, served by the same Node server in production (single deploy). Styling approach decided at CC-022.
+- **Consequences:** EJS views are retired as each game is ported. Legacy CSP stays relaxed until the React app replaces inline scripts.
+
+### ADR-001 — Language: JavaScript
+
+- **Status:** Accepted · 2026-10-16
+- **Context:** Rewrite of server, game engines and shared event contracts.
+- **Decision:** Plain JavaScript (owner's choice). New code uses ES modules. Types and contracts are documented with JSDoc
+  (`@typedef`, `@param`) so editors still give autocomplete; event names live in one shared constants module, never as string literals.
+- **Consequences:** No build step for the server. Protocol safety comes from shared constants + tests instead of a compiler.
 
 ### ADR-000 — Server-authoritative game model
 

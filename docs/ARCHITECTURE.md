@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-10-16
+Last updated: 2026-10-18 (docs audit: bots, sessions and tabs, abuse limits, owner console, waking-up screen)
 
 ## 1. Legacy (deleted in CC-029)
 
@@ -46,9 +46,17 @@ packages/
 tests live next to code: *.test.js (unit), *.integration.test.js
 ```
 
-Status: composition root, config, `service/http/` (sessions, matches), `service/realtime/` (gateway, rooms), `domain/` (identity, rooms, matches), `data/` (room + match accessors), `persistence/` (database, session store, MongoDB room DAO so rooms survive restarts (CC-101), MongoDB match DAO), `models/`, `utils/` exist (CC-011…CC-020, CC-016).
+Status: every folder above exists. `service/http/` has sessions, accounts, matches, progress, leaderboards, the owner
+console (`adminRoutes.js`) and the web app router. `domain/` has identity, rooms, matches (fair play), progression,
+gamification, leaderboards, bots, analytics and the player transfer. `persistence/` stores rooms, matches, accounts,
+progress, stats, quests, boards, transfers and sessions in MongoDB, so nothing is lost on a restart (CC-101). The full
+list of what is stored where is [DATA.md](DATA.md).
 
-### Computer players (CC-138, CC-221, CC-225, ADR-025)
+### Computer players (CC-138, CC-221, CC-225, ADR-025, ADR-040, ADR-041)
+
+In plain words, with every level: [games/BOTS.md](games/BOTS.md). The strategies are pure functions in
+`packages/games/src/bots/` (one per game, with named levels, checked by a contract kit); the server only decides when
+and where they play.
 
 ```
 lobby "Play Rocky" ──room:play-computer──► botComponent.playComputer ─► roomComponent (create, seat the bot)
@@ -69,6 +77,49 @@ lobby "Play Rocky" ──room:play-computer──► botComponent.playComputer �
   computer games to `BOT_DAILY_XP` a day. The verdict stores it in `credit.botXp`. Computer games never reach a
   leaderboard.
 - Room views carry `revision`, so the web app keeps the newest view when a computer's update overtakes an answer.
+- Limits: at most 3 computer games per player, and `domain/bots/thinkingQueue.js` chooses one computer move at a time
+  on the whole server and then rests as long as the search took.
+
+### Sessions and tabs (ADR-030, ADR-033)
+
+- Sessions live in MongoDB (`player_sessions`) behind the `cc.sid` cookie: 30 days rolling for everyone, and 90 days
+  absolute after signing in for accounts (ADR-030).
+- `service/http/session.js` `createSessionCheck` compares the session's `sessionVersion` with the account's on every
+  `/api` request and every socket handshake. Password change and "Sign out other devices" count the version up; the
+  browser that asked gets a new session id (with 5 s of grace for its requests already on the way) and every other
+  socket of the account is disconnected.
+- In the web app, `lib/socket.js` reports a socket the server ended on purpose, and `lib/sessionBroadcast.js` posts
+  `"changed"` on the BroadcastChannel `cc.session` after a sign up, log in, log out or new guest. `SessionProvider`
+  then asks `GET /api/session` again and takes the server's answer (ADR-033). The message carries no identity.
+
+### Abuse limits (ADR-035)
+
+```
+request ─► app-wide /api limit (300 a minute per session or address, CC-110) ─► session check ─► route limits
+                                                                                (sign-up 10 an hour, failed logins)
+socket  ─► origin and session check ─► socketAdmission (5 per session, 30 per address) ─► one event budget per player
+room:create ─► roomLimits (3 waiting per player, 30 open per network, 2000 open in all)
+```
+
+Client addresses come from `X-Forwarded-For` with `TRUST_PROXY_HOPS` (DEPLOYMENT.md). Rooms store only a keyed hash
+of the address (`network`). A `room gauge` log line every minute shows rooms, connections and players.
+
+### Owner console (CC-233, ADR-036)
+
+`/admin` and `/api/admin/analytics`, answered only for account ids in `ADMIN_ACCOUNT_IDS`; everyone else gets the
+ordinary 404. `persistence/analyticsDao.js` runs read-only aggregations over what gameplay already stores,
+`domain/analytics/` turns them into metrics (India days, `utils/indiaTime.js`), hides any group under 5
+(`privacy.js`) and caches each range for 5 minutes. The web pages are lazy-loaded for admins only, with SVG charts,
+tables and CSV export and no new dependency. There is no new tracking; telemetry is planned in
+[analytics/EVENTS.md](analytics/EVENTS.md) (ADR-034).
+
+### First load: "Waking up the arcade" (CC-232, ADR-005)
+
+The free Render instance sleeps after 15 minutes. `apps/web/index.html` carries a static arcade-cabinet screen
+inside `#root`, styled only by the built CSS (no inline style or script, so the CSP is unchanged). It stays hidden for
+0.6 s so a warm visit never shows it, and React replaces it on its first render. While `/api/session` is still
+outstanding the layout shows the same screen (`WakingUp`), and after 10 s it says it can take up to a minute. On a
+true cold start Render's own loading page comes first; replacing that is open decision ADR-046.
 
 ### Game engine contract (implemented — `packages/games/src/engine.js`, CC-014)
 
@@ -97,7 +148,9 @@ Engines are registered with `defineEngine()` (shape check) in `createEngineRegis
 options, determinism from a seed, JSON-safe state/views, robustness against garbage input, outsiders, scenario
 rejections, full playthrough without mutation, game-over refusal, and identical replay.
 
-### Data model (target, draft)
+### Data model
+
+Every collection with its fields, who reads it and how long it is kept: [DATA.md](DATA.md). Summary:
 
 - `users` (legacy, read-only) — username, email, bcrypt `password`; read at a legacy player's first login (CC-078), never written.
 - `matches` (implemented, CC-016) — matchId, roomCode, gameId, options, seed, players[{playerId, displayName}], log[{kind, playerId?, move?, at}], result{result, winners, reason}, startedAt, endedAt, schemaVersion; replayable with `replayGame()`. Ratings fields arrive with CC-042.
@@ -106,7 +159,15 @@ rejections, full playthrough without mutation, game-over refusal, and identical 
 - `player_stats` (implemented, CC-054) — playerId (unique), winsByGame, matchesByGame, checkmateWins, questsCompleted, winStreak{current,best}, dailyStreak{current,best,lastDay}, recentKeys (exactly-once window), mergedFrom, updatedAt, version (compare-and-set).
 - `player_achievements` (implemented, CC-054) — playerId + achievementId (unique), unlockedAt, matchId.
 - `player_quests` (implemented, CC-089) — playerId + day (unique), items (self-contained snapshot of the day's 3 quests), sweepAt, recentKeys, expiresAt (TTL, day + 8 days), version.
-- `ratings` — userId, game, rating, rd, volatility
-- `sessions` — managed by session store
+- `rooms` and `closed_rooms` (implemented, CC-101, ADR-017) — one document per room with optimistic versioning and a `dueAt`
+  index for deadlines; seats may carry `bot`, games `seals` (CC-225), rooms a hashed `network` (CC-107); closed rooms keep
+  a small record for a day so a late visitor hears why.
+- `leaderboard_entries` (implemented, CC-053, ADR-015) — board, period, playerId, score, recentKeys; accounts only.
+- `player_transfers` (implemented, CC-032, ADR-014) — one record per guest that moved into an account.
+- `player_sessions` (implemented, CC-013, ADR-030) — connect-mongo sessions with `sessionVersion` and `signedInAt`;
+  `accounts.sessionVersion` is the current version.
+- Matches also store the fair-play verdict (`credit`, ADR-021, with `botXp` for computer games, ADR-025) and progress
+  keeps `unrankedXp`.
+- `ratings` — userId, game, rating, rd, volatility (planned, CC-042, ADR-027)
 
 Replaces `RPSData`, `TicTacToeData`, `ChessData` (single `matches` collection keyed by `game`).
