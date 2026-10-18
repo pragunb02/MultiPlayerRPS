@@ -81,9 +81,9 @@ jobs:
   e2e:
     name: Browser persona tests (desktop + mobile)
     runs-on: ubuntu-latest
-    # The suite took about 18 minutes, and 26 once the request and presence journeys (CC-207) were added, so 35
+    # The suite takes about 22 minutes on main and about 37 with the request and presence journeys (CC-207), so 45
     # until CC-236 makes it fast.
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
