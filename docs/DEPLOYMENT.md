@@ -108,7 +108,7 @@ for another page of the site leaves a waiting room.
 
 ## Finished games (the match pipeline)
 
-Every finished game goes into `pending_matches` in MongoDB first (CC-111, ADR-035). From there the server records
+Every finished game goes into `pending_matches` in MongoDB first (CC-111, ADR-047). From there the server records
 the match, judges it for fair play, and applies progression, gamification and leaderboards, each a named step. A
 step that fails is retried after 2 s, 4 s, 8 s and so on, at most 5 minutes apart, 10 attempts in all. A restart
 resumes at the first step not done, and every step counts a game once however often it runs. Done records are

@@ -16,7 +16,7 @@ const WITHOUT_ID = Object.freeze({ projection: { _id: 0 } });
  */
 
 /**
- * The match pipeline's outbox in MongoDB (CC-111, ADR-035): one record per finished game, so a database blip or a
+ * The match pipeline's outbox in MongoDB (CC-111, ADR-047): one record per finished game, so a database blip or a
  * crash never loses what the game earned. Stored through the driver directly, like rooms: the match inside is
  * engine owned JSON, so a schema here would only get in the way.
  *

@@ -1,7 +1,7 @@
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 
 /**
- * How the match pipeline retries (CC-111, ADR-035). A failed attempt waits `firstDelayMs`, then twice as long after
+ * How the match pipeline retries (CC-111, ADR-047). A failed attempt waits `firstDelayMs`, then twice as long after
  * each further failure, never more than `maxDelayMs`. After `maxAttempts` failed attempts the game is marked
  * failed. The defaults wait about 13 minutes in all, longer than an Atlas primary change. A done game is kept
  * `keepDoneMs`, longer than any room lives, so a finished room seen again never runs its game twice.
@@ -69,7 +69,7 @@ function checkSteps(steps) {
 }
 
 /**
- * The match pipeline's outbox (CC-111, ADR-035). Every finished game is added once and then run through the
+ * The match pipeline's outbox (CC-111, ADR-047). Every finished game is added once and then run through the
  * named steps in order. A step that is done is remembered, so a game that failed or was cut off by a restart
  * resumes at the first step not done. A failing step does not hold back later steps that do not need it. Each
  * step changes nothing the second time, so a game run again still counts once.
