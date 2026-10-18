@@ -81,6 +81,24 @@ for (const form of Object.keys(SIZES)) {
         }
       });
 
+      screen("lobby: a How to play strip of three steps under the cards", async ({ page }) => {
+        for (const slug of ["rock-paper-scissors", "tic-tac-toe", "chess"]) {
+          await page.goto(`/games/${slug}`);
+          const strip = page.getByRole("region", { name: "How to play" });
+          const steps = strip.getByRole("listitem");
+
+          await expect(steps).toHaveCount(3);
+          const cards = await page.getByRole("heading", { level: 2, name: "Join a friend" }).boundingBox();
+          const stripBox = await strip.boundingBox();
+          expect(stripBox.y, slug).toBeGreaterThan(cards.y);
+          if (form === "desktop") {
+            // Three steps side by side, across the page.
+            expect(await trackCount(strip.getByRole("list")), slug).toBe(3);
+            expect(stripBox.width, slug).toBeGreaterThan(size.width * 0.8);
+          }
+        }
+      });
+
       screen("visitor profile: a heading, art, a preview of the card and two ways in", async ({ page }) => {
         await page.goto("/profile");
         const profile = page.getByRole("region", { name: "Your profile" });
