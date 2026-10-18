@@ -1,6 +1,7 @@
 import { Router } from "express";
+import { normaliseEmail } from "../../models/credentials.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { UnauthorizedError, ValidationError } from "../../utils/errors.js";
+import { AppError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
 import { createLoginThrottle, LOGIN_THROTTLE } from "./loginThrottle.js";
 import { clientIpKey, createRateLimit } from "./rateLimits.js";
 import { establishAccountSession, requireIdentity } from "./session.js";
@@ -50,7 +51,6 @@ function requireNoFields(body) {
 }
 
 const TOO_MANY_ATTEMPTS = "Too many attempts, try again later";
-const normalisedEmail = (email) => (typeof email === "string" ? email.trim().toLowerCase() : "");
 
 /**
  * Accounts over HTTP. Logout is `DELETE /api/session`, "who am I" is `GET /api/session`.
@@ -156,17 +156,35 @@ export function createAuthRoutes({
 
   router.post("/auth/login", perIp, async (req, res) => {
     const { email, password } = requireFields(req.body, ["email", "password"]);
-    const attempt = { email: normalisedEmail(email), address: clientIpKey(req) };
+    const attempt = { email: normaliseEmail(email), address: clientIpKey(req) };
     await loginThrottle.before(attempt);
     let loggedIn;
     try {
       loggedIn = await accountComponent.login({ email, password, now: now() });
     } catch (err) {
       if (err instanceof UnauthorizedError) loginThrottle.failed(attempt);
+      // A store that failed behind the login answers like a wrong password, so the answer says nothing about the
+      // email. The failure itself is logged, without the email, so it is not missed (CC-245).
+      if (err instanceof UnauthorizedError && err.cause !== undefined && !(err.cause instanceof AppError)) {
+        req.log.error({ err: err.cause }, "the legacy store failed behind a login");
+      }
       throw err;
     }
     loginThrottle.succeeded(attempt);
     req.log.info({ playerId: loggedIn.identity.id }, "logged in");
+    if (loggedIn.legacyFailure !== undefined) {
+      req.log.error({ err: loggedIn.legacyFailure }, "the legacy store failed behind a login");
+    }
+    // An account stored under an older email spelling is rewritten at its login (CC-245). The logs never hold the
+    // email, only that it happened, and a warning when another account already had the new spelling.
+    if (loggedIn.emailUpdate === "rewritten") {
+      req.log.info({ playerId: loggedIn.identity.id }, "stored email rewritten to the one spelling");
+    } else if (loggedIn.emailUpdate === "collision") {
+      req.log.warn(
+        { playerId: loggedIn.identity.id },
+        "stored email left in an older spelling: another account already has the one spelling",
+      );
+    }
     await signIn(req, res, loggedIn, 200);
   });
 

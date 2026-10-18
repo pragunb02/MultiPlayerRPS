@@ -1,3 +1,5 @@
+import { ACCOUNT_MESSAGES } from "@classicade/shared";
+import { aliasesOf } from "../models/credentials.js";
 import { DuplicateKey } from "../persistence/errors.js";
 import { assertDefined } from "../utils/assert.js";
 import { ConflictError, NotFoundError } from "../utils/errors.js";
@@ -31,21 +33,48 @@ async function orNotFound(read) {
  */
 export function createAccountAccessor({ accountDao }) {
   assertDefined(accountDao, "accountDao");
+  /**
+   * Accounts made before the one email spelling (CC-245) whose stored email it changes, by the spelling they
+   * normalise to. Read at boot. No new account is stored that way, and each one is rewritten at its next login.
+   *
+   * @type {Map<string, string[]>}
+   */
+  let aliases = new Map();
+  const emailTaken = () =>
+    new ConflictError(ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE, { details: { field: "email" } });
 
   return Object.freeze({
     /**
+     * Reads which accounts are stored under a spelling the one email spelling changes, so login and sign-up
+     * still see them. Only accounts with an email outside plain ASCII are read, and only their email.
+     *
+     * @returns {Promise<number>} how many accounts have such an email
+     */
+    async loadEmailAliases() {
+      const stored = (await accountDao.listNonAsciiEmails()).map((account) => account.email);
+      aliases = aliasesOf(stored, (email) => email);
+      return [...aliases.values()].reduce((count, emails) => count + emails.length, 0);
+    },
+
+    /**
+     * Refuses an email that an account already has in any spelling, also one stored before the one spelling.
+     *
      * @param {{ username: string, email: string, passwordHash: string, createdAt: number }} account
      * @returns {Promise<Readonly<Account>>}
      * @throws {ConflictError} with `details.field` "username" or "email"
      */
     async create({ username, email, passwordHash, createdAt }) {
+      if (aliases.has(email)) {
+        throw emailTaken();
+      }
       try {
         return toAccount(
           await accountDao.insert({ username, email, passwordHash, createdAt: new Date(createdAt) }),
         );
       } catch (err) {
         if (err instanceof DuplicateKey) {
-          const message = err.field === "username" ? "That username is taken" : "That email can't be used";
+          const message =
+            err.field === "username" ? "That username is taken" : ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE;
           throw new ConflictError(message, { details: { field: err.field }, cause: err });
         }
         throw err;
@@ -54,17 +83,37 @@ export function createAccountAccessor({ accountDao }) {
 
     /**
      * @param {string} email  normalised
-     * @returns {Promise<Readonly<Account>[]>} the account, or an empty list (lets callers keep timing uniform)
+     * @returns {Promise<Readonly<Account>[]>} the accounts with that email, oldest first, also those stored under an
+     *   older spelling of it, or an empty list. One read either way, so callers keep timing uniform.
      */
     async findByEmail(email) {
+      const docs = await accountDao.listByEmails([email, ...(aliases.get(email) ?? [])]);
+      return Object.freeze(docs.map(toAccount));
+    },
+
+    /**
+     * Rewrites an account's email stored under an older spelling to the one spelling, after a login proved the
+     * password. Never onto an email another account already has.
+     *
+     * @param {{ accountId: string, from: string, to: string }} change
+     * @returns {Promise<"rewritten" | "collision" | "unchanged">}
+     */
+    async healEmail({ accountId, from, to }) {
       try {
-        return [toAccount(await accountDao.getByEmail(email))];
+        const changed = await accountDao.updateEmail({ accountId, from, to });
+        if (!changed) {
+          return "unchanged";
+        }
       } catch (err) {
-        if (err instanceof RangeError) {
-          return [];
+        if (err instanceof DuplicateKey) {
+          return "collision";
         }
         throw err;
       }
+      const left = (aliases.get(to) ?? []).filter((email) => email !== from);
+      if (left.length === 0) aliases.delete(to);
+      else aliases.set(to, left);
+      return "rewritten";
     },
 
     /** @param {string} accountId @param {string} passwordHash */

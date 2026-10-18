@@ -38,6 +38,28 @@ export function createInMemoryAccountDao() {
       return copy(doc);
     },
 
+    async listByEmails(emails) {
+      return [...accounts.values()].filter((account) => emails.includes(account.email)).map(copy);
+    },
+
+    async listNonAsciiEmails() {
+      return [...accounts.values()]
+        .filter((account) => [...account.email].some((char) => char.codePointAt(0) > 127))
+        .map(({ accountId, email }) => ({ accountId, email }));
+    },
+
+    async updateEmail({ accountId, from, to }) {
+      const doc = accounts.get(accountId);
+      if (doc === undefined || doc.email !== from) {
+        return false;
+      }
+      if ([...accounts.values()].some((account) => account.email === to)) {
+        throw Object.assign(new DuplicateKey("email already registered"), { field: "email" });
+      }
+      accounts.set(accountId, { ...doc, email: to });
+      return true;
+    },
+
     async getById(accountId) {
       if (!accounts.has(accountId)) {
         throw new RangeError(`No account ${accountId}`);

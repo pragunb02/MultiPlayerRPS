@@ -102,9 +102,9 @@ describe("failed logins (CC-117)", () => {
     let broken = false;
     const accountDao = {
       ...accounts,
-      getByEmail: async (email) => {
+      listByEmails: async (emails) => {
         if (broken) throw new Error("database down");
-        return accounts.getByEmail(email);
+        return accounts.listByEmails(emails);
       },
     };
     server = await startTestServer({
@@ -132,5 +132,32 @@ describe("failed logins (CC-117)", () => {
 
     expect(first.status).toBe(401);
     expect(second.status).toBe(429);
+  });
+
+  // The login and the limits read the email the same way, so another spelling is not a fresh set of guesses (CC-245).
+  it("counts guesses at other spellings of one email against that email", async () => {
+    await start();
+    const spellings = [
+      "RIYA@example.com",
+      " riya@example.com ",
+      "ｒiya@example.com",
+      "riya＠example.com",
+      "Ｒｉｙａ@EXAMPLE.com",
+    ];
+    const statuses = [];
+    for (const email of spellings) {
+      statuses.push(
+        (await post("/api/auth/login", { email, password: "guessing123" }, { from: ATTACKER })).status,
+      );
+    }
+
+    const sixth = await post(
+      "/api/auth/login",
+      { email: "riya@ｅxample.com", password: RIYA.password },
+      { from: ATTACKER },
+    );
+
+    expect(statuses).toEqual([401, 401, 401, 401, 401]);
+    expect(sixth.status).toBe(429);
   });
 });

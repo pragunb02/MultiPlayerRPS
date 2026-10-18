@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../utils/errors.js";
-import { parseEmail, parsePassword, parseUsername, RESERVED_NAME, UNSUITABLE_NAME } from "./credentials.js";
+import {
+  aliasesOf,
+  normaliseEmail,
+  parseLoginEmail,
+  previousEmailSpelling,
+  parseEmail,
+  parsePassword,
+  parseUsername,
+  RESERVED_NAME,
+  UNSUITABLE_NAME,
+} from "./credentials.js";
 
 const fieldOf = (fn) => {
   try {
@@ -53,6 +63,57 @@ describe("credentials", () => {
 
   it.each(["no-at-sign", "a@b", "a b@c.de", `${"x".repeat(250)}@a.co`, null])("rejects email %j", (raw) => {
     expect(fieldOf(() => parseEmail(raw))).toBe("email");
+  });
+
+  // One person, one account: spellings of the same address that look the same are stored the same (CC-245).
+  it.each([
+    ["an accent typed as one character or as two", "jose\u0301@example.com", "jos\u00e9@example.com"],
+    ["full-width letters from a phone keyboard", "\uff32\uff49\uff59\uff41@example.com", "riya@example.com"],
+    ["a full-width at sign", "riya\uff20example.com", "riya@example.com"],
+    ["a wide space around it", "\u3000riya@example.com\u3000", "riya@example.com"],
+    ["capitals outside the Latin alphabet", "\u0394\u0399\u0391@example.gr", "\u03b4\u03b9\u03b1@example.gr"],
+  ])("stores %s as one email", (_, typed, stored) => {
+    expect(parseEmail(typed)).toBe(stored);
+    expect(parseEmail(typed)).toBe(parseEmail(stored));
+  });
+
+  it.each([
+    ["a zero-width space", "riya\u200b@example.com"],
+    ["a right-to-left mark", "riya\u200f@example.com"],
+    ["a control character", "riya\u0007@example.com"],
+  ])("refuses an email with %s, which nobody can see", (_, raw) => {
+    expect(fieldOf(() => parseEmail(raw))).toBe("email");
+  });
+
+  it("does not fold Gmail dots or plus addresses, which mean different mailboxes elsewhere", () => {
+    expect(parseEmail("r.iya+games@gmail.com")).toBe("r.iya+games@gmail.com");
+  });
+
+  it("normalises any text the same way as parseEmail, without checking it, for the login limits", () => {
+    expect(normaliseEmail(" \uff32iya@Example.com ")).toBe("riya@example.com");
+    expect(normaliseEmail("not an email")).toBe("not an email");
+    expect(normaliseEmail(undefined)).toBe("");
+  });
+
+  it("lets a login email hold an invisible character, for accounts made before sign-up refused them", () => {
+    expect(parseLoginEmail(" Riya\u200b@Example.com")).toBe("riya\u200b@example.com");
+    expect(fieldOf(() => parseLoginEmail("not an email"))).toBe("email");
+    expect(fieldOf(() => parseLoginEmail(`${"x".repeat(250)}@a.co`))).toBe("email");
+  });
+
+  it("spells an email the way it was stored before the one spelling: trimmed and lower-cased only", () => {
+    expect(previousEmailSpelling(" \uff32iya@Example.com ")).toBe("\uff52iya@example.com");
+  });
+
+  it("groups stored emails the one spelling changes by the spelling they become", () => {
+    const aliases = aliasesOf(
+      ["\uff52iya@example.com", "\uff52\uff49ya@example.com", "plain@example.com", "Upper@example.com"],
+      (email) => email.toLowerCase(),
+    );
+
+    expect([...aliases]).toEqual([
+      ["riya@example.com", ["\uff52iya@example.com", "\uff52\uff49ya@example.com"]],
+    ]);
   });
 
   it("keeps passwords exactly as typed", () => {

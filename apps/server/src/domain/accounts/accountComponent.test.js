@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { describe, expect, it, vi } from "vitest";
+import { ACCOUNT_MESSAGES } from "@classicade/shared";
 import { createAccountAccessor } from "../../data/accountAccessor.js";
 import { createLegacyUserAccessor } from "../../data/legacyUserAccessor.js";
 import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
@@ -11,10 +12,13 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "../../utils/errors.js";
+import { createLegacyPasswordChecker } from "../../utils/legacyPassword.js";
 import { createPasswordHasher } from "../../utils/passwordHasher.js";
 import { createAccountComponent } from "./accountComponent.js";
 
 const FAST = { N: 2 ** 10, r: 8, p: 1 };
+const LEGACY_PASSWORDS = createLegacyPasswordChecker({ dummyCost: 4 });
+const EMAIL_UNAVAILABLE = ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE;
 const NOW = Date.UTC(2026, 9, 16);
 const RIYA = { username: "Riya", email: "Riya@Example.com", password: "correct horse battery" };
 // Shaped like a document of the legacy app's `users` collection (bcrypt, cost 4 to keep tests fast).
@@ -32,12 +36,15 @@ const legacyAccessor = (legacyUsers = []) =>
 function setup({ params = FAST, legacyUsers = [] } = {}) {
   const accountDao = createInMemoryAccountDao();
   const passwordHasher = createPasswordHasher({ params });
+  const accountAccessor = createAccountAccessor({ accountDao });
+  const legacyUserAccessor = legacyAccessor(legacyUsers);
   const accounts = createAccountComponent({
-    accountAccessor: createAccountAccessor({ accountDao }),
-    legacyUserAccessor: legacyAccessor(legacyUsers),
+    accountAccessor,
+    legacyUserAccessor,
     passwordHasher,
+    legacyPasswords: LEGACY_PASSWORDS,
   });
-  return { accounts, accountDao, passwordHasher };
+  return { accounts, accountDao, accountAccessor, legacyUserAccessor, passwordHasher };
 }
 
 describe("accountComponent", () => {
@@ -81,7 +88,7 @@ describe("accountComponent", () => {
 
     it.each([
       [{ ...RIYA, email: "other@example.com", username: "RIYA" }, "username", "That username is taken"],
-      [{ ...RIYA, username: "Other" }, "email", "That email can't be used"],
+      [{ ...RIYA, username: "Other" }, "email", EMAIL_UNAVAILABLE],
     ])("refuses duplicates (%#)", async (input, field, message) => {
       const { accounts } = setup();
       await accounts.signup({ ...RIYA, now: NOW });
@@ -134,6 +141,7 @@ describe("accountComponent", () => {
         accountAccessor: createAccountAccessor({ accountDao }),
         legacyUserAccessor: legacyAccessor(),
         passwordHasher: { ...passwordHasher, verifyAgainstDummy: dummy },
+        legacyPasswords: LEGACY_PASSWORDS,
       });
 
       await expect(accounts.login({ email: "nobody@example.com", password: "whatever123" })).rejects.toThrow(
@@ -150,12 +158,370 @@ describe("accountComponent", () => {
         accountAccessor: createAccountAccessor({ accountDao: weak.accountDao }),
         legacyUserAccessor: legacyAccessor(),
         passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
       });
 
       await current.login({ email: RIYA.email, password: RIYA.password });
 
       expect((await weak.accountDao.getByEmail("riya@example.com")).passwordHash).toMatch(/^scrypt\$1024\$/);
     });
+  });
+
+  // The time a login takes must not say whether the email has an account, a legacy row, or nothing (CC-245).
+  describe("login does the same work for every email", () => {
+    const TWINS = [
+      { ...LEGACY_SAM, email: "twin@example.com" },
+      { ...LEGACY_SAM, username: "twin two", email: "Twin@Example.com" },
+      { ...LEGACY_SAM, username: "twin three", email: "TWIN@example.com" },
+    ];
+    const ALONE_MS = 250;
+
+    /**
+     * Counts the slow steps (scrypt, hash or verify, and bcrypt) and which stores were read. Every slow step also
+     * waits until a step of the other kind has started, and fails after a moment alone. So code that runs bcrypt and
+     * then scrypt one after the other fails, and only code that runs them at the same time passes.
+     */
+    function counted({
+      legacyUsers = [
+        LEGACY_SAM,
+        { ...LEGACY_SAM, email: "corrupt@example.com", password: "x" },
+        ...TWINS,
+        { ...LEGACY_SAM, username: "wide sam", email: "ｗide.sam@example.com" },
+      ],
+    } = {}) {
+      let legacyFails = false;
+      const accountDao = createInMemoryAccountDao();
+      const hasher = createPasswordHasher({ params: FAST });
+      const work = { scrypt: 0, bcrypt: 0, accountReads: 0, legacyReads: 0 };
+      const accountAccessor = createAccountAccessor({ accountDao });
+      const legacyUserAccessor = legacyAccessor(legacyUsers);
+      let together = Promise.withResolvers();
+      let watching = false;
+      const startedBoth = () => work.scrypt > 0 && work.bcrypt > 0;
+      const slow =
+        (kind, run) =>
+        async (...args) => {
+          if (!watching) return run(...args);
+          work[kind] += 1;
+          if (startedBoth()) together.resolve();
+          await Promise.race([
+            together.promise,
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error(`${kind} ran alone, one after the other`)), ALONE_MS);
+            }),
+          ]);
+          return run(...args);
+        };
+      const accounts = createAccountComponent({
+        accountAccessor: {
+          ...accountAccessor,
+          findByEmail: (email) => {
+            work.accountReads += 1;
+            return accountAccessor.findByEmail(email);
+          },
+        },
+        legacyUserAccessor: {
+          findByEmail: async (email) => {
+            work.legacyReads += 1;
+            if (legacyFails) throw new Error("legacy store unavailable");
+            return legacyUserAccessor.findByEmail(email);
+          },
+        },
+        passwordHasher: {
+          ...hasher,
+          hash: slow("scrypt", (...args) => hasher.hash(...args)),
+          verify: slow("scrypt", (...args) => hasher.verify(...args)),
+          verifyAgainstDummy: slow("scrypt", (...args) => hasher.verifyAgainstDummy(...args)),
+        },
+        legacyPasswords: {
+          verify: slow("bcrypt", (...args) => LEGACY_PASSWORDS.verify(...args)),
+          verifyAgainstDummy: slow("bcrypt", (...args) => LEGACY_PASSWORDS.verifyAgainstDummy(...args)),
+        },
+      });
+      const reset = () => {
+        Object.assign(work, { scrypt: 0, bcrypt: 0, accountReads: 0, legacyReads: 0 });
+        together = Promise.withResolvers();
+        watching = true;
+      };
+      /** Makes the legacy store fail from now on, once the account exists. */
+      const breakLegacy = () => {
+        legacyFails = true;
+      };
+      return { accounts, work, reset, breakLegacy, accountDao, accountAccessor, legacyUserAccessor, hasher };
+    }
+
+    const ONE_OF_EACH = { scrypt: 1, bcrypt: 1, accountReads: 1, legacyReads: 1 };
+    const OLD_SPELLING = "ｗide@example.com";
+    const signedUpRiya = async (options) => {
+      const ctx = counted(options);
+      await ctx.accounts.signup({ ...RIYA, now: NOW });
+      // An account made before the one email spelling, stored under the old one (CC-245).
+      await ctx.accountDao.insert({
+        username: "Wide",
+        email: OLD_SPELLING,
+        passwordHash: await ctx.hasher.hash(RIYA.password),
+        createdAt: new Date(NOW),
+      });
+      await ctx.accountAccessor.loadEmailAliases();
+      await ctx.legacyUserAccessor.loadEmailAliases();
+      ctx.reset();
+      return ctx;
+    };
+
+    it.each([
+      ["an account's email, wrong password", RIYA.email, "wrong password!"],
+      ["an account's email, right password", RIYA.email, RIYA.password],
+      ["an unknown email", "nobody@example.com", "wrong password!"],
+      ["a legacy email, wrong password", LEGACY_SAM.email, "wrong password!"],
+      ["a legacy email, right password", LEGACY_SAM.email, LEGACY_PASSWORD],
+      ["a legacy row with a corrupt hash", "corrupt@example.com", "wrong password!"],
+      ["one of three legacy rows that differ only in case", "twin@example.com", "wrong password!"],
+      ["an email typed in capitals no legacy row has", "tWIN@example.com", "wrong password!"],
+      [
+        "an account under an older spelling, typed the old way, wrong password",
+        OLD_SPELLING,
+        "wrong password!",
+      ],
+      ["an account under an older spelling, typed the old way, right password", OLD_SPELLING, RIYA.password],
+      ["an account under an older spelling, typed the new way", "wide@example.com", "wrong password!"],
+      ["a legacy row under a spelling a query cannot match", "wide.sam@example.com", "wrong password!"],
+    ])(
+      "reads both stores and runs one scrypt and one bcrypt at the same time for %s",
+      async (_, email, password) => {
+        const { accounts, work } = await signedUpRiya();
+
+        const answer = await accounts.login({ email, password, now: NOW }).catch((err) => err);
+
+        // Either signed in, or the one failure. Anything else (such as a step that ran alone) fails the test.
+        expect(answer instanceof UnauthorizedError || answer.identity !== undefined).toBe(true);
+        expect(work).toEqual(ONE_OF_EACH);
+      },
+    );
+
+    it("gives every failure the same answer", async () => {
+      const { accounts } = await signedUpRiya();
+
+      const answers = [];
+      for (const email of [
+        RIYA.email,
+        "nobody@example.com",
+        LEGACY_SAM.email,
+        "corrupt@example.com",
+        "twin@example.com",
+      ]) {
+        answers.push(
+          await accounts.login({ email, password: "wrong password!", now: NOW }).catch((err) => err),
+        );
+      }
+
+      for (const answer of answers) {
+        expect(answer).toBeInstanceOf(UnauthorizedError);
+        expect({ message: answer.message, details: answer.details }).toEqual({
+          message: "Invalid email or password",
+          details: {},
+        });
+      }
+    });
+
+    // The legacy store is only needed for an email without an account (CC-245).
+    it("lets an account log in while the legacy store fails, after the same work", async () => {
+      const { accounts, work, breakLegacy } = await signedUpRiya();
+      breakLegacy();
+
+      const signedIn = await accounts.login({ email: RIYA.email, password: RIYA.password, now: NOW });
+
+      expect(signedIn.identity.displayName).toBe("Riya");
+      expect(signedIn.legacyFailure).toEqual(new Error("legacy store unavailable"));
+      expect(work).toEqual(ONE_OF_EACH);
+    });
+
+    it("answers any other email the usual failure while the legacy store fails, keeping the cause for the logs", async () => {
+      const { accounts, work, breakLegacy } = await signedUpRiya();
+      breakLegacy();
+
+      const wrong = await accounts
+        .login({ email: RIYA.email, password: "wrong password!", now: NOW })
+        .catch((err) => err);
+      const unknown = await accounts
+        .login({ email: LEGACY_SAM.email, password: LEGACY_PASSWORD, now: NOW })
+        .catch((err) => err);
+
+      for (const answer of [wrong, unknown]) {
+        expect(answer).toBeInstanceOf(UnauthorizedError);
+        expect({ message: answer.message, details: answer.details }).toEqual({
+          message: "Invalid email or password",
+          details: {},
+        });
+      }
+      expect(unknown.cause).toEqual(new Error("legacy store unavailable"));
+      expect(wrong.cause).toEqual(new Error("legacy store unavailable"));
+      expect(work.scrypt).toBe(2);
+      expect(work.bcrypt).toBe(2);
+    });
+  });
+
+  // Accounts and legacy rows stored before the one email spelling are found, and accounts heal at login (CC-245).
+  describe("emails stored under an older spelling", () => {
+    const OLD = "ｗide@example.com";
+    const NEW = "wide@example.com";
+
+    async function withStored({ accounts: stored = [], legacyUsers = [] } = {}) {
+      const ctx = setup({ legacyUsers });
+      const made = [];
+      for (const { email, username, password } of stored) {
+        made.push(
+          await ctx.accountDao.insert({
+            username,
+            email,
+            passwordHash: await ctx.passwordHasher.hash(password),
+            createdAt: new Date(NOW),
+          }),
+        );
+      }
+      await ctx.accountAccessor.loadEmailAliases();
+      await ctx.legacyUserAccessor.loadEmailAliases();
+      return { ...ctx, made };
+    }
+
+    it.each([OLD, NEW, " ＷIDE@example.com "])(
+      "logs in to an account stored under the old spelling, typed as %j, and rewrites its email",
+      async (typed) => {
+        const { accounts, accountDao, made } = await withStored({
+          accounts: [{ email: OLD, username: "Wide", password: RIYA.password }],
+        });
+
+        const signedIn = await accounts.login({ email: typed, password: RIYA.password, now: NOW });
+
+        expect(signedIn).toMatchObject({ identity: { displayName: "Wide" }, emailUpdate: "rewritten" });
+        expect((await accountDao.getById(made[0].accountId)).email).toBe(NEW);
+        const again = await accounts.login({ email: NEW, password: RIYA.password, now: NOW });
+        expect(again.emailUpdate).toBeUndefined();
+      },
+    );
+
+    it("leaves the email as it is when another account already has the one spelling", async () => {
+      const { accounts, accountDao, made } = await withStored({
+        accounts: [
+          { email: OLD, username: "Wide", password: RIYA.password },
+          { email: NEW, username: "Other", password: "another password 1" },
+        ],
+      });
+
+      const old = await accounts.login({ email: OLD, password: RIYA.password, now: NOW });
+      const current = await accounts.login({ email: NEW, password: "another password 1", now: NOW });
+
+      expect(old).toMatchObject({ identity: { displayName: "Wide" }, emailUpdate: "collision" });
+      expect(current.identity.displayName).toBe("Other");
+      expect((await accountDao.getById(made[0].accountId)).email).toBe(OLD);
+    });
+
+    it.each([OLD, NEW])(
+      "refuses a sign-up with %j while an account has it under the old spelling",
+      async (email) => {
+        const { accounts } = await withStored({
+          accounts: [{ email: OLD, username: "Wide", password: RIYA.password }],
+        });
+
+        await expect(
+          accounts.signup({ username: "Thief", email, password: RIYA.password, now: NOW }),
+        ).rejects.toMatchObject({
+          constructor: ConflictError,
+          message: EMAIL_UNAVAILABLE,
+          details: { field: "email" },
+        });
+      },
+    );
+
+    it.each([OLD, NEW])(
+      "refuses a sign-up with %j while a legacy row has it under the old spelling",
+      async (email) => {
+        const { accounts } = await withStored({
+          legacyUsers: [{ ...LEGACY_SAM, email: " ｗIDE@Example.com" }],
+        });
+
+        await expect(
+          accounts.signup({ username: "Thief", email, password: RIYA.password, now: NOW }),
+        ).rejects.toMatchObject({
+          constructor: ConflictError,
+          message: EMAIL_UNAVAILABLE,
+          details: { field: "email" },
+        });
+      },
+    );
+
+    it("lets the legacy player behind a row under the old spelling log in", async () => {
+      const { accounts } = await withStored({
+        legacyUsers: [{ ...LEGACY_SAM, email: " ｗIDE@Example.com" }],
+      });
+
+      const signedIn = await accounts.login({ email: NEW, password: LEGACY_PASSWORD, now: NOW });
+
+      expect(signedIn.identity.displayName).toBe("Sam_Lee");
+    });
+
+    it("lets an account with an invisible character, made before sign-up refused them, still log in", async () => {
+      const { accounts } = await withStored({
+        accounts: [{ email: "riya​@example.com", username: "Hidden", password: RIYA.password }],
+      });
+
+      const signedIn = await accounts.login({
+        email: "riya​@example.com",
+        password: RIYA.password,
+        now: NOW,
+      });
+
+      expect(signedIn.identity.displayName).toBe("Hidden");
+    });
+  });
+
+  describe("emails that look the same are the same person (CC-245)", () => {
+    const COMPOSED = "josé@example.com";
+    const DECOMPOSED = "josé@example.com";
+
+    it("logs in with an accent typed either way", async () => {
+      const { accounts } = setup();
+      const signedUp = await accounts.signup({ ...RIYA, email: COMPOSED, now: NOW });
+
+      expect(await accounts.login({ email: DECOMPOSED, password: RIYA.password, now: NOW })).toEqual(
+        signedUp,
+      );
+    });
+
+    it.each([
+      ["an account's email typed in another Unicode form", { accountEmail: COMPOSED, email: DECOMPOSED }],
+      [
+        "an account's email in full-width letters",
+        { accountEmail: "riya@example.com", email: "Ｒiya@example.com" },
+      ],
+      ["a legacy email in another case", { email: "SAM@EXAMPLE.COM" }],
+      [
+        "a legacy email stored with spaces around it",
+        { legacyEmail: " Sam@Example.com  ", email: "sam@example.com" },
+      ],
+      ["one of two legacy rows that differ only in case", { twin: true, email: "sam@example.com" }],
+    ])(
+      "refuses %s at sign-up with the one message",
+      async (_, { accountEmail, legacyEmail, twin, email }) => {
+        const legacyUsers = [
+          { ...LEGACY_SAM, ...(legacyEmail !== undefined && { email: legacyEmail }) },
+          ...(twin ? [{ ...LEGACY_SAM, username: "sam two", email: "sam@example.com" }] : []),
+        ];
+        const { accounts } = setup({ legacyUsers });
+        if (accountEmail !== undefined) {
+          await accounts.signup({ ...RIYA, email: accountEmail, now: NOW });
+        }
+
+        const refused = await accounts
+          .signup({ username: "Thief", email, password: RIYA.password, now: NOW })
+          .catch((err) => err);
+
+        expect(refused).toBeInstanceOf(ConflictError);
+        expect({ message: refused.message, details: refused.details }).toEqual({
+          message: EMAIL_UNAVAILABLE,
+          details: { field: "email" },
+        });
+      },
+    );
   });
 
   describe("legacy players (CC-078)", () => {
@@ -224,7 +590,7 @@ describe("accountComponent", () => {
         accounts.signup({ username: "Thief", email: "SAM@example.com", password: RIYA.password, now: NOW }),
       ).rejects.toMatchObject({
         constructor: ConflictError,
-        message: "That email can't be used",
+        message: EMAIL_UNAVAILABLE,
         details: { field: "email" },
       });
     });
@@ -238,6 +604,7 @@ describe("accountComponent", () => {
         accountAccessor: failing,
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
       });
 
       await expect(accounts.login(samLogin)).rejects.toThrow("database unavailable");
@@ -252,24 +619,93 @@ describe("accountComponent", () => {
         accountAccessor: taken,
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
       });
 
       await expect(accounts.login(samLogin)).rejects.toThrow(/No free username/);
     });
 
-    it("never looks at legacy data for an email that already has an account", async () => {
-      const findByEmail = vi.fn(async () => []);
-      const accounts = createAccountComponent({
-        accountAccessor: createAccountAccessor({ accountDao: createInMemoryAccountDao() }),
-        legacyUserAccessor: { findByEmail },
-        passwordHasher: createPasswordHasher({ params: FAST }),
+    it("logs in once the account exists through the account, not the legacy row", async () => {
+      const { accounts } = setup({ legacyUsers: [LEGACY_SAM] });
+      const first = await accounts.login(samLogin);
+
+      await expect(accounts.login({ ...samLogin, password: "wrong password!" })).rejects.toThrow(
+        UnauthorizedError,
+      );
+      expect(await accounts.login(samLogin)).toEqual(first);
+    });
+
+    // Before CC-003 the old app stored emails as typed, so one address can have several rows (CC-245). Each login
+    // checks exactly one of them, so the time taken stays the same: the row written in the capitals the player
+    // types, or else the oldest.
+    describe("two legacy rows that differ only in case", () => {
+      const twin = {
+        username: "sam two",
+        email: "sam@example.com",
+        password: bcrypt.hashSync("second password", 4),
+      };
+      const legacyUsers = [LEGACY_SAM, twin];
+
+      it("opens the row written in the capitals the player types", async () => {
+        const first = setup({ legacyUsers });
+        const second = setup({ legacyUsers });
+
+        const sam = await first.accounts.login({
+          email: "Sam@Example.com",
+          password: LEGACY_PASSWORD,
+          now: NOW,
+        });
+        const samTwo = await second.accounts.login({
+          email: "sam@example.com",
+          password: "second password",
+          now: NOW,
+        });
+
+        expect(sam.identity.displayName).toBe("Sam_Lee");
+        expect(samTwo.identity.displayName).toBe("sam_two");
       });
-      await accounts.signup({ ...RIYA, now: NOW });
-      findByEmail.mockClear();
 
-      await accounts.login({ email: RIYA.email, password: RIYA.password, now: NOW });
+      it("checks the oldest row when no row is written the way the player types", async () => {
+        const { accounts } = setup({ legacyUsers });
 
-      expect(findByEmail).not.toHaveBeenCalled();
+        await expect(
+          accounts.login({ email: "SAM@EXAMPLE.COM", password: "second password", now: NOW }),
+        ).rejects.toThrow(UnauthorizedError);
+        expect(
+          (await accounts.login({ email: "SAM@EXAMPLE.COM", password: LEGACY_PASSWORD, now: NOW })).identity
+            .displayName,
+        ).toBe("Sam_Lee");
+      });
+
+      it("never signs one twin into the account the other just made with a different password", async () => {
+        const { accounts } = setup({ legacyUsers });
+
+        const results = await Promise.allSettled([
+          accounts.login({ email: "Sam@Example.com", password: LEGACY_PASSWORD, now: NOW }),
+          accounts.login({ email: "sam@example.com", password: "second password", now: NOW }),
+        ]);
+
+        expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+        expect(results.find((result) => result.status === "rejected").reason).toBeInstanceOf(
+          UnauthorizedError,
+        );
+      });
+
+      // A known limit, written down in CC-245: one address, one account.
+      it("keeps the address for the twin who logged in first", async () => {
+        const { accounts } = setup({ legacyUsers });
+        await accounts.login({ email: "Sam@Example.com", password: LEGACY_PASSWORD, now: NOW });
+
+        await expect(
+          accounts.login({ email: "sam@example.com", password: "second password", now: NOW }),
+        ).rejects.toThrow(UnauthorizedError);
+      });
+    });
+
+    it("finds a legacy email stored with spaces around it", async () => {
+      const { accounts } = setup({ legacyUsers: [{ ...LEGACY_SAM, email: "  Sam@Example.com " }] });
+
+      expect((await accounts.login(samLogin)).identity.displayName).toBe("Sam_Lee");
     });
   });
 
@@ -281,6 +717,7 @@ describe("accountComponent", () => {
         accountAccessor: createAccountAccessor({ accountDao }),
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: { ...passwordHasher, hash },
+        legacyPasswords: LEGACY_PASSWORDS,
       });
       await accounts.signup({ ...RIYA, now: NOW });
       hash.mockClear();
@@ -296,7 +733,7 @@ describe("accountComponent", () => {
       for (const refused of [legacy, account]) {
         expect(refused).toBeInstanceOf(ConflictError);
         expect({ message: refused.message, details: refused.details }).toEqual({
-          message: "That email can't be used",
+          message: EMAIL_UNAVAILABLE,
           details: { field: "email" },
         });
       }

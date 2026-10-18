@@ -27,6 +27,9 @@ test("nobody can sign up with a legacy player's email", async ({ players }) => {
   await page.getByLabel("Password").fill("squatting password");
   await page.getByRole("button", { name: "Create account" }).click();
 
-  await expect(page.getByText("That email can't be used")).toBeVisible();
+  // The same one message as for an account's email, so nobody learns who played the old app (CC-238).
+  await expect(page.getByText("If it's yours")).toHaveText(
+    "That email can't be used. If it's yours, log in or reset your password.",
+  );
   await expect(page).toHaveURL("/signup");
 });

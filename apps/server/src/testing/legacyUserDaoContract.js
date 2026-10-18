@@ -19,36 +19,72 @@ export const LEGACY_USERS = Object.freeze([
 /**
  * Behaviour every legacy-user DAO must have (MongoDB and the in-memory double).
  *
- * @param {(seed: ReadonlyArray<object>) => Promise<{ getByEmail: Function }>} createDao
+ * @param {(seed: ReadonlyArray<object>) => Promise<{ listByEmail: Function }>} createDao
  */
 export function runLegacyUserDaoContract(createDao) {
   it("finds a legacy user by email regardless of the case it was stored in", async () => {
     const dao = await createDao(LEGACY_USERS);
 
-    expect(await dao.getByEmail("riya@example.com")).toEqual({
-      username: "Riya Sharma",
-      email: "Riya@Example.com",
-      passwordHash: LEGACY_USERS[0].password,
-    });
+    expect(await dao.listByEmail("riya@example.com")).toEqual([
+      { username: "Riya Sharma", email: "Riya@Example.com", passwordHash: LEGACY_USERS[0].password },
+    ]);
   });
 
-  it("throws for unknown emails and for rows without a password", async () => {
+  it("finds nobody for unknown emails and for rows without a password", async () => {
     const dao = await createDao(LEGACY_USERS);
 
-    await expect(dao.getByEmail("nobody@example.com")).rejects.toThrow(RangeError);
-    await expect(dao.getByEmail("broken@example.com")).rejects.toThrow(RangeError);
+    expect(await dao.listByEmail("nobody@example.com")).toEqual([]);
+    expect(await dao.listByEmail("broken@example.com")).toEqual([]);
   });
 
   it("reads a legacy row without a username as an empty one (the migration picks a name)", async () => {
     const dao = await createDao([{ email: "nameless@example.com", password: LEGACY_USERS[0].password }]);
 
-    expect((await dao.getByEmail("nameless@example.com")).username).toBe("");
+    expect((await dao.listByEmail("nameless@example.com"))[0].username).toBe("");
   });
 
   it("treats regex characters in the email literally", async () => {
     const dao = await createDao(LEGACY_USERS);
 
-    await expect(dao.getByEmail("r.ya@example.com")).rejects.toThrow(RangeError);
-    await expect(dao.getByEmail(".*")).rejects.toThrow(RangeError);
+    expect(await dao.listByEmail("r.ya@example.com")).toEqual([]);
+    expect(await dao.listByEmail(".*")).toEqual([]);
+  });
+
+  // The old app stored emails exactly as typed until CC-003, spaces included (CC-245).
+  it("finds a legacy email stored with spaces around it", async () => {
+    const dao = await createDao([{ ...LEGACY_USERS[1], email: "  Bob@Example.com " }]);
+
+    expect(await dao.listByEmail("bob@example.com")).toEqual([
+      { username: "bob", email: "  Bob@Example.com ", passwordHash: LEGACY_USERS[1].password },
+    ]);
+  });
+
+  it("also finds rows by their exact stored email, for spellings a query cannot normalise", async () => {
+    const dao = await createDao([
+      ...LEGACY_USERS,
+      { ...LEGACY_USERS[1], username: "wide", email: "ｗide@example.com" },
+    ]);
+
+    expect(await dao.listByEmail("wide@example.com")).toEqual([]);
+    expect(
+      (await dao.listByEmail("wide@example.com", ["ｗide@example.com"])).map((user) => user.username),
+    ).toEqual(["wide"]);
+  });
+
+  it("lists only the legacy emails that are not plain ASCII", async () => {
+    const dao = await createDao([...LEGACY_USERS, { ...LEGACY_USERS[1], email: "ｗide@example.com" }]);
+
+    expect(await dao.listNonAsciiEmails()).toEqual(["ｗide@example.com"]);
+  });
+
+  it("returns every row that differs only in case, oldest first", async () => {
+    const dao = await createDao([
+      ...LEGACY_USERS,
+      { ...LEGACY_USERS[1], username: "riya two", email: "riya@example.com" },
+    ]);
+
+    const found = await dao.listByEmail("riya@example.com");
+
+    expect(found.map((user) => user.username)).toEqual(["Riya Sharma", "riya two"]);
   });
 }

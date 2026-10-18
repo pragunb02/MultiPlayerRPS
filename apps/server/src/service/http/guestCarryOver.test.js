@@ -153,6 +153,23 @@ describe("a guest's progress follows them to their account (CC-032)", () => {
     expect((await get("/matches", second.cookie)).matches).toHaveLength(1);
   });
 
+  // A double-clicked "Create account" that still sends twice, or two tabs (CC-245).
+  it("makes one account and moves the guest's data once when two sign-ups from one guest session race", async () => {
+    server = await startTestServer({ now: clockOn(DAY) });
+    const alice = await clients.player();
+    const bob = await clients.player();
+    await aliceBeatsBob(alice, bob);
+    const xp = 30 + (await questBonus(alice.cookie));
+    const signup = () => post("/api/auth/signup", RIYA, alice.cookie);
+
+    const answers = await Promise.all([signup(), signup()]);
+
+    expect(answers.map((answer) => answer.status).sort()).toEqual([201, 409]);
+    const created = answers.find((answer) => answer.status === 201);
+    expect((await get("/progress", created.cookie)).progress.xp).toBe(xp);
+    expect((await get("/matches", created.cookie)).matches).toHaveLength(1);
+  });
+
   it("a match that finishes while its guest signs in lands on the account", async () => {
     server = await startTestServer({ now: clockOn(DAY) });
     const alice = await clients.player();

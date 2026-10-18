@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { ACCOUNT_MESSAGES } from "@classicade/shared";
 import { AppRequestError } from "../lib/errors.js";
 import { fakeApi, GUEST, PROGRESS } from "../testing/fakes.js";
 import { renderApp } from "../testing/render.jsx";
@@ -105,6 +106,72 @@ describe("SignupPage", () => {
     for (const label of ["Username", "Email", "Password"]) {
       expect(screen.getByLabelText(label)).not.toHaveAttribute("aria-invalid", "true");
     }
+  });
+
+  // CC-238: one message for every email that cannot be used, and a way on for the person it belongs to.
+  describe("an email that can't be used", () => {
+    const unavailable = () =>
+      new AppRequestError({
+        code: "CONFLICT",
+        message: ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE,
+        details: { field: "email" },
+        status: 409,
+      });
+
+    async function signUpWithTakenEmail(path) {
+      const user = userEvent.setup();
+      const api = fakeApi({ signup: async () => Promise.reject(unavailable()) });
+      renderApp({ path, api });
+      await user.type(screen.getByLabelText("Username"), "Riya");
+      await user.type(screen.getByLabelText("Email"), "riya@example.com");
+      await user.type(screen.getByLabelText("Password"), "correct horse battery");
+      await user.click(screen.getByRole("button", { name: "Create account" }));
+      return user;
+    }
+
+    it("says the one message at the email field, with log in as a link that keeps next", async () => {
+      await signUpWithTakenEmail("/signup?next=%2Fgames%2Fchess");
+
+      const email = screen.getByLabelText("Email");
+      await waitFor(() => expect(email).toHaveAttribute("aria-invalid", "true"));
+      expect(email).toHaveAccessibleDescription(ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE);
+      const logIn = within(screen.getByText(/If it's yours/)).getByRole("link", { name: "log in" });
+      expect(logIn).toHaveAttribute("href", "/login?next=%2Fgames%2Fchess");
+      expect(logIn.getAttribute("href")).not.toContain("riya");
+    });
+
+    it("links nothing for resetting the password, which does not exist yet (CC-033)", async () => {
+      await signUpWithTakenEmail("/signup");
+
+      const message = await screen.findByText(/If it's yours/);
+      expect(within(message).getAllByRole("link")).toHaveLength(1);
+      expect(within(message).getByRole("link")).toHaveAttribute("href", "/login");
+    });
+
+    it("takes the player to the login page from the link", async () => {
+      const user = await signUpWithTakenEmail("/signup");
+
+      await user.click(await screen.findByRole("link", { name: "log in", exact: true }));
+
+      expect(await screen.findByRole("heading", { level: 1, name: "Log in" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Email")).toHaveValue("");
+    });
+  });
+
+  it("sends one sign-up for a double click", async () => {
+    const user = userEvent.setup();
+    let answer;
+    const api = fakeApi({ signup: vi.fn(() => new Promise((resolve) => (answer = resolve))) });
+    renderApp({ path: "/signup", api });
+    await user.type(screen.getByLabelText("Username"), "Riya");
+    await user.type(screen.getByLabelText("Email"), "riya@example.com");
+    await user.type(screen.getByLabelText("Password"), "correct horse battery");
+
+    await user.dblClick(screen.getByRole("button", { name: "Create account" }));
+    answer({ identity: USER });
+
+    expect(await screen.findByRole("heading", { level: 1, name: /play the classics/i })).toBeInTheDocument();
+    expect(api.signup).toHaveBeenCalledOnce();
   });
 
   it("creates the account and goes home by default", async () => {

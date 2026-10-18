@@ -34,16 +34,61 @@ export function parseUsername(raw) {
 }
 
 /**
+ * The one spelling of an email that every comparison uses: sign-up, login, the legacy lookup and the login limits
+ * (CC-245). Spaces around it go. Unicode NFKC turns full-width letters from phone keyboards into normal ones and
+ * joins an accent typed as two characters into one. The whole address is lower-cased, because the mail providers
+ * our players use ignore case, and `Riya@` and `riya@` being two accounts would only confuse them. NFKC runs again
+ * after lower-casing, because lower-casing can in rare cases leave a form NFKC would still change.
+ *
+ * Gmail dots and plus addresses are kept as typed. Other providers treat them as different mailboxes, and a plus
+ * address is how some people keep two accounts on purpose (see CC-245).
+ *
+ * @param {unknown} raw  anything a client sent
+ * @returns {string} the normalised text, or "" when it is not text. It is not checked to be an email.
+ */
+export function normaliseEmail(raw) {
+  return typeof raw === "string" ? raw.normalize("NFKC").trim().toLowerCase().normalize("NFKC") : "";
+}
+
+// Control, invisible formatting and unassigned characters. Nobody can see them, so an address holding one looks the
+// same as the address without it.
+const INVISIBLE = /\p{C}/u;
+
+/**
  * @param {unknown} raw
- * @returns {string} trimmed, lower-cased email
+ * @returns {string} the email in its one spelling (see normaliseEmail)
  */
 export function parseEmail(raw) {
-  const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  const email = normaliseEmail(raw);
+  if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email) || INVISIBLE.test(email)) {
+    throw invalid("email", "Enter a valid email address");
+  }
+  return email;
+}
+
+/**
+ * The email of a login, in the one spelling. Like `parseEmail`, but it lets invisible characters through: an
+ * account made before sign-up refused them must still be able to log in (CC-245).
+ *
+ * @param {unknown} raw
+ * @returns {string}
+ * @throws {ValidationError} when it does not look like an email at all
+ */
+export function parseLoginEmail(raw) {
+  const email = normaliseEmail(raw);
   if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) {
     throw invalid("email", "Enter a valid email address");
   }
   return email;
 }
+
+/**
+ * How the email was stored before the one spelling: trimmed and lower-cased only (CC-245).
+ *
+ * @param {string} raw
+ * @returns {string}
+ */
+export const previousEmailSpelling = (raw) => raw.trim().toLowerCase();
 
 /**
  * @param {unknown} raw
@@ -57,4 +102,23 @@ export function parsePassword(raw) {
     throw invalid("password", "Passwords cannot be only spaces");
   }
   return raw;
+}
+
+/**
+ * The stored emails that the one email spelling changes, by the spelling they normalise to. A query can match
+ * case and spaces, but not Unicode forms, so these are looked up by their exact stored text instead (CC-245).
+ *
+ * @param {string[]} emails  stored emails
+ * @param {(email: string) => string} plain  how a query already matches a stored email
+ * @returns {Map<string, string[]>}
+ */
+export function aliasesOf(emails, plain) {
+  const aliases = new Map();
+  for (const email of emails) {
+    const normalised = normaliseEmail(email);
+    if (normalised !== plain(email)) {
+      aliases.set(normalised, [...(aliases.get(normalised) ?? []), email]);
+    }
+  }
+  return aliases;
 }

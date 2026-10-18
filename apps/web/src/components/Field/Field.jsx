@@ -3,9 +3,10 @@ import styles from "./Field.module.css";
 
 /**
  * A labelled form input with an optional hint and error, wired for screen readers
- * (`aria-describedby`, `aria-invalid`).
+ * (`aria-describedby`, `aria-invalid`). The error may hold a link, such as the way on from an email that can't
+ * be used (CC-238).
  *
- * @param {{ label: string, error?: string, hint?: string } & import("react").InputHTMLAttributes<HTMLInputElement>} props
+ * @param {{ label: string, error?: import("react").ReactNode, hint?: string } & import("react").InputHTMLAttributes<HTMLInputElement>} props
  */
 export function Field({ label, error = "", hint = "", ...input }) {
   const id = useId();
