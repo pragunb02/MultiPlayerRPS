@@ -218,7 +218,8 @@ Format: each decision gets an ID, status (`Open` · `Accepted` · `Superseded`),
      last few results in the current session, and no profile is stored.
   6. Rock Paper Scissors characters use commit and reveal (CC-225). Before the player chooses, the server sends a
      SHA-256 hash of the character's throw plus a random salt. After the reveal the client checks the hash and
-     shows "Lock checked".
+     shows the result in plain words, "✓ Fair: Rocky's choice didn't change", with the hashes one press away in
+     "How we keep it fair" (worded by CC-254, the check is unchanged).
 - **Consequences.** The owner dashboard reports bot XP per player per day as a North Star guardrail. Whether
   adaptive difficulty counts as behavioural monitoring under the DPDP Act goes to the lawyer's review.
 

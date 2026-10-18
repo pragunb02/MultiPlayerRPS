@@ -8,7 +8,7 @@ import { fakeSound } from "../../testing/fakes.js";
 import { RpsBoard } from "./RpsBoard.jsx";
 
 // The computer's lock in Rock Paper Scissors (CC-225): shown before the person chooses, checked in the browser
-// after the round.
+// after the round, and said in plain words with the proof folded away (CC-254).
 const Services = ({ children }) => (
   <ServicesProvider services={{ sound: fakeSound() }}>{children}</ServicesProvider>
 );
@@ -64,27 +64,54 @@ function playRound(before, after) {
   return view;
 }
 
+/** Everything on the main screen, outside the dialog. */
+const mainText = (container) => container.textContent;
+const HEX_64 = /[0-9a-f]{64}/;
+const FAIR = "✓ Fair: Rocky's choice didn't change";
+const WARNING =
+  "Warning: Rocky's choice doesn't match what was locked in. This round may not have been fair.";
+const PROOF = "Show the proof (for the curious)";
+
+/** Opens "How we keep it fair" and answers the dialog. */
+async function openExplanation(user) {
+  await user.click(screen.getByRole("button", { name: "How we keep it fair" }));
+  return screen.getByRole("dialog", { name: "How we keep it fair" });
+}
+
 describe("RpsBoard against a computer character", () => {
-  it("shows Rocky's lock before you choose, and that he has locked in", () => {
-    render(
+  it("says in plain words that Rocky has chosen and cannot change it, with no code on the screen", () => {
+    const { container } = render(
       <RpsBoard room={room({ locked: [{ playerId: ROCKY, turn: 0, commitment: LOCK }] })} onMove={vi.fn()} />,
     );
 
-    expect(screen.getByText(/Rocky has locked in a throw/)).toHaveTextContent("Lock 7f3a…c21");
-    expect(screen.getByText("Rocky has locked in")).toBeInTheDocument();
+    expect(
+      screen
+        .getByText(/Rocky has chosen\. It's locked/)
+        .textContent.replace(/\s+/g, " ")
+        .trim(),
+    ).toBe("🔒 Rocky has chosen. It's locked, so Rocky can't change it after you pick.");
+    expect(screen.getByText("Rocky has chosen")).toBeInTheDocument();
+    expect(mainText(container)).not.toContain("7f3a");
+    expect(mainText(container)).not.toMatch(/lock id|key|…c21/i);
   });
 
-  it("says the lock checked out when the reveal matches the lock it showed before the round", async () => {
+  it("says Rocky's choice didn't change when the reveal matches the lock it showed before the round", async () => {
     const check = await revealed("rock");
 
-    playRound({ locked: [lockOf(check)] }, { checks: [check], rounds: roundWon("rock") });
+    const { container } = playRound(
+      { locked: [lockOf(check)] },
+      { checks: [check], rounds: roundWon("rock") },
+    );
 
-    expect(screen.getByText(/Rocky threw/)).toHaveTextContent("Rocky threw Rock. Checking the lock…");
-    expect(await screen.findByText("Lock checked ✓")).toBeInTheDocument();
+    expect(screen.getByText("Checking that Rocky's choice didn't change…")).toHaveClass("quiet");
+    expect(await screen.findByText(FAIR)).toHaveClass("good");
     expect(screen.getByText("Rocky is choosing…")).toBeInTheDocument();
+    expect(mainText(container)).not.toMatch(HEX_64);
+    expect(mainText(container)).not.toContain(check.salt);
+    expect(mainText(container)).not.toContain('{"choice"');
   });
 
-  it("says the lock does not match when the reveal brings a different lock, even one its throw hashes to", async () => {
+  it("warns in plain words when the reveal brings a different lock, even one its throw hashes to", async () => {
     const check = await revealed("rock");
 
     playRound(
@@ -92,24 +119,26 @@ describe("RpsBoard against a computer character", () => {
       { checks: [check], rounds: roundWon("rock") },
     );
 
-    expect(await screen.findByText("The lock does not match this throw.")).toHaveClass("bad");
-    expect(screen.queryByText("Lock checked ✓")).not.toBeInTheDocument();
+    const warning = await screen.findByText(WARNING);
+    expect(warning).toHaveClass("bad");
+    expect(within(warning).getByText("⚠")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByText(FAIR)).not.toBeInTheDocument();
   });
 
-  it("says the lock does not match when the revealed throw is not the one that decided the round", async () => {
+  it("warns when the revealed throw is not the one that decided the round", async () => {
     const check = await revealed("rock");
 
     playRound({ locked: [lockOf(check)] }, { checks: [check], rounds: roundWon("paper") });
 
-    expect(await screen.findByText("The lock does not match this throw.")).toHaveClass("bad");
+    expect(await screen.findByText(WARNING)).toHaveClass("bad");
   });
 
-  it("says so when the throw and key do not hash to the lock", async () => {
+  it("warns when the throw and key do not hash to the lock", async () => {
     const check = await revealed("rock", { lie: true });
 
     playRound({ locked: [lockOf(check)] }, { checks: [check], rounds: roundWon("rock") });
 
-    expect(await screen.findByText("The lock does not match this throw.")).toHaveClass("bad");
+    expect(await screen.findByText(WARNING)).toHaveClass("bad");
   });
 
   it("keeps the first lock it showed for a turn, so one sent again later cannot replace it", async () => {
@@ -121,7 +150,7 @@ describe("RpsBoard against a computer character", () => {
 
     view.rerender(<RpsBoard room={room({ checks: [check], rounds: roundWon("rock") })} onMove={vi.fn()} />);
 
-    expect(await screen.findByText("The lock does not match this throw.")).toBeInTheDocument();
+    expect(await screen.findByText(WARNING)).toBeInTheDocument();
   });
 
   it("follows a rematch: the same turn in the next game has its own lock", async () => {
@@ -135,7 +164,7 @@ describe("RpsBoard against a computer character", () => {
       <RpsBoard room={room({ game: "g2", checks: [check], rounds: roundWon("rock") })} onMove={vi.fn()} />,
     );
 
-    expect(await screen.findByText("Lock checked ✓")).toBeInTheDocument();
+    expect(await screen.findByText(FAIR)).toBeInTheDocument();
   });
 
   it("checks a throw that no round used, when the game ended before it was played", async () => {
@@ -143,10 +172,10 @@ describe("RpsBoard against a computer character", () => {
 
     playRound({ locked: [lockOf(check)] }, { checks: [check] });
 
-    expect(await screen.findByText("Lock checked ✓")).toBeInTheDocument();
+    expect(await screen.findByText(FAIR)).toBeInTheDocument();
   });
 
-  it("does not claim a check for a lock it never showed, as after opening the page mid game", async () => {
+  it("does not claim a round was fair for a lock it never showed, as after opening the page mid game", async () => {
     render(
       <RpsBoard
         room={room({ checks: [await revealed("rock")], rounds: roundWon("rock") })}
@@ -154,28 +183,94 @@ describe("RpsBoard against a computer character", () => {
       />,
     );
 
-    expect(
-      screen.getByText("This browser did not see the lock before this round, so it cannot check it."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Lock checked ✓")).not.toBeInTheDocument();
+    expect(screen.getByText("This page opened after Rocky chose, so it can't check this round.")).toHaveClass(
+      "quiet",
+    );
+    expect(screen.queryByText(FAIR)).not.toBeInTheDocument();
   });
 
-  it("explains how the lock works, shows the lock it showed before the round and the whole check, and closes", async () => {
+  it("says so in plain words when the browser cannot check", async () => {
+    const check = await revealed("rock");
+    vi.stubGlobal("crypto", {});
+    try {
+      playRound({ locked: [lockOf(check)] }, { checks: [check], rounds: roundWon("rock") });
+
+      expect(
+        await screen.findByText(
+          "This browser can't check Rocky's choice, so we can't show that this round was fair.",
+        ),
+      ).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("explains the lock in three everyday steps, with the proof folded away", async () => {
     const user = userEvent.setup();
     const check = await revealed("scissors");
     playRound({ locked: [lockOf(check)] }, { checks: [check], rounds: roundWon("scissors") });
 
-    await user.click(screen.getByRole("button", { name: "How we keep it fair" }));
+    const dialog = await openExplanation(user);
 
-    const dialog = screen.getByRole("dialog", { name: "How we keep it fair" });
-    expect(dialog).toHaveTextContent("Rocky is a computer player and chooses before you do");
-    expect(within(dialog).getByText("Lock shown before you chose").nextElementSibling).toHaveTextContent(
-      check.commitment,
+    const steps = within(dialog).getAllByRole("listitem");
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toHaveTextContent("Rocky is a computer player and picks first, in secret");
+    expect(steps[0]).toHaveTextContent("sealing it in an envelope");
+    expect(steps[1]).toHaveTextContent("nobody can change what is inside: not Rocky, and not us");
+    expect(steps[2]).toHaveTextContent(
+      "Your own browser checks that the choice inside is the one that was sealed",
     );
-    expect(dialog).toHaveTextContent(`${check.text}:${check.salt}`);
-    expect(await within(dialog).findByText("Lock checked ✓")).toBeInTheDocument();
+    expect(await within(dialog).findByText(FAIR)).toBeInTheDocument();
+    const proof = within(dialog).getByText(PROOF).closest("details");
+    expect(proof).not.toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: "Got it" })).toHaveFocus();
+  });
+
+  it("reaches the proof by keyboard and opens it, with each part named in words and the SHA-256 line", async () => {
+    const user = userEvent.setup();
+    const check = await revealed("scissors");
+    playRound({ locked: [lockOf(check)] }, { checks: [check], rounds: roundWon("scissors") });
+    const dialog = await openExplanation(user);
+
+    await user.tab({ shift: true });
+    expect(within(dialog).getByText(PROOF)).toHaveFocus();
+    // The test browser does not open a summary with Enter, a real one does (the browser test presses it).
+    await user.click(within(dialog).getByText(PROOF));
+
+    const proof = within(dialog).getByText(PROOF).closest("details");
+    expect(proof).toHaveAttribute("open");
+    const part = (label) => within(proof).getByText(label).nextElementSibling;
+    expect(part("Lock shown before you picked")).toHaveTextContent(check.commitment);
+    expect(part("Rocky's choice, shown after the round")).toHaveTextContent("Scissors");
+    expect(part("Secret key, shown after the round")).toHaveTextContent(check.salt);
+    expect(part("Text to check (the choice, a colon and the key)")).toHaveTextContent(
+      `${check.text}:${check.salt}`,
+    );
+    expect(part("Lock sent with the choice and the key")).toHaveTextContent(check.commitment);
+    expect(proof).toHaveTextContent("Anyone can check it with any SHA-256 tool");
     await user.click(screen.getByRole("button", { name: "Got it" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps the keyboard focus where it is when the room updates behind the open explanation", async () => {
+    const user = userEvent.setup();
+    const check = await revealed("rock");
+    const view = playRound({ locked: [lockOf(check)] }, { checks: [check], rounds: roundWon("rock") });
+    const dialog = await openExplanation(user);
+    await user.tab({ shift: true });
+
+    view.rerender(
+      <RpsBoard
+        room={room({
+          locked: [{ playerId: ROCKY, turn: 1, commitment: LOCK }],
+          checks: [check],
+          rounds: roundWon("rock"),
+        })}
+        onMove={vi.fn()}
+      />,
+    );
+
+    expect(within(dialog).getByText(PROOF)).toHaveFocus();
   });
 
   it("prints the lock it remembered, not the one the reveal brings", async () => {
@@ -186,49 +281,62 @@ describe("RpsBoard against a computer character", () => {
       { checks: [check], rounds: roundWon("rock") },
     );
 
-    await user.click(screen.getByRole("button", { name: "How we keep it fair" }));
+    const dialog = await openExplanation(user);
 
-    const dialog = screen.getByRole("dialog", { name: "How we keep it fair" });
-    expect(within(dialog).getByText("Lock shown before you chose").nextElementSibling).toHaveTextContent(
+    expect(within(dialog).getByText("Lock shown before you picked").nextElementSibling).toHaveTextContent(
       LOCK,
     );
-    expect(within(dialog).getByText("Lock sent with the throw and key").nextElementSibling).toHaveTextContent(
-      check.commitment,
-    );
+    expect(
+      within(dialog).getByText("Lock sent with the choice and the key").nextElementSibling,
+    ).toHaveTextContent(check.commitment);
+    expect(await within(dialog).findByText(WARNING)).toBeInTheDocument();
   });
 
-  it("says in the explanation when it never saw the lock", async () => {
+  it("says in the proof when it never saw the lock", async () => {
     const user = userEvent.setup();
     render(<RpsBoard room={room({ checks: [await revealed("rock")] })} onMove={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "How we keep it fair" }));
+    const dialog = await openExplanation(user);
 
-    const dialog = screen.getByRole("dialog", { name: "How we keep it fair" });
-    expect(within(dialog).getByText("Lock shown before you chose").nextElementSibling).toHaveTextContent(
-      "This browser did not see the lock before this round",
+    expect(within(dialog).getByText("Lock shown before you picked").nextElementSibling).toHaveTextContent(
+      "This page opened after Rocky chose",
     );
   });
 
-  it("explains the lock before any round is over too, and closes with Escape", async () => {
+  it("shows this round's lock in the proof before any round is over, and closes with Escape", async () => {
     const user = userEvent.setup();
     render(
       <RpsBoard room={room({ locked: [{ playerId: ROCKY, turn: 0, commitment: LOCK }] })} onMove={vi.fn()} />,
     );
 
-    await user.click(screen.getByRole("button", { name: "How we keep it fair" }));
-    await user.keyboard("{Escape}");
+    const dialog = await openExplanation(user);
 
+    expect(within(dialog).getByText("Lock for this round").nextElementSibling).toHaveTextContent(LOCK);
+    expect(dialog).toHaveTextContent("Rocky's choice and the secret key are shown after the round.");
+    await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("shows a revealed move it does not know as it is", async () => {
+  it("says the proof comes once Rocky has chosen, when there is no lock yet", async () => {
+    const user = userEvent.setup();
+    render(<RpsBoard room={room()} onMove={vi.fn()} />);
+
+    const dialog = await openExplanation(user);
+
+    expect(dialog).toHaveTextContent("The proof shows here once Rocky has chosen.");
+  });
+
+  it("shows a revealed move it does not know as it is, only inside the proof", async () => {
+    const user = userEvent.setup();
     const odd = { playerId: ROCKY, turn: 0, text: '{"choice":"lizard"}', salt: "s", commitment: "c" };
     const broken = { playerId: ROCKY, turn: 0, text: "not json", salt: "s", commitment: "d" };
+    const choice = () => screen.getByText("Rocky's choice, shown after the round").nextElementSibling;
 
     const { rerender } = render(<RpsBoard room={room({ checks: [odd] })} onMove={vi.fn()} />);
-    expect(screen.getByText(/Rocky threw/)).toHaveTextContent('Rocky threw {"choice":"lizard"}.');
+    await openExplanation(user);
+    expect(choice()).toHaveTextContent('{"choice":"lizard"}');
     rerender(<RpsBoard room={room({ checks: [broken] })} onMove={vi.fn()} />);
-    expect(screen.getByText(/Rocky threw/)).toHaveTextContent("Rocky threw not json.");
+    expect(choice()).toHaveTextContent("not json");
   });
 });
 

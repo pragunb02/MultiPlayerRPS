@@ -2,8 +2,9 @@ import { expect, test } from "./fixtures.js";
 
 // A visitor plays a computer character from a game's page (CC-138, CC-221, CC-225): one tap on "Play Rocky" opens
 // a room with Rocky seated and the game on, labelled as a computer player everywhere. Rocky's throw is locked
-// before the visitor chooses and checked in the browser after each round. The server pauses like a person before
-// each computer move, as in production.
+// before the visitor chooses and checked in the browser after each round. The board says so in plain words, and the
+// proof is folded away in the explanation (CC-254). The server pauses like a person before each computer move, as in
+// production.
 
 const RPS = "/games/rock-paper-scissors";
 const phase = (player) => player.page.locator("[data-cc-phase]");
@@ -27,6 +28,13 @@ async function playComputer(player, { slug, character, level }) {
   return ms;
 }
 
+const LOCKED = "Rocky has chosen. It's locked, so Rocky can't change it after you pick.";
+const FAIR = "✓ Fair: Rocky's choice didn't change";
+const PROOF = "Show the proof (for the curious)";
+/** A whole lock or key, and the short lock code the board showed before CC-254. */
+const HEX_64 = /[0-9a-f]{64}/;
+const SHORT_LOCK = /[0-9a-f]{4}…[0-9a-f]{3}/;
+
 const roundsPlayed = (player) =>
   player.page.getByRole("list", { name: "Rounds" }).getByRole("listitem").count();
 
@@ -38,7 +46,7 @@ async function playRpsOut(player) {
   for (let round = 0; round < 30; round++) {
     await expect(phase(player)).toHaveAttribute("data-cc-phase", /my-turn|finished/, { timeout: 10_000 });
     if ((await phase(player).getAttribute("data-cc-phase")) === "finished") return;
-    await expect(player.page.getByText(/Rocky has locked in a throw/)).toBeVisible();
+    await expect(player.page.getByText(LOCKED)).toBeVisible();
     const before = await roundsPlayed(player);
     await hands(player).getByRole("button", { name: /Rock/ }).click();
     await expect.poll(() => roundsPlayed(player), { timeout: 10_000 }).toBeGreaterThan(before);
@@ -76,20 +84,55 @@ test.describe("a visitor plays a computer character", () => {
 
     await expect(seats(visitor)).toContainText("Rockycomputer · Easy");
     await expect(visitor.page.getByText(/Rocky is a computer player\. This game counts/)).toBeVisible();
-    await expect(visitor.page.getByText("Rocky has locked in", { exact: true })).toBeVisible();
+    await expect(visitor.page.getByText("Rocky has chosen", { exact: true })).toBeVisible();
     // Before the first round is over nothing about Rocky's throw reached this browser, only its lock.
     expect(visitor.record.socketFrames.join("\n")).not.toMatch(/"salt"/);
     await playRpsOut(visitor);
 
     await expect(visitor.page.locator("#result-heading")).toHaveText(/^You (won|lost)/);
-    await expect(visitor.page.getByText("Lock checked ✓")).toBeVisible();
+    await expect(visitor.page.getByText(FAIR)).toBeVisible();
     await expect(
       visitor.page.getByRole("status").filter({ hasText: /XP left today from computer games/ }),
     ).toBeVisible();
     await control(visitor, "rps.fairness").click();
     const dialog = visitor.page.getByRole("dialog", { name: "How we keep it fair" });
-    await expect(dialog).toContainText("Rocky is a computer player and chooses before you do");
-    await expect(dialog).toContainText("Lock checked ✓");
+    await expect(dialog).toContainText("Rocky is a computer player and picks first, in secret");
+    await expect(dialog).toContainText(FAIR);
+    await visitor.page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+  });
+
+  test("the board says it in plain words with no codes, and the proof is one press away in the explanation (CC-254)", async ({
+    players,
+  }) => {
+    const visitor = await players.open("visitor");
+    await playComputer(visitor, { slug: "rock-paper-scissors", character: "Rocky" });
+    const main = visitor.page.locator("main");
+    await expect(main).toContainText("Best of 3 · You 0 – Rocky 0 · first to 2 wins");
+    await expect(visitor.page.getByText(LOCKED)).toBeVisible();
+    expect(await main.innerText()).not.toMatch(HEX_64);
+    expect(await main.innerText()).not.toMatch(SHORT_LOCK);
+
+    await hands(visitor).getByRole("button", { name: /Rock/ }).click();
+    await expect.poll(() => roundsPlayed(visitor), { timeout: 10_000 }).toBe(1);
+
+    await expect(visitor.page.getByText(FAIR)).toBeVisible();
+    await expect(main).toContainText(/Best of 3 · You [01] – Rocky [01] · first to 2 wins/);
+    const shown = await main.innerText();
+    expect(shown).not.toMatch(HEX_64);
+    expect(shown).not.toMatch(SHORT_LOCK);
+    expect(shown).not.toContain('{"choice"');
+    await control(visitor, "rps.fairness").click();
+    const dialog = visitor.page.getByRole("dialog", { name: "How we keep it fair" });
+    await expect(dialog.getByRole("listitem")).toHaveCount(3);
+    await expect(dialog.getByText("Lock shown before you picked", { exact: true })).toBeHidden();
+    // One press opens the proof. Here it is the keyboard: Shift and Tab from "Got it" reach it, Enter opens it.
+    await visitor.page.keyboard.press("Shift+Tab");
+    await expect(dialog.getByText(PROOF)).toBeFocused();
+    await visitor.page.keyboard.press("Enter");
+    await expect(dialog.getByText("Lock shown before you picked", { exact: true })).toBeVisible();
+    expect(await dialog.innerText()).toMatch(HEX_64);
+    await expect(dialog).toContainText("Anyone can check it with any SHA-256 tool");
     await visitor.page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
   });
@@ -105,7 +148,7 @@ test.describe("a visitor plays a computer character", () => {
     await expect(phase(visitor)).toHaveAttribute("data-cc-phase", "my-turn");
     expect(visitor.url()).toBe(room);
     await expect(seats(visitor)).toContainText("Rockycomputer · Hard");
-    await expect(visitor.page.getByText(/Rocky has locked in a throw/)).toBeVisible();
+    await expect(visitor.page.getByText(LOCKED)).toBeVisible();
   });
 
   test("Tic-Tac-Toe against Unbeatable Pip ends in a draw or a loss", async ({ players }) => {
