@@ -7,6 +7,39 @@ reused; the next free ID is **ADR-047**. A later change to a decision is a dated
 
 ## Open decisions
 
+### ADR-047 — Finished games go through a stored outbox with named steps and retries
+
+- **Status:** Accepted · 2026-10-18 (proposed in [CC-111](tickets/CC-111.md))
+
+**Context.** After a game ended, the match was recorded and XP, quests and boards applied in nested background
+tasks that ran once (CC-017). A database blip or a crash in between lost the match or its rewards for good (BUG-16).
+We run one instance on Atlas M0, and every step can already run twice without counting twice.
+
+**Decision.**
+
+1. Every finished game is added to `pending_matches` (one record per `matchId`) and run through five named steps:
+   record match, judge, apply progression, apply gamification, apply leaderboards. Each step declares the steps it
+   needs, and a done step is remembered, so a game resumes where it stopped.
+2. Delivery is at least once. Exactly once comes from the steps, which already change nothing the second time
+   (the idempotent consumer pattern). The leaderboard step now reads the stored match and progress instead of what
+   progression just answered, so it is safe to repeat too.
+3. A failed attempt waits 2 s, doubling up to 5 minutes, for at most 10 attempts. Then the record is marked failed and
+   `match pipeline failed` is logged at error level, the line to alert on.
+4. The finished room is the record of a game until its outbox entry exists (the "outbox as a field on the record"
+   variant). Before any change to a finished room (a rematch, someone leaving, the room closing) the room component
+   adds its game if missing, and refuses the change while it cannot. At startup and every minute, the game of every
+   finished room is added if missing too. That covers a crash or a blip between saving the room and adding the
+   entry, without a transaction across two collections.
+5. Done records expire after 2 days (TTL index), longer than any room lives. Failed records are kept.
+
+**Why not a MongoDB transaction.** It would make the room save and the outbox entry one write, but every room write
+would need a session, the integration tests a replica set, and the room DAO already chose single document writes
+(ADR-017). For one instance the finished room gives the same guarantee for as long as it can matter.
+
+**Consequences.** About five more small writes per finished game and one indexed query every 5 seconds, far below
+M0's 100 operations a second. One new collection with three indexes. A second instance (CC-061) needs a lease in the
+record, because today one process keeps the games it is running in memory.
+
 ### ADR-046 — Our own screen in front of Render's cold start page
 
 - **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)

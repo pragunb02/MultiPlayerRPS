@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { describePage, GAMES, LEADERBOARDS, PUBLIC_PAGE_PATHS } from "@classicade/shared";
-import { gameForSlug, normaliseRoomCode, paths, returnPathFor, safeNext } from "./paths.js";
+import { gameForSlug, normaliseRoomCode, paths, returnPathFor, returnsToRoom, safeNext } from "./paths.js";
 
 describe("paths", () => {
   it("builds readable URLs from game ids", () => {
@@ -96,6 +96,27 @@ describe("returnPathFor", () => {
   it("on account pages, passes their `next` on instead of nesting it", () => {
     expect(returnPathFor({ pathname: "/login", search: "?next=%2Fprofile" })).toBe("/profile");
     expect(returnPathFor({ pathname: "/signup", search: "" })).toBe("/");
+  });
+});
+
+describe("returnsToRoom (CC-112)", () => {
+  it("is true for the room's own page, however it is spelled", () => {
+    expect(returnsToRoom("/games/chess/rooms/AB2CD3", "AB2CD3")).toBe(true);
+    expect(returnsToRoom("/games/chess/rooms/ab2cd3", "AB2CD3")).toBe(true);
+    expect(returnsToRoom("/room/ab2cd3", "AB2CD3")).toBe(true);
+  });
+
+  it("is true for logging in or signing up on the way back to the room", () => {
+    expect(returnsToRoom(paths.signup("/games/chess/rooms/AB2CD3"), "AB2CD3")).toBe(true);
+    expect(returnsToRoom(paths.login("/games/chess/rooms/AB2CD3"), "AB2CD3")).toBe(true);
+  });
+
+  it("is false for any other page, another room, or an account page going elsewhere", () => {
+    expect(returnsToRoom("/", "AB2CD3")).toBe(false);
+    expect(returnsToRoom("/games/chess", "AB2CD3")).toBe(false);
+    expect(returnsToRoom("/games/chess/rooms/ZZ9ZZ9", "AB2CD3")).toBe(false);
+    expect(returnsToRoom(paths.signup("/profile"), "AB2CD3")).toBe(false);
+    expect(returnsToRoom("/signup", "AB2CD3")).toBe(false);
   });
 });
 

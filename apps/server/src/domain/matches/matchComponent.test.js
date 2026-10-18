@@ -9,7 +9,9 @@ import { createMatchComponent } from "./matchComponent.js";
 // 2025-10-09 09:00 UTC: early enough that a test's games stay in one UTC day.
 const T0 = Date.UTC(2025, 9, 9, 9);
 const DAY = 86_400_000;
-const room = (overrides = {}) => ({
+// A finished room. It finished at its last activity unless a test says otherwise.
+const room = (overrides = {}) => finishedRoom({ lastActivityAt: T0 + 9_000, ...overrides });
+const finishedRoom = ({ lastActivityAt, finishedAt = lastActivityAt, ...overrides }) => ({
   code: "ROOM22",
   gameId: "rps",
   options: { bestOf: 1 },
@@ -27,7 +29,8 @@ const room = (overrides = {}) => ({
     log: [{ kind: "move", playerId: "guest_a", move: { choice: "rock" }, at: T0 + 1 }],
   },
   createdAt: T0 - 1_000,
-  lastActivityAt: T0 + 9_000,
+  lastActivityAt,
+  finishedAt,
   version: 7,
   ...overrides,
 });
@@ -37,6 +40,26 @@ const setup = () =>
   createMatchComponent({ matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }) });
 
 describe("matchComponent", () => {
+  it("ends the match when the game finished, even when the room changed after that (CC-111)", () => {
+    const matches = setup();
+    // A rematch request a minute later moved the room's last activity on.
+    const later = room({ finishedAt: T0 + 9_000, lastActivityAt: T0 + 69_000 });
+
+    expect(matches.finishedMatch({ room: later, outcome: WIN_A }).endedAt).toBe(T0 + 9_000);
+  });
+
+  it("turns a finished room into the match to record, without storing it, and records it once (CC-111)", async () => {
+    const matches = setup();
+    const finished = matches.finishedMatch({ room: room(), outcome: WIN_A });
+
+    const first = await matches.record(finished);
+    const again = await matches.record(finished);
+
+    expect(finished).toEqual(first);
+    expect(Object.isFrozen(finished)).toBe(true);
+    expect(again).toEqual(first);
+  });
+
   it("records a finished room as a match: players, seed, log, result and timing — not engine state", async () => {
     const matches = setup();
 

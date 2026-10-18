@@ -54,6 +54,20 @@ export function parseRoomRef(raw) {
   return { code: parseRoomCode(code) };
 }
 
+/**
+ * Leaving a room. `waitingOnly` asks to leave only while the room still waits for players: the page closing
+ * sends it, so a game that started a moment before is never forfeited by it (CC-112).
+ *
+ * @returns {{ code: string, waitingOnly: boolean }}
+ */
+export function parseLeaveRoom(raw) {
+  const { code, waitingOnly = false } = requireObject(raw, ["code", "waitingOnly"]);
+  if (typeof waitingOnly !== "boolean") {
+    throw new ValidationError("waitingOnly must be true or false", { details: { field: "waitingOnly" } });
+  }
+  return { code: parseRoomCode(code), waitingOnly };
+}
+
 /** @returns {{ code: string, move: unknown }} */
 export function parseGameMove(raw) {
   const { code, move } = requireObject(raw, ["code", "move"]);
