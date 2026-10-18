@@ -2,14 +2,85 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-047**. A later change to a decision is a dated **Amended** paragraph under it.
-"Accepted by default" means the builders chose and the owner has not decided yet; the owner may change it.
+reused; the next free ID is **ADR-051** (ADR-048 is held by open PR #82). A later change to a decision is a dated
+**Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
+the owner may change it.
 
 ## Open decisions
 
+### ADR-046 — Our own screen in front of Render's cold start page
+
+- **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)
+- **Context.** On a true cold start the browser first gets Render's own loading page, before our process can send
+  any HTML, and Render offers no way to brand it. The "Waking up the arcade" screen (CC-232) shows only once our
+  server answers.
+- **Options.** (1) Leave it as it is. (2) Serve the web app from static hosting or a CDN (with CC-028 or CC-123), so
+  our screen loads at once and waits for the API. (3) A service worker that shows the screen on repeat visits.
+- **Recommendation.** Decide with CC-123 (brand domain and CDN). Until then option 1.
+
+### ADR-045 — Keep the previous build's files online after a deploy
+
+- **Status:** Open · 2026-10-17 (from [CC-181](tickets/CC-181.md), owner to decide)
+- **Context.** Render builds every deploy from scratch, so a tab opened before a deploy asks for script files that
+  no longer exist. Since CC-181 such a tab reloads once instead of showing an error, so nobody is stuck.
+- **Options.** (1) Leave it: the reload is enough. (2) Keep the old files for a while (storage for old files, for
+  example a bucket or a CDN, and a rule for when to drop them).
+- **Recommendation.** Option 1 until a CDN exists (CC-123), then revisit.
+
+### ADR-003 — Database: stay on MongoDB vs move to PostgreSQL
+
+- **Status:** Open
+- **Context:** Ratings, leaderboards, friends, payments are relational; matches/moves fit documents.
+- **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
+
+## Accepted decisions
+
+### ADR-050 — Rewards one beat at a time, outcome moments, Bit and the empty screens
+
+- **Status:** Accepted · 2026-10-18 (owner accepted every recommendation in [CC-099](tickets/CC-099.md),
+  [CC-163](tickets/CC-163.md), [CC-153](tickets/CC-153.md) and [CC-259](tickets/CC-259.md), with two choices below)
+- **Decision.**
+  1. Rewards play one beat at a time from a pure queue in the result card (result, series, XP, level up, up to 3
+     achievements, quests, streak, save progress, summary), automatically, tap or key to skip, capped at 6 s. One
+     effect on screen at a time; confetti only for a real win; at most 3 sounds (result, level up, one chime), XP
+     silent; no reward toasts on the room page while the result shows; under reduced motion the summary shows at
+     once. The server adds `matchId` to achievement and quest updates.
+  2. Outcome moments: four tones (win, quiet win for forfeit, idle or claim with no confetti, gentle loss, even);
+     kind loss lines (at most 8 words, no "!", no shaming), no red, no shake, no flashing.
+  3. Bit, the mascot: **a placeholder SVG in our own style for now** (owner), swapped for an artist's version later
+     under a written copyright assignment; never AI drafts for Bit; outside art only under CC0, CC BY 4.0 or MIT,
+     every asset credited in `docs/CREDITS.md` with a test (CC-230). After a loss Bit is "thinking" with a tip.
+  4. Page transitions use the browser's View Transitions through React Router (no added bundle); ADR-016 noted.
+  5. Win cards are made in the browser now; guests and minors get an unnamed card.
+  6. Empty screens (CC-259) first: grid and card CSS fixes, a visitor profile preview, a "how to get on the board"
+     panel, a lobby "how to play" strip, and **on phones a one-row header with Log in and Sign up both in a menu**
+     (owner).
+  7. Order: CC-259 and CC-163 first, CC-099 after #67 (inside today's result section if CC-157 is not ready),
+     CC-153 in eight PRs.
+
+### ADR-049 — The game shell, the series scoreboard and the match layout
+
+- **Status:** Accepted · 2026-10-18 (owner accepted every recommendation in [CC-157](tickets/CC-157.md),
+  [CC-161](tickets/CC-161.md) and [CC-172](tickets/CC-172.md))
+- **Decision.**
+  1. CC-157 starts after #67 merges. Order: CC-157, CC-161, CC-172, then CC-166, CC-167, CC-168 move each game onto
+     the shell.
+  2. One `MatchShell` with slots (request banner, match bar, presence, board, side panel, action bar, result,
+     announcer). Games plug in through optional fields on the existing `GAME_VIEWS` registry; game actions are data
+     the shell renders, and the shell's confirm dialog replaces per-game ones (chess resign).
+  3. Shell animations use CSS keyframes, not Motion, so the RPS and Tic-Tac-Toe downloads stay small.
+  4. Series history is stored with the room (`series.history`, the last 20 games, oldest first). Amends ADR-015
+     point 7; DATA.md gets the field. The score counts wins, draws are half dots with no "½" in the numbers, and it
+     shows from game 1. For RPS the series counts matches; rounds are a second line. Head-to-head across rooms is
+     out of scope.
+  5. Layout: the match frame uses `svh` (with `vh` fallback) and a board sized by container queries; desktop puts
+     presence, clocks and moves in a side column; phones get a compact match header, the request banner takes the
+     match bar's row while open, and the result is a non-blocking bottom sheet. 360x800 is added as a design and
+     test viewport, `viewport-fit=cover` with safe-area padding everywhere.
+
 ### ADR-047 — Finished games go through a stored outbox with named steps and retries
 
-- **Status:** Accepted · 2026-10-18 (proposed in [CC-111](tickets/CC-111.md))
+- **Status:** Accepted · 2026-10-18 (proposed in [CC-111](tickets/CC-111.md), merged in PR #78)
 
 **Context.** After a game ended, the match was recorded and XP, quests and boards applied in nested background
 tasks that ran once (CC-017). A database blip or a crash in between lost the match or its rewards for good (BUG-16).
@@ -39,76 +110,6 @@ would need a session, the integration tests a replica set, and the room DAO alre
 **Consequences.** About five more small writes per finished game and one indexed query every 5 seconds, far below
 M0's 100 operations a second. One new collection with three indexes. A second instance (CC-061) needs a lease in the
 record, because today one process keeps the games it is running in memory.
-
-### ADR-046 — Our own screen in front of Render's cold start page
-
-- **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)
-- **Context.** On a true cold start the browser first gets Render's own loading page, before our process can send
-  any HTML, and Render offers no way to brand it. The "Waking up the arcade" screen (CC-232) shows only once our
-  server answers.
-- **Options.** (1) Leave it as it is. (2) Serve the web app from static hosting or a CDN (with CC-028 or CC-123), so
-  our screen loads at once and waits for the API. (3) A service worker that shows the screen on repeat visits.
-- **Recommendation.** Decide with CC-123 (brand domain and CDN). Until then option 1.
-
-### ADR-045 — Keep the previous build's files online after a deploy
-
-- **Status:** Open · 2026-10-17 (from [CC-181](tickets/CC-181.md), owner to decide)
-- **Context.** Render builds every deploy from scratch, so a tab opened before a deploy asks for script files that
-  no longer exist. Since CC-181 such a tab reloads once instead of showing an error, so nobody is stuck.
-- **Options.** (1) Leave it: the reload is enough. (2) Keep the old files for a while (storage for old files, for
-  example a bucket or a CDN, and a rule for when to drop them).
-- **Recommendation.** Option 1 until a CDN exists (CC-123), then revisit.
-
-### ADR-003 — Database: stay on MongoDB vs move to PostgreSQL
-
-- **Status:** Open
-- **Context:** Ratings, leaderboards, friends, payments are relational; matches/moves fit documents.
-- **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
-
-## Accepted decisions
-
-### ADR-049 — The game shell, the series scoreboard and the match layout
-
-- **Status:** Accepted · 2026-10-18 (owner accepted every recommendation in [CC-157](tickets/CC-157.md),
-  [CC-161](tickets/CC-161.md) and [CC-172](tickets/CC-172.md))
-- **Decision.**
-  1. CC-157 starts after #67 merges. Order: CC-157, CC-161, CC-172, then CC-166, CC-167, CC-168 move each game onto
-     the shell.
-  2. One `MatchShell` with slots (request banner, match bar, presence, board, side panel, action bar, result,
-     announcer). Games plug in through optional fields on the existing `GAME_VIEWS` registry; game actions are data
-     the shell renders, and the shell's confirm dialog replaces per-game ones (chess resign).
-  3. Shell animations use CSS keyframes, not Motion, so the RPS and Tic-Tac-Toe downloads stay small.
-  4. Series history is stored with the room (`series.history`, the last 20 games, oldest first). Amends ADR-015
-     point 7; DATA.md gets the field. The score counts wins, draws are half dots with no "½" in the numbers, and it
-     shows from game 1. For RPS the series counts matches; rounds are a second line. Head-to-head across rooms is
-     out of scope.
-  5. Layout: the match frame uses `svh` (with `vh` fallback) and a board sized by container queries; desktop puts
-     presence, clocks and moves in a side column; phones get a compact match header, the request banner takes the
-     match bar's row while open, and the result is a non-blocking bottom sheet. 360x800 is added as a design and
-     test viewport, `viewport-fit=cover` with safe-area padding everywhere.
-
-### ADR-050 — Rewards one beat at a time, outcome moments, Bit and the empty screens
-
-- **Status:** Accepted · 2026-10-18 (owner accepted every recommendation in [CC-099](tickets/CC-099.md),
-  [CC-163](tickets/CC-163.md), [CC-153](tickets/CC-153.md) and [CC-259](tickets/CC-259.md), with two choices below)
-- **Decision.**
-  1. Rewards play one beat at a time from a pure queue in the result card (result, series, XP, level up, up to 3
-     achievements, quests, streak, save progress, summary), automatically, tap or key to skip, capped at 6 s. One
-     effect on screen at a time; confetti only for a real win; at most 3 sounds (result, level up, one chime), XP
-     silent; no reward toasts on the room page while the result shows; under reduced motion the summary shows at
-     once. The server adds `matchId` to achievement and quest updates.
-  2. Outcome moments: four tones (win, quiet win for forfeit, idle or claim with no confetti, gentle loss, even);
-     kind loss lines (at most 8 words, no "!", no shaming), no red, no shake, no flashing.
-  3. Bit, the mascot: **a placeholder SVG in our own style for now** (owner), swapped for an artist's version later
-     under a written copyright assignment; never AI drafts for Bit; outside art only under CC0, CC BY 4.0 or MIT,
-     every asset credited in `docs/CREDITS.md` with a test (CC-230). After a loss Bit is "thinking" with a tip.
-  4. Page transitions use the browser's View Transitions through React Router (no added bundle); ADR-016 noted.
-  5. Win cards are made in the browser now; guests and minors get an unnamed card.
-  6. Empty screens (CC-259) first: grid and card CSS fixes, a visitor profile preview, a "how to get on the board"
-     panel, a lobby "how to play" strip, and **on phones a one-row header with Log in and Sign up both in a menu**
-     (owner).
-  7. Order: CC-259 and CC-163 first, CC-099 after #67 (inside today's result section if CC-157 is not ready),
-     CC-153 in eight PRs.
 
 ### ADR-044 — Backups: age-encrypted mongodump to an S3-compatible bucket, from GitHub Actions
 
@@ -259,8 +260,16 @@ record, because today one process keeps the games it is running in memory.
   less: no fake clocks, shorter game timings, retries or skipped tests. Each commit on `main` gets its own CI
   concurrency group (`github.sha`; pull requests keep one group per branch and cancel older runs), so no run on
   `main` is cancelled or replaced by the next merge's and the every-10th-merge stop sees every result. Turning off
-  `cancel-in-progress` alone was not enough: a group keeps only its newest waiting run (PR #88 review). The cost is more jobs per pull request against
-  the account's 20 runners at once, so parts are added only when the measured times call for them.
+  `cancel-in-progress` alone was not enough: a group keeps only its newest waiting run (PR #88 review). The
+  cost is more jobs per pull request against the account's 20 runners at once, so parts are added only when the
+  measured times call for them.
+- **Amended · 2026-10-18 (owner, fast mode, PR #89).** The up-to-date rule above is **not in force** while fast mode
+  lasts: branch protection's "require branches to be up to date before merging" (`strict`) is turned off, so a PR
+  can merge without being updated onto the newest `main`. In its place the coordinator runs `main`'s checks after
+  each merge and fixes a clash at once (CLAUDE.md working agreement rule 6). Builders run only lint, format and the
+  tests of the files they touch locally; docs-only PRs merge without review, code PRs get one combined reviewer plus
+  the skeptic, and PRs touching auth, sessions, sockets, input validation or personal data keep both reviewers (rule
+  8). The strict setting and the full reviews return when the feature phase ends.
 
 ### ADR-038 — Button feedback: every press answers, waiting says so
 
@@ -273,8 +282,8 @@ record, because today one process keeps the games it is running in memory.
   4. Cannot act: `aria-disabled` with a reason shown on hover, focus and press, never a silent `disabled`.
   5. Failed: the reason under the button, with Retry only for network, timeout and server errors.
   6. Every control has a stable `data-cc-control` name, and the browser tests press each one in every state (CC-170).
-- **Amended · 2026-10-18** (CC-239, PR #71. **Accepted by default (owner may change); takes effect when #71
-  merges.** Until then the code shows "Sending…" after 150 ms). "Sending…" appears after 400 ms, above the 250 to
+- **Amended · 2026-10-18** (CC-239, PR #71. **Accepted by default (owner may change); in effect since #71 merged
+  on 2026-10-18.** Before that the code showed "Sending…" after 150 ms). "Sending…" appears after 400 ms, above the 250 to
   350 ms round trip from India to the Oregon server, so a normal answer never flashes it. Once shown, it stays at
   least 300 ms. An answer that arrives during that hold is shown when the hold ends, but the action itself resolves
   at once, so pages navigate without waiting. The values follow the Epic Stack's `useDelayedIsPending` (400/300),
@@ -404,7 +413,7 @@ record, because today one process keeps the games it is running in memory.
   "went dormant"). The Dormant total is not shown, because it needs every match ever. (5) The North Star headline
   is Regular plus Core on the last full week's Sunday against the Sunday before, and the console shows the moves
   between those two days. The 3-day weekly returning players number (PRODUCT_VISION.md 7.1) stays on the
-  Overview without the North Star label, and 7.1 needs the owner's rewording.
+  Overview without the North Star label, and 7.1 needs the owner's rewording (CC-268).
 
 ### ADR-033 — Every tab follows the session: server disconnects and a message without identity
 
@@ -825,8 +834,8 @@ live in MongoDB since CC-101) have no `declinedBy` or `drawAnswer`. The server's
 does the client. Declining runs through the room component's versioned `change({ decide })` like every other room
 change, and answers GONE once the rematch window has ended.
 
-**Amended · 2026-10-18** (owner decision recorded in PR #67, CC-159. **Takes effect when #67 merges**; until then
-the rules above are what runs). Requests come from a server-side `room.requests` list instead of being worked out
+**Amended · 2026-10-18** (owner decision recorded in PR #67, CC-159. **In effect since #67 merged on 2026-10-18**;
+the rules above no longer run). Requests come from a server-side `room.requests` list instead of being worked out
 from the view. Each request has a type, who asked, who is asked, times and a state (open, accepted, declined,
 withdrawn or expired), and the last answer stays for 10 s. A rematch request lasts 60 s and a chess draw offer 30 s,
 and both expire through the existing deadline sweep. Only one request of a type is open at a time, asking again
@@ -862,7 +871,7 @@ short). Changing a sound is a code change. A browser without Web Audio stays sil
 Why not a library (Howler, Tone.js): both are built for playing files or music and would add weight for what is
 about two hundred lines.
 
-**Amended · 2026-10-18** (owner decision recorded in PR #67, CC-208. **Takes effect when #67 merges**). Point 4:
+**Amended · 2026-10-18** (owner decision recorded in PR #67, CC-208. **In effect since #67 merged**). Point 4:
 `cc.sound` stays the one key and gets an extended shape: `muted` and `volume` as before, plus `categories`, an
 on or off switch and a volume for each of the six notification categories. Old values without `categories` still
 read. The checker in the storage allowlist (`e2e/fixtures.js`) follows the new shape, and no new key is added.

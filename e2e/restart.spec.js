@@ -1,4 +1,4 @@
-import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
+import { createRoom, expect, header, joinAsGuest, test } from "./fixtures.js";
 import { restartServer } from "./serverControl.js";
 
 // The server restarts under the players' feet (CC-101): every deploy does it, so does a crash, and the hosting
@@ -19,7 +19,7 @@ const cell = (player, name) => board(player).getByRole("gridcell", { name: new R
 async function asGuest(player) {
   await player.page.goto("/");
   await player.page.getByRole("button", { name: "Play as a guest" }).click();
-  const name = player.page.getByRole("banner").getByText(/^Guest-/);
+  const name = (await header(player.page)).getByText(/^Guest-/);
   await expect(name).toBeVisible();
   return name.textContent();
 }

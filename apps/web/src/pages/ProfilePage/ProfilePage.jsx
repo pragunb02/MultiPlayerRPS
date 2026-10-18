@@ -19,6 +19,7 @@ import { useProgress } from "../../hooks/useProgress.js";
 import { useSession } from "../../hooks/useSession.js";
 import { AccountSettings } from "./AccountSettings.jsx";
 import styles from "./ProfilePage.module.css";
+import { VisitorProfile } from "./VisitorProfile.jsx";
 
 const OUTCOME_LABEL = { win: "Won", loss: "Lost", draw: "Draw" };
 const formatDate = (ms) =>
@@ -159,19 +160,7 @@ export function ProfilePage() {
     );
   }
   if (session.identity === undefined) {
-    return (
-      <section>
-        <PageTitle>Your profile</PageTitle>
-        <h1>Your profile</h1>
-        <p>
-          Play a game or{" "}
-          <Link to={paths.login(paths.profile())} data-cc-control="profile.login">
-            log in
-          </Link>{" "}
-          to see your progress.
-        </p>
-      </section>
-    );
+    return <VisitorProfile />;
   }
   return (
     <section className={styles.page}>

@@ -508,15 +508,6 @@ describe("ProfilePage", () => {
     expect(await screen.findByText("ludo vs —")).toBeInTheDocument();
   });
 
-  it("invites visitors without a session to play or log in", async () => {
-    renderApp({ path: "/profile" });
-
-    expect(await screen.findByRole("link", { name: "log in" })).toHaveAttribute(
-      "href",
-      "/login?next=%2Fprofile",
-    );
-  });
-
   it("nudges guests to create an account", async () => {
     renderApp({
       path: "/profile",

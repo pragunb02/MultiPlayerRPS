@@ -1,4 +1,4 @@
-import { expect, formFactor, test } from "./fixtures.js";
+import { expect, formFactor, header, test } from "./fixtures.js";
 import { answerTo, arm, installProbe } from "./controlProbe.js";
 import { GAMES, openPair, SITE_REQUESTS } from "./matchStates.js";
 import { allStatesFor, ANSWER_MS, NOT_PRESSED, putAway } from "./matchShellPresses.js";
@@ -13,7 +13,7 @@ test.describe("every press in the header and footer answers within 100 ms", () =
     await installProbe(guest);
     await guest.page.goto("/");
     await guest.page.locator('[data-cc-control="home.play_guest"]').click();
-    await expect(guest.page.getByRole("banner").getByText(/^Guest-/)).toBeVisible();
+    await expect((await header(guest.page)).getByText(/^Guest-/)).toBeVisible();
     const ids = await guest.page
       .locator("header [data-cc-control], footer [data-cc-control]")
       .evaluateAll((elements) =>
@@ -24,7 +24,12 @@ test.describe("every press in the header and footer answers within 100 ms", () =
     for (const id of new Set(ids.filter((id) => !NOT_PRESSED.has(id)))) {
       if (guest.url() !== "/") {
         await guest.page.goto("/");
-        await expect(guest.page.getByRole("banner").getByText(/^Guest-/)).toBeVisible();
+        await expect((await header(guest.page)).getByText(/^Guest-/)).toBeVisible();
+      }
+      // On a phone the player's controls are in the header's menu, so it is opened first. The menu button itself
+      // is pressed as it is, and its answer is the menu closing (CC-259).
+      if (id !== "header.menu") {
+        await header(guest.page);
       }
       const armed = await arm(guest.page);
       await guest.page.locator(`[data-cc-control="${id}"]`).first().click();

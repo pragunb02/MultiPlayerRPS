@@ -1,4 +1,4 @@
-import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
+import { createRoom, expect, header, joinAsGuest, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
 // Every state of every screen a person can reach (CC-084), with what they can do from there.
@@ -151,7 +151,7 @@ test.describe("room", () => {
     await expect(riya.page).toHaveURL("/");
     const room = await createRoom(riya, "chess");
 
-    await riya.page.getByRole("banner").getByRole("button", { name: "Log out" }).click();
+    await (await header(riya.page)).getByRole("button", { name: "Log out" }).click();
     await expect(riya.page).toHaveURL("/");
     await riya.page.goBack();
 
@@ -200,7 +200,7 @@ test.describe("profile", () => {
     await guest.page.goto("/");
     await guest.page.getByRole("button", { name: "Play as a guest" }).click();
     // The guest session must exist before the next page load, or the profile asks to log in instead.
-    await expect(guest.page.getByRole("banner").getByText(/^Guest-/)).toBeVisible();
+    await expect((await header(guest.page)).getByText(/^Guest-/)).toBeVisible();
     await guest.page.goto("/profile");
     await expect(guest.page.getByText("You're playing as a guest.")).toBeVisible();
     await guest.page.getByRole("link", { name: "Create an account" }).click();

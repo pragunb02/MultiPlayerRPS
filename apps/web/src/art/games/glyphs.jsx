@@ -62,3 +62,30 @@ export function JoystickGlyph() {
     </g>
   );
 }
+
+/** A noughts-and-crosses X, drawn still. */
+export function CrossGlyph() {
+  return (
+    <path
+      d="M16 16 L48 48 M48 16 L16 48"
+      className={`${art.fNone} ${art.sCurrent}`}
+      strokeWidth="8"
+      strokeLinecap="round"
+    />
+  );
+}
+
+/** A noughts-and-crosses O, drawn still. */
+export function NoughtGlyph() {
+  return <circle cx="32" cy="32" r="16" className={`${art.fNone} ${art.sCurrent}`} strokeWidth="8" />;
+}
+
+/** A chess clock face, for the time each player has left. */
+export function ClockGlyph() {
+  return (
+    <g className={`${art.fNone} ${art.sCurrent}`} strokeLinecap="round" strokeWidth="5">
+      <circle cx="32" cy="36" r="20" />
+      <path d="M32 36 V24 M32 36 L40 42 M26 8 H38 M32 8 V16" />
+    </g>
+  );
+}

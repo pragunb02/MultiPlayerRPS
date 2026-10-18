@@ -279,4 +279,67 @@ describe("LeaderboardPage", () => {
       );
     });
   });
+
+  describe("how to get on the board, beside a board with few players (CC-259)", () => {
+    const howTo = () => screen.findByRole("complementary", { name: "How to get on the board" });
+    const manyEntries = Array.from({ length: 25 }, (_, index) =>
+      entry(index + 1, `p${index + 1}`, 1000 - index),
+    );
+
+    it("explains the rules of the XP board, with one button to the games", async () => {
+      renderApp({
+        path: "/leaderboards/overall",
+        api: api({ boards: { overall: { board: boardInfo("overall"), entries: ENTRIES } } }),
+      });
+
+      const panel = await howTo();
+      expect(
+        within(panel)
+          .getAllByRole("listitem")
+          .map((step) => step.textContent),
+      ).toEqual([
+        "Play with an account. Only accounts are ranked.",
+        "Earn XP from games and daily quests.",
+        "Games against the computer never count here.",
+      ]);
+      expect(within(panel).getByRole("link", { name: "Play a game" })).toHaveAttribute("href", "/");
+    });
+
+    it("says only this week counts on the weekly board", async () => {
+      renderApp({ path: "/leaderboards/weekly", api: api() });
+
+      expect(await howTo()).toHaveTextContent("Earn XP from games and daily quests this week.");
+    });
+
+    it("sends a game board's players to that game", async () => {
+      renderApp({ path: "/leaderboards/chess", api: api() });
+
+      const panel = await howTo();
+      expect(panel).toHaveTextContent("Win a game of Chess against another player.");
+      expect(within(panel).getByRole("link", { name: "Play Chess" })).toHaveAttribute("href", "/games/chess");
+    });
+
+    it("shows no numbers of its own, so it never pretends the site is busy", async () => {
+      renderApp({ path: "/leaderboards/overall", api: api() });
+
+      expect((await howTo()).textContent).not.toMatch(/\d/);
+    });
+
+    it("leaves a full board on its own", async () => {
+      renderApp({
+        path: "/leaderboards/overall",
+        api: api({ boards: { overall: { board: boardInfo("overall"), entries: manyEntries } } }),
+      });
+
+      await screen.findByRole("list", { name: "Overall XP rankings" });
+      expect(screen.queryByRole("complementary", { name: "How to get on the board" })).toBeNull();
+    });
+
+    it("waits for the board before showing it", () => {
+      renderApp({ path: "/leaderboards/overall", api: api() });
+
+      expect(screen.getByText("Loading the leaderboard…")).toBeInTheDocument();
+      expect(screen.queryByRole("complementary", { name: "How to get on the board" })).toBeNull();
+    });
+  });
 });

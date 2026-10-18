@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.js";
+import { expect, header, test } from "./fixtures.js";
 
 // A visitor who has to wait (CC-232). The "Waking up the arcade" screen is in the HTML the server sends, so it shows
 // while the app downloads, and the app shows the same screen while the session check waits for a slow server.
@@ -68,7 +68,8 @@ async function watchForTheScreen(page) {
 const framesSeen = (page) => page.evaluate(() => window.wakeFrames);
 const pageScreen = (page) => page.locator("[data-wake='page']");
 const appScreen = (page) => page.locator("[data-wake='app']");
-const homeIsReady = (page) => expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
+const homeIsReady = async (page) =>
+  expect((await header(page)).getByRole("link", { name: "Log in" })).toBeVisible();
 // Not waiting for the page's load event, which comes only after a slowed script has run.
 const AS_SOON_AS_IT_ARRIVES = { waitUntil: "commit" };
 

@@ -33,6 +33,7 @@ export const SHARDS = Object.freeze([
   Object.freeze([
     "match-shell-presses-tictactoe.spec.js", // 875
     "accessibility.spec.js", // 203, desktop only
+    "dead-space.spec.js", // new (CC-259), not measured yet
   ]),
   // 1106 s
   Object.freeze([

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.js";
+import { expect, header, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
 /** Signs a new account up from the sign-up page, landing on the home page. */
@@ -28,7 +28,7 @@ test.describe("account holder", () => {
     const { page } = riya;
 
     await page.goto("/games/chess");
-    await page.getByRole("banner").getByRole("link", { name: "Sign up" }).click();
+    await (await header(page)).getByRole("link", { name: "Sign up" }).click();
     await expect(page).toHaveURL("/signup?next=%2Fgames%2Fchess");
     await expect(page).toHaveTitle("Sign up · ClassiCade");
     await page.getByLabel("Username").fill(account.username);
@@ -37,7 +37,7 @@ test.describe("account holder", () => {
     await page.getByRole("button", { name: "Create account" }).click();
 
     await expect(page).toHaveURL("/games/chess");
-    const banner = page.getByRole("banner");
+    const banner = await header(page);
     await expect(banner).toContainText(account.username);
     await expect(banner.getByRole("link", { name: "Log in" })).toHaveCount(0);
 
@@ -48,12 +48,12 @@ test.describe("account holder", () => {
     await page.goto("/signup");
     await expect(page).toHaveURL("/");
 
-    await banner.getByRole("button", { name: "Log out" }).click();
+    await (await header(page)).getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL("/");
-    await expect(banner.getByRole("link", { name: "Log in" })).toBeVisible();
+    await expect((await header(page)).getByRole("link", { name: "Log in" })).toBeVisible();
 
     await page.goto("/profile");
-    await page.getByRole("link", { name: "log in", exact: true }).click();
+    await page.getByRole("main").getByRole("link", { name: "Log in", exact: true }).click();
     await page.getByLabel("Email").fill(account.email.toUpperCase());
     await page.getByLabel("Password").fill(account.password);
     await page.getByRole("button", { name: "Log in" }).click();
@@ -105,7 +105,7 @@ test.describe("account holder", () => {
     await laptop.page.reload();
     await expect(laptop.page.getByRole("heading", { name: account.username })).toBeVisible();
     await phone.page.reload();
-    await expect(phone.page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
+    await expect((await header(phone.page)).getByRole("link", { name: "Log in" })).toBeVisible();
 
     phone.expect(401, "/api/auth/login");
     await phone.page.goto("/login");
@@ -135,7 +135,7 @@ test.describe("account holder", () => {
 
     await phone.page.goto("/profile");
     await expect(phone.page.getByRole("heading", { name: "Your profile" })).toBeVisible();
-    await expect(phone.page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
+    await expect((await header(phone.page)).getByRole("link", { name: "Log in" })).toBeVisible();
     await laptop.page.reload();
     await expect(laptop.page.getByRole("heading", { name: account.username })).toBeVisible();
     await expect(laptop.page.getByRole("banner")).toContainText(account.username);
