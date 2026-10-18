@@ -8,7 +8,8 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
   list. BUG-42 (CC-115, #74): the alerts tests load the chess board before they start. BUG-43 (CC-086, fixed on
   `main` with CC-053): `index.html` is sent relative to the build folder. BUG-44 (CC-101): the test waits for the
   guest name first. BUG-41 (CC-254) is fixed in PR #77 with `useEffectEvent` and is in progress until it merges.
-  IDs BUG-30, BUG-31, BUG-40 and SEC-20 to SEC-22 are held by the open PRs #69 and #71.
+  IDs BUG-30, BUG-31 and SEC-20 to SEC-22 are held by the open PR #69. BUG-40 is the long-name
+  layout bug from CC-237 (#71), to fix in CC-256.
 - **2026-10-18 — CC-115, CC-234:** BUG-20 fixed. Socket.IO does not reconnect after the server ends a socket on
   purpose, and the web app never asked who it was after that, so other tabs and remotely signed out devices kept
   their old screen. A tab now asks `GET /api/session` again when the server ends its socket or refuses it as signed
@@ -113,6 +114,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | BUG-37 | ✅     | The browser's lock check did not compare the reveal with the lock shown before the round                                                                                       | `lib/sealCheck.js`, `useSealChecks`                                    | CC-138         |
 | BUG-38 | ✅     | Match history did not label computer opponents                                                                                                                                 | `matchComponent.js` listForPlayer, profile                             | CC-138         |
 | BUG-39 | ✅     | `useRoom` could replace a newer room view with an older answer                                                                                                                 | `useRoom.js` revision check                                            | CC-138         |
+| BUG-40 | 🔴     | A 20 character username (allowed by sign-up) overflows on mobile: it covers Log out, and a form covers "Sign out other devices"                                                | `components/Layout` header, `ProfilePage` on a narrow screen           | CC-256         |
 | BUG-41 | 🟡     | Any room update behind an open dialog sent keyboard focus back to the dialog's first button ("Got it"): `Modal` ran its focus effect again on every new `onClose`              | `components/Modal/Modal.jsx` focus effect                              | CC-254         |
 | BUG-42 | ✅     | `RoomPage.alerts.test.jsx` waited the default 1 s for the lazily loaded chess board, so busy test runs failed                                                                  | `RoomPage.alerts.test.jsx`                                             | CC-115         |
 | BUG-43 | ✅     | Every page answered 500 when the checkout lives under a dot-folder (`~/.worktrees/…`): `res.sendFile` with an absolute path refuses a dot segment. Production was not affected | `service/http/webApp.js` index.html                                    | CC-086, CC-053 |
