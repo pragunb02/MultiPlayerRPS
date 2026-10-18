@@ -18,9 +18,12 @@ const ENGINES = Object.freeze({
       name: "webkit",
       device: devices["Desktop Safari"],
       // GitHub's macOS runners are too slow to time a 100 ms answer: presses were answered in 101 to 508 ms there
-      // and each of these tests took 3 to 6 minutes. They pass on WebKit on a laptop, and Chromium and Firefox
-      // time every press on each pull request (CC-184).
-      grepInvert: process.env.CI ? /every press in .* answers within 100 ms/ : undefined,
+      // and each of these tests took 3 to 6 minutes. The level-up burst comes and goes faster than the runner
+      // looks for it, so that check missed it in two runs out of four. These pass on WebKit on a laptop, and
+      // Chromium and Firefox run them on each pull request (CC-184).
+      grepInvert: process.env.CI
+        ? /every press in .* answers within 100 ms|a level-up bursts behind the new badge/
+        : undefined,
       // Chess games that take 4 s on a laptop took over 30 s on those runners, so WebKit gets 60 s there. The
       // other engines keep Playwright's 30 s.
       timeout: process.env.CI ? 60_000 : undefined,
