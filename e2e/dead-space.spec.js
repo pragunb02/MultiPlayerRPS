@@ -96,6 +96,44 @@ for (const form of Object.keys(SIZES)) {
           expect(box.width).toBeGreaterThan(size.width * 0.8);
         }
       });
+
+      screen(
+        "leaderboards: a board with few players has the way onto it beside or under it",
+        async ({ page }) => {
+          await page.goto("/leaderboards/overall");
+          const card = page
+            .locator("div")
+            .filter({ has: page.getByRole("heading", { level: 2, name: "Overall XP" }) });
+          const panel = page.getByRole("complementary", { name: "How to get on the board" });
+          await expect(page.getByText("Loading the leaderboard…")).toHaveCount(0);
+          // The server shares one database with every other test, so the board may already be full here.
+          const listed = await page
+            .getByRole("list", { name: "Overall XP rankings" })
+            .getByRole("listitem")
+            .count();
+
+          const area = page.getByRole("main").locator("section");
+          const areaBox = await area.boundingBox();
+          if (listed < 25) {
+            await expect(panel).toBeVisible();
+            await expect(panel.getByRole("link", { name: "Play a game" })).toBeVisible();
+            const cardBox = await card.last().boundingBox();
+            const panelBox = await panel.boundingBox();
+            if (form === "desktop") {
+              // Side by side, and together as wide as the page.
+              expect(Math.abs(panelBox.y - cardBox.y)).toBeLessThan(2);
+              expect(panelBox.x + panelBox.width - areaBox.x).toBeGreaterThan(areaBox.width - 2);
+            } else {
+              expect(panelBox.y).toBeGreaterThan(cardBox.y + cardBox.height);
+            }
+          } else {
+            await expect(panel).toHaveCount(0);
+          }
+          if (form === "desktop") {
+            expect(areaBox.width).toBeGreaterThan(size.width * 0.8);
+          }
+        },
+      );
     });
   }
 }
