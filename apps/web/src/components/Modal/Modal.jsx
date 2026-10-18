@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useEffectEvent, useId, useRef } from "react";
 import styles from "./Modal.module.css";
 
 /**
@@ -9,6 +9,9 @@ import styles from "./Modal.module.css";
 export function Modal({ open, title, onClose, children, actions }) {
   const dialog = useRef(null);
   const titleId = useId();
+  // Callers often pass a new `onClose` on every render. Reading it here keeps the focus where it is when the page
+  // behind the dialog updates, instead of moving it back to the first button (CC-254).
+  const close = useEffectEvent(() => onClose());
 
   useEffect(() => {
     if (!open) {
@@ -16,13 +19,13 @@ export function Modal({ open, title, onClose, children, actions }) {
     }
     const previouslyFocused = document.activeElement;
     dialog.current?.querySelector("button")?.focus();
-    const onKey = (event) => event.key === "Escape" && onClose();
+    const onKey = (event) => event.key === "Escape" && close();
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) {
     return null;

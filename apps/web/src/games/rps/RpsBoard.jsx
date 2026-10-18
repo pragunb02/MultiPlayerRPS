@@ -60,19 +60,32 @@ function choiceReason({ reason, opponent, busy }) {
 
 /** What the opponent is doing this round. A computer that sealed its throw has chosen, whether it was sent yet. */
 function opponentStatus(room, opponent) {
-  if (room.fairness?.locked.some((lock) => lock.playerId === opponent.playerId)) {
-    return `${opponent.displayName} has locked in`;
-  }
-  return room.game.view.hasChosen[opponent.playerId]
+  const sealed = room.fairness?.locked.some((lock) => lock.playerId === opponent.playerId);
+  return sealed || room.game.view.hasChosen[opponent.playerId]
     ? `${opponent.displayName} has chosen`
     : `${opponent.displayName} is choosing…`;
+}
+
+/**
+ * The match in one line: "Best of 3 · You 0 – Rocky 0 · first to 2 wins". You come first when you play. Drawn
+ * rounds do not count (the engine replays them), so the number of wins needed is half the rounds, rounded up.
+ */
+function seriesLine(room, view) {
+  const seats = [...room.seats].sort(
+    (a, b) => Number(b.playerId === room.you) - Number(a.playerId === room.you),
+  );
+  const score = seats
+    .map((seat) => `${nameOf(room, seat.playerId)} ${view.score[seat.playerId] ?? 0}`)
+    .join(" – ");
+  return `Best of ${view.bestOf} · ${score} · first to ${Math.ceil(view.bestOf / 2)} wins`;
 }
 
 /**
  * Rock Paper Scissors. Your own pending choice is shown to you. The opponent's shows only as "has chosen",
  * because the server never sends it before the round resolves. The pressed hand lights up at once, and a hand
  * that cannot be chosen says why when pressed (CC-164). Against a computer character its lock shows above the
- * hands, and its check after each round (CC-225).
+ * hands, and its check after each round, in plain words (CC-225, CC-254). The score line says how the match is
+ * won, and a drawn round says it is played again.
  *
  * @param {{ room: any, onMove: (move: { choice: string }) => Promise<unknown>, reason?: string }} props
  *   `reason`: why the viewer cannot play now (see playReason), empty when they can
@@ -85,18 +98,13 @@ export function RpsBoard({ room, onMove, reason = playReason(room, { reconnectin
   const opponent = room.seats.find((seat) => seat.playerId !== room.you);
   const chosen = move.sent?.choice ?? view.yourChoice;
   const why = choiceReason({ reason, opponent, busy: move.busy });
+  // A drawn round is played again, so it keeps its number. Only rounds someone won move the heading on.
+  const roundNumber = view.rounds.filter((round) => round.winner !== "").length + 1;
 
   return (
     <div className={styles.board}>
       <TurnBanner room={room} />
-      {/* A paragraph cannot carry a label, so screen readers hear the word as part of the text (CC-183). */}
-      <p className={styles.score}>
-        <span className="visually-hidden">Score: </span>
-        {room.seats
-          .map((seat) => `${nameOf(room, seat.playerId)} ${view.score[seat.playerId] ?? 0}`)
-          .join(" — ")}
-        <span className={styles.bestOf}>Best of {view.bestOf}</span>
-      </p>
+      <p className={styles.score}>{seriesLine(room, view)}</p>
 
       {view.rounds.length > 0 && (
         <Reveal key={view.rounds.length} room={room} round={view.rounds[view.rounds.length - 1]} />
@@ -105,7 +113,10 @@ export function RpsBoard({ room, onMove, reason = playReason(room, { reconnectin
 
       {playing && (
         <>
-          <h2 className={styles.round}>Round {view.round}</h2>
+          <h2 className={styles.round}>Round {roundNumber}</h2>
+          {view.rounds.at(-1)?.winner === "" && (
+            <p className={styles.status}>Draw. It doesn&apos;t count, so play the round again.</p>
+          )}
           <div className={styles.choices} role="group" aria-label="Your choice">
             {CHOICES.map((choice) => (
               <button
