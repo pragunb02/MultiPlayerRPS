@@ -97,7 +97,9 @@ jobs:
       - uses: ./.github/actions/browser-tests-setup
         with:
           browser: chromium
-      # Builds the web app, then starts the real server in production config (e2e/playwright.config.js).
+      # Builds the web app, then starts the real server in production config (e2e/playwright.config.js). Three
+      # workers on these four-CPU machines, measured (CC-236, CI run 39094168823): every 100 ms press check passed
+      # and each part's tests took 6 to 7 minutes. Firefox, below, needs two.
       - name: Browser tests, part ${{ matrix.part }} of 4
         working-directory: e2e
         run: npx playwright test --project=desktop --project=mobile --workers=3 --reporter=list,blob
@@ -212,9 +214,11 @@ jobs:
       - uses: ./.github/actions/browser-tests-setup
         with:
           browser: firefox
+      # Two workers: with three, a press in a chess state answered in 203 ms instead of 100 (CC-236, CI run
+      # 39094168823), a busy machine and not the app, which a test must not be loosened for.
       - name: Browser tests, part ${{ matrix.part }} of 4
         working-directory: e2e
-        run: npx playwright test --project=firefox --workers=3 --reporter=list,blob
+        run: npx playwright test --project=firefox --workers=2 --reporter=list,blob
         env:
           CI: "true"
           E2E_BROWSER: firefox

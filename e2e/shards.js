@@ -12,51 +12,51 @@
 export const RESTARTS = /restart[a-z-]*\.spec\.js$/;
 
 /**
- * The parts, with each file's test time on CI in seconds, desktop and mobile together, from the merged report of
- * CI run 39091677381 (2026-10-18). About 700 s each.
+ * The parts, with each file's test time on CI in seconds, desktop and mobile together, three workers per machine,
+ * from the merged report of CI run 39094168823 (2026-10-18). About 1100 s each.
  */
 export const SHARDS = Object.freeze([
-  // 699 s
+  // 1132 s
   Object.freeze([
-    "match-shell-presses-chess.spec.js", // 592
-    "owner.spec.js", // 18
-    "visitor.spec.js", // 17
-    "leaderboard.spec.js", // 14
-    "host-away.spec.js", // 13
-    "gamification.spec.js", // 12
-    "attacker.spec.js", // 10
-    "deploy.spec.js", // 7
-    "fairPlay.spec.js", // 6
-    "legacy.spec.js", // 5
-    "names.spec.js", // 3
-    "crawler.spec.js", // 2
+    "match-shell-presses-chess.spec.js", // 1022
+    "owner.spec.js", // 24
+    "visitor.spec.js", // 19
+    "attacker.spec.js", // 17
+    "gamification.spec.js", // 16
+    "deploy.spec.js", // 10
+    "fairPlay.spec.js", // 9
+    "legacy.spec.js", // 7
+    "crawler.spec.js", // 4
+    "names.spec.js", // 4
   ]),
-  // 691 s
+  // 1078 s
   Object.freeze([
-    "match-shell-presses-tictactoe.spec.js", // 509
-    "accessibility.spec.js", // 182, desktop only
+    "match-shell-presses-tictactoe.spec.js", // 875
+    "accessibility.spec.js", // 203, desktop only
   ]),
-  // 710 s
+  // 1106 s
   Object.freeze([
-    "match-shell-presses-rps.spec.js", // 512
-    "chess.spec.js", // 198
+    "match-shell-presses-rps.spec.js", // 846
+    "chess.spec.js", // 260
   ]),
-  // 690 s
+  // 1107 s
   Object.freeze([
-    "match-shell.spec.js", // 209
-    "save-progress.spec.js", // 51
-    "navigation.spec.js", // 48
-    "computer.spec.js", // 47
-    "invite.spec.js", // 46
-    "visual.spec.js", // 46
-    "requests.spec.js", // 45
-    "screens.spec.js", // 40
-    "rematch.spec.js", // 39
-    "sessions.spec.js", // 34
-    "waking-up.spec.js", // 33
-    "user.spec.js", // 31
-    "guest.spec.js", // 21
-    "presence.spec.js", // new (CC-207), not measured yet
+    "match-shell.spec.js", // 347
+    "requests.spec.js", // 122
+    "save-progress.spec.js", // 71
+    "computer.spec.js", // 67
+    "navigation.spec.js", // 65
+    "presence.spec.js", // 61
+    "invite.spec.js", // 59
+    "visual.spec.js", // 52
+    "rematch.spec.js", // 49
+    "user.spec.js", // 39
+    "sessions.spec.js", // 38
+    "screens.spec.js", // 35
+    "waking-up.spec.js", // 32
+    "guest.spec.js", // 27
+    "leaderboard.spec.js", // 22
+    "host-away.spec.js", // 21
   ]),
 ]);
 
