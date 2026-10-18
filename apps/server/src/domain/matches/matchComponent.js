@@ -95,7 +95,8 @@ export function createMatchComponent({ matchAccessor }) {
       log: room.game.log,
       result: { result: outcome.result, winners: outcome.winners, reason: outcome.reason },
       startedAt: room.game.startedAt,
-      endedAt: room.lastActivityAt,
+      // When the game finished. The room's last activity moves on with rematch requests and leaving.
+      endedAt: room.finishedAt,
     });
   }
 

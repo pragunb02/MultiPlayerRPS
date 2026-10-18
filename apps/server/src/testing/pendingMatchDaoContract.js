@@ -119,6 +119,46 @@ export function runPendingMatchDaoContract(createDao) {
     );
   });
 
+  it("never changes a done game again, from a failure or a second finish", async () => {
+    const dao = await createDao();
+    await dao.insertIfAbsent(entry("m1"));
+    await dao.markDone({ matchId: "m1", doneAt: at(3), expiresAt: at(100) });
+
+    await dao.recordFailure({
+      matchId: "m1",
+      status: "failed",
+      attempts: 1,
+      nextAttemptAt: at(5),
+      lastError: { step: "judge", message: "late run" },
+    });
+    await dao.markDone({ matchId: "m1", doneAt: at(9), expiresAt: at(200) });
+
+    expect(await dao.get("m1")).toEqual(
+      expect.objectContaining({ status: "done", attempts: 0, doneAt: at(3), expiresAt: at(100) }),
+    );
+    expect((await dao.get("m1")).lastError).toBeUndefined();
+  });
+
+  it("ignores a failure counted from an old read, so attempts never go back", async () => {
+    const dao = await createDao();
+    await dao.insertIfAbsent(entry("m1"));
+    const failure = (attempts, message) => ({
+      matchId: "m1",
+      status: "pending",
+      attempts,
+      nextAttemptAt: at(attempts),
+      lastError: { step: "judge", message },
+    });
+    await dao.recordFailure(failure(1, "first"));
+    await dao.recordFailure(failure(2, "second"));
+
+    await dao.recordFailure(failure(2, "from a run that read attempts 1"));
+
+    expect(await dao.get("m1")).toEqual(
+      expect.objectContaining({ attempts: 2, lastError: { step: "judge", message: "second" } }),
+    );
+  });
+
   it("keeps the stored game apart from the one it was given", async () => {
     const dao = await createDao();
     const given = entry("m1");

@@ -39,7 +39,8 @@ describe("useRoom: leaving the page (CC-112)", () => {
 
     unmount();
 
-    expect(leaves(socket)).toEqual([[SOCKET_EVENTS.ROOM_LEAVE, { code: CODE }]]);
+    // Only while it still waits: a game that started a moment ago is never forfeited by closing the page.
+    expect(leaves(socket)).toEqual([[SOCKET_EVENTS.ROOM_LEAVE, { code: CODE, waitingOnly: true }]]);
   });
 
   it("keeps the seat on the way to sign up and back to this room", async () => {

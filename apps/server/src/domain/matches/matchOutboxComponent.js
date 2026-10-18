@@ -1,7 +1,7 @@
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 
 /**
- * How the match pipeline retries (CC-111, ADR-033). A failed attempt waits `firstDelayMs`, then twice as long after
+ * How the match pipeline retries (CC-111, ADR-034). A failed attempt waits `firstDelayMs`, then twice as long after
  * each further failure, never more than `maxDelayMs`. After `maxAttempts` failed attempts the game is marked
  * failed. The defaults wait about 13 minutes in all, longer than an Atlas primary change. A done game is kept
  * `keepDoneMs`, longer than any room lives, so a finished room seen again never runs its game twice.
@@ -51,7 +51,7 @@ export const delayAfter = (attempt, policy) =>
  *   | { matchId: string, status: "failed", step: string, error: unknown, attempts: number }
  *   | { matchId: string, status: "failed" | "busy" }} RunOutcome
  *   what one run of a game did. `failed` without a step is a game that failed for good before this run, and
- *   `busy` one that this process is running already
+ *   `busy` one that this process is running already, or that another run moved to a later attempt meanwhile
  */
 
 function checkSteps(steps) {
@@ -69,7 +69,7 @@ function checkSteps(steps) {
 }
 
 /**
- * The match pipeline's outbox (CC-111, ADR-033). Every finished game is added once and then run through the
+ * The match pipeline's outbox (CC-111, ADR-034). Every finished game is added once and then run through the
  * named steps in order. A step that is done is remembered, so a game that failed or was cut off by a restart
  * resumes at the first step not done. A failing step does not hold back later steps that do not need it. Each
  * step changes nothing the second time, so a game run again still counts once.
@@ -125,19 +125,28 @@ export function createMatchOutboxComponent({ pendingMatchAccessor, steps, policy
       : { matchId, status: "retrying", ...failure, attempts, nextAttemptAt };
   }
 
-  /** @returns {Promise<RunOutcome>} */
-  async function runOnce(entry, now) {
-    const { matchId } = entry;
+  /**
+   * Runs one game, unless this process runs it already. The record is read once this run has the game, because
+   * another run may have finished it or moved it to a later attempt since it was listed. With `dueOnly`, a game
+   * whose next attempt has not come yet is left alone.
+   *
+   * @returns {Promise<RunOutcome>}
+   */
+  async function runOnce(matchId, now, { dueOnly }) {
     if (running.has(matchId)) return { matchId, status: "busy" };
-    if (entry.status === "done") return { matchId, status: "done", ran: [] };
-    if (entry.status === "failed") return { matchId, status: "failed" };
     running.add(matchId);
     try {
+      const entry = await pendingMatchAccessor.get(matchId);
+      if (entry.status === "done") return { matchId, status: "done", ran: [] };
+      if (entry.status === "failed") return { matchId, status: "failed" };
+      if (dueOnly && entry.nextAttemptAt > now) return { matchId, status: "busy" };
       return await runEntry(entry, now);
     } finally {
       running.delete(matchId);
     }
   }
+  // Whether a batch of due games is running. The next look waits for it to end instead of starting another.
+  let batchRunning = false;
 
   return Object.freeze({
     /**
@@ -154,20 +163,27 @@ export function createMatchOutboxComponent({ pendingMatchAccessor, steps, policy
      * @param {{ matchId: string, now: number }} input
      * @returns {Promise<RunOutcome>}
      */
-    run: async ({ matchId, now }) => runOnce(await pendingMatchAccessor.get(matchId), now),
+    run: ({ matchId, now }) => runOnce(matchId, now, { dueOnly: false }),
 
     /**
-     * Runs the games whose next attempt is due, one after the other.
+     * Runs the games whose next attempt is due, one after the other. While an earlier batch still runs, this
+     * answers nothing at once.
      *
      * @param {{ now: number, limit?: number }} input  `limit` games at most in one go
      * @returns {Promise<RunOutcome[]>}
      */
     async runDue({ now, limit = 20 }) {
-      const outcomes = [];
-      for (const entry of await pendingMatchAccessor.listDue({ now, limit })) {
-        outcomes.push(await runOnce(entry, now));
+      if (batchRunning) return [];
+      batchRunning = true;
+      try {
+        const outcomes = [];
+        for (const { matchId } of await pendingMatchAccessor.listDue({ now, limit })) {
+          outcomes.push(await runOnce(matchId, now, { dueOnly: true }));
+        }
+        return outcomes;
+      } finally {
+        batchRunning = false;
       }
-      return outcomes;
     },
   });
 }

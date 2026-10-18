@@ -76,8 +76,11 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  *   generateSeed?: () => number,
  *   generateMatchId?: () => string,
  *   botTurns?: Pick<ReturnType<typeof import("../bots/botTurns.js").createBotTurns>, "settle" | "checkMove" | "fairness">,
+ *   keepFinishedGame?: (game: { room: Readonly<import("../../data/roomAccessor.js").Room>, outcome: object }) => Promise<unknown>,
  * }} deps  lifetimes, limits and generators can be given so tests are short and exact. `botTurns` are the rules for
- *   computer players (CC-138, CC-225). Without them no room ever seats one
+ *   computer players (CC-138, CC-225). Without them no room ever seats one. `keepFinishedGame` stores a finished
+ *   game for the match pipeline (CC-111). It runs before every change to a finished room, so a game is never
+ *   replaced by a rematch or closed with its room before it is safe. Without it nothing is kept
  */
 export function createRoomComponent({
   roomAccessor,
@@ -89,6 +92,7 @@ export function createRoomComponent({
   generateSeed = randomSeed,
   generateMatchId = randomUUID,
   botTurns = NO_BOT_TURNS,
+  keepFinishedGame = async () => {},
 }) {
   assertDefined(roomAccessor, "roomAccessor");
   assertDefined(engines, "engines");
@@ -98,6 +102,7 @@ export function createRoomComponent({
   assertFunction(generateCode, "generateCode");
   assertFunction(generateSeed, "generateSeed");
   assertFunction(generateMatchId, "generateMatchId");
+  assertFunction(keepFinishedGame, "keepFinishedGame");
 
   const engineFor = (room) => engines.get(room.gameId);
   const seatOf = (room, playerId) => room.seats.find((seat) => seat.playerId === playerId);
@@ -146,7 +151,19 @@ export function createRoomComponent({
     }
   }
 
+  /**
+   * A finished room holds its game until the match pipeline has it (CC-111). Before the room changes or closes,
+   * the game is kept. Keeping a game twice changes nothing, and when keeping fails the change fails with it, so the
+   * game stays in its room for the next try.
+   */
+  async function keepGameOf(room) {
+    if (room.status === ROOM_STATUS.FINISHED) {
+      await keepFinishedGame({ room, outcome: room.result });
+    }
+  }
+
   async function close(room, reason, now) {
+    await keepGameOf(room);
     await roomAccessor.close({ room, reason, closedAt: now });
     events.emit(ROOM_EVENTS.CLOSED, { code: room.code, reason });
   }
@@ -201,6 +218,7 @@ export function createRoomComponent({
         if (decision === room) {
           return { closed: false, changed: false, room };
         }
+        await keepGameOf(room);
         const saved = await roomAccessor.save({ room: stamp(decision), previous: room });
         if (room.status === ROOM_STATUS.PLAYING && saved.status === ROOM_STATUS.FINISHED) {
           events.emit(ROOM_EVENTS.GAME_FINISHED, { room: saved, outcome: saved.result });
@@ -474,12 +492,17 @@ export function createRoomComponent({
 
     /**
      * Leaves a room. Leaving a game in progress forfeits it, an empty room is closed, and the host role passes on.
+     * With `waitingOnly` it leaves only a room that still waits for players, and changes nothing once the game has
+     * started: the room page sends that when it closes, and a game that started a moment before must not be
+     * forfeited by it (CC-112).
      *
-     * @param {{ code: string, playerId: string, now: number }} input
+     * @param {{ code: string, playerId: string, now: number, waitingOnly?: boolean }} input
      * @returns {Promise<{ closed: true } | { closed: false, room: Readonly<import("../../data/roomAccessor.js").Room> }>}
      */
-    async leaveRoom({ code, playerId, now }) {
-      const result = await change({ code, now, decide: (room) => leaving(room, playerId, now) });
+    async leaveRoom({ code, playerId, now, waitingOnly = false }) {
+      const decide = (room) =>
+        waitingOnly && room.status !== ROOM_STATUS.WAITING ? room : leaving(room, playerId, now);
+      const result = await change({ code, now, decide });
       return result.closed ? CLOSED : { closed: false, room: result.room };
     },
 

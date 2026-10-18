@@ -99,7 +99,7 @@ export const MATCH_STEPS = Object.freeze({
 });
 
 /**
- * What happens after a game ends, as one flat list of named steps (CC-111, ADR-033):
+ * What happens after a game ends, as one flat list of named steps (CC-111, ADR-034):
  * 1. Record the match, so XP and the rest only ever come from a stored match.
  * 2. Judge it: a match recorded for a guest who has just signed in moves to their account first (CC-032), then it
  *    is judged once for fair play (CC-095). Every later step gives nothing to a player it does not count for.
@@ -207,13 +207,31 @@ export function logPipelineOutcome(logger, outcome) {
 }
 
 /**
- * After a game ends, its match goes into the match pipeline's outbox and runs at once (CC-111, ADR-033). The
+ * Stores a finished game in the match pipeline's outbox, unless the outbox has it already (CC-111). The room
+ * component calls it before any change to a finished room, so a rematch or a closing room never takes a game with
+ * it that the outbox does not have yet.
+ *
+ * @param {{
+ *   outbox: Pick<ReturnType<typeof createMatchOutboxComponent>, "add">,
+ *   matchComponent: Pick<ReturnType<typeof createMatchComponent>, "finishedMatch">,
+ *   now?: () => number,
+ * }} deps
+ * @returns {(game: { room: object, outcome: object }) => Promise<boolean>} whether the game was added now
+ */
+export const keepFinishedGameIn =
+  ({ outbox, matchComponent, now = Date.now }) =>
+  (game) =>
+    outbox.add({ match: matchComponent.finishedMatch(game), now: now() });
+
+/**
+ * After a game ends, its match goes into the match pipeline's outbox and runs at once (CC-111, ADR-034). The
  * outbox keeps it in MongoDB until every step is done, so a database blip or a crash never loses it. Everything
  * runs as background work, so a slow database never delays a game, and shutdown waits for it.
  *
- * The finished room is the record of a game until its outbox entry exists. `addFinishedRooms` adds the game of
- * every finished room again (nothing changes for one the outbox has), at startup before anything can close a room,
- * and every minute. That covers a crash or a blip between saving the finished room and adding its game.
+ * The finished room is the record of a game until its outbox entry exists. The room component keeps the game
+ * before the room changes (see `keepFinishedGameIn`). `addFinishedRooms` adds the game of every finished room
+ * again (nothing changes for one the outbox has), at startup before anything can close a room, and every minute.
+ * Together they cover a crash or a blip between saving the finished room and adding its game.
  * `runDue` runs the games whose next attempt has come.
  *
  * @param {{
@@ -248,11 +266,12 @@ export function connectMatchPipeline({
     );
   });
 
+  const keep = keepFinishedGameIn({ outbox, matchComponent, now });
   return Object.freeze({
     async addFinishedRooms() {
       let added = 0;
       for (const game of await roomComponent.listFinishedGames()) {
-        if (await outbox.add({ match: matchComponent.finishedMatch(game), now: now() })) added += 1;
+        if (await keep(game)) added += 1;
       }
       // A finished game the pipeline never got: its announcement was lost to a crash or a blip.
       if (added > 0) logger.warn({ added }, "finished games added to the match pipeline late");
@@ -500,36 +519,6 @@ export async function startServer({
     legacyUserAccessor,
     passwordHasher: createPasswordHasher(),
   });
-  const limitsOfRooms = roomLimits(rooms.limits);
-  const engines = createEngineRegistry(ENGINES);
-  const botRegistry = createBotRegistry(BOTS);
-  assertCharactersPlayable(botRegistry);
-  const botTurns = createBotTurns({
-    bots: botRegistry,
-    engines,
-    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
-  });
-  const roomComponent = createRoomComponent({
-    roomAccessor,
-    engines,
-    events: domainEvents,
-    lifetimes: roomLifetimes(rooms.lifetimes),
-    limits: limitsOfRooms,
-    botTurns,
-  });
-  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
-  const botDriver = createBotDriver({
-    roomComponent,
-    roomAccessor,
-    botTurns,
-    botComponent,
-    thinking: createThinkingQueue(),
-    events: domainEvents,
-    delayMs: pauseBetween(bots.pauseMs ?? HUMAN_PAUSE_MS),
-    logger,
-    now,
-  });
-  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -572,15 +561,47 @@ export async function startServer({
     leaderboardComponent,
     logger,
   });
+  const outbox = createMatchOutboxComponent({
+    pendingMatchAccessor,
+    steps: pipeline.steps ? pipeline.steps(steps) : steps,
+    policy: matchRetryPolicy(pipeline.policy),
+  });
+  const limitsOfRooms = roomLimits(rooms.limits);
+  const engines = createEngineRegistry(ENGINES);
+  const botRegistry = createBotRegistry(BOTS);
+  assertCharactersPlayable(botRegistry);
+  const botTurns = createBotTurns({
+    bots: botRegistry,
+    engines,
+    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
+  });
+  const roomComponent = createRoomComponent({
+    roomAccessor,
+    engines,
+    events: domainEvents,
+    lifetimes: roomLifetimes(rooms.lifetimes),
+    limits: limitsOfRooms,
+    botTurns,
+    keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
+  });
+  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  const botDriver = createBotDriver({
+    roomComponent,
+    roomAccessor,
+    botTurns,
+    botComponent,
+    thinking: createThinkingQueue(),
+    events: domainEvents,
+    delayMs: pauseBetween(bots.pauseMs ?? HUMAN_PAUSE_MS),
+    logger,
+    now,
+  });
+  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
   const matchPipeline = connectMatchPipeline({
     domainEvents,
     matchComponent,
     roomComponent,
-    outbox: createMatchOutboxComponent({
-      pendingMatchAccessor,
-      steps: pipeline.steps ? pipeline.steps(steps) : steps,
-      policy: matchRetryPolicy(pipeline.policy),
-    }),
+    outbox,
     tasks,
     logger,
     now,

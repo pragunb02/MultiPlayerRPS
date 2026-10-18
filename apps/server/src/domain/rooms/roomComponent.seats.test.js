@@ -101,3 +101,24 @@ describe("roomComponent: a game starts only with everyone there (CC-112)", () =>
     expect(room.status).toBe("playing");
   });
 });
+
+describe("roomComponent: leaving a room that was waiting (CC-112)", () => {
+  it("gives up a waiting seat when asked to leave only a waiting room", async () => {
+    const { rooms, code } = await waitingRoom();
+
+    const result = await rooms.leaveRoom({ code, playerId: ALICE.id, now: T0 + 1, waitingOnly: true });
+
+    expect(result).toEqual({ closed: true });
+  });
+
+  it("changes nothing once the game has started, so leaving the page never forfeits a new game", async () => {
+    const { rooms, code } = await waitingRoom();
+    await rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
+
+    const result = await rooms.leaveRoom({ code, playerId: ALICE.id, now: T0 + 2, waitingOnly: true });
+
+    expect(result.room.status).toBe("playing");
+    expect(result.room.game.log).toEqual([]);
+    expect(result.room.seats.map((seat) => seat.playerId)).toEqual([ALICE.id, BOB.id]);
+  });
+});

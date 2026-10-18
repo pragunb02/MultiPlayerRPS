@@ -2,10 +2,12 @@
 export function createInMemoryPendingMatchDao() {
   const records = new Map();
   const copy = (doc) => structuredClone(doc);
-  const change = (matchId, fields) => {
+  /** Changes a record that is there and passes `when`, as a filtered update does. */
+  const change = (matchId, when, fields) => {
     const doc = records.get(matchId);
-    if (doc !== undefined) records.set(matchId, copy({ ...doc, ...fields }));
+    if (doc !== undefined && when(doc)) records.set(matchId, copy({ ...doc, ...fields }));
   };
+  const always = () => true;
 
   return Object.freeze({
     ensureIndexes: async () => {},
@@ -32,16 +34,21 @@ export function createInMemoryPendingMatchDao() {
     },
 
     async addDone({ matchId, step }) {
-      const doc = records.get(matchId);
-      if (doc !== undefined && !doc.done.includes(step)) change(matchId, { done: [...doc.done, step] });
+      change(matchId, always, { done: [...new Set([...(records.get(matchId)?.done ?? []), step])] });
     },
 
     async recordFailure({ matchId, status, attempts, nextAttemptAt, lastError }) {
-      change(matchId, { status, attempts, nextAttemptAt, lastError });
+      change(matchId, (doc) => doc.status === "pending" && doc.attempts === attempts - 1, {
+        status,
+        attempts,
+        nextAttemptAt,
+        lastError,
+        expiresAt: undefined,
+      });
     },
 
     async markDone({ matchId, doneAt, expiresAt }) {
-      change(matchId, { status: "done", doneAt, expiresAt });
+      change(matchId, (doc) => doc.status === "pending", { status: "done", doneAt, expiresAt });
     },
   });
 }

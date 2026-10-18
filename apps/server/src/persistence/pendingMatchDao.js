@@ -16,7 +16,7 @@ const WITHOUT_ID = Object.freeze({ projection: { _id: 0 } });
  */
 
 /**
- * The match pipeline's outbox in MongoDB (CC-111, ADR-033): one record per finished game, so a database blip or a
+ * The match pipeline's outbox in MongoDB (CC-111, ADR-034): one record per finished game, so a database blip or a
  * crash never loses what the game earned. Stored through the driver directly, like rooms: the match inside is
  * engine owned JSON, so a schema here would only get in the way.
  *
@@ -84,15 +84,29 @@ export function createPendingMatchDao({ connection }) {
     },
 
     /**
+     * Records the `attempts`th failure. It changes only a pending record that has had one failure less, so a run
+     * that read the record before another run changed it can neither undo a finish nor count an attempt twice.
+     * A record that fails for good never expires.
+     *
      * @param {Pick<PendingMatchDoc, "matchId" | "status" | "attempts" | "nextAttemptAt" | "lastError">} failure
      */
     async recordFailure({ matchId, status, attempts, nextAttemptAt, lastError }) {
-      await pending.updateOne({ matchId }, { $set: { status, attempts, nextAttemptAt, lastError } });
+      await pending.updateOne(
+        { matchId, status: "pending", attempts: attempts - 1 },
+        { $set: { status, attempts, nextAttemptAt, lastError }, $unset: { expiresAt: "" } },
+      );
     },
 
-    /** @param {{ matchId: string, doneAt: Date, expiresAt: Date }} done */
+    /**
+     * Marks a pending record done. A record that is done or failed already stays as it is.
+     *
+     * @param {{ matchId: string, doneAt: Date, expiresAt: Date }} done
+     */
     async markDone({ matchId, doneAt, expiresAt }) {
-      await pending.updateOne({ matchId }, { $set: { status: "done", doneAt, expiresAt } });
+      await pending.updateOne(
+        { matchId, status: "pending" },
+        { $set: { status: "done", doneAt, expiresAt } },
+      );
     },
   });
 }

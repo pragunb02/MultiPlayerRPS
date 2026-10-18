@@ -320,6 +320,7 @@ reused; the next free ID is **ADR-047**. A later change to a decision is a dated
   over the socket (does not reach tabs without a socket, and puts identity on a channel that does not need it).
 - **Consequences:** One extra `GET /api/session` per tab when the session changes. A browser without BroadcastChannel
   (none we support) still recovers its tabs that have a socket.
+
 ### ADR-034 — Finished games go through a stored outbox with named steps and retries
 
 - **Status:** Accepted · 2026-10-18 (proposed in [CC-111](tickets/CC-111.md))
@@ -339,8 +340,10 @@ We run one instance on Atlas M0, and every step can already run twice without co
 3. A failed attempt waits 2 s, doubling up to 5 minutes, for at most 10 attempts. Then the record is marked failed and
    `match pipeline failed` is logged at error level, the line to alert on.
 4. The finished room is the record of a game until its outbox entry exists (the "outbox as a field on the record"
-   variant). At startup and every minute, the game of every finished room is added if missing. That covers a crash
-   between saving the room and adding the entry, without a transaction across two collections.
+   variant). Before any change to a finished room (a rematch, someone leaving, the room closing) the room component
+   adds its game if missing, and refuses the change while it cannot. At startup and every minute, the game of every
+   finished room is added if missing too. That covers a crash or a blip between saving the room and adding the
+   entry, without a transaction across two collections.
 5. Done records expire after 2 days (TTL index), longer than any room lives. Failed records are kept.
 
 **Why not a MongoDB transaction.** It would make the room save and the outbox entry one write, but every room write

@@ -176,6 +176,98 @@ describe("matchOutboxComponent (CC-111)", () => {
     expect(names()).toEqual(["slow"]);
   });
 
+  it("skips a listed game that another run finished meanwhile, and never turns it back to pending", async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let failNext = false;
+    const ran = [];
+    const { outbox, pendingMatchAccessor } = setup(() => [
+      {
+        name: "a",
+        async run({ matchId }) {
+          ran.push(matchId);
+          if (matchId === "m0") await gate;
+          if (failNext) throw new Error("late run");
+        },
+      },
+    ]);
+    await outbox.add({ match: { matchId: "m0", players: [] }, now: T0 });
+    await outbox.add({ match: { matchId: "m1", players: [] }, now: T0 });
+
+    // The batch lists both games, then waits inside m0. Meanwhile the game's own run finishes m1.
+    const batch = outbox.runDue({ now: T0 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await outbox.run({ matchId: "m1", now: T0 });
+    failNext = true;
+    release();
+    const outcomes = await batch;
+
+    expect(ran).toEqual(["m0", "m1"]);
+    expect(outcomes.map(({ matchId, status }) => [matchId, status])).toEqual([
+      ["m0", "retrying"],
+      ["m1", "done"],
+    ]);
+    expect(await pendingMatchAccessor.get("m1")).toEqual(
+      expect.objectContaining({ status: "done", attempts: 0 }),
+    );
+  });
+
+  it("starts no second batch while one is still running", async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const { outbox, names } = setup((log) => [
+      { name: "slow", run: async () => (log.push({ name: "slow" }), gate) },
+    ]);
+    await outbox.add({ match: MATCH, now: T0 });
+
+    const first = outbox.runDue({ now: T0 });
+    const second = await outbox.runDue({ now: T0 });
+    release();
+
+    expect(second).toEqual([]);
+    expect((await first).map((outcome) => outcome.status)).toEqual(["done"]);
+    expect(names()).toEqual(["slow"]);
+  });
+
+  it("leaves a listed game alone that another run moved to a later attempt meanwhile", async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const ran = [];
+    const { outbox, pendingMatchAccessor } = setup(() => [
+      {
+        name: "a",
+        async run({ matchId }) {
+          ran.push(matchId);
+          if (matchId === "m0") return gate;
+          throw new Error("down");
+        },
+      },
+    ]);
+    await outbox.add({ match: { matchId: "m0", players: [] }, now: T0 });
+    await outbox.add({ match: { matchId: "m1", players: [] }, now: T0 });
+
+    const batch = outbox.runDue({ now: T0 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await outbox.run({ matchId: "m1", now: T0 });
+    release();
+    const outcomes = await batch;
+
+    expect(ran).toEqual(["m0", "m1"]);
+    expect(outcomes.map(({ matchId, status }) => [matchId, status])).toEqual([
+      ["m0", "done"],
+      ["m1", "busy"],
+    ]);
+    expect(await pendingMatchAccessor.get("m1")).toEqual(
+      expect.objectContaining({ attempts: 1, nextAttemptAt: T0 + 1_000 }),
+    );
+  });
+
   it("keeps the words of a failure that is not an Error", async () => {
     const { outbox, pendingMatchAccessor } = setup(() => [
       {

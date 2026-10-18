@@ -53,8 +53,9 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
     () => () => {
       if (!waitingSeat.current || returnsToRoom(pathNow.current(), code)) return;
       waitingSeat.current = false;
-      // Nothing waits for this answer: the page is gone, and a seat that is gone already needs no leaving.
-      socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code }).catch(() => undefined);
+      // Nothing waits for this answer: the page is gone, and a seat that is gone already needs no leaving. The
+      // game may have started since this page last heard, so the server leaves only a room still waiting.
+      socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code, waitingOnly: true }).catch(() => undefined);
     },
     [socket, code],
   );
