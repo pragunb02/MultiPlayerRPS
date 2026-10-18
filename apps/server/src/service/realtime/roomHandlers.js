@@ -1,6 +1,6 @@
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { ForbiddenError, GoneError, NotFoundError } from "../../utils/errors.js";
-import { parseCreateRoom, parseGameMove, parseRoomRef } from "./payloads.js";
+import { parseCreateRoom, parseGameMove, parseLeaveRoom, parseRoomRef } from "./payloads.js";
 
 export const roomChannel = (code) => `room:${code}`;
 const codeFromChannel = (channel) => channel.slice("room:".length);
@@ -83,8 +83,8 @@ export function createRoomHandlers({ io, socket, roomComponent, networkOf, now, 
     },
 
     async [SOCKET_EVENTS.ROOM_LEAVE](payload) {
-      const { code } = parseRoomRef(payload);
-      const result = await roomComponent.leaveRoom({ code, playerId: identity.id, now: now() });
+      const { code, waitingOnly } = parseLeaveRoom(payload);
+      const result = await roomComponent.leaveRoom({ code, playerId: identity.id, now: now(), waitingOnly });
       for (const own of await playerSockets(io, code, identity.id)) {
         own.leave(roomChannel(code));
       }

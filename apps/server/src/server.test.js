@@ -7,8 +7,14 @@ import {
   handleFatalErrors,
   handleShutdownSignals,
   identityFollowers,
+  logPipelineOutcome,
+  MATCH_STEPS,
+  matchPipelineSteps,
   startHousekeeping,
 } from "./server.js";
+import { createPendingMatchAccessor } from "./data/pendingMatchAccessor.js";
+import { createMatchOutboxComponent, matchRetryPolicy } from "./domain/matches/matchOutboxComponent.js";
+import { createInMemoryPendingMatchDao } from "./testing/inMemoryPendingMatchDao.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
 import { PROGRESSION_EVENTS } from "./domain/progression/progressionComponent.js";
 import { ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
@@ -104,197 +110,227 @@ describe("assertEnginesInCatalog", () => {
   });
 });
 
-describe("connectMatchPipeline", () => {
-  const event = { room: { code: "ROOM22" }, outcome: {} };
-  const match = { matchId: "m1", gameId: "rps", result: { reason: "best-of-1" }, credit: { notCounted: [] } };
+describe("the match pipeline (CC-111)", () => {
+  const T = 1_234;
+  const room = { code: "ROOM22" };
+  const event = { room, outcome: {} };
+  const finished = Object.freeze({
+    matchId: "m1",
+    gameId: "rps",
+    result: { reason: "best-of-1" },
+    players: [],
+  });
+  const judged = Object.freeze({
+    ...finished,
+    credit: { notCounted: [{ playerId: "p", reason: "ended-too-soon" }] },
+  });
 
-  function setup({
-    recordFinished,
-    applyMatch,
-    judge = async (recorded) => recorded,
-    follow = async ({ match: recorded }) => recorded,
-    applyGamification = vi.fn().mockResolvedValue(),
-    applyToBoards = vi.fn().mockResolvedValue(),
-  }) {
-    const domainEvents = new EventEmitter();
+  /**
+   * The real outbox over the in-memory store, with fake components. Each component call is recorded in `calls`,
+   * in order. `fail` names steps that throw, and how often.
+   */
+  function setup({ fail = {}, finishedGames = [] } = {}) {
+    const calls = [];
+    const left = { ...fail };
+    const call = (name, args, result) => {
+      calls.push([name, args]);
+      if ((left[name] ?? 0) > 0) {
+        left[name] -= 1;
+        return Promise.reject(new Error(`${name} down`));
+      }
+      return Promise.resolve(result);
+    };
+    const matchComponent = {
+      finishedMatch: ({ room: from }) => ({ ...finished, roomCode: from.code }),
+      record: (match) => call("record", match, finished),
+      getById: async () => judged,
+      judge: (match) => call("judge", match, judged),
+    };
     const capture = captureLogger();
     const tasks = createBackgroundTasks({ logger: capture.logger });
-    connectMatchPipeline({
+    const steps = matchPipelineSteps({
+      matchComponent,
+      playerTransferComponent: { follow: (input) => call("follow", input, judged) },
+      progressionComponent: { applyMatch: (match) => call("progression", match, [{}, {}]) },
+      gamificationComponent: { applyMatch: (input) => call("gamification", input) },
+      leaderboardComponent: { applyMatch: (input) => call("leaderboards", input) },
+      logger: capture.logger,
+    });
+    const pendingMatchAccessor = createPendingMatchAccessor({
+      pendingMatchDao: createInMemoryPendingMatchDao(),
+    });
+    const outbox = createMatchOutboxComponent({
+      pendingMatchAccessor,
+      steps,
+      policy: matchRetryPolicy({ firstDelayMs: 1_000, maxDelayMs: 1_000, maxAttempts: 2 }),
+    });
+    let now = T;
+    const domainEvents = new EventEmitter();
+    const pipeline = connectMatchPipeline({
       domainEvents,
-      matchComponent: { recordFinished, judge },
-      playerTransferComponent: { follow },
-      progressionComponent: { applyMatch },
-      gamificationComponent: { applyMatch: applyGamification },
-      leaderboardComponent: { applyMatch: applyToBoards },
+      matchComponent,
+      roomComponent: { listFinishedGames: async () => finishedGames },
+      outbox,
       tasks,
       logger: capture.logger,
-      now: () => 1_234,
+      now: () => now,
     });
-    return { domainEvents, tasks, ...capture };
+    const finish = async () => {
+      domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
+      await tasks.drain();
+    };
+    const later = async (ms) => {
+      now += ms;
+      pipeline.runDue();
+      await tasks.drain();
+    };
+    const names = () => calls.map(([name]) => name);
+    return { steps, calls, names, finish, later, pipeline, pendingMatchAccessor, tasks, ...capture };
   }
 
-  it("records the match, applies progression, gamification, then the leaderboards — in that order", async () => {
-    const recordFinished = vi.fn().mockResolvedValue(match);
-    const updates = [{}, {}];
-    const order = [];
-    const applyMatch = vi.fn(async () => {
-      order.push("progression");
-      return updates;
-    });
-    const applyGamification = vi.fn(async () => {
-      order.push("gamification");
-    });
-    const applyToBoards = vi.fn(async () => {
-      order.push("leaderboards");
-    });
-    const { domainEvents, tasks, find } = setup({
-      recordFinished,
-      applyMatch,
-      applyGamification,
-      applyToBoards,
-    });
+  it("has five named steps in order, the boards needing progression but not gamification", () => {
+    const { steps } = setup();
 
-    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
-    await tasks.drain();
-
-    expect(recordFinished).toHaveBeenCalledWith(event);
-    expect(applyMatch).toHaveBeenCalledWith(match);
-    expect(applyToBoards).toHaveBeenCalledWith({ match, updates });
-    expect(order).toEqual(["progression", "gamification", "leaderboards"]);
-    expect(find("match recorded")[0].matchId).toBe("m1");
-    expect(find("progression applied")[0]).toEqual(expect.objectContaining({ matchId: "m1", players: 2 }));
-    expect(find("leaderboards applied")[0].matchId).toBe("m1");
+    expect(steps.map(({ name, needs = [] }) => [name, needs])).toEqual([
+      [MATCH_STEPS.RECORD, []],
+      [MATCH_STEPS.JUDGE, [MATCH_STEPS.RECORD]],
+      [MATCH_STEPS.PROGRESSION, [MATCH_STEPS.JUDGE]],
+      [MATCH_STEPS.GAMIFICATION, [MATCH_STEPS.PROGRESSION]],
+      [MATCH_STEPS.LEADERBOARDS, [MATCH_STEPS.PROGRESSION]],
+    ]);
   });
 
-  it("awards progression, gamification and leaderboards for the match as it stands after following players who just signed in (CC-032)", async () => {
-    const moved = { ...match, players: [{ playerId: "user_1" }] };
-    const follow = vi.fn().mockResolvedValue(moved);
-    const updates = [{ playerId: "user_1" }];
-    const applyMatch = vi.fn().mockResolvedValue(updates);
-    const applyGamification = vi.fn().mockResolvedValue();
-    const applyToBoards = vi.fn().mockResolvedValue();
-    const { domainEvents, tasks } = setup({
-      recordFinished: vi.fn().mockResolvedValue(match),
-      applyMatch,
-      follow,
-      applyGamification,
-      applyToBoards,
-    });
+  it("records a finished game, follows and judges it, then applies progression, gamification and boards", async () => {
+    const { calls, names, finish, find, pendingMatchAccessor } = setup();
 
-    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
-    await tasks.drain();
+    await finish();
 
-    expect(follow).toHaveBeenCalledWith({ match, now: 1_234 });
-    expect(applyMatch).toHaveBeenCalledWith(moved);
-    expect(applyGamification).toHaveBeenCalledWith({ match: moved, updates, now: 1_234 });
-    expect(applyToBoards).toHaveBeenCalledWith({ match: moved, updates });
-  });
-
-  it("judges the followed match for fair play, and every later step gets the verdict (CC-095)", async () => {
-    const moved = { ...match, players: [{ playerId: "user_1" }], credit: undefined };
-    const judged = { ...moved, credit: { notCounted: [{ playerId: "user_1", reason: "ended-too-soon" }] } };
-    const judge = vi.fn().mockResolvedValue(judged);
-    const applyMatch = vi.fn().mockResolvedValue([]);
-    const applyGamification = vi.fn().mockResolvedValue();
-    const applyToBoards = vi.fn().mockResolvedValue();
-    const { domainEvents, tasks, find } = setup({
-      recordFinished: vi.fn().mockResolvedValue(match),
-      follow: vi.fn().mockResolvedValue(moved),
-      judge,
-      applyMatch,
-      applyGamification,
-      applyToBoards,
-    });
-
-    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
-    await tasks.drain();
-
-    expect(judge).toHaveBeenCalledWith(moved);
-    expect(applyMatch).toHaveBeenCalledWith(judged);
-    expect(applyGamification).toHaveBeenCalledWith({ match: judged, updates: [], now: 1_234 });
-    expect(applyToBoards).toHaveBeenCalledWith({ match: judged, updates: [] });
-    expect(find("progression applied")[0].notCounted).toEqual(["ended-too-soon"]);
-  });
-
-  it("then counts the match for achievements, streaks and quests, with progression's updates", async () => {
-    const updates = [{ playerId: "guest_a" }];
-    const applyGamification = vi.fn().mockResolvedValue();
-    const { domainEvents, tasks, find } = setup({
-      recordFinished: vi.fn().mockResolvedValue(match),
-      applyMatch: vi.fn().mockResolvedValue(updates),
-      applyGamification,
-    });
-
-    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
-    await tasks.drain();
-
-    expect(applyGamification).toHaveBeenCalledWith({ match, updates, now: 1_234 });
+    expect(names()).toEqual(["record", "follow", "judge", "progression", "gamification", "leaderboards"]);
+    expect(calls[0][1]).toEqual({ ...finished, roomCode: "ROOM22" });
+    expect(calls[1][1]).toEqual({ match: judged, now: T });
+    expect(calls[3][1]).toBe(judged);
+    expect(calls[4][1]).toEqual({ match: judged, now: T });
+    expect(calls[5][1]).toEqual({ match: judged });
+    expect(find("match recorded")[0]).toEqual(
+      expect.objectContaining({ matchId: "m1", reason: "best-of-1" }),
+    );
+    expect(find("progression applied")[0]).toEqual(
+      expect.objectContaining({ matchId: "m1", players: 2, notCounted: ["ended-too-soon"] }),
+    );
     expect(find("gamification applied")[0].matchId).toBe("m1");
+    expect(find("leaderboards applied")[0].matchId).toBe("m1");
+    expect(find("match pipeline done")[0].steps).toHaveLength(5);
+    expect((await pendingMatchAccessor.get("m1")).status).toBe("done");
   });
 
-  it("logs a failed gamification update with the match id, and still applies the leaderboards", async () => {
-    const applyToBoards = vi.fn().mockResolvedValue();
-    const { domainEvents, tasks, find } = setup({
-      recordFinished: vi.fn().mockResolvedValue(match),
-      applyMatch: vi.fn().mockResolvedValue([]),
-      applyGamification: vi.fn().mockRejectedValue(new Error("db down")),
-      applyToBoards,
+  it("never awards anything while recording fails, and retries it later", async () => {
+    const { names, finish, later, find } = setup({ fail: { record: 1 } });
+
+    await finish();
+    const afterFailure = names();
+    await later(1_000);
+
+    expect(afterFailure).toEqual(["record"]);
+    expect(find("match pipeline step failed, will retry")[0]).toEqual(
+      expect.objectContaining({
+        matchId: "m1",
+        step: MATCH_STEPS.RECORD,
+        attempts: 1,
+        nextAttemptAt: T + 1_000,
+      }),
+    );
+    expect(names().slice(1)).toEqual([
+      "record",
+      "follow",
+      "judge",
+      "progression",
+      "gamification",
+      "leaderboards",
+    ]);
+  });
+
+  it("still applies the boards when gamification fails, and later retries only gamification", async () => {
+    const { names, finish, later } = setup({ fail: { gamification: 1 } });
+
+    await finish();
+    await later(1_000);
+
+    expect(names()).toEqual([
+      "record",
+      "follow",
+      "judge",
+      "progression",
+      "gamification",
+      "leaderboards",
+      "gamification",
+    ]);
+  });
+
+  it("logs a game that failed for good at error level, as the alert", async () => {
+    const { finish, later, find } = setup({ fail: { progression: 9 } });
+
+    await finish();
+    await later(1_000);
+    await later(60_000);
+
+    const [alert] = find("match pipeline failed");
+    expect(alert).toEqual(
+      expect.objectContaining({
+        level: 50,
+        matchId: "m1",
+        step: MATCH_STEPS.PROGRESSION,
+        attempts: 2,
+        alert: true,
+      }),
+    );
+    expect(alert.err.message).toBe("progression down");
+    expect(find("match pipeline failed")).toHaveLength(1);
+  });
+
+  it("logs a failure to reach the outbox at all as a failed background task, with the match", async () => {
+    const capture = captureLogger();
+    const tasks = createBackgroundTasks({ logger: capture.logger });
+    const domainEvents = new EventEmitter();
+    connectMatchPipeline({
+      domainEvents,
+      matchComponent: { finishedMatch: () => finished },
+      roomComponent: { listFinishedGames: async () => [] },
+      outbox: { add: async () => Promise.reject(new Error("db down")) },
+      tasks,
+      logger: capture.logger,
     });
 
     domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
     await tasks.drain();
 
-    expect(find("progression applied")).toHaveLength(1);
-    expect(find("background task failed")[0]).toEqual(
-      expect.objectContaining({ task: "apply gamification", matchId: "m1" }),
-    );
-    expect(applyToBoards).toHaveBeenCalledWith({ match, updates: [] });
-  });
-
-  it("logs a failed leaderboard update with the match id", async () => {
-    const { domainEvents, tasks, find } = setup({
-      recordFinished: vi.fn().mockResolvedValue(match),
-      applyMatch: vi.fn().mockResolvedValue([]),
-      applyToBoards: vi.fn().mockRejectedValue(new Error("db down")),
-    });
-
-    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
-    await tasks.drain();
-
-    expect(find("gamification applied")).toHaveLength(1);
-    expect(find("background task failed")[0]).toEqual(
-      expect.objectContaining({ task: "apply leaderboards", matchId: "m1" }),
+    expect(capture.find("background task failed")[0]).toEqual(
+      expect.objectContaining({ task: "match pipeline", matchId: "m1", roomCode: "ROOM22" }),
     );
   });
 
-  it("never awards progression when recording the match failed", async () => {
-    const applyMatch = vi.fn();
-    const { domainEvents, tasks, find } = setup({
-      recordFinished: vi.fn().mockRejectedValue(new Error("db down")),
-      applyMatch,
-    });
+  it("adds the game of a finished room the pipeline never got, once, with a warning", async () => {
+    const { pipeline, pendingMatchAccessor, later, names, find } = setup({ finishedGames: [event] });
 
-    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
-    await tasks.drain();
+    const first = await pipeline.addFinishedRooms();
+    const second = await pipeline.addFinishedRooms();
+    await later(0);
 
-    expect(applyMatch).not.toHaveBeenCalled();
-    expect(find("background task failed")[0]).toEqual(
-      expect.objectContaining({ task: "record match", roomCode: "ROOM22" }),
-    );
+    expect([first, second]).toEqual([1, 0]);
+    expect(find("finished games added to the match pipeline late")).toEqual([
+      expect.objectContaining({ level: 40, added: 1 }),
+    ]);
+    expect((await pendingMatchAccessor.get("m1")).status).toBe("done");
+    expect(names()[0]).toBe("record");
   });
 
-  it("logs a failed progression update with the match id", async () => {
-    const { domainEvents, tasks, find } = setup({
-      recordFinished: vi.fn().mockResolvedValue(match),
-      applyMatch: vi.fn().mockRejectedValue(new Error("db down")),
-    });
+  it("says nothing about runs that changed nothing", () => {
+    const { logger, entries } = captureLogger();
 
-    domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
-    await tasks.drain();
+    logPipelineOutcome(logger, { matchId: "m1", status: "done", ran: [] });
+    logPipelineOutcome(logger, { matchId: "m1", status: "busy" });
+    logPipelineOutcome(logger, { matchId: "m1", status: "failed" });
 
-    expect(find("background task failed")[0]).toEqual(
-      expect.objectContaining({ task: "apply progression", matchId: "m1" }),
-    );
+    expect(entries).toEqual([]);
   });
 });
 
@@ -351,23 +387,27 @@ describe("startHousekeeping", () => {
   const noRooms = async () => ({ waiting: 0, playing: 0, finished: 0 });
   const noConnections = () => ({ connections: 0, players: 0 });
 
+  const idlePipeline = () => ({ runDue: vi.fn(), addFinishedRooms: vi.fn(async () => 0) });
+
   function setup(
     roomComponent,
     playerTransferComponent = idleTransfers(),
     connections = noConnections,
     botDriver = { resume: vi.fn(async () => {}) },
+    matchPipeline = idlePipeline(),
   ) {
     vi.useFakeTimers();
     const capture = captureLogger();
     const housekeeping = startHousekeeping({
       roomComponent: { countRooms: noRooms, ...roomComponent },
       playerTransferComponent,
+      matchPipeline,
       connections,
       botDriver,
       logger: capture.logger,
       now: () => 42,
     });
-    return { housekeeping, playerTransferComponent, botDriver, ...capture };
+    return { housekeeping, playerTransferComponent, botDriver, matchPipeline, ...capture };
   }
 
   it("lets computer players plan again for every room at each room sweep, and logs a failing run (CC-138)", async () => {
@@ -381,6 +421,40 @@ describe("startHousekeeping", () => {
 
     expect(botDriver.resume).toHaveBeenCalledTimes(2);
     expect(find("planning for computer players failed")).toHaveLength(1);
+    housekeeping.stop();
+  });
+
+  it("runs the match pipeline's due games every 5 seconds and adds lost finished games every minute (CC-111)", async () => {
+    const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
+    const { housekeeping, matchPipeline } = setup(roomComponent);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(matchPipeline.runDue).toHaveBeenCalledTimes(12);
+    expect(matchPipeline.addFinishedRooms).toHaveBeenCalledOnce();
+    housekeeping.stop();
+  });
+
+  it("logs a failure of the match pipeline's checks and keeps going (CC-111)", async () => {
+    const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
+    const matchPipeline = {
+      runDue: vi.fn(() => {
+        throw new Error("boom");
+      }),
+      addFinishedRooms: vi.fn(async () => Promise.reject(new Error("db down"))),
+    };
+    const { housekeeping, find } = setup(
+      roomComponent,
+      idleTransfers(),
+      noConnections,
+      undefined,
+      matchPipeline,
+    );
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(find("running the match pipeline failed")).toHaveLength(24);
+    expect(find("adding finished games to the match pipeline failed")).toHaveLength(2);
     housekeeping.stop();
   });
 

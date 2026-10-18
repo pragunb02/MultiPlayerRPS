@@ -9,6 +9,7 @@ import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
+import { createPendingMatchAccessor } from "../data/pendingMatchAccessor.js";
 import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js";
 import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
@@ -24,10 +25,17 @@ import { createIdentityComponent } from "../domain/identity/identityComponent.js
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
+import { createMatchOutboxComponent } from "../domain/matches/matchOutboxComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
-import { connectLeaderboardBonuses, connectMatchPipeline, identityFollowers } from "../server.js";
+import {
+  connectLeaderboardBonuses,
+  connectMatchPipeline,
+  identityFollowers,
+  keepFinishedGameIn,
+  matchPipelineSteps,
+} from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionCheck, createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
@@ -46,13 +54,14 @@ import {
 import { createInMemoryLeaderboardDao } from "./inMemoryLeaderboardDao.js";
 import { createInMemoryLegacyUserDao } from "./inMemoryLegacyUserDao.js";
 import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
+import { createInMemoryPendingMatchDao } from "./inMemoryPendingMatchDao.js";
 import { createInMemoryPlayerTransferDao } from "./inMemoryPlayerTransferDao.js";
 import { createInMemoryProgressDao } from "./inMemoryProgressDao.js";
 import { testConfig } from "./testConfig.js";
 
 /**
  * Wires the app the same way the composition root does, but with in-memory stores (sessions, rooms,
- * matches), deterministic guests and seed 42 — fast tests without a database.
+ * matches, the match pipeline's outbox), deterministic guests and seed 42: fast tests without a database.
  *
  * @param {{
  *   env?: Record<string, string>,
@@ -69,6 +78,8 @@ import { testConfig } from "./testConfig.js";
  *   accountDao?: ReturnType<typeof createInMemoryAccountDao>,   lets a test make account storage fail
  *   now?: () => number,
  *   analyticsDao?: object,   the owner console's totals (CC-233), an empty site unless a test gives its own
+ *   pendingMatchDao?: ReturnType<typeof createInMemoryPendingMatchDao>,   the match pipeline's outbox, which a test
+ *     can make fail (CC-111)
  * }} [options]
  */
 export function createTestApp({
@@ -85,6 +96,7 @@ export function createTestApp({
   accountDao = createInMemoryAccountDao(),
   now = Date.now,
   analyticsDao = createEmptyAnalyticsDao(),
+  pendingMatchDao = createInMemoryPendingMatchDao(),
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -105,36 +117,6 @@ export function createTestApp({
     passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }), // fast for tests
   });
   const domainEvents = new EventEmitter();
-  const engineRegistry = createEngineRegistry(engines);
-  const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
-  const botTurns = createBotTurns({
-    bots: createBotRegistry(BOTS.filter((bot) => engineRegistry.has(bot.gameId))),
-    engines: engineRegistry,
-    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
-  });
-  const roomComponent = createRoomComponent({
-    roomAccessor,
-    engines: engineRegistry,
-    events: domainEvents,
-    generateSeed: () => 42,
-    ...(roomLimits && { limits: roomLimits }),
-    botTurns,
-  });
-  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
-  // Computer players act at once in tests, so a test only waits for the server, never for a pause.
-  const botDriver = createBotDriver({
-    roomComponent,
-    roomAccessor,
-    botTurns,
-    botComponent,
-    thinking: createThinkingQueue(),
-    events: domainEvents,
-    delayMs: () => 0,
-    logger: capture.logger,
-    retryMs: 10,
-    now,
-  });
-  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const matchComponent = createMatchComponent({ matchAccessor });
@@ -171,13 +153,53 @@ export function createTestApp({
     matches: matchComponent,
   });
   const tasks = createBackgroundTasks({ logger: capture.logger });
-  connectMatchPipeline({
+  const outbox = createMatchOutboxComponent({
+    pendingMatchAccessor: createPendingMatchAccessor({ pendingMatchDao }),
+    steps: matchPipelineSteps({
+      matchComponent,
+      playerTransferComponent,
+      progressionComponent,
+      gamificationComponent,
+      leaderboardComponent,
+      logger: capture.logger,
+    }),
+  });
+  const engineRegistry = createEngineRegistry(engines);
+  const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
+  const botTurns = createBotTurns({
+    bots: createBotRegistry(BOTS.filter((bot) => engineRegistry.has(bot.gameId))),
+    engines: engineRegistry,
+    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
+  });
+  const roomComponent = createRoomComponent({
+    roomAccessor,
+    engines: engineRegistry,
+    events: domainEvents,
+    generateSeed: () => 42,
+    ...(roomLimits && { limits: roomLimits }),
+    botTurns,
+    keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
+  });
+  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  // Computer players act at once in tests, so a test only waits for the server, never for a pause.
+  const botDriver = createBotDriver({
+    roomComponent,
+    roomAccessor,
+    botTurns,
+    botComponent,
+    thinking: createThinkingQueue(),
+    events: domainEvents,
+    delayMs: () => 0,
+    logger: capture.logger,
+    retryMs: 10,
+    now,
+  });
+  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
+  const matchPipeline = connectMatchPipeline({
     domainEvents,
     matchComponent,
-    playerTransferComponent,
-    progressionComponent,
-    gamificationComponent,
-    leaderboardComponent,
+    roomComponent,
+    outbox,
     tasks,
     logger: capture.logger,
     now,
@@ -236,6 +258,7 @@ export function createTestApp({
     playerTransferComponent,
     gamificationComponent,
     leaderboardComponent,
+    matchPipeline,
     tasks,
     endedSessions,
     otherSessionsEnded,
