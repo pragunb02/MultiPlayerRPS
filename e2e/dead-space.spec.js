@@ -80,6 +80,22 @@ for (const form of Object.keys(SIZES)) {
           }
         }
       });
+
+      screen("visitor profile: a heading, art, a preview of the card and two ways in", async ({ page }) => {
+        await page.goto("/profile");
+        const profile = page.getByRole("region", { name: "Your profile" });
+
+        await expect(profile.getByRole("heading", { level: 1, name: "Your profile" })).toBeVisible();
+        await expect(profile.locator("svg").first()).toBeVisible();
+        await expect(profile.getByRole("list", { name: "What your card will show" })).toBeVisible();
+        await expect(profile.getByRole("button", { name: "Play as a guest" })).toBeVisible();
+        await expect(profile.getByRole("link", { name: "Log in" })).toBeVisible();
+        const box = await profile.boundingBox();
+        expect(box.height).toBeGreaterThan(250);
+        if (form === "desktop") {
+          expect(box.width).toBeGreaterThan(size.width * 0.8);
+        }
+      });
     });
   }
 }

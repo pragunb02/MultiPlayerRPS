@@ -272,7 +272,7 @@ test.describe("history: signing in and out", () => {
 
     await at(page, "/profile", "Your profile · ClassiCade", "Your profile");
     await expect(page.getByText(account.username)).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "log in", exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: "Log in", exact: true })).toBeVisible();
     await page.goForward();
     await at(page, ...HOME);
   });
