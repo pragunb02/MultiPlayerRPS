@@ -206,28 +206,30 @@ describe("auth routes", () => {
 
   // A store failing behind a login answers the usual 401, so it says nothing about the email, but it is logged
   // as an error so it is not missed (CC-245).
-  it("logs a legacy store failure behind a login that answered the usual 401", async () => {
-    // Read fine once at boot, then the store fails.
-    let booted = false;
+  it.each([
+    ["an unknown email", { email: "nobody@example.com", password: RIYA.password }, 401],
+    ["an account with a wrong password", { email: RIYA.email, password: "wrong password!" }, 401],
+    ["an account with the right password", { email: RIYA.email, password: RIYA.password }, 200],
+  ])("logs a legacy store failure behind a login for %s, without the email", async (_, body, status) => {
+    // Read fine at boot and for the sign-up, then the store fails.
+    let reads = 0;
     const failing = {
       filter() {
-        if (!booted) {
-          booted = true;
-          return [];
-        }
+        reads += 1;
+        if (reads <= 2) return [];
         throw new Error("legacy store unavailable");
       },
     };
     server = await startTestServer({ legacyUsers: failing });
-    await post("/api/auth/signup", RIYA).catch(() => {});
+    expect((await post("/api/auth/signup", RIYA)).status).toBe(201);
 
-    const unknown = await post("/api/auth/login", { email: "nobody@example.com", password: RIYA.password });
+    const login = await post("/api/auth/login", body);
 
-    expect(unknown.status).toBe(401);
-    expect(unknown.body.error.message).toBe("Invalid email or password");
-    const [logged] = server.find("a store failed behind a login, answered as a failed login");
+    expect(login.status).toBe(status);
+    if (status === 401) expect(login.body.error.message).toBe("Invalid email or password");
+    const [logged] = server.find("the legacy store failed behind a login");
     expect(logged).toMatchObject({ level: 50, err: { message: "legacy store unavailable" } });
-    expect(JSON.stringify(logged)).not.toContain("nobody@example.com");
+    expect(JSON.stringify(logged)).not.toContain("example.com");
   });
 
   // Accounts stored under an older email spelling are rewritten at login, and the logs hold no email (CC-245).

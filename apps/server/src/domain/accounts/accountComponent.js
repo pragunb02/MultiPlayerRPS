@@ -42,8 +42,9 @@ const identityOf = (account) =>
  *
  * When the account's email was stored under an older spelling, the login rewrites it to the one spelling, and
  * `emailUpdate` says how that went (CC-245): "rewritten", or "collision" when another account already has it.
+ * `legacyFailure` is a failure of the legacy store that this login did not need, passed up so it is logged.
  *
- * @typedef {{ identity: Readonly<import("../../models/identity.js").Identity>, sessionVersion: number, emailUpdate?: "rewritten" | "collision" }} SignIn
+ * @typedef {{ identity: Readonly<import("../../models/identity.js").Identity>, sessionVersion: number, emailUpdate?: "rewritten" | "collision", legacyFailure?: unknown }} SignIn
  */
 
 /** @param {Readonly<import("../../data/accountAccessor.js").Account>} account @returns {Readonly<SignIn>} */
@@ -238,8 +239,13 @@ export function createAccountComponent({
         legacyPasswords.verifyAgainstDummy(normalised.password),
       ]);
       if (!matches) {
-        throw new UnauthorizedError(INVALID_LOGIN);
+        throw new UnauthorizedError(INVALID_LOGIN, legacy.failure);
       }
+      // The account did not need the legacy store, but a failure of it is still passed up for the logs.
+      const signedIn = Object.freeze({
+        ...signInOf(account),
+        ...(legacy.failure !== undefined && { legacyFailure: legacy.failure.cause }),
+      });
       if (passwordHasher.needsRehash(account.passwordHash)) {
         await accountAccessor.updatePasswordHash(
           account.accountId,
@@ -252,12 +258,9 @@ export function createAccountComponent({
           from: account.email,
           to: normalised.email,
         });
-        return Object.freeze({
-          ...signInOf(account),
-          ...(outcome !== "unchanged" && { emailUpdate: outcome }),
-        });
+        return Object.freeze({ ...signedIn, ...(outcome !== "unchanged" && { emailUpdate: outcome }) });
       }
-      return signInOf(account);
+      return signedIn;
     },
 
     /**

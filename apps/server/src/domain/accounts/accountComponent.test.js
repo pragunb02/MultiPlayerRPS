@@ -331,6 +331,7 @@ describe("accountComponent", () => {
       const signedIn = await accounts.login({ email: RIYA.email, password: RIYA.password, now: NOW });
 
       expect(signedIn.identity.displayName).toBe("Riya");
+      expect(signedIn.legacyFailure).toEqual(new Error("legacy store unavailable"));
       expect(work).toEqual(ONE_OF_EACH);
     });
 
@@ -353,6 +354,7 @@ describe("accountComponent", () => {
         });
       }
       expect(unknown.cause).toEqual(new Error("legacy store unavailable"));
+      expect(wrong.cause).toEqual(new Error("legacy store unavailable"));
       expect(work.scrypt).toBe(2);
       expect(work.bcrypt).toBe(2);
     });

@@ -166,12 +166,15 @@ export function createAuthRoutes({
       // A store that failed behind the login answers like a wrong password, so the answer says nothing about the
       // email. The failure itself is logged, without the email, so it is not missed (CC-245).
       if (err instanceof UnauthorizedError && err.cause !== undefined && !(err.cause instanceof AppError)) {
-        req.log.error({ err: err.cause }, "a store failed behind a login, answered as a failed login");
+        req.log.error({ err: err.cause }, "the legacy store failed behind a login");
       }
       throw err;
     }
     loginThrottle.succeeded(attempt);
     req.log.info({ playerId: loggedIn.identity.id }, "logged in");
+    if (loggedIn.legacyFailure !== undefined) {
+      req.log.error({ err: loggedIn.legacyFailure }, "the legacy store failed behind a login");
+    }
     // An account stored under an older email spelling is rewritten at its login (CC-245). The logs never hold the
     // email, only that it happened, and a warning when another account already had the new spelling.
     if (loggedIn.emailUpdate === "rewritten") {
