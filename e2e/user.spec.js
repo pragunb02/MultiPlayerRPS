@@ -87,8 +87,8 @@ test.describe("account holder", () => {
       secrets: [account.email, account.password, "another password 1"],
     });
     await signUp(riya, account);
-    await riya.page.getByRole("banner").getByRole("button", { name: "Log out" }).click();
-    await expect(riya.page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
+    await (await header(riya.page)).getByRole("button", { name: "Log out" }).click();
+    await expect((await header(riya.page)).getByRole("link", { name: "Log in" })).toBeVisible();
     riya.expect(409, "/api/auth/signup");
     const { page } = riya;
 

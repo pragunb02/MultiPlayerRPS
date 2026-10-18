@@ -32,11 +32,17 @@ async function holdBack(page, url) {
 /**
  * Moves every animation on the page forward to `ms` after it started, as if the player had waited that long. The
  * screen's lines appear after delays of up to a minute and a half, far too long to sit through in a test.
+ *
+ * The animations come from the stylesheet. Before it applies, the unstyled screen already counts as visible, but no
+ * browser draws it, and there is no animation to move yet. One moved then would start again from zero when the
+ * stylesheet arrived, so this waits for the screen's own grid layout first (CC-275).
  */
-const waitAsIf = (page, ms) =>
-  page.evaluate((time) => {
+async function waitAsIf(page, ms) {
+  await expect(page.locator("[data-wake='page']")).toHaveCSS("display", "grid");
+  await page.evaluate((time) => {
     for (const animation of document.getAnimations()) animation.currentTime = time;
   }, ms);
+}
 
 /** Whether the element is drawn right now, without waiting for it as `toBeVisible` would. */
 const shownNow = (locator) =>
