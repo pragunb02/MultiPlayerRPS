@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../../utils/errors.js";
-import { parseCreateRoom, parseGameMove, parsePlayComputer, parseRoomRef } from "./payloads.js";
+import {
+  parseCreateRoom,
+  parseGameMove,
+  parseLeaveRoom,
+  parsePlayComputer,
+  parseRoomRef,
+} from "./payloads.js";
 
 describe("socket payload validation", () => {
   describe("parseCreateRoom", () => {
@@ -36,6 +42,23 @@ describe("socket payload validation", () => {
     it.each([{}, { code: "nope" }, { code: "AB2CD3", playerId: "guest_x" }])("rejects %j", (raw) => {
       expect(() => parseRoomRef(raw)).toThrow(ValidationError);
     });
+  });
+
+  describe("parseLeaveRoom (CC-112)", () => {
+    it("reads whether only a waiting room should be left, which is false unless asked", () => {
+      expect(parseLeaveRoom({ code: "ab2cd3" })).toEqual({ code: "AB2CD3", waitingOnly: false });
+      expect(parseLeaveRoom({ code: "AB2CD3", waitingOnly: true })).toEqual({
+        code: "AB2CD3",
+        waitingOnly: true,
+      });
+    });
+
+    it.each([{ code: "AB2CD3", waitingOnly: "yes" }, { code: "AB2CD3", playerId: "guest_x" }, {}])(
+      "rejects %j",
+      (raw) => {
+        expect(() => parseLeaveRoom(raw)).toThrow(ValidationError);
+      },
+    );
   });
 
   describe("parseGameMove", () => {

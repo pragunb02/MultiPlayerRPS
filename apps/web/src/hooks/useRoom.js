@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ROOM_STATUS, SOCKET_EVENTS } from "@classicade/shared";
+import { returnsToRoom } from "../app/paths.js";
 import { useServices } from "../app/servicesContext.js";
 
 /**
@@ -13,8 +14,10 @@ export const newerRoom = (current, incoming) =>
 /**
  * One room, kept in sync with the server. Once `enabled` — there is someone to join as — it joins, applies every
  * pushed update for this room, and rejoins after the connection drops and comes back. It never starts a session
- * itself: whoever arrives without one chooses how to join first (CC-086). Leaving the page does not leave the
- * room — only `leave()` does (it forfeits a game in progress).
+ * itself: whoever arrives without one chooses how to join first (CC-086). Leaving the page leaves a waiting room,
+ * so nobody starts a game against a player who has gone (CC-112). The seat is kept when the next page leads back
+ * to this room, such as signing up from it. A game in progress or a finished game keeps the seat: only `leave()`
+ * gives it up (it forfeits a game in progress).
  *
  * `refresh()` joins again, to learn whether the room is still there when a deadline it showed has passed. A room
  * that has closed answers with a GONE error saying why (CC-101).
@@ -22,9 +25,10 @@ export const newerRoom = (current, incoming) =>
  * status: "joining" | "ready" | "closed" | "error"
  *
  * @param {string} code
- * @param {{ enabled: boolean }} options
+ * @param {{ enabled: boolean, currentPath?: () => string }} options  `currentPath` is where the browser is when the
+ *   room page goes away. The router has already moved by then. Tests give it, the app reads the address bar.
  */
-export function useRoom(code, { enabled }) {
+export function useRoom(code, { enabled, currentPath = addressBar }) {
   const { socket } = useServices();
   const [joins, setJoins] = useState(0);
   const [state, setState] = useState({
@@ -33,6 +37,28 @@ export function useRoom(code, { enabled }) {
     error: undefined,
     closedReason: "",
   });
+  // Whether the viewer holds a seat in this room while it waits for players. A ref, because the cleanup that
+  // leaves the room must see the latest room, not the one from when that effect started.
+  const waitingSeat = useRef(false);
+  const room = state.room;
+  useEffect(() => {
+    waitingSeat.current = room !== undefined && room.you !== "" && room.status === ROOM_STATUS.WAITING;
+  }, [room]);
+  const pathNow = useRef(currentPath);
+  useEffect(() => {
+    pathNow.current = currentPath;
+  }, [currentPath]);
+
+  useEffect(
+    () => () => {
+      if (!waitingSeat.current || returnsToRoom(pathNow.current(), code)) return;
+      waitingSeat.current = false;
+      // Nothing waits for this answer: the page is gone, and a seat that is gone already needs no leaving. The
+      // game may have started since this page last heard, so the server leaves only a room still waiting.
+      socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code, waitingOnly: true }).catch(() => undefined);
+    },
+    [socket, code],
+  );
 
   useEffect(() => {
     if (!enabled) {
@@ -83,7 +109,10 @@ export function useRoom(code, { enabled }) {
     [socket, code],
   );
 
-  const leave = useCallback(() => socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code }), [socket, code]);
+  const leave = useCallback(() => {
+    waitingSeat.current = false;
+    return socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code });
+  }, [socket, code]);
 
   /** Asks for — or withdraws — a rematch in a finished room; once everyone asked, the new game starts here. */
   const rematch = useCallback(async () => {
@@ -102,4 +131,9 @@ export function useRoom(code, { enabled }) {
   }, [socket, code]);
 
   return { ...state, move, leave, rematch, declineRematch, refresh };
+}
+
+/** The path and query the browser shows now. */
+function addressBar() {
+  return `${window.location.pathname}${window.location.search}`;
 }

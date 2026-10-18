@@ -77,6 +77,29 @@ export function createMatchComponent({ matchAccessor }) {
   const labelled = (players) =>
     players.map((player) => (isBotPlayerId(player.playerId) ? { ...player, computer: true } : player));
 
+  /**
+   * The match a finished room holds, as it is recorded: players, seed, moves, result and times, never the
+   * engine's state. Nothing is stored here, so the match pipeline can keep it until it is recorded (CC-111).
+   *
+   * @param {{ room: Readonly<import("../../data/roomAccessor.js").Room>, outcome: { result: string, winners: string[], reason: string } }} event
+   * @returns {Readonly<import("../../data/matchAccessor.js").Match>}
+   */
+  function finishedMatch({ room, outcome }) {
+    return Object.freeze({
+      matchId: room.game.matchId,
+      roomCode: room.code,
+      gameId: room.gameId,
+      options: room.options,
+      seed: room.game.seed,
+      players: room.seats.map(({ playerId, displayName }) => ({ playerId, displayName })),
+      log: room.game.log,
+      result: { result: outcome.result, winners: outcome.winners, reason: outcome.reason },
+      startedAt: room.game.startedAt,
+      // When the game finished. The room's last activity moves on with rematch requests and leaving.
+      endedAt: room.finishedAt,
+    });
+  }
+
   /** How the match went for one player. */
   function outcomeFor(match, playerId) {
     if (match.result.result === "draw") {
@@ -86,25 +109,21 @@ export function createMatchComponent({ matchAccessor }) {
   }
 
   return Object.freeze({
+    finishedMatch,
+
     /**
-     * Records the match a room just finished (subscribed to `room.gameFinished`).
+     * Records a match. Recording the same match again returns the stored one.
+     *
+     * @param {Readonly<import("../../data/matchAccessor.js").Match>} match  from `finishedMatch`
+     */
+    record: (match) => matchAccessor.record(match),
+
+    /**
+     * Records the match a room just finished.
      *
      * @param {{ room: Readonly<import("../../data/roomAccessor.js").Room>, outcome: { result: string, winners: string[], reason: string } }} event
      */
-    recordFinished({ room, outcome }) {
-      return matchAccessor.record({
-        matchId: room.game.matchId,
-        roomCode: room.code,
-        gameId: room.gameId,
-        options: room.options,
-        seed: room.game.seed,
-        players: room.seats.map(({ playerId, displayName }) => ({ playerId, displayName })),
-        log: room.game.log,
-        result: { result: outcome.result, winners: outcome.winners, reason: outcome.reason },
-        startedAt: room.game.startedAt,
-        endedAt: room.lastActivityAt,
-      });
-    },
+    recordFinished: (event) => matchAccessor.record(finishedMatch(event)),
 
     /**
      * Decides once whether a recorded match counts for each of its players, and stores it with the match.
