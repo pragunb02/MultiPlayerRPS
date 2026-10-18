@@ -68,9 +68,12 @@ These rules come first. Where they differ from anything below, they win.
 5. Finishing: ✅ on the board, update linked findings in `KNOWN_ISSUES.md`, add a dated changelog line in `PROGRESS.md`
    using ticket IDs, update the stage counters.
 6. Non-trivial decisions (library, pattern, data model) get an ADR in `DECISIONS.md` first.
-7. **Every CI check must be green before merging**: lint, format, audit, unit + integration with coverage
-   gates, the Docker build and the browser suites (Chromium desktop + mobile, Firefox; `.github/workflows/ci.yml`), on
-   a branch that is up to date with `main`. WebKit runs on every PR but is advisory until its known flakes are fixed. **Merging to `main` deploys to
+7. **Every required check must be green before merging**, on a branch that is up to date with `main`. Branch
+   protection requires eight: lint, format, audit, unit + integration (coverage gates); the Docker build; the browser
+   suites on Chromium (desktop + mobile) and Firefox; the backup round trip; actionlint (all in
+   `.github/workflows/ci.yml`); and CodeQL for JavaScript and for Actions (GitHub's CodeQL setup, not ci.yml). WebKit
+   runs nightly, on demand and on PRs that change `apps/web`, `packages/shared` or `e2e`; it is advisory until its
+   open flakes (CC-273) are fixed. **Merging to `main` deploys to
    production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
    dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging (DEPLOYMENT.md).
 8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
