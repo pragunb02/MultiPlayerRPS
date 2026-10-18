@@ -66,8 +66,11 @@ These rules come first. Where they differ from anything below, they win.
 5. Finishing: ✅ on the board, update linked findings in `KNOWN_ISSUES.md`, add a dated changelog line in `PROGRESS.md`
    using ticket IDs, update the stage counters.
 6. Non-trivial decisions (library, pattern, data model) get an ADR in `DECISIONS.md` first.
-7. **CI must be green before merging** (`.github/workflows/ci.yml`: lint, format, audit, unit + integration with
-   coverage gates, browser tests). **Merging to `main` deploys to production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
+7. **The fast CI checks must be green before merging**: lint, format, audit, unit + integration with coverage
+   gates, and the Docker build (`.github/workflows/ci.yml`). Since 2026-10-18 (owner, until CC-236 makes the suite
+   fast) the browser tests still run on every PR and on `main` but are not required to merge; every 10th merge, or
+   at once when they go red on `main`, merging stops until they are green again. **Merging to `main` deploys to
+   production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
    dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging (DEPLOYMENT.md).
 8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
 

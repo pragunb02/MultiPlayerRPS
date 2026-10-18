@@ -5,7 +5,7 @@
 |               |                                                                                                                                                                                                                                                                                                                                    |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)                                                                                                                                                                                                                                    |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-248`                                                                                                                                                                                                                                                                     |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-256`                                                                                                                                                                                                                                                                     |
 | Current stage | **Stage 0 — Foundation**                                                                                                                                                                                                                                                                                                           |
 | Stage health  | 🟢 On track                                                                                                                                                                                                                                                                                                                        |
 | In progress   | CC-138 bots in rooms, CC-049 error tracking and alerts, CC-126 comment sweep, CC-233 owner analytics console (PR #64); PR #50 story mode design                                                                                                                                                                                    |
@@ -16,8 +16,8 @@
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 58 / 79      |
-| S1 MVP launch   | 🟡 Started     | 9 / 91       |
+| S0 Foundation   | 🟡 In progress | 59 / 79      |
+| S1 MVP launch   | 🟡 Started     | 27 / 100     |
 | S2 Retention    | ⚪ Not started | 3 / 55       |
 | S3 Monetization | ⚪ Not started | 0 / 10       |
 | S4 Scale        | ⚪ Not started | 0 / 6        |
@@ -31,14 +31,23 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
-| Security (SEC)   | 5    | 0           | 14    |
-| Bugs (BUG)       | 12   | 0           | 17    |
+| Security (SEC)   | 1    | 1           | 17    |
+| Bugs (BUG)       | 11   | 0           | 26    |
 | Tech debt (DEBT) | 7    | 1           | 12    |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-18 — CC-236 — Owner decision: the browser test job is no longer a required check (branch protection now requires lint/unit/coverage and Docker only). It still runs on every PR and on main; every 10th merge, or when it goes red on main, merging stops until it is green. Back to required once CC-236 brings the suite under 6 minutes. CLAUDE.md rule 7 updated.
+- 2026-10-18 — ADR-034 — Owner decisions on analytics: anonymous counts for everyone, India days, opt-out in the browser, player statuses with the North Star Regular plus Core each week (CC-255), and the CC-036 time limits.
+- 2026-10-18 — CC-138, CC-221, CC-225 — Play a computer character from the lobby (#61): Rocky, Pip and Queen Vee seated at once, always labelled, sealed RPS throws checked in the browser, at most 3 computer games, one chess search at a time server-wide, bot XP capped at 100 a day and kept off every board. BUG-32 to BUG-39 found and fixed along the way.
+- 2026-10-18 — Board sync — Set ✅ for tickets merged without a board update: CC-107, CC-116, CC-117 (#57), CC-162, CC-164, CC-170 (#53), CC-180 to CC-182 (#51), CC-183 (#63), CC-232 (#62), CC-233 (#64); SEC-13, SEC-15, SEC-16 and BUG-24 fixed, SEC-17 in progress (CC-245). 🟦 for the tickets builders are on: CC-036, CC-158 to CC-160, CC-207, CC-208 (#67), CC-138 (#61), CC-184, CC-203 (#65), CC-236 to CC-239, CC-241, CC-244, CC-245. New tickets CC-248 to CC-253 from the data inventory's findings (CC-241, #70).
+- 2026-10-18 — CC-233 — Owner analytics console at /admin from existing data (#64): active players, games, guests and conversion (legacy first logins counted apart), cohorts, busiest hours; admin allowlist ADMIN_ACCOUNT_IDS, groups under 5 hidden.
+- 2026-10-18 — CC-183 — Accessibility fixes from the axe audit (#63): chess grid semantics, page changes announced and focused, axe checks on every screen in CI.
+- 2026-10-18 — CC-232 — Waking up the arcade screen (#62) for cold starts, with a reload link after 90 s and the real page title and description first for crawlers.
+- 2026-10-18 — CC-107, CC-116, CC-117, CC-118 — Security batch (#57): room flood limits (3 waiting rooms per player, 2000 open, 30 per network), sockets per session and address, sign-up and failed-login limits, password change and sign out other devices, 90-day signed-in session lifetime.
+- 2026-10-18 — CC-236 to CC-246 — Tickets for test speed, flaky tests, sign-up and Sending fixes, latency, data inventory, room events, caching, event catalogue, identity duplicates and room behaviour (#66); the browser job gets 30 minutes until CC-236 lands (#68).
 - 2026-10-18 — CC-247 — main was red after #62 (CC-232) and #64 (CC-233) merged: the owner console page still called the page template the old way and rendered "undefined". Fixed the call; production was not affected for players (the console is off until ADMIN_ACCOUNT_IDS is set). Each PR had passed CI against an older main, so Render should deploy only after CI passes on main, and PRs should be up to date before merging.
 - 2026-10-18 — CC-241, CC-244 — **Data inventory and proposed event catalogue** (docs only). [DATA.md](DATA.md) lists every place data lives (11 MongoDB collections, the legacy `users` and the other legacy collections, server memory, the cookie, `cc.sound`, logs, backups) with who can read it, how long it is kept and how it goes. The privacy page was checked against it: 13 findings in [CC-241](tickets/CC-241.md#findings), among them rooms stored in MongoDB (the page says memory), the network hash written to rooms, the login throttle keeping emails with addresses for 30 days, and backups not named. [analytics/EVENTS.md](analytics/EVENTS.md) proposes 33 events with no ids for minors and unknown ages, and nine open questions for the owner.
 - 2026-10-18 — Growth plan accepted — [GROWTH.md](GROWTH.md): friends launch first, public launch after 4 weeks of data, notification caps (ADR-031), launch sequence and brand domain (ADR-032). Its new ideas wait in docs/IDEAS.md under the feature freeze.
