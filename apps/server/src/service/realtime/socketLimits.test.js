@@ -142,6 +142,29 @@ describe("realtime limits (CC-107)", () => {
     expect((await createRace(elsewhere)).ok).toBe(true);
   });
 
+  it("keeps the cap per network across midnight, for a socket that connected the day before and a new one (CC-249)", async () => {
+    let time = Date.UTC(2026, 9, 18, 23, 59);
+    server = await startTestServer({
+      env: { TRUST_PROXY_HOPS: "1" },
+      roomLimits: roomLimits({ openRoomsPerAddress: 3 }),
+      now: () => time,
+    });
+    const lateTab = await socketFrom({ cookie: await guestCookie(), address: "203.0.113.7" });
+    expect((await createRace(lateTab)).ok).toBe(true);
+
+    time = Date.UTC(2026, 9, 19, 0, 1);
+    const morningTab = await socketFrom({ cookie: await guestCookie(), address: "203.0.113.7" });
+    const acks = [
+      await createRace(lateTab),
+      await createRace(morningTab),
+      await createRace(morningTab),
+      await createRace(lateTab),
+    ];
+
+    expect(acks.map((ack) => ack.ok)).toEqual([true, true, false, false]);
+    expect(acks[2].error.details).toEqual({ reason: ROOM_LIMIT_REASONS.NETWORK_ROOMS, limit: 3 });
+  });
+
   it("answers server busy once the server holds as many rooms as it can", async () => {
     server = await startTestServer({ roomLimits: roomLimits({ openRoomsMax: 1 }) });
     const alice = await clients.player();
