@@ -17,9 +17,6 @@ export async function checkSeal({ text, salt, commitment }, subtle = globalThis.
   return hex === commitment;
 }
 
-/** The start and the end of a lock, short enough to read: `7f3a…c21`. */
-export const shortLock = (commitment) => `${commitment.slice(0, 4)}…${commitment.slice(-3)}`;
-
 /** The throw a revealed move names, or "" when its text is not a move this app can read. */
 function choiceIn(text) {
   try {

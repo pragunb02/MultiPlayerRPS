@@ -52,7 +52,7 @@ describe("RpsBoard", () => {
     await user.click(screen.getByRole("button", { name: /paper/i }));
 
     expect(onMove).toHaveBeenCalledWith({ choice: "paper" });
-    expect(screen.getByText("Score:").closest("p")).toHaveTextContent(/^Score: You 1 — Riya 0Best of/);
+    expect(screen.getByText(/^Best of/)).toHaveTextContent("Best of 3 · You 1 – Riya 0 · first to 2 wins");
     expect(screen.getByRole("heading", { name: "Round 2" })).toBeInTheDocument();
     expect(within(screen.getByRole("list", { name: "Rounds" })).getByText("You won")).toBeInTheDocument();
   });
@@ -143,10 +143,54 @@ describe("RpsBoard", () => {
     });
     render(<RpsBoard room={room(view)} onMove={vi.fn()} />);
 
-    expect(screen.getByText("Score:").closest("p")).toHaveTextContent(/^Score: You 1 — Riya 0Best of/);
+    expect(screen.getByText(/^Best of/)).toHaveTextContent("Best of 3 · You 1 – Riya 0 · first to 2 wins");
     const rounds = within(screen.getByRole("list", { name: "Rounds" }));
     expect(rounds.getByText("Draw")).toBeInTheDocument();
     expect(rounds.getByText("Opponent won")).toBeInTheDocument();
+  });
+
+  it("puts you first in the score line wherever you sit, and says how many wins a longer match needs (CC-254)", () => {
+    const view = rpsView({ bestOf: 5, score: { [ME]: 2, [THEM]: 1 } });
+
+    render(<RpsBoard room={room(view, { seats: [...seats].reverse() })} onMove={vi.fn()} />);
+
+    expect(screen.getByText(/^Best of/)).toHaveTextContent("Best of 5 · You 2 – Riya 1 · first to 3 wins");
+  });
+
+  it("shows a spectator the players in their seats' order", () => {
+    render(<RpsBoard room={room(rpsView(), { you: "" })} onMove={vi.fn()} />);
+
+    expect(screen.getByText(/^Best of/)).toHaveTextContent("Best of 3 · Me 1 – Riya 0 · first to 2 wins");
+  });
+
+  it("says a drawn round does not count and is played again, only right after the draw (CC-254)", () => {
+    const draw = { choices: { [ME]: "rock", [THEM]: "rock" }, winner: "" };
+    const { rerender } = render(
+      <RpsBoard room={room(rpsView({ round: 3, rounds: [...rpsView().rounds, draw] }))} onMove={vi.fn()} />,
+    );
+
+    expect(screen.getByText("Draw. It doesn't count, so play the round again.")).toBeInTheDocument();
+    rerender(<RpsBoard room={room(rpsView())} onMove={vi.fn()} />);
+    expect(screen.queryByText(/It doesn't count/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the round's number after draws, since a drawn round is played again (CC-254)", () => {
+    const draw = { choices: { [ME]: "rock", [THEM]: "rock" }, winner: "" };
+    const { rerender } = render(
+      <RpsBoard
+        room={room(rpsView({ score: { [ME]: 0, [THEM]: 0 }, round: 2, rounds: [draw] }))}
+        onMove={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Round 1" })).toBeInTheDocument();
+    rerender(
+      <RpsBoard
+        room={room(rpsView({ round: 4, rounds: [draw, ...rpsView().rounds, draw] }))}
+        onMove={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Round 2" })).toBeInTheDocument();
   });
 
   it("shows '?' for a choice this version of the app doesn't know", () => {

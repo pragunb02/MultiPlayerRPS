@@ -15,6 +15,9 @@
   padding: var(--space-6);
   max-width: 28rem;
   width: 100%;
+  /* A long dialog scrolls inside itself, so its buttons stay reachable on a small phone. */
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
   box-shadow: var(--shadow-md), var(--glow-primary);
   animation: dialog-in var(--duration-slow) var(--ease-spring);
 }

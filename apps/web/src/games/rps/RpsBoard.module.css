@@ -14,16 +14,6 @@
   font-size: var(--text-lg);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: baseline;
-}
-.bestOf {
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: 400;
-  color: var(--color-text-muted);
 }
 .round {
   margin: 0;
