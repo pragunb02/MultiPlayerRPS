@@ -225,8 +225,8 @@ export function createRoomDao({ connection, betweenClosedReads = async () => {} 
      */
     countOpen: () => rooms.estimatedDocumentCount(),
 
-    /** @param {string} network  open rooms opened from this network */
-    countByNetwork: (network) => rooms.countDocuments({ network, ...OPEN }),
+    /** @param {ReadonlyArray<string>} networks  open rooms opened under any of these network names */
+    countByNetworks: (networks) => rooms.countDocuments({ network: { $in: [...networks] }, ...OPEN }),
 
     /** @returns {Promise<Record<string, number>>} open rooms per status, only for statuses that have any */
     async countByStatus() {

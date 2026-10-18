@@ -28,8 +28,8 @@ const FACTS = [
   },
   {
     fact: "the room's network hash uses a random key that changes every UTC day",
-    data: "a random key that the server makes in its memory for each UTC day and forgets when the day ends",
-    page: /a key that is random, kept only in the server's memory and replaced every day \(UTC\)/,
+    data: "It names new rooms during that day. During the next day it is kept only to count the rooms opened under it",
+    page: /a key that is random, kept only in the server's memory and replaced every day \(UTC\)\. A key names rooms for one day, is kept one more day only to count them, and is then deleted/,
   },
   {
     fact: "the login throttle remembers networks for 30 days, as keyed hashes",

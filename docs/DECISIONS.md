@@ -276,9 +276,11 @@ reused; the next free ID is **ADR-047**. A later change to a decision is a dated
   them, so a second instance (CC-061) needs shared counters. Rooms stored before the change have no network and do
   not count. SEC-17 (sign-up says an email cannot be used) is an accepted trade-off until CC-033 sends email.
 - **Amended · 2026-10-18** (CC-249, CC-250, [tickets/CC-249.md](tickets/CC-249.md)). The network hash in point 2 is
-  keyed with a random key made in memory for each UTC day and dropped when the day ends, no longer with
-  `SESSION_SECRET`, so nobody can turn a stored hash back into an address once its day is over. A restart or midnight
-  gives a network a new hash, so rooms open from before stop counting for the 30 until they close. The failed login
+  keyed with a random key made in memory for each UTC day, no longer with `SESSION_SECRET`. A key names new rooms
+  for its day, is kept the next day only to count them (like Plausible's current and previous salt, so midnight does
+  not double the cap), and is dropped at the following midnight by a timer. The name is worked out when a room is
+  created, not when a socket connects. Once a key is dropped, nobody can turn its hashes back into addresses. A
+  restart forgets the keys, so rooms open from before it stop counting for the 30 until they close. The failed login
   counts in point 5 are kept under keyed hashes of the email and address (a random key per process), never the plain
   values. No new env var. A second instance (CC-061) would need a shared key, derived with HKDF from a new secret.
 

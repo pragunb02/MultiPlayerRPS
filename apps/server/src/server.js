@@ -50,7 +50,7 @@ import { createHttpApp } from "./service/http/app.js";
 import { createSessionCheck, createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
-import { createNetworkKey } from "./utils/networkKey.js";
+import { createNetworkKey, dropOldNetworkKeysEveryMidnight } from "./utils/networkKey.js";
 import { createPasswordHasher } from "./utils/passwordHasher.js";
 import { createTtlCache } from "./utils/ttlCache.js";
 
@@ -494,6 +494,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
   });
   const server = http.createServer(app);
+  const networkKey = createNetworkKey({ now });
   const gateway = createRealtimeGateway({
     httpServer: server,
     sessionMiddleware,
@@ -503,7 +504,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     domainEvents,
     checkSession,
     trustProxyHops: config.trustProxyHops,
-    networkOf: createNetworkKey({ now }),
+    networkOf: networkKey.networkOf,
     limits: limitsOfRooms,
     now,
     botComponent,
@@ -521,7 +522,10 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     sweepIntervalMs: rooms.sweepIntervalMs,
   });
 
+  const keyRotation = dropOldNetworkKeysEveryMidnight({ networkKey, now });
+
   const close = async () => {
+    keyRotation.stop();
     housekeeping.stop();
     botDriver.stop();
     await gateway.close();
@@ -533,6 +537,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     const port = await listen(server, config.port);
     return { server, port, close };
   } catch (err) {
+    keyRotation.stop();
     botDriver.stop();
     await database.close();
     throw err;

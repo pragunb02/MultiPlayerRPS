@@ -116,14 +116,16 @@ they still exist in production is not known from the code. **Owner check:** Atla
    `network`.
 2. **`network`** is a keyed hash of the host's network address: HMAC-SHA-256, cut to 16 hex characters
    (`apps/server/src/utils/networkKey.js`, CC-107). It lets the server count open rooms per network. The address
-   itself is never stored. The key is a random key that the server makes in its memory for each UTC day and forgets
-   when the day ends (CC-249). It is never written anywhere and does not come from `SESSION_SECRET` or any other
-   setting. While the day lasts, the running server could test addresses against it, so the hash is pseudonymous
-   personal data for that day. After it, nobody can turn the hash back into an address, not from the database, a
-   backup or the server's settings. A restart or midnight gives an address a new hash, so rooms open from before stop
-   counting for the cap until they close. Rooms stored before CC-249 hold a hash keyed with `SESSION_SECRET`. They
-   keep working, stop counting for the cap, and are gone within 24 hours, but backups taken before CC-249 keep them
-   for up to 30 days.
+   itself is never stored. The key is a random key that the server makes in its memory for each UTC day (CC-249).
+   It names new rooms during that day. During the next day it is kept only to count the rooms opened under it, so
+   midnight does not double the cap, and at the following midnight it is dropped, by a timer even when nobody opens
+   a room. The key is never written anywhere and does not come from `SESSION_SECRET` or any other setting. While it
+   is held, the running server could test addresses against it, so the hash is pseudonymous personal data for those
+   two days at most. After that, nobody can turn the hash back into an address, not from the database, a backup or
+   the server's settings. The name is worked out when the room is created, so a socket kept open past midnight gets
+   that day's name. A restart forgets every key, so rooms open from before it stop counting for the cap until they
+   close. Rooms stored before CC-249 hold a hash keyed with `SESSION_SECRET`. They keep working, stop counting for
+   the cap, and are gone within 24 hours, but backups taken before CC-249 keep them for up to 30 days.
 3. **Personal data:** pseudonymous.
 4. **Who can read it:** everyone who opens the room's link while it is open gets the room view: every seat's player id
    and display name, the host id, and the game view (seated players see their own view, others the spectator view).
@@ -246,7 +248,7 @@ written to MongoDB, except the network hash, which is also stored in `rooms`.
 | HTTP rate limits            | request counts per IP address (`ip:<address>`, IPv6 grouped by /56) or per session id                                                                                              | the window: 1 minute (API), 15 minutes (auth, guest sessions), 1 hour (sign-ups) | `service/http/rateLimits.js`, `authRoutes.js`, `sessionRoutes.js` |
 | Login throttle              | failed logins per email and address, failed logins per email, and the addresses that signed in to each email, up to 10. Only keyed hashes are kept, never the email or the address | failures 15 minutes, known addresses 30 days                                     | `service/http/loginThrottle.js` (CC-117)                          |
 | Socket admission            | open connections per session id and per address, an event budget per player id                                                                                                     | while connected, and until the budget refills                                    | `service/realtime/socketAdmission.js`                             |
-| Network hash                | the day's random key, and the keyed hash of an address worked out when a socket connects                                                                                           | the key until the UTC day ends, the hash for the socket's life (and in `rooms`)  | `utils/networkKey.js`, `realtime/gateway.js`                      |
+| Network hash                | today's and yesterday's random keys, and the socket's address key, from which a room's hash is worked out when it is created                                                       | a key until the second UTC midnight after its day, the address while connected   | `utils/networkKey.js`, `realtime/gateway.js`                      |
 | Session renewals            | session ids being renewed by their own player                                                                                                                                      | 5 seconds                                                                        | `service/http/session.js`                                         |
 | Sign-outs                   | per player id, how often they signed out other devices and which session stayed                                                                                                    | the process's life                                                               | `service/realtime/gateway.js`                                     |
 | Requests in flight          | per socket, events still being handled                                                                                                                                             | until answered                                                                   | `service/realtime/connections.js`                                 |

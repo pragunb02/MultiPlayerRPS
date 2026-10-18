@@ -38,7 +38,8 @@ const playerRoom = (playerId) => `player:${playerId}`;
  *   checkSession: (sessionData: object) => Promise<void>,   throws UnauthorizedError for a session that may no
  *     longer be used (see createSessionCheck)
  *   trustProxyHops: number,   how many proxies to look through for the player's address, as for HTTP
- *   networkOf: (address: string) => string,   names an address without being it, for the rooms per network
+ *   networkOf: (address: string) => import("../../utils/networkKey.js").NetworkNames,   names an address
+ *     without being it, for the rooms per network
  *   limits?: Readonly<import("../../domain/rooms/roomLimits.js").RoomLimits>,
  *   now?: () => number,
  *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
@@ -117,7 +118,9 @@ export function createRealtimeGateway({
         throw new TooManyRequestsError(admitted.message);
       }
       socket.data.release = admitted.release;
-      socket.data.network = networkOf(addressKey(address));
+      // The address stays with the socket, as socket admission already keeps it. Its network name is worked out
+      // when a room is created, so a socket kept open past midnight gets that day's name (CC-249).
+      socket.data.address = addressKey(address);
       // The browser may have gone while its session was checked. Socket.IO then drops the socket without any
       // event, so the place is given back when the connection itself closes, or now if it already has.
       if (socket.conn.readyState === "open") {
@@ -184,9 +187,9 @@ export function createRealtimeGateway({
       socket,
       {
         [SOCKET_EVENTS.IDENTITY_GET]: () => socket.data.identity,
-        ...createRoomHandlers({ io, socket, roomComponent, now, logger: socketLogger }),
+        ...createRoomHandlers({ io, socket, roomComponent, networkOf, now, logger: socketLogger }),
         ...(botComponent &&
-          createBotHandlers({ socket, botComponent, roomComponent, now, logger: socketLogger })),
+          createBotHandlers({ socket, botComponent, roomComponent, networkOf, now, logger: socketLogger })),
       },
       socketLogger,
       { allow: () => admission.allowEvent(identity.id) },

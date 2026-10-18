@@ -57,9 +57,10 @@ export function PrivacyPage() {
           <li>
             <strong>A daily code for your network.</strong> So that one network cannot open hundreds of rooms,
             each room also keeps a short code worked out from the IP address of the player who opened it, with
-            a key that is random, kept only in the server&apos;s memory and replaced every day (UTC). The
-            address itself is never stored. Once the day&apos;s key is gone, nobody, not even us, can turn the
-            code back into an address. The code is deleted with the room.
+            a key that is random, kept only in the server&apos;s memory and replaced every day (UTC). A key
+            names rooms for one day, is kept one more day only to count them, and is then deleted. The address
+            itself is never stored. Once a key is deleted, nobody, not even us, can turn its codes back into
+            an address. The code is deleted with the room.
           </li>
           <li>
             <strong>Progress.</strong> Your XP, level, statistics, achievements and daily quests, worked out

@@ -6,7 +6,8 @@ import { createNetworkKey, dropOldNetworkKeysEveryMidnight } from "./networkKey.
 const DAY = 24 * 60 * 60 * 1000;
 const ADDRESS = "ip:203.0.113.7";
 const NOON = Date.UTC(2026, 9, 18, 12);
-const hashWith = (key, address = ADDRESS) => createHmac("sha256", key).update(address).digest("hex").slice(0, 16);
+const hashWith = (key, address = ADDRESS) =>
+  createHmac("sha256", key).update(address).digest("hex").slice(0, 16);
 
 /** A clock the test moves by hand. */
 function clockAt(start) {
@@ -167,7 +168,10 @@ describe("dropOldNetworkKeysEveryMidnight (CC-249)", () => {
     vi.useFakeTimers({ now: NOON });
     const unref = vi.spyOn(globalThis, "setTimeout");
 
-    const rotation = dropOldNetworkKeysEveryMidnight({ networkKey: { dropOldKeys: () => {} }, now: Date.now });
+    const rotation = dropOldNetworkKeysEveryMidnight({
+      networkKey: { dropOldKeys: () => {} },
+      now: Date.now,
+    });
 
     expect(unref.mock.results[0].value.hasRef()).toBe(false);
     rotation.stop();
