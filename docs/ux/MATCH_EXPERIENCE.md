@@ -83,15 +83,20 @@ at most three draw offers per game. The series keeps a history of every game wit
    seconds, one every three seconds, not stored, and a "mute opponent's emotes" switch.
 7. **Button feedback standard** for every control in the app (`useAction` and `ActionButton`):
 
-   | Phase                  | When                        | What the player sees                                                     |
-   | ---------------------- | --------------------------- | ------------------------------------------------------------------------ |
-   | Pressed                | at once                     | The press shadow, optionally a click sound                               |
-   | Waiting                | after 150 ms with no answer | A spinner and "Sending", the button keeps its width                      |
-   | Done                   | 600 ms                      | A check mark or the change itself                                        |
-   | Disabled with a reason | always                      | Still focusable, and clicking shows why: "Not your turn", "Reconnecting" |
-   | Failed                 | on error                    | A message under the button with Retry, network failures go to the banner |
+   | Phase                  | When                                              | What the player sees                                                     |
+   | ---------------------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
+   | Pressed                | at once                                           | The press shadow, optionally a click sound                               |
+   | Waiting                | after 400 ms with no answer, then at least 300 ms | A spinner and "Sending", the button keeps its width                      |
+   | Done                   | 600 ms                                            | A check mark or the change itself                                        |
+   | Disabled with a reason | always                                            | Still focusable, and clicking shows why: "Not your turn", "Reconnecting" |
+   | Failed                 | on error                                          | A message under the button with Retry, network failures go to the banner |
 
-   The rule: every click gives a visible response within 100 ms. A browser test enforces it.
+   The rule: every click gives a visible response within 100 ms. A browser test enforces it. The press and the click
+   sound are that response. "Sending" waits 400 ms because a usual round trip from India to the Oregon server takes
+   about 250 to 350 ms, and at 150 ms it flashed on almost every press. Once shown it stays at least 300 ms, so an
+   answer just after 400 ms does not flash it either. Only the words wait: a failure and its reason show at once,
+   and a board takes the next move as soon as the answer is in (CC-239, research and sources in
+   docs/tickets/CC-239.md).
 
 8. **Announcer**: one polite and one urgent screen-reader region per match. Urgent only for a request to you, your
    own connection loss and the result.
@@ -197,7 +202,7 @@ Status: ok, missing (no feedback), broken (wrong result) or dead (nothing visibl
 | Journey step                   | Feedback needed within 100 ms           | Today                                      |
 | ------------------------------ | --------------------------------------- | ------------------------------------------ |
 | Play as a guest                | press, then a spinner                   | ok, no spinner                             |
-| Create a room                  | press, spinner after 150 ms             | missing spinner                            |
+| Create a room                  | press, spinner after 400 ms             | missing spinner                            |
 | Join by code                   | the reason while the button is disabled | missing reason                             |
 | Open an invite as a visitor    | the chooser with three options          | ok                                         |
 | Copy or share the invite       | a toast                                 | ok                                         |
@@ -218,7 +223,7 @@ Status: ok, missing (no feedback), broken (wrong result) or dead (nothing visibl
 Personas: first time visitors need short "how to play" text in the shell. Guests get the save progress beat last in
 the reward queue. Account holders get their leaderboard rank change as a beat. Returning players with a streak get a
 streak beat. On mobile every main control lives in the sticky action bar or the bottom sheet. On a slow network the
-spinner shows after 150 ms, the connection banner after one second, and a timeout becomes an inline Retry.
+spinner shows after 400 ms (and stays at least 300 ms), the connection banner after one second, and a timeout becomes an inline Retry.
 
 ## 5. UX telemetry (first party, privacy safe)
 
