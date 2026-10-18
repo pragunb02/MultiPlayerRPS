@@ -112,6 +112,33 @@ describe("the header menu (CC-259)", () => {
     expect(menuButton()).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("announces who you are from outside the menu, which a phone hides while it is closed", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(await screen.findByRole("button", { name: "Play as a guest" }));
+
+    const announcement = await screen.findByText(`Playing as ${GUEST.displayName}, a guest.`);
+    expect(announcement).toHaveAttribute("aria-live", "polite");
+    expect(panel()).not.toContainElement(announcement);
+    expect(screen.getByRole("banner")).not.toContainElement(announcement);
+  });
+
+  it("names an account holder in the announcement", async () => {
+    renderApp({
+      api: fakeApi({ getSession: async () => ({ kind: "user", id: "user_1", displayName: "Riya" }) }),
+    });
+
+    expect(await screen.findByText("Signed in as Riya.")).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("has a plain Menu button while there is no progress to save", async () => {
+    renderApp();
+
+    await within(screen.getByRole("banner")).findByRole("link", { name: "Log in" });
+    expect(menuButton()).toHaveAccessibleName("Menu");
+    expect(menuButton().querySelector(".menuDot")).toBeNull();
+  });
+
   it("holds the player's name and level once they play", async () => {
     renderApp({ api: fakeApi({ getSession: async () => GUEST }) });
 

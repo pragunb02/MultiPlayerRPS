@@ -1,4 +1,6 @@
 import { expect, formFactor, test } from "./fixtures.js";
+import { OWNER } from "./ownerConsole.js";
+import { newAccount } from "./personas.js";
 
 // No screen leaves a large empty area (CC-259). Each check measures the page instead of comparing pictures: grid
 // tracks against the number of items, card heights against their content, and how much of the width the content
@@ -187,3 +189,53 @@ for (const form of Object.keys(SIZES)) {
     });
   }
 }
+
+/** Logs a person in from the login page, and waits for the home page. */
+async function logIn(page, { email, password }) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page).toHaveURL("/");
+}
+
+/** The phone header's height, and whether the menu button shares the row with the navigation. */
+async function headerRow(page) {
+  const banner = page.getByRole("banner");
+  const nav = await banner.getByRole("navigation", { name: "Main" }).boundingBox();
+  const toggle = await banner.getByRole("button", { name: /^Menu/ }).boundingBox();
+  return { height: (await banner.boundingBox()).height, sameRow: Math.abs(nav.y - toggle.y) < toggle.height };
+}
+
+test.describe("phone header with more links, at 360 x 800", () => {
+  const SMALLEST = { width: 360, height: 800 };
+
+  test("stays one row for an account holder (three links) and for an admin (four links)", async ({
+    players,
+  }, testInfo) => {
+    test.skip(formFactor(testInfo) !== "mobile", "the phone header is checked on the mobile project");
+    const account = newAccount();
+    const riya = await players.open("riya", { secrets: [account.email, account.password] });
+    await riya.page.setViewportSize(SMALLEST);
+    await riya.page.goto("/signup");
+    await riya.page.getByLabel("Username").fill(account.username);
+    await riya.page.getByLabel("Email").fill(account.email);
+    await riya.page.getByLabel("Password").fill(account.password);
+    await riya.page.getByRole("button", { name: "Create account" }).click();
+    await expect(riya.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveCount(3);
+
+    const owner = await players.open("owner", { secrets: [OWNER.email, OWNER.password] });
+    await owner.page.setViewportSize(SMALLEST);
+    await logIn(owner.page, OWNER);
+    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveCount(4);
+
+    for (const [who, page] of [
+      ["account holder", riya.page],
+      ["admin", owner.page],
+    ]) {
+      const row = await headerRow(page);
+      expect(row.height, who).toBeLessThanOrEqual(64);
+      expect(row.sameRow, who).toBe(true);
+    }
+  });
+});

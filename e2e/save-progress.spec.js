@@ -8,6 +8,9 @@ import { E2E_MONGO_URI, newAccount } from "./personas.js";
 
 const card = (page) => page.getByRole("region", { name: "Save your progress" });
 const headerSignup = async (page) => (await header(page)).getByRole("link", { name: /sign up/i });
+// Gone from the page, whether or not the phone's menu is open: counted without opening it.
+const noHeaderSignup = (page) =>
+  expect(page.getByRole("banner").locator('[data-cc-control="header.signup"]')).toHaveCount(0);
 /** A toast (the room's result panel is a status region too). */
 const toast = (page, text) =>
   page
@@ -128,7 +131,7 @@ test.describe("a guest who wins", () => {
     ).toBeVisible();
     await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
     await expect(card(alice.page)).toHaveCount(0);
-    await expect(await headerSignup(alice.page)).toHaveCount(0);
+    await noHeaderSignup(alice.page);
 
     // Signing in replaced the form in history: Back stays in the room, as the account, and never shows the form.
     await alice.page.goBack();
@@ -328,7 +331,7 @@ test.describe("never shown to", () => {
     await expect(levelUp.getByRole("link")).toHaveCount(0);
     await expect(levelUp.getByRole("button")).toHaveCount(0);
     await expect(card(alice.page)).toHaveCount(0);
-    await expect(await headerSignup(alice.page)).toHaveCount(0);
+    await noHeaderSignup(alice.page);
     await alice.page.goto("/");
     await expect(alice.page.getByRole("region", { name: "Daily quests" })).toBeVisible();
     await expect(alice.page.getByText(/sign up so it's never lost/)).toHaveCount(0);

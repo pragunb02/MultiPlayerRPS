@@ -475,6 +475,13 @@ describe("the header's sign-up link", () => {
     expect(link).toHaveTextContent(/^Save progress/);
   });
 
+  it("marks the phone menu's button, so the nudge inside a closed menu is still seen (CC-259)", async () => {
+    openRoom({ path: "/profile" });
+
+    const button = await banner().findByRole("button", { name: "Menu, with Save progress" });
+    expect(button.querySelector(".menuDot")).toHaveAttribute("aria-hidden", "true");
+  });
+
   it("says 'Sign up' to a guest with no XP yet, and changes once XP comes in", async () => {
     const { socket } = openRoom({
       path: "/profile",

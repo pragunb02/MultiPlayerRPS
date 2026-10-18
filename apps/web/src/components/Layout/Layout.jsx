@@ -26,6 +26,14 @@ function MenuIcon() {
   );
 }
 
+/** What the live region says about who you are, read out when it changes. Empty without a session. */
+function identityAnnouncement(identity) {
+  if (identity === undefined) return "";
+  return identity.kind === "guest"
+    ? `Playing as ${identity.displayName}, a guest.`
+    : `Signed in as ${identity.displayName}.`;
+}
+
 /**
  * App shell: header with brand, navigation and who you are. Pages render into <Outlet />. Under the header sit the
  * player's own connection (CC-158) and the requests other players sent them from rooms they are not looking at
@@ -93,18 +101,21 @@ export function Layout() {
           type="button"
           ref={buttonRef}
           className={styles.menuButton}
-          aria-label="Menu"
+          aria-label={hasProgress ? "Menu, with Save progress" : "Menu"}
+          title={hasProgress ? "Save your progress: sign up from this menu" : undefined}
           aria-expanded={menuOpen}
           aria-controls="header-menu"
           data-cc-control="header.menu"
           onClick={toggleMenu}
         >
           <MenuIcon />
+          {/* A guest with XP sees a dot on the button, so the Save progress nudge inside is not missed (CC-097). */}
+          {hasProgress && <span className={styles.menuDot} aria-hidden="true" />}
         </button>
         <div id="header-menu" ref={panelRef} className={`${styles.player} ${menuOpen ? styles.open : ""}`}>
           <SoundControl />
           {identity && <LevelChip key={identity.id} />}
-          <div className={styles.identity} aria-live="polite">
+          <div className={styles.identity}>
             {identity && (
               <span className={styles.name} title={identity.kind === "guest" ? "Guest" : "Account"}>
                 {identity.displayName}
@@ -134,6 +145,10 @@ export function Layout() {
           </div>
         </div>
       </header>
+      {/* Outside the menu, which a phone hides while it is closed: a hidden region is never read out (CC-259). */}
+      <p className="visually-hidden" aria-live="polite">
+        {identityAnnouncement(identity)}
+      </p>
       <ConnectionBanner />
       <main id="main" className={styles.main}>
         <WakingUp />
