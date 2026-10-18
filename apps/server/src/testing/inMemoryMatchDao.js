@@ -30,7 +30,11 @@ export function createInMemoryMatchDao() {
 
     async countWins({ playerId, gameId }) {
       return [...matches.values()].filter(
-        (m) => m.gameId === gameId && m.result.winners.includes(playerId) && countsFor(m, playerId),
+        (m) =>
+          m.gameId === gameId &&
+          m.result.winners.includes(playerId) &&
+          countsFor(m, playerId) &&
+          !m.players.some((p) => p.playerId.startsWith("bot_")),
       ).length;
     },
 
@@ -47,14 +51,18 @@ export function createInMemoryMatchDao() {
         .filter((m) => has(m, playerId) && countsFor(m, playerId) && m.matchId !== excluding)
         .filter((m) => m.endedAt >= from && m.endedAt < to)
         .sort((a, b) => a.endedAt - b.endedAt)
-        .map(({ matchId, players, endedAt }) => copy({ matchId, players, endedAt }));
+        .map(({ matchId, players, endedAt, credit }) =>
+          copy({ matchId, players, endedAt, ...(credit !== undefined && { credit }) }),
+        );
     },
 
     async listWithdrawn({ playerId, from }) {
       return [...matches.values()]
         .filter((m) => has(m, playerId))
         .filter((m) =>
-          (m.credit?.notCounted ?? []).some((e) => e.playerId === playerId && e.withdrawnFrom === from),
+          [...(m.credit?.notCounted ?? []), ...(m.credit?.botXp ?? [])].some(
+            (e) => e.playerId === playerId && e.withdrawnFrom === from,
+          ),
         )
         .sort((a, b) => a.endedAt - b.endedAt)
         .map(copy);

@@ -238,3 +238,106 @@ export function statesFor(gameId) {
   }
   return states;
 }
+
+/**
+ * The computer character on each game's page (CC-221), and how a visitor brings a game against it to the same result
+ * every time, so a state built again shows the same controls: a loss or a draw, never a win (a win also offers to
+ * save progress). Pip plays at Unbeatable for that.
+ */
+const COMPUTER = Object.freeze({
+  tictactoe: {
+    name: "Pip",
+    level: "Unbeatable",
+    async finish(player) {
+      for (let turn = 0; turn < 12; turn++) {
+        await expect(phaseOf(player)).toHaveAttribute("data-cc-phase", /my-turn|finished/, {
+          timeout: 10_000,
+        });
+        if ((await phaseOf(player).getAttribute("data-cc-phase")) === "finished") return;
+        await player.page
+          .getByRole("grid", { name: "Tic-Tac-Toe board" })
+          .getByRole("gridcell", { name: /: empty$/ })
+          .first()
+          .click();
+        await expect(phaseOf(player)).not.toHaveAttribute("data-cc-phase", "my-turn");
+      }
+    },
+  },
+  rps: {
+    name: "Rocky",
+    // Rocky's throws cannot be known, so the visitor plays rematches until one is lost.
+    async finish(player) {
+      // Rocky may have thrown already, then the round is over at once: each round waits for the rounds list to grow.
+      const rounds = () => player.page.getByRole("list", { name: "Rounds" }).getByRole("listitem").count();
+      for (let game = 0; game < 12; game++) {
+        for (let round = 0; round < 30; round++) {
+          await expect(phaseOf(player)).toHaveAttribute("data-cc-phase", /my-turn|finished/, {
+            timeout: 10_000,
+          });
+          if ((await phaseOf(player).getAttribute("data-cc-phase")) === "finished") break;
+          const before = await rounds();
+          await hand(player, /Rock/).click();
+          await expect.poll(rounds, { timeout: 10_000 }).toBeGreaterThan(before);
+        }
+        await expect(player.page.locator("#result-heading")).toHaveText(/^You (won|lost)/);
+        if ((await player.page.locator("#result-heading").textContent()).startsWith("You lost")) return;
+        await control(player.page, "room.rematch.ask").click();
+        await expect(phaseOf(player)).toHaveAttribute("data-cc-phase", "my-turn", { timeout: 10_000 });
+      }
+      throw new Error("Rocky never won a game");
+    },
+  },
+  chess: {
+    name: "Queen Vee",
+    // A move each first, whichever colour the visitor got, so the move list always has moves to step through.
+    async opening(player) {
+      const white =
+        (await square(player, "a8").boundingBox()).y < (await square(player, "a1").boundingBox()).y;
+      await square(player, white ? "e2" : "e7").click();
+      await square(player, white ? "e4" : "e5").click();
+      await expect(phaseOf(player)).toHaveAttribute("data-cc-phase", "their-turn");
+      await expect(phaseOf(player)).toHaveAttribute("data-cc-phase", "my-turn", { timeout: 10_000 });
+    },
+    async finish(player) {
+      await control(player.page, "chess.resign").click();
+      await control(player.page, "chess.resign.confirm").click();
+    },
+  },
+});
+
+/** Alice plays the game's computer character from its page, at the state's level, and it is her turn. */
+async function startVsComputer(pair, gameId) {
+  const { alice } = pair;
+  await alice.page.goto(`/games/${GAMES[gameId].slug}`);
+  const { level } = COMPUTER[gameId];
+  if (level !== undefined) {
+    await alice.page.getByRole("group", { name: "Level" }).getByRole("button", { name: level }).click();
+  }
+  await control(alice.page, "lobby.play_computer").click();
+  await expect(phaseOf(alice)).toHaveAttribute("data-cc-phase", "my-turn", { timeout: 15_000 });
+  await GAMES[gameId].ready?.(alice, alice);
+  await COMPUTER[gameId].opening?.(alice);
+  return alice;
+}
+
+/**
+ * The states of a game against the game's computer character (CC-138, CC-221): its page with the level pick, the
+ * visitor's turn (with the lock in Rock Paper Scissors, CC-225), and the result. Only Alice is in the room.
+ */
+export function computerStatesFor(gameId) {
+  const computer = COMPUTER[gameId];
+  return {
+    "computer lobby": async (pair) => {
+      await pair.alice.page.goto(`/games/${GAMES[gameId].slug}`);
+      await expect(pair.alice.page.getByRole("button", { name: `Play ${computer.name}` })).toBeVisible();
+      return { clicker: pair.alice };
+    },
+    "computer my-turn": async (pair) => ({ clicker: await startVsComputer(pair, gameId) }),
+    "computer finished": async (pair) => {
+      const alice = await startVsComputer(pair, gameId);
+      await computer.finish(alice);
+      await phaseIs(alice, "finished");
+      return { clicker: alice };
+    },
+  };
+}

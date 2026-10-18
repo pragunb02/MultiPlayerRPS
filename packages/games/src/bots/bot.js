@@ -22,13 +22,21 @@
  * @property {ReadonlyArray<unknown>} history   the bot's final views of earlier games against the same
  *   opponent in this room (rematches), oldest first. Empty for the first game.
  *
+ * @typedef {Object} BotQuestion
+ * @property {unknown} view       what the bot's seat may see right now
+ * @property {string} botId       the bot's player id in this game
+ *
  * @typedef {Object} Bot
  * @property {string} gameId                        matches the engine's id
  * @property {ReadonlyArray<Readonly<BotLevel>>} levels   easiest first
  * @property {(turn: BotTurn) => unknown} chooseMove   returns a raw move, as a client would send it
+ * @property {(question: BotQuestion) => ReadonlyArray<unknown>} [answer]   optional. Called when it is not the
+ *   bot's turn, so a question the other player asked (a chess draw offer) never waits for the bot. Returns the raw
+ *   move that answers it in a list, or an empty list when there is nothing to answer.
  */
 
 const LEVEL_ID = /^[a-z][a-z0-9-]*$/;
+const NOTHING_TO_ANSWER = () => [];
 
 /**
  * Checks a bot against the contract's shape and freezes it, so a malformed bot fails at import time.
@@ -66,11 +74,15 @@ export function defineBot(bot) {
   if (typeof bot?.chooseMove !== "function") {
     problems.push("chooseMove must be a function");
   }
+  if (bot?.answer !== undefined && typeof bot.answer !== "function") {
+    problems.push("answer, when given, must be a function");
+  }
   if (problems.length > 0) {
     throw new TypeError(`Invalid bot for "${bot?.gameId}": ${problems.join(", ")}`);
   }
   const known = new Set(ids);
   const choose = bot.chooseMove;
+  const answer = bot.answer ?? NOTHING_TO_ANSWER;
   return Object.freeze({
     gameId: bot.gameId,
     levels: Object.freeze(levels.map((level) => Object.freeze({ ...level }))),
@@ -80,5 +92,7 @@ export function defineBot(bot) {
       }
       return choose(turn);
     },
+    // A bot without questions to answer still has `answer`, so the server never has to ask which kind it is.
+    answer: (question) => Object.freeze([...answer(question)]),
   });
 }

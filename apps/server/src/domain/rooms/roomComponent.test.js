@@ -26,18 +26,30 @@ const partyEngine = defineEngine({ ...raceEngine, id: "party", players: { min: 2
  * Room component over the real accessor and the in-memory DAO, with the reference "race" engine. `wrap` can
  * change what the accessor does, to play another server writing at the same moment or storage failing.
  */
-function setup({ codes = ["ROOM22", "ROOM33", "ROOM44"], engines = [raceEngine], wrap = (a) => a } = {}) {
+function setup({
+  codes = ["ROOM22", "ROOM33", "ROOM44"],
+  engines = [raceEngine],
+  wrap = (a) => a,
+  botTurns,
+} = {}) {
+  // Every saved change is also published as CHANGED (for the bot driver). It is kept apart, so the tests of the
+  // other events read as before.
   const published = [];
+  const changes = [];
   const queue = [...codes];
   const accessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const rooms = createRoomComponent({
     roomAccessor: wrap(accessor),
     engines: createEngineRegistry(engines),
-    events: { emit: (event, payload) => published.push({ event, payload }) },
+    events: {
+      emit: (event, payload) =>
+        (event === ROOM_EVENTS.CHANGED ? changes : published).push({ event, payload }),
+    },
     generateCode: () => queue.shift(),
     generateSeed: () => 42, // seed 42 makes the second seat (Bob) move first in "race"
+    ...(botTurns && { botTurns }),
   });
-  return { rooms, published, accessor };
+  return { rooms, published, changes, accessor };
 }
 
 const createRace = (rooms, host = ALICE, now = T0) =>
@@ -460,12 +472,14 @@ describe("roomComponent", () => {
       });
     });
 
-    it("includes the engine's view, whose turn it is, and the outcome once playing", async () => {
+    it("includes the match id, the engine's view, whose turn it is, and the outcome once playing", async () => {
       const { rooms, code } = await startedGame();
+      const room = await rooms.getRoom(code);
 
-      const view = rooms.viewFor(await rooms.getRoom(code), ALICE.id);
+      const view = rooms.viewFor(room, ALICE.id);
 
       expect(view.game).toEqual({
+        matchId: room.game.matchId,
         view: { count: 0, target: 3, toMove: BOB.id },
         activePlayers: [BOB.id],
         outcome: { status: "ongoing" },

@@ -50,34 +50,41 @@ export const test = base.extend({
       const isRestartNoise = (url) => record.restarting && new URL(url).pathname.startsWith("/socket.io/");
       const engine = browser.browserType().name();
 
-      page.on("console", (message) => {
-        if (message.type() !== "error" && message.type() !== "warning") return;
-        // The browser logs every failed request as a console error; those are judged by status below.
-        if (isFailedLoadMessage(message.text())) return;
-        if (record.restarting && isRealtimeDownMessage(message.text())) return;
-        if (isEngineOwnMessage(engine, message.text())) return;
-        record.problems.push(`console.${message.type()}: ${message.text()}`);
-      });
-      page.on("pageerror", (error) => {
-        if (isFetchRefusedWhileLeaving(engine, error.stack ?? "", new URL(baseURL).origin)) return;
-        record.problems.push(`page error: ${error.message}`);
-      });
-      page.on("request", (request) => record.urls.push(request.url()));
-      page.on("framenavigated", (frame) => frame === page.mainFrame() && record.urls.push(frame.url()));
-      page.on("response", (response) => {
-        if (response.status() >= 400 && !isExpected(response.status(), response.url())) {
-          record.problems.push(`HTTP ${response.status()} ${response.request().method()} ${response.url()}`);
-        }
-      });
-      page.on("requestfailed", (request) => {
-        const reason = request.failure()?.errorText ?? "";
-        // Navigating away cancels in-flight requests and closes sockets; that is not a failure.
-        if (!isCancelledRequest(reason) && !isRestartNoise(request.url()))
-          record.problems.push(`request failed: ${request.url()} ${reason}`);
-      });
-      page.on("websocket", (socket) =>
-        socket.on("framereceived", (frame) => record.socketFrames.push(String(frame.payload))),
-      );
+      // Every tab of the person's browser is recorded the same way, so a second tab is checked as the first.
+      const watch = (tab) => {
+        tab.on("console", (message) => {
+          if (message.type() !== "error" && message.type() !== "warning") return;
+          // The browser logs every failed request as a console error; those are judged by status below.
+          if (isFailedLoadMessage(message.text())) return;
+          if (record.restarting && isRealtimeDownMessage(message.text())) return;
+          if (isEngineOwnMessage(engine, message.text())) return;
+          record.problems.push(`console.${message.type()}: ${message.text()}`);
+        });
+        tab.on("pageerror", (error) => {
+          if (isFetchRefusedWhileLeaving(engine, error.stack ?? "", new URL(baseURL).origin)) return;
+          record.problems.push(`page error: ${error.message}`);
+        });
+        tab.on("request", (request) => record.urls.push(request.url()));
+        tab.on("framenavigated", (frame) => frame === tab.mainFrame() && record.urls.push(frame.url()));
+        tab.on("response", (response) => {
+          if (response.status() >= 400 && !isExpected(response.status(), response.url())) {
+            record.problems.push(
+              `HTTP ${response.status()} ${response.request().method()} ${response.url()}`,
+            );
+          }
+        });
+        tab.on("requestfailed", (request) => {
+          const reason = request.failure()?.errorText ?? "";
+          // Navigating away cancels in-flight requests and closes sockets; that is not a failure.
+          if (!isCancelledRequest(reason) && !isRestartNoise(request.url()))
+            record.problems.push(`request failed: ${request.url()} ${reason}`);
+        });
+        tab.on("websocket", (socket) =>
+          socket.on("framereceived", (frame) => record.socketFrames.push(String(frame.payload))),
+        );
+        return tab;
+      };
+      watch(page);
 
       const player = {
         name,
@@ -85,6 +92,8 @@ export const test = base.extend({
         context,
         record,
         secrets,
+        /** Opens another tab in the same browser (same cookies), recorded and checked like the first (CC-115). */
+        openTab: async () => watch(await context.newPage()),
         /** Declare a failure the test provokes on purpose, e.g. a wrong password → 401 on /api/auth/login. */
         expect: (status, path) => record.expected.push({ status, path }),
         /** Declare that the server restarts during this test, so the dropped realtime connection is expected. */
@@ -133,8 +142,15 @@ async function checkClean({ name, page, context, record, secrets }) {
     expect(session.secure, `${name}: session cookie must be Secure`).toBe(true);
     expect(session.sameSite, `${name}: session cookie must be SameSite=Lax`).toBe("Lax");
   }
-  if (!page.isClosed() && page.url().startsWith("http")) {
-    const exposed = await page.evaluate(() => ({
+  // The first tab, and any other tab the test opened in this browser (openTab).
+  for (const tab of new Set([page, ...context.pages()])) {
+    await checkStorage({ name, tab });
+  }
+}
+
+async function checkStorage({ name, tab }) {
+  if (!tab.isClosed() && tab.url().startsWith("http")) {
+    const exposed = await tab.evaluate(() => ({
       cookie: document.cookie,
       local: Object.entries(localStorage),
       session: Object.keys(sessionStorage),

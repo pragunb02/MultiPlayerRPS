@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { fakeSocket } from "../../testing/fakes.js";
@@ -99,6 +99,94 @@ describe("PlayPage", () => {
       await screen.findByRole("heading", { name: "You're invited to play Rock Paper Scissors" }),
     ).toBeInTheDocument();
     expect(screen.getByText("AB2CD3")).toBeInTheDocument();
+  });
+
+  describe("playing the computer character (CC-221)", () => {
+    it("makes Play Rocky the main action, starting at the easiest level with one tap", async () => {
+      const user = userEvent.setup();
+      const socket = fakeSocket();
+      socket.request.mockImplementation(async (event) =>
+        event === "room:play-computer" ? { code: "AB2CD3" } : new Promise(() => {}),
+      );
+      const { api } = renderApp({ path: "/games/rock-paper-scissors", socket });
+      const panels = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
+
+      await user.click(screen.getByRole("button", { name: "Play Rocky" }));
+
+      expect(panels[0]).toBe("Play Rocky");
+      expect(api.startGuest).toHaveBeenCalledOnce();
+      expect(socket.request).toHaveBeenCalledWith("room:play-computer", {
+        gameId: "rps",
+        level: "easy",
+        options: {},
+      });
+      expect(await screen.findByText(/Joining room AB2CD3/)).toBeInTheDocument();
+    });
+
+    it("says before the game that the character is a computer and how its games count", () => {
+      renderApp({ path: "/games/chess" });
+
+      expect(screen.getByRole("heading", { name: "Play Queen Vee" })).toBeInTheDocument();
+      expect(screen.getByText("Computer")).toBeInTheDocument();
+      expect(screen.getByText(/count for quests and up to 100 XP a day/)).toBeInTheDocument();
+      expect(screen.getByText(/never count on leaderboards/)).toBeInTheDocument();
+    });
+
+    it("plays at the level picked with one tap", async () => {
+      const user = userEvent.setup();
+      const socket = fakeSocket();
+      socket.request.mockImplementation(async () => ({ code: "AB2CD3" }));
+      renderApp({ path: "/games/tic-tac-toe", socket });
+      const levels = screen.getByRole("group", { name: "Level" });
+
+      await user.click(within(levels).getByRole("button", { name: "Unbeatable" }));
+
+      expect(within(levels).getByRole("button", { name: "Unbeatable" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(within(levels).getByRole("button", { name: "Easy" })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByText(/Never loses\. A draw is the best you can do\./)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Play Pip" }));
+      expect(socket.request).toHaveBeenCalledWith("room:play-computer", {
+        gameId: "tictactoe",
+        level: "hard",
+        options: {},
+      });
+    });
+
+    it("answers a press of the level already picked by showing how it plays again (CC-164)", async () => {
+      const user = userEvent.setup();
+      renderApp({ path: "/games/rock-paper-scissors" });
+      const line = () => screen.getByText(/Throws at random/).closest("p");
+      const before = line();
+
+      await user.click(
+        within(screen.getByRole("group", { name: "Level" })).getByRole("button", { name: "Easy" }),
+      );
+
+      expect(line()).toHaveTextContent("Easy: Throws at random, so there is no habit to read.");
+      expect(line()).not.toBe(before);
+    });
+
+    it("keeps inviting a friend as the second way to play", () => {
+      renderApp({ path: "/games/rock-paper-scissors" });
+
+      expect(screen.getByRole("heading", { name: "Play a friend" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create room" })).toHaveClass("secondary");
+      expect(screen.getByRole("button", { name: "Play Rocky" })).toHaveClass("primary");
+    });
+
+    it("explains a failure under the button", async () => {
+      const user = userEvent.setup();
+      const socket = fakeSocket();
+      socket.request.mockRejectedValue(new Error("Slow down"));
+      renderApp({ path: "/games/rock-paper-scissors", socket });
+
+      await user.click(screen.getByRole("button", { name: "Play Rocky" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Slow down");
+    });
   });
 
   it("shows not-found for an unknown game", () => {

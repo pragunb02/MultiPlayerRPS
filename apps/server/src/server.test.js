@@ -351,18 +351,38 @@ describe("startHousekeeping", () => {
   const noRooms = async () => ({ waiting: 0, playing: 0, finished: 0 });
   const noConnections = () => ({ connections: 0, players: 0 });
 
-  function setup(roomComponent, playerTransferComponent = idleTransfers(), connections = noConnections) {
+  function setup(
+    roomComponent,
+    playerTransferComponent = idleTransfers(),
+    connections = noConnections,
+    botDriver = { resume: vi.fn(async () => {}) },
+  ) {
     vi.useFakeTimers();
     const capture = captureLogger();
     const housekeeping = startHousekeeping({
       roomComponent: { countRooms: noRooms, ...roomComponent },
       playerTransferComponent,
       connections,
+      botDriver,
       logger: capture.logger,
       now: () => 42,
     });
-    return { housekeeping, playerTransferComponent, ...capture };
+    return { housekeeping, playerTransferComponent, botDriver, ...capture };
   }
+
+  it("lets computer players plan again for every room at each room sweep, and logs a failing run (CC-138)", async () => {
+    const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
+    const botDriver = {
+      resume: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("database down")),
+    };
+    const { housekeeping, find } = setup(roomComponent, idleTransfers(), noConnections, botDriver);
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(botDriver.resume).toHaveBeenCalledTimes(2);
+    expect(find("planning for computer players failed")).toHaveLength(1);
+    housekeeping.stop();
+  });
 
   it("applies game deadlines every second and sweeps idle rooms every minute", () => {
     const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
@@ -396,11 +416,12 @@ describe("startHousekeeping", () => {
 
   it("does nothing more once stopped", () => {
     const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
-    const { housekeeping, playerTransferComponent } = setup(roomComponent);
+    const { housekeeping, playerTransferComponent, botDriver } = setup(roomComponent);
 
     housekeeping.stop();
     vi.advanceTimersByTime(120_000);
 
+    expect(botDriver.resume).not.toHaveBeenCalled();
     expect(roomComponent.expireDue).not.toHaveBeenCalled();
     expect(roomComponent.sweepExpired).not.toHaveBeenCalled();
     expect(playerTransferComponent.resumePending).not.toHaveBeenCalled();

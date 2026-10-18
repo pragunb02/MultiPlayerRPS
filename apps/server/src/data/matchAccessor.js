@@ -17,12 +17,14 @@ import { NotFoundError } from "../utils/errors.js";
  * @property {Readonly<MatchCredit>} [credit]   how the match counts, once judged (CC-095). Matches recorded before
  *   then have none and count for everyone
  *
- * @typedef {{ notCounted: ReadonlyArray<Readonly<{ playerId: string, reason: string, withdrawnFrom?: string }>> }} MatchCredit
+ * @typedef {{ notCounted: ReadonlyArray<Readonly<{ playerId: string, reason: string, withdrawnFrom?: string }>>, botXp?: ReadonlyArray<Readonly<{ playerId: string, xp: number, left: number, withdrawnFrom?: string, withdrawnXp?: number }>> }} MatchCredit
  *   the players the match does not count for, and why (a NOT_COUNTED_REASONS value). `withdrawnFrom` names the
- *   guest it counted for before the guest's games moved to this player
+ *   guest it counted for before the guest's games moved to this player. `botXp` is there in a game against a
+ *   computer character: the XP it gave each person within the day's limit, and what was left of it (ADR-025). A
+ *   guest's such game that gave more than the account had left keeps the part taken away in `withdrawnXp`
  *
- * @typedef {Readonly<{ matchId: string, players: ReadonlyArray<{ playerId: string }>, endedAt: number }>} CountedGame
- *   the little the fair play limits need to know about another game of a player
+ * @typedef {Readonly<{ matchId: string, players: ReadonlyArray<{ playerId: string }>, endedAt: number, credit?: Readonly<MatchCredit> }>} CountedGame
+ *   the little the fair play limits need to know about another game of a player, with its verdict once judged
  */
 
 function deepFreeze(value) {

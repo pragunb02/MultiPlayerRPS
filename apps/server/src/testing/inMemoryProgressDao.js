@@ -2,7 +2,7 @@ import { DuplicateKey } from "../persistence/errors.js";
 
 /** Test double with the same contract as `createProgressDao` (verified by the shared contract tests). */
 export function createInMemoryProgressDao() {
-  const COUNTERS = ["xp", "matchesPlayed", "wins", "losses", "draws"];
+  const COUNTERS = ["xp", "unrankedXp", "matchesPlayed", "wins", "losses", "draws"];
   const players = new Map();
   const totalsOf = (doc) => Object.fromEntries(COUNTERS.map((key) => [key, doc?.[key] ?? 0]));
   const add = (totals, inc) =>

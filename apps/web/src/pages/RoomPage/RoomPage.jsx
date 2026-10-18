@@ -6,6 +6,7 @@ import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { outcomeFor } from "../../components/Celebrations/outcome.js";
+import { ComputerNote } from "../../components/ComputerNote/ComputerNote.jsx";
 import { ResultCelebration } from "../../components/Celebrations/ResultCelebration.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
@@ -252,6 +253,7 @@ export function RoomPage() {
         <aside className={styles.side}>
           <h2 className="visually-hidden">Players</h2>
           <Seats room={view} />
+          <ComputerNote room={view} />
         </aside>
       </div>
 

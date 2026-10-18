@@ -1,10 +1,8 @@
-import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { SOCKET_EVENTS } from "@classicade/shared";
-import { useServices } from "../../app/servicesContext.js";
 import { Confetti } from "../../art/effects/Confetti.jsx";
 import { XpPop } from "../../art/effects/XpPop.jsx";
 import { isUncountedMatch, notCountedMessage } from "../notCounted.js";
+import { useMatchProgress } from "./matchProgressContext.js";
 import { outcomeFor } from "./outcome.js";
 import styles from "./ResultCelebration.module.css";
 
@@ -20,26 +18,17 @@ const BANNERS = Object.freeze({
  * once the server has recorded the match. All of it is decoration over the room's own result text ("You won!",
  * announced in its status region) and the XP toast, so it is hidden from screen readers and skipped (except the
  * static banner) under reduced motion. A game that didn't count (CC-095) says why under the banner, and the toast
- * announces the same words.
+ * announces the same words. Both come from the match's own progress update, which may have arrived before this was
+ * on screen (CC-235). A quest bonus that follows has its own toast and pop (GamificationToasts).
  *
- * @param {{ room: { you: string, game: { outcome: { result: string, winners: string[] } } } }} props
+ * @param {{ room: { you: string, game: { matchId: string, outcome: { result: string, winners: string[] } } } }} props
  */
 export function ResultCelebration({ room }) {
-  const { socket } = useServices();
-  const [xp, setXp] = useState(0);
-  const [notCounted, setNotCounted] = useState("");
+  const update = useMatchProgress(room.game.matchId);
   const outcome = outcomeFor(room);
-
-  // The match's own XP; a quest bonus that follows it has its own toast and pop (GamificationToasts).
-  useEffect(
-    () =>
-      socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, (update) => {
-        if (update.source === "quest") return;
-        setXp(update.xpGained);
-        setNotCounted(isUncountedMatch(update) ? notCountedMessage(update.notCountedReason) : "");
-      }),
-    [socket],
-  );
+  const xp = update === undefined ? 0 : update.xpGained;
+  const notCounted =
+    update !== undefined && isUncountedMatch(update) ? notCountedMessage(update.notCountedReason) : "";
 
   return (
     <div className={`${styles.celebration} ${styles[outcome]}`} aria-hidden="true">

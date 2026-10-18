@@ -159,9 +159,29 @@ describe("progressionComponent", () => {
           progress: expect.objectContaining({ xp: 60, level: 2, matchesPlayed: 0 }),
           counted: true,
           notCountedReason: "",
+          ranked: true,
         }),
       },
     ]);
+  });
+
+  it("keeps a bonus that a game against a computer character earned off the leaderboards (ADR-025)", async () => {
+    const { progression, published, progressDao } = setup();
+
+    await progression.awardBonus({
+      playerId: "guest_a",
+      displayName: "Alice",
+      key: "quest:2026-10-16:win-1",
+      xp: 60,
+      at: T0,
+      unranked: true,
+    });
+
+    expect(published[0].payload).toEqual(expect.objectContaining({ xpGained: 60, ranked: false }));
+    expect(await progressDao.getByPlayer("guest_a")).toEqual(
+      expect.objectContaining({ xp: 60, unrankedXp: 60 }),
+    );
+    expect(published[0].payload.progress).not.toHaveProperty("unrankedXp");
   });
 
   it("does not flag a level-up for bonus XP that stays within the level", async () => {
@@ -213,6 +233,60 @@ describe("progressionComponent", () => {
       expect.objectContaining({ xp: 0, matchesPlayed: 0, wins: 0, losses: 0 }),
     );
     expect(published).toHaveLength(2);
+  });
+
+  describe("games against a computer character (ADR-025)", () => {
+    const vsRocky = (botXp) =>
+      match({
+        players: [PLAYERS[0], { playerId: "bot_rocky_easy", displayName: "Rocky" }],
+        credit: { notCounted: [], botXp: [{ playerId: "guest_a", ...botXp }] },
+      });
+
+    it("gives the computer character no progress, and the person the XP their verdict allows", async () => {
+      const { progression, published } = setup();
+
+      const updates = await progression.applyMatch(vsRocky({ xp: 10, left: 0 }));
+
+      expect(updates.map((u) => u.playerId)).toEqual(["guest_a"]);
+      expect(updates[0]).toEqual(
+        expect.objectContaining({ xpGained: 10, counted: true, botXpLeft: 0, result: "win" }),
+      );
+      expect(published).toHaveLength(1);
+      expect(await progression.getProgress("guest_a")).toEqual(
+        expect.objectContaining({ xp: 10, matchesPlayed: 1, wins: 1 }),
+      );
+    });
+
+    it("marks the XP from a game against a computer character as unranked, and a game between people not", async () => {
+      const { progression, progressDao } = setup();
+
+      await progression.applyMatch(vsRocky({ xp: 30, left: 70 }));
+      await progression.applyMatch(match({ matchId: "m-people" }));
+
+      expect(await progressDao.getByPlayer("guest_a")).toEqual(
+        expect.objectContaining({ xp: 60, unrankedXp: 30 }),
+      );
+      expect(await progression.getProgress("guest_a")).not.toHaveProperty("unrankedXp");
+    });
+
+    it("still counts the game when the day's XP from computer games is used up", async () => {
+      const { progression } = setup();
+
+      const [update] = await progression.applyMatch(vsRocky({ xp: 0, left: 0 }));
+
+      expect(update).toEqual(expect.objectContaining({ xpGained: 0, counted: true, botXpLeft: 0 }));
+      expect(await progression.getProgress("guest_a")).toEqual(
+        expect.objectContaining({ xp: 0, matchesPlayed: 1, wins: 1 }),
+      );
+    });
+
+    it("says nothing about the computer limit after a game between people", async () => {
+      const { progression } = setup();
+
+      const updates = await progression.applyMatch(match());
+
+      expect(updates[0]).not.toHaveProperty("botXpLeft");
+    });
   });
 
   it("refuses to start without a way to read withdrawn matches", () => {
@@ -296,8 +370,78 @@ describe("progressionComponent: a guest's progress moving to their account (CC-0
       now: T0 + 5,
     });
 
-    expect(carried).toEqual({ xp: 30, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 });
+    expect(carried).toEqual({ xp: 30, unrankedXp: 0, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 });
     expect(await progression.getProgress(ACCOUNT.id)).toEqual(expect.objectContaining({ xp: 30, wins: 1 }));
+  });
+
+  it("takes back only the XP a withdrawn game against a computer character really gave", async () => {
+    const { progression, progressDao, matchAccessor } = setup();
+    await progressDao.applyMatchOnce({
+      playerId: "guest_a",
+      matchId: "m0",
+      inc: { xp: 50, matchesPlayed: 2, wins: 2 },
+      at: new Date(T0),
+    });
+    await matchAccessor.record(
+      match({
+        matchId: "m-vs-rocky",
+        players: [
+          { playerId: ACCOUNT.id, displayName: "Riya" },
+          { playerId: "bot_rocky_easy", displayName: "Rocky" },
+        ],
+        result: { result: "win", winners: [ACCOUNT.id], reason: "best-of-1" },
+      }),
+    );
+    await matchAccessor.judgeOnce({
+      matchId: "m-vs-rocky",
+      credit: {
+        notCounted: [{ playerId: ACCOUNT.id, reason: "opponent-daily-limit", withdrawnFrom: "guest_a" }],
+        botXp: [{ playerId: ACCOUNT.id, xp: 20, left: 0 }],
+      },
+    });
+
+    const { moved: carried } = await progression.transferPlayer({
+      from: "guest_a",
+      to: ACCOUNT,
+      now: T0 + 5,
+    });
+
+    expect(carried).toEqual(expect.objectContaining({ xp: 30, matchesPlayed: 1, wins: 1 }));
+  });
+
+  it("takes back the XP of a guest's computer game that went past the account's own daily limit (ADR-025)", async () => {
+    const { progression, progressDao, matchAccessor } = setup();
+    await progressDao.applyMatchOnce({
+      playerId: "guest_a",
+      matchId: "m0",
+      inc: { xp: 30, unrankedXp: 30, matchesPlayed: 1, wins: 1 },
+      at: new Date(T0),
+    });
+    await matchAccessor.record(
+      match({
+        matchId: "m-vs-rocky",
+        players: [
+          { playerId: ACCOUNT.id, displayName: "Riya" },
+          { playerId: "bot_rocky_easy", displayName: "Rocky" },
+        ],
+        result: { result: "win", winners: [ACCOUNT.id], reason: "best-of-1" },
+      }),
+    );
+    await matchAccessor.judgeOnce({
+      matchId: "m-vs-rocky",
+      credit: {
+        notCounted: [],
+        botXp: [{ playerId: ACCOUNT.id, xp: 10, left: 0, withdrawnFrom: "guest_a", withdrawnXp: 20 }],
+      },
+    });
+
+    const { moved: carried } = await progression.transferPlayer({
+      from: "guest_a",
+      to: ACCOUNT,
+      now: T0 + 5,
+    });
+
+    expect(carried).toEqual(expect.objectContaining({ xp: 10, unrankedXp: 10, matchesPlayed: 1, wins: 1 }));
   });
 
   it("awards a match that finished during the move to the account, once", async () => {

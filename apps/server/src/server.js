@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import http from "node:http";
-import { createEngineRegistry, ENGINES } from "@classicade/games";
+import { BOTS, createBotRegistry, createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
@@ -15,6 +15,11 @@ import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createAccountComponent } from "./domain/accounts/accountComponent.js";
 import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/analyticsComponent.js";
+import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botComponent.js";
+import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
+import { createBotTurns } from "./domain/bots/botTurns.js";
+import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
+import { createThinkingQueue } from "./domain/bots/thinkingQueue.js";
 import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
@@ -190,8 +195,9 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
 
 /**
  * Periodic work: close idle rooms, apply game deadlines that have passed (a chess flag falling while nobody
- * moves), and finish guest → account transfers that were interrupted (CC-032). A failing run is logged and the
- * next one still happens. Timers don't keep the process alive.
+ * moves), and finish guest → account transfers that were interrupted (CC-032). With the room sweep, computer
+ * players plan again for every room, so one whose plan was dropped after the database kept failing still moves
+ * (CC-138). A failing run is logged and the next one still happens. Timers don't keep the process alive.
  *
  * Once a minute it also logs a gauge: how many rooms are open in each status and how many realtime connections and
  * players there are (CC-107). Operators read it to see how close the server is to its limits (roomLimits.js).
@@ -200,6 +206,7 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
  *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "sweepExpired" | "expireDue" | "countRooms">,
  *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "resumePending">,
  *   connections: () => { connections: number, players: number },
+ *   botDriver: Pick<ReturnType<typeof createBotDriver>, "resume">,
  *   logger: Logger,
  *   now?: () => number,
  *   sweepIntervalMs?: number,
@@ -210,6 +217,7 @@ export function startHousekeeping({
   roomComponent,
   playerTransferComponent,
   connections,
+  botDriver,
   logger,
   now = Date.now,
   sweepIntervalMs = ROOM_SWEEP_INTERVAL_MS,
@@ -224,6 +232,7 @@ export function startHousekeeping({
   };
   const timers = [
     every(sweepIntervalMs, () => roomComponent.sweepExpired({ now: now() }), "room sweep failed"),
+    every(sweepIntervalMs, () => botDriver.resume(), "planning for computer players failed"),
     every(
       CLOCK_TICK_INTERVAL_MS,
       () => roomComponent.expireDue({ now: now() }),
@@ -301,12 +310,14 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
  *     limits?: Partial<import("./domain/rooms/roomLimits.js").RoomLimits>,
  *     sweepIntervalMs?: number,
  *   },
- * }} deps  `now` and `rooms` are for tests only. Production runs on the real clock and the standard room
- *   lifetimes and limits. Integration tests move the clock, and browser tests shorten lifetimes to watch a room
- *   close, raise the connections per address (every test player shares one) and fill the server on purpose.
+ *   bots?: { pauseMs?: { min: number, max: number } },
+ * }} deps  `now`, `rooms` and `bots` are for tests only. Production runs on the real clock, the standard room
+ *   lifetimes and limits, and a human-like pause before each computer move. Integration tests move the clock and
+ *   let computer players act at once, and browser tests shorten lifetimes to watch a room close, raise the
+ *   connections per address (every test player shares one) and fill the server on purpose.
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
-export async function startServer({ config, logger, limits = {}, now = Date.now, rooms = {} }) {
+export async function startServer({ config, logger, limits = {}, now = Date.now, rooms = {}, bots = {} }) {
   if (config.webDistDir !== "" && !existsSync(path.join(config.webDistDir, "index.html"))) {
     throw new Error(`WEB_DIST_DIR has no index.html: ${config.webDistDir} (run npm run build:web)`);
   }
@@ -361,13 +372,35 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     passwordHasher: createPasswordHasher(),
   });
   const limitsOfRooms = roomLimits(rooms.limits);
+  const engines = createEngineRegistry(ENGINES);
+  const botRegistry = createBotRegistry(BOTS);
+  assertCharactersPlayable(botRegistry);
+  const botTurns = createBotTurns({
+    bots: botRegistry,
+    engines,
+    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
+  });
   const roomComponent = createRoomComponent({
     roomAccessor,
-    engines: createEngineRegistry(ENGINES),
+    engines,
     events: domainEvents,
     lifetimes: roomLifetimes(rooms.lifetimes),
     limits: limitsOfRooms,
+    botTurns,
   });
+  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  const botDriver = createBotDriver({
+    roomComponent,
+    roomAccessor,
+    botTurns,
+    botComponent,
+    thinking: createThinkingQueue(),
+    events: domainEvents,
+    delayMs: pauseBetween(bots.pauseMs ?? HUMAN_PAUSE_MS),
+    logger,
+    now,
+  });
+  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -417,11 +450,14 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
 
   // Rooms are stored, so they outlive this process (CC-101). Nobody is connected to a process that has only
   // just started, and a chess flag may have fallen while no server was running: settle both before anyone
-  // can join. A game that ends here is recorded through the match pipeline above.
+  // can join. A game that ends here is recorded through the match pipeline above. Then a computer player whose
+  // turn it was when the last process stopped gets to move again (CC-138).
   try {
     await roomComponent.markEveryoneAway({ now: now() });
     await roomComponent.expireDue({ now: now() });
+    await botDriver.resume();
   } catch (err) {
+    botDriver.stop();
     await database.close();
     throw err;
   }
@@ -470,6 +506,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     networkOf: createNetworkKey({ secret: config.sessionSecret }),
     limits: limitsOfRooms,
     now,
+    botComponent,
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
   sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
@@ -478,6 +515,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     roomComponent,
     playerTransferComponent,
     connections: gateway.counts,
+    botDriver,
     logger,
     now,
     sweepIntervalMs: rooms.sweepIntervalMs,
@@ -485,6 +523,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
 
   const close = async () => {
     housekeeping.stop();
+    botDriver.stop();
     await gateway.close();
     await tasks.drain();
     await database.close();
@@ -494,6 +533,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     const port = await listen(server, config.port);
     return { server, port, close };
   } catch (err) {
+    botDriver.stop();
     await database.close();
     throw err;
   }

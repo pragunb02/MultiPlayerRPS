@@ -402,6 +402,37 @@ describe("ProfilePage", () => {
     expect(api.getMatches).toHaveBeenLastCalledWith({ limit: 10, before: 123 });
   });
 
+  it("labels a computer opponent in the history as a computer, never as a person of that name", async () => {
+    const vsRocky = {
+      ...match(4, "win"),
+      players: [
+        { playerId: USER.id, displayName: "Riya" },
+        { playerId: "bot_rocky_easy", displayName: "Rocky", computer: true },
+      ],
+    };
+    const vsPerson = {
+      ...match(3, "loss"),
+      players: [
+        { playerId: USER.id, displayName: "Riya" },
+        { playerId: "user_rocky", displayName: "Rocky" },
+      ],
+    };
+    renderApp({
+      path: "/profile",
+      api: fakeApi({
+        getSession: async () => USER,
+        getProgress: async () => progress,
+        getMatches: async () => ({ matches: [vsRocky, vsPerson] }),
+      }),
+    });
+
+    const list = await screen.findByRole("list", { name: "Match history" });
+    const [first, second] = within(list).getAllByRole("listitem");
+    expect(first).toHaveTextContent("Rock Paper Scissors vs Rocky (computer)");
+    expect(second).toHaveTextContent("Rock Paper Scissors vs Rocky");
+    expect(second).not.toHaveTextContent("computer");
+  });
+
   it("says so when the next page of matches can't be loaded, keeping the list and the button", async () => {
     const user = userEvent.setup();
     const api = fakeApi({

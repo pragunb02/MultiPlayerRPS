@@ -5,10 +5,11 @@ const DUPLICATE_KEY_CODE = 11000;
 // Idempotency window: the last N matches applied per player are remembered.
 const RECENT_MATCHES = 200;
 const MAX_ATTEMPTS = 3;
-const COUNTERS = ["xp", "matchesPlayed", "wins", "losses", "draws"];
+const COUNTERS = ["xp", "unrankedXp", "matchesPlayed", "wins", "losses", "draws"];
 
 /**
- * @typedef {{ xp: number, matchesPlayed: number, wins: number, losses: number, draws: number }} ProgressTotals
+ * @typedef {{ xp: number, unrankedXp: number, matchesPlayed: number, wins: number, losses: number, draws: number }} ProgressTotals
+ *   `unrankedXp` is the part of `xp` that never reaches a leaderboard (ADR-025)
  * @typedef {ProgressTotals & { playerId: string, updatedAt: Date }} ProgressDoc
  * @typedef {{ applied: boolean, before: ProgressTotals, mergedInto?: string }} ApplyResult
  *   `mergedInto`: the player's progress has moved to that account (nothing applied here)
@@ -18,6 +19,8 @@ const progressSchema = new mongoose.Schema(
   {
     playerId: { type: String, required: true, unique: true },
     xp: { type: Number, default: 0 },
+    // The part of xp earned from games against computer characters. Leaderboards leave it out (ADR-025).
+    unrankedXp: { type: Number, default: 0 },
     matchesPlayed: { type: Number, default: 0 },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
@@ -33,7 +36,7 @@ const progressSchema = new mongoose.Schema(
   { collection: "player_progress", versionKey: false },
 );
 
-const ZERO = Object.freeze({ xp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 });
+const ZERO = Object.freeze({ xp: 0, unrankedXp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 });
 const totalsOf = (doc) => Object.fromEntries(COUNTERS.map((key) => [key, doc?.[key] ?? 0]));
 
 /**

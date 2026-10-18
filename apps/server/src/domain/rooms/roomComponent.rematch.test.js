@@ -21,7 +21,7 @@ function setup() {
   const rooms = createRoomComponent({
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine]),
-    events: { emit: (event, payload) => published.push({ event, payload }) },
+    events: { emit: (event, payload) => event !== ROOM_EVENTS.CHANGED && published.push({ event, payload }) },
     generateCode: () => "ROOM22",
     generateSeed: () => 42, // seed 42: the second seat moves first
     generateMatchId: () => `m${++matchNumber}`,

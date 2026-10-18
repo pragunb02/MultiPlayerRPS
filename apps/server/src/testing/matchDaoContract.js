@@ -189,6 +189,18 @@ export function runMatchDaoContract(createDao) {
     expect(await dao.countWins({ playerId: "guest_b", gameId: "rps" })).toBe(2);
   });
 
+  it("leaves wins against a computer character out of the count of wins (ADR-025)", async () => {
+    const dao = await createDao();
+    const vsRocky = [
+      { playerId: "guest_b", displayName: "Bob" },
+      { playerId: "bot_rocky_easy", displayName: "Rocky" },
+    ];
+    await dao.insert(matchDoc({ matchId: "m-person" }));
+    await dao.insert(matchDoc({ matchId: "m-computer", players: vsRocky }));
+
+    expect(await dao.countWins({ playerId: "guest_b", gameId: "rps" })).toBe(1);
+  });
+
   it("lists a player's games that count in a time window, without one match, oldest first", async () => {
     const dao = await createDao();
     const at = (n, overrides = {}) =>
@@ -214,7 +226,12 @@ export function runMatchDaoContract(createDao) {
 
     expect(listed).toEqual([
       { matchId: "m-1", players: matchDoc().players, endedAt: new Date(T0 + 1000) },
-      { matchId: "m-4", players: matchDoc().players, endedAt: new Date(T0 + 4000) },
+      {
+        matchId: "m-4",
+        players: matchDoc().players,
+        endedAt: new Date(T0 + 4000),
+        credit: { notCounted: [] },
+      },
     ]);
   });
 
@@ -243,5 +260,31 @@ export function runMatchDaoContract(createDao) {
     expect(listed[0]).toEqual(
       expect.objectContaining({ players: user, credit: withdrawn("user_1", "guest_a") }),
     );
+  });
+
+  it("also lists the games against a computer character that give a player less XP than they gave the guest", async () => {
+    const dao = await createDao();
+    const user = [
+      { playerId: "user_1", displayName: "Riya" },
+      { playerId: "bot_rocky_easy", displayName: "Rocky" },
+    ];
+    const botXp = (entry) => ({ notCounted: [], botXp: [{ playerId: "user_1", xp: 10, left: 0, ...entry }] });
+    await dao.insert(matchDoc({ matchId: "m-capped", players: user }));
+    await dao.insert(matchDoc({ matchId: "m-other-guest", players: user }));
+    await dao.insert(matchDoc({ matchId: "m-full", players: user }));
+    await dao.judgeOnce({
+      matchId: "m-capped",
+      credit: botXp({ withdrawnFrom: "guest_a", withdrawnXp: 20 }),
+    });
+    await dao.judgeOnce({
+      matchId: "m-other-guest",
+      credit: botXp({ withdrawnFrom: "guest_c", withdrawnXp: 20 }),
+    });
+    await dao.judgeOnce({ matchId: "m-full", credit: botXp({}) });
+
+    const listed = await dao.listWithdrawn({ playerId: "user_1", from: "guest_a" });
+
+    expect(listed.map((m) => m.matchId)).toEqual(["m-capped"]);
+    expect(listed[0].credit).toEqual(botXp({ withdrawnFrom: "guest_a", withdrawnXp: 20 }));
   });
 }

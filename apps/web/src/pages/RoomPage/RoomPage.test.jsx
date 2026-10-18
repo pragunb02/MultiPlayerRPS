@@ -478,6 +478,73 @@ describe("RoomPage: every other state and path", () => {
   });
 });
 
+// The server records the match in the background, so its progress update can come before the page has drawn the
+// result. The result must still show it (CC-235).
+describe("the result's own XP and reason", () => {
+  const forfeitWin = { result: "win", winners: [GUEST.id], reason: "forfeit" };
+  const game = ({ matchId = "match-1", outcome = { status: "ongoing" } } = {}) => ({
+    matchId,
+    view: {},
+    activePlayers: outcome.status === "ongoing" ? [GUEST.id] : [],
+    outcome,
+  });
+  const finishedRoom = (matchId) =>
+    playing({ status: "finished", game: game({ matchId, outcome: forfeitWin }) });
+  const uncounted = (matchId) => ({
+    source: "match",
+    key: matchId,
+    matchId,
+    xpGained: 0,
+    leveledUp: false,
+    progress: { level: 1 },
+    counted: false,
+    notCountedReason: "ended-too-soon",
+  });
+  const counted = (matchId) => ({ ...uncounted(matchId), xpGained: 30, counted: true, notCountedReason: "" });
+  const resultOf = () => screen.getByRole("heading", { name: "You won by forfeit" }).parentElement;
+  const xpPop = () => document.querySelector("[data-effect='xp-pop']");
+
+  async function playingRoom() {
+    const opened = openRoom({ joined: playing({ game: game() }) });
+    await screen.findByText(/board is not available yet/);
+    return opened;
+  }
+
+  it("says why the game didn't count when the update came before the result was drawn", async () => {
+    const { socket } = await playingRoom();
+
+    act(() => {
+      socket.push("room:updated", finishedRoom("match-1"));
+      socket.push("progress:updated", uncounted("match-1"));
+    });
+
+    expect(
+      await within(resultOf()).findByText("This game didn't count: it ended too soon"),
+    ).toBeInTheDocument();
+  });
+
+  it("floats the XP when the update came before the room said the game was over", async () => {
+    const { socket } = await playingRoom();
+
+    act(() => socket.push("progress:updated", counted("match-1")));
+    act(() => socket.push("room:updated", finishedRoom("match-1")));
+
+    expect(await screen.findByRole("heading", { name: "You won by forfeit" })).toBeInTheDocument();
+    expect(xpPop()).toHaveTextContent("+30 XP");
+  });
+
+  it("never shows the update of the game before under the next game's result", async () => {
+    const { socket } = await playingRoom();
+
+    act(() => socket.push("progress:updated", uncounted("match-0")));
+    act(() => socket.push("room:updated", finishedRoom("match-1")));
+
+    await screen.findByRole("heading", { name: "You won by forfeit" });
+    expect(within(resultOf()).queryByText(/didn't count/)).toBeNull();
+    expect(xpPop()).toBeNull();
+  });
+});
+
 describe("progress toasts", () => {
   it.each([
     [{ xpGained: 30, leveledUp: false, progress: { level: 1 } }, "+30 XP"],

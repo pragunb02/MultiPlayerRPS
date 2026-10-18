@@ -57,7 +57,8 @@ const toRawMove = ({ from, to, promotion }) =>
 /**
  * Chess bots built on a small engine of our own (board.js, search.js). Stockfish would be far stronger
  * than any of these levels need, and a few hundred lines keep the package free of a large binary.
- * They play moves only: they never resign, offer a draw or accept one.
+ * They never resign, offer a draw or accept one. A draw offer made while it is their opponent's turn is
+ * declined at once, so the offer never waits for an answer that will not come.
  */
 export const chessBot = defineBot({
   gameId: GAME_IDS.CHESS,
@@ -88,5 +89,10 @@ export const chessBot = defineBot({
         ? beginner(board, rng)
         : searchMove(board, { ...CHESS_SEARCH_LIMITS[difficulty], rng }).move;
     return toRawMove(move);
+  },
+  answer({ view, botId }) {
+    return view.drawOfferBy !== "" && view.drawOfferBy !== botId
+      ? [{ type: CHESS_ACTIONS.DECLINE_DRAW }]
+      : [];
   },
 });

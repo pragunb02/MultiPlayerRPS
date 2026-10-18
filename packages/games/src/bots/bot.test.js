@@ -30,6 +30,19 @@ describe("defineBot", () => {
     expect(defineBot(valid).chooseMove(turn("only"))).toEqual({ add: 1 });
   });
 
+  it("answers nothing when the bot has no questions to answer", () => {
+    expect(defineBot(valid).answer({ view: {}, botId: "bot" })).toEqual([]);
+  });
+
+  it("passes a question to the bot's own answer, as a frozen list", () => {
+    const bot = defineBot({ ...valid, answer: ({ botId }) => [{ reply: botId }] });
+
+    const answers = bot.answer({ view: {}, botId: "bot" });
+
+    expect(answers).toEqual([{ reply: "bot" }]);
+    expect(Object.isFrozen(answers)).toBe(true);
+  });
+
   it("refuses a difficulty the bot does not have", () => {
     expect(() => raceBot.chooseMove(turn("expert"))).toThrow(/Unknown race bot difficulty "expert"/);
   });
@@ -46,6 +59,7 @@ describe("defineBot", () => {
     [{ ...valid, levels: [{ id: "easy", name: "Easy", description: "" }] }, /needs a description/],
     [{ ...valid, levels: [valid.levels[0], valid.levels[0]] }, /level ids must be unique/],
     [{ ...valid, chooseMove: "nope" }, /chooseMove must be a function/],
+    [{ ...valid, answer: "nope" }, /answer, when given, must be a function/],
     [undefined, /Invalid bot for "undefined"/],
   ])("rejects a malformed bot (%#)", (bot, message) => {
     expect(() => defineBot(bot)).toThrow(message);

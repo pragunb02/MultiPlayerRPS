@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
-import { ROOM_CODE_LENGTH } from "@classicade/shared";
+import { characterForGame, ROOM_CODE_LENGTH } from "@classicade/shared";
 import { gameForSlug, paths } from "../../app/paths.js";
 import { GameArt } from "../../art/games/GameArt.jsx";
 import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { PlayComputer } from "../../components/PlayComputer/PlayComputer.jsx";
 import { gameView } from "../../games/registry.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useCreateRoom } from "../../hooks/useCreateRoom.js";
@@ -13,9 +14,10 @@ import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import styles from "./PlayPage.module.css";
 
 /**
- * One game's lobby: create a room with the game's options, or join a friend's room by code. Create room shows a
- * spinner while the room is being made and explains a failure under the button. Join room says what is missing
- * while the code is not complete (CC-164).
+ * One game's lobby. The main action plays the game's computer character at once, at the level picked with one tap
+ * (CC-221). Below it: create a room with the game's options to invite a friend, or join a friend's room by code.
+ * Each button shows a spinner while the server works and explains a failure under it. Join room says what is
+ * missing while the code is not complete (CC-164).
  */
 export function PlayPage() {
   const { slug } = useParams();
@@ -32,6 +34,13 @@ export function PlayPage() {
     },
     { id: "lobby.create" },
   );
+  const playComputer = useAction(
+    async (level) => {
+      const roomCode = await createRoom.playComputer({ gameId: game.id, level, options: {} });
+      navigate(paths.room(game.id, roomCode));
+    },
+    { id: "lobby.play_computer" },
+  );
 
   if (game === undefined) {
     return <NotFoundPage />;
@@ -40,6 +49,7 @@ export function PlayPage() {
     return <Navigate to={paths.game(game.id)} replace />;
   }
   const { Options } = gameView(game.id);
+  const character = characterForGame(game.id);
 
   function join(event) {
     event.preventDefault();
@@ -54,10 +64,17 @@ export function PlayPage() {
         <GameArt gameId={game.id} className={styles.art} />
       </div>
       <div className={styles.panels}>
+        <PlayComputer character={character} action={playComputer} />
         <div className={styles.panel}>
-          <h2>Start a room</h2>
+          <h2>Play a friend</h2>
           {Options && <Options value={options} onChange={setOptions} />}
-          <Button control="lobby.create" size="lg" action={create} pendingLabel="Creating…">
+          <Button
+            control="lobby.create"
+            variant="secondary"
+            size="lg"
+            action={create}
+            pendingLabel="Creating…"
+          >
             Create room
           </Button>
         </div>

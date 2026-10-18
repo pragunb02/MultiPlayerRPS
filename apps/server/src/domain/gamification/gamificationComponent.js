@@ -1,6 +1,7 @@
 import { DAILY_SWEEP_BONUS_XP } from "@classicade/shared";
+import { isBotPlayerId } from "../../models/botIdentity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { creditFor } from "../matches/fairPlay.js";
+import { creditFor, hasComputerPlayer } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
 import { nextUtcMidnight, utcDay } from "./calendar.js";
 import { achievementStanding, evaluateAchievements } from "./evaluateAchievements.js";
@@ -107,8 +108,10 @@ export function createGamificationComponent({
    * Bonus XP and the quest counter for every completed quest of the day. Each is idempotent by key, so this
    * also finishes what a crash interrupted last time.
    */
-  async function rewardQuests({ playerId, displayName, questDay, at, stats: counted }) {
+  async function rewardQuests({ playerId, displayName, questDay, at, stats: counted, computerGame }) {
     let stats = counted;
+    // A bonus that this game against a computer character earned stays off the leaderboards (ADR-025).
+    const unrankedAt = (completedAt) => computerGame && completedAt === at;
     for (const item of questDay.items.filter((i) => i.completedAt !== null)) {
       const key = questKey(questDay.day, item.id);
       await progressionComponent.awardBonus({
@@ -117,6 +120,7 @@ export function createGamificationComponent({
         key,
         xp: item.bonusXp,
         at: item.completedAt,
+        unranked: unrankedAt(item.completedAt),
       });
       ({ stats } = await gamificationAccessor.applyToStatsOnce({
         playerId,
@@ -133,6 +137,7 @@ export function createGamificationComponent({
         key: questKey(questDay.day, SWEEP),
         xp: DAILY_SWEEP_BONUS_XP,
         at: questDay.sweepAt,
+        unranked: unrankedAt(questDay.sweepAt),
       });
     }
     return stats;
@@ -163,6 +168,7 @@ export function createGamificationComponent({
       questDay: quests.questDay,
       at,
       stats: counted.stats,
+      computerGame: hasComputerPlayer(match),
     });
 
     if (counted.applied) {
@@ -193,13 +199,13 @@ export function createGamificationComponent({
     /**
      * Counts a recorded match for each of its players (after progression applied it): stats and streaks,
      * quests and their bonus XP, then achievements. A player the match doesn't count for (CC-095) gets none of
-     * it. Applying the same match again changes nothing.
+     * it, and neither does a computer character (ADR-025). Applying the same match again changes nothing.
      *
      * @param {{ match: Readonly<import("../../data/matchAccessor.js").Match>, now: number }} input
      */
     async applyMatch({ match, now }) {
       for (const { playerId, displayName } of match.players.filter(
-        (p) => creditFor(match, p.playerId).counted,
+        (p) => !isBotPlayerId(p.playerId) && creditFor(match, p.playerId).counted,
       )) {
         await applyForPlayer({ match, playerId, displayName, now });
       }

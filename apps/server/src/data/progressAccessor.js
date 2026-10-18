@@ -6,13 +6,15 @@ import { ConflictError } from "../utils/errors.js";
  * @typedef {Object} Progress   domain model (frozen); a player with no games yet has all-zero progress
  * @property {string} playerId
  * @property {number} xp
+ * @property {number} unrankedXp   the part of `xp` from games against computer characters, and from quests they
+ *   completed. Leaderboards leave it out (ADR-025)
  * @property {number} matchesPlayed
  * @property {number} wins
  * @property {number} losses
  * @property {number} draws
  */
 
-const ZERO = Object.freeze({ xp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 });
+const ZERO = Object.freeze({ xp: 0, unrankedXp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 });
 
 /**
  * @param {{ progressDao: ReturnType<typeof import("../persistence/progressDao.js").createProgressDao> }} deps

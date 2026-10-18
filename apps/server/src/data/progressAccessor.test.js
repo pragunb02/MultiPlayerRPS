@@ -10,6 +10,7 @@ describe("progressAccessor", () => {
     expect(await setup().get("guest_new")).toEqual({
       playerId: "guest_new",
       xp: 0,
+      unrankedXp: 0,
       matchesPlayed: 0,
       wins: 0,
       losses: 0,
@@ -23,19 +24,32 @@ describe("progressAccessor", () => {
     const { applied, before, after } = await progress.applyMatchOnce({
       playerId: "guest_a",
       matchId: "m1",
-      inc: { xp: 30, matchesPlayed: 1, wins: 1 },
+      inc: { xp: 30, unrankedXp: 0, matchesPlayed: 1, wins: 1 },
       at: Date.UTC(2026, 9, 16),
     });
 
     expect(applied).toBe(true);
     expect(before.xp).toBe(0);
-    expect(after).toEqual({ playerId: "guest_a", xp: 30, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 });
+    expect(after).toEqual({
+      playerId: "guest_a",
+      xp: 30,
+      unrankedXp: 0,
+      matchesPlayed: 1,
+      wins: 1,
+      losses: 0,
+      draws: 0,
+    });
     expect(await progress.get("guest_a")).toEqual(after);
   });
 
   it("reports a repeated match as not applied, with unchanged totals", async () => {
     const progress = setup();
-    const change = { playerId: "guest_a", matchId: "m1", inc: { xp: 30, matchesPlayed: 1, wins: 1 }, at: 0 };
+    const change = {
+      playerId: "guest_a",
+      matchId: "m1",
+      inc: { xp: 30, unrankedXp: 0, matchesPlayed: 1, wins: 1 },
+      at: 0,
+    };
     await progress.applyMatchOnce(change);
 
     const again = await progress.applyMatchOnce(change);
@@ -56,7 +70,7 @@ describe("progressAccessor", () => {
     const first = await progress.applyAwardOnce(award);
     const again = await progress.applyAwardOnce(award);
 
-    expect(first.after).toEqual(expect.objectContaining({ xp: 20, matchesPlayed: 0 }));
+    expect(first.after).toEqual(expect.objectContaining({ xp: 20, unrankedXp: 0, matchesPlayed: 0 }));
     expect(again.applied).toBe(false);
     expect((await progress.get("guest_a")).xp).toBe(20);
   });
@@ -76,7 +90,7 @@ describe("progressAccessor", () => {
 });
 
 describe("progressAccessor: a guest's progress moving to an account (CC-032)", () => {
-  const WIN = { xp: 30, matchesPlayed: 1, wins: 1 };
+  const WIN = { xp: 30, unrankedXp: 0, matchesPlayed: 1, wins: 1 };
   const play = (progress, playerId, matchId) =>
     progress.applyMatchOnce({ playerId, matchId, inc: WIN, at: Date.UTC(2026, 9, 16) });
 
@@ -87,7 +101,9 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
 
     const result = await progress.mergeInto({ from: "guest_a", to: "user_1", at: 1, withdraw: {} });
 
-    expect(result).toEqual({ moved: { xp: 30, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 } });
+    expect(result).toEqual({
+      moved: { xp: 30, unrankedXp: 0, matchesPlayed: 1, wins: 1, losses: 0, draws: 0 },
+    });
     expect((await progress.get("user_1")).xp).toBe(60);
   });
 
@@ -100,11 +116,15 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
       from: "guest_a",
       to: "user_1",
       at: 1,
-      withdraw: { xp: 20, matchesPlayed: 1, losses: 1 },
+      withdraw: { xp: 20, unrankedXp: 0, matchesPlayed: 1, losses: 1 },
     });
 
-    expect(result).toEqual({ moved: { xp: 10, matchesPlayed: 0, wins: 1, losses: 0, draws: 0 } });
-    expect(await progress.get("user_1")).toEqual(expect.objectContaining({ xp: 40, matchesPlayed: 1 }));
+    expect(result).toEqual({
+      moved: { xp: 10, unrankedXp: 0, matchesPlayed: 0, wins: 1, losses: 0, draws: 0 },
+    });
+    expect(await progress.get("user_1")).toEqual(
+      expect.objectContaining({ xp: 40, unrankedXp: 0, matchesPlayed: 1 }),
+    );
   });
 
   it("moves nothing the second time", async () => {
@@ -114,7 +134,7 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
 
     const again = await progress.mergeInto({ from: "guest_a", to: "user_1", at: 2, withdraw: {} });
 
-    expect(again.moved).toEqual({ xp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 });
+    expect(again.moved).toEqual({ xp: 0, unrankedXp: 0, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 });
     expect((await progress.get("user_1")).xp).toBe(30);
   });
 
