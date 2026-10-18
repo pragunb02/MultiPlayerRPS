@@ -37,7 +37,13 @@ async function deployRemovesBoardFile(player) {
 test.describe("a tab from before a deploy", () => {
   test("reloads once into the room when the board's file is gone, never showing the error page", async ({
     players,
+    browserName,
   }) => {
+    // On WebKit, Playwright's stand-in answer for the file stays in the tab after the reload, so the reloaded page
+    // never asks the server again and the test would fail for a reason players never meet. A plain server that
+    // answers 404 and then the file, with no Playwright in between, showed WebKit asking again after the reload
+    // and loading the file (CC-184, finding F-3).
+    test.skip(browserName === "webkit", "Playwright's routing on WebKit keeps the deploy's missing file");
     const alice = await players.open("alice");
     await alice.page.goto("/games/rock-paper-scissors");
     await alice.page.getByRole("combobox", { name: /match length/i }).selectOption("1");

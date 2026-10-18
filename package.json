@@ -18,9 +18,10 @@
     "lint": "eslint . && node scripts/check-comments.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run --tags-filter=\"not slow\"",
+    "test:watch": "vitest --tags-filter=\"not slow\"",
+    "test:coverage": "vitest run --coverage --tags-filter=\"not slow\"",
+    "test:all": "vitest run --coverage",
     "dev:web": "npm run dev -w @classicade/web",
     "build:web": "npm run build -w @classicade/web",
     "test:e2e": "npm test -w @classicade/e2e"

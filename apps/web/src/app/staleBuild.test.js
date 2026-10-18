@@ -26,6 +26,8 @@ function fakeWindow(path) {
       if (listeners.get(type) === listener) listeners.delete(type);
     },
     listening: (type) => listeners.has(type),
+    /** The browser sends a plain event such as `beforeunload` or `pageshow`. */
+    fire: (type) => listeners.get(type)?.(new Event(type)),
     /** Vite reports a file that failed to load. Answers whether the failure was swallowed. */
     failLoad() {
       const event = new Event("vite:preloadError", { cancelable: true });
@@ -106,13 +108,40 @@ describe("recoverFromStaleBuild", () => {
     expect(tab.reloads).toBe(1);
   });
 
+  it("never reloads a page that is leaving, so the player's own navigation goes ahead (F-8)", () => {
+    const tab = fakeWindow("/");
+    recoverFromStaleBuild({ window: tab, now: clock().now });
+
+    tab.fire("beforeunload");
+    const swallowed = tab.failLoad();
+
+    expect(swallowed).toBe(true);
+    expect(tab.reloads).toBe(0);
+    expect(path(tab)).toBe("/");
+  });
+
+  for (const sign of ["pageshow", "pointerdown", "keydown"]) {
+    it(`recovers again once the player turns out to be staying (${sign})`, () => {
+      const tab = fakeWindow("/games/chess/rooms/AB2CD3");
+      recoverFromStaleBuild({ window: tab, now: clock().now });
+      tab.fire("beforeunload");
+
+      tab.fire(sign);
+
+      expect(tab.failLoad()).toBe(true);
+      expect(tab.reloads).toBe(1);
+    });
+  }
+
   it("stops listening when asked", () => {
     const tab = fakeWindow("/");
     const stop = recoverFromStaleBuild({ window: tab, now: clock().now });
 
     stop();
 
-    expect(tab.listening("vite:preloadError")).toBe(false);
+    for (const type of ["vite:preloadError", "beforeunload", "pageshow", "pointerdown", "keydown"]) {
+      expect(tab.listening(type), type).toBe(false);
+    }
     expect(tab.failLoad()).toBe(false);
     expect(tab.reloads).toBe(0);
   });
