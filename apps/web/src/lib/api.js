@@ -71,6 +71,19 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     signOutOtherDevices: async () => {
       await request("POST", "/auth/sign-out-others");
     },
+    /**
+     * The signed-in player's own account: username, when it was made, the birth year if stated, and the age group
+     * it gives (CC-152).
+     */
+    getAccount: async () => (await request("GET", "/account")).account,
+    /** Sets a birth year the account does not have yet. Answers the account. */
+    setBirthYear: async (birthYear) => (await request("PUT", "/account/birth-year", { birthYear })).account,
+    /** Everything ClassiCade holds about the account, as JSON, after the password is given again (CC-035). */
+    exportData: (password) => request("POST", "/account/export", { password }),
+    /** Deletes the account and everything linked to it. This browser is signed out (CC-035). */
+    deleteAccount: async (password) => {
+      await request("POST", "/account/delete", { password });
+    },
     getProgress: async () => (await request("GET", "/progress")).progress,
     getMatches: (query = {}) => request("GET", `/matches${toQuery(query)}`),
     getMatch: async (matchId) => (await request("GET", `/matches/${encodeURIComponent(matchId)}`)).match,

@@ -95,6 +95,10 @@ export function fakeApi(overrides = {}) {
     login: vi.fn(),
     changePassword: vi.fn().mockResolvedValue(undefined),
     signOutOtherDevices: vi.fn().mockResolvedValue(undefined),
+    getAccount: vi.fn().mockResolvedValue({ username: "Riya", createdAt: 0, ageGroup: "unknown" }),
+    setBirthYear: vi.fn(),
+    exportData: vi.fn(),
+    deleteAccount: vi.fn().mockResolvedValue(undefined),
     getProgress: vi.fn().mockResolvedValue(PROGRESS),
     getMatches: vi.fn(),
     getMatch: vi.fn(),
@@ -209,5 +213,16 @@ export function fakeSound({
       return true;
     }),
     listen: vi.fn(() => () => undefined),
+  };
+}
+
+/** A fake of the file saver (lib/download.js): it records what would have been saved, in `saved`. */
+export function fakeDownload() {
+  const saved = [];
+  return {
+    saved,
+    saveJson: vi.fn((file) => {
+      saved.push(file);
+    }),
   };
 }

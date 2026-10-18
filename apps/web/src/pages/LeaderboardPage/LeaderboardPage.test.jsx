@@ -343,3 +343,33 @@ describe("LeaderboardPage", () => {
     });
   });
 });
+
+describe("LeaderboardPage and hidden names (CC-152)", () => {
+  it("shows a hidden player's place and score without a name, and says why", async () => {
+    const hidden = { rank: 2, displayName: "Hidden player", hidden: true, level: 2, score: 40 };
+    renderApp({
+      path: "/leaderboards/overall",
+      api: api({
+        boards: { overall: { board: boardInfo("overall"), entries: [entry(1, "ada", 900, 6), hidden] } },
+      }),
+    });
+
+    await screen.findByRole("list", { name: "Overall XP rankings" });
+
+    expect(rows()[1]).toHaveTextContent("2Hidden playerLv 240 XP");
+    expect(within(rows()[1]).getByText("Hidden player")).toHaveClass("hidden");
+    expect(within(rows()[0]).getByText("ada")).not.toHaveClass("hidden");
+    expect(screen.getByText(/is a player under 18 or one who has not said their age/)).toBeInTheDocument();
+  });
+
+  it("says nothing about hidden names when every name shows", async () => {
+    renderApp({
+      path: "/leaderboards/overall",
+      api: api({ boards: { overall: { board: boardInfo("overall"), entries: ENTRIES } } }),
+    });
+
+    await screen.findByRole("list", { name: "Overall XP rankings" });
+
+    expect(screen.queryByText(/has not said their age/)).toBeNull();
+  });
+});
