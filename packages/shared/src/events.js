@@ -22,7 +22,8 @@
  *   present in a game where a computer player sealed a move (CC-225). `locked` are moves chosen but not shown yet,
  *   each as its lock. `checks` are the shown ones: SHA-256 of `text:salt` in lowercase hexadecimal equals `commitment`
  * @property {string} you             the viewer's player id ("" for spectators)
- * @property {{ view: unknown, activePlayers: string[], outcome: object } | undefined} game   present once started
+ * @property {{ matchId: string, view: unknown, activePlayers: string[], outcome: object } | undefined} game   present
+ *   once started. `matchId` names this game's match, the same id as in `progress:updated` (CC-235)
  * @property {number} serverTime      server clock (ms) when the view was produced, so client timers do not drift
  * @property {number} revision        counts the room's saved changes. A view with a lower revision than one already
  *   shown is older, because an update can overtake the answer to a request (CC-138)
