@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.js";
+import { expect, formFactor, test } from "./fixtures.js";
 import { answerTo, arm, installProbe, otherSaw } from "./controlProbe.js";
 import { computerStatesFor, GAMES, openPair, snapshot, statesFor } from "./matchStates.js";
 
@@ -284,7 +284,7 @@ for (const gameId of Object.keys(GAMES)) {
     for (const [name, build] of Object.entries(allStatesFor(gameId))) {
       test(name, async ({ players }, testInfo) => {
         test.setTimeout(90_000);
-        const project = testInfo.project.name;
+        const project = formFactor(testInfo);
         const known = BELOW_THE_FOLD.get(`${project} ${gameId} ${name}`);
         test.fail(known !== undefined, `CC-172 has to fix this layout: ${known}`);
         const pair = await openPair(players);

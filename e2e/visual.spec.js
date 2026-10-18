@@ -1,4 +1,4 @@
-import { expect, joinAsGuest, test } from "./fixtures.js";
+import { expect, formFactor, joinAsGuest, test } from "./fixtures.js";
 
 // The arcade look (CC-087, ADR-012): every themed screen renders in light and dark with no CSP violations or
 // console errors (the players fixture checks), celebrations play, and with reduced motion nothing moves while
@@ -186,7 +186,10 @@ test("with reduced motion nothing animates after a win or a level-up, and the wo
 test("the game cards can be reached and opened with the keyboard, with a visible focus ring", async ({
   players,
 }, testInfo) => {
-  test.skip(testInfo.project.name === "mobile", "keyboard navigation is a desktop journey");
+  test.skip(formFactor(testInfo) === "mobile", "keyboard navigation is a desktop journey");
+  // Safari's Tab key moves only between form fields unless the player turns on "Press Tab to highlight each item".
+  // Option and Tab reaches links too, and that is the key a Safari keyboard user presses (CC-184).
+  const nextItem = testInfo.project.use.defaultBrowserType === "webkit" ? "Alt+Tab" : "Tab";
   const { page } = await players.open("visitor");
   await page.goto("/");
   await expect(page.locator("main li")).toHaveCount(3);
@@ -194,7 +197,7 @@ test("the game cards can be reached and opened with the keyboard, with a visible
 
   const names = [];
   for (let press = 0; press < 20 && names.length < 3; press++) {
-    await page.keyboard.press("Tab");
+    await page.keyboard.press(nextItem);
     const name = await focusedName();
     if (["Rock Paper Scissors", "Tic Tac Toe", "Chess"].includes(name)) names.push(name);
   }

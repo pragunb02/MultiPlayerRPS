@@ -5,11 +5,13 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BASE_URL, E2E_PORT } from "./personas.js";
+import { APP_URL, E2E_PORT } from "./personas.js";
 
 const CONTROL_DIR = path.join(os.tmpdir(), `classicade-e2e-${E2E_PORT}`);
 const APP_PID_FILE = path.join(CONTROL_DIR, "app.pid");
 const ROOM_OPTIONS_FILE = path.join(CONTROL_DIR, "rooms.json");
+/** The run's TLS certificate and key, made by server.mjs. They live only in this temporary folder. */
+export const TLS_DIR = path.join(CONTROL_DIR, "tls");
 const RESTART_TIMEOUT_MS = 30_000;
 
 /** Called by server.mjs: a fresh control folder, with the standard room options. */
@@ -35,7 +37,7 @@ const appPid = () => Number(readFileSync(APP_PID_FILE, "utf8"));
 
 async function isHealthy() {
   try {
-    return (await fetch(`${BASE_URL}/health`)).ok;
+    return (await fetch(`${APP_URL}/health`)).ok;
   } catch {
     return false;
   }

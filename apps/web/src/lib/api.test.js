@@ -125,6 +125,16 @@ describe("api client", () => {
     });
   });
 
+  it("reports a success whose answer was cut off as NETWORK, never as an empty answer", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => Promise.reject(new TypeError("Load failed")),
+    });
+
+    await expect(createApiClient({ fetchImpl }).getGames()).rejects.toMatchObject({ code: "NETWORK" });
+  });
+
   it("reports network failures as NETWORK", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
 

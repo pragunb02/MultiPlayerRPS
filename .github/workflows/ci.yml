@@ -33,6 +33,7 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm audit --audit-level=high
+      # Leaves out the tests tagged slow (long bot games). nightly.yml runs every test (CC-203).
       - run: npm run test:coverage
       - name: Coverage report
         if: always()
@@ -105,6 +106,41 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 14
+
+  # The same browser suite on Firefox, on a laptop screen (CC-184). It takes about as long as the Chromium job and
+  # runs beside it, so it adds no waiting. Not a required check yet: the owner decides when, after a green streak.
+  # WebKit is much slower on GitHub's runners and has its own workflow, webkit.yml.
+  e2e-firefox:
+    name: Browser persona tests (firefox desktop)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - name: Install Firefox
+        run: npx playwright install --with-deps firefox
+      - run: npm run test:e2e
+        env:
+          CI: "true"
+          E2E_BROWSER: firefox
+      - name: Playwright report and failure traces
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-firefox
           path: |
             e2e/playwright-report/
             e2e/test-results/

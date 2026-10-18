@@ -1,4 +1,11 @@
 import { test as base, expect } from "@playwright/test";
+import {
+  isCancelledRequest,
+  isEngineOwnMessage,
+  isFailedLoadMessage,
+  isFetchRefusedWhileLeaving,
+  isRealtimeDownMessage,
+} from "./browserNoise.js";
 
 /**
  * `players.open(name)` gives a person their own browser (own cookies), as Render serves it: behind HTTPS, so the
@@ -30,6 +37,8 @@ export const test = base.extend({
     async function open(name, { secrets = [] } = {}) {
       const context = await browser.newContext({
         baseURL,
+        // The certificate is made for this run only (tlsFront.js). Test code only, the app is unchanged.
+        ignoreHTTPSErrors: true,
         extraHTTPHeaders: { "X-Forwarded-Proto": "https" },
       });
       const page = await context.newPage();
@@ -37,20 +46,24 @@ export const test = base.extend({
       const isExpected = (status, url) =>
         record.expected.some((e) => e.status === status && new URL(url).pathname === e.path);
       // While the server restarts, the browser's realtime connection fails until the next process is up, and
-      // Chrome reports each attempt. That is the expected cost of a restart, and the only one (CC-101).
+      // the browser reports each attempt. That is the expected cost of a restart, and the only one (CC-101).
       const isRestartNoise = (url) => record.restarting && new URL(url).pathname.startsWith("/socket.io/");
-      const RESTART_CONSOLE = /^WebSocket connection to '[^']*\/socket\.io\/[^']*' failed/;
+      const engine = browser.browserType().name();
 
       // Every tab of the person's browser is recorded the same way, so a second tab is checked as the first.
       const watch = (tab) => {
         tab.on("console", (message) => {
           if (message.type() !== "error" && message.type() !== "warning") return;
           // The browser logs every failed request as a console error; those are judged by status below.
-          if (/Failed to load resource/.test(message.text())) return;
-          if (record.restarting && RESTART_CONSOLE.test(message.text())) return;
+          if (isFailedLoadMessage(message.text())) return;
+          if (record.restarting && isRealtimeDownMessage(message.text())) return;
+          if (isEngineOwnMessage(engine, message.text())) return;
           record.problems.push(`console.${message.type()}: ${message.text()}`);
         });
-        tab.on("pageerror", (error) => record.problems.push(`page error: ${error.message}`));
+        tab.on("pageerror", (error) => {
+          if (isFetchRefusedWhileLeaving(engine, error.stack ?? "", new URL(baseURL).origin)) return;
+          record.problems.push(`page error: ${error.message}`);
+        });
         tab.on("request", (request) => record.urls.push(request.url()));
         tab.on("framenavigated", (frame) => frame === tab.mainFrame() && record.urls.push(frame.url()));
         tab.on("response", (response) => {
@@ -63,7 +76,7 @@ export const test = base.extend({
         tab.on("requestfailed", (request) => {
           const reason = request.failure()?.errorText ?? "";
           // Navigating away cancels in-flight requests and closes sockets; that is not a failure.
-          if (!/ERR_ABORTED|NS_BINDING_ABORTED/.test(reason) && !isRestartNoise(request.url()))
+          if (!isCancelledRequest(reason) && !isRestartNoise(request.url()))
             record.problems.push(`request failed: ${request.url()} ${reason}`);
         });
         tab.on("websocket", (socket) =>
@@ -180,5 +193,14 @@ export async function createRoom(player, gameSlug) {
   const { pathname } = new URL(invite);
   return { invite, path: pathname, code: pathname.split("/").pop() };
 }
+
+/**
+ * Whether this run is on a phone or a laptop, whatever the browser engine. Tests that differ by screen or by
+ * input (touch, keyboard) ask this instead of the project's name, so a new engine's project needs no changes there.
+ *
+ * @param {import("@playwright/test").TestInfo} testInfo
+ * @returns {"mobile" | "desktop"}
+ */
+export const formFactor = (testInfo) => (testInfo.project.use.isMobile ? "mobile" : "desktop");
 
 export { expect };

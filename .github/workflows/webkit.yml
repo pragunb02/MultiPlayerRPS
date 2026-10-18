@@ -1,0 +1,81 @@
+# The browser suite on WebKit, the engine of Safari and of every browser on an iPhone (CC-184).
+# It runs on macOS, where Playwright's WebKit is Safari's own engine. Playwright's Linux WebKit is a different port,
+# and on GitHub's Linux runners it did not finish in 20 minutes. Even on macOS a whole run takes far longer than the
+# Chromium job, so it does not run on every pull request. It runs every night, on the "Run workflow" button, and on
+# pull requests that change what the browser gets or how it is tested. Not a required check yet: the owner decides
+# when, after it has run green for a while.
+name: WebKit
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "e2e/**"
+      - ".github/workflows/webkit.yml"
+  schedule:
+    # 03:47 UTC, after the nightly unit run and off the hour, when GitHub's runners are least busy.
+    - cron: "47 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webkit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webkit:
+    name: Browser persona tests (webkit desktop, part ${{ matrix.shard }} of 3)
+    runs-on: macos-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - name: Install WebKit
+        run: npx playwright install webkit
+      # A third of the suite each, two at a time. Playwright would start only one worker on these three-core
+      # machines, and three at a time left too little for the server, so chess games ran past 30 seconds.
+      - name: Browser tests, part ${{ matrix.shard }} of 3
+        working-directory: e2e
+        timeout-minutes: 35
+        run: npx playwright test --project=webkit --shard=${{ matrix.shard }}/3 --workers=2
+        env:
+          CI: "true"
+          E2E_BROWSER: webkit
+      # The restart tests stop the server, so they run once, after the other tests of the first part. Their own
+      # output folders keep the first part's failure traces, which Playwright would otherwise clear.
+      - name: Restart tests
+        if: matrix.shard == 1 && !cancelled()
+        working-directory: e2e
+        timeout-minutes: 10
+        run: npx playwright test --project="restart webkit" --no-deps --output=test-results-restart
+        env:
+          CI: "true"
+          E2E_BROWSER: webkit
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-restart
+      - name: Playwright report and failure traces
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-webkit-${{ matrix.shard }}
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+            e2e/playwright-report-restart/
+            e2e/test-results-restart/
+          retention-days: 14

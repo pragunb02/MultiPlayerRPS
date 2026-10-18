@@ -1,0 +1,45 @@
+# Every unit and integration test, including the slow ones that pull requests leave out (CC-203). The slow ones
+# play many whole games to show the bots are strong and never stuck. That does not change from one unrelated pull
+# request to the next, so it runs once a night and on the "Run workflow" button.
+# GitHub runs schedules only from main, may start them late at busy times, and pauses them after 60 days without
+# any activity in this public repository. A failed run emails whoever last changed the schedule.
+name: Nightly
+
+on:
+  schedule:
+    # 03:17 UTC, off the hour, when GitHub's runners are least busy.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  all-tests:
+    name: Every unit and integration test, slow ones included (coverage gates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary (integration tests)
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - run: npm run test:all
+      - name: Coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-nightly
+          path: coverage/
+          retention-days: 14
