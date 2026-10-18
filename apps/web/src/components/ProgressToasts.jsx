@@ -57,7 +57,7 @@ export function ProgressToasts() {
       setBurst({ id: ++nextBurst.current, level: progress.level });
       sound.play(SOUNDS.LEVEL_UP);
     } else if (isComputerGame(update)) {
-      toast.show(computerXpMessage(update), { tone: "info" });
+      toast.show(computerXpMessage(update), { tone: "info", category: CATEGORIES.REWARD });
     } else if (xpGained > 0 && source !== "quest") {
       toast.show(`+${xpGained} XP`, { tone: "info", category: CATEGORIES.REWARD });
     }

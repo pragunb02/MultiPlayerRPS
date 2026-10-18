@@ -412,6 +412,10 @@ describe("rematch requests (CC-104, CC-159)", () => {
   it("holds rewards back while a question is open (CC-208)", async () => {
     const { socket } = openRoom(finished({ requests: [request()] }));
     await popup();
+    // The page settles once the session is known, so the reward below arrives while the question already holds.
+    await waitFor(() =>
+      expect(within(screen.getAllByRole("banner")[0]).getByText(GUEST.displayName)).toBeVisible(),
+    );
 
     act(() =>
       socket.push("progress:updated", {
