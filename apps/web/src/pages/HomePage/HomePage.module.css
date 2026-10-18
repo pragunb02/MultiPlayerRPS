@@ -54,7 +54,8 @@
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  /* auto-fit, not auto-fill: empty tracks collapse, so three games share the whole row with no hole beside them. */
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--space-6);
 }
 /* A game tile: its own accent colour, illustrated, lifts on hover and keyboard focus (the whole tile is the link). */

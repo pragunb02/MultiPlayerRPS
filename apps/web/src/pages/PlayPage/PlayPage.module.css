@@ -44,6 +44,8 @@
 .panels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  /* Each card keeps the height of its own content, instead of stretching to the tallest card in the row. */
+  align-items: start;
   gap: var(--space-6);
 }
 .panel {
