@@ -45,6 +45,7 @@ function siteDao(calls = []) {
     listAchievementUnlocks: record("achievements", () => [{ achievementId: "first-win", players: 9 }]),
     listQuestCompletions: record("quests", () => [{ questId: "play-3", completions: 3 }]),
     listLeaderboardSizes: record("boards", () => [{ board: "xp", period: "all", entries: 4 }]),
+    listPlayerDays: record("playerDays", () => []),
   });
 }
 
@@ -86,6 +87,7 @@ describe("analyticsComponent", () => {
     });
     expect(report.generatedAt).toBe(NOW);
     expect(Object.fromEntries(report.overview.headlines.map(({ id, ...rest }) => [id, rest]))).toEqual({
+      northStar: { value: 0, previous: 0, change: 0, week: "2026-10-05" },
       activePlayers: { value: 10, previous: FEWER_THAN_MIN, change: "hidden" },
       matches: { value: 26, previous: 13, change: 1 },
       newPlayers: { value: 6, previous: FEWER_THAN_MIN, change: "hidden" },
@@ -123,6 +125,42 @@ describe("analyticsComponent", () => {
       change: 0.6,
       week: "2026-10-05",
     });
+  });
+
+  it("reads the days of play for statuses from India midnight 15 days before the headline week to the end of today", async () => {
+    const calls = [];
+    await component(siteDao(calls)).getReport({ range: RANGE, now: NOW });
+
+    expect(calls.filter((call) => call.name === "playerDays").map(({ args: [moments] }) => moments)).toEqual([
+      { from: new Date("2026-09-19T18:30:00.000Z"), to: new Date("2026-10-17T18:30:00.000Z") },
+    ]);
+  });
+
+  it("reports statuses by week, the moves of the headline week, and the North Star beside the week before", async () => {
+    const dao = createEmptyAnalyticsDao({
+      listPlayerDays: async () =>
+        many(5, () => ({
+          kind: "user",
+          days: ["2026-09-01", "2026-09-29", "2026-10-01", "2026-10-06", "2026-10-08", "2026-10-13"],
+        })),
+    });
+
+    const report = await component(dao).getReport({ range: RANGE, now: NOW });
+
+    expect(report.overview.headlines[0]).toEqual({
+      id: "northStar",
+      value: 5,
+      previous: 5,
+      change: 0,
+      week: "2026-10-05",
+    });
+    expect(report.statuses.weeks).toEqual([
+      expect.objectContaining({ week: "2026-10-12", through: "2026-10-17", complete: false, casual: 5 }),
+    ]);
+    expect(report.statuses.moves).toEqual(
+      expect.objectContaining({ week: "2026-10-05", from: "2026-10-04", to: "2026-10-11" }),
+    );
+    expect(report.statuses.moves.rows.find((row) => row.from === "regular").to.regular).toBe(5);
   });
 
   it("reports every page with totals only and no ids", async () => {
