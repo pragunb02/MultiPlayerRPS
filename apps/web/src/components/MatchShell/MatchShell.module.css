@@ -1,0 +1,135 @@
+/* The match frame (CC-157). Its animations are CSS keyframes on transform and opacity, so a game without Motion
+   downloads none (ADR-049). Reduced motion turns them all off in global.css. */
+.matchBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+.matchBar h1 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.score {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+@media (max-width: 48rem) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+.main,
+.stage {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  min-width: 0;
+}
+.side,
+.presence {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+.card {
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+/* The action bar: a row under the board while the game is on, at most four buttons. */
+.actionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.underStage {
+  justify-content: flex-end;
+}
+/* At the end it sits in the result card, Rematch on top, and comes in just after the headline. */
+.inResult {
+  flex-direction: column;
+  align-items: center;
+  animation: bar-in var(--duration-slow) var(--ease-out) both;
+}
+
+/* The result card: the reward beat of the game (ADR-012). */
+.outcome {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  background: var(--color-primary-soft);
+  border: 2px solid var(--color-primary);
+  box-shadow: var(--glow-primary);
+  animation: outcome-in var(--duration-slow) var(--ease-spring) both;
+}
+.outcome h2 {
+  margin: 0;
+}
+/* The headline and its celebration. The buttons under it are not part of it. */
+.headline {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+}
+/* The card takes the result's colour: gold for a win, neutral for a loss (the words say which). */
+.win {
+  border-color: var(--color-tier-gold);
+  box-shadow: var(--glow-gold);
+}
+.loss {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+.again {
+  display: inline-block;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  box-shadow: var(--shadow-press);
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.again:hover {
+  transform: translateY(-2px);
+}
+.again:active {
+  transform: translateY(2px);
+  box-shadow: var(--shadow-press-small);
+}
+@keyframes outcome-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.97);
+  }
+}
+@keyframes bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}

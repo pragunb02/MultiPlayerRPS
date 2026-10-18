@@ -165,6 +165,23 @@ Requests reach both players on any page: every change is pushed as `request:upda
 and a socket that connects is sent every request still open in its player's rooms. The web app shows them in the
 room's request banner, or as a popup on any other page (`components/SiteRequests`).
 
+### The match shell (CC-157, ADR-049)
+
+The room page joins the room and handles closed, missing and refused rooms. An open room is drawn by one
+`components/MatchShell/MatchShell.jsx`, which never names a game. Its slots: the request banner and claim win
+(sticky, under the site's own connection banner), the match bar (game name, the game's `inGameScore`), the stage
+(the game's `Board`, or the invite while the room waits), the action bar (the game's `actions` and Leave while
+playing; Rematch, New opponent and Leave in the result card at the end), the result card, presence and the game's
+`Panel` in the side column, and one polite and one urgent screen reader region (`useAnnounce`). Which slot shows
+where, and what the action bar holds, are pure functions in `matchShell.js`.
+
+A game plugs in through optional fields on its `GAME_VIEWS` entry (`games/registry.js`). A game with only a `Board`
+plays like any other. Game actions are data (`GameAction`: control, label, reason, an intent that is a move or a
+request, an optional `confirm`), so the shell draws them all the same way, adds the reconnecting and request
+reasons, and asks for confirmation in its own dialog (chess resign). At most three fit beside Leave. Every entry
+passes `games/testing/gameViewContract.js` (`registry.test.js`). Shell animations are CSS keyframes, so a game
+without Motion downloads none.
+
 Engines are registered with `defineEngine()` (shape check) in `createEngineRegistry()`. Every engine's test file calls
 `describeEngineContract(engine, scenario, { describe, it })` from `@classicade/games/testing`, which runs 13 checks:
 options, determinism from a seed, JSON-safe state/views, robustness against garbage input, outsiders, scenario
