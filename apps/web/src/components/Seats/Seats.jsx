@@ -77,7 +77,7 @@ export function Seats({ room }) {
         {room.seats.map((seat) => (
           <li key={seat.playerId} className={styles.seat}>
             <span className={seat.connected ? styles.online : styles.offline} aria-hidden="true" />
-            <span>{seat.displayName}</span>
+            <span className={styles.name}>{seat.displayName}</span>
             {seat.playerId === room.you && <span className={styles.tag}>you</span>}
             {isComputer(seat) && <span className={styles.tag}>computer · {levelNameOf(seat)}</span>}
             {seat.playerId === room.hostId && <span className={styles.tag}>host</span>}
