@@ -252,6 +252,17 @@ record, because today one process keeps the games it is running in memory.
   merge. The cost is that a PR is updated and checked again after every merge ahead of it. Until the setting was on,
   the coordinator re-ran the fast checks against the current `main` before each merge when another PR had merged
   since.
+- **Amended · 2026-10-18 (CC-236, owner's rule: faster only by running in parallel).** The Chromium and Firefox
+  browser suites each run as four parts on separate machines, plus one job for the restart tests, one at a time.
+  The parts are lists of whole spec files balanced by measured CI time (`e2e/shards.js`), not Playwright's
+  `--shard`, which splits by test count. A last job per engine keeps the old check name, merges the reports, and
+  passes only when every part passed and every test `playwright test --list` finds ran exactly once. Nothing checks
+  less: no fake clocks, shorter game timings, retries or skipped tests. Each commit on `main` gets its own CI
+  concurrency group (`github.sha`; pull requests keep one group per branch and cancel older runs), so no run on
+  `main` is cancelled or replaced by the next merge's and the every-10th-merge stop sees every result. Turning off
+  `cancel-in-progress` alone was not enough: a group keeps only its newest waiting run (PR #88 review). The
+  cost is more jobs per pull request against the account's 20 runners at once, so parts are added only when the
+  measured times call for them.
 - **Amended · 2026-10-18 (owner, fast mode, PR #89).** The up-to-date rule above is **not in force** while fast mode
   lasts: branch protection's "require branches to be up to date before merging" (`strict`) is turned off, so a PR
   can merge without being updated onto the newest `main`. In its place the coordinator runs `main`'s checks after

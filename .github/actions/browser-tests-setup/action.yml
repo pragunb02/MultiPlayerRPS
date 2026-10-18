@@ -1,0 +1,38 @@
+# Everything a browser test job needs before Playwright runs (CC-236): Node with npm's download cache, the MongoDB
+# binary the e2e server's in-memory database uses, the packages, and one Playwright browser with its system
+# packages. The browser comes from a cache keyed on the Playwright version; on a hit `playwright install` finds it
+# and only installs the system packages, which cannot be cached.
+name: Browser tests setup
+description: Node, packages, MongoDB binary and one Playwright browser, for the e2e jobs in ci.yml
+inputs:
+  browser:
+    description: chromium or firefox
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+    - name: Cache MongoDB binary
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/mongodb-binaries
+        key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+    - run: npm ci
+      shell: bash
+    - name: Playwright version
+      id: playwright
+      shell: bash
+      run: echo "version=$(npx playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+    - name: Cache Playwright ${{ inputs.browser }}
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ inputs.browser }}-${{ steps.playwright.outputs.version }}
+    - name: Install ${{ inputs.browser }} and its system packages
+      shell: bash
+      run: npx playwright install --with-deps "$BROWSER"
+      env:
+        BROWSER: ${{ inputs.browser }}
