@@ -44,6 +44,33 @@ describe("useServerCountdown", () => {
     expect(onElapsed).toHaveBeenCalledOnce();
   });
 
+  it("still reaches 0 when the moment passes between the render and the timer starting, on a busy device", () => {
+    vi.useFakeTimers({ now: 1_000 });
+    const onElapsed = vi.fn();
+    // The render reads the clock first, then the effect finds the moment already past.
+    const clock = vi.fn().mockReturnValueOnce(1_000).mockReturnValue(4_000);
+    const { result } = renderHook(() =>
+      useServerCountdown({ until: SERVER_T + 2_000, serverTime: SERVER_T, onElapsed, now: clock }),
+    );
+    expect(onElapsed).toHaveBeenCalledOnce();
+
+    act(() => vi.advanceTimersByTime(0));
+
+    expect(result.current).toBe(0);
+  });
+
+  it("forgets the late update when unmounted at once", () => {
+    vi.useFakeTimers({ now: 1_000 });
+    const clock = vi.fn().mockReturnValueOnce(1_000).mockReturnValue(4_000);
+    const { unmount } = renderHook(() =>
+      useServerCountdown({ until: SERVER_T + 2_000, serverTime: SERVER_T, onElapsed: vi.fn(), now: clock }),
+    );
+
+    unmount();
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("starts measuring again from a newer view of the server", () => {
     const { result, rerender } = countdown({ until: SERVER_T + 60_000 });
     act(() => vi.advanceTimersByTime(10_000));

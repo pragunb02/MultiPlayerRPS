@@ -1,4 +1,4 @@
-import { CHESS_ACTIONS, GAME_IDS } from "@classicade/shared";
+import { CHESS_ACTIONS, CHESS_REQUEST_TYPES, GAME_IDS, REQUEST_ANSWERS } from "@classicade/shared";
 import { randomIndex } from "../../rng.js";
 import { defineBot } from "../bot.js";
 import { legalMoves, makeMove, moveFromSan, parseFen, squareName, START_FEN } from "./board.js";
@@ -90,9 +90,11 @@ export const chessBot = defineBot({
         : searchMove(board, { ...CHESS_SEARCH_LIMITS[difficulty], rng }).move;
     return toRawMove(move);
   },
-  answer({ view, botId }) {
-    return view.drawOfferBy !== "" && view.drawOfferBy !== botId
-      ? [{ type: CHESS_ACTIONS.DECLINE_DRAW }]
-      : [];
+  // A draw offer is declined at once, so the person knows to play on (ADR-025). The room's requests carry the
+  // offer (CC-159), so only the ones addressed to this bot reach it.
+  answer({ requests }) {
+    return requests
+      .filter((request) => request.type === CHESS_REQUEST_TYPES.DRAW)
+      .map((request) => ({ type: request.type, answer: REQUEST_ANSWERS.DECLINE }));
   },
 });

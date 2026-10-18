@@ -53,12 +53,44 @@ describe("replayGame", () => {
     });
   });
 
-  it("treats a forfeit as a no-op on the board", () => {
-    const log = [{ kind: "forfeit", playerId: "alice", at: T0 }];
+  it.each(["forfeit", "idle"])("treats a %s as a no-op on the board", (kind) => {
+    const log = [{ kind, playerId: "alice", at: T0 }];
 
     const state = replayGame(tictactoeEngine, { players, options: {}, seed: 42, log });
 
     expect(state.board.every((cell) => cell === "")).toBe(true);
+  });
+
+  it("reproduces an accepted draw offer (CC-159)", () => {
+    const log = [
+      { kind: "move", playerId: "bob", move: { type: "move", from: "e2", to: "e4" }, at: T0 },
+      { kind: "agree", type: "draw", from: "bob", playerId: "alice", at: T0 + 1 },
+    ];
+
+    const state = replayGame(chessEngine, { players, options: { timeControl: "blitz-5+0" }, seed: 42, log });
+
+    expect(chessEngine.getOutcome(state)).toEqual({
+      status: "finished",
+      result: "draw",
+      winners: [],
+      reason: "agreement",
+    });
+  });
+
+  it("refuses an agreement the game does not know", () => {
+    const agree = (type) => [{ kind: "agree", type, from: "bob", playerId: "alice", at: T0 }];
+
+    expect(() =>
+      replayGame(rpsEngine, { players, options: { bestOf: 1 }, seed: 1, log: agree("draw") }),
+    ).toThrow(/rps has no request type "draw"/);
+    expect(() =>
+      replayGame(chessEngine, {
+        players,
+        options: { timeControl: "blitz-5+0" },
+        seed: 1,
+        log: agree("truce"),
+      }),
+    ).toThrow(/chess has no request type "truce"/);
   });
 
   it("refuses a tampered log with an illegal move", () => {

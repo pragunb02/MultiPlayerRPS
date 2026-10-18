@@ -173,6 +173,35 @@ describe("checkEngineContract catches broken engines", () => {
     });
   });
 
+  describe("request hooks", () => {
+    // A variant with a truce request: accepting it ends the race with no winner.
+    const withTruce = (acceptRequest) =>
+      broken({ requestTypes: { truce: { lifetimeMs: 1_000, limitPerPlayer: 1 } }, acceptRequest });
+    const REQUEST_CHECK =
+      "keeps request hooks pure: accepting changes the game, never mutates, and is plain data";
+
+    it("accepts well-behaved hooks", () => {
+      expect(violatedChecks(withTruce((state) => ({ ...state, winner: "truce" })))).toEqual([]);
+    });
+
+    it("catches an acceptRequest that mutates state", () => {
+      const mutating = withTruce((state) => {
+        state.winner = "truce";
+        return state;
+      });
+
+      expect(violatedChecks(mutating)).toContain(REQUEST_CHECK);
+    });
+
+    it("catches an acceptRequest that gives something other than plain data", () => {
+      expect(violatedChecks(withTruce((state) => ({ ...state, at: new Date(0) })))).toContain(REQUEST_CHECK);
+    });
+
+    it("catches an acceptRequest that changes nothing", () => {
+      expect(violatedChecks(withTruce((state) => state))).toContain(REQUEST_CHECK);
+    });
+  });
+
   it("collects every violation instead of stopping at the first", () => {
     const veryBroken = broken({ validateMove: () => ok({ add: 1 }) });
 
@@ -180,6 +209,6 @@ describe("checkEngineContract catches broken engines", () => {
   });
 
   it("exposes the list of checks", () => {
-    expect(CONTRACT_CHECK_NAMES).toHaveLength(12);
+    expect(CONTRACT_CHECK_NAMES).toHaveLength(13);
   });
 });

@@ -6,6 +6,7 @@ import { paths, returnPathFor } from "../app/paths.js";
 import { useServices } from "../app/servicesContext.js";
 import { LevelUpBurst } from "../art/effects/LevelUpBurst.jsx";
 import { useSound } from "../hooks/useSound.js";
+import { CATEGORIES } from "../lib/notify/categories.js";
 import { SOUNDS } from "../lib/sound/sounds.js";
 import { computerXpMessage, isComputerGame, isUncountedMatch, notCountedMessage } from "./notCounted.js";
 import { PROMPTS, useSaveProgress } from "./SaveProgress/saveProgressContext.js";
@@ -46,15 +47,19 @@ export function ProgressToasts() {
   const onProgress = useEffectEvent((update) => {
     const { source, xpGained, leveledUp, progress } = update;
     if (isUncountedMatch(update)) {
-      toast.show(notCountedMessage(update.notCountedReason), { tone: "info" });
+      toast.show(notCountedMessage(update.notCountedReason), { tone: "info", category: CATEGORIES.REWARD });
     } else if (leveledUp) {
-      toast.show(`Level up! You reached level ${progress.level}`, { tone: "success", ...saveOffer() });
+      toast.show(`Level up! You reached level ${progress.level}`, {
+        tone: "success",
+        category: CATEGORIES.REWARD,
+        ...saveOffer(),
+      });
       setBurst({ id: ++nextBurst.current, level: progress.level });
       sound.play(SOUNDS.LEVEL_UP);
     } else if (isComputerGame(update)) {
-      toast.show(computerXpMessage(update), { tone: "info" });
+      toast.show(computerXpMessage(update), { tone: "info", category: CATEGORIES.REWARD });
     } else if (xpGained > 0 && source !== "quest") {
-      toast.show(`+${xpGained} XP`, { tone: "info" });
+      toast.show(`+${xpGained} XP`, { tone: "info", category: CATEGORIES.REWARD });
     }
   });
 

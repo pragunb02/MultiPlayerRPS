@@ -299,6 +299,35 @@ const CHECKS = Object.freeze([
     },
   },
   {
+    name: "keeps request hooks pure: accepting changes the game, never mutates, and is plain data",
+    run(engine, scenario) {
+      if (engine.requestTypes === undefined) {
+        return;
+      }
+      const [to, from] = scenario.players;
+      play(engine, scenario, (state, index) => {
+        for (const type of Object.keys(engine.requestTypes)) {
+          let accepted;
+          try {
+            accepted = engine.acceptRequest(state, { type, from, to }, CTX);
+          } catch (err) {
+            throw new ContractViolation(
+              `step ${index}: acceptRequest threw on frozen state, does it mutate? (${err.message})`,
+            );
+          }
+          assert(
+            isJsonSafe(accepted),
+            `step ${index}: accepting ${type} gave a state that is not plain data`,
+          );
+          assert(
+            JSON.stringify(accepted) !== JSON.stringify(state),
+            `step ${index}: accepting ${type} during the game must change it`,
+          );
+        }
+      });
+    },
+  },
+  {
     name: "replays identically",
     run(engine, scenario) {
       assert(

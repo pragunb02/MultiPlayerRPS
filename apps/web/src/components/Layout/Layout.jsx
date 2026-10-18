@@ -5,15 +5,21 @@ import { useAction } from "../../hooks/useAction.js";
 import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
+import { ConnectionBanner } from "../ConnectionBanner/ConnectionBanner.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { PageAnnouncer } from "../PageAnnouncer/PageAnnouncer.jsx";
 import { useSaveProgress } from "../SaveProgress/saveProgressContext.js";
+import { SiteRequests } from "../SiteRequests/SiteRequests.jsx";
 import { SoundControl } from "../SoundControl/SoundControl.jsx";
 import { WakingUp } from "../WakingUp/WakingUp.jsx";
 import styles from "./Layout.module.css";
 
-/** App shell: header with brand, navigation and who you are; pages render into <Outlet />. */
+/**
+ * App shell: header with brand, navigation and who you are. Pages render into <Outlet />. Under the header sit the
+ * player's own connection (CC-158) and the requests other players sent them from rooms they are not looking at
+ * (CC-207), so both reach them on every page.
+ */
 export function Layout() {
   const session = useSession();
   const navigate = useNavigate();
@@ -101,8 +107,10 @@ export function Layout() {
           </div>
         </div>
       </header>
+      <ConnectionBanner />
       <main id="main" className={styles.main}>
         <WakingUp />
+        <SiteRequests />
         <Outlet />
       </main>
       <PageAnnouncer />

@@ -24,7 +24,7 @@ const CLOSING = Object.freeze({ closing: { $exists: true } });
  * @property {Record<string, unknown>} [series]
  * @property {number} createdAt
  * @property {number} lastActivityAt
- * @property {number} dueAt              when the running game's next deadline falls (0 = none)
+ * @property {number} dueAt              when something next happens in the room by itself (0 = none)
  * @property {number} expiresAt          when the room's lifetime ends
  * @property {number} version            optimistic concurrency token, counted up on every write
  *
@@ -96,7 +96,7 @@ export function createRoomDao({ connection, betweenClosedReads = async () => {} 
         { key: { code: 1 }, unique: true, name: "code_unique" },
         // Rooms a player sits in: signing in or out changes their seats.
         { key: { "seats.playerId": 1 }, name: "seats_player" },
-        // Every second: rooms whose game deadline has come (a chess flag).
+        // Every second: rooms where something is due (a chess flag, a request expiring).
         { key: { dueAt: 1 }, name: "due_at" },
         // Every minute: rooms whose lifetime has ended.
         { key: { expiresAt: 1 }, name: "expires_at" },
@@ -210,7 +210,7 @@ export function createRoomDao({ connection, betweenClosedReads = async () => {} 
     /** @param {string} playerId */
     listBySeat: (playerId) => find({ "seats.playerId": playerId }),
 
-    /** @param {number} now  rooms with a game deadline at or before `now` */
+    /** @param {number} now  rooms with something due at or before `now` */
     listDue: (now) => find({ dueAt: { $gt: 0, $lte: now } }),
 
     /** @param {number} now  rooms whose lifetime ended at or before `now` */

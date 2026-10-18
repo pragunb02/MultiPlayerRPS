@@ -1,83 +1,183 @@
-import { ROOM_STATUS } from "@classicade/shared";
+import { REQUEST_ANSWERS, REQUEST_STATES, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
 import { SOUNDS } from "../lib/sound/sounds.js";
 import { gameView } from "./registry.js";
 import { gameNumber, isYourTurn, nameOf } from "./roomView.js";
 
 /**
  * What a room update means for the person watching it: which sounds to play (CC-103), which questions are waiting
- * for an answer, and which answers to tell them about (CC-104). Everything here is worked out from two RoomViews,
- * the one before an update and the one after, so it is the same after a reload and needs no extra server events.
- * Each game adds its own part through the client game registry, and nothing here names a game.
+ * for an answer, and how the questions they were part of ended (CC-104, CC-159). The requests themselves come from
+ * the server (the RoomView's `requests`), so a reload shows the same ones. How a request ended is worked out by
+ * comparing the view before and after an update, so it is news only once. Each game adds the words for its own
+ * kinds of request through the client game registry, and nothing here names a game.
  */
 
 /**
- * Something one player asks the other and waits for an answer to: a draw offer, a rematch.
+ * What pressing a button does: send a game move, ask for something, or answer a request.
  *
- * @typedef {{ type: "move", move: object } | { type: "rematch" } | { type: "decline-rematch" }} RoomAction
- *   what pressing a button does: send a game move, ask for (or take back) a rematch, or say no to one
+ * @typedef {{ type: "move", move: object }
+ *   | { type: "ask", requestType: string }
+ *   | { type: "answer", requestType: string, answer: string }} RoomAction
  *
- * @typedef {Object} RoomRequest
- * @property {string} key            stays the same while the request stands, so it alerts only once
- * @property {string} from           the player id who asked
- * @property {string} title          the heading the other player sees
+ * @typedef {Object} RequestTexts      the words for one kind of request
+ * @property {string} title            the heading the player asked sees
+ * @property {string} waitingTitle     the name of what the asker sees while they wait
  * @property {(name: string) => string} question   the question, given the asker's name
- * @property {string} waitingTitle   the heading the asker sees while waiting
- * @property {boolean} showWaiting   whether the room page shows the asker a waiting card with Cancel (false when
- *   the game's own panel already does)
+ * @property {(name: string) => string} waiting    what the asker sees, given the name of the player asked
+ * @property {(name: string) => string} declined   what the asker hears when the other says no
+ * @property {(name: string) => string} withdrawn  what the player asked hears when the asker takes it back
+ * @property {(name: string) => string} accepted   what the asker hears when the other says yes
+ * @property {(game: string) => string} site       the question on another page, such as "wants a rematch at
+ *   Chess", after the asker's name
+ *
+ * @typedef {Object} RoomRequest       an open request, with its words and what its buttons do
+ * @property {string} key              the same while the request stands, so it alerts only once
+ * @property {string} type
+ * @property {string} from             the player id who asked
+ * @property {string} to               the player id who was asked
+ * @property {number} createdAt        server time
+ * @property {number} expiresAt        server time
+ * @property {RequestTexts} texts
  * @property {RoomAction} accept
  * @property {RoomAction} decline
  * @property {RoomAction} cancel
+ *
+ * @typedef {Object} RequestAnswer     how a request the viewer was part of ended
+ * @property {string} key
+ * @property {string} type
+ * @property {string} state            a REQUEST_STATES value
+ * @property {boolean} asked           whether the viewer was the one who asked
+ * @property {string} otherId          the other player's id
+ * @property {string} message          what to tell the viewer
  */
 
-const NONE = Object.freeze([]);
-const none = () => NONE;
-const declinedBy = (room) => room.rematch?.declinedBy ?? "";
+/** The words of a rematch request, the one kind every room has. */
+export const REMATCH_TEXTS = Object.freeze({
+  title: "Rematch?",
+  waitingTitle: "Rematch asked",
+  question: (name) => `${name} wants a rematch.`,
+  waiting: (name) => `Waiting for ${name} to answer your rematch request`,
+  declined: (name) => `${name} declined the rematch`,
+  withdrawn: (name) => `${name} took back the rematch request`,
+  accepted: (name) => `${name} accepted. Starting the next game`,
+  site: (game) => `wants a rematch at ${game}`,
+});
+
+/** Words for a kind of request a game added but this version of the web app does not know yet. */
+const UNKNOWN_TEXTS = Object.freeze({
+  title: "Request",
+  waitingTitle: "Request sent",
+  question: (name) => `${name} is asking you something.`,
+  waiting: (name) => `Waiting for ${name} to answer`,
+  declined: (name) => `${name} said no`,
+  withdrawn: (name) => `${name} took the request back`,
+  accepted: (name) => `${name} said yes`,
+  site: (game) => `is asking you something at ${game}`,
+});
 
 /**
- * A rematch someone asked for, while it can still happen (CC-037). Once you asked as well the new game starts, so
- * you only ever see either your own request or theirs.
+ * The words for one kind of request in one game.
  *
- * @param {any} room  RoomView
- * @returns {RoomRequest[]}
+ * @param {string} gameId
+ * @param {string} type
+ * @returns {RequestTexts}
  */
-function rematchRequests(room) {
-  if (room.status !== ROOM_STATUS.FINISHED || room.rematch === undefined || !room.rematch.available) {
-    return [];
-  }
-  const { requestedBy } = room.rematch;
-  const asking = requestedBy.includes(room.you) ? [room.you] : requestedBy;
-  return asking.map((from) => ({
-    key: `rematch:${from}`,
-    from,
-    title: "Rematch?",
-    question: (name) => `${name} wants a rematch.`,
-    waitingTitle: "Rematch asked",
-    showWaiting: false,
-    accept: { type: "rematch" },
-    decline: { type: "decline-rematch" },
-    cancel: { type: "rematch" },
-  }));
+export function textsFor(gameId, type) {
+  if (type === ROOM_REQUEST_TYPES.REMATCH) return REMATCH_TEXTS;
+  // The type comes from the other player: only the game's own kinds count, never what an object inherits.
+  const texts = gameView(gameId).requestTexts;
+  return texts !== undefined && Object.hasOwn(texts, type) ? texts[type] : UNKNOWN_TEXTS;
 }
 
+const NONE = Object.freeze([]);
+const requestsIn = (room) => room.requests ?? NONE;
+const keyOf = (request) => `${request.type}:${request.from}:${request.createdAt}`;
+const answer = (requestType, value) => ({ type: "answer", requestType, answer: value });
+
 /**
- * Every request standing in the room: the rematch, then whatever the game adds (a chess draw offer).
+ * Every request open in the room, with its words and what its buttons do.
  *
  * @param {any} room  RoomView
  * @returns {RoomRequest[]}
  */
 export function roomRequests(room) {
-  const forGame = room.game === undefined ? NONE : (gameView(room.gameId).requests ?? none)(room);
-  return [...rematchRequests(room), ...forGame];
+  return requestsIn(room)
+    .filter((request) => request.state === REQUEST_STATES.OPEN)
+    .map((request) => ({
+      key: keyOf(request),
+      type: request.type,
+      from: request.from,
+      to: request.to,
+      createdAt: request.createdAt,
+      expiresAt: request.expiresAt,
+      texts: textsFor(room.gameId, request.type),
+      accept: answer(request.type, REQUEST_ANSWERS.ACCEPT),
+      decline: answer(request.type, REQUEST_ANSWERS.DECLINE),
+      cancel: answer(request.type, REQUEST_ANSWERS.WITHDRAW),
+    }));
 }
 
 /**
  * The requests the viewer is asked to answer. Spectators answer nothing.
  *
  * @param {any} room  RoomView
- * @returns {RoomRequest[]}
  */
-export function incomingRequests(room) {
-  return room.you === "" ? [] : roomRequests(room).filter((request) => request.from !== room.you);
+export const incomingRequests = (room) =>
+  room.you === "" ? [] : roomRequests(room).filter((request) => request.to === room.you);
+
+/**
+ * The requests the viewer asked that wait for an answer.
+ *
+ * @param {any} room  RoomView
+ */
+export const outgoingRequests = (room) =>
+  room.you === "" ? [] : roomRequests(room).filter((request) => request.from === room.you);
+
+/** What the viewer is told about how one request they were part of ended. */
+function answerMessage(room, request) {
+  const texts = textsFor(room.gameId, request.type);
+  const asked = request.from === room.you;
+  const other = nameOf(room, asked ? request.to : request.from);
+  switch (request.state) {
+    case REQUEST_STATES.ACCEPTED:
+      return asked ? texts.accepted(other) : "You accepted";
+    case REQUEST_STATES.DECLINED:
+      return asked ? texts.declined(other) : "You said no";
+    case REQUEST_STATES.WITHDRAWN:
+      return asked ? "You took the request back" : texts.withdrawn(other);
+    default:
+      return asked ? `No answer from ${other}` : `The request from ${other} ran out of time`;
+  }
+}
+
+/**
+ * How the requests the viewer was part of ended in this update: accepted, declined, withdrawn or expired (CC-160).
+ * Both players are told, each in their own words. A request that simply went away without an answer (a draw offer
+ * when the game ended another way) is not news.
+ *
+ * @param {any} previous  RoomView before the update
+ * @param {any} next      RoomView after it
+ * @returns {RequestAnswer[]}
+ */
+export function requestAnswers(previous, next) {
+  if (previous.code !== next.code || next.you === "") {
+    return [];
+  }
+  const wasOpen = new Set(
+    requestsIn(previous)
+      .filter((request) => request.state === REQUEST_STATES.OPEN)
+      .map(keyOf),
+  );
+  return requestsIn(next)
+    .filter((request) => request.state !== REQUEST_STATES.OPEN && wasOpen.has(keyOf(request)))
+    .filter((request) => request.from === next.you || request.to === next.you)
+    .map((request) => ({
+      key: keyOf(request),
+      type: request.type,
+      state: request.state,
+      asked: request.from === next.you,
+      otherId: request.from === next.you ? request.to : request.from,
+      message: answerMessage(next, request),
+    }));
 }
 
 /**
@@ -92,32 +192,24 @@ function leaverName(previous, next) {
 }
 
 /**
- * What the other side did with a rematch request: the asker hears that it was declined, the one asked hears that
- * it was taken back. Nobody is told about their own answer. When the opponent leaves the finished game (New
- * opponent, Leave room) the one still there hears it at once, so they never wait for a rematch that cannot come
- * (CC-162).
+ * Short messages for the viewer that are not about a request: the opponent leaving the finished game (New
+ * opponent, Leave room, or staying away too long), so they never wait for a rematch that cannot come (CC-162,
+ * CC-207).
+ *
+ * @param {any} previous  RoomView before the update
+ * @param {any} next      RoomView after it
+ * @returns {string[]}
  */
-function rematchNotices(previous, next) {
-  const you = next.you;
-  if (you === "" || next.status !== ROOM_STATUS.FINISHED || previous.rematch === undefined) {
+export function roomNotices(previous, next) {
+  if (previous.code !== next.code || next.you === "" || next.status !== ROOM_STATUS.FINISHED) {
     return [];
   }
-  if (next.rematch === undefined) {
+  if (previous.rematch === undefined || next.rematch === undefined) {
     return [];
   }
-  if (!next.rematch.available) {
-    return previous.rematch.available ? [`${leaverName(previous, next)} left the room`] : [];
-  }
-  const by = declinedBy(next);
-  if (by !== "" && by !== you && declinedBy(previous) !== by) {
-    return [`${nameOf(next, by)} declined the rematch`];
-  }
-  if (by !== "") {
-    return [];
-  }
-  return previous.rematch.requestedBy
-    .filter((id) => id !== you && !next.rematch.requestedBy.includes(id))
-    .map((id) => `${nameOf(next, id)} took back the rematch request`);
+  return previous.rematch.available && !next.rematch.available
+    ? [`${leaverName(previous, next)} left the room`]
+    : [];
 }
 
 /** Whether two views show the same game of the room (a rematch is a new game in the same room). */
@@ -127,23 +219,6 @@ const sameGame = (previous, next) =>
   next.game !== undefined &&
   gameNumber(previous) === gameNumber(next);
 
-/**
- * Short messages for the viewer about answers to requests (CC-104), for example "Bob declined your draw offer".
- *
- * @param {any} previous  RoomView before the update
- * @param {any} next      RoomView after it
- * @returns {string[]}
- */
-export function roomNotices(previous, next) {
-  if (previous.code !== next.code) {
-    return [];
-  }
-  const forGame = sameGame(previous, next)
-    ? (gameView(next.gameId).notices ?? none)(previous, next, next.you)
-    : NONE;
-  return [...rematchNotices(previous, next), ...forGame];
-}
-
 /** The viewer's result sound for a game that just ended. Spectators get none: it is not their win or loss. */
 function resultSound(room) {
   const { outcome } = room.game;
@@ -152,6 +227,9 @@ function resultSound(room) {
   }
   if (outcome.result === "draw") {
     return [SOUNDS.DRAW];
+  }
+  if (outcome.winners.length === 0) {
+    return NONE;
   }
   return [outcome.winners.includes(room.you) ? SOUNDS.WIN : SOUNDS.LOSS];
 }
@@ -176,11 +254,14 @@ export function roomSounds({ previous, next, hidden }) {
   const ended = previous.status === ROOM_STATUS.PLAYING && next.status === ROOM_STATUS.FINISHED;
   const forGame =
     !started && sameGame(previous, next)
-      ? (gameView(next.gameId).soundsFor ?? none)(previous, next, next.you)
+      ? (gameView(next.gameId).soundsFor ?? (() => NONE))(previous, next, next.you)
       : NONE;
   const seen = new Set(incomingRequests(previous).map((request) => request.key));
   const asked = incomingRequests(next).some((request) => !seen.has(request.key));
-  const answered = roomNotices(previous, next).length > 0;
+  // The asker hears the answer. Taking back your own request is not news to you.
+  const answered =
+    requestAnswers(previous, next).some((each) => each.asked && each.state !== REQUEST_STATES.WITHDRAWN) ||
+    roomNotices(previous, next).length > 0;
   const turn = hidden && !started && !isYourTurn(previous) && isYourTurn(next);
   return [
     ...forGame,

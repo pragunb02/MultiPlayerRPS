@@ -1,4 +1,4 @@
-import { BOT_DAILY_XP, NOT_COUNTED_REASONS, XP_AWARDS } from "@classicade/shared";
+import { BOT_DAILY_XP, NOT_COUNTED_REASONS, ROOM_END_REASONS, XP_AWARDS } from "@classicade/shared";
 import { isBotPlayerId, opponentKey } from "../../models/botIdentity.js";
 
 /**
@@ -24,8 +24,9 @@ export const FAIR_PLAY_LIMITS = Object.freeze({
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
-// The outcome reason the room component gives a game somebody left.
-const LEFT_THE_GAME = "forfeit";
+// The outcome reasons the room component gives a game somebody left, or stopped playing until the idle limit
+// ended it (CC-036). Waiting out the limit is as easy as leaving, so both are judged the same way.
+const LEFT_THE_GAME = new Set([ROOM_END_REASONS.FORFEIT, ROOM_END_REASONS.IDLE]);
 
 /**
  * @typedef {Readonly<{ counted: true } | { counted: false, reason: string }>} Verdict   how a match counts for one
@@ -80,7 +81,7 @@ export function endedTooSoon(match) {
   );
   const someoneNeverMoved = moves.some((count) => count === 0);
   const leftEarly =
-    match.result.reason === LEFT_THE_GAME && moves.some((count) => count < FAIR_PLAY_LIMITS.MIN_MOVES_EACH);
+    LEFT_THE_GAME.has(match.result.reason) && moves.some((count) => count < FAIR_PLAY_LIMITS.MIN_MOVES_EACH);
   return someoneNeverMoved || leftEarly;
 }
 

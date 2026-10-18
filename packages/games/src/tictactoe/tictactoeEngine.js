@@ -42,6 +42,8 @@ const isFinished = (state) => state.winner !== "" || state.board.every((cell) =>
 export const tictactoeEngine = defineEngine({
   id: GAME_IDS.TIC_TAC_TOE,
   players: { min: 2, max: 2 },
+  // Nine cells leave little to think about, so a minute without a move means the player has gone (CC-036).
+  turnLimitMs: 60_000,
 
   validateOptions(raw) {
     if (raw === null || typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).length > 0) {

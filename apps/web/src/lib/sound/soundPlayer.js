@@ -1,3 +1,4 @@
+import { categoryOf, SOUND_CATEGORIES } from "../notify/categories.js";
 import { RECIPES, SOUNDS } from "./sounds.js";
 
 /** Loudness of everything at full volume. The slider is squared first, because ears hear loudness that way. */
@@ -25,10 +26,20 @@ export const CLICK_SOUND_SELECTOR = "[data-sound='click']";
  *   hasUserActivation: () => boolean,
  *   preferences: ReturnType<typeof import("./soundPreferences.js").createSoundPreferences>,
  *   recipes?: typeof RECIPES,
- * }} deps  `hasUserActivation` says whether the page is inside a user gesture right now
+ *   now?: () => number,
+ * }} deps  `hasUserActivation` says whether the page is inside a user gesture right now. `now` is the clock of
+ *   each category's rate limit (CC-208)
  */
-export function createSoundPlayer({ createContext, hasUserActivation, preferences, recipes = RECIPES }) {
+export function createSoundPlayer({
+  createContext,
+  hasUserActivation,
+  preferences,
+  recipes = RECIPES,
+  now = Date.now,
+}) {
   let settings = preferences.load();
+  // When each category last made a sound, for its rate limit.
+  const lastPlayed = new Map();
   let context;
   let master;
   let broken = false;
@@ -45,7 +56,20 @@ export function createSoundPlayer({ createContext, hasUserActivation, preference
     listeners.forEach((listener) => listener());
   }
 
-  function voice(note, at) {
+  /**
+   * How loud one sound plays next to the main volume (CC-208): its category's volume, 0 when its category is off
+   * or played too recently, and 1 for a sound without a category (the click of a button).
+   */
+  function loudnessOf(name, at) {
+    const id = SOUND_CATEGORIES[name];
+    if (id === undefined) return 1;
+    const setting = settings.categories[id];
+    const last = lastPlayed.get(id);
+    if (!setting.on || (last !== undefined && last !== at && at - last < categoryOf(id).minGapMs)) return 0;
+    return setting.volume;
+  }
+
+  function voice(note, at, loudness) {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     const end = at + note.dur;
@@ -55,7 +79,7 @@ export function createSoundPlayer({ createContext, hasUserActivation, preference
       oscillator.frequency.exponentialRampToValueAtTime(note.to, end);
     }
     gain.gain.setValueAtTime(SILENT, at);
-    gain.gain.exponentialRampToValueAtTime(note.gain, at + ATTACK_S);
+    gain.gain.exponentialRampToValueAtTime(Math.max(SILENT, note.gain * loudness), at + ATTACK_S);
     gain.gain.exponentialRampToValueAtTime(SILENT, end);
     oscillator.connect(gain);
     gain.connect(master);
@@ -92,6 +116,24 @@ export function createSoundPlayer({ createContext, hasUserActivation, preference
         throw new RangeError("volume must be a number from 0 to 1");
       }
       update({ ...settings, volume });
+    },
+
+    /**
+     * Turns one kind of notice's sound on or off, or sets its volume (CC-208).
+     *
+     * @param {string} id  a category id (CATEGORIES)
+     * @param {{ on?: boolean, volume?: number }} change
+     */
+    setCategory(id, change) {
+      const current = settings.categories[categoryOf(id).id];
+      const next = { ...current, ...change };
+      if (typeof next.on !== "boolean") {
+        throw new TypeError("on must be true or false");
+      }
+      if (typeof next.volume !== "number" || !(next.volume >= 0 && next.volume <= 1)) {
+        throw new RangeError("volume must be a number from 0 to 1");
+      }
+      update({ ...settings, categories: { ...settings.categories, [id]: Object.freeze(next) } });
     },
 
     /** Starts audio if the page is inside a user gesture. Safe to call any number of times. */
@@ -132,10 +174,21 @@ export function createSoundPlayer({ createContext, hasUserActivation, preference
       if (list.length === 0 || level() === 0 || context?.state !== "running") {
         return false;
       }
+      const at = now();
+      const audible = list
+        .map((name) => ({ name, loudness: loudnessOf(name, at) }))
+        .filter(({ loudness }) => loudness > 0);
+      if (audible.length === 0) {
+        return false;
+      }
+      audible.forEach(({ name }) => {
+        const id = SOUND_CATEGORIES[name];
+        if (id !== undefined) lastPlayed.set(id, at);
+      });
       try {
         const start = context.currentTime + 0.01;
-        list.forEach((name, index) =>
-          recipes[name].forEach((note) => voice(note, start + index * STAGGER_S + note.at)),
+        audible.forEach(({ name, loudness }, index) =>
+          recipes[name].forEach((note) => voice(note, start + index * STAGGER_S + note.at, loudness)),
         );
         return true;
       } catch {

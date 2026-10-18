@@ -1,8 +1,23 @@
+import { useCallback, useState } from "react";
 import { Svg } from "../../art/Svg.jsx";
 import { useSound, useSoundSettings } from "../../hooks/useSound.js";
 import { DEFAULT_SOUND_SETTINGS } from "../../lib/sound/soundPreferences.js";
 import { SOUNDS } from "../../lib/sound/sounds.js";
 import styles from "./SoundControl.module.css";
+import { SoundSettings } from "./SoundSettings.jsx";
+
+/** A small gear: the settings for each kind of sound. */
+function Gear() {
+  return (
+    <Svg viewBox="0 0 24 24" width={18} height={18} className={styles.icon}>
+      <circle cx="12" cy="12" r="3" className={styles.line} />
+      <path
+        d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"
+        className={styles.line}
+      />
+    </Svg>
+  );
+}
 
 /** A speaker, with sound waves when sound is on and a cross when it is off. */
 function Speaker({ on }) {
@@ -27,6 +42,8 @@ export function SoundControl() {
   const sound = useSound();
   const { muted, volume } = useSoundSettings();
   const on = !muted && volume > 0;
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   function toggle() {
     if (on) {
@@ -68,6 +85,18 @@ export function SoundControl() {
         disabled={muted}
         onChange={changeVolume}
       />
+      <button
+        type="button"
+        className={styles.settings}
+        data-cc-control="header.sound_settings"
+        aria-label="Sound settings"
+        title="Sound settings"
+        aria-haspopup="dialog"
+        onClick={() => setSettingsOpen(true)}
+      >
+        <Gear />
+      </button>
+      <SoundSettings open={settingsOpen} onClose={closeSettings} />
     </div>
   );
 }

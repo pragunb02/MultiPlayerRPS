@@ -8,6 +8,7 @@ import { chessEngine } from "./chessEngine.js";
 const A = "alice";
 const B = "bob";
 const T0 = 1_700_000_000_000;
+const CTX = Object.freeze({ now: T0 });
 
 // Seed 42 makes bob White. Fool's mate: 1. f3 e5 2. g4 Qh4#.
 describeEngineContract(
@@ -34,7 +35,7 @@ describeEngineContract(
         move: { type: "move", from: "e2", to: "e4", promotion: "k" },
         reason: MOVE_REJECTIONS.INVALID_MOVE,
       },
-      { player: A, move: { type: "accept-draw" }, reason: MOVE_REJECTIONS.ILLEGAL_MOVE },
+      { player: A, move: { type: "accept-draw" }, reason: MOVE_REJECTIONS.INVALID_MOVE },
     ],
   },
   { describe, it },
@@ -446,9 +447,17 @@ describe("chessEngine draws by rule", () => {
   });
 });
 
-describe("chessEngine draw offers", () => {
-  it("ends in agreement when the opponent accepts", () => {
-    const state = act(act(newGame(), B, { type: "offer-draw" }), A, { type: "accept-draw" });
+describe("chessEngine draw offers (CC-159)", () => {
+  it("lets each player offer a draw three times a game, for thirty seconds each", () => {
+    expect(chessEngine.requestTypes).toEqual({ draw: { lifetimeMs: 30_000, limitPerPlayer: 3 } });
+  });
+
+  it("ends in a draw by agreement when the opponent accepts", () => {
+    const state = chessEngine.acceptRequest(
+      playSan(newGame(), ["e4"]),
+      { type: "draw", from: B, to: A },
+      CTX,
+    );
 
     expect(chessEngine.getOutcome(state)).toEqual({
       status: "finished",
@@ -456,84 +465,19 @@ describe("chessEngine draw offers", () => {
       winners: [],
       reason: "agreement",
     });
+    expect(chessEngine.deadline(state)).toBe(0);
   });
 
-  it("treats a counter-offer as agreement", () => {
-    const state = act(act(newGame(), B, { type: "offer-draw" }), A, { type: "offer-draw" });
+  it("leaves a game that is already over as it was", () => {
+    const resigned = act(newGame(), A, { type: "resign" });
 
-    expect(chessEngine.getOutcome(state).reason).toBe("agreement");
+    expect(chessEngine.acceptRequest(resigned, { type: "draw", from: B, to: A }, CTX)).toBe(resigned);
   });
 
-  it("refuses offering twice and accepting your own offer", () => {
-    const offered = act(newGame(), B, { type: "offer-draw" });
-
-    expect(chessEngine.validateMove(offered, B, { type: "offer-draw" }, { now: T0 }).reason).toBe(
-      MOVE_REJECTIONS.ILLEGAL_MOVE,
-    );
-    expect(chessEngine.validateMove(offered, B, { type: "accept-draw" }, { now: T0 }).reason).toBe(
-      MOVE_REJECTIONS.ILLEGAL_MOVE,
-    );
-  });
-
-  it("is declined by the opponent making a move instead", () => {
-    const offeredByWhite = playSan(act(newGame(), B, { type: "offer-draw" }), ["e4"]);
-    expect(offeredByWhite.drawOfferBy).toBe(B); // your own move keeps your offer standing
-
-    const declined = playSan(offeredByWhite, ["e5"]);
-    expect(declined.drawOfferBy).toBe("");
-    expect(chessEngine.viewFor(declined, B).drawAnswer).toBe("declined");
-  });
-
-  it("starts with no answer, and a new offer clears the last answer", () => {
-    const declined = act(act(newGame(), B, { type: "offer-draw" }), A, { type: "decline-draw" });
-
-    expect(chessEngine.viewFor(newGame(), A).drawAnswer).toBe("");
-    expect(chessEngine.viewFor(act(declined, A, { type: "offer-draw" }), B)).toEqual(
-      expect.objectContaining({ drawOfferBy: A, drawAnswer: "" }),
-    );
-  });
-
-  it("shows no answer for a game stored before draw answers existed", () => {
-    const { drawAnswer, ...stored } = playSan(newGame(), ["e4"]);
-
-    expect(drawAnswer).toBe("");
-    expect(chessEngine.viewFor(stored, A).drawAnswer).toBe("");
-    expect(chessEngine.viewFor(playSan(stored, ["e5"]), A).drawAnswer).toBe("");
-  });
-
-  it("lets the opponent decline an offer, and the game goes on (CC-104)", () => {
-    const declined = act(act(newGame(), B, { type: "offer-draw" }), A, { type: "decline-draw" });
-
-    expect(chessEngine.getOutcome(declined)).toEqual({ status: "ongoing" });
-    expect(chessEngine.viewFor(declined, A)).toEqual(
-      expect.objectContaining({ drawOfferBy: "", drawAnswer: "declined", toMove: B }),
-    );
-  });
-
-  it("lets the offerer withdraw the offer before it is answered (CC-104)", () => {
-    const withdrawn = act(act(newGame(), B, { type: "offer-draw" }), B, { type: "withdraw-draw" });
-
-    expect(chessEngine.viewFor(withdrawn, A)).toEqual(
-      expect.objectContaining({ drawOfferBy: "", drawAnswer: "withdrawn" }),
-    );
-    expect(chessEngine.validateMove(withdrawn, A, { type: "accept-draw" }, { now: T0 }).ok).toBe(false);
-  });
-
-  it("refuses declining without an offer, declining your own and withdrawing someone else's", () => {
-    const offered = act(newGame(), B, { type: "offer-draw" });
-    const rejection = (state, player, type) =>
-      chessEngine.validateMove(state, player, { type }, { now: T0 }).reason;
-
-    expect(rejection(newGame(), A, "decline-draw")).toBe(MOVE_REJECTIONS.ILLEGAL_MOVE);
-    expect(rejection(offered, B, "decline-draw")).toBe(MOVE_REJECTIONS.ILLEGAL_MOVE);
-    expect(rejection(offered, A, "withdraw-draw")).toBe(MOVE_REJECTIONS.ILLEGAL_MOVE);
-    expect(rejection(newGame(), B, "withdraw-draw")).toBe(MOVE_REJECTIONS.ILLEGAL_MOVE);
-  });
-
-  it("keeps the last answer through later moves that decline nothing", () => {
-    const declined = act(act(newGame(), B, { type: "offer-draw" }), A, { type: "decline-draw" });
-
-    expect(chessEngine.viewFor(playSan(declined, ["e4"]), A).drawAnswer).toBe("declined");
+  it("no longer takes draw offers as moves", () => {
+    for (const type of ["offer-draw", "accept-draw", "decline-draw", "withdraw-draw"]) {
+      expect(chessEngine.validateMove(newGame(), B, { type }, CTX).reason).toBe(MOVE_REJECTIONS.INVALID_MOVE);
+    }
   });
 });
 
@@ -637,8 +581,6 @@ describe("chessEngine view", () => {
       timeControl: "blitz-5+0",
       clocks: { w: 300_000, b: 300_000 },
       lastMoveAt: T0,
-      drawOfferBy: "",
-      drawAnswer: "",
     });
   });
 

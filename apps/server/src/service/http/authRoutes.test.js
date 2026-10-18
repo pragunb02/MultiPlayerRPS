@@ -133,7 +133,7 @@ describe("auth routes", () => {
 
     expect(rejoined.data.you).toBe(signedUp.body.identity.id);
     expect(rejoined.data.seats).toEqual([
-      { playerId: signedUp.body.identity.id, displayName: "Riya", connected: true },
+      expect.objectContaining({ playerId: signedUp.body.identity.id, displayName: "Riya", connected: true }),
     ]);
     expect(joined.data.status).toBe("playing"); // the account against the friend, not against the old guest seat
     expect(joined.data.seats.map((seat) => seat.displayName)).toEqual(["Riya", friend.identity.displayName]);

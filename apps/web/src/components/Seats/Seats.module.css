@@ -68,10 +68,21 @@
   background: var(--color-primary-soft);
   color: var(--color-text);
 }
+/* Where the player is (CC-158): quiet while all is well, the warning colour while they are away or gone. */
 .status {
   margin-left: auto;
   font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+.away,
+.gone {
   color: var(--color-warning);
+}
+.timer {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 @keyframes seat-in {
   from {
