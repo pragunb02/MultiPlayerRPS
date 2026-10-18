@@ -86,6 +86,7 @@ record, because today one process keeps the games it is running in memory.
      presence, clocks and moves in a side column; phones get a compact match header, the request banner takes the
      match bar's row while open, and the result is a non-blocking bottom sheet. 360x800 is added as a design and
      test viewport, `viewport-fit=cover` with safe-area padding everywhere.
+
 ### ADR-050 — Rewards one beat at a time, outcome moments, Bit and the empty screens
 
 - **Status:** Accepted · 2026-10-18 (owner accepted every recommendation in [CC-099](tickets/CC-099.md),
