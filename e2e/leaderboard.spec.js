@@ -27,6 +27,8 @@ async function signUp(player, account) {
   await player.page.getByLabel("Username").fill(account.username);
   await player.page.getByLabel("Email").fill(account.email);
   await player.page.getByLabel("Password").fill(account.password);
+  // An adult, so the name shows on the public boards (CC-152).
+  await player.page.getByLabel("Year of birth").selectOption("1990");
   await player.page.getByRole("button", { name: "Create account" }).click();
   await expect(player.page).toHaveURL("/");
 }
