@@ -10,19 +10,22 @@ import { roomChannel, stampedView } from "./roomHandlers.js";
  *   socket: import("socket.io").Socket,
  *   botComponent: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
  *   roomComponent: ReturnType<typeof import("../../domain/rooms/roomComponent.js").createRoomComponent>,
+ *   networkOf: (address: string) => import("../../utils/networkKey.js").NetworkNames,
  *   now: () => number,
  *   logger: import("../../utils/logger.js").Logger,
- * }} deps
+ * }} deps  `networkOf` names the socket's address when the game is created, as for any new room
  */
-export function createBotHandlers({ socket, botComponent, roomComponent, now, logger }) {
+export function createBotHandlers({ socket, botComponent, roomComponent, networkOf, now, logger }) {
   const identity = socket.data.identity;
 
   return {
     async [SOCKET_EVENTS.ROOM_PLAY_COMPUTER](payload) {
       const { gameId, options, level } = parsePlayComputer(payload);
+      const network = networkOf(socket.data.address);
       const room = await botComponent.playComputer({
         host: identity,
-        network: socket.data.network,
+        network: network.name,
+        earlierNetworks: network.earlier,
         gameId,
         options,
         level,

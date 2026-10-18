@@ -62,13 +62,49 @@ describe("roomComponent.listFinishedGames (CC-111)", () => {
   });
 });
 
+describe("roomComponent: an aborted game is not a match (CC-036, CC-111)", () => {
+  /** Bob never makes the first move, so the game is aborted once the first move limit is over. */
+  async function abortedGame(rooms) {
+    const { code } = await rooms.createRoom({
+      network: "n",
+      host: ALICE,
+      gameId: "race",
+      options: OPTIONS,
+      now: T0,
+    });
+    await rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
+    const abortedAt = T0 + 1 + ROOM_LIFETIMES.firstMoveMs;
+    await rooms.expireDue({ now: abortedAt });
+    expect((await rooms.getRoom(code)).result.result).toBe("aborted");
+    return { code, abortedAt };
+  }
+
+  it("is not listed with the finished games", async () => {
+    const { rooms } = setup();
+    await abortedGame(rooms);
+
+    expect(await rooms.listFinishedGames()).toEqual([]);
+  });
+
+  it("is not kept before a rematch replaces it", async () => {
+    const { rooms, kept } = setup();
+    const { code, abortedAt } = await abortedGame(rooms);
+
+    await rooms.askRequest({ code, playerId: ALICE.id, type: "rematch", now: abortedAt + 1 });
+    const rematch = await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: abortedAt + 2 });
+
+    expect(rematch.status).toBe("playing");
+    expect(kept).toEqual([]);
+  });
+});
+
 describe("roomComponent: a finished game is kept before its room changes (CC-111)", () => {
   it("keeps the game before a rematch replaces it", async () => {
     const { rooms, kept, finishedGame } = setup();
     const { code, announced } = await finishedGame();
 
-    await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 4 });
-    await rooms.requestRematch({ code, playerId: BOB.id, now: T0 + 5 });
+    await rooms.askRequest({ code, playerId: ALICE.id, type: "rematch", now: T0 + 4 });
+    await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: T0 + 5 });
 
     expect(kept[0]).toEqual(announced);
     expect(new Set(kept.map(({ room }) => room.game.matchId))).toEqual(
@@ -100,12 +136,14 @@ describe("roomComponent: a finished game is kept before its room changes (CC-111
   it("refuses the change while the game cannot be kept, so the game stays in its room", async () => {
     const { rooms, kept, control, finishedGame } = setup();
     const { code, announced } = await finishedGame();
-    await rooms.requestRematch({ code, playerId: ALICE.id, now: T0 + 4 });
+    await rooms.askRequest({ code, playerId: ALICE.id, type: "rematch", now: T0 + 4 });
     control.failKeeping = 1;
 
-    await expect(rooms.requestRematch({ code, playerId: BOB.id, now: T0 + 5 })).rejects.toThrow("db blip");
+    await expect(rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: T0 + 5 })).rejects.toThrow(
+      "db blip",
+    );
     const still = await rooms.getRoom(code);
-    const rematch = await rooms.requestRematch({ code, playerId: BOB.id, now: T0 + 6 });
+    const rematch = await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: T0 + 6 });
 
     expect(still.status).toBe("finished");
     expect(still.game.matchId).toBe(announced.room.game.matchId);

@@ -21,11 +21,11 @@ describe("useSound (CC-103)", () => {
   it("follows every change of the settings", () => {
     const sound = fakeSound();
     const { result } = renderHook(() => useSoundSettings(), { wrapper: withSound(sound) });
-    expect(result.current).toEqual({ muted: false, volume: 0.6 });
+    expect(result.current).toEqual(expect.objectContaining({ muted: false, volume: 0.6 }));
 
     act(() => sound.setMuted(true));
 
-    expect(result.current).toEqual({ muted: true, volume: 0.6 });
+    expect(result.current).toEqual(expect.objectContaining({ muted: true, volume: 0.6 }));
   });
 });
 

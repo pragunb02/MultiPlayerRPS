@@ -221,6 +221,28 @@ describe("realtime gateway", () => {
     await own.tasks.drain();
   });
 
+  it("tells every connected player that the server is restarting before it cuts them off (CC-158)", async () => {
+    const own = await startTestServer(); // closed here, not by afterEach
+    const res = await fetch(`${own.baseUrl}/api/session/guest`, { method: "POST" });
+    const cookie = res.headers.get("set-cookie").split(";")[0];
+    const socket = connect(own.baseUrl, {
+      transports: ["websocket"],
+      extraHeaders: { cookie },
+      reconnection: false,
+    });
+    sockets.push(socket);
+    await connected(socket);
+    const heard = [];
+    socket.onAny((event) => heard.push(event));
+    const cut = new Promise((resolve) => socket.once("disconnect", resolve));
+
+    await own.gateway.close();
+    await cut;
+
+    expect(heard).toEqual([SOCKET_EVENTS.SERVER_RESTARTING]);
+    await own.tasks.drain();
+  });
+
   it("reports closing an already closed gateway", async () => {
     const own = await startTestServer(); // closed here, not by afterEach
     await own.gateway.close();

@@ -40,15 +40,20 @@ const finished = ({ code = "AB2CD3", outcome = outcomes.win, games = 1, ...overr
   players: { min: 2, max: 2 },
   seats: [ME, BOB],
   you: GUEST.id,
-  game: { view: {}, activePlayers: [], outcome },
-  rematch: { requestedBy: [], available: true },
+  game: { view: {}, activePlayers: [], outcome, number: games },
+  rematch: { available: true },
   series: { games, wins: {} },
   ...overrides,
 });
 const playing = (overrides = {}) =>
   finished({
     status: "playing",
-    game: { view: {}, activePlayers: [GUEST.id], outcome: { status: "ongoing" } },
+    game: {
+      view: {},
+      activePlayers: [GUEST.id],
+      outcome: { status: "ongoing" },
+      number: overrides.series?.games ?? 1,
+    },
     ...overrides,
   });
 
@@ -428,8 +433,12 @@ describe("the streak-at-risk line", () => {
   });
 
   it("appears when a pushed streak puts it at risk", async () => {
-    const { socket } = openRoom({ path: "/", api: { getStreaks: vi.fn().mockResolvedValue(NO_STREAKS) } });
+    const getStreaks = vi.fn().mockResolvedValue(NO_STREAKS);
+    const { socket } = openRoom({ path: "/", api: { getStreaks } });
     await screen.findByRole("region", { name: "Daily quests" });
+    // The first answer is in before the push, so a slow test machine cannot let it overwrite the pushed streak.
+    await waitFor(() => expect(getStreaks).toHaveBeenCalled());
+    await act(() => getStreaks.mock.results[0].value);
     expect(line()).toBeNull();
 
     act(() => socket.push(SOCKET_EVENTS.STREAKS_UPDATED, { streaks: AT_RISK }));

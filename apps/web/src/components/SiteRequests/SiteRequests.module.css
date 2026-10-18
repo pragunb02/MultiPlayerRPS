@@ -1,0 +1,42 @@
+/*
+ * A question from another room (CC-207), at the top of whatever page the player is on. It is part of the page, so
+ * it pushes the page down instead of covering a board or a button.
+ */
+.stack {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.popup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md), var(--glow-primary);
+  animation: slide-in var(--duration-slow) var(--ease-spring);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+.question {
+  margin: 0;
+  flex: 1 1 14rem;
+  font-weight: 700;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}

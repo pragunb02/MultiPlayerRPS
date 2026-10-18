@@ -19,6 +19,7 @@ export const NO_MATCH_FACTS = Object.freeze({
 export function createEmptyAnalyticsDao(reads = {}) {
   return Object.freeze({
     listPlayerActivity: async () => [],
+    listPlayerDays: async () => [],
     getMatchFacts: async () => ({ ...NO_MATCH_FACTS }),
     listSignups: async () => ({ transfers: [], accounts: [] }),
     listAchievementUnlocks: async () => [],

@@ -5,8 +5,11 @@
 // scripts/workflows.test.mjs checks that every spec file is in exactly one part and that both CI matrices list
 // exactly these parts, so a new file fails CI until it is given a part.
 
-/** The tests that restart the server. They run on their own, one at a time, after nothing else (CC-101). */
-export const RESTARTS = "restart.spec.js";
+/**
+ * The tests that restart the server (CC-101), or run it with short room times for a while (CC-207). They run on
+ * their own, one at a time, so they cut off nothing else.
+ */
+export const RESTARTS = /restart[a-z-]*\.spec\.js$/;
 
 /**
  * The parts, with each file's test time on CI in seconds, desktop and mobile together, from the merged report of
@@ -53,6 +56,7 @@ export const SHARDS = Object.freeze([
     "waking-up.spec.js", // 33
     "user.spec.js", // 31
     "guest.spec.js", // 21
+    "presence.spec.js", // new (CC-207), not measured yet
   ]),
 ]);
 

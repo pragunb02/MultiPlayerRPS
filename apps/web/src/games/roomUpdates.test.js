@@ -1,12 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { incomingRequests, roomNotices, roomRequests, roomSounds } from "./roomUpdates.js";
+import {
+  incomingRequests,
+  outgoingRequests,
+  REMATCH_TEXTS,
+  requestAnswers,
+  roomNotices,
+  roomRequests,
+  roomSounds,
+  textsFor,
+} from "./roomUpdates.js";
 
 const ME = "guest_me";
 const BOB = "guest_bob";
 const seats = [
-  { playerId: ME, displayName: "Me", connected: true },
-  { playerId: BOB, displayName: "Bob", connected: true },
+  { playerId: ME, displayName: "Me", connected: true, presence: "here" },
+  { playerId: BOB, displayName: "Bob", connected: true, presence: "here" },
 ];
+const T = 5_000_000;
 
 /** A RoomView of a game the web app has no board for: only the room's own rules apply. */
 const room = ({ game = {}, ...overrides } = {}) => ({
@@ -15,23 +25,34 @@ const room = ({ game = {}, ...overrides } = {}) => ({
   status: "playing",
   you: ME,
   seats,
-  game: { view: {}, activePlayers: [BOB], outcome: { status: "ongoing" }, ...game },
+  requests: [],
+  game: { view: {}, activePlayers: [BOB], outcome: { status: "ongoing" }, number: 1, ...game },
   ...overrides,
 });
-const finished = ({ rematch = { requestedBy: [], available: true, declinedBy: "" }, ...overrides } = {}) =>
+const finished = ({ requests = [], rematch = { available: true }, ...overrides } = {}) =>
   room({
     status: "finished",
     rematch,
+    requests,
     series: { games: 1, wins: { [ME]: 1 } },
     game: { activePlayers: [], outcome: { status: "finished", result: "win", winners: [ME] } },
     ...overrides,
   });
 const chess = (view = {}, overrides = {}) =>
-  room({
-    gameId: "chess",
-    game: { view: { moves: [], drawOfferBy: "", drawAnswer: "", ...view }, activePlayers: [ME] },
-    ...overrides,
-  });
+  room({ gameId: "chess", game: { view: { moves: [], ...view }, activePlayers: [ME] }, ...overrides });
+
+/** A request in the shape the server sends (RoomRequest in SOCKET_EVENTS). */
+const request = (overrides = {}) => ({
+  type: "rematch",
+  from: BOB,
+  to: ME,
+  createdAt: T,
+  expiresAt: T + 60_000,
+  state: "open",
+  endedAt: 0,
+  ...overrides,
+});
+const ended = (state, overrides = {}) => request({ state, endedAt: T + 5, ...overrides });
 
 describe("roomSounds (CC-103)", () => {
   it("is quiet for the first view, so opening or reloading a room makes no sound", () => {
@@ -47,7 +68,7 @@ describe("roomSounds (CC-103)", () => {
 
   it("plays the start when the game begins, and a rematch is a new start", () => {
     const waiting = { ...room(), status: "waiting", game: undefined };
-    const rematch = room({ series: { games: 1, wins: { [ME]: 1 } } });
+    const rematch = room({ game: { number: 2 } });
 
     expect(roomSounds({ previous: waiting, next: room(), hidden: false })).toEqual(["game-start"]);
     expect(roomSounds({ previous: finished(), next: rematch, hidden: false })).toEqual(["game-start"]);
@@ -58,7 +79,7 @@ describe("roomSounds (CC-103)", () => {
       { moves: ["e4", "e5", "Qh5", "Nc6", "Bc4", "Nf6", "Qxf7#"] },
       { status: "finished" },
     );
-    const rematch = chess({}, { series: { games: 1, wins: {} } });
+    const rematch = chess({}, { game: { view: { moves: [] }, activePlayers: [ME], number: 2 } });
 
     expect(roomSounds({ previous: lastGame, next: rematch, hidden: false })).toEqual(["game-start"]);
   });
@@ -75,15 +96,17 @@ describe("roomSounds (CC-103)", () => {
     expect(roomSounds({ previous: room(), next: room(), hidden: false })).toEqual([]);
   });
 
-  it("follows the deciding move with the viewer's result", () => {
+  it("follows the deciding move with the viewer's result, and an aborted game has none", () => {
     const win = { status: "finished", result: "win", winners: [ME] };
     const loss = { status: "finished", result: "win", winners: [BOB] };
     const draw = { status: "finished", result: "draw", winners: [] };
-    const ended = (outcome) => room({ status: "finished", game: { outcome, activePlayers: [] } });
+    const aborted = { status: "finished", result: "aborted", winners: [], reason: "aborted" };
+    const over = (outcome) => room({ status: "finished", game: { outcome, activePlayers: [] } });
 
-    expect(roomSounds({ previous: room(), next: ended(win), hidden: false })).toEqual(["win"]);
-    expect(roomSounds({ previous: room(), next: ended(loss), hidden: false })).toEqual(["loss"]);
-    expect(roomSounds({ previous: room(), next: ended(draw), hidden: false })).toEqual(["draw"]);
+    expect(roomSounds({ previous: room(), next: over(win), hidden: false })).toEqual(["win"]);
+    expect(roomSounds({ previous: room(), next: over(loss), hidden: false })).toEqual(["loss"]);
+    expect(roomSounds({ previous: room(), next: over(draw), hidden: false })).toEqual(["draw"]);
+    expect(roomSounds({ previous: room(), next: over(aborted), hidden: false })).toEqual([]);
   });
 
   it("plays the checkmating move and then the win", () => {
@@ -91,8 +114,8 @@ describe("roomSounds (CC-103)", () => {
     const mated = {
       ...before,
       status: "finished",
-      series: { games: 1, wins: { [ME]: 1 } },
       game: {
+        ...before.game,
         view: { ...before.game.view, moves: ["f3", "e5", "g4", "Qh4#"] },
         activePlayers: [],
         outcome: { status: "finished", result: "win", winners: [ME] },
@@ -103,31 +126,63 @@ describe("roomSounds (CC-103)", () => {
   });
 
   it("gives spectators and players without a seat no result sound", () => {
-    const ended = room({
+    const over = room({
       status: "finished",
       game: { outcome: { status: "finished", result: "win", winners: [BOB] }, activePlayers: [] },
     });
 
-    expect(roomSounds({ previous: room({ you: "" }), next: { ...ended, you: "" }, hidden: false })).toEqual(
+    expect(roomSounds({ previous: room({ you: "" }), next: { ...over, you: "" }, hidden: false })).toEqual(
       [],
     );
     expect(
-      roomSounds({ previous: room({ you: "ghost" }), next: { ...ended, you: "ghost" }, hidden: false }),
+      roomSounds({ previous: room({ you: "ghost" }), next: { ...over, you: "ghost" }, hidden: false }),
     ).toEqual([]);
   });
 
   it("chimes once when someone asks you something", () => {
-    const asked = finished({ rematch: { requestedBy: [BOB], available: true, declinedBy: "" } });
+    const asked = finished({ requests: [request()] });
 
     expect(roomSounds({ previous: finished(), next: asked, hidden: false })).toEqual(["notify"]);
     expect(roomSounds({ previous: asked, next: { ...asked }, hidden: false })).toEqual([]);
   });
 
-  it("chimes when your request is answered", () => {
-    const asked = finished({ rematch: { requestedBy: [ME], available: true, declinedBy: "" } });
-    const declined = finished({ rematch: { requestedBy: [], available: true, declinedBy: BOB } });
+  it("chimes when your request is answered or runs out, and when the opponent leaves", () => {
+    const mine = request({ from: ME, to: BOB });
+    const asked = finished({ requests: [mine] });
 
-    expect(roomSounds({ previous: asked, next: declined, hidden: false })).toEqual(["notify"]);
+    expect(
+      roomSounds({
+        previous: asked,
+        next: finished({ requests: [{ ...mine, state: "declined" }] }),
+        hidden: false,
+      }),
+    ).toEqual(["notify"]);
+    expect(
+      roomSounds({
+        previous: asked,
+        next: finished({ requests: [{ ...mine, state: "expired" }] }),
+        hidden: false,
+      }),
+    ).toEqual(["notify"]);
+    expect(
+      roomSounds({ previous: finished(), next: finished({ rematch: { available: false } }), hidden: false }),
+    ).toEqual(["notify"]);
+  });
+
+  it("is quiet about the viewer's own answer", () => {
+    const asked = finished({ requests: [request()] });
+
+    expect(
+      roomSounds({ previous: asked, next: finished({ requests: [ended("declined")] }), hidden: false }),
+    ).toEqual([]);
+    const mine = request({ from: ME, to: BOB });
+    expect(
+      roomSounds({
+        previous: finished({ requests: [mine] }),
+        next: finished({ requests: [{ ...mine, state: "withdrawn" }] }),
+        hidden: false,
+      }),
+    ).toEqual([]);
   });
 
   it("calls you back to a background tab when it became your move", () => {
@@ -148,127 +203,170 @@ describe("roomSounds (CC-103)", () => {
   });
 });
 
-describe("roomRequests (CC-104)", () => {
-  it("turns the opponent's rematch request into a question with accept, decline and cancel", () => {
-    const asked = finished({ rematch: { requestedBy: [BOB], available: true, declinedBy: "" } });
+describe("roomRequests (CC-159)", () => {
+  it("turns the opponent's open rematch request into a question with accept, decline and cancel", () => {
+    const [asked] = incomingRequests(finished({ requests: [request()] }));
 
-    const [request] = incomingRequests(asked);
-
-    expect(request).toEqual(
-      expect.objectContaining({
-        key: `rematch:${BOB}`,
-        from: BOB,
-        title: "Rematch?",
-        showWaiting: false,
-        accept: { type: "rematch" },
-        decline: { type: "decline-rematch" },
-        cancel: { type: "rematch" },
-      }),
-    );
-    expect(request.question("Bob")).toBe("Bob wants a rematch.");
-    expect(request.waitingTitle).toBe("Rematch asked");
+    expect(asked).toEqual({
+      key: `rematch:${BOB}:${T}`,
+      type: "rematch",
+      from: BOB,
+      to: ME,
+      createdAt: T,
+      expiresAt: T + 60_000,
+      texts: REMATCH_TEXTS,
+      accept: { type: "answer", requestType: "rematch", answer: "accept" },
+      decline: { type: "answer", requestType: "rematch", answer: "decline" },
+      cancel: { type: "answer", requestType: "rematch", answer: "withdraw" },
+    });
+    expect(asked.texts.question("Bob")).toBe("Bob wants a rematch.");
   });
 
-  it("shows only your own request once you asked", () => {
-    const both = finished({ rematch: { requestedBy: [BOB, ME], available: true, declinedBy: "" } });
+  it("tells the viewer's own requests apart from the ones they were asked", () => {
+    const mine = finished({ requests: [request({ from: ME, to: BOB })] });
 
-    expect(roomRequests(both).map((request) => request.from)).toEqual([ME]);
-    expect(incomingRequests(both)).toEqual([]);
+    expect(outgoingRequests(mine).map((each) => each.from)).toEqual([ME]);
+    expect(incomingRequests(mine)).toEqual([]);
   });
 
-  it("has no rematch request during a game, after an opponent left, or in rooms without the rematch field", () => {
-    const left = finished({ rematch: { requestedBy: [BOB], available: false, declinedBy: "" } });
-
-    expect(roomRequests(room())).toEqual([]);
-    expect(roomRequests(left)).toEqual([]);
-    expect(roomRequests({ ...finished(), rematch: undefined })).toEqual([]);
+  it("lists only open requests, and none in rooms from before requests existed", () => {
+    expect(roomRequests(finished({ requests: [ended("declined")] }))).toEqual([]);
+    expect(roomRequests({ ...finished(), requests: undefined })).toEqual([]);
   });
 
-  it("adds the game's own requests, such as a chess draw offer", () => {
-    expect(incomingRequests(chess({ drawOfferBy: BOB })).map((request) => request.key)).toEqual([
-      `draw:${BOB}`,
-    ]);
-    expect(incomingRequests(chess({ drawOfferBy: ME }))).toEqual([]);
-    expect(roomRequests(chess({ drawOfferBy: ME })).map((request) => request.from)).toEqual([ME]);
-  });
-
-  it("asks spectators nothing and has nothing before the game started", () => {
-    const watching = finished({ you: "", rematch: { requestedBy: [BOB], available: true, declinedBy: "" } });
+  it("asks spectators nothing", () => {
+    const watching = finished({ you: "", requests: [request()] });
 
     expect(incomingRequests(watching)).toEqual([]);
-    expect(roomRequests({ ...room(), status: "waiting", game: undefined })).toEqual([]);
+    expect(outgoingRequests(watching)).toEqual([]);
+    expect(roomRequests(watching)).toHaveLength(1);
+  });
+
+  it.each(["constructor", "__proto__", "tostring", "hasOwnProperty"])(
+    "words a request of kind %s, which every object inherits or nearly, as one nobody knows",
+    (type) => {
+      const texts = textsFor("chess", type);
+
+      expect(texts.question("Bob")).toBe("Bob is asking you something.");
+      expect(texts.site("Chess")).toBe("is asking you something at Chess");
+    },
+  );
+
+  it("words a game's own requests through the registry, and a kind nobody knows plainly", () => {
+    expect(textsFor("chess", "draw").question("Bob")).toBe("Bob offers a draw.");
+    const unknown = textsFor("ludo", "truce");
+
+    expect([
+      unknown.title,
+      unknown.question("Bob"),
+      unknown.waiting("Bob"),
+      unknown.declined("Bob"),
+      unknown.withdrawn("Bob"),
+      unknown.accepted("Bob"),
+      unknown.site("Ludo"),
+    ]).toEqual([
+      "Request",
+      "Bob is asking you something.",
+      "Waiting for Bob to answer",
+      "Bob said no",
+      "Bob took the request back",
+      "Bob said yes",
+      "is asking you something at Ludo",
+    ]);
+    expect(REMATCH_TEXTS.waiting("Bob")).toBe("Waiting for Bob to answer your rematch request");
+    expect(REMATCH_TEXTS.site("Chess")).toBe("wants a rematch at Chess");
   });
 });
 
-describe("roomNotices (CC-104)", () => {
-  const rematch = (requestedBy, declinedBy = "") => ({ requestedBy, available: true, declinedBy });
-
-  it("tells the asker who declined the rematch", () => {
-    expect(
-      roomNotices(finished({ rematch: rematch([ME]) }), finished({ rematch: rematch([], BOB) })),
-    ).toEqual(["Bob declined the rematch"]);
-  });
-
-  it("tells the one asked that the request was taken back", () => {
-    expect(roomNotices(finished({ rematch: rematch([BOB]) }), finished({ rematch: rematch([]) }))).toEqual([
-      "Bob took back the rematch request",
-    ]);
-  });
-
-  it("tells nobody about their own answer, or the same answer twice", () => {
-    const declinedByMe = finished({ rematch: rematch([], ME) });
-
-    expect(roomNotices(finished({ rematch: rematch([BOB]) }), declinedByMe)).toEqual([]);
-    expect(roomNotices(finished({ rematch: rematch([ME]) }), finished({ rematch: rematch([ME]) }))).toEqual(
-      [],
+describe("requestAnswers (CC-160)", () => {
+  const answered = (before, after, viewer = ME) =>
+    requestAnswers(
+      finished({ requests: [before], you: viewer }),
+      finished({ requests: [after], you: viewer }),
     );
-    const declined = finished({ rematch: rematch([], BOB) });
-    expect(roomNotices(declined, { ...declined })).toEqual([]);
+
+  it("tells the asker, in their words, how the other player answered", () => {
+    const mine = request({ from: ME, to: BOB });
+
+    expect(answered(mine, { ...mine, state: "declined", endedAt: T + 5 })).toEqual([
+      {
+        key: `rematch:${ME}:${T}`,
+        type: "rematch",
+        state: "declined",
+        asked: true,
+        otherId: BOB,
+        message: "Bob declined the rematch",
+      },
+    ]);
+    expect(answered(mine, { ...mine, state: "accepted" })[0].message).toBe(
+      "Bob accepted. Starting the next game",
+    );
+    expect(answered(mine, { ...mine, state: "expired" })[0].message).toBe("No answer from Bob");
+    expect(answered(mine, { ...mine, state: "withdrawn" })[0].message).toBe("You took the request back");
   });
 
-  it("tells the player still there that the opponent left the finished game, by name (CC-162)", () => {
-    const asked = finished({ rematch: rematch([BOB]) });
-    const gone = { requestedBy: [], available: false, declinedBy: "" };
+  it("tells the player asked how it ended too", () => {
+    const theirs = request();
 
-    expect(roomNotices(asked, finished({ rematch: { ...gone, leftName: "Bobby" } }))).toEqual([
+    expect(answered(theirs, { ...theirs, state: "withdrawn" })[0]).toEqual(
+      expect.objectContaining({ asked: false, otherId: BOB, message: "Bob took back the rematch request" }),
+    );
+    expect(answered(theirs, { ...theirs, state: "declined" })[0].message).toBe("You said no");
+    expect(answered(theirs, { ...theirs, state: "accepted" })[0].message).toBe("You accepted");
+    expect(answered(theirs, { ...theirs, state: "expired" })[0].message).toBe(
+      "The request from Bob ran out of time",
+    );
+  });
+
+  it("is news only once, and never across rooms, for spectators or for players it does not concern", () => {
+    const theirs = request();
+    const done = { ...theirs, state: "declined" };
+
+    expect(answered(done, done)).toEqual([]);
+    expect(answered(theirs, done, "")).toEqual([]);
+    expect(
+      answered(
+        request({ from: "guest_x", to: "guest_y" }),
+        ended("declined", { from: "guest_x", to: "guest_y" }),
+      ),
+    ).toEqual([]);
+    expect(
+      requestAnswers(finished({ requests: [theirs] }), finished({ code: "ZZZZZZ", requests: [done] })),
+    ).toEqual([]);
+  });
+
+  it("uses the game's words for its own requests", () => {
+    const offer = request({ type: "draw", from: ME, to: BOB });
+    const before = chess({}, { requests: [offer] });
+
+    expect(
+      requestAnswers(before, chess({}, { requests: [{ ...offer, state: "declined" }] }))[0].message,
+    ).toBe("Bob declined your draw offer");
+  });
+});
+
+describe("roomNotices (CC-162, CC-207)", () => {
+  it("tells the player still there that the opponent left the finished game, by name", () => {
+    const before = finished();
+    const gone = { available: false };
+
+    expect(roomNotices(before, finished({ rematch: { ...gone, leftName: "Bobby" } }))).toEqual([
       "Bobby left the room",
     ]);
-    expect(roomNotices(asked, { ...finished({ rematch: gone }), seats: [asked.seats[0]] })).toEqual([
-      `${asked.seats[1].displayName} left the room`,
+    expect(roomNotices(before, { ...finished({ rematch: gone }), seats: [before.seats[0]] })).toEqual([
+      "Bob left the room",
     ]);
-    expect(roomNotices(asked, finished({ rematch: gone }))).toEqual(["Your opponent left the room"]);
+    expect(roomNotices(before, finished({ rematch: gone }))).toEqual(["Your opponent left the room"]);
   });
 
   it("says nothing more once a rematch is off, after a rematch started, for spectators, or before the game finished", () => {
-    const asked = finished({ rematch: rematch([BOB]) });
-    const gone = finished({ rematch: { requestedBy: [], available: false, declinedBy: "" } });
+    const gone = finished({ rematch: { available: false } });
 
     expect(roomNotices(gone, gone)).toEqual([]);
-    expect(roomNotices(asked, room({ series: { games: 1, wins: {} } }))).toEqual([]);
-    expect(roomNotices({ ...asked, you: "" }, { ...finished(), you: "" })).toEqual([]);
+    expect(roomNotices(finished(), room({ game: { number: 2 } }))).toEqual([]);
+    expect(roomNotices({ ...finished(), you: "" }, { ...gone, you: "" })).toEqual([]);
     expect(roomNotices(room(), finished())).toEqual([]);
-    expect(roomNotices(asked, { ...finished(), rematch: undefined })).toEqual([]);
-  });
-
-  it("reads rooms from a server that does not send who declined yet", () => {
-    const old = (requestedBy) => finished({ rematch: { requestedBy, available: true } });
-
-    expect(roomNotices(old([BOB]), old([]))).toEqual(["Bob took back the rematch request"]);
-  });
-
-  it("adds the game's own notices while the same game goes on", () => {
-    const offered = chess({ drawOfferBy: ME });
-
-    expect(roomNotices(offered, chess({ drawAnswer: "declined" }))).toEqual(["Bob declined your draw offer"]);
-    expect(roomNotices(room(), room())).toEqual([]);
-  });
-
-  it("ignores updates from another room", () => {
-    expect(
-      roomNotices(
-        finished({ rematch: rematch([ME]) }),
-        finished({ code: "ZZZZZZ", rematch: rematch([], BOB) }),
-      ),
-    ).toEqual([]);
+    expect(roomNotices(finished(), { ...finished(), rematch: undefined })).toEqual([]);
+    expect(roomNotices(finished(), finished({ code: "ZZZZZZ", rematch: { available: false } }))).toEqual([]);
   });
 });

@@ -24,6 +24,9 @@ const REACHES_OTHER = new Set([
   "room.request.decline",
   "room.request.cancel",
   "room.new_opponent",
+  "request.new_opponent",
+  "site_request.accept",
+  "site_request.decline",
 ]);
 
 /** Presses that end the state they are pressed in, besides links to other pages. */
@@ -42,9 +45,12 @@ export const NOT_PRESSED = new Map([
   ["header.skip", "shows only while it has the keyboard focus, and is checked by the keyboard tests"],
 ]);
 
-/** The distinct controls on screen: one of each name, and one blocked and one ready where both exist. */
-async function controlsOn(page) {
-  const found = await page.locator("main [data-cc-control]").evaluateAll((elements) =>
+/**
+ * The distinct controls on screen: one of each name, and one blocked and one ready where both exist. `scope` is
+ * where to look: the page's main part, or only the questions from other rooms on a page that is not a room.
+ */
+async function controlsOn(page, scope) {
+  const found = await page.locator(`${scope} [data-cc-control]`).evaluateAll((elements) =>
     elements
       .filter((element) => element.getClientRects().length > 0)
       .map((element) => ({
@@ -61,11 +67,11 @@ async function controlsOn(page) {
     .sort((a, b) => Number(leaves(a)) - Number(leaves(b)));
 }
 
-const selector = ({ id, blocked }) =>
-  `main [data-cc-control="${id}"]${blocked ? '[aria-disabled="true"]' : ':not([aria-disabled="true"])'}`;
+const selector = ({ id, blocked }, scope) =>
+  `${scope} [data-cc-control="${id}"]${blocked ? '[aria-disabled="true"]' : ':not([aria-disabled="true"])'}`;
 
 /** Closes a dialog a press opened (Leave room, Resign), so the next press finds the page as it was. */
-async function putAway(page) {
+export async function putAway(page) {
   const dialog = page.locator('[role="dialog"][aria-modal="true"]');
   if (await dialog.isVisible().catch(() => false)) {
     await page.keyboard.press("Escape");
@@ -76,7 +82,7 @@ async function putAway(page) {
 async function enter(players, build) {
   const state = await build(await openPair(players));
   const room = [state.clicker, ...(state.other ? [state.other] : [])];
-  return { ...state, room, expected: await snapshot(room) };
+  return { scope: "main", ...state, room, expected: await snapshot(room) };
 }
 
 /**
@@ -84,12 +90,44 @@ async function enter(players, build) {
  * after the state itself, such as the save progress card once the win's XP has arrived, so it waits a little.
  */
 async function find(state, entry) {
-  const target = state.clicker.page.locator(selector(entry)).first();
+  const target = state.clicker.page.locator(selector(entry, state.scope)).first();
   return target.waitFor({ state: "visible", timeout: 3_000 }).then(
     () => target,
     () => undefined,
   );
 }
+
+/** Presses `target` and reads what the clicker's page showed in answer, and since when the other player watched. */
+async function pressAndWatch(state, entry, target) {
+  const { page } = state.clicker;
+  const armed = await arm(page);
+  const otherArmed = state.other ? await arm(state.other.page) : undefined;
+  // The browser's own download bar is the answer to Download PGN, and it can take a moment to start.
+  const downloads = await target.evaluate((element) => element.hasAttribute("download"));
+  const downloaded = downloads
+    ? page.waitForEvent("download", { timeout: 5_000 }).then(
+        () => true,
+        () => false,
+      )
+    : Promise.resolve(false);
+  if (entry.blocked) {
+    // A forced press skips the check that nothing covers the control, so the control is brought to the middle of
+    // the screen first, clear of the request banner that stays at the top while the page scrolls (CC-160).
+    await target.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  }
+  await target.click({ force: entry.blocked });
+  await page.waitForTimeout(ANSWER_MS + 50);
+  const answer = await answerTo(page, armed);
+  return { answer, otherArmed, answered: (await downloaded) || answer.ms <= ANSWER_MS };
+}
+
+/** Whether a control pressed while blocked is ready now, because what blocked it was only for a moment. */
+const blockEnded = (state, entry) =>
+  state.clicker.page
+    .locator(selector({ ...entry, blocked: false }, state.scope))
+    .first()
+    .isVisible()
+    .catch(() => false);
 
 /**
  * Presses every control the clicker sees in this state and lists every press nobody could see an answer to. When
@@ -101,7 +139,7 @@ async function find(state, entry) {
 async function pressEverything({ players, build, name }) {
   let state = await enter(players, build);
   const problems = [];
-  const controls = await controlsOn(state.clicker.page);
+  const controls = await controlsOn(state.clicker.page, state.scope);
   expect(controls.length, `${name}: the page shows controls`).toBeGreaterThan(0);
 
   for (const entry of controls) {
@@ -117,21 +155,17 @@ async function pressEverything({ players, build, name }) {
       problems.push(`${label}: on screen at first, but not when the state was built again`);
       continue;
     }
+    let press = await pressAndWatch(state, entry, target);
+    if (!press.answered && entry.blocked && (await blockEnded(state, entry))) {
+      // A short wait, such as the pause before asking again (CC-159), ran out during the press, so the press met
+      // a control that was no longer blocked. The state is built again and the blocked control pressed in time.
+      state = await enter(players, build);
+      target = await find(state, entry);
+      if (target !== undefined) press = await pressAndWatch(state, entry, target);
+    }
     const { page } = state.clicker;
-    const armed = await arm(page);
-    const otherArmed = state.other ? await arm(state.other.page) : undefined;
-    // The browser's own download bar is the answer to Download PGN, and it can take a moment to start.
-    const downloads = await target.evaluate((element) => element.hasAttribute("download"));
-    const downloaded = downloads
-      ? page.waitForEvent("download", { timeout: 5_000 }).then(
-          () => true,
-          () => false,
-        )
-      : Promise.resolve(false);
-    await target.click({ force: entry.blocked });
-    await page.waitForTimeout(ANSWER_MS + 50);
-    const answer = await answerTo(page, armed);
-    if (!(await downloaded) && !(answer.ms <= ANSWER_MS)) {
+    const { answer, otherArmed } = press;
+    if (!press.answered) {
       problems.push(
         `${label}: nothing visible within ${ANSWER_MS} ms (fastest answer: ${answer.kind} after ${answer.ms} ms)`,
       );

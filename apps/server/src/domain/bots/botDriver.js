@@ -133,7 +133,7 @@ export function createBotDriver({
       return [await botComponent.acceptRematch(input)];
     }
     if (action.kind === "answer") {
-      return [await roomComponent.makeMove({ ...input, move: action.move })];
+      return [await roomComponent.answerRequest({ ...input, ...action.reply })];
     }
     const move = await thinking.think(() => botTurns.moveFor(room, action.playerId));
     // Waiting for its turn to think may take a while: the person may have left or resigned meanwhile.

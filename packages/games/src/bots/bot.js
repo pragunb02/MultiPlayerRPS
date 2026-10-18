@@ -25,14 +25,17 @@
  * @typedef {Object} BotQuestion
  * @property {unknown} view       what the bot's seat may see right now
  * @property {string} botId       the bot's player id in this game
+ * @property {ReadonlyArray<{ type: string, from: string }>} requests   the room's open requests addressed to the
+ *   bot (CC-159), such as a chess draw offer
  *
  * @typedef {Object} Bot
  * @property {string} gameId                        matches the engine's id
  * @property {ReadonlyArray<Readonly<BotLevel>>} levels   easiest first
  * @property {(turn: BotTurn) => unknown} chooseMove   returns a raw move, as a client would send it
- * @property {(question: BotQuestion) => ReadonlyArray<unknown>} [answer]   optional. Called when it is not the
- *   bot's turn, so a question the other player asked (a chess draw offer) never waits for the bot. Returns the raw
- *   move that answers it in a list, or an empty list when there is nothing to answer.
+ * @property {(question: BotQuestion) => ReadonlyArray<{ type: string, answer: string }>} [answer]   optional.
+ *   Called when it is not the bot's turn, so a question the other player asked (a chess draw offer) never waits
+ *   for the bot. Returns the answer to each request it answers, as the request type and a REQUEST_ANSWERS value,
+ *   or an empty list when there is nothing to answer.
  */
 
 const LEVEL_ID = /^[a-z][a-z0-9-]*$/;

@@ -62,8 +62,8 @@ describe("a finished game whose outbox add failed (CC-111)", () => {
       expect.objectContaining({ task: "match pipeline", roomCode: code }),
     );
 
-    await send(bob.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
-    const rematch = await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code });
+    await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+    const rematch = await send(alice.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
     server.matchPipeline.runDue();
     await server.tasks.drain();
     server.matchPipeline.runDue();

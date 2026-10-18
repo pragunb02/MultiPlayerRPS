@@ -1,7 +1,7 @@
 import { expect, formFactor, test } from "./fixtures.js";
 import { answerTo, arm, installProbe } from "./controlProbe.js";
-import { GAMES, openPair } from "./matchStates.js";
-import { allStatesFor, ANSWER_MS, NOT_PRESSED } from "./matchShellPresses.js";
+import { GAMES, openPair, SITE_REQUESTS } from "./matchStates.js";
+import { allStatesFor, ANSWER_MS, NOT_PRESSED, putAway } from "./matchShellPresses.js";
 
 // The match shell around every game (CC-164, CC-170, CC-172): every press in the header and footer answers within
 // 100 ms, and each state's main controls fit on the screen. The presses inside each game's states are in
@@ -35,6 +35,8 @@ test.describe("every press in the header and footer answers within 100 ms", () =
           `${id}: nothing visible within ${ANSWER_MS} ms (fastest: ${answer.kind} after ${answer.ms} ms)`,
         );
       }
+      // The sound settings open in a dialog, which would be in the way of the next press.
+      await putAway(guest.page);
     }
 
     expect(ids.length).toBeGreaterThan(3);
@@ -67,6 +69,16 @@ const MAIN_CONTROLS = Object.freeze({
   "rematch-declined": () => [at("room.rematch.ask"), at("room.new_opponent")],
   "request-asked": () => [at("room.request.cancel")],
   "request-asked-of-me": () => [at("room.request.accept"), at("room.request.decline")],
+  "rematch-asked-away": () => [at("room.request.cancel"), at("room.new_opponent")],
+  "rematch-asked-offline": () => [
+    at("request.copy_invite"),
+    at("request.new_opponent"),
+    at("request.play_computer"),
+  ],
+  "rematch-asked-elsewhere": () => [
+    `${SITE_REQUESTS} [data-cc-control="site_request.accept"]`,
+    `${SITE_REQUESTS} [data-cc-control="site_request.decline"]`,
+  ],
   "computer lobby": () => [at("lobby.computer_level"), at("lobby.play_computer")],
   "computer my-turn": (gameId) => BOARD[gameId],
   "computer finished": () => RESULT,

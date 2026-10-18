@@ -168,7 +168,8 @@ describe("browser test parts", () => {
   it("put every spec file but the restart tests in exactly one part", async () => {
     const planned = SHARDS.flat();
 
-    expect([...planned].sort()).toEqual((await specFiles()).filter((name) => name !== RESTARTS));
+    expect((await specFiles()).filter((name) => RESTARTS.test(name))).toContain("restart.spec.js");
+    expect([...planned].sort()).toEqual((await specFiles()).filter((name) => !RESTARTS.test(name)));
     expect(new Set(planned).size).toBe(planned.length);
   });
 

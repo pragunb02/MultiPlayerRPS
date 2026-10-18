@@ -12,14 +12,22 @@ import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
 import { createBotHandlers } from "./botHandlers.js";
 import { trackConnections } from "./connections.js";
-import { broadcastRoom, createRoomHandlers, handleSocketGone, roomChannel } from "./roomHandlers.js";
+import {
+  broadcastRoom,
+  createRoomHandlers,
+  handleSocketGone,
+  handleSocketOnline,
+  playerChannel,
+  pushRequests,
+  roomChannel,
+} from "./roomHandlers.js";
 import { createSocketAdmission } from "./socketAdmission.js";
 
 const MAX_MESSAGE_BYTES = 16 * 1024;
 
 const sessionRoom = (sessionId) => `session:${sessionId}`;
 /** Every socket of one player (all their tabs), for player-specific pushes such as progress. */
-const playerRoom = (playerId) => `player:${playerId}`;
+const playerRoom = playerChannel;
 
 /**
  * Realtime entry point. Connections are accepted only from allowed browser origins and only with a
@@ -38,7 +46,8 @@ const playerRoom = (playerId) => `player:${playerId}`;
  *   checkSession: (sessionData: object) => Promise<void>,   throws UnauthorizedError for a session that may no
  *     longer be used (see createSessionCheck)
  *   trustProxyHops: number,   how many proxies to look through for the player's address, as for HTTP
- *   networkOf: (address: string) => string,   names an address without being it, for the rooms per network
+ *   networkOf: (address: string) => import("../../utils/networkKey.js").NetworkNames,   names an address
+ *     without being it, for the rooms per network
  *   limits?: Readonly<import("../../domain/rooms/roomLimits.js").RoomLimits>,
  *   now?: () => number,
  *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
@@ -117,7 +126,9 @@ export function createRealtimeGateway({
         throw new TooManyRequestsError(admitted.message);
       }
       socket.data.release = admitted.release;
-      socket.data.network = networkOf(addressKey(address));
+      // The address stays with the socket, as socket admission already keeps it. Its network name is worked out
+      // when a room is created, so a socket kept open past midnight gets that day's name (CC-249).
+      socket.data.address = addressKey(address);
       // The browser may have gone while its session was checked. Socket.IO then drops the socket without any
       // event, so the place is given back when the connection itself closes, or now if it already has.
       if (socket.conn.readyState === "open") {
@@ -162,6 +173,7 @@ export function createRealtimeGateway({
     }
     socket.join([sessionRoom(sessionId), playerRoom(identity.id)]);
     socketLogger.info("socket connected");
+    handleSocketOnline({ socket, roomComponent, now, logger: socketLogger });
     let roomChannels = [];
     socket.on("disconnecting", () => {
       roomChannels = [...socket.rooms].filter((channel) => channel.startsWith("room:"));
@@ -184,9 +196,9 @@ export function createRealtimeGateway({
       socket,
       {
         [SOCKET_EVENTS.IDENTITY_GET]: () => socket.data.identity,
-        ...createRoomHandlers({ io, socket, roomComponent, now, logger: socketLogger }),
+        ...createRoomHandlers({ io, socket, roomComponent, networkOf, now, logger: socketLogger }),
         ...(botComponent &&
-          createBotHandlers({ socket, botComponent, roomComponent, now, logger: socketLogger })),
+          createBotHandlers({ socket, botComponent, roomComponent, networkOf, now, logger: socketLogger })),
       },
       socketLogger,
       { allow: () => admission.allowEvent(identity.id) },
@@ -240,6 +252,11 @@ export function createRealtimeGateway({
     io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.STREAKS_UPDATED, { streaks });
   });
 
+  // Domain to transport: a request opened or ended, so both players hear about it on any page (CC-207).
+  domainEvents.on(ROOM_EVENTS.REQUESTS_CHANGED, ({ room, playerIds }) =>
+    pushRequests({ io, roomComponent, room, playerIds, now }),
+  );
+
   // Domain → transport: a room changed on its own (e.g. a clock ran out) — push everyone their new view.
   domainEvents.on(ROOM_EVENTS.UPDATED, ({ room }) => {
     broadcastRoom({ io, roomComponent, room, now }).catch((err) =>
@@ -271,6 +288,8 @@ export function createRealtimeGateway({
     /** Disconnects all sockets and closes the underlying HTTP server. */
     close() {
       closing = true;
+      // Players hear why they are cut off, and that their game is kept for the next server (CC-158).
+      io.emit(SOCKET_EVENTS.SERVER_RESTARTING, {});
       return new Promise((resolve, reject) => {
         io.close((err) => (err ? reject(err) : resolve()));
         connections.closeIdle();

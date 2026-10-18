@@ -59,10 +59,11 @@ export function playReason(room, { reconnecting }) {
 }
 
 /**
- * Which game of the room this is: 0 for the first, and each rematch adds one. It is the same while a game is
- * played and after it finished, so it tells a rematch apart from the game before it.
+ * Which game of the room this is: 1 for the first, and each rematch adds one, as the server counts them. It is the
+ * same while a game is played and after it finished, so it tells a rematch apart from the game before it. 0 while
+ * the room waits for its first game.
  */
-export function gameNumber(room) {
-  if (room.series === undefined) return 0;
-  return room.series.games - (room.status === ROOM_STATUS.FINISHED ? 1 : 0);
-}
+export const gameNumber = (room) => room.game?.number ?? 0;
+
+/** The viewer's seat in the room, or undefined for a spectator. */
+export const seatOf = (room, playerId) => room.seats.find((seat) => seat.playerId === playerId);

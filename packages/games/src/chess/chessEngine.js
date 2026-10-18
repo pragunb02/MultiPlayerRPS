@@ -1,9 +1,9 @@
 import { Chess } from "chess.js";
 import {
   CHESS_ACTIONS,
-  CHESS_DRAW_ANSWERS as ANSWERS,
   CHESS_END_REASONS as END,
   CHESS_PROMOTIONS,
+  CHESS_REQUEST_TYPES,
   CHESS_TIME_CONTROLS,
   DEFAULT_CHESS_TIME_CONTROL,
   GAME_IDS,
@@ -33,8 +33,6 @@ const FLAG = "flag";
  * @property {Array<{ from: string, to: string, san: string, at: number, promotion?: string }>} moves
  * @property {string} fen                         current position, so a move never needs the game replayed
  * @property {string[]} positions                 position keys since the last capture or pawn move, current one last
- * @property {string} drawOfferBy                 player id with a standing draw offer, or ""
- * @property {string} drawAnswer                  how the last offer ended without a draw (CHESS_DRAW_ANSWERS)
  * @property {{ reason: string, winner: string }} end   reason is "" while the game is on. winner is "" for a draw.
  */
 
@@ -105,7 +103,7 @@ function timeout(state, loser) {
   const end = hasMatingMaterial(state.fen, winner)
     ? { reason: END.TIMEOUT, winner: state.byColor[winner] }
     : { reason: END.TIMEOUT_VS_INSUFFICIENT_MATERIAL, winner: "" };
-  return { ...state, clocks: { ...state.clocks, [loser]: 0 }, drawOfferBy: "", end };
+  return { ...state, clocks: { ...state.clocks, [loser]: 0 }, end };
 }
 
 /** Result of the position after a move, if the board itself ends the game. */
@@ -148,9 +146,15 @@ function validateBoardMove(state, raw) {
 }
 
 /**
- * Chess with server-side clocks. The rules of the board come from chess.js. Clocks, resignation and draw offers
- * are handled here. Running out of time is detected both when a late move arrives and via the `deadline`
- * hook, so a player who stops moving still loses on time.
+ * How long a draw offer stays open, and how often one player may offer a draw in one game (CC-159). Thirty seconds
+ * is enough to think about an offer without the clock, which keeps running, deciding it.
+ */
+const DRAW_OFFER = Object.freeze({ lifetimeMs: 30_000, limitPerPlayer: 3 });
+
+/**
+ * Chess with server-side clocks. The rules of the board come from chess.js. Clocks and resignation are handled
+ * here. Running out of time is detected both when a late move arrives and via the `deadline` hook, so a player
+ * who stops moving still loses on time. A draw offer is a room request, and accepting it ends the game here.
  */
 export const chessEngine = defineEngine({
   id: GAME_IDS.CHESS,
@@ -187,8 +191,6 @@ export const chessEngine = defineEngine({
       moves: [],
       fen: board.fen(),
       positions: [board.hash()],
-      drawOfferBy: "",
-      drawAnswer: ANSWERS.NONE,
       end: { reason: "", winner: "" },
     };
   },
@@ -203,30 +205,9 @@ export const chessEngine = defineEngine({
     if (!isPlainObject(raw) || !ACTIONS.has(raw.type)) {
       return reject(MOVE_REJECTIONS.INVALID_MOVE, `Send { type: ${[...ACTIONS].join(" | ")} }`);
     }
-    const opponent = state.players.find((p) => p !== playerId);
     switch (raw.type) {
       case CHESS_ACTIONS.RESIGN:
         return ok({ type: CHESS_ACTIONS.RESIGN });
-      case CHESS_ACTIONS.OFFER_DRAW:
-        if (state.drawOfferBy === playerId) {
-          return reject(MOVE_REJECTIONS.ILLEGAL_MOVE, "You already offered a draw");
-        }
-        // Offering when the opponent already offered is agreeing.
-        return ok({
-          type: state.drawOfferBy === opponent ? CHESS_ACTIONS.ACCEPT_DRAW : CHESS_ACTIONS.OFFER_DRAW,
-        });
-      case CHESS_ACTIONS.ACCEPT_DRAW:
-        return state.drawOfferBy === opponent
-          ? ok({ type: CHESS_ACTIONS.ACCEPT_DRAW })
-          : reject(MOVE_REJECTIONS.ILLEGAL_MOVE, "There is no draw offer to accept");
-      case CHESS_ACTIONS.DECLINE_DRAW:
-        return state.drawOfferBy === opponent
-          ? ok({ type: CHESS_ACTIONS.DECLINE_DRAW })
-          : reject(MOVE_REJECTIONS.ILLEGAL_MOVE, "There is no draw offer to decline");
-      case CHESS_ACTIONS.WITHDRAW_DRAW:
-        return state.drawOfferBy === playerId
-          ? ok({ type: CHESS_ACTIONS.WITHDRAW_DRAW })
-          : reject(MOVE_REJECTIONS.ILLEGAL_MOVE, "You have no draw offer to withdraw");
       default: {
         const color = state.colors[playerId];
         if (sideToMove(state) !== color) {
@@ -244,15 +225,7 @@ export const chessEngine = defineEngine({
     const opponent = state.players.find((p) => p !== playerId);
     switch (move.type) {
       case CHESS_ACTIONS.RESIGN:
-        return { ...state, drawOfferBy: "", end: { reason: END.RESIGNATION, winner: opponent } };
-      case CHESS_ACTIONS.OFFER_DRAW:
-        return { ...state, drawOfferBy: playerId, drawAnswer: ANSWERS.NONE };
-      case CHESS_ACTIONS.DECLINE_DRAW:
-        return { ...state, drawOfferBy: "", drawAnswer: ANSWERS.DECLINED };
-      case CHESS_ACTIONS.WITHDRAW_DRAW:
-        return { ...state, drawOfferBy: "", drawAnswer: ANSWERS.WITHDRAWN };
-      case CHESS_ACTIONS.ACCEPT_DRAW:
-        return { ...state, drawOfferBy: "", end: { reason: END.AGREEMENT, winner: "" } };
+        return { ...state, end: { reason: END.RESIGNATION, winner: opponent } };
       case FLAG:
         return timeout(state, state.colors[playerId]);
       default: {
@@ -266,8 +239,6 @@ export const chessEngine = defineEngine({
         const fen = chess.fen();
         const positions =
           halfMoveClock(fen) === 0 ? [chess.hash()] : [...positionsOf(state, current), chess.hash()];
-        // Moving instead of answering declines the opponent's offer, but your own offer stands.
-        const declines = state.drawOfferBy === opponent;
         const remaining =
           state.lastMoveAt > 0
             ? state.clocks[color] - (now - state.lastMoveAt) + state.incrementMs
@@ -279,8 +250,6 @@ export const chessEngine = defineEngine({
           moves: [...state.moves, { ...played, san, at: now }],
           fen,
           positions,
-          drawOfferBy: declines ? "" : state.drawOfferBy,
-          drawAnswer: declines ? ANSWERS.DECLINED : state.drawAnswer,
           end: boardEnd(chess, playerId, positions),
         };
       }
@@ -314,9 +283,6 @@ export const chessEngine = defineEngine({
       timeControl: state.timeControl,
       clocks: state.clocks,
       lastMoveAt: state.lastMoveAt,
-      drawOfferBy: state.drawOfferBy,
-      // Games stored before draw answers existed (CC-104) have none: nobody answered an offer in them.
-      drawAnswer: state.drawAnswer ?? ANSWERS.NONE,
     };
   },
 
@@ -325,6 +291,12 @@ export const chessEngine = defineEngine({
   },
 
   deadline,
+
+  requestTypes: { [CHESS_REQUEST_TYPES.DRAW]: DRAW_OFFER },
+
+  /** The only request is a draw offer: the opponent accepting it ends the game in a draw by agreement. */
+  acceptRequest: (state) =>
+    isOver(state) ? state : { ...state, end: { reason: END.AGREEMENT, winner: "" } },
 
   expire(state, { now }) {
     const due = deadline(state);

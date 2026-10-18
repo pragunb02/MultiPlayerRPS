@@ -7,3 +7,6 @@ export const ANALYTICS_MAX_RANGE_DAYS = 400;
 
 /** What a total says when the data behind it has already been removed, so it is not shown as 0. */
 export const ANALYTICS_NOT_KEPT = "not kept";
+
+/** What a count of people says when a bounded read cannot see all of them, so it is not shown as 0 (CC-255). */
+export const ANALYTICS_NOT_COUNTED = "not counted";

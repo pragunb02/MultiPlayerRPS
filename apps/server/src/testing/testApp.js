@@ -300,7 +300,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     domainEvents: testApp.domainEvents,
     checkSession: testApp.checkSession,
     trustProxyHops: testApp.config.trustProxyHops,
-    networkOf: createNetworkKey({ secret: testApp.config.sessionSecret }),
+    networkOf: createNetworkKey({ now }).networkOf,
     now,
     ...(options.roomLimits && { limits: options.roomLimits }),
     botComponent: testApp.botComponent,

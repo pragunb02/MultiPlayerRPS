@@ -1,5 +1,5 @@
 import { Chess } from "chess.js";
-import { CHESS_ACTIONS } from "@classicade/shared";
+import { CHESS_REQUEST_TYPES, REQUEST_ANSWERS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { chessEngine } from "../../chess/chessEngine.js";
 import { createSeededRng, randomIndex } from "../../rng.js";
@@ -148,16 +148,17 @@ describe("chessBot levels", () => {
     expect(strong.maxNodes).toBeGreaterThan(club.maxNodes);
   });
 
-  it("declines a draw the opponent offers while it is their turn, and has nothing else to answer", () => {
-    const state = newGame();
-    const offered = chessEngine.applyMove(state, WHITE, { type: CHESS_ACTIONS.OFFER_DRAW }, CTX);
-    const view = (game) => chessEngine.viewFor(game, BLACK);
+  it("declines a draw offered to it, and has nothing else to answer", () => {
+    const view = chessEngine.viewFor(newGame(), BLACK);
+    const draw = { type: CHESS_REQUEST_TYPES.DRAW, from: WHITE };
 
-    expect(chessBot.answer({ view: view(offered), botId: BLACK })).toEqual([
-      { type: CHESS_ACTIONS.DECLINE_DRAW },
+    expect(chessBot.answer({ view, botId: BLACK, requests: [draw] })).toEqual([
+      { type: CHESS_REQUEST_TYPES.DRAW, answer: REQUEST_ANSWERS.DECLINE },
     ]);
-    expect(chessBot.answer({ view: view(state), botId: BLACK })).toEqual([]);
-    expect(chessBot.answer({ view: view(offered), botId: WHITE })).toEqual([]);
+    expect(chessBot.answer({ view, botId: BLACK, requests: [] })).toEqual([]);
+    expect(chessBot.answer({ view, botId: BLACK, requests: [{ type: "takeback", from: WHITE }] })).toEqual(
+      [],
+    );
   });
 
   it("refuses to choose once the game is over", () => {

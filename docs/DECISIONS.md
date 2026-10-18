@@ -328,6 +328,14 @@ record, because today one process keeps the games it is running in memory.
   limits ([DEPLOYMENT.md](DEPLOYMENT.md#client-addresses-and-rate-limits)). Login counts live in the process and a restart forgets
   them, so a second instance (CC-061) needs shared counters. Rooms stored before the change have no network and do
   not count. SEC-17 (sign-up says an email cannot be used) is an accepted trade-off until CC-033 sends email.
+- **Amended · 2026-10-18** (CC-249, CC-250, [tickets/CC-249.md](tickets/CC-249.md)). The network hash in point 2 is
+  keyed with a random key made in memory for each UTC day, no longer with `SESSION_SECRET`. A key names new rooms
+  for its day, is kept the next day only to count them (like Plausible's current and previous salt, so midnight does
+  not double the cap), and is dropped at the following midnight by a timer. The name is worked out when a room is
+  created, not when a socket connects. Once a key is dropped, nobody can turn its hashes back into addresses. A
+  restart forgets the keys, so rooms open from before it stop counting for the 30 until they close. The failed login
+  counts in point 5 are kept under keyed hashes of the email and address (a random key per process), never the plain
+  values. No new env var. A second instance (CC-061) would need a shared key, derived with HKDF from a new secret.
 
 ### ADR-034 — Analytics: anonymous counts, India days, player statuses, and the CC-036 time limits
 
@@ -353,6 +361,17 @@ record, because today one process keeps the games it is running in memory.
   so per-person funnels across visits are not possible; the browser works out per-visit sequences itself (rage
   clicks, time to first move) and sends only the result. Retention, cohorts and statuses come from game records,
   which already exist. EVENTS.md becomes Accepted with these answers; CC-173 writes the privacy page wording.
+- **Amended 2026-10-18 (CC-255, accepted by default, owner may change).** How point 4 is built, research in
+  [CC-255](tickets/CC-255.md). (1) A day of play is an India day with a match that counted under ADR-021, against a
+  person or a character. Bots are not players. (2) Days are counted back with today as day 1, so the windows do not
+  overlap: last game on day 1 to 7 is active, 8 to 14 Lapsing, 15 or more Dormant. Returning means 14 or more days
+  without a game in between (Dormant yesterday). (3) When two fit, New wins, then Dormant, Lapsing, Returning,
+  Core, Regular, Casual, so a busy first week counts towards the North Star only from day 8. (4) The weekly trend
+  is each status on the week's last day. Returning and turning Dormant are counted over the week ("came back",
+  "went dormant"). The Dormant total is not shown, because it needs every match ever. (5) The North Star headline
+  is Regular plus Core on the last full week's Sunday against the Sunday before, and the console shows the moves
+  between those two days. The 3-day weekly returning players number (PRODUCT_VISION.md 7.1) stays on the
+  Overview without the North Star label, and 7.1 needs the owner's rewording.
 
 ### ADR-033 — Every tab follows the session: server disconnects and a message without identity
 

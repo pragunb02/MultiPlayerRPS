@@ -122,7 +122,7 @@ describe("botDriver", () => {
     await vi.advanceTimersByTimeAsync(PAUSE * 4);
     expect(updates).toHaveLength(1);
 
-    await rooms.requestRematch({ code: room.code, playerId: PERSON.id, now: 4 });
+    await rooms.askRequest({ code: room.code, playerId: PERSON.id, type: "rematch", now: 4 });
     await vi.advanceTimersByTimeAsync(PAUSE);
 
     expect(updates).toHaveLength(2);

@@ -95,6 +95,66 @@ export function createAnalyticsDao({ connection }) {
       ]),
 
     /**
+     * Every person who finished a match in a range that counted for them under fair play, without their id: their
+     * kind and the India days of that play, oldest first. The first day is their last such day before the range
+     * when there is one. Bots are left out as players. Players who did not play in the range are never read, so
+     * the work grows with the range, not with all history (CC-255).
+     *
+     * The range is read through the `endedAt` index. The day before it is one look per player through the
+     * `players.playerId` and `endedAt` index, newest first, stopping at the first match that counted for them.
+     *
+     * @param {Moments} moments
+     * @returns {Promise<Array<{ kind: string, days: string[] }>>}
+     */
+    listPlayerDays: ({ from, to }) =>
+      aggregate("matches", [
+        { $match: { endedAt: { $gte: from, $lt: to } } },
+        {
+          $project: {
+            _id: 0,
+            endedAt: 1,
+            ids: "$players.playerId",
+            notCounted: { $ifNull: ["$credit.notCounted.playerId", []] },
+          },
+        },
+        { $unwind: "$ids" },
+        { $match: { ids: { $not: BOT_ID } } },
+        { $match: { $expr: { $not: [{ $in: ["$ids", "$notCounted"] }] } } },
+        { $group: { _id: { player: "$ids", day: dayOf("$endedAt") } } },
+        { $sort: { "_id.day": 1 } },
+        { $group: { _id: "$_id.player", days: { $push: "$_id.day" } } },
+        {
+          $lookup: {
+            from: "matches",
+            localField: "_id",
+            foreignField: "players.playerId",
+            let: { player: "$_id" },
+            pipeline: [
+              { $match: { endedAt: { $lt: from } } },
+              { $sort: { endedAt: -1 } },
+              {
+                $match: {
+                  $expr: {
+                    $not: [{ $in: ["$$player", { $ifNull: ["$credit.notCounted.playerId", []] }] }],
+                  },
+                },
+              },
+              { $limit: 1 },
+              { $project: { _id: 0, day: dayOf("$endedAt") } },
+            ],
+            as: "before",
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            kind: { $arrayElemAt: [{ $split: ["$_id", "_"] }, 0] },
+            days: { $concatArrays: ["$before.day", "$days"] },
+          },
+        },
+      ]),
+
+    /**
      * Totals of the matches that ended in a range: per India day and game, per India weekday and hour, by who
      * played (accounts, guests, both, with a bot), by length in whole seconds, rematches per game (a later match
      * in the same room), and the player results fair play did not count.

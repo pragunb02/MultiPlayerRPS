@@ -7,13 +7,19 @@ const seats = (...connected) =>
   connected.map((isConnected, i) => ({ playerId: `p${i}`, displayName: `P${i}`, connected: isConnected }));
 
 describe("room lifetimes", () => {
-  it("keeps a finished game open for a rematch for half an hour, and a game whose players are away for two hours", () => {
+  it("keeps a finished game open for a rematch for half an hour, a game whose players are away for two hours, and sets the times of requests and presence", () => {
     expect(ROOM_LIFETIMES).toEqual({
       waitingMs: 30 * MINUTE,
       rematchWindowMs: 30 * MINUTE,
       awayMs: 120 * MINUTE,
       idleGameMs: 24 * 60 * MINUTE,
       closedRecordMs: 24 * 60 * MINUTE,
+      rematchRequestMs: MINUTE,
+      answerKeptMs: 10_000,
+      reaskCooldownMs: 10_000,
+      awayReleaseMs: 2 * MINUTE,
+      reconnectGraceMs: MINUTE,
+      firstMoveMs: MINUTE,
     });
     expect(Object.isFrozen(ROOM_LIFETIMES)).toBe(true);
   });

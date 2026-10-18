@@ -1,4 +1,4 @@
-import { BOT_CHARACTERS, ROOM_STATUS } from "@classicade/shared";
+import { BOT_CHARACTERS, REQUEST_ANSWERS, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
 import { botIdentity } from "../../models/botIdentity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { GoneError, NotFoundError } from "../../utils/errors.js";
@@ -43,7 +43,7 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  * usual create and join.
  *
  * @param {{
- *   roomComponent: Pick<ReturnType<typeof import("../rooms/roomComponent.js").createRoomComponent>, "createRoom" | "joinRoom" | "leaveRoom" | "getRoom" | "requestRematch">,
+ *   roomComponent: Pick<ReturnType<typeof import("../rooms/roomComponent.js").createRoomComponent>, "createRoom" | "joinRoom" | "leaveRoom" | "getRoom" | "answerRequest">,
  *   roomAccessor: Pick<ReturnType<typeof import("../../data/roomAccessor.js").createRoomAccessor>, "listBySeat">,
  *   events: { emit: (event: string, payload: unknown) => void },
  * }} deps
@@ -99,17 +99,17 @@ export function createBotComponent({ roomComponent, roomAccessor, events }) {
 
   return Object.freeze({
     /**
-     * @param {{ host: import("../../models/identity.js").Identity, network: string, gameId: string, options: unknown, level: string, now: number }} input
-     *   `level` is one of the character's level picks, such as "easy". `network` names the host's network, as for
-     *   any new room, so a game against a computer counts toward the rooms open from it
+     * @param {{ host: import("../../models/identity.js").Identity, network: string, earlierNetworks?: ReadonlyArray<string>, gameId: string, options: unknown, level: string, now: number }} input
+     *   `level` is one of the character's level picks, such as "easy". `network` and `earlierNetworks` name the
+     *   host's network, as for any new room, so a game against a computer counts toward the rooms open from it
      * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>} the room, its game already started
      * @throws {import("../../utils/errors.js").ValidationError} for a game without a character, an unknown level or
      *   invalid options
      */
-    async playComputer({ host, network, gameId, options, level, now }) {
+    async playComputer({ host, network, earlierNetworks = [], gameId, options, level, now }) {
       const bot = botIdentity({ gameId, level });
       return inTurn(host.id, async () => {
-        const room = await roomComponent.createRoom({ host, network, gameId, options, now });
+        const room = await roomComponent.createRoom({ host, network, earlierNetworks, gameId, options, now });
         const started = await roomComponent.joinRoom({ code: room.code, player: bot, now });
         await endOldestGames({ playerId: host.id, keep: room.code, now });
         return started;
@@ -117,21 +117,26 @@ export function createBotComponent({ roomComponent, roomAccessor, events }) {
     },
 
     /**
-     * A computer player says yes to the rematch the person asked for. When that starts a new game, the person's
-     * oldest games against computers end as for any new one, so a rematch never takes them past
+     * A computer player says yes to the rematch the person asked for (CC-159), which starts the new game. The
+     * person's oldest games against computers then end as for any new one, so a rematch never takes them past
      * MAX_COMPUTER_GAMES.
      *
      * @param {{ code: string, playerId: string, now: number }} input  `playerId` is the computer player's
      * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>} the room after the answer
+     * @throws {import("../../utils/errors.js").ConflictError} when the person's request is no longer open
      */
     async acceptRematch({ code, playerId, now }) {
       const asked = await roomComponent.getRoom(code);
       const [person] = asked.seats.filter((seat) => seat.bot === undefined);
       return inTurn(person.playerId, async () => {
-        const room = await roomComponent.requestRematch({ code, playerId, now });
-        if (room.status === ROOM_STATUS.PLAYING) {
-          await endOldestGames({ playerId: person.playerId, keep: code, now });
-        }
+        const room = await roomComponent.answerRequest({
+          code,
+          playerId,
+          type: ROOM_REQUEST_TYPES.REMATCH,
+          answer: REQUEST_ANSWERS.ACCEPT,
+          now,
+        });
+        await endOldestGames({ playerId: person.playerId, keep: code, now });
         return room;
       });
     },

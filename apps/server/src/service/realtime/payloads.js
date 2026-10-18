@@ -1,9 +1,14 @@
+import { REQUEST_ANSWERS } from "@classicade/shared";
 import { parseRoomCode } from "../../models/roomCode.js";
 import { ValidationError } from "../../utils/errors.js";
 
 const MAX_OPTIONS_BYTES = 1_024;
 const MAX_MOVE_BYTES = 2_048;
 const GAME_ID_PATTERN = /^[a-z][a-z0-9-]{0,31}$/;
+// Request types are short lowercase names such as "rematch" or "draw". Which ones a room knows is a rule of the
+// room and its game, checked in the domain.
+const REQUEST_TYPE_PATTERN = /^[a-z][a-z0-9-]{0,31}$/;
+const ANSWERS = new Set(Object.values(REQUEST_ANSWERS));
 
 const isPlainObject = (value) =>
   value !== null &&
@@ -66,6 +71,24 @@ export function parseLeaveRoom(raw) {
     throw new ValidationError("waitingOnly must be true or false", { details: { field: "waitingOnly" } });
   }
   return { code: parseRoomCode(code), waitingOnly };
+}
+
+/** @returns {{ code: string, type: string }} */
+export function parseRoomRequest(raw) {
+  const { code, type } = requireObject(raw, ["code", "type"]);
+  if (typeof type !== "string" || !REQUEST_TYPE_PATTERN.test(type)) {
+    throw new ValidationError("Unknown request", { details: { field: "type" } });
+  }
+  return { code: parseRoomCode(code), type };
+}
+
+/** @returns {{ code: string, type: string, answer: string }} */
+export function parseRoomAnswer(raw) {
+  const { answer, ...request } = requireObject(raw, ["code", "type", "answer"]);
+  if (!ANSWERS.has(answer)) {
+    throw new ValidationError("Answer accept, decline or withdraw", { details: { field: "answer" } });
+  }
+  return { ...parseRoomRequest(request), answer };
 }
 
 /** @returns {{ code: string, move: unknown }} */

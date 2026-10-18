@@ -42,9 +42,20 @@ describe("roomComponent: a game starts only with everyone there (CC-112)", () =>
     expect(room.status).toBe("waiting");
     expect(room.game).toBeUndefined();
     expect(room.seats).toEqual([
-      { playerId: ALICE.id, displayName: "Alice", connected: false },
-      { playerId: BOB.id, displayName: "Bob", connected: true },
+      { playerId: ALICE.id, displayName: "Alice", connected: false, away: false, since: T0 + 1 },
+      { playerId: BOB.id, displayName: "Bob", connected: true, away: false, since: T0 + 2 },
     ]);
+  });
+
+  it("does not start while the host is on another page of the site, and starts once they are back (CC-207)", async () => {
+    const { rooms, code } = await waitingRoom();
+    await rooms.playerAway({ code, playerId: ALICE.id, now: T0 + 1 });
+
+    const joined = await rooms.joinRoom({ code, player: BOB, now: T0 + 2 });
+    const back = await rooms.joinRoom({ code, player: ALICE, now: T0 + 3 });
+
+    expect(joined.status).toBe("waiting");
+    expect(back.status).toBe("playing");
   });
 
   it("starts the game the moment the away host comes back", async () => {

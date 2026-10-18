@@ -15,6 +15,8 @@ export const OWNER_PLAYER_ID = `user_${OWNER.accountId}`;
 /** The seeded week, Monday to Sunday in India time, and what the console must show for it. */
 export const SEEDED_WEEK = Object.freeze({ from: "2025-03-03", to: "2025-03-09" });
 export const SEEDED_TOTALS = Object.freeze({
+  // Everybody played for the first time this week, so they are all New and nobody is Regular or Core yet.
+  northStar: "0",
   activePlayers: "16",
   matches: "21",
   newPlayers: "16",
@@ -24,9 +26,22 @@ export const SEEDED_TOTALS = Object.freeze({
   conversionRate: "33.3%",
 });
 
+/** The week after, for player statuses (CC-255), and what its Statuses page must show. */
+export const STATUS_WEEK = Object.freeze({ from: "2025-03-10", to: "2025-03-16" });
+export const STATUS_TOTALS = Object.freeze({
+  northStar: "16",
+  weekRow: ["2025-03-10", "2025-03-16", "0", "0", "10", "6", "0", "0", "0", "16", "yes"],
+  newToRegular: "10",
+  newToCore: "6",
+});
+
 /**
  * The week: 10 guests in 5 pairs play Rock Paper Scissors on Monday, Wednesday and Friday evenings. 6 accounts
  * in 3 pairs play chess on Tuesday and Tic Tac Toe on Thursday. 5 other guests save their progress on Thursday.
+ *
+ * The week after (STATUS_WEEK), the same guests play on Monday and Wednesday, so they are Regular on Sunday, and
+ * the same accounts play on Tuesday, Thursday, Saturday and Sunday, so they are Core. It is after the seeded
+ * week, so none of that week's totals change.
  */
 export function seededWeek() {
   const guests = Array.from({ length: 10 }, (_, index) => playerId("guest", 500 + index));
@@ -46,6 +61,12 @@ export function seededWeek() {
     ),
     ...pairs(accounts).map((pair) =>
       matchDoc({ gameId: "tictactoe", playerIds: pair, endedAt: at("2025-03-06"), seconds: 30 }),
+    ),
+    ...["2025-03-10", "2025-03-12"].flatMap((day) =>
+      pairs(guests).map((pair) => matchDoc({ gameId: "rps", playerIds: pair, endedAt: at(day) })),
+    ),
+    ...["2025-03-11", "2025-03-13", "2025-03-15", "2025-03-16"].flatMap((day) =>
+      pairs(accounts).map((pair) => matchDoc({ gameId: "chess", playerIds: pair, endedAt: at(day) })),
     ),
   ];
   const transfers = Array.from({ length: 5 }, (_, number) =>

@@ -133,7 +133,7 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
     await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "rock" } });
     await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "scissors" } });
-    await send(alice.socket, SOCKET_EVENTS.ROOM_REMATCH, { code: room.code });
+    await send(alice.socket, SOCKET_EVENTS.ROOM_REQUEST, { code: room.code, type: "rematch" });
 
     const bobBack = rejoinOnReconnect(bob.socket, room.code);
     const aliceBack = rejoinOnReconnect(alice.socket, room.code);
@@ -142,10 +142,15 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     await aliceBack;
 
     expect(bobJoin.data.status).toBe("finished");
-    expect(bobJoin.data.rematch).toEqual(
-      expect.objectContaining({ requestedBy: [alice.identity.id], available: true }),
-    );
-    const accepted = await send(bob.socket, SOCKET_EVENTS.ROOM_REMATCH, { code: room.code });
+    expect(bobJoin.data.rematch).toEqual(expect.objectContaining({ available: true }));
+    expect(bobJoin.data.requests).toEqual([
+      expect.objectContaining({ type: "rematch", from: alice.identity.id, state: "open" }),
+    ]);
+    const accepted = await send(bob.socket, SOCKET_EVENTS.ROOM_ANSWER, {
+      code: room.code,
+      type: "rematch",
+      answer: "accept",
+    });
     expect(accepted.data.status).toBe("playing");
     expect(accepted.data.series).toEqual({ games: 1, wins: { [alice.identity.id]: 1 } });
   });
@@ -226,6 +231,42 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     expect(data.game.outcome).toEqual(
       expect.objectContaining({ winners: [white.identity.id], reason: "timeout" }),
     );
+  });
+
+  // PR #67 review: the idle limit of a turn ran on while the server was down, so a player lost for it at startup.
+  it("starts the turn of a Tic-Tac-Toe game again when the server is back, however long it was down", async () => {
+    let time = Date.UTC(2026, 9, 16, 12, 0, 0);
+    const server = serverProcess({ now: () => time });
+    await server.start();
+    const alice = await guest(server);
+    const bob = await guest(server);
+    const { data: room } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "tictactoe",
+      options: {},
+    });
+    const code = room.code;
+    const { data: started } = await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
+    const byId = { [alice.identity.id]: alice, [bob.identity.id]: bob };
+    const first = byId[started.game.activePlayers[0]];
+    const second = first === alice ? bob : alice;
+    await send(first.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { cell: 0 } });
+    time += 1_000;
+    await send(second.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { cell: 4 } });
+
+    // The first player is due. The server goes down, and stays down far longer than the minute a turn has.
+    const firstBack = rejoinOnReconnect(first.socket, code);
+    const secondBack = rejoinOnReconnect(second.socket, code);
+    await server.stop();
+    time += 10 * 60_000;
+    await server.start();
+    const resumedAt = time;
+    const { data } = await firstBack;
+    await secondBack;
+
+    expect(data.status).toBe("playing");
+    expect(data.game.turnEndsAt).toBeGreaterThanOrEqual(resumedAt + 60_000);
+    const moved = await send(first.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { cell: 1 } });
+    expect(moved.ok).toBe(true);
   });
 
   it("says why a room is gone when someone comes back after it closed", async () => {

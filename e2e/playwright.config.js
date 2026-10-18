@@ -46,6 +46,8 @@ const restartProjects = targets.map(({ name, device }, index) => ({
   use: { ...device },
   testMatch: RESTARTS,
   fullyParallel: false,
+  // One test at a time across every file: a restart cuts off whatever else is running (CC-207).
+  workers: 1,
   dependencies: index === 0 ? targets.map((target) => target.name) : [`restart ${targets[index - 1].name}`],
 }));
 
