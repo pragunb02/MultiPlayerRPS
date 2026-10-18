@@ -1,28 +1,14 @@
-import { Suspense, useCallback, useState } from "react";
+import { useCallback } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
-import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS, ROOM_STATUS } from "@classicade/shared";
+import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
-import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
-import { Button } from "../../components/Button/Button.jsx";
-import { outcomeFor } from "../../components/Celebrations/outcome.js";
-import { ComputerNote } from "../../components/ComputerNote/ComputerNote.jsx";
-import { ResultCelebration } from "../../components/Celebrations/ResultCelebration.jsx";
-import { ClaimWin } from "../../components/ClaimWin/ClaimWin.jsx";
-import { Modal } from "../../components/Modal/Modal.jsx";
+import { MatchShell } from "../../components/MatchShell/MatchShell.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
-import { RematchPanel } from "../../components/Rematch/RematchPanel.jsx";
-import { RequestBanner } from "../../components/RequestBanner/RequestBanner.jsx";
-import { SaveProgressCard } from "../../components/SaveProgress/SaveProgressCard.jsx";
-import { Seats } from "../../components/Seats/Seats.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
-import { resultHeadline } from "../../games/outcomeText.js";
 import { gameView } from "../../games/registry.js";
-import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
-import { gameNumber, matchPhase, playReason, PLAY_REASONS } from "../../games/roomView.js";
 import { useRoomAlerts } from "../../games/useRoomAlerts.js";
-import { useAction } from "../../hooks/useAction.js";
 import { useReconnecting } from "../../hooks/useReconnecting.js";
 import { useRoom } from "../../hooks/useRoom.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -75,16 +61,14 @@ function awayFromFullRoom(room) {
     .join(" and ");
 }
 
-/** Which requests stand for the viewer: one they were asked, one they asked, or none (CC-170). */
-function requestState(room) {
-  if (incomingRequests(room).length > 0) return "incoming";
-  return outgoingRequests(room).length > 0 ? "outgoing" : "none";
-}
-
 /**
- * A room from joining to the result: waiting with an invite, the game board, the outcome. Its URL names the game
- * and the room; any other spelling (lower-case code, old `/room/:code` link, wrong game) is replaced by the
- * canonical one — before joining where the code alone decides it, after joining where the room's game does.
+ * A room from joining to the result. The page joins the room and handles a room that is closed, missing or
+ * refused. An open room is drawn by the match shell (CC-157), with the invite on its stage while the room waits for
+ * players.
+ *
+ * Its URL names the game and the room. Any other spelling (a lower-case code, an old `/room/:code` link, the wrong
+ * game) is replaced by the canonical one: before joining where the code alone decides it, after joining where the
+ * room's game does.
  *
  * Someone who arrives without a session first chooses how to join: as a guest, or by logging in or signing up
  * and coming straight back (CC-086). Nothing is created for them until they choose.
@@ -98,7 +82,6 @@ export function RoomPage() {
   const toast = useToast();
   const session = useSession();
   const room = useRoom(code, { enabled: session.status === "ready" });
-  const [confirmingLeave, setConfirmingLeave] = useState(false);
   const reconnecting = useReconnecting();
   const gameId = room.room?.gameId ?? urlGame?.id;
   const notify = useCallback(
@@ -116,11 +99,6 @@ export function RoomPage() {
     await room.leave();
     navigate(paths.game(gameId), { replace: true });
   };
-  const leave = useAction(leaveRoom, { id: "room.leave" });
-  const forfeit = useAction(leaveRoom, { id: "room.leave.confirm" });
-  const newOpponent = useAction(leaveRoom, { id: "room.new_opponent" });
-  // The same choice in the request banner, when the opponent cannot answer (CC-207). It has its own feedback.
-  const bannerNewOpponent = useAction(leaveRoom, { id: "request.new_opponent" });
 
   if (gameId !== undefined && location.pathname !== paths.room(gameId, code)) {
     return <Navigate to={paths.room(gameId, code)} replace />;
@@ -186,119 +164,33 @@ export function RoomPage() {
   }
 
   const view = room.room;
-  const game = getGame(view.gameId);
-  const { Board } = gameView(view.gameId);
-  const playing = view.status === ROOM_STATUS.PLAYING;
-  const finished = view.status === ROOM_STATUS.FINISHED;
-  const offline = reconnecting ? PLAY_REASONS.RECONNECTING : "";
   const away = awayFromFullRoom(view);
-
-  /** What a request button does (RoomAction): a game move, asking for something, or answering a request. */
-  function act(action) {
-    if (action.type === "move") return room.move(action.move);
-    return action.type === "ask"
-      ? room.ask(action.requestType)
-      : room.answer(action.requestType, action.answer);
-  }
+  const waiting =
+    away === "" ? (
+      <div className={`${styles.card} ${styles.invite}`}>
+        <InviteArt className={styles.inviteArt} />
+        <h2>Invite a friend</h2>
+        <ShareRoom code={view.code} gameId={view.gameId} />
+      </div>
+    ) : (
+      <div className={styles.card} role="status">
+        <h2>Waiting for {away}</h2>
+        <p>{away} is away. The game starts as soon as they are back.</p>
+      </div>
+    );
 
   return (
-    <section className={styles.room} data-cc-phase={matchPhase(view)} data-cc-request={requestState(view)}>
-      <PageTitle>{`${game?.name ?? view.gameId} · Room ${view.code}`}</PageTitle>
-      <RequestBanner room={view} onAction={act} onNewOpponent={bannerNewOpponent} reason={offline} />
-      <header className={styles.header}>
-        <h1 className={styles.title}>
-          <GameIcon gameId={view.gameId} size={32} />
-          {game?.name ?? view.gameId}
-        </h1>
-        <Button
-          control="room.leave"
-          variant="ghost"
-          action={leave}
-          reason={offline}
-          onClick={() => (playing ? setConfirmingLeave(true) : leave.run())}
-        >
-          Leave room
-        </Button>
-      </header>
-
-      <div className={styles.layout}>
-        <div className={styles.stage}>
-          <ClaimWin room={view} onClaim={room.claimWin} reason={offline} />
-          {finished && (
-            <section
-              className={`${styles.outcome} ${styles[outcomeFor(view)]}`}
-              aria-labelledby="result-heading"
-            >
-              <div className={styles.headline} role="status">
-                <ResultCelebration room={view} />
-                <h2 id="result-heading">{resultHeadline(view)}</h2>
-              </div>
-              <RematchPanel room={view} onAction={act} onWindowEnded={room.refresh} reason={offline} />
-              {view.you === "" ? (
-                <Link to={paths.game(view.gameId)} className={styles.again} data-cc-control="room.play_game">
-                  Play {game?.name ?? "a game"}
-                </Link>
-              ) : (
-                <Button control="room.new_opponent" variant="secondary" action={newOpponent} reason={offline}>
-                  New opponent
-                </Button>
-              )}
-            </section>
-          )}
-          {view.status === ROOM_STATUS.WAITING && away !== "" && (
-            <div className={styles.card} role="status">
-              <h2>Waiting for {away}</h2>
-              <p>{away} is away. The game starts as soon as they are back.</p>
-            </div>
-          )}
-          {view.status === ROOM_STATUS.WAITING && away === "" && (
-            <div className={`${styles.card} ${styles.invite}`}>
-              <InviteArt className={styles.inviteArt} />
-              <h2>Invite a friend</h2>
-              <ShareRoom code={view.code} gameId={view.gameId} />
-            </div>
-          )}
-          {view.status !== ROOM_STATUS.WAITING &&
-            (Board ? (
-              <Suspense fallback={<p aria-busy="true">Loading the board…</p>}>
-                {/* A rematch is a new game in this room: a fresh board, not the last game's leftovers. */}
-                <Board
-                  key={gameNumber(view)}
-                  room={view}
-                  onMove={room.move}
-                  onAsk={room.ask}
-                  reason={playReason(view, { reconnecting })}
-                />
-              </Suspense>
-            ) : (
-              <p className={styles.card}>The {game?.name ?? "game"} board is not available yet.</p>
-            ))}
-          {finished && <SaveProgressCard room={view} game={gameNumber(view)} />}
-        </div>
-        <aside className={styles.side}>
-          <h2 className="visually-hidden">Players</h2>
-          <Seats room={view} />
-          <ComputerNote room={view} />
-        </aside>
-      </div>
-
-      <Modal
-        open={confirmingLeave}
-        title="Leave the game?"
-        onClose={() => setConfirmingLeave(false)}
-        actions={
-          <>
-            <Button control="room.leave.stay" variant="secondary" onClick={() => setConfirmingLeave(false)}>
-              Stay
-            </Button>
-            <Button control="room.leave.confirm" action={forfeit} reason={offline}>
-              Leave and forfeit
-            </Button>
-          </>
-        }
-      >
-        <p>The game is still on. If you leave now, you forfeit and your opponent wins.</p>
-      </Modal>
-    </section>
+    <MatchShell
+      room={view}
+      game={gameView(view.gameId)}
+      reconnecting={reconnecting}
+      waiting={waiting}
+      onMove={room.move}
+      onAsk={room.ask}
+      onAnswer={room.answer}
+      onClaimWin={room.claimWin}
+      onWindowEnded={room.refresh}
+      onLeave={leaveRoom}
+    />
   );
 }
