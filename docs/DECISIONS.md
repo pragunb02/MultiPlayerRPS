@@ -169,11 +169,12 @@ reused; the next free ID is **ADR-047**. A later change to a decision is a dated
 - **Amended · 2026-10-18 (lesson of CC-247 and CC-257).** Twice in one day two PRs that were each green broke
   `main` together. CC-247: #62 changed the page template's call and #64 still used the old one. CC-257: #74 made
   `SessionProvider` need a `sessionBroadcast` service, and #75's celebration tests built their services without
-  it, so 13 tests failed. Branch protection does not require a PR to be up to date with `main`, so a green check
-  can be a check against an older `main`. **Rule:** before each merge, when another PR has merged since the PR's
-  last run, the coordinator runs the fast checks again against the current `main` (update the branch, or re-run
-  on the merge result) and merges only when they pass. Requiring "up to date before merging" in branch protection
-  would do the same automatically but makes every PR rebase after every merge; the owner may choose it instead.
+  it, so 13 tests failed. Branch protection did not require a PR to be up to date with `main`, so a green check
+  could be a check against an older `main`. **Rule (owner, 2026-10-18):** branch protection now requires a PR to be
+  up to date with `main` for the fast checks, so every PR runs them again on top of the newest `main` before it can
+  merge. The cost is that a PR is updated and checked again after every merge ahead of it. Until the setting was on,
+  the coordinator re-ran the fast checks against the current `main` before each merge when another PR had merged
+  since.
 
 ### ADR-038 — Button feedback: every press answers, waiting says so
 
