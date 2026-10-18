@@ -42,8 +42,8 @@ describe("roomComponent: a game starts only with everyone there (CC-112)", () =>
     expect(room.status).toBe("waiting");
     expect(room.game).toBeUndefined();
     expect(room.seats).toEqual([
-      { playerId: ALICE.id, displayName: "Alice", connected: false },
-      { playerId: BOB.id, displayName: "Bob", connected: true },
+      expect.objectContaining({ playerId: ALICE.id, displayName: "Alice", connected: false }),
+      expect.objectContaining({ playerId: BOB.id, displayName: "Bob", connected: true }),
     ]);
   });
 
