@@ -10,6 +10,7 @@ import { createGamificationAccessor } from "./data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "./data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "./data/legacyUserAccessor.js";
 import { createMatchAccessor } from "./data/matchAccessor.js";
+import { createPendingMatchAccessor } from "./data/pendingMatchAccessor.js";
 import { createPlayerTransferAccessor } from "./data/playerTransferAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
@@ -25,6 +26,7 @@ import { createIdentityComponent } from "./domain/identity/identityComponent.js"
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "./domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
+import { createMatchOutboxComponent, matchRetryPolicy } from "./domain/matches/matchOutboxComponent.js";
 import {
   createProgressionComponent,
   PROGRESSION_EVENTS,
@@ -40,6 +42,7 @@ import { connectDatabase } from "./persistence/database.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
+import { createPendingMatchDao } from "./persistence/pendingMatchDao.js";
 import { createPlayerTransferDao } from "./persistence/playerTransferDao.js";
 import { createProgressDao } from "./persistence/progressDao.js";
 import { createQuestDao } from "./persistence/questDao.js";
@@ -61,6 +64,10 @@ const ROOM_SWEEP_INTERVAL_MS = 60_000;
 const GAUGE_INTERVAL_MS = 60_000;
 const CLOCK_TICK_INTERVAL_MS = 1_000;
 const TRANSFER_RESUME_INTERVAL_MS = 60_000;
+// How often the match pipeline looks for games whose next attempt is due (CC-111).
+const MATCH_PIPELINE_INTERVAL_MS = 5_000;
+// How often finished rooms are checked for a game the match pipeline never got (CC-111).
+const FINISHED_ROOMS_INTERVAL_MS = 60_000;
 // Owner console reports kept at once: one per range the owner looked at in the last 5 minutes.
 const ANALYTICS_CACHED_REPORTS = 20;
 
@@ -82,88 +89,199 @@ export function assertEnginesInCatalog(engines) {
  * @typedef {Pick<NodeJS.Process, "on" | "once" | "exit">} ProcessLike
  */
 
+/** The match pipeline's steps by name (CC-111). The logs and the stored outbox records use these names. */
+export const MATCH_STEPS = Object.freeze({
+  RECORD: "record match",
+  JUDGE: "judge",
+  PROGRESSION: "apply progression",
+  GAMIFICATION: "apply gamification",
+  LEADERBOARDS: "apply leaderboards",
+});
+
 /**
- * After a game ends: record the match, award progression from the recorded match (so XP only ever comes from a
- * persisted match), then count it for achievements, streaks and quests (CC-054, CC-089), then move its accounts up
- * the leaderboards (CC-053). Each step runs as a background task — a slow database never delays a game — and
- * shutdown drains them. Before progression, a match recorded for a guest who has just signed in moves to their
- * account (CC-032), so the account gets the XP, the streak, the quest progress and the board entries. Then the
- * match is judged once for fair play (CC-095): every later step gives nothing to a player it doesn't count for. The
- * leaderboard step runs even when the gamification step failed.
+ * What happens after a game ends, as one flat list of named steps (CC-111, ADR-047):
+ * 1. Record the match, so XP and the rest only ever come from a stored match.
+ * 2. Judge it: a match recorded for a guest who has just signed in moves to their account first (CC-032), then it
+ *    is judged once for fair play (CC-095). Every later step gives nothing to a player it does not count for.
+ * 3. Apply progression: XP and levels.
+ * 4. Apply gamification: achievements, streaks and quests (CC-054, CC-089).
+ * 5. Apply leaderboards (CC-053). It needs progression but not gamification, so a failing gamification step does
+ *    not keep the boards back.
+ * Each step reads the match from storage and changes nothing when it runs again, so a game the outbox runs a
+ * second time, after a failure or a restart, still counts once.
  *
  * @param {{
- *   domainEvents: import("node:events").EventEmitter,
- *   matchComponent: { recordFinished: Function, judge: Function },
+ *   matchComponent: Pick<ReturnType<typeof createMatchComponent>, "record" | "judge" | "getById">,
  *   playerTransferComponent: { follow: Function },
  *   progressionComponent: { applyMatch: Function },
  *   gamificationComponent: { applyMatch: Function },
  *   leaderboardComponent: { applyMatch: Function },
- *   tasks: ReturnType<typeof createBackgroundTasks>,
  *   logger: Logger,
- *   now?: () => number,
  * }} deps
+ * @returns {ReadonlyArray<import("./domain/matches/matchOutboxComponent.js").MatchStep>}
  */
-export function connectMatchPipeline({
-  domainEvents,
+export function matchPipelineSteps({
   matchComponent,
   playerTransferComponent,
   progressionComponent,
   gamificationComponent,
   leaderboardComponent,
+  logger,
+}) {
+  const stored = (matchId) => matchComponent.getById(matchId);
+  return Object.freeze([
+    {
+      name: MATCH_STEPS.RECORD,
+      async run({ match }) {
+        const recorded = await matchComponent.record(match);
+        logger.info(
+          { matchId: recorded.matchId, gameId: recorded.gameId, reason: recorded.result.reason },
+          "match recorded",
+        );
+      },
+    },
+    {
+      name: MATCH_STEPS.JUDGE,
+      needs: [MATCH_STEPS.RECORD],
+      // Judged after following, so the fair play limits look at the players as they are now (CC-095).
+      run: async ({ matchId, now }) =>
+        matchComponent.judge(await playerTransferComponent.follow({ match: await stored(matchId), now })),
+    },
+    {
+      name: MATCH_STEPS.PROGRESSION,
+      needs: [MATCH_STEPS.JUDGE],
+      async run({ matchId }) {
+        const judged = await stored(matchId);
+        const updates = await progressionComponent.applyMatch(judged);
+        logger.info(
+          {
+            matchId,
+            players: updates.length,
+            notCounted: judged.credit.notCounted.map(({ reason }) => reason),
+          },
+          "progression applied",
+        );
+      },
+    },
+    {
+      name: MATCH_STEPS.GAMIFICATION,
+      needs: [MATCH_STEPS.PROGRESSION],
+      async run({ matchId, now }) {
+        await gamificationComponent.applyMatch({ match: await stored(matchId), now });
+        logger.info({ matchId }, "gamification applied");
+      },
+    },
+    {
+      name: MATCH_STEPS.LEADERBOARDS,
+      needs: [MATCH_STEPS.PROGRESSION],
+      async run({ matchId }) {
+        await leaderboardComponent.applyMatch({ match: await stored(matchId) });
+        logger.info({ matchId }, "leaderboards applied");
+      },
+    },
+  ]);
+}
+
+/**
+ * Logs what one run of a game through the match pipeline did. A step that failed for good is logged at error
+ * level as "match pipeline failed": that line is the alert (CC-049). Each failed attempt before it is a warning
+ * with the time of the next attempt.
+ *
+ * @param {Logger} logger
+ * @param {import("./domain/matches/matchOutboxComponent.js").RunOutcome} outcome
+ */
+export function logPipelineOutcome(logger, outcome) {
+  const { matchId } = outcome;
+  if (outcome.status === "done" && outcome.ran.length > 0) {
+    logger.info({ matchId, steps: outcome.ran }, "match pipeline done");
+  } else if (outcome.status === "retrying") {
+    const { error, step, attempts, nextAttemptAt } = outcome;
+    logger.warn(
+      { err: error, matchId, step, attempts, nextAttemptAt },
+      "match pipeline step failed, will retry",
+    );
+  } else if (outcome.status === "failed" && Object.hasOwn(outcome, "step")) {
+    const { error, step, attempts } = outcome;
+    logger.error({ err: error, matchId, step, attempts, alert: true }, "match pipeline failed");
+  }
+}
+
+/**
+ * Stores a finished game in the match pipeline's outbox, unless the outbox has it already (CC-111). The room
+ * component calls it before any change to a finished room, so a rematch or a closing room never takes a game with
+ * it that the outbox does not have yet.
+ *
+ * @param {{
+ *   outbox: Pick<ReturnType<typeof createMatchOutboxComponent>, "add">,
+ *   matchComponent: Pick<ReturnType<typeof createMatchComponent>, "finishedMatch">,
+ *   now?: () => number,
+ * }} deps
+ * @returns {(game: { room: object, outcome: object }) => Promise<boolean>} whether the game was added now
+ */
+export const keepFinishedGameIn =
+  ({ outbox, matchComponent, now = Date.now }) =>
+  (game) =>
+    outbox.add({ match: matchComponent.finishedMatch(game), now: now() });
+
+/**
+ * After a game ends, its match goes into the match pipeline's outbox and runs at once (CC-111, ADR-047). The
+ * outbox keeps it in MongoDB until every step is done, so a database blip or a crash never loses it. Everything
+ * runs as background work, so a slow database never delays a game, and shutdown waits for it.
+ *
+ * The finished room is the record of a game until its outbox entry exists. The room component keeps the game
+ * before the room changes (see `keepFinishedGameIn`). `addFinishedRooms` adds the game of every finished room
+ * again (nothing changes for one the outbox has), at startup before anything can close a room, and every minute.
+ * Together they cover a crash or a blip between saving the finished room and adding its game.
+ * `runDue` runs the games whose next attempt has come.
+ *
+ * @param {{
+ *   domainEvents: import("node:events").EventEmitter,
+ *   matchComponent: Pick<ReturnType<typeof createMatchComponent>, "finishedMatch">,
+ *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "listFinishedGames">,
+ *   outbox: ReturnType<typeof createMatchOutboxComponent>,
+ *   tasks: ReturnType<typeof createBackgroundTasks>,
+ *   logger: Logger,
+ *   now?: () => number,
+ * }} deps
+ * @returns {{ addFinishedRooms: () => Promise<number>, runDue: () => void }}
+ */
+export function connectMatchPipeline({
+  domainEvents,
+  matchComponent,
+  roomComponent,
+  outbox,
   tasks,
   logger,
   now = Date.now,
 }) {
   domainEvents.on(ROOM_EVENTS.GAME_FINISHED, (event) => {
+    const match = matchComponent.finishedMatch(event);
     tasks.run(
-      "record match",
+      "match pipeline",
       async () => {
-        const match = await matchComponent.recordFinished(event);
-        logger.info(
-          { matchId: match.matchId, gameId: match.gameId, reason: match.result.reason },
-          "match recorded",
-        );
-        tasks.run(
-          "apply progression",
-          async () => {
-            // Judged after following, so the fair play limits look at the players as they are now (CC-095).
-            const followed = await matchComponent.judge(
-              await playerTransferComponent.follow({ match, now: now() }),
-            );
-            const updates = await progressionComponent.applyMatch(followed);
-            logger.info(
-              {
-                matchId: match.matchId,
-                players: updates.length,
-                notCounted: followed.credit.notCounted.map(({ reason }) => reason),
-              },
-              "progression applied",
-            );
-            tasks.run(
-              "apply gamification",
-              async () => {
-                try {
-                  await gamificationComponent.applyMatch({ match: followed, updates, now: now() });
-                  logger.info({ matchId: match.matchId }, "gamification applied");
-                } finally {
-                  tasks.run(
-                    "apply leaderboards",
-                    async () => {
-                      await leaderboardComponent.applyMatch({ match: followed, updates });
-                      logger.info({ matchId: match.matchId }, "leaderboards applied");
-                    },
-                    { matchId: match.matchId },
-                  );
-                }
-              },
-              { matchId: match.matchId },
-            );
-          },
-          { matchId: match.matchId },
-        );
+        await outbox.add({ match, now: now() });
+        logPipelineOutcome(logger, await outbox.run({ matchId: match.matchId, now: now() }));
       },
-      { roomCode: event.room.code },
+      { matchId: match.matchId, roomCode: event.room.code },
     );
+  });
+
+  const keep = keepFinishedGameIn({ outbox, matchComponent, now });
+  return Object.freeze({
+    async addFinishedRooms() {
+      let added = 0;
+      for (const game of await roomComponent.listFinishedGames()) {
+        if (await keep(game)) added += 1;
+      }
+      // A finished game the pipeline never got: its announcement was lost to a crash or a blip.
+      if (added > 0) logger.warn({ added }, "finished games added to the match pipeline late");
+      return added;
+    },
+    runDue() {
+      tasks.run("match pipeline", async () => {
+        (await outbox.runDue({ now: now() })).forEach((outcome) => logPipelineOutcome(logger, outcome));
+      });
+    },
   });
 }
 
@@ -195,9 +313,11 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
 
 /**
  * Periodic work: close idle rooms, apply game deadlines that have passed (a chess flag falling while nobody
- * moves), and finish guest → account transfers that were interrupted (CC-032). With the room sweep, computer
- * players plan again for every room, so one whose plan was dropped after the database kept failing still moves
- * (CC-138). A failing run is logged and the next one still happens. Timers don't keep the process alive.
+ * moves), finish moving guests' data to their accounts where that was interrupted (CC-032), and keep the match
+ * pipeline going (CC-111): games whose next attempt is due every few seconds, finished rooms whose game it never
+ * got every minute. With the room sweep, computer players plan again for every room, so one whose plan was dropped
+ * after the database kept failing still moves (CC-138). A failing run is logged and the next one still happens.
+ * Timers don't keep the process alive.
  *
  * Once a minute it also logs a gauge: how many rooms are open in each status and how many realtime connections and
  * players there are (CC-107). Operators read it to see how close the server is to its limits (roomLimits.js).
@@ -205,22 +325,27 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
  * @param {{
  *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "sweepExpired" | "expireDue" | "countRooms">,
  *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "resumePending">,
+ *   matchPipeline: ReturnType<typeof connectMatchPipeline>,
  *   connections: () => { connections: number, players: number },
  *   botDriver: Pick<ReturnType<typeof createBotDriver>, "resume">,
  *   logger: Logger,
  *   now?: () => number,
  *   sweepIntervalMs?: number,
- * }} deps  `sweepIntervalMs` is shorter only in tests that watch a room close
+ *   pipelineIntervalMs?: number,
+ * }} deps  `sweepIntervalMs` and `pipelineIntervalMs` are shorter only in tests that watch a room close or a
+ *   game being retried
  * @returns {{ stop: () => void }}
  */
 export function startHousekeeping({
   roomComponent,
   playerTransferComponent,
+  matchPipeline,
   connections,
   botDriver,
   logger,
   now = Date.now,
   sweepIntervalMs = ROOM_SWEEP_INTERVAL_MS,
+  pipelineIntervalMs = MATCH_PIPELINE_INTERVAL_MS,
 }) {
   const every = (intervalMs, work, failure) => {
     const timer = setInterval(() => {
@@ -248,6 +373,12 @@ export function startHousekeeping({
         );
       },
       "resuming guest transfers failed",
+    ),
+    every(pipelineIntervalMs, () => matchPipeline.runDue(), "running the match pipeline failed"),
+    every(
+      FINISHED_ROOMS_INTERVAL_MS,
+      () => matchPipeline.addFinishedRooms(),
+      "adding finished games to the match pipeline failed",
     ),
     every(
       GAUGE_INTERVAL_MS,
@@ -311,13 +442,27 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
  *     sweepIntervalMs?: number,
  *   },
  *   bots?: { pauseMs?: { min: number, max: number } },
- * }} deps  `now`, `rooms` and `bots` are for tests only. Production runs on the real clock, the standard room
- *   lifetimes and limits, and a human-like pause before each computer move. Integration tests move the clock and
- *   let computer players act at once, and browser tests shorten lifetimes to watch a room close, raise the
- *   connections per address (every test player shares one) and fill the server on purpose.
+ *   pipeline?: {
+ *     steps?: (steps: ReadonlyArray<import("./domain/matches/matchOutboxComponent.js").MatchStep>) => ReadonlyArray<import("./domain/matches/matchOutboxComponent.js").MatchStep>,
+ *     policy?: Partial<typeof import("./domain/matches/matchOutboxComponent.js").MATCH_RETRY_POLICY>,
+ *     intervalMs?: number,
+ *   },
+ * }} deps  `now`, `rooms`, `bots` and `pipeline` are for tests only. Production runs on the real clock, the
+ *   standard room lifetimes and limits, a human-like pause before each computer move and the standard match
+ *   pipeline. Integration tests move the clock, let computer players act at once and make a pipeline step fail or
+ *   stop, and browser tests shorten lifetimes to watch a room close, raise the connections per address (every
+ *   test player shares one) and fill the server on purpose.
  * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
  */
-export async function startServer({ config, logger, limits = {}, now = Date.now, rooms = {}, bots = {} }) {
+export async function startServer({
+  config,
+  logger,
+  limits = {},
+  now = Date.now,
+  rooms = {},
+  bots = {},
+  pipeline = {},
+}) {
   if (config.webDistDir !== "" && !existsSync(path.join(config.webDistDir, "index.html"))) {
     throw new Error(`WEB_DIST_DIR has no index.html: ${config.webDistDir} (run npm run build:web)`);
   }
@@ -337,6 +482,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
   const playerTransferDao = createPlayerTransferDao({ connection: database.connection });
   const leaderboardDao = createLeaderboardDao({ connection: database.connection });
   const analyticsDao = createAnalyticsDao({ connection: database.connection }); // read-only, CC-233
+  const pendingMatchDao = createPendingMatchDao({ connection: database.connection });
   await Promise.all(
     [
       roomDao,
@@ -348,6 +494,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
       questDao,
       achievementDao,
       leaderboardDao,
+      pendingMatchDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -361,6 +508,7 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
   const gamificationAccessor = createGamificationAccessor({ statsDao, questDao, achievementDao });
   const leaderboardAccessor = createLeaderboardAccessor({ leaderboardDao });
   const analyticsAccessor = createAnalyticsAccessor({ analyticsDao });
+  const pendingMatchAccessor = createPendingMatchAccessor({ pendingMatchDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -371,36 +519,6 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     legacyUserAccessor,
     passwordHasher: createPasswordHasher(),
   });
-  const limitsOfRooms = roomLimits(rooms.limits);
-  const engines = createEngineRegistry(ENGINES);
-  const botRegistry = createBotRegistry(BOTS);
-  assertCharactersPlayable(botRegistry);
-  const botTurns = createBotTurns({
-    bots: botRegistry,
-    engines,
-    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
-  });
-  const roomComponent = createRoomComponent({
-    roomAccessor,
-    engines,
-    events: domainEvents,
-    lifetimes: roomLifetimes(rooms.lifetimes),
-    limits: limitsOfRooms,
-    botTurns,
-  });
-  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
-  const botDriver = createBotDriver({
-    roomComponent,
-    roomAccessor,
-    botTurns,
-    botComponent,
-    thinking: createThinkingQueue(),
-    events: domainEvents,
-    delayMs: pauseBetween(bots.pauseMs ?? HUMAN_PAUSE_MS),
-    logger,
-    now,
-  });
-  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -435,24 +553,68 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
     cache: createTtlCache({ ttlMs: REPORT_TTL_MS, maxEntries: ANALYTICS_CACHED_REPORTS }),
   });
   const tasks = createBackgroundTasks({ logger });
-  connectMatchPipeline({
-    domainEvents,
+  const steps = matchPipelineSteps({
     matchComponent,
     playerTransferComponent,
     progressionComponent,
     gamificationComponent,
     leaderboardComponent,
+    logger,
+  });
+  const outbox = createMatchOutboxComponent({
+    pendingMatchAccessor,
+    steps: pipeline.steps ? pipeline.steps(steps) : steps,
+    policy: matchRetryPolicy(pipeline.policy),
+  });
+  const limitsOfRooms = roomLimits(rooms.limits);
+  const engines = createEngineRegistry(ENGINES);
+  const botRegistry = createBotRegistry(BOTS);
+  assertCharactersPlayable(botRegistry);
+  const botTurns = createBotTurns({
+    bots: botRegistry,
+    engines,
+    sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
+  });
+  const roomComponent = createRoomComponent({
+    roomAccessor,
+    engines,
+    events: domainEvents,
+    lifetimes: roomLifetimes(rooms.lifetimes),
+    limits: limitsOfRooms,
+    botTurns,
+    keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
+  });
+  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  const botDriver = createBotDriver({
+    roomComponent,
+    roomAccessor,
+    botTurns,
+    botComponent,
+    thinking: createThinkingQueue(),
+    events: domainEvents,
+    delayMs: pauseBetween(bots.pauseMs ?? HUMAN_PAUSE_MS),
+    logger,
+    now,
+  });
+  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => botDriver.watch(room));
+  const matchPipeline = connectMatchPipeline({
+    domainEvents,
+    matchComponent,
+    roomComponent,
+    outbox,
     tasks,
     logger,
     now,
   });
   connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks, now });
 
-  // Rooms are stored, so they outlive this process (CC-101). Nobody is connected to a process that has only
-  // just started, and a chess flag may have fallen while no server was running: settle both before anyone
+  // Rooms are stored, so they outlive this process (CC-101). First, a game that finished just before a crash
+  // reaches the match pipeline while its room still shows it (CC-111). Nobody is connected to a process that has
+  // only just started, and a chess flag may have fallen while no server was running: settle both before anyone
   // can join. A game that ends here is recorded through the match pipeline above. Then a computer player whose
   // turn it was when the last process stopped gets to move again (CC-138).
   try {
+    await matchPipeline.addFinishedRooms();
     await roomComponent.markEveryoneAway({ now: now() });
     await roomComponent.expireDue({ now: now() });
     await botDriver.resume();
@@ -514,12 +676,16 @@ export async function startServer({ config, logger, limits = {}, now = Date.now,
   const housekeeping = startHousekeeping({
     roomComponent,
     playerTransferComponent,
+    matchPipeline,
     connections: gateway.counts,
     botDriver,
     logger,
     now,
     sweepIntervalMs: rooms.sweepIntervalMs,
+    pipelineIntervalMs: pipeline.intervalMs,
   });
+  // Games the last process left unfinished (cut off by a crash or a deploy) run now, not in a few seconds.
+  matchPipeline.runDue();
 
   const close = async () => {
     housekeeping.stop();

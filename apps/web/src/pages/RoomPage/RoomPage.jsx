@@ -61,6 +61,18 @@ function RoomClosed({ reason, game }) {
   );
 }
 
+/**
+ * Who the game waits for when every seat is taken but someone is away, by name, or "" when nobody is (CC-112). The
+ * server starts the game only when everyone is there.
+ */
+function awayFromFullRoom(room) {
+  if (room.seats.length < room.players.max) return "";
+  return room.seats
+    .filter((seat) => !seat.connected)
+    .map((seat) => seat.displayName)
+    .join(" and ");
+}
+
 /** Which requests stand for the viewer: one they were asked, one they asked, or none (CC-170). */
 function requestState(room) {
   if (incomingRequests(room).length > 0) return "incoming";
@@ -172,6 +184,7 @@ export function RoomPage() {
   const playing = view.status === ROOM_STATUS.PLAYING;
   const finished = view.status === ROOM_STATUS.FINISHED;
   const offline = reconnecting ? PLAY_REASONS.RECONNECTING : "";
+  const away = awayFromFullRoom(view);
 
   /** What a request button does (RoomAction): a game move, or asking for or declining a rematch. */
   function act(action) {
@@ -227,7 +240,13 @@ export function RoomPage() {
               )}
             </section>
           )}
-          {view.status === ROOM_STATUS.WAITING && (
+          {view.status === ROOM_STATUS.WAITING && away !== "" && (
+            <div className={styles.card} role="status">
+              <h2>Waiting for {away}</h2>
+              <p>{away} is away. The game starts as soon as they are back.</p>
+            </div>
+          )}
+          {view.status === ROOM_STATUS.WAITING && away === "" && (
             <div className={`${styles.card} ${styles.invite}`}>
               <InviteArt className={styles.inviteArt} />
               <h2>Invite a friend</h2>
