@@ -27,11 +27,14 @@ import {
   topItems,
   weeklyReturning,
 } from "./metrics.js";
-import { northStarOn, statusMoves, statusWeeks, statusWindow } from "./playerStatuses.js";
+import { yieldToEventLoop } from "../../utils/yieldToEventLoop.js";
+import { northStarOn, statusMoves, statusRows, statusWeeks, statusWindow } from "./playerStatuses.js";
 import { peopleCount, shareOf } from "./privacy.js";
 
 /** How long a report is reused before it is worked out again (CC-233). */
 export const REPORT_TTL_MS = 5 * 60 * 1000;
+/** How many players' statuses are worked out between two pauses for live games (CC-255). */
+export const STATUS_SLICE = 250;
 /** The range the console opens with: the last 30 days, today included. */
 export const DEFAULT_RANGE_DAYS = 30;
 const GAME_IDS = Object.freeze(GAMES.map((game) => game.id));
@@ -57,6 +60,21 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
     from: new Date(startOfDay(from)),
     to: new Date(startOfDay(addDays(to, 1))),
   });
+
+  /**
+   * The status book of every player, built a slice of players at a time with a pause between slices, because
+   * this server also runs live games and a year of statuses for many players is a lot of work in one go.
+   */
+  async function statusBookOf(players, window) {
+    const rows = [];
+    for (let start = 0; start < players.length; start += STATUS_SLICE) {
+      if (start > 0) {
+        await yieldToEventLoop();
+      }
+      rows.push(...statusRows(players.slice(start, start + STATUS_SLICE), window));
+    }
+    return Object.freeze({ window, rows: Object.freeze(rows) });
+  }
 
   async function build(range, now) {
     const today = dayOf(now);
@@ -95,6 +113,7 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
       analyticsAccessor.listQuestCompletions(momentsOf(range)),
       analyticsAccessor.listLeaderboardSizes({ periods: ["all", ...weeks.map((week) => week.id)] }),
     ]);
+    const book = await statusBookOf(playerDays, statusDays);
 
     const active = activeIn(players, range);
     const activeBefore = activeIn(players, previous);
@@ -115,8 +134,8 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
         headlines: Object.freeze([
           headline({
             id: "northStar",
-            value: peopleCount(northStarOn(playerDays, addDays(headlineWeek, 6))),
-            previous: peopleCount(northStarOn(playerDays, addDays(headlineWeek, -1))),
+            value: peopleCount(northStarOn(book, addDays(headlineWeek, 6))),
+            previous: peopleCount(northStarOn(book, addDays(headlineWeek, -1))),
             week: headlineWeek,
           }),
           headline({
@@ -154,8 +173,8 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
         ]),
       }),
       statuses: Object.freeze({
-        weeks: Object.freeze(statusWeeks(playerDays, { weeks: rangeWeeks, today })),
-        moves: statusMoves(playerDays, { week: headlineWeek }),
+        weeks: Object.freeze(statusWeeks(book, { weeks: rangeWeeks, today })),
+        moves: statusMoves(book, { week: headlineWeek }),
       }),
       players: Object.freeze({
         summary: activitySummary(players, range),

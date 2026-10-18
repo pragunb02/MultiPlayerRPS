@@ -3,7 +3,7 @@ import { createAnalyticsAccessor } from "../../data/analyticsAccessor.js";
 import { createAnalyticsRange } from "../../models/analyticsRange.js";
 import { createEmptyAnalyticsDao, NO_MATCH_FACTS } from "../../testing/emptyAnalyticsDao.js";
 import { createTtlCache } from "../../utils/ttlCache.js";
-import { createAnalyticsComponent, REPORT_TTL_MS } from "./analyticsComponent.js";
+import { createAnalyticsComponent, REPORT_TTL_MS, STATUS_SLICE } from "./analyticsComponent.js";
 import { FEWER_THAN_MIN } from "./privacy.js";
 
 const NOW = Date.parse("2026-10-17T06:00:00.000Z"); // 11:30 India time, Saturday 17 October
@@ -161,6 +161,23 @@ describe("analyticsComponent", () => {
       expect.objectContaining({ week: "2026-10-05", from: "2026-10-04", to: "2026-10-11" }),
     );
     expect(report.statuses.moves.rows.find((row) => row.from === "regular").to.regular).toBe(5);
+  });
+
+  it("works statuses out a slice of players at a time, pausing for live games in between, and counts everyone", async () => {
+    const dao = createEmptyAnalyticsDao({
+      listPlayerDays: async () =>
+        many(STATUS_SLICE * 2 + 1, () => ({ kind: "guest", days: ["2026-09-01", "2026-10-13"] })),
+    });
+    let paused = 0;
+    const counting = () => {
+      paused += 1;
+    };
+    setImmediate(counting);
+
+    const report = await component(dao).getReport({ range: RANGE, now: NOW });
+
+    expect(report.statuses.weeks[0].casual).toBe(STATUS_SLICE * 2 + 1);
+    expect(paused).toBe(1);
   });
 
   it("reports every page with totals only and no ids", async () => {

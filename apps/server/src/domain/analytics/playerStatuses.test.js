@@ -1,16 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { ANALYTICS_NOT_COUNTED } from "@classicade/shared";
-import { addDays } from "../../utils/indiaTime.js";
+import { addDays, bucketsOf, daysOf } from "../../utils/indiaTime.js";
 import {
   NOT_PLAYING_YET,
   northStarOn,
   STATUSES,
   statusMoves,
   statusOn,
+  statusRows,
   statusWeeks,
   statusWindow,
 } from "./playerStatuses.js";
 import { FEWER_THAN_MIN } from "./privacy.js";
+
+const bookOf = (players, window) => ({ window, rows: statusRows(players, window) });
+/** The weekly trend of some players, from a book over exactly the days it needs. */
+const weeksOf = (players, weeks) => statusWeeks(bookOf(players, statusWindow(weeks)), weeks);
+/** The moves of one week, from a book over exactly the days it needs. */
+const movesOf = (players, { week }) =>
+  statusMoves(bookOf(players, statusWindow({ weeks: [week], today: addDays(week, 7) })), { week });
 
 // Sunday 18 October 2026, India time. "Back n" is the day n days before it, so back 0 is today, day 1.
 const TODAY = "2026-10-18";
@@ -119,7 +127,7 @@ describe("statusWeeks", () => {
       ...many(5, () => player(["2026-09-01", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"])),
     ];
 
-    expect(statusWeeks(players, { weeks: WEEKS, today: "2026-10-14" })).toEqual([
+    expect(weeksOf(players, { weeks: WEEKS, today: "2026-10-14" })).toEqual([
       {
         week: "2026-10-05",
         through: "2026-10-11",
@@ -152,20 +160,20 @@ describe("statusWeeks", () => {
   it("counts who turned Dormant during the week, on their 15th day without a game", () => {
     const players = many(5, () => player(["2026-09-01", "2026-09-28"]));
 
-    const [first, second] = statusWeeks(players, { weeks: WEEKS, today: TODAY });
+    const [first, second] = weeksOf(players, { weeks: WEEKS, today: TODAY });
 
     expect(first).toMatchObject({ lapsing: 5, wentDormant: 0 });
     expect(second).toMatchObject({ lapsing: 0, wentDormant: 5 });
   });
 
   it("leaves out weeks that have not started", () => {
-    expect(statusWeeks([], { weeks: ["2026-10-12", "2026-10-19"], today: TODAY })).toHaveLength(1);
+    expect(weeksOf([], { weeks: ["2026-10-12", "2026-10-19"], today: TODAY })).toHaveLength(1);
   });
 
   it("hides groups of 1 to 4 players", () => {
     const players = many(4, () => player(["2026-10-12"]));
 
-    expect(statusWeeks(players, { weeks: ["2026-10-12"], today: TODAY })[0]).toMatchObject({
+    expect(weeksOf(players, { weeks: ["2026-10-12"], today: TODAY })[0]).toMatchObject({
       new: FEWER_THAN_MIN,
       casual: 0,
       northStar: 0,
@@ -182,7 +190,7 @@ describe("northStarOn", () => {
       player(daysBack(3, 0)),
     ];
 
-    expect(northStarOn(players, TODAY)).toBe(2);
+    expect(northStarOn(bookOf(players, { from: TODAY, to: TODAY }), TODAY)).toBe(2);
   });
 });
 
@@ -198,7 +206,7 @@ describe("statusMoves", () => {
       ...many(2, () => player(["2026-09-01", "2026-09-10", "2026-10-18"])),
     ];
 
-    const moves = statusMoves(players, { week: WEEK });
+    const moves = movesOf(players, { week: WEEK });
 
     expect(moves.from).toBe("2026-10-11");
     expect(moves.to).toBe("2026-10-18");
@@ -210,7 +218,7 @@ describe("statusMoves", () => {
   });
 
   it("lists every status it can come from and go to, in order", () => {
-    const moves = statusMoves([], { week: WEEK });
+    const moves = movesOf([], { week: WEEK });
 
     expect(moves.rows.map((row) => row.from)).toEqual([NOT_PLAYING_YET, ...Object.values(STATUSES)]);
     expect(Object.keys(moves.rows[0].to)).toEqual(Object.values(STATUSES));
@@ -219,19 +227,63 @@ describe("statusMoves", () => {
   it("says Dormant to Dormant is not counted, because players who stayed away are never read", () => {
     const players = many(5, () => player(["2026-09-01", "2026-09-10"]));
 
-    expect(cell(statusMoves(players, { week: WEEK }), STATUSES.DORMANT, STATUSES.DORMANT)).toBe(
+    expect(cell(movesOf(players, { week: WEEK }), STATUSES.DORMANT, STATUSES.DORMANT)).toBe(
       ANALYTICS_NOT_COUNTED,
     );
   });
 
   it("leaves out players who had not started by the week's Sunday", () => {
     const players = many(5, () => player(["2026-10-20"]));
-    const moves = statusMoves(players, { week: WEEK });
+    const moves = movesOf(players, { week: WEEK });
 
     expect(
       moves.rows.every((row) =>
         Object.values(row.to).every((value) => value === 0 || value === ANALYTICS_NOT_COUNTED),
       ),
     ).toBe(true);
+  });
+});
+
+describe("cost", () => {
+  // The report runs on the server that also runs live games (CC-255). The longest range, 400 days, with 1,000
+  // players who each play about one day in ten must stay under 50 ms per slice of 250 players, and under 50 ms
+  // for the trend, the moves and the North Star together. Each budget is the best of 3 runs, so a busy machine
+  // does not fail it.
+  const BUDGET_MS = 50;
+  const SLICE = 250;
+  const weeks = bucketsOf({ from: addDays(TODAY, -399), to: TODAY, bucket: "week" });
+  const window = statusWindow({ weeks, today: TODAY });
+  const players = many(1000, (number) =>
+    player(daysOf(window).filter((_, index) => (index * 7 + number) % 10 === 0)),
+  );
+  const fastest = (work) =>
+    Math.min(
+      ...many(3, () => {
+        const started = performance.now();
+        work();
+        return performance.now() - started;
+      }),
+    );
+
+  it("works out a slice of 250 players' statuses over the longest range within the budget", () => {
+    const slowest = Math.max(
+      ...many(players.length / SLICE, (slice) =>
+        fastest(() => statusRows(players.slice(slice * SLICE, (slice + 1) * SLICE), window)),
+      ),
+    );
+
+    expect(slowest).toBeLessThan(BUDGET_MS);
+  });
+
+  it("reads the trend, the moves and the North Star from the book within the budget", () => {
+    const book = bookOf(players, window);
+
+    const took = fastest(() => {
+      statusWeeks(book, { weeks, today: TODAY });
+      statusMoves(book, { week: weeks[weeks.length - 2] });
+      northStarOn(book, TODAY);
+    });
+
+    expect(took).toBeLessThan(BUDGET_MS);
   });
 });
