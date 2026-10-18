@@ -83,7 +83,9 @@ const UNKNOWN_TEXTS = Object.freeze({
  */
 export function textsFor(gameId, type) {
   if (type === ROOM_REQUEST_TYPES.REMATCH) return REMATCH_TEXTS;
-  return gameView(gameId).requestTexts?.[type] ?? UNKNOWN_TEXTS;
+  // The type comes from the other player: only the game's own kinds count, never what an object inherits.
+  const texts = gameView(gameId).requestTexts;
+  return texts !== undefined && Object.hasOwn(texts, type) ? texts[type] : UNKNOWN_TEXTS;
 }
 
 const NONE = Object.freeze([]);

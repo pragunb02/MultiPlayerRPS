@@ -46,6 +46,17 @@ describe("room requests (CC-159)", () => {
     expect(ruleFor({ type: "draw", engine: {}, lifetimes })).toBeUndefined();
   });
 
+  it.each(["constructor", "__proto__", "tostring", "hasOwnProperty"])(
+    "knows no kind %s that the game's rules inherit as an object (security)",
+    (type) => {
+      // A plain object as well as the engine's own: the rule is found among the game's own kinds only.
+      const plain = { requestTypes: { draw: { lifetimeMs: 30_000, limitPerPlayer: 3 } } };
+
+      expect(rules(type)).toBeUndefined();
+      expect(ruleFor({ type, engine: plain, lifetimes })).toBeUndefined();
+    },
+  );
+
   it("opens a request to the other player, with its times, and counts it against the asker's limit", () => {
     const room = ask(playing);
 

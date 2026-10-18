@@ -43,6 +43,7 @@ import { ROOM_REQUEST_TYPES } from "@classicade/shared";
  *   room keeps them, so they expire, cool down and are answered the same way in every game.
  * @property {(state: State, request: { type: string, from: PlayerId, to: PlayerId }, ctx: MoveContext) => State} [acceptRequest]
  *   Optional, but required together with `requestTypes`. What accepting one of those requests does to the game.
+ *   `defineEngine` makes it throw for any other type, so an engine never has to check the type itself.
  *
  * @typedef {Object} RequestType
  * @property {number} lifetimeMs       how long the request stays open without an answer
@@ -72,6 +73,30 @@ function requestProblems(engine) {
       ? []
       : [`request type ${type} needs a positive lifetimeMs and limitPerPlayer`];
   });
+}
+
+/**
+ * The request hooks of a checked engine. Request types come from a player, so the rules sit in an object without a
+ * prototype: a type such as "constructor" finds nothing instead of what every object inherits. Accepting a type
+ * the game did not declare throws, whatever the engine's own `acceptRequest` would have done with it.
+ */
+function ownRequestHooks(engine) {
+  const requestTypes = Object.freeze(
+    Object.assign(
+      Object.create(null),
+      Object.fromEntries(
+        Object.entries(engine.requestTypes).map(([type, rule]) => [type, Object.freeze({ ...rule })]),
+      ),
+    ),
+  );
+  const accept = engine.acceptRequest;
+  const acceptRequest = (state, request, ctx) => {
+    if (!Object.hasOwn(requestTypes, request.type)) {
+      throw new TypeError(`${engine.id} has no request type "${request.type}"`);
+    }
+    return accept(state, request, ctx);
+  };
+  return { requestTypes, acceptRequest };
 }
 
 const REQUIRED_FUNCTIONS = [
@@ -118,15 +143,6 @@ export function defineEngine(engine) {
   if (problems.length > 0) {
     throw new TypeError(`Invalid game engine "${engine?.id}": ${problems.join("; ")}`);
   }
-  const requestTypes =
-    engine.requestTypes === undefined
-      ? {}
-      : {
-          requestTypes: Object.freeze(
-            Object.fromEntries(
-              Object.entries(engine.requestTypes).map(([type, rule]) => [type, Object.freeze({ ...rule })]),
-            ),
-          ),
-        };
-  return Object.freeze({ ...engine, ...requestTypes, players: Object.freeze({ min, max }) });
+  const requestHooks = engine.requestTypes === undefined ? {} : ownRequestHooks(engine);
+  return Object.freeze({ ...engine, ...requestHooks, players: Object.freeze({ min, max }) });
 }

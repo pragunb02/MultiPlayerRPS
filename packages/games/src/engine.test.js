@@ -54,6 +54,26 @@ describe("defineEngine", () => {
     expect(Object.isFrozen(engine.requestTypes.truce)).toBe(true);
   });
 
+  it.each(["constructor", "__proto__", "tostring", "hasOwnProperty"])(
+    "has no request type %s it did not declare, and refuses to accept one (security)",
+    (type) => {
+      const engine = defineEngine({
+        ...valid,
+        requestTypes: { truce: { lifetimeMs: 30_000, limitPerPlayer: 3 } },
+        acceptRequest: (state) => ({ ...state, truce: true }),
+      });
+
+      expect(Object.hasOwn(engine.requestTypes, type)).toBe(false);
+      expect(engine.requestTypes[type]).toBeUndefined();
+      expect(() => engine.acceptRequest({}, { type, from: "a", to: "b" }, { now: 0 })).toThrow(
+        `has no request type "${type}"`,
+      );
+      expect(engine.acceptRequest({}, { type: "truce", from: "a", to: "b" }, { now: 0 })).toEqual({
+        truce: true,
+      });
+    },
+  );
+
   it.each([0, -1, 1.5, "30s"])("refuses a turn limit of %s", (turnLimitMs) => {
     expect(() => defineEngine({ ...valid, turnLimitMs })).toThrow(/turnLimitMs must be a positive/);
   });

@@ -38,10 +38,12 @@ export function ruleFor({ type, engine, lifetimes }) {
       limitPerPlayer: UNLIMITED,
     };
   }
-  const own = engine.requestTypes?.[type];
-  return own === undefined
-    ? undefined
-    : { status: ROOM_STATUS.PLAYING, lifetimeMs: own.lifetimeMs, limitPerPlayer: own.limitPerPlayer };
+  // The type comes from a player: only the game's own kinds count, never what an object inherits ("constructor").
+  if (engine.requestTypes === undefined || !Object.hasOwn(engine.requestTypes, type)) {
+    return undefined;
+  }
+  const own = engine.requestTypes[type];
+  return { status: ROOM_STATUS.PLAYING, lifetimeMs: own.lifetimeMs, limitPerPlayer: own.limitPerPlayer };
 }
 
 /**

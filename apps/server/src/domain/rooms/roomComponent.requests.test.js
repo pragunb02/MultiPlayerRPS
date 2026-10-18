@@ -159,6 +159,18 @@ describe("roomComponent requests of a game (CC-159)", () => {
     );
   });
 
+  it.each(["constructor", "__proto__", "tostring", "hasOwnProperty"])(
+    "refuses a request of kind %s, which objects inherit, and keeps the room as it was (security)",
+    async (type) => {
+      const { rooms, code } = await chessGame();
+
+      await expect(rooms.askRequest({ code, playerId: BOB.id, type, now: T0 + 2 })).rejects.toThrow(
+        ValidationError,
+      );
+      expect((await rooms.getRoom(code)).requests ?? []).toEqual([]);
+    },
+  );
+
   it("refuses kinds of request the game does not have", async () => {
     const { rooms, code } = await chessGame();
 

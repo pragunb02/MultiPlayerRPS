@@ -242,6 +242,16 @@ describe("roomRequests (CC-159)", () => {
     expect(roomRequests(watching)).toHaveLength(1);
   });
 
+  it.each(["constructor", "__proto__", "tostring", "hasOwnProperty"])(
+    "words a request of kind %s, which every object inherits or nearly, as one nobody knows",
+    (type) => {
+      const texts = textsFor("chess", type);
+
+      expect(texts.question("Bob")).toBe("Bob is asking you something.");
+      expect(texts.site("Chess")).toBe("is asking you something at Chess");
+    },
+  );
+
   it("words a game's own requests through the registry, and a kind nobody knows plainly", () => {
     expect(textsFor("chess", "draw").question("Bob")).toBe("Bob offers a draw.");
     const unknown = textsFor("ludo", "truce");

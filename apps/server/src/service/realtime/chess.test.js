@@ -94,6 +94,18 @@ describe("Chess over sockets", () => {
     expect(ack.data.serverTime).toBe(now); // views carry server time, so clients can show drift-free clocks
   });
 
+  it.each(["constructor", "__proto__", "tostring"])(
+    "refuses a hand-made request of kind %s, so no endless draw offer reaches the opponent (security)",
+    async (type) => {
+      const { bob, code } = await chessGame();
+
+      const ack = await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type });
+
+      expect(ack.error.code).toBe("VALIDATION_FAILED");
+      expect((await server.roomComponent.getRoom(code)).requests ?? []).toEqual([]);
+    },
+  );
+
   it("tells the offerer when the opponent declines a draw, and the game goes on (CC-104, CC-159)", async () => {
     const { alice, bob, code } = await chessGame();
     const aliceSeesOffer = nextEvent(alice.socket);
