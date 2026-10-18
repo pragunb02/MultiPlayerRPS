@@ -86,6 +86,28 @@ record, because today one process keeps the games it is running in memory.
      presence, clocks and moves in a side column; phones get a compact match header, the request banner takes the
      match bar's row while open, and the result is a non-blocking bottom sheet. 360x800 is added as a design and
      test viewport, `viewport-fit=cover` with safe-area padding everywhere.
+### ADR-050 — Rewards one beat at a time, outcome moments, Bit and the empty screens
+
+- **Status:** Accepted · 2026-10-18 (owner accepted every recommendation in [CC-099](tickets/CC-099.md),
+  [CC-163](tickets/CC-163.md), [CC-153](tickets/CC-153.md) and [CC-259](tickets/CC-259.md), with two choices below)
+- **Decision.**
+  1. Rewards play one beat at a time from a pure queue in the result card (result, series, XP, level up, up to 3
+     achievements, quests, streak, save progress, summary), automatically, tap or key to skip, capped at 6 s. One
+     effect on screen at a time; confetti only for a real win; at most 3 sounds (result, level up, one chime), XP
+     silent; no reward toasts on the room page while the result shows; under reduced motion the summary shows at
+     once. The server adds `matchId` to achievement and quest updates.
+  2. Outcome moments: four tones (win, quiet win for forfeit, idle or claim with no confetti, gentle loss, even);
+     kind loss lines (at most 8 words, no "!", no shaming), no red, no shake, no flashing.
+  3. Bit, the mascot: **a placeholder SVG in our own style for now** (owner), swapped for an artist's version later
+     under a written copyright assignment; never AI drafts for Bit; outside art only under CC0, CC BY 4.0 or MIT,
+     every asset credited in `docs/CREDITS.md` with a test (CC-230). After a loss Bit is "thinking" with a tip.
+  4. Page transitions use the browser's View Transitions through React Router (no added bundle); ADR-016 noted.
+  5. Win cards are made in the browser now; guests and minors get an unnamed card.
+  6. Empty screens (CC-259) first: grid and card CSS fixes, a visitor profile preview, a "how to get on the board"
+     panel, a lobby "how to play" strip, and **on phones a one-row header with Log in and Sign up both in a menu**
+     (owner).
+  7. Order: CC-259 and CC-163 first, CC-099 after #67 (inside today's result section if CC-157 is not ready),
+     CC-153 in eight PRs.
 
 ### ADR-044 — Backups: age-encrypted mongodump to an S3-compatible bucket, from GitHub Actions
 
