@@ -40,7 +40,7 @@ const toDoc = (doc) => ({
   createdAt: doc.createdAt,
   // Accounts made before CC-116 have no version stored. Their sessions were all made at version 0.
   sessionVersion: doc.sessionVersion ?? 0,
-  ...(doc.birthYear !== undefined && doc.birthYear !== null && { birthYear: doc.birthYear }),
+  ...(typeof doc.birthYear === "number" && { birthYear: doc.birthYear }),
 });
 
 const isId = (accountId) => mongoose.isValidObjectId(accountId);

@@ -309,12 +309,9 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
         }
         for (const match of page) {
           if (!sharedWithAnotherPerson(match, playerId)) {
-            erased.matchesDeleted += (await matchAccessor.deleteForPlayer({
-              matchId: match.matchId,
-              playerId,
-            }))
-              ? 1
-              : 0;
+            erased.matchesDeleted += Number(
+              await matchAccessor.deleteForPlayer({ matchId: match.matchId, playerId }),
+            );
             continue;
           }
           const stand = deletedPlayer(newUuid());
@@ -322,12 +319,9 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
           const players = renamed.players.map((p) =>
             p.playerId === stand.id ? { ...p, displayName: stand.displayName } : p,
           );
-          erased.matchesAnonymised += (await matchAccessor.replaceRenamed({
-            from: playerId,
-            match: { ...renamed, players },
-          }))
-            ? 1
-            : 0;
+          erased.matchesAnonymised += Number(
+            await matchAccessor.replaceRenamed({ from: playerId, match: { ...renamed, players } }),
+          );
         }
       }
     },
