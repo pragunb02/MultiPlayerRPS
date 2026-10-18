@@ -78,13 +78,14 @@ describe("room lifetimes in the room component (CC-101)", () => {
       await finishedGame(ctx, T0);
       await ctx.rooms.sweepExpired({ now: T0 + 15 * MINUTE });
 
-      const room = await ctx.rooms.requestRematch({
+      const room = await ctx.rooms.askRequest({
         code: ctx.code,
         playerId: BOB.id,
+        type: "rematch",
         now: T0 + 15 * MINUTE,
       });
 
-      expect(room.rematch.requestedBy).toEqual([BOB.id]);
+      expect(room.requests).toEqual([expect.objectContaining({ from: BOB.id, state: "open" })]);
     });
 
     it("tells the players when the window ends", async () => {

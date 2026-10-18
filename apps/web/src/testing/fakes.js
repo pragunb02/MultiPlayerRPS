@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import { AppRequestError } from "../lib/errors.js";
+import { DEFAULT_SOUND_SETTINGS } from "../lib/sound/soundPreferences.js";
 
 export const GUEST = Object.freeze({
   kind: "guest",
@@ -175,8 +176,12 @@ export function fakeSessionBroadcast() {
  *
  * @param {{ muted?: boolean, volume?: number }} [initial]
  */
-export function fakeSound({ muted = false, volume = 0.6 } = {}) {
-  let settings = Object.freeze({ muted, volume });
+export function fakeSound({
+  muted = false,
+  volume = 0.6,
+  categories = DEFAULT_SOUND_SETTINGS.categories,
+} = {}) {
+  let settings = Object.freeze({ muted, volume, categories });
   const listeners = new Set();
   const played = [];
   const update = (next) => {
@@ -192,6 +197,12 @@ export function fakeSound({ muted = false, volume = 0.6 } = {}) {
     },
     setMuted: vi.fn((value) => update({ ...settings, muted: value })),
     setVolume: vi.fn((value) => update({ ...settings, volume: value })),
+    setCategory: vi.fn((id, change) =>
+      update({
+        ...settings,
+        categories: { ...settings.categories, [id]: { ...settings.categories[id], ...change } },
+      }),
+    ),
     unlock: vi.fn(),
     play: vi.fn((names) => {
       played.push(...(typeof names === "string" ? [names] : names));

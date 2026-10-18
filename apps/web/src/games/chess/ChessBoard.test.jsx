@@ -43,8 +43,17 @@ const chessView = (overrides = {}) => ({
   timeControl: "blitz-5+0",
   clocks: { w: 300_000, b: 300_000 },
   lastMoveAt: 0,
-  drawOfferBy: "",
   ...overrides,
+});
+/** An open draw offer, as the room sends requests (CC-159). */
+const drawOffer = (from, to) => ({
+  type: "draw",
+  from,
+  to,
+  createdAt: 1_000_000,
+  expiresAt: 1_030_000,
+  state: "open",
+  endedAt: 0,
 });
 
 describe("ChessBoard", () => {
@@ -103,19 +112,25 @@ describe("ChessBoard", () => {
     expect(onMove).toHaveBeenCalledWith({ type: "resign" });
   });
 
-  it("offers a draw, and leaves answering the opponent's offer to the room's request popup (CC-104)", async () => {
+  it("offers a draw through the room, and leaves answering the opponent's offer to the request banner (CC-159)", async () => {
     const user = userEvent.setup();
-    const onMove = vi.fn().mockResolvedValue({});
-    const { rerender } = render(<ChessBoard room={room(chessView())} onMove={onMove} />);
+    const onAsk = vi.fn().mockResolvedValue({});
+    const { rerender } = render(<ChessBoard room={room(chessView())} onMove={vi.fn()} onAsk={onAsk} />);
 
     await user.click(screen.getByRole("button", { name: "Offer draw" }));
-    expect(onMove).toHaveBeenLastCalledWith({ type: "offer-draw" });
+    expect(onAsk).toHaveBeenLastCalledWith("draw");
 
-    rerender(<ChessBoard room={room(chessView({ drawOfferBy: THEM }))} onMove={onMove} />);
+    rerender(
+      <ChessBoard
+        room={room(chessView(), { requests: [drawOffer(THEM, ME)] })}
+        onMove={vi.fn()}
+        onAsk={onAsk}
+      />,
+    );
     expect(screen.queryByText("Riya offers a draw.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Accept draw" })).toBeNull();
     expect(screen.getByRole("button", { name: "Offer draw" })).toHaveAccessibleDescription(
-      "Riya offered a draw. Answer it above the board",
+      "Riya asked first. Answer it above the board",
     );
   });
 
@@ -201,7 +216,7 @@ describe("ChessBoard", () => {
   });
 
   it("shows your own draw offer as pending", () => {
-    render(<ChessBoard room={room(chessView({ drawOfferBy: ME }))} onMove={vi.fn()} />);
+    render(<ChessBoard room={room(chessView(), { requests: [drawOffer(ME, THEM)] })} onMove={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "Draw offered" })).toHaveAccessibleDescription(
       "Waiting for Riya to answer",
@@ -1243,12 +1258,12 @@ describe("ChessBoard says why a press did nothing (CC-164)", () => {
 
   it("lets you offer a draw and resign on the opponent's turn", async () => {
     const user = userEvent.setup();
-    const onMove = vi.fn().mockResolvedValue({});
-    render(<ChessBoard room={room(chessView({ toMove: THEM }))} onMove={onMove} />);
+    const onAsk = vi.fn().mockResolvedValue({});
+    render(<ChessBoard room={room(chessView({ toMove: THEM }))} onMove={vi.fn()} onAsk={onAsk} />);
 
     await user.click(screen.getByRole("button", { name: "Offer draw" }));
 
-    expect(onMove).toHaveBeenCalledWith({ type: "offer-draw" });
+    expect(onAsk).toHaveBeenCalledWith("draw");
     expect(screen.getByRole("button", { name: "Resign" })).not.toHaveAttribute("aria-disabled");
   });
 

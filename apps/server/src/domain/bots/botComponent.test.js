@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BOTS, createBotRegistry } from "@classicade/games";
-import { GAME_IDS } from "@classicade/shared";
+import { GAME_IDS, ROOM_REQUEST_TYPES } from "@classicade/shared";
 import { botRooms, NETWORK, PERSON } from "../../testing/botRooms.js";
-import { GoneError, ValidationError } from "../../utils/errors.js";
+import { ConflictError, GoneError, ValidationError } from "../../utils/errors.js";
 import { ROOM_EVENTS } from "../rooms/roomComponent.js";
 import { assertCharactersPlayable, createBotComponent, MAX_COMPUTER_GAMES } from "./botComponent.js";
 
@@ -21,13 +21,19 @@ describe("botComponent.playComputer", () => {
     expect(room.status).toBe("playing");
     expect(room.hostId).toBe(PERSON.id);
     expect(rooms.viewFor(room, PERSON.id).seats).toEqual([
-      { playerId: PERSON.id, displayName: "Alice", connected: true },
-      {
+      expect.objectContaining({
+        playerId: PERSON.id,
+        displayName: "Alice",
+        connected: true,
+        presence: "here",
+      }),
+      expect.objectContaining({
         playerId: id,
         displayName: name,
         connected: true,
+        presence: "here",
         bot: { character: id.split("_")[1], level: "easy" },
-      },
+      }),
     ]);
   });
 
@@ -128,7 +134,12 @@ describe("botComponent.playComputer", () => {
       for (let i = 0; i < MAX_COMPUTER_GAMES; i++) {
         await setup.playComputer({ gameId: GAME_IDS.RPS, now: 1_000 + i });
       }
-      await setup.rooms.requestRematch({ code, playerId: PERSON.id, now: 2_000 });
+      await setup.rooms.askRequest({
+        code,
+        playerId: PERSON.id,
+        type: ROOM_REQUEST_TYPES.REMATCH,
+        now: 2_000,
+      });
 
       const rematch = await setup.botComponent.acceptRematch({ code, playerId: rocky, now: 2_001 });
 
@@ -138,17 +149,19 @@ describe("botComponent.playComputer", () => {
       expect((await setup.rooms.getRoom("ROOM33")).status).toBe("finished");
     });
 
-    it("ends nothing when the computer's answer starts no game", async () => {
+    it("ends nothing, and says so, when the person has no rematch request open", async () => {
       const setup = botRooms();
       const { code, rocky } = await finishedGame(setup);
       for (let i = 0; i < MAX_COMPUTER_GAMES; i++) {
         await setup.playComputer({ gameId: GAME_IDS.RPS, now: 1_000 + i });
       }
 
-      // The person did not ask, so the computer's yes only waits for theirs.
-      const room = await setup.botComponent.acceptRematch({ code, playerId: rocky, now: 2_001 });
+      // The person did not ask, so there is nothing to say yes to.
+      await expect(setup.botComponent.acceptRematch({ code, playerId: rocky, now: 2_001 })).rejects.toThrow(
+        ConflictError,
+      );
 
-      expect(room.status).toBe("finished");
+      expect((await setup.rooms.getRoom(code)).status).toBe("finished");
       expect(await playing(setup.roomAccessor)).toHaveLength(MAX_COMPUTER_GAMES);
     });
 

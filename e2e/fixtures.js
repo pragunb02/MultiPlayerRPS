@@ -27,8 +27,39 @@ import {
  * can read web storage and it outlives the session (CC-103).
  */
 export const STORAGE_ALLOWLIST = Object.freeze({
-  "cc.sound": (value) => /^\{"muted":(true|false),"volume":(0|1|0\.\d+)\}$/.test(value),
+  "cc.sound": isSoundSetting,
 });
+
+/** The kinds of notice whose sound is set apart (CC-208, lib/notify/categories.js). */
+const SOUND_CATEGORIES = Object.freeze(["request", "turn", "result", "reward", "social", "system"]);
+const isVolume = (value) => typeof value === "number" && value >= 0 && value <= 1;
+
+/**
+ * The sound setting: muted and the volume, and since CC-208 the same two for each kind of notice. Nothing else may
+ * be in it, so nothing about a player or a game can hide there.
+ */
+function isSoundSetting(raw) {
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  const keys = Object.keys(value ?? {});
+  const categories = value?.categories ?? {};
+  return (
+    keys.every((key) => ["muted", "volume", "categories"].includes(key)) &&
+    typeof value.muted === "boolean" &&
+    isVolume(value.volume) &&
+    Object.entries(categories).every(
+      ([id, setting]) =>
+        SOUND_CATEGORIES.includes(id) &&
+        Object.keys(setting).length === 2 &&
+        typeof setting.on === "boolean" &&
+        isVolume(setting.volume),
+    )
+  );
+}
 
 export const test = base.extend({
   players: async ({ browser, baseURL }, use) => {

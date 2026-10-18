@@ -46,6 +46,23 @@ export function PrivacyPage() {
             if a result is ever questioned.
           </li>
           <li>
+            <strong>Game rooms.</strong> While a room is open we store it in our database: the game, the room
+            code, the players&apos; ids and names, every move with its time, and the result. That is how a
+            game carries on when the server restarts. A room is deleted 30 minutes to 24 hours after the last
+            activity: 30 minutes for a room nobody joined or a finished game, 2 hours when every player is
+            away, 24 hours when a game sits open with nobody moving. It is deleted at once when the last
+            player leaves. A short note that the room closed (its code, game and why) stays for 24 hours, so
+            an old link can say what happened.
+          </li>
+          <li>
+            <strong>A daily code for your network.</strong> So that one network cannot open hundreds of rooms,
+            each room also keeps a short code worked out from the IP address of the player who opened it, with
+            a key that is random, kept only in the server&apos;s memory and replaced every day (UTC). A key
+            names rooms for one day, is kept one more day only to count them, and is then deleted. The address
+            itself is never stored. Once a key is deleted, nobody, not even us, can turn its codes back into
+            an address. The code is deleted with the room.
+          </li>
+          <li>
             <strong>Progress.</strong> Your XP, level, statistics, achievements and daily quests, worked out
             from the games you play.
           </li>
@@ -83,14 +100,22 @@ export function PrivacyPage() {
 
       <LegalSection title="4. What we do not do">
         <ul>
-          <li>No ads, no tracking pixels, no analytics services, no third party scripts or fonts.</li>
+          <li>No ads, no tracking pixels, no third party analytics, no third party scripts or fonts.</li>
+          <li>
+            We do not count how you use the site. If we ever do, it will be anonymous counts on our own
+            server, with no id for you or your browser and a way to switch it off, and this page will say so
+            before it starts.
+          </li>
           <li>We do not sell or rent your data, and we do not share it for marketing.</li>
-          <li>We do not record your IP address with your games or your account.</li>
+          <li>
+            We do not store your IP address in our database or in our own logs. Rooms keep only the daily code
+            in section 2.
+          </li>
         </ul>
       </LegalSection>
 
       <LegalSection title="5. Who else handles it">
-        <p>Two services run the site for us and only handle data to do that:</p>
+        <p>Three services run the site for us and only handle data to do that:</p>
         <ul>
           <li>
             <strong>Render</strong> hosts the server. Like any web host it sees the requests your browser
@@ -99,21 +124,37 @@ export function PrivacyPage() {
           <li>
             <strong>MongoDB Atlas</strong> hosts the database where everything in section 2 is stored.
           </li>
+          <li>
+            <strong>GitHub</strong> runs our backups. Every night GitHub Actions makes an encrypted copy of
+            the whole database and puts it in a storage bucket the owner rents. The copy is locked on the way,
+            so only the owner can open it, and the bucket&apos;s provider only ever holds locked data. Each
+            copy is deleted after 30 days.
+          </li>
         </ul>
+        <p>Their servers may be outside your country, including in the United States.</p>
         <p>
-          Their servers may be outside your country, including in the United States. To stop one person from
-          flooding the site, the server counts recent requests per IP address for a few minutes. Those counts
-          are kept in memory only and are never written to the database.
+          To stop one person from flooding the site, the server counts recent requests and connections per IP
+          address, for 1 minute to 1 hour, and for as long as a connection stays open. To protect accounts
+          from password guessing, it also counts wrong passwords for 15 minutes, and it remembers for 30 days
+          which networks signed in to each account, up to 10 per account, so a network you use is never slowed
+          down during an attack on your account. For logins it keeps only keyed hashes made with a random key,
+          never the email or the address itself. All of this lives in the server&apos;s memory only, is not
+          saved anywhere, and is forgotten when the server restarts.
         </p>
       </LegalSection>
 
       <LegalSection title="6. How long we keep it">
         <ul>
           <li>
-            Sessions end 30 days after your last visit, and then they are deleted. Logging out ends yours at
-            once.
+            Sessions end 30 days after your last visit. A signed-in session also ends 90 days after you sign
+            in, and when the password is changed or &quot;sign out other devices&quot; is used on another
+            device. Logging out ends and deletes yours at once. Any other ended session is deleted about 30
+            days after its last use.
           </li>
-          <li>Open game rooms live only in the server&apos;s memory and close once they are left or idle.</li>
+          <li>
+            Game rooms are kept 30 minutes to 24 hours after the last activity, and the note that a room
+            closed 24 hours more (section 2).
+          </li>
           <li>
             Daily quests are kept for about a week, weekly leaderboard entries for four weeks after the week.
           </li>
@@ -123,7 +164,14 @@ export function PrivacyPage() {
             guest again.
           </li>
           <li>
-            Server logs record which page was asked for and how it went, without your email or password.
+            Backups hold a copy of everything above for 30 days. Something deleted from the database is gone
+            from the backups 30 days later.
+          </li>
+          <li>
+            Server logs record each request (what was asked for, how it went and how long it took) and events
+            such as signing up, logging in, joining a room and finishing a match, with the player id, room
+            code or match id involved. Our own log lines never hold your IP address, email or password. Render
+            keeps them for 7 to 14 days, depending on the plan.
           </li>
         </ul>
       </LegalSection>

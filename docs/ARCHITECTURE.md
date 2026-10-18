@@ -140,13 +140,35 @@ true cold start Render's own loading page comes first; replacing that is open de
  * @property {(state) => PlayerId[]} activePlayers                           who may act now (empty when finished)
  * @property {(state) => number} [deadline]       optional: when a time-based event happens if nobody acts (0 = none)
  * @property {(state, { now }) => State} [expire]  optional, with deadline: applies it (e.g. chess flag falls)
+ * @property {number} [turnLimitMs]                optional idle limit per move once a player has moved (CC-036)
+ * @property {Record<string, { lifetimeMs, limitPerPlayer }>} [requestTypes]  optional requests during play (CC-159)
+ * @property {(state, { type, from, to }, { now }) => State} [acceptRequest]  with requestTypes: what accepting does
  */
 ```
 
+### Requests and presence (CC-159, CC-207, CC-158, CC-036)
+
+Rooms keep `requests` (`domain/rooms/roomRequests.js`): a rematch after a finished game, and the engine's own kinds
+during play (the chess draw offer). Each has a type, who asked and who was asked, when it was made and when it
+expires, and a state (open, accepted, declined, withdrawn, expired). One of each kind is open at a time, an ended one
+stays 10 s so both players see the answer, and the same player may ask again only after a 10 s cooldown. Expiry and
+every other timed rule run through the room's `dueAt` and the every second deadline sweep. Times live in
+`roomLifetimes.js`.
+
+Each seat has a presence (`domain/rooms/roomPresence.js`): here (the room page is open), away (another page of the
+site) or offline. The gateway records them from `room:join`, `room:away`, socket disconnects and connects. A finished
+room lets go of a player away for 2 minutes. A game whose opponent is offline past a 60 s grace period can be claimed
+as a win. Idle players lose by the engine's `turnLimitMs`, and a game whose first move never comes is aborted and
+recorded nowhere.
+
+Requests reach both players on any page: every change is pushed as `request:updated` to each player's own channel,
+and a socket that connects is sent every request still open in its player's rooms. The web app shows them in the
+room's request banner, or as a popup on any other page (`components/SiteRequests`).
+
 Engines are registered with `defineEngine()` (shape check) in `createEngineRegistry()`. Every engine's test file calls
-`describeEngineContract(engine, scenario, { describe, it })` from `@classicade/games/testing`, which runs 10 checks:
+`describeEngineContract(engine, scenario, { describe, it })` from `@classicade/games/testing`, which runs 13 checks:
 options, determinism from a seed, JSON-safe state/views, robustness against garbage input, outsiders, scenario
-rejections, full playthrough without mutation, game-over refusal, and identical replay.
+rejections, full playthrough without mutation, game-over refusal, pure time and request hooks, and identical replay.
 
 ### Data model
 

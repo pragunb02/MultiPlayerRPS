@@ -86,6 +86,12 @@ describe("owner console pages", () => {
   it("shows the headline numbers with the period before and the change", async () => {
     await openConsole();
 
+    expect(within(tile("Regular and Core players")).getByText("11")).toBeVisible();
+    expect(tile("Regular and Core players")).toHaveTextContent(
+      "North Star: played 2 or more days in the full week from 2025-03-03",
+    );
+    expect(tile("Regular and Core players")).toHaveTextContent("Before: fewer than 5");
+    expect(tile("Weekly returning players")).not.toHaveTextContent("North Star");
     expect(within(tile("Active players")).getByText("16")).toBeVisible();
     expect(tile("Active players")).toHaveTextContent("Before: 0 (new)");
     expect(tile("Matches finished")).toHaveTextContent("Before: 30 (−30.0%)");
@@ -132,6 +138,7 @@ describe("owner console pages", () => {
     ["retention", "Cohort retention", ["Day 1 return"]],
     ["conversion", "Sign ups", ["Accounts created"]],
     ["engagement", "Busiest hours (India time)", ["Top achievements unlocked", "Leaderboard participants"]],
+    ["statuses", "Player statuses by week", ["Moves between statuses", "Came back"]],
   ])("draws the %s page", async (section, heading, more) => {
     renderApp({ path: `/admin/${section}?${WEEK}`, api: ownerApi() });
 
@@ -145,7 +152,7 @@ describe("owner console pages", () => {
     ).toHaveAttribute("aria-current", "page");
   });
 
-  it.each(["", "/players", "/games", "/retention", "/conversion", "/engagement"])(
+  it.each(["", "/players", "/games", "/retention", "/conversion", "/engagement", "/statuses"])(
     "gives every control on the console%s a stable name (CC-164)",
     async (section) => {
       await openConsole(`/admin${section}?${WEEK}`);
@@ -248,6 +255,83 @@ describe("owner console pages", () => {
     expect(await created[0].text()).toBe(
       "Achievement,Players\r\nFirst Victory,12\r\nRising Star,fewer than 5\r\n",
     );
+  });
+
+  it("draws the statuses as a weekly chart and table, with the North Star and the flows of the week", async () => {
+    await openConsole(`/admin/statuses?${WEEK}`);
+
+    expect(
+      screen.getByRole("img", { name: /^Players by status on the last day of each week, 1 bars/ }),
+    ).toBeVisible();
+    const table = screen.getByRole("table", { name: "Player statuses by week" });
+    const row = within(table).getByRole("rowheader", { name: "2025-03-03" }).closest("tr");
+    expect(row).toHaveTextContent("2025-03-0916fewer than 5650fewer than 5011yes");
+    expect(screen.getByText(/Today is day 1/)).toBeVisible();
+    expect(document.title).toBe("Statuses · Owner console · ClassiCade");
+  });
+
+  it("shows how players moved between statuses in the headline week, with what cannot be counted", async () => {
+    await openConsole(`/admin/statuses?${WEEK}`);
+
+    const table = screen.getByRole("table", { name: "Moves between statuses" });
+    expect(within(table).getByRole("rowheader", { name: "Not playing yet" }).closest("tr")).toHaveTextContent(
+      "Not playing yet16000000",
+    );
+    expect(within(table).getByRole("rowheader", { name: "Regular" }).closest("tr")).toHaveTextContent(
+      "Regular00050fewer than 50",
+    );
+    expect(within(table).getByRole("rowheader", { name: "Dormant" }).closest("tr")).toHaveTextContent(
+      "not counted",
+    );
+    expect(screen.getByText(/from Sunday 2025-03-02 to Sunday 2025-03-09/)).toBeVisible();
+  });
+
+  it("marks a week that is still going on", async () => {
+    const going = structuredClone(REPORT);
+    going.statuses.weeks[0].complete = false;
+    await openConsole(
+      `/admin/statuses?${WEEK}`,
+      ownerApi({ getAnalytics: vi.fn().mockResolvedValue(going) }),
+    );
+
+    const table = screen.getByRole("table", { name: "Player statuses by week" });
+    expect(within(table).getByRole("rowheader", { name: "2025-03-03" }).closest("tr")).toHaveTextContent(
+      "not yet",
+    );
+  });
+
+  it("says so when no week of the period has started yet", async () => {
+    const future = structuredClone(REPORT);
+    future.statuses.weeks = [];
+    await openConsole(
+      `/admin/statuses?${WEEK}`,
+      ownerApi({ getAnalytics: vi.fn().mockResolvedValue(future) }),
+    );
+
+    expect(screen.getByRole("img", { name: /No week of this period has started yet\./ })).toBeVisible();
+  });
+
+  it("exports the statuses and the moves as CSV with hidden groups and uncounted cells in words", async () => {
+    const created = [];
+    URL.createObjectURL = vi.fn((blob) => {
+      created.push(blob);
+      return "blob:test";
+    });
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await openConsole(`/admin/statuses?${WEEK}`);
+
+    await userEvent.click(screen.getByRole("button", { name: "Export CSV: Player statuses by week" }));
+    await userEvent.click(screen.getByRole("button", { name: "Export CSV: Moves between statuses" }));
+
+    expect(await created[0].text()).toBe(
+      "Week from,Last day,New,Casual,Regular,Core,Lapsing,Came back,Went dormant,Regular and Core (North Star),Week over\r\n" +
+        "2025-03-03,2025-03-09,16,fewer than 5,6,5,0,fewer than 5,0,11,yes\r\n",
+    );
+    const moves = (await created[1].text()).split("\r\n");
+    expect(moves[0]).toBe("From,New,Casual,Regular,Core,Returning,Lapsing,Dormant");
+    expect(moves[1]).toBe("Not playing yet,16,0,0,0,0,0,0");
+    expect(moves[8]).toBe("Dormant,0,0,0,0,0,0,not counted");
   });
 
   it("counts legacy players' first logins apart from sign ups", async () => {

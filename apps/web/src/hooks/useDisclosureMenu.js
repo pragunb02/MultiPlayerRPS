@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
+const OPEN_DIALOG = '[role="dialog"][aria-modal="true"]';
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]";
 
 /**
@@ -38,6 +39,8 @@ export function useDisclosureMenu() {
     panelRef.current.querySelector(FOCUSABLE)?.focus();
     const onKeyDown = (event) => {
       if (event.key !== "Escape") return;
+      // A dialog opened from the menu, such as the sound settings, takes this Escape for itself.
+      if (panelRef.current.querySelector(OPEN_DIALOG) !== null) return;
       close();
       buttonRef.current.focus();
     };

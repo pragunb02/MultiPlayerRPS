@@ -7,10 +7,12 @@ import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { useDisclosureMenu } from "../../hooks/useDisclosureMenu.js";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
+import { ConnectionBanner } from "../ConnectionBanner/ConnectionBanner.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { PageAnnouncer } from "../PageAnnouncer/PageAnnouncer.jsx";
 import { useSaveProgress } from "../SaveProgress/saveProgressContext.js";
+import { SiteRequests } from "../SiteRequests/SiteRequests.jsx";
 import { SoundControl } from "../SoundControl/SoundControl.jsx";
 import { WakingUp } from "../WakingUp/WakingUp.jsx";
 import styles from "./Layout.module.css";
@@ -25,9 +27,11 @@ function MenuIcon() {
 }
 
 /**
- * App shell: header with brand, navigation and who you are. Pages render into <Outlet />. On a phone the header
- * is one row (CC-259): the sound controls, your level and name, Log in and Sign up move into a menu behind one
- * button. On a wider screen the same controls sit in the row and the button is not shown.
+ * App shell: header with brand, navigation and who you are. Pages render into <Outlet />. Under the header sit the
+ * player's own connection (CC-158) and the requests other players sent them from rooms they are not looking at
+ * (CC-207), so both reach them on every page. On a phone the header is one row (CC-259): the sound controls, your
+ * level and name, Log in and Sign up move into a menu behind one button. On a wider screen the same controls sit in
+ * the row and the button is not shown.
  */
 export function Layout() {
   const session = useSession();
@@ -130,8 +134,10 @@ export function Layout() {
           </div>
         </div>
       </header>
+      <ConnectionBanner />
       <main id="main" className={styles.main}>
         <WakingUp />
+        <SiteRequests />
         <Outlet />
       </main>
       <PageAnnouncer />

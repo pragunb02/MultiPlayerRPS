@@ -132,6 +132,10 @@
 .swatch.chess {
   background: var(--color-game-chess);
 }
+/* An open table wider than a phone scrolls inside its frame instead of widening the whole page. */
+.details {
+  min-width: 0;
+}
 .details summary {
   cursor: pointer;
   font-weight: 700;

@@ -1,9 +1,15 @@
+import { PRESENCE, REQUEST_ANSWERS, REQUEST_STATES, ROOM_REQUEST_TYPES } from "@classicade/shared";
+import { useAskReason } from "../../games/useAskReason.js";
 import { useAction } from "../../hooks/useAction.js";
 import { formatCountdown, useServerCountdown } from "../../hooks/useServerCountdown.js";
 import { Button } from "../Button/Button.jsx";
 import styles from "./RematchPanel.module.css";
 
+const REMATCH = ROOM_REQUEST_TYPES.REMATCH;
 const names = (seats) => seats.map((seat) => seat.displayName).join(" and ");
+const ASK = Object.freeze({ type: "ask", requestType: REMATCH });
+const ACCEPT = Object.freeze({ type: "answer", requestType: REMATCH, answer: REQUEST_ANSWERS.ACCEPT });
+const WITHDRAW = Object.freeze({ type: "answer", requestType: REMATCH, answer: REQUEST_ANSWERS.WITHDRAW });
 
 /** The series score, such as `You 2 – 1 Bob`, across the games played in this room. */
 function SeriesScore({ room }) {
@@ -46,51 +52,54 @@ const leftText = (room) =>
     ? `${room.rematch.leftName} left, so there is no rematch this time.`
     : "Your opponent left, so there is no rematch this time.";
 
+/** The last rematch request of this room the server still keeps, open or just ended. */
+const lastRematch = (room) => (room.requests ?? []).findLast((request) => request.type === REMATCH);
+
 /**
  * After a finished game, at the top of the result: ask the same opponent for a rematch, accept theirs, see that
- * they declined (CC-104), or see that they left (CC-037, CC-162). Rematch is the main action of the result. The new
- * game starts in this same room, so the page and its URL stay where they are.
+ * they declined or did not answer (CC-104, CC-159), or see that they left (CC-037, CC-162). Rematch is the main
+ * action of the result. The new game starts in this same room, so the page and its URL stay where they are.
  *
  * @param {{
- *   room: { gameId: string, you: string, serverTime: number,
- *     seats: Array<{ playerId: string, displayName: string, connected: boolean }>,
- *     rematch?: { requestedBy: string[], available: boolean, until: number, declinedBy?: string, leftName?: string },
- *     series?: { games: number, wins: Record<string, number> } },
- *   onRematch: () => Promise<unknown>,
+ *   room: any,
+ *   onAction: (action: import("../../games/roomUpdates.js").RoomAction) => Promise<unknown>,
  *   onWindowEnded: () => void,
  *   reason?: string,
  * }} props  `room` is the RoomView (SOCKET_EVENTS). `reason`: why the button cannot be pressed now, such as
  *   "Reconnecting", empty when it can
  */
-export function RematchPanel({ room, onRematch, onWindowEnded, reason = "" }) {
-  const toggle = useAction(onRematch, { id: "room.rematch" });
+export function RematchPanel({ room, onAction, onWindowEnded, reason = "" }) {
+  const ask = useAction(() => onAction(ASK), { id: "room.rematch.ask" });
+  const accept = useAction(() => onAction(ACCEPT), { id: "room.rematch.accept" });
+  const cancel = useAction(() => onAction(WITHDRAW), { id: "room.rematch.cancel" });
+  // Right after a "no" asking again waits a moment (CC-159). The reason says so and goes by itself.
+  const cooldown = useAskReason(room, REMATCH);
   if (room.rematch === undefined || room.you === "") {
     return null;
   }
   const opponents = room.seats.filter((seat) => seat.playerId !== room.you);
-  const { requestedBy, available } = room.rematch;
-  const youAsked = requestedBy.includes(room.you);
-  const theyAsked = opponents.filter((seat) => requestedBy.includes(seat.playerId));
-  const offline = opponents.filter((seat) => !seat.connected);
+  const last = lastRematch(room);
+  const open = last?.state === REQUEST_STATES.OPEN;
+  const offline = opponents.filter((seat) => seat.presence === PRESENCE.OFFLINE);
 
   let message;
   let action = null;
-  if (!available) {
+  if (!room.rematch.available) {
     message = leftText(room);
-  } else if (youAsked) {
+  } else if (open && last.from === room.you) {
     message = `Waiting for ${names(opponents)}…`;
     action = (
-      <Button control="room.rematch.cancel" variant="secondary" action={toggle} reason={reason}>
+      <Button control="room.rematch.cancel" variant="secondary" action={cancel} reason={reason}>
         Cancel rematch
       </Button>
     );
-  } else if (theyAsked.length > 0) {
-    message = `${names(theyAsked)} wants a rematch!`;
+  } else if (open) {
+    message = `${names(opponents)} wants a rematch!`;
     action = (
       <Button
         control="room.rematch.accept"
         size="lg"
-        action={toggle}
+        action={accept}
         reason={reason}
         className={styles.invited}
       >
@@ -98,17 +107,19 @@ export function RematchPanel({ room, onRematch, onWindowEnded, reason = "" }) {
       </Button>
     );
   } else {
-    // After a "no" the panel says so, and asking again stays possible (CC-104).
-    const declinedBy = room.rematch.declinedBy ?? "";
-    if (declinedBy === room.you) {
-      message = "You declined the rematch. Changed your mind?";
-    } else if (declinedBy !== "") {
-      message = `${names(opponents.filter((seat) => seat.playerId === declinedBy))} declined the rematch.`;
+    // After a "no" or no answer the panel says so, and asking again stays possible (CC-104).
+    if (last?.state === REQUEST_STATES.DECLINED) {
+      message =
+        last.to === room.you
+          ? "You declined the rematch. Changed your mind?"
+          : `${names(opponents)} declined the rematch.`;
+    } else if (last?.state === REQUEST_STATES.EXPIRED && last.from === room.you) {
+      message = `No answer from ${names(opponents)}.`;
     } else {
       message = "Fancy another round?";
     }
     action = (
-      <Button control="room.rematch.ask" size="lg" action={toggle} reason={reason}>
+      <Button control="room.rematch.ask" size="lg" action={ask} reason={reason || cooldown}>
         Rematch
       </Button>
     );
@@ -123,10 +134,10 @@ export function RematchPanel({ room, onRematch, onWindowEnded, reason = "" }) {
         {message}
       </p>
       {action}
-      {available && offline.length > 0 && (
+      {room.rematch.available && offline.length > 0 && (
         <p className={styles.hint}>{names(offline)} is offline right now.</p>
       )}
-      {available && (
+      {room.rematch.available && (
         <RematchWindow
           until={room.rematch.until}
           serverTime={room.serverTime}

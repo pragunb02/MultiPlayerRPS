@@ -10,13 +10,19 @@ import { SOCKET_EVENTS } from "@classicade/shared";
 export function createSocketClients(baseUrl) {
   const open = [];
 
-  async function openSocket(cookie) {
+  /**
+   * @param {string} cookie
+   * @param {{ listen?: (socket: import("socket.io-client").Socket) => void }} [options]  `listen` subscribes
+   *   before the socket connects, for pushes the server sends the moment it does
+   */
+  async function openSocket(cookie, { listen = () => undefined } = {}) {
     const socket = connect(baseUrl(), {
       transports: ["websocket"],
       extraHeaders: { cookie },
       reconnection: false,
     });
     open.push(socket);
+    listen(socket);
     await new Promise((resolve, reject) => {
       socket.once("connect", resolve);
       socket.once("connect_error", reject);
@@ -48,6 +54,21 @@ export const send = (socket, event, payload) => socket.timeout(2_000).emitWithAc
 /** Resolves with the next server push of `event` (default: room update). */
 export const nextEvent = (socket, event = SOCKET_EVENTS.ROOM_UPDATED) =>
   new Promise((resolve) => socket.once(event, resolve));
+
+/**
+ * Resolves with the first server push of `event` that passes `test`. Presence can change a few times in a row
+ * (offline, then away, then here), so a test waits for the state it expects instead of counting pushes.
+ */
+export const eventWhere = (socket, test, event = SOCKET_EVENTS.ROOM_UPDATED) =>
+  new Promise((resolve) => {
+    const listener = (payload) => {
+      if (test(payload)) {
+        socket.off(event, listener);
+        resolve(payload);
+      }
+    };
+    socket.on(event, listener);
+  });
 
 /**
  * Host creates a room, guest joins, and the host has seen the game start.

@@ -30,6 +30,14 @@ describe("the result headline names how the game ended (CC-162)", () => {
     ["tictactoe", draw("board-full"), "Draw with a full board"],
     ["rps", win("b", "best-of-3"), "You lost the best of 3"],
     ["rps", win("a", "forfeit"), "You won by forfeit"],
+    ["tictactoe", win("a", "idle"), "You won on the move timer"],
+    ["rps", win("b", "idle"), "You lost on the move timer"],
+    ["rps", draw("idle"), "Draw on the move timer"],
+    [
+      "chess",
+      { result: "aborted", winners: [], reason: "aborted" },
+      "Game aborted: the first move did not come in time",
+    ],
   ])("%s: %o reads %s", (gameId, outcome, text) => {
     expect(resultHeadline(finished(gameId, outcome))).toBe(text);
   });

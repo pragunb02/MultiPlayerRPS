@@ -12,12 +12,24 @@ const APP_PID_FILE = path.join(CONTROL_DIR, "app.pid");
 const ROOM_OPTIONS_FILE = path.join(CONTROL_DIR, "rooms.json");
 /** The run's TLS certificate and key, made by server.mjs. They live only in this temporary folder. */
 export const TLS_DIR = path.join(CONTROL_DIR, "tls");
+const DOWN_FILE = path.join(CONTROL_DIR, "down.json");
 const RESTART_TIMEOUT_MS = 30_000;
 
 /** Called by server.mjs: a fresh control folder, with the standard room options. */
 export function resetControl() {
   mkdirSync(CONTROL_DIR, { recursive: true });
   rmSync(ROOM_OPTIONS_FILE, { force: true });
+  rmSync(DOWN_FILE, { force: true });
+}
+
+/** Called by server.mjs before it starts the next app process: how long the server stays down first. */
+export function downTime() {
+  try {
+    return JSON.parse(readFileSync(DOWN_FILE, "utf8")).downMs;
+  } catch (err) {
+    if (err.code === "ENOENT") return 0;
+    throw err;
+  }
 }
 
 /** Called by server.mjs whenever it starts an app process. */
@@ -46,12 +58,15 @@ async function isHealthy() {
 /**
  * Stops the app process and waits until the next one serves requests. A deploy stops it gracefully
  * (SIGTERM), a crash kills it on the spot (SIGKILL). `rooms` are the room options of the next process
- * (`{ lifetimes, sweepIntervalMs }`, see startServer), and stay until the next restart.
+ * (`{ lifetimes, sweepIntervalMs }`, see startServer), and stay until the next restart. `downMs` keeps the
+ * server away that long before the next process starts, because a quick machine restarts it within a second and
+ * the browser would not notice.
  *
- * @param {{ crash?: boolean, rooms?: object }} [options]
+ * @param {{ crash?: boolean, rooms?: object, downMs?: number }} [options]
  */
-export async function restartServer({ crash = false, rooms = {} } = {}) {
+export async function restartServer({ crash = false, rooms = {}, downMs = 0 } = {}) {
   writeFileSync(ROOM_OPTIONS_FILE, JSON.stringify(rooms));
+  writeFileSync(DOWN_FILE, JSON.stringify({ downMs }));
   const before = appPid();
   process.kill(before, crash ? "SIGKILL" : "SIGTERM");
   const deadline = Date.now() + RESTART_TIMEOUT_MS;

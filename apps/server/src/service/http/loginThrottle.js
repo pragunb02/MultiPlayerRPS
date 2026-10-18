@@ -1,3 +1,4 @@
+import { createHmac, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import { TooManyRequestsError } from "../../utils/errors.js";
 
@@ -37,28 +38,43 @@ export const LOGIN_THROTTLE = Object.freeze({
  * The counts behind the rules above. They live in this process: a restart forgets the failures and the known
  * addresses together, so nobody is ever blocked by a count that outlived the reason for it.
  *
+ * No email and no address is kept, only keyed hashes of them (CC-250). The throttle only ever asks whether it has
+ * seen the same email, or the same email and address, before, and a hash answers that just as well. The key is
+ * random and made with the throttle, so it dies with the counts, and a memory dump holds nothing that can be turned
+ * back into a player's email or where they sign in from.
+ *
  * @param {{
  *   limits?: LoginThrottleLimits,
  *   now?: () => number,
  *   wait?: (ms: number) => Promise<unknown>,
  *   pruneAbove?: number,
- * }} [deps]  `now` and `wait` are injectable so tests run without real time passing, and `pruneAbove` so a test
- *   can watch old keys being dropped without remembering ten thousand of them
+ *   randomKey?: () => Buffer,
+ * }} [deps]  `now` and `wait` are injectable so tests run without real time passing, `pruneAbove` so a test
+ *   can watch old keys being dropped without remembering ten thousand of them, and `randomKey` so a test can give
+ *   two throttles the same key
  */
 export function createLoginThrottle({
   limits = LOGIN_THROTTLE,
   now = Date.now,
   wait = sleep,
   pruneAbove = PRUNE_ABOVE,
+  randomKey = () => randomBytes(32),
 } = {}) {
+  const key = randomKey();
   /** @type {Map<string, { failures: number, endsAt: number }>} */
   const failures = new Map();
-  /** @type {Map<string, Map<string, number>>} email to the addresses that signed in to it, and when */
+  /** @type {Map<string, Map<string, number>>} the hash of an email, to the pairs that signed in to it and when */
   const known = new Map();
   let prunedAt = now();
 
-  const pairKey = (email, address) => `${email}\n${address}`;
-  const emailKey = (email) => `${email}\n`;
+  // Each hash says what it is for, and the parts go in as a JSON array, so no email or address can be split in a
+  // way that gives another one's hash. 16 bytes are plenty: two different inputs sharing a hash will not happen.
+  const hash = (...parts) =>
+    createHmac("sha256", key).update(JSON.stringify(parts)).digest().subarray(0, 16).toString("base64url");
+  // A known address is kept under the hash of the pair, not of the address alone, so two emails that signed in
+  // from the same place cannot be linked through the throttle.
+  const pairKey = (email, address) => hash("pair", email, address);
+  const emailKey = (email) => hash("email", email);
 
   function failuresOf(key) {
     const entry = failures.get(key);
@@ -72,7 +88,7 @@ export function createLoginThrottle({
   }
 
   function isKnown(email, address) {
-    const signedInAt = known.get(email)?.get(address);
+    const signedInAt = known.get(emailKey(email))?.get(pairKey(email, address));
     return signedInAt !== undefined && now() - signedInAt < limits.knownAddressMs;
   }
 
@@ -83,10 +99,9 @@ export function createLoginThrottle({
       for (const [key, entry] of failures) if (now() >= entry.endsAt) failures.delete(key);
     }
     if (known.size > pruneAbove) {
-      for (const [email, addresses] of known) {
-        for (const [address, at] of addresses)
-          if (now() - at >= limits.knownAddressMs) addresses.delete(address);
-        if (addresses.size === 0) known.delete(email);
+      for (const [email, pairs] of known) {
+        for (const [pair, at] of pairs) if (now() - at >= limits.knownAddressMs) pairs.delete(pair);
+        if (pairs.size === 0) known.delete(email);
       }
     }
   }
@@ -124,16 +139,20 @@ export function createLoginThrottle({
      */
     succeeded({ email, address }) {
       prune();
-      failures.delete(pairKey(email, address));
-      const addresses = known.get(email) ?? new Map();
-      addresses.delete(address);
-      addresses.set(address, now());
+      const pair = pairKey(email, address);
+      failures.delete(pair);
+      const pairs = known.get(emailKey(email)) ?? new Map();
+      pairs.delete(pair);
+      pairs.set(pair, now());
       // Only the most recent addresses are kept. A Map keeps the order things were added in.
-      while (addresses.size > limits.knownAddressesPerEmail) addresses.delete(addresses.keys().next().value);
-      known.set(email, addresses);
+      while (pairs.size > limits.knownAddressesPerEmail) pairs.delete(pairs.keys().next().value);
+      known.set(emailKey(email), pairs);
     },
 
     /** @returns {{ counts: number, emails: number }} how much is remembered, so tests can see old keys go */
     remembered: () => ({ counts: failures.size, emails: known.size }),
+
+    /** @returns {string[]} every key it holds, so a test can check that none is an email or an address (CC-250) */
+    keys: () => [...failures.keys(), ...[...known].flatMap(([email, pairs]) => [email, ...pairs.keys()])],
   });
 }

@@ -51,7 +51,7 @@ async function restartDuring(roomPlayers, options) {
   for (const [index, player] of roomPlayers.entries()) {
     await expect.poll(() => connects(player), { timeout: 20_000 }).toBeGreaterThan(before[index]);
     await expect(seats(player)).toHaveCount(1);
-    await expect(seats(player)).not.toContainText("disconnected", { timeout: 20_000 });
+    await expect(seats(player)).not.toContainText(/reconnecting|offline|away/, { timeout: 20_000 });
   }
 }
 
@@ -105,7 +105,7 @@ test.describe("the server restarts", () => {
 
     await expect(cell(o, "top left")).toHaveAccessibleName("top left: X");
     await expect(cell(o, "middle centre")).toHaveAccessibleName("middle centre: O");
-    await expect(seats(x)).not.toContainText("disconnected");
+    await expect(seats(x)).not.toContainText(/reconnecting|offline|away/);
     await cell(x, "top centre").click();
     await cell(o, "bottom left").click();
     await cell(x, "top right").click();

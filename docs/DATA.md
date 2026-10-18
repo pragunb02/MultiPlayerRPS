@@ -7,7 +7,10 @@ file that shows it, so a reviewer can check it.
 **Rule:** a pull request that stores something new, or keeps something for a different time, updates this file and
 the privacy page (`apps/web/src/pages/LegalPages/PrivacyPage.jsx`) in the same pull request.
 
-Where this file and the privacy page disagree today, the finding is in [tickets/CC-241.md](tickets/CC-241.md#findings).
+Where this file and the privacy page disagreed, the finding is in [tickets/CC-241.md](tickets/CC-241.md#findings).
+F1 to F4, F8 and F9 were fixed in CC-248 to CC-250 (2026-10-18), and
+`apps/web/src/pages/LegalPages/privacyFacts.test.jsx` now fails when a sentence it checks here changes and the page
+does not.
 
 ## How to read it
 
@@ -42,7 +45,7 @@ Where this file and the privacy page disagree today, the finding is in [tickets/
 | [`player_quests`](#player_quests)                     | pseudonymous                                                          | 8 days after the quest day                                     | MongoDB TTL index, the guest transfer    |
 | [`leaderboard_entries`](#leaderboard_entries)         | yes for accounts: username, level, score (public)                     | all time boards for ever, weekly boards 28 days after the week | MongoDB TTL index (weekly only)          |
 | [`player_transfers`](#player_transfers)               | pseudonymous: guest id, account id and username                       | for ever                                                       | nothing                                  |
-| [Server memory](#server-memory)                       | yes: IP addresses, emails with addresses (login throttle)             | seconds to 30 days, and never past a restart or deploy         | a restart, pruning                       |
+| [Server memory](#server-memory)                       | yes: IP addresses (rate limits, connections), keyed hashes            | seconds to 30 days, and never past a restart or deploy         | a restart, pruning                       |
 | [`cc.sid` cookie](#the-ccsid-cookie)                  | pseudonymous: a random session id                                     | 30 days after the last response                                | the browser, logout                      |
 | [`cc.sound`](#ccsound-in-localstorage)                | no                                                                    | until the browser's site data is cleared                       | the browser                              |
 | [Server logs](#server-logs)                           | pseudonymous: player ids, room codes; Render's own lines may hold IPs | Render's plan: 7 days on Hobby, 14 on Pro                      | Render                                   |
@@ -111,10 +114,18 @@ they still exist in production is not known from the code. **Owner check:** Atla
    every move and forfeit with the player id and the time), `result`, `rematch` (who asked, who declined, the name of
    a player who left), `series` (wins per player id), `createdAt`, `lastActivityAt`, `dueAt`, `expiresAt`, and
    `network`.
-2. **`network`** is a keyed hash of the host's network address: HMAC-SHA-256 with `SESSION_SECRET`, cut to 16 hex
-   characters (`apps/server/src/utils/networkKey.js`, CC-107). It lets the server count open rooms per network. The
-   address itself is never stored. Anyone with the secret could hash every IPv4 address and find which one it was,
-   so it is pseudonymous personal data, not anonymous.
+2. **`network`** is a keyed hash of the host's network address: HMAC-SHA-256, cut to 16 hex characters
+   (`apps/server/src/utils/networkKey.js`, CC-107). It lets the server count open rooms per network. The address
+   itself is never stored. The key is a random key that the server makes in its memory for each UTC day (CC-249).
+   It names new rooms during that day. During the next day it is kept only to count the rooms opened under it, so
+   midnight does not double the cap, and at the following midnight it is dropped, by a timer even when nobody opens
+   a room. The key is never written anywhere and does not come from `SESSION_SECRET` or any other setting. While it
+   is held, the running server could test addresses against it, so the hash is pseudonymous personal data for those
+   two days at most. After that, nobody can turn the hash back into an address, not from the database, a backup or
+   the server's settings. The name is worked out when the room is created, so a socket kept open past midnight gets
+   that day's name. A restart forgets every key, so rooms open from before it stop counting for the cap until they
+   close. Rooms stored before CC-249 hold a hash keyed with `SESSION_SECRET`. They keep working, stop counting for
+   the cap, and are gone within 24 hours, but backups taken before CC-249 keep them for up to 30 days.
 3. **Personal data:** pseudonymous.
 4. **Who can read it:** everyone who opens the room's link while it is open gets the room view: every seat's player id
    and display name, the host id, and the game view (seated players see their own view, others the spectator view).
@@ -232,19 +243,22 @@ they still exist in production is not known from the code. **Owner check:** Atla
 Kept in the server process only. A restart, a deploy or the free plan's sleep forgets all of it. Nothing here is
 written to MongoDB, except the network hash, which is also stored in `rooms`.
 
-| What                        | Holds                                                                                                                                                                        | Kept for                                                                         | Code                                                              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| HTTP rate limits            | request counts per IP address (`ip:<address>`, IPv6 grouped by /56) or per session id                                                                                        | the window: 1 minute (API), 15 minutes (auth, guest sessions), 1 hour (sign-ups) | `service/http/rateLimits.js`, `authRoutes.js`, `sessionRoutes.js` |
-| Login throttle              | failed logins per email and address, failed logins per email, and **the addresses that signed in to each email**, up to 10 per email                                         | failures 15 minutes, known addresses 30 days                                     | `service/http/loginThrottle.js` (CC-117)                          |
-| Socket admission            | open connections per session id and per address, an event budget per player id                                                                                               | while connected, and until the budget refills                                    | `service/realtime/socketAdmission.js`                             |
-| Network hash                | the keyed hash of an address, worked out when a socket connects                                                                                                              | the socket's life (and in `rooms`, above)                                        | `utils/networkKey.js`, `realtime/gateway.js`                      |
-| Session renewals            | session ids being renewed by their own player                                                                                                                                | 5 seconds                                                                        | `service/http/session.js`                                         |
-| Sign-outs                   | per player id, how often they signed out other devices and which session stayed                                                                                              | the process's life                                                               | `service/realtime/gateway.js`                                     |
-| Requests in flight          | per socket, events still being handled                                                                                                                                       | until answered                                                                   | `service/realtime/connections.js`                                 |
-| Background tasks and timers | post-game work (match, progression, gamification, leaderboards), the room sweep (1 minute), game deadlines (1 second), transfer resume (1 minute), the room gauge (1 minute) | until done                                                                       | `utils/backgroundTasks.js`, `server.js`                           |
+| What                        | Holds                                                                                                                                                                              | Kept for                                                                         | Code                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| HTTP rate limits            | request counts per IP address (`ip:<address>`, IPv6 grouped by /56) or per session id                                                                                              | the window: 1 minute (API), 15 minutes (auth, guest sessions), 1 hour (sign-ups) | `service/http/rateLimits.js`, `authRoutes.js`, `sessionRoutes.js` |
+| Login throttle              | failed logins per email and address, failed logins per email, and the addresses that signed in to each email, up to 10. Only keyed hashes are kept, never the email or the address | failures 15 minutes, known addresses 30 days                                     | `service/http/loginThrottle.js` (CC-117)                          |
+| Socket admission            | open connections per session id and per address, an event budget per player id                                                                                                     | while connected, and until the budget refills                                    | `service/realtime/socketAdmission.js`                             |
+| Network hash                | today's and yesterday's random keys, and the socket's address key, from which a room's hash is worked out when it is created                                                       | a key until the second UTC midnight after its day, the address while connected   | `utils/networkKey.js`, `realtime/gateway.js`                      |
+| Session renewals            | session ids being renewed by their own player                                                                                                                                      | 5 seconds                                                                        | `service/http/session.js`                                         |
+| Sign-outs                   | per player id, how often they signed out other devices and which session stayed                                                                                                    | the process's life                                                               | `service/realtime/gateway.js`                                     |
+| Requests in flight          | per socket, events still being handled                                                                                                                                             | until answered                                                                   | `service/realtime/connections.js`                                 |
+| Background tasks and timers | post-game work (match, progression, gamification, leaderboards), the room sweep (1 minute), game deadlines (1 second), transfer resume (1 minute), the room gauge (1 minute)       | until done                                                                       | `utils/backgroundTasks.js`, `server.js`                           |
 
-Personal data: yes. IP addresses and emails (with the addresses they signed in from) are personal data. Nobody can
-read this memory except through the server's own behaviour (a refusal or a wait).
+Personal data: yes. The HTTP rate limits and socket admission hold IP addresses for minutes, or while a socket is
+connected. The login throttle holds no email and no address: its keys are HMAC-SHA-256 hashes with a random key made
+when the process starts (CC-250). A known address is kept under the hash of the email and address together, so two
+emails that signed in from the same place cannot be linked through it. Nobody can read this memory except through
+the server's own behaviour (a refusal or a wait).
 
 ## Browser
 
@@ -308,10 +322,12 @@ No other cookie, localStorage, sessionStorage or IndexedDB key is used in `apps/
 ## Not stored anywhere
 
 1. Raw IP addresses in MongoDB or in our log lines.
-2. Passwords. Only scrypt hashes, and bcrypt hashes in the legacy `users`.
-3. Analytics, page views, presses or funnels. There is no telemetry yet (CC-173 to CC-178, the catalogue in
-   [analytics/EVENTS.md](analytics/EVENTS.md) is proposed).
-4. Chat or any free text from players. Display names are the only text a player chooses, and they pass the name
+2. Emails or addresses in the login throttle's memory. It keeps keyed hashes only (CC-250).
+3. Passwords. Only scrypt hashes, and bcrypt hashes in the legacy `users`.
+4. Analytics, page views, presses or funnels. There is no telemetry yet (CC-173 to CC-178, the catalogue in
+   [analytics/EVENTS.md](analytics/EVENTS.md) is proposed). ADR-034 decided it will be anonymous counts only, first
+   party, with an opt out. No third-party analytics.
+5. Chat or any free text from players. Display names are the only text a player chooses, and they pass the name
    filter (ADR-022).
 
 ## Coming (not on `main` yet)

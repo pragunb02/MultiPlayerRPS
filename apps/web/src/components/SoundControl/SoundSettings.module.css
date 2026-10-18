@@ -1,0 +1,33 @@
+/* The sound settings (CC-208): one row for each kind of notice, its switch and its volume side by side. */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+.label {
+  grid-column: 1 / -1;
+  font-weight: 700;
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--space-12);
+}
+.volume {
+  width: 8rem;
+  accent-color: var(--color-primary);
+}
+.note {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

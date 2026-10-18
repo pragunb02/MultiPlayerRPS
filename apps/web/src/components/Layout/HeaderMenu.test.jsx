@@ -57,6 +57,17 @@ describe("the header menu (CC-259)", () => {
     expect(menuButton()).toHaveFocus();
   });
 
+  it("leaves an Escape to the sound settings dialog opened from it", async () => {
+    const { user } = await openMenu();
+    await user.click(within(panel()).getByRole("button", { name: "Sound settings" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(menuButton()).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("ignores other keys", async () => {
     const { user } = await openMenu();
 

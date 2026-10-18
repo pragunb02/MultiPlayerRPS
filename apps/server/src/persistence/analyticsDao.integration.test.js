@@ -44,6 +44,7 @@ describe("analytics DAO (integration)", () => {
     const empty = createEmptyAnalyticsDao();
 
     expect(await dao.listPlayerActivity()).toEqual(await empty.listPlayerActivity());
+    expect(await dao.listPlayerDays(OCTOBER)).toEqual(await empty.listPlayerDays(OCTOBER));
     expect(await dao.getMatchFacts(OCTOBER)).toEqual(await empty.getMatchFacts(OCTOBER));
     expect(await dao.listSignups(OCTOBER)).toEqual(await empty.listSignups(OCTOBER));
     expect(await dao.listAchievementUnlocks(OCTOBER)).toEqual(await empty.listAchievementUnlocks(OCTOBER));
@@ -87,6 +88,39 @@ describe("analytics DAO (integration)", () => {
         ],
       },
     ]);
+  });
+
+  it("lists each player's India days of counted play in a range, with their last such day before it", async () => {
+    const { dao, insert } = await open();
+    await insert("matches", [
+      // 23:59:59 India time on 16 October, and the first second of 17 October.
+      matchDoc({ playerIds: [G1, U1], endedAt: "2026-10-16T18:29:59.000Z" }),
+      matchDoc({ playerIds: [G1, BOT], endedAt: "2026-10-16T18:30:00.000Z" }),
+      matchDoc({ playerIds: [U1, G1], endedAt: "2026-10-16T05:00:00.000Z" }),
+      matchDoc({
+        playerIds: [U1, U2],
+        endedAt: "2026-10-05T10:00:00.000Z",
+        notCounted: [{ playerId: U2, reason: "hourly-limit" }],
+      }),
+      // Before the range: G1's last counted day is 20 September, because the 25th did not count for them.
+      matchDoc({ playerIds: [G1, G2], endedAt: "2026-09-10T10:00:00.000Z" }),
+      matchDoc({ playerIds: [G1, G2], endedAt: "2026-09-20T10:00:00.000Z" }),
+      matchDoc({
+        playerIds: [G1, U2],
+        endedAt: "2026-09-25T10:00:00.000Z",
+        notCounted: [{ playerId: G1, reason: "hourly-limit" }],
+      }),
+      // After the range.
+      matchDoc({ playerIds: [U1, G2], endedAt: "2026-11-01T03:00:00.000Z", judged: false }),
+    ]);
+
+    const players = await dao.listPlayerDays(OCTOBER);
+
+    expect([...players].sort((a, b) => a.kind.localeCompare(b.kind))).toEqual([
+      { kind: "guest", days: ["2026-09-20", "2026-10-16", "2026-10-17"] },
+      { kind: "user", days: ["2026-10-05", "2026-10-16"] },
+    ]);
+    expect(JSON.stringify(players)).not.toMatch(/guest_|user_|bot_/);
   });
 
   it("totals a range's matches by day, game, hour, who played, length, rematches and fair play", async () => {

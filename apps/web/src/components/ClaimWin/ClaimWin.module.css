@@ -1,0 +1,15 @@
+/* The choice to claim the win from an opponent who did not come back (CC-036), in the page above the board. */
+.card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-warning);
+  border-radius: var(--radius-lg);
+}
+.text {
+  margin: 0;
+  flex: 1 1 14rem;
+}

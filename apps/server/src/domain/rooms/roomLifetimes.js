@@ -1,6 +1,7 @@
 import { ROOM_CLOSE_REASONS, ROOM_STATUS } from "@classicade/shared";
 
-const MINUTE_MS = 60 * 1000;
+const SECOND_MS = 1000;
+const MINUTE_MS = 60 * SECOND_MS;
 const HOUR_MS = 60 * MINUTE_MS;
 
 /**
@@ -16,6 +17,23 @@ const HOUR_MS = 60 * MINUTE_MS;
  *    forgotten tab cannot keep a room forever.
  * 5. What is left of a closed room (its code, game, reason and time) is kept for `closedRecordMs`, so whoever
  *    comes back with the link learns why it is gone instead of being told it never existed.
+ *
+ * The things that happen inside a room have their own times (CC-159, CC-207, CC-036):
+ *
+ * 6. A rematch request stays open for `rematchRequestMs`. A minute is long enough to come back from another tab,
+ *    and short enough that nobody waits on a player who has gone.
+ * 7. How a request ended stays in the room for `answerKeptMs`, so a player who was looking elsewhere still sees
+ *    the answer. After an answer that was not a yes, the same player may ask the same thing again only after
+ *    `reaskCooldownMs`, so a "no" is not followed at once by the same question.
+ * 8. A player who stays off the page of a finished room for `awayReleaseMs` gives up their seat. The opponent is
+ *    told at once that there will be no rematch, instead of waiting for someone who has moved on.
+ * 9. A player who loses their connection during a game has `reconnectGraceMs` to come back. A minute covers a
+ *    phone lock screen, a switch from mobile data to wifi and a server restart. After it the opponent may claim
+ *    the win.
+ * 10. A player who has not made their first move of a game within `firstMoveMs` of their turn starting aborts it,
+ *     and nothing is recorded. Later moves have each game's own limit (the engine's `turnLimitMs`). A server
+ *     restart starts the current turn again, and a player due to move who was offline gets that time back, up to
+ *     `reconnectGraceMs` in one turn, so nobody loses a game for time they could not play (roomPresence.js).
  */
 export const ROOM_LIFETIMES = Object.freeze({
   waitingMs: 30 * MINUTE_MS,
@@ -23,6 +41,12 @@ export const ROOM_LIFETIMES = Object.freeze({
   awayMs: 2 * HOUR_MS,
   idleGameMs: 24 * HOUR_MS,
   closedRecordMs: 24 * HOUR_MS,
+  rematchRequestMs: MINUTE_MS,
+  answerKeptMs: 10 * SECOND_MS,
+  reaskCooldownMs: 10 * SECOND_MS,
+  awayReleaseMs: 2 * MINUTE_MS,
+  reconnectGraceMs: MINUTE_MS,
+  firstMoveMs: MINUTE_MS,
 });
 
 /** @typedef {typeof ROOM_LIFETIMES} RoomLifetimes */

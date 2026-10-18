@@ -14,8 +14,11 @@ describe("roomComponent with computer players", () => {
 
     expect(changes.at(-1)).toEqual({ event: ROOM_EVENTS.CHANGED, payload: { room: expect.any(Object) } });
     expect(changes.at(-1).payload.room.seats[0].connected).toBe(false);
-    const seen = changes.length;
     await rooms.markEveryoneAway({ now: 3 });
+    // Restarting resumes the game, which is saved and published once.
+    const seen = changes.length;
+    expect(changes.at(-1).payload.room.game.resumedAt).toBe(3);
+    await rooms.playerDisconnected({ code: room.code, playerId: PERSON.id, now: 4 });
     expect(changes).toHaveLength(seen);
   });
 
@@ -53,7 +56,9 @@ describe("roomComponent with computer players", () => {
       [PERSON.id, false],
       ["bot_rocky_easy", true],
     ]);
-    expect(await rooms.markEveryoneAway({ now: 3 })).toEqual([]);
+    // Only the game resumes: the person stays offline and the computer connected.
+    expect(await rooms.markEveryoneAway({ now: 3 })).toEqual([room.code]);
+    expect((await rooms.getRoom(room.code)).seats.map((seat) => seat.connected)).toEqual([false, true]);
   });
 
   it("refuses a second person in a game against the computer, because it has started", async () => {

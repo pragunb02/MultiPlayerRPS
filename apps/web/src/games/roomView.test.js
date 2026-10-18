@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gameNumber, isYourTurn, nameOf, opponentsOf } from "./roomView.js";
+import { gameNumber, isYourTurn, nameOf, opponentsOf, seatOf } from "./roomView.js";
 
 const seats = [
   { playerId: "a", displayName: "Alice" },
@@ -32,10 +32,13 @@ describe("roomView readers", () => {
     expect(isYourTurn(room({ status: "finished" }))).toBe(false);
   });
 
-  it("counts the games of a room the same while playing and after finishing", () => {
-    expect(gameNumber(room())).toBe(0);
-    expect(gameNumber(room({ status: "finished", series: { games: 1 } }))).toBe(0);
-    expect(gameNumber(room({ status: "playing", series: { games: 1 } }))).toBe(1);
-    expect(gameNumber(room({ status: "finished", series: { games: 2 } }))).toBe(1);
+  it("numbers the games of a room as the server does, and 0 before the first one", () => {
+    expect(gameNumber(room({ game: undefined }))).toBe(0);
+    expect(gameNumber(room({ game: { activePlayers: [], number: 3 } }))).toBe(3);
+  });
+
+  it("finds a seat by player id", () => {
+    expect(seatOf(room(), "b")).toEqual({ playerId: "b", displayName: "Bob" });
+    expect(seatOf(room(), "z")).toBeUndefined();
   });
 });

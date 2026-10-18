@@ -142,6 +142,11 @@ describe("owner console (integration)", () => {
     expect(report.players.weeklyReturning).toEqual([
       { week: "2025-03-03", complete: true, players: 6, withPerson: 1, accounts: 0 },
     ]);
+    // The first pair started on Sunday 2 March, India time, so on Sunday 9 March that is 8 days back: no
+    // longer New but Regular. Everyone else started inside the week and is still New.
+    expect(report.statuses.weeks).toEqual([
+      expect.objectContaining({ week: "2025-03-03", new: 6, regular: "<5", core: 0, northStar: "<5" }),
+    ]);
   });
 
   it("hides every group of 1 to 4 people, and never sends an id, a name or a room code", async () => {

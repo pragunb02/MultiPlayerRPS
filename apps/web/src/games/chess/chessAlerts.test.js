@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chessNotices, chessRequests, chessSounds, soundForSan } from "./chessAlerts.js";
+import { CHESS_REQUEST_TEXTS, chessReasonPhrase, chessSounds, soundForSan } from "./chessAlerts.js";
 
 const ME = "guest_me";
 const BOB = "guest_bob";
@@ -13,7 +13,7 @@ const chess = ({ status = "playing", you = ME, ...view } = {}) => ({
   status,
   you,
   seats,
-  game: { view: { moves: [], drawOfferBy: "", drawAnswer: "", ...view }, activePlayers: [ME] },
+  game: { view: { moves: [], ...view }, activePlayers: [ME] },
 });
 
 describe("chess sounds (CC-103)", () => {
@@ -36,65 +36,37 @@ describe("chess sounds (CC-103)", () => {
     const before = chess({ moves: ["e4"] });
 
     expect(chessSounds(before, chess({ moves: ["e4", "exd5"] }))).toEqual(["capture"]);
-    expect(chessSounds(before, chess({ moves: ["e4"], drawOfferBy: BOB }))).toEqual([]);
+    expect(chessSounds(before, chess({ moves: ["e4"] }))).toEqual([]);
   });
 });
 
-describe("chess draw offers as requests (CC-104)", () => {
-  it("turns a standing offer into a request with accept, decline and withdraw moves", () => {
-    const [request] = chessRequests(chess({ drawOfferBy: BOB }));
+describe("chess draw offers as room requests (CC-159)", () => {
+  it("words the offer for both players and every way it can end", () => {
+    const draw = CHESS_REQUEST_TEXTS.draw;
 
-    expect(request).toEqual(
-      expect.objectContaining({
-        key: `draw:${BOB}`,
-        from: BOB,
-        title: "Draw offer",
-        waitingTitle: "Draw offered",
-        showWaiting: true,
-        accept: { type: "move", move: { type: "accept-draw" } },
-        decline: { type: "move", move: { type: "decline-draw" } },
-        cancel: { type: "move", move: { type: "withdraw-draw" } },
-      }),
-    );
-    expect(request.question("Bob")).toBe("Bob offers a draw.");
-  });
-
-  it("has no request without an offer or once the game is over", () => {
-    expect(chessRequests(chess())).toEqual([]);
-    expect(chessRequests(chess({ status: "finished", drawOfferBy: BOB }))).toEqual([]);
-  });
-});
-
-describe("chess draw answers (CC-104)", () => {
-  it("tells the offerer that the opponent declined, also by simply moving", () => {
-    const offered = chess({ drawOfferBy: ME });
-
-    expect(chessNotices(offered, chess({ drawAnswer: "declined" }), ME)).toEqual([
+    expect([
+      draw.title,
+      draw.question("Bob"),
+      draw.waiting("Bob"),
+      draw.declined("Bob"),
+      draw.withdrawn("Bob"),
+      draw.accepted("Bob"),
+      draw.site("Chess"),
+    ]).toEqual([
+      "Draw offer",
+      "Bob offers a draw.",
+      "Draw offered. Waiting for Bob to answer",
       "Bob declined your draw offer",
-    ]);
-  });
-
-  it("tells the opponent that the offer was withdrawn", () => {
-    const offered = chess({ drawOfferBy: BOB });
-
-    expect(chessNotices(offered, chess({ drawAnswer: "withdrawn" }), ME)).toEqual([
       "Bob withdrew the draw offer",
+      "Bob accepted the draw",
+      "offers a draw at Chess",
     ]);
   });
+});
 
-  it("tells nobody about their own answer", () => {
-    expect(chessNotices(chess({ drawOfferBy: BOB }), chess({ drawAnswer: "declined" }), ME)).toEqual([]);
-    expect(chessNotices(chess({ drawOfferBy: ME }), chess({ drawAnswer: "withdrawn" }), ME)).toEqual([]);
-  });
-
-  it("says nothing to spectators, after an accepted draw, while the offer stands, or with no offer before", () => {
-    const offered = chess({ drawOfferBy: ME });
-    const declined = chess({ drawAnswer: "declined" });
-
-    expect(chessNotices(offered, declined, "")).toEqual([]);
-    expect(chessNotices(offered, chess({ status: "finished" }), ME)).toEqual([]);
-    expect(chessNotices(offered, chess({ drawOfferBy: ME, moves: ["e4"] }), ME)).toEqual([]);
-    expect(chessNotices(chess(), declined, ME)).toEqual([]);
-    expect(chessNotices(offered, chess(), ME)).toEqual([]);
+describe("chess end reasons (CC-162)", () => {
+  it("words every way a game ends, and nothing for a reason it does not know", () => {
+    expect(chessReasonPhrase("agreement")).toBe("by agreement");
+    expect(chessReasonPhrase("nonsense")).toBe("");
   });
 });

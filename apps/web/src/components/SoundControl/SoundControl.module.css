@@ -1,10 +1,11 @@
-/* The sound switch and volume slider in the header (CC-103). */
+/* The sound switch, the volume slider and the sound settings button in the header (CC-103, CC-208). */
 .control {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
 }
-.toggle {
+.toggle,
+.settings {
   display: inline-grid;
   place-items: center;
   width: 2.25rem;
@@ -17,10 +18,12 @@
   cursor: pointer;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
-.toggle:hover {
+.toggle:hover,
+.settings:hover {
   border-color: var(--color-primary);
 }
-.toggle:focus-visible {
+.toggle:focus-visible,
+.settings:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }

@@ -5,6 +5,8 @@ import { expect } from "./fixtures.js";
 import { installProbe } from "./controlProbe.js";
 
 const control = (page, id) => page.locator(`main [data-cc-control="${id}"]`);
+/** Where the questions from other rooms show on any page (CC-207). */
+export const SITE_REQUESTS = "[data-cc-site-requests]";
 const phaseOf = (player) => player.page.locator("[data-cc-phase]");
 
 /** Waits until the player's room page says the match is in `phase` (data-cc-phase on the room page). */
@@ -213,6 +215,29 @@ export function statesFor(gameId) {
       await phaseIs(winner, "finished", "none");
       await expect(winner.page.locator("main").getByText(/declined the rematch\.$/)).toBeVisible();
       return { clicker: winner, other: loser };
+    },
+    // The one asked went to the home page without pressing Leave (CC-207): the asker sees where they are.
+    "rematch-asked-away": async (pair) => {
+      const { winner, loser } = await rematchAsked(pair, game);
+      await loser.page.locator('[data-cc-control="header.home"]').click();
+      await expect(winner.page.getByText("is on another page. They have been told.")).toBeVisible();
+      return { clicker: winner, other: loser };
+    },
+    // The one asked closed their browser (CC-207): the asker is told at once, with ways to play on.
+    "rematch-asked-offline": async (pair) => {
+      const { winner, loser } = await finishWith(pair, game);
+      await loser.leave();
+      await control(winner.page, "room.rematch.ask").click();
+      await phaseIs(winner, "finished", "outgoing");
+      await expect(control(winner.page, "request.copy_invite")).toBeVisible();
+      return { clicker: winner };
+    },
+    // The question reaches the one asked on the home page (CC-207). Only its own controls are pressed there.
+    "rematch-asked-elsewhere": async (pair) => {
+      const { winner, loser } = await rematchAsked(pair, game);
+      await loser.page.locator('[data-cc-control="header.home"]').click();
+      await expect(loser.page.locator(SITE_REQUESTS)).toBeVisible();
+      return { clicker: loser, other: winner, scope: SITE_REQUESTS };
     },
   };
   if (game.draw !== undefined) {

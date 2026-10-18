@@ -13,7 +13,7 @@ import { createLogger } from "../apps/server/src/utils/logger.js";
 import { createPasswordHasher } from "../apps/server/src/utils/passwordHasher.js";
 import { OWNER, seededWeek } from "./ownerConsole.js";
 import { APP_PORT, E2E_MONGO_PORT, E2E_MONGO_URI, E2E_PORT, LEGACY_PLAYER } from "./personas.js";
-import { recordAppPid, resetControl, roomOptions, TLS_DIR } from "./serverControl.js";
+import { downTime, recordAppPid, resetControl, roomOptions, TLS_DIR } from "./serverControl.js";
 import { makeCertificate, startTlsFront } from "./tlsFront.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -59,7 +59,7 @@ function startApp() {
     // Stopped by a signal, or shut down cleanly after one: start the next process. Failing by itself (it could
     // not even boot) would only fail again, so the whole test server stops instead.
     if (signal !== null || code === 0) {
-      startApp();
+      setTimeout(startApp, downTime());
       return;
     }
     logger.fatal({ code }, "the e2e app process failed");

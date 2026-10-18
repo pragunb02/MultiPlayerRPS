@@ -8,24 +8,26 @@ import { Button } from "../../components/Button/Button.jsx";
 import { outcomeFor } from "../../components/Celebrations/outcome.js";
 import { ComputerNote } from "../../components/ComputerNote/ComputerNote.jsx";
 import { ResultCelebration } from "../../components/Celebrations/ResultCelebration.jsx";
+import { ClaimWin } from "../../components/ClaimWin/ClaimWin.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { RematchPanel } from "../../components/Rematch/RematchPanel.jsx";
+import { RequestBanner } from "../../components/RequestBanner/RequestBanner.jsx";
 import { SaveProgressCard } from "../../components/SaveProgress/SaveProgressCard.jsx";
 import { Seats } from "../../components/Seats/Seats.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { resultHeadline } from "../../games/outcomeText.js";
 import { gameView } from "../../games/registry.js";
-import { incomingRequests, roomRequests } from "../../games/roomUpdates.js";
+import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
 import { gameNumber, matchPhase, playReason, PLAY_REASONS } from "../../games/roomView.js";
 import { useRoomAlerts } from "../../games/useRoomAlerts.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useReconnecting } from "../../hooks/useReconnecting.js";
 import { useRoom } from "../../hooks/useRoom.js";
 import { useSession } from "../../hooks/useSession.js";
+import { CATEGORIES } from "../../lib/notify/categories.js";
 import { JoinChooser } from "./JoinChooser.jsx";
-import { RoomRequests } from "./RoomRequests.jsx";
 import styles from "./RoomPage.module.css";
 
 /** Why a room closed, in the players' words (CC-101). */
@@ -76,7 +78,7 @@ function awayFromFullRoom(room) {
 /** Which requests stand for the viewer: one they were asked, one they asked, or none (CC-170). */
 function requestState(room) {
   if (incomingRequests(room).length > 0) return "incoming";
-  return roomRequests(room).some((request) => request.from === room.you) ? "outgoing" : "none";
+  return outgoingRequests(room).length > 0 ? "outgoing" : "none";
 }
 
 /**
@@ -99,7 +101,10 @@ export function RoomPage() {
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const reconnecting = useReconnecting();
   const gameId = room.room?.gameId ?? urlGame?.id;
-  const notify = useCallback((message) => toast.show(message, { tone: "info" }), [toast]);
+  const notify = useCallback(
+    (message) => toast.show(message, { tone: "info", category: CATEGORIES.SOCIAL }),
+    [toast],
+  );
   useRoomAlerts(room.room, { notify, dismiss: toast.dismiss });
 
   /**
@@ -114,6 +119,8 @@ export function RoomPage() {
   const leave = useAction(leaveRoom, { id: "room.leave" });
   const forfeit = useAction(leaveRoom, { id: "room.leave.confirm" });
   const newOpponent = useAction(leaveRoom, { id: "room.new_opponent" });
+  // The same choice in the request banner, when the opponent cannot answer (CC-207). It has its own feedback.
+  const bannerNewOpponent = useAction(leaveRoom, { id: "request.new_opponent" });
 
   if (gameId !== undefined && location.pathname !== paths.room(gameId, code)) {
     return <Navigate to={paths.room(gameId, code)} replace />;
@@ -186,15 +193,18 @@ export function RoomPage() {
   const offline = reconnecting ? PLAY_REASONS.RECONNECTING : "";
   const away = awayFromFullRoom(view);
 
-  /** What a request button does (RoomAction): a game move, or asking for or declining a rematch. */
+  /** What a request button does (RoomAction): a game move, asking for something, or answering a request. */
   function act(action) {
     if (action.type === "move") return room.move(action.move);
-    return action.type === "rematch" ? room.rematch() : room.declineRematch();
+    return action.type === "ask"
+      ? room.ask(action.requestType)
+      : room.answer(action.requestType, action.answer);
   }
 
   return (
     <section className={styles.room} data-cc-phase={matchPhase(view)} data-cc-request={requestState(view)}>
       <PageTitle>{`${game?.name ?? view.gameId} · Room ${view.code}`}</PageTitle>
+      <RequestBanner room={view} onAction={act} onNewOpponent={bannerNewOpponent} reason={offline} />
       <header className={styles.header}>
         <h1 className={styles.title}>
           <GameIcon gameId={view.gameId} size={32} />
@@ -213,7 +223,7 @@ export function RoomPage() {
 
       <div className={styles.layout}>
         <div className={styles.stage}>
-          <RoomRequests room={view} onAction={act} reason={offline} />
+          <ClaimWin room={view} onClaim={room.claimWin} reason={offline} />
           {finished && (
             <section
               className={`${styles.outcome} ${styles[outcomeFor(view)]}`}
@@ -223,12 +233,7 @@ export function RoomPage() {
                 <ResultCelebration room={view} />
                 <h2 id="result-heading">{resultHeadline(view)}</h2>
               </div>
-              <RematchPanel
-                room={view}
-                onRematch={room.rematch}
-                onWindowEnded={room.refresh}
-                reason={offline}
-              />
+              <RematchPanel room={view} onAction={act} onWindowEnded={room.refresh} reason={offline} />
               {view.you === "" ? (
                 <Link to={paths.game(view.gameId)} className={styles.again} data-cc-control="room.play_game">
                   Play {game?.name ?? "a game"}
@@ -261,6 +266,7 @@ export function RoomPage() {
                   key={gameNumber(view)}
                   room={view}
                   onMove={room.move}
+                  onAsk={room.ask}
                   reason={playReason(view, { reconnecting })}
                 />
               </Suspense>

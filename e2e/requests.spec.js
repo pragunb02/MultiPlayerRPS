@@ -83,7 +83,9 @@ test.describe("draw offers", () => {
 
     await bob.page.getByRole("button", { name: "Offer draw" }).click();
     const waiting = bob.page.getByRole("region", { name: "Draw offered" });
-    await expect(waiting).toContainText(`Waiting for ${aliceName}…`);
+    await expect(waiting).toContainText(`Draw offered. Waiting for ${aliceName} to answer`);
+    // The offer has thirty seconds, shown as a bar and a countdown to both players (CC-160).
+    await expect(waiting.getByRole("progressbar", { name: "Time left to answer" })).toBeVisible();
     await expect(popup(alice)).toBeVisible();
     await expect(popup(alice)).toHaveAccessibleName("Draw offer");
     await expect(popup(alice)).toHaveAccessibleDescription(`${bobName} offers a draw.`);
@@ -147,8 +149,15 @@ test.describe("draw offers", () => {
   });
 });
 
+/** Presses Rematch again once the short pause after the last answer is over (CC-159, ten seconds). */
+async function askAgain(rematch) {
+  await expect(rematch).not.toHaveAttribute("aria-disabled", "true", { timeout: 15_000 });
+  await rematch.click();
+}
+
 test.describe("rematch requests", () => {
   test("declined, asked again and withdrawn, asked again and accepted", async ({ players }, testInfo) => {
+    test.setTimeout(90_000);
     const { alice, bob, aliceName, bobName } = await finishedRps(players);
 
     await alice.page.getByRole("button", { name: "Rematch", exact: true }).click();
@@ -162,18 +171,20 @@ test.describe("rematch requests", () => {
     await expect(alice.page.getByText(`${bobName} declined the rematch.`)).toBeVisible();
     await screenshot(alice, "rematch-declined", testInfo);
 
-    await alice.page.getByRole("button", { name: "Rematch", exact: true }).click();
+    // Right after a "no" the same question waits a moment (CC-159): Rematch says so instead of asking.
+    const rematch = alice.page.getByRole("button", { name: "Rematch", exact: true });
+    await expect(rematch).toHaveAccessibleDescription("You can ask again in a moment");
+    await askAgain(rematch);
     await expect(popup(bob)).toBeVisible();
     await alice.page.getByRole("button", { name: "Cancel rematch" }).click();
     await expect(popup(bob)).toHaveCount(0);
     await expect(bob.page.getByText(`${aliceName} took back the rematch request`)).toBeVisible();
 
-    await alice.page.getByRole("button", { name: "Rematch", exact: true }).click();
+    await askAgain(rematch);
     await popup(bob).getByRole("button", { name: "Decline" }).click();
-    // The message about the first "no" may still be up as well.
     const declined = alice.page.getByText(`${bobName} declined the rematch`, { exact: true });
     await expect(declined.first()).toBeVisible();
-    await alice.page.getByRole("button", { name: "Rematch", exact: true }).click();
+    await askAgain(rematch);
     await popup(bob).getByRole("button", { name: "Accept" }).click();
     for (const player of [alice, bob]) {
       await expect(player.page.getByRole("group", { name: "Your choice" })).toBeVisible();
@@ -218,7 +229,8 @@ test.describe("sound switch", () => {
 
     await expect((await header(riya.page)).getByRole("button", { name: "Sound off" })).toBeVisible();
     const stored = await riya.page.evaluate(() => Object.entries(localStorage));
-    expect(stored).toEqual([["cc.sound", '{"muted":true,"volume":0.6}']]);
+    expect(stored.map(([key]) => key)).toEqual(["cc.sound"]);
+    expect(JSON.parse(stored[0][1])).toEqual(expect.objectContaining({ muted: true, volume: 0.6 }));
 
     await banner.getByRole("button", { name: "Sound off" }).click();
     await riya.page.reload();

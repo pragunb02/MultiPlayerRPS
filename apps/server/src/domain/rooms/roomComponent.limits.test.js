@@ -123,6 +123,53 @@ describe("room limits (CC-107)", () => {
       await expect(create(rooms, guest(2), T0 + 2)).resolves.toMatchObject({ status: "waiting" });
     });
 
+    it("keeps a room named under an older key working, and stops counting it once the name changes (CC-249)", async () => {
+      const rooms = setup({ openRoomsPerAddress: 1 });
+      const yesterday = await create(rooms, guest(1), T0, "name-under-yesterdays-key");
+
+      const joined = await rooms.joinRoom({ code: yesterday.code, player: guest(2), now: T0 + 1 });
+      const today = await create(rooms, guest(3), T0 + 2, "name-under-todays-key");
+
+      expect(joined.status).toBe("playing");
+      expect(today).toMatchObject({ status: "waiting", network: "name-under-todays-key" });
+    });
+
+    it("also counts the rooms opened under the network's earlier names, so midnight does not double the cap (CC-249)", async () => {
+      const rooms = setup({ openRoomsPerAddress: 2 });
+      await create(rooms, guest(1), T0, "yesterdays-name");
+      const today = (host) =>
+        rooms.createRoom({
+          host,
+          network: "todays-name",
+          earlierNetworks: ["yesterdays-name"],
+          gameId: "race",
+          options: { target: 3 },
+          now: T0 + 1,
+        });
+
+      await expect(today(guest(2))).resolves.toMatchObject({ network: "todays-name" });
+
+      await expect(today(guest(3))).rejects.toThrow("Too many rooms are open from your network");
+    });
+
+    it.each([["yesterdays-name"], [[""]], [[42]]])(
+      "refuses earlier network names that are not a list of names (%o)",
+      async (earlierNetworks) => {
+        const rooms = setup();
+
+        await expect(
+          rooms.createRoom({
+            host: ALICE,
+            network: "net-a",
+            earlierNetworks,
+            gameId: "race",
+            options: { target: 3 },
+            now: T0,
+          }),
+        ).rejects.toThrow(TypeError);
+      },
+    );
+
     it.each([[undefined], [""], [42]])(
       "refuses to create a room without the host's network (%o)",
       async (network) => {

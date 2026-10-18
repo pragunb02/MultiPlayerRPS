@@ -26,6 +26,12 @@ describe("owner console formats", () => {
     expect(csvValue("not kept")).toBe("no longer kept");
   });
 
+  it("writes a count the server could not see in full as not counted, on screen and in files", () => {
+    expect(formatCount("not counted")).toBe("not counted");
+    expect(csvValue("not counted")).toBe("not counted");
+    expect(drawable("not counted")).toBe(0);
+  });
+
   it("writes counts, shares, lengths and decimals for people", () => {
     expect(formatCount(123456)).toBe("1,23,456");
     expect(formatShare(0.4545)).toBe("45.5%");
