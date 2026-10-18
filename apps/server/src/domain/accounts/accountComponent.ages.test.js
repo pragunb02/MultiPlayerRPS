@@ -244,3 +244,19 @@ describe("accountComponent password checks and closing (CC-035)", () => {
     ).rejects.toThrow(ConflictError);
   });
 });
+
+describe("accountComponent.close and storage failures (CC-035)", () => {
+  it("passes a storage failure through instead of calling the account gone", async () => {
+    const failure = new Error("database down");
+    const accounts = createAccountComponent({
+      accountAccessor: { getById: async () => Promise.reject(failure) },
+      legacyUserAccessor: { findByEmail: async () => [] },
+      passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }),
+      accountDeletionAccessor: { closeLegacy: async () => {}, isLegacyClosed: async () => false },
+    });
+
+    await expect(accounts.close({ playerId: "user_0123456789abcdef01234567", now: NOW })).rejects.toBe(
+      failure,
+    );
+  });
+});

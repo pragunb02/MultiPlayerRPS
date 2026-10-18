@@ -635,7 +635,27 @@ describe("SignupPage and the year of birth (CC-152)", () => {
     expect(api.signup.mock.calls[0][0].birthYear).toBe(1999);
   });
 
-  it("after an under 13 refusal keeps the year as chosen and offers guest play instead", async () => {
+  it("refuses a child's year in the page, without sending it, and keeps the year as chosen", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({ signup: vi.fn() });
+    renderApp({ path: "/signup", api });
+    const year = String(new Date().getFullYear() - 8);
+
+    await fill(user);
+    await user.selectOptions(screen.getByLabelText("Year of birth"), year);
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(
+      await screen.findByText(
+        "ClassiCade accounts are for people aged 13 and over. You can keep playing as a guest.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Year of birth")).toBeDisabled();
+    expect(screen.getByLabelText("Year of birth")).toHaveValue(year);
+    expect(api.signup).not.toHaveBeenCalled();
+  });
+
+  it("after an under 13 refusal by the server keeps the year as chosen and offers guest play instead", async () => {
     const user = userEvent.setup();
     const refusal = new AppRequestError({
       code: "VALIDATION_FAILED",
@@ -645,7 +665,8 @@ describe("SignupPage and the year of birth (CC-152)", () => {
     });
     const api = fakeApi({ signup: vi.fn().mockRejectedValue(refusal) });
     renderApp({ path: "/signup", api });
-    const year = String(new Date().getFullYear() - 5);
+    // A year the page lets through, which the server refuses all the same here.
+    const year = String(new Date().getFullYear() - 13);
 
     await fill(user);
     await user.selectOptions(screen.getByLabelText("Year of birth"), year);

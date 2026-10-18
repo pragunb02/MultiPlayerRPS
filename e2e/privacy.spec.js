@@ -109,7 +109,7 @@ test.describe("an account holder's data (CC-035)", () => {
 });
 
 test.describe("the year of birth (CC-152)", () => {
-  test("a child is refused an account after choosing the year, and cannot pick another year in that visit", async ({
+  test("a child is refused an account after choosing the year, the year is never sent, and cannot be changed", async ({
     players,
   }) => {
     const account = newAccount();
@@ -121,7 +121,6 @@ test.describe("the year of birth (CC-152)", () => {
     await expect(year).toHaveValue("");
     await expect(page.getByText(/must be|aged 13|under 18|over 18/)).toHaveCount(0);
 
-    kid.expect(400, "/api/auth/signup");
     await page.getByLabel("Username").fill(account.username);
     await page.getByLabel("Email").fill(account.email);
     await page.getByLabel("Password").fill(account.password);
@@ -134,6 +133,7 @@ test.describe("the year of birth (CC-152)", () => {
     ).toBeVisible();
     await expect(year).toBeDisabled();
     await expect(year).toHaveValue(childYear);
+    expect(kid.record.urls.some((url) => url.endsWith("/api/auth/signup"))).toBe(false);
     await page.getByRole("link", { name: "Play as a guest" }).click();
     await expect(page).toHaveURL("/");
   });

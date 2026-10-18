@@ -159,6 +159,19 @@ describe("deleting your account (CC-035)", () => {
     expect(api.deleteAccount).not.toHaveBeenCalled();
   });
 
+  it("closes the question with Escape, deleting nothing", async () => {
+    const api = profileApi();
+    const { privacy } = await openPrivacy({ api });
+
+    await userEvent.type(within(privacy).getByLabelText("Password for deleting"), "my password");
+    await userEvent.click(within(privacy).getByRole("button", { name: "Delete my account" }));
+    await screen.findByRole("dialog", { name: "Delete your account?" });
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(api.deleteAccount).not.toHaveBeenCalled();
+  });
+
   it("deletes the account, signs this browser out and says it is done", async () => {
     const api = profileApi();
     const { privacy, sessionBroadcast, url } = await openPrivacy({ api });

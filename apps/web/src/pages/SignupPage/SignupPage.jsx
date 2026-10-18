@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ERROR_CODES } from "@classicade/shared";
+import { ERROR_CODES, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
@@ -51,6 +51,7 @@ export function SignupPage() {
   const [form, setForm] = useState({ username: "", email: "", password: "", birthYear: "" });
   // Set when the server refused the year (under 13). The choice then stays as it is for this visit (CC-152).
   const [tooYoung, setTooYoung] = useState(false);
+  const thisYear = new Date().getFullYear();
   const [touched, setTouched] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -79,6 +80,16 @@ export function SignupPage() {
   function submit(event) {
     event.preventDefault();
     setTouched({ username: true, email: true, password: true });
+    // Checked here as well as on the server, so a child's year of birth is never sent anywhere (CC-152).
+    const year = Number(form.birthYear);
+    if (
+      form.birthYear !== YEAR_NOT_SAID &&
+      isTooYoungForAccount({ birthYear: year, currentYear: thisYear })
+    ) {
+      setFieldErrors({ birthYear: TOO_YOUNG_MESSAGE });
+      setTooYoung(true);
+      return;
+    }
     if (Object.keys(RULES).every((field) => RULES[field](form[field]) === "")) {
       signup.run();
     }
@@ -127,7 +138,7 @@ export function SignupPage() {
         />
         <YearSelect
           control="auth.signup.birth_year"
-          currentYear={new Date().getFullYear()}
+          currentYear={thisYear}
           value={form.birthYear}
           onChange={(birthYear) => setForm((current) => ({ ...current, birthYear }))}
           error={fieldErrors.birthYear ?? ""}
