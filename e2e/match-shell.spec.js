@@ -1,6 +1,6 @@
 import { expect, formFactor, header, test } from "./fixtures.js";
 import { answerTo, arm, installProbe } from "./controlProbe.js";
-import { GAMES, openPair, SITE_REQUESTS } from "./matchStates.js";
+import { GAMES, openPair, phaseIs, SITE_REQUESTS, statesFor } from "./matchStates.js";
 import { allStatesFor, ANSWER_MS, NOT_PRESSED, putAway } from "./matchShellPresses.js";
 
 // The match shell around every game (CC-164, CC-170, CC-172): every press in the header and footer answers within
@@ -153,3 +153,38 @@ for (const gameId of Object.keys(GAMES)) {
     }
   });
 }
+
+// The match shell draws the frame of every game (CC-157). Tic-Tac-Toe brings only its board, no actions, panel or
+// score, so it shows that a game with only a board fills the frame: the name in the match bar, the board on the
+// stage, both players beside it, Leave alone in the action bar, and at the end the result card holding Rematch, New
+// opponent and Leave.
+test.describe("a game that brings only a board plugs into the match shell", () => {
+  const slot = (player, name) => player.page.locator(`main [data-cc-slot="${name}"]`);
+  const controls = (locator) =>
+    locator.locator("[data-cc-control]").evaluateAll((elements) => elements.map((e) => e.dataset.ccControl));
+
+  test("Tic-Tac-Toe plays in the shell's slots and ends in its result card", async ({ players }) => {
+    const pair = await openPair(players);
+    const { clicker, other } = await statesFor("tictactoe")["my-turn"](pair);
+
+    for (const player of [clicker, other]) {
+      await expect(slot(player, "match-bar").getByRole("heading", { level: 1 })).toHaveText("Tic Tac Toe");
+      await expect(slot(player, "stage").locator('[data-cc-control="ttt.cell"]')).toHaveCount(9);
+      await expect(
+        slot(player, "presence").getByRole("list", { name: "Players" }).getByRole("listitem"),
+      ).toHaveCount(2);
+      expect(await controls(slot(player, "action-bar"))).toEqual(["room.leave"]);
+      await expect(slot(player, "panel")).toHaveCount(0);
+      await expect(slot(player, "result")).toHaveCount(0);
+    }
+
+    await GAMES.tictactoe.win(clicker, other);
+    await phaseIs(clicker, "finished");
+
+    await expect(slot(clicker, "result").locator("#result-heading")).toHaveText(/^You won/);
+    const ending = slot(clicker, "result").locator('[data-cc-slot="action-bar"]');
+    await expect(ending.locator('[data-cc-control="room.rematch.ask"]')).toBeVisible();
+    expect(await controls(ending)).toEqual(["room.rematch.ask", "room.new_opponent", "room.leave"]);
+    await expect(slot(clicker, "stage").locator('[data-cc-control="ttt.cell"]')).toHaveCount(9);
+  });
+});
