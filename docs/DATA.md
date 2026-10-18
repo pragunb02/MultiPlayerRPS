@@ -45,6 +45,9 @@ does not.
 | [`player_quests`](#player_quests)                     | pseudonymous                                                          | 8 days after the quest day                                     | MongoDB TTL index, the guest transfer    |
 | [`leaderboard_entries`](#leaderboard_entries)         | yes for accounts: username, level, score (public)                     | all time boards for ever, weekly boards 28 days after the week | MongoDB TTL index (weekly only)          |
 | [`player_transfers`](#player_transfers)               | pseudonymous: guest id, account id and username                       | for ever                                                       | nothing                                  |
+| [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)           | until the player deletes the account                           | account deletion (CC-035)                |
+| [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                             | 30 days                                                        | MongoDB TTL index                        |
+| [`legacy_closures`](#legacy_closures)                 | pseudonymous: the id of a legacy row whose player deleted the account | for ever                                                       | nothing                                  |
 | [Server memory](#server-memory)                       | yes: IP addresses (rate limits, connections), keyed hashes            | seconds to 30 days, and never past a restart or deploy         | a restart, pruning                       |
 | [`cc.sid` cookie](#the-ccsid-cookie)                  | pseudonymous: a random session id                                     | 30 days after the last response                                | the browser, logout                      |
 | [`cc.sound`](#ccsound-in-localstorage)                | no                                                                    | until the browser's site data is cleared                       | the browser                              |
@@ -240,6 +243,74 @@ of every nightly backup.
 3. **Who can read it:** no client (the sign-in answer shows `carriedOver` once). The owner.
 4. **Kept for:** for ever, so the move is never done twice (ADR-014).
 5. **Deleted by:** nothing.
+
+### `accounts.birthYear`
+
+`apps/server/src/persistence/accountDao.js`, the rule in `packages/shared/src/ages.js` (CC-152)
+
+1. **Holds:** a four digit year on the account, only when the player chose one at sign-up or once in settings. Never
+   a date. No field means the age is unknown, which counts as a minor (ADR-028).
+2. **Personal data:** yes.
+3. **Who can read it:** the player (`GET /api/account`, the data export). It decides whether the username shows on
+   the public leaderboards: only adults' names show, everyone else's entry reads "Hidden player" (`hidden: true`),
+   worked out each time a board is read. The year itself is never sent to anyone else. The owner.
+4. **Kept for:** until the account is deleted.
+5. **Deleted by:** account deletion.
+
+### `account_deletions`
+
+`apps/server/src/persistence/accountDeletionDao.js`, rules in `apps/server/src/domain/accounts/playerDataComponent.js`
+(CC-035)
+
+1. **Holds:** per deleted account: `playerId`, `requestedAt`, `sweepAgainAt` (until the second sweep) and
+   `expiresAt`. No username, no email.
+2. **Personal data:** pseudonymous at most. The id leads nowhere once the deletion is done.
+3. **Who can read it:** no client. The owner.
+4. **Kept for:** 30 days, as long as the backups, so a restore can be followed by the same deletions again
+   ([runbooks/backup-restore.md](runbooks/backup-restore.md)). Housekeeping erases each deletion once more 5 minutes
+   after it was asked, which finishes one the server could not complete.
+5. **Deleted by:** MongoDB's TTL index on `expiresAt`.
+
+### `legacy_closures`
+
+`apps/server/src/persistence/accountDeletionDao.js` (CC-035)
+
+1. **Holds:** `legacyId` (the MongoDB id of a legacy `users` row) and `closedAt`, for each legacy player who deleted
+   the account made from their row. No email. The legacy row itself is never written.
+2. **Personal data:** pseudonymous. It says that the person behind a legacy row deleted their account.
+3. **Who can read it:** no client. The owner.
+4. **Kept for:** for ever, as long as the legacy row it closes. A login whose email only matches a closed row fails as
+   a wrong password would. Signing up with that email makes a new, empty account.
+5. **Deleted by:** nothing. It can go with the legacy `users` collection.
+
+### Deletion and export, store by store (CC-035)
+
+`POST /api/account/delete` and `POST /api/account/export`, both with the password, in
+`apps/server/src/domain/accounts/playerDataComponent.js`. This table is what each store does. The rows above still
+describe the stores as they were before CC-035 and are brought in line by CC-248.
+
+| Store                                       | Account deletion                                          | In the data export                     |
+| ------------------------------------------- | --------------------------------------------------------- | -------------------------------------- |
+| `accounts`                                  | deleted                                                   | username, email, created, birth year   |
+| `users` (legacy)                            | untouched, its id goes into `legacy_closures`             | no (read only, not the account's data) |
+| `player_sessions`                           | every session of the account deleted                      | no                                     |
+| `rooms`                                     | seat handed to a stand-in who leaves, a game is forfeited | no (rooms close within 24 hours)       |
+| `matches`                                   | anonymised when another person played, else deleted       | every match, others by name only       |
+| `player_progress`                           | deleted, with the guest markers naming the account        | yes                                    |
+| `player_stats`                              | deleted                                                   | yes                                    |
+| `player_achievements`                       | deleted                                                   | yes                                    |
+| `player_quests`                             | deleted                                                   | yes                                    |
+| `leaderboard_entries`                       | deleted                                                   | yes, without the player id             |
+| `player_transfers`                          | deleted                                                   | yes                                    |
+| server memory (login throttle, rate limits) | not reached, forgotten at the next deploy or restart      | no                                     |
+| server logs (Render)                        | not reached, ids only, 7 or 14 days                       | no                                     |
+| backups                                     | not reached, age out within 30 days                       | no                                     |
+
+1. **Anonymised matches.** A match another person played stays in their history. The deleted player's id is replaced
+   everywhere in it by a new random stand-in for that match (`deleted_<uuid>`, named "Deleted player"), so the
+   anonymous matches cannot be joined back into one history. A stand-in earns nothing (`models/deletedPlayer.js`).
+2. **Rooms.** In every room the player sits in, a new stand-in takes the seat and leaves at once, so a game that ends
+   later cannot write the player's data back.
 
 ## Server memory
 

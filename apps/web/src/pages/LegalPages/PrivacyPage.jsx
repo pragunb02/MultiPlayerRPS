@@ -41,6 +41,13 @@ export function PrivacyPage() {
             email address is for logging in and is never shown to other players.
           </li>
           <li>
+            <strong>Year of birth, if you want.</strong> When you sign up, or later in your profile, you can
+            give the year you were born. We keep the year only, never a date, and you can say nothing. We use
+            it for one thing: whether you are an adult. If you are under 18, or have not said, we treat you as
+            under 18 and show &quot;Hidden player&quot; instead of your username on the public leaderboards.
+            We do not accept an account from someone who tells us they are under 13.
+          </li>
+          <li>
             <strong>Games you play.</strong> For each finished match we keep the game, the players&apos; ids
             and names, every move and the result. That is your match history, and it lets a match be replayed
             if a result is ever questioned.
@@ -182,6 +189,36 @@ export function PrivacyPage() {
           about you, to correct it, or to delete your account and everything linked to it. Until a delete
           button exists, ask the owner at the contact address above. Depending on where you live, you may also
           complain to your data protection authority.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Deleting your account and downloading your data">
+        <p>
+          With an account, your{" "}
+          <Link to={paths.profile()} data-cc-control="legal.profile">
+            profile
+          </Link>{" "}
+          has two buttons, each asking for your password again:
+        </p>
+        <ul>
+          <li>
+            <strong>Download my data</strong> gives you a file (JSON) with your account, your games, progress,
+            achievements, quests and leaderboard places. Other players appear in it by their display name
+            only.
+          </li>
+          <li>
+            <strong>Delete my account</strong> deletes it at once, with your progress, achievements, quests,
+            leaderboard places and sessions, and signs you out everywhere. Games you played against other
+            people stay in their history with your name replaced by &quot;Deleted player&quot;. A game you are
+            in at that moment ends, and your opponent wins. Games against the computer only are deleted. If
+            your account came from the earlier version of the site, that old record is closed so it can never
+            sign in again.
+          </li>
+        </ul>
+        <p>
+          Every night the database is copied into an encrypted backup, and each backup is deleted after 30
+          days. So a deleted account is gone from the backups within 30 days. If we ever restore a backup, we
+          delete again every account that was deleted after it was made.
         </p>
       </LegalSection>
 
