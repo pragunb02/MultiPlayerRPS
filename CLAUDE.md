@@ -48,13 +48,19 @@ These rules come first. Where they differ from anything below, they win.
    changes in `docs/PROGRESS.md`. Nothing decided only in chat.
 6. **Steady, not frantic.** At most six builders run at once, and only on independent work (no shared files).
    Builders run lint, format, coverage and only their own browser tests locally; CI runs the full browser suite.
-   `main` stays green: a merge waits for every check, and a red `main` is fixed before anything else merges.
+   `main` stays green: a red `main` is fixed before anything else merges. **Fast mode (owner, 2026-10-18, until the
+   feature phase ends):** builders run only lint, format and the tests of the files they touch locally, and CI runs
+   the rest; branches need not be up to date with `main` to merge, and the coordinator runs `main`'s checks after
+   each merge and fixes a clash at once.
 7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (the growth plan, `docs/GROWTH.md`,
    added by PR #60) and the owner's admin console are in scope.
 8. **Two reviews before every merge.** Every pull request is reviewed before merge by two reviewer agents in
    parallel: a code reviewer (correctness, tests, the working agreement and comment style, regressions) and a
    security reviewer (auth, sessions, sockets, input, data exposure, secrets). Each finding is checked by a second
    agent that tries to refute it. Confirmed findings are fixed, or written down with a reason, before the merge.
+   **Fast mode:** docs-only PRs merge without review; code PRs get one combined reviewer plus the skeptic; PRs that
+   touch auth, sessions, sockets, input validation or personal data keep both reviewers. Full reviews return after
+   the feature phase.
 
 ### Workflow rules
 
