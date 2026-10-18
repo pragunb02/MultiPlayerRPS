@@ -3,8 +3,7 @@
 Every unit of work is a ticket with a permanent ID **`CC-###`** (ClassiCade). IDs are sequential, never reused,
 and don't encode the stage — a ticket can move between stages without changing its ID.
 
-**Next free ID: `CC-259`** — bump this when you add a ticket.
-**Next free ID: `CC-260`** — bump this when you add a ticket. (CC-256 is taken by PR #71.)
+**Next free ID: `CC-260`** — bump this when you add a ticket.
 
 | Field  | Values                                                                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

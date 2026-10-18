@@ -5,7 +5,7 @@
 |               |                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)                                                                                                                                                                                                                                                                        |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-259` · reading guide: [README.md](README.md)                                                                                                                                                                                                                                                                 |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-260` · reading guide: [README.md](README.md)                                                                                                                                                                                                                                                                 |
 | Current stage | **Stage 0 — Foundation**                                                                                                                                                                                                                                                                                                                                               |
 | Stage health  | 🟢 On track                                                                                                                                                                                                                                                                                                                                                            |
 | In progress   | Open PRs: #67 requests and presence (CC-036, CC-158 to CC-160, CC-207, CC-208), #69 identity duplicates (CC-245, CC-238), #71 invite flake and Sending (CC-237, CC-239), #77 plain fairness words (CC-254), #78 seats and match outbox (CC-111, CC-112), #65 CI test infrastructure (CC-203, CC-184). Also CC-049 error tracking and alerts, CC-236 fast browser suite |
@@ -17,7 +17,7 @@
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
 | S0 Foundation   | 🟡 In progress | 61 / 79      |
-| S1 MVP launch   | 🟡 Started     | 32 / 103     |
+| S1 MVP launch   | 🟡 Started     | 32 / 104     |
 | S2 Retention    | ⚪ Not started | 4 / 55       |
 | S3 Monetization | ⚪ Not started | 0 / 10       |
 | S4 Scale        | ⚪ Not started | 0 / 6        |
