@@ -59,7 +59,7 @@ const FACTS = [
   {
     fact: "a signed-in session also ends 90 days after signing in",
     data: "An account's session also stops working 90 days after signing in",
-    page: /A signed-in session also ends 90 days after you sign in, when you change your password, and when you sign out your other devices/,
+    page: /A signed-in session also ends 90 days after you sign in, and when the password is changed or "sign out other devices" is used on another device/,
   },
   {
     fact: "logs hold player ids and room codes but no addresses or emails from the app",
