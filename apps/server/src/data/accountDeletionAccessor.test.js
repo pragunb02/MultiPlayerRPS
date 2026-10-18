@@ -16,7 +16,7 @@ describe("accountDeletionAccessor", () => {
 
     expect(await deletions.listDue({ now: AT + 4, limit: 5 })).toEqual([]);
     const due = await deletions.listDue({ now: AT + 5, limit: 5 });
-    expect(due).toEqual([{ playerId: PLAYER, requestedAt: AT }]);
+    expect(due).toEqual([{ playerId: PLAYER, requestedAt: AT, formerIds: [] }]);
     expect(Object.isFrozen(due)).toBe(true);
     await deletions.markSwept(PLAYER);
     expect(await deletions.listDue({ now: AT + 5, limit: 5 })).toEqual([]);

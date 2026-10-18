@@ -247,6 +247,46 @@ describe("a deletion that cannot erase everything at once (CC-035)", () => {
   });
 });
 
+describe("a game recorded under the player's guest id after they signed up (CC-035 review)", () => {
+  it("is erased with the account, though the guest's transfer record is gone by then", async () => {
+    server = await startTestServer();
+    const guest = await call("POST", "/session/guest");
+    const guestId = guest.body.identity.id;
+    const signup = await call("POST", "/auth/signup", {
+      body: { username: "riya", email: "riya@example.com", password: PASSWORD },
+      cookie: guest.cookie,
+    });
+    expect(signup.status).toBe(201);
+    // The pipeline recorded this game under the guest id after the transfer had run, and has not judged it yet.
+    const late = {
+      matchId: "00000000-0000-4000-8000-0000000000e1",
+      roomCode: "ROOM22",
+      gameId: "race",
+      options: {},
+      seed: 1,
+      players: [
+        { playerId: guestId, displayName: guest.body.identity.displayName },
+        { playerId: "guest_00000000-0000-4000-8000-0000000000ff", displayName: "Bob" },
+      ],
+      log: [],
+      result: { result: "win", winners: [guestId], reason: "reached-target" },
+      startedAt: 1,
+      endedAt: 2,
+    };
+    await server.matchComponent.record(late);
+    await server.progressionComponent.applyMatch({ ...late, credit: { notCounted: [] } });
+
+    expect(
+      (await call("POST", "/account/delete", { body: { password: PASSWORD }, cookie: signup.cookie })).status,
+    ).toBe(204);
+
+    const stored = await server.matchComponent.getById(late.matchId);
+    expect(JSON.stringify(stored)).not.toContain(guestId);
+    expect(JSON.stringify(stored)).not.toContain(guest.body.identity.displayName);
+    expect((await server.progressionComponent.getProgress(guestId)).matchesPlayed).toBe(0);
+  });
+});
+
 describe("createAccountRoutes", () => {
   it("fails fast without its dependencies", () => {
     expect(() => createAccountRoutes({})).toThrow(TypeError);

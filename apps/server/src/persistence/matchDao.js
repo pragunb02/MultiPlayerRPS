@@ -138,12 +138,13 @@ export function createMatchDao({ connection }) {
      * Replaces a match with its renamed copy — only while `from` is still one of its players, so renaming twice
      * (or concurrently) changes it once.
      *
-     * @param {{ matchId: string, from: string, doc: Omit<MatchDoc, "schemaVersion"> }} rename
+     * @param {{ matchId: string, from: string, doc: Omit<MatchDoc, "schemaVersion">, unjudged?: boolean }} rename
+     *   `unjudged`: only while the stored match has no fair play verdict yet (CC-035)
      * @returns {Promise<boolean>} whether the match was renamed now
      */
-    async renamePlayer({ matchId, from, doc }) {
+    async renamePlayer({ matchId, from, doc, unjudged = false }) {
       const { matchedCount } = await Match.replaceOne(
-        { matchId, "players.playerId": from },
+        { matchId, "players.playerId": from, ...(unjudged && { credit: { $exists: false } }) },
         { ...doc, matchId, schemaVersion: MATCH_SCHEMA_VERSION },
       );
       return matchedCount === 1;

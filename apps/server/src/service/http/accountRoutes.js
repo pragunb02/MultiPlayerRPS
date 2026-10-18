@@ -136,7 +136,9 @@ export function createAccountRoutes({
     const { password } = requireExactly(req.body, ["password"]);
     const { id: playerId } = requireIdentity(req.session);
     const at = now();
-    await noteWrongPassword(res, () => playerDataComponent.closeAccount({ playerId, password, now: at }));
+    const { formerIds } = await noteWrongPassword(res, () =>
+      playerDataComponent.closeAccount({ playerId, password, now: at }),
+    );
     // The account is gone. Its connections are cut before anything else, so no device can play on under it.
     onAccountDeleted(playerId);
     const sessionId = req.sessionID;
@@ -144,7 +146,7 @@ export function createAccountRoutes({
     res.clearCookie(SESSION_COOKIE_NAME);
     onSessionEnded(sessionId);
     try {
-      const { erased } = await playerDataComponent.eraseAccount({ playerId, now: at });
+      const { erased } = await playerDataComponent.eraseAccount({ playerId, formerIds, now: at });
       req.log.info({ playerId, erased }, "account deleted");
     } catch (err) {
       // The deletion is recorded and the account closed, so the sweeps finish it within minutes (CC-035).

@@ -262,7 +262,8 @@ of every nightly backup.
 `apps/server/src/persistence/accountDeletionDao.js`, rules in `apps/server/src/domain/accounts/playerDataComponent.js`
 (CC-035)
 
-1. **Holds:** per deleted account: `playerId`, `requestedAt`, `sweepAgainAt` (until the second sweep) and
+1. **Holds:** per deleted account: `playerId`, `formerIds` (the guest ids the player had before signing up, worked
+   out once so every sweep can erase under them too), `requestedAt`, `sweepAgainAt` (until the last sweep) and
    `expiresAt`. No username, no email.
 2. **Personal data:** pseudonymous at most. The id leads nowhere once the deletion is done.
 3. **Who can read it:** no client. The owner.

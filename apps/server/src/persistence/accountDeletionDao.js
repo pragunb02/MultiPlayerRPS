@@ -4,6 +4,7 @@ import mongoose from "mongoose";
  * @typedef {Object} AccountDeletionDoc   persistence object: one account that was deleted (CC-035)
  * @property {string} playerId              the deleted account's player id, which leads nowhere any more
  * @property {Date} requestedAt
+ * @property {string[]} formerIds            the guest ids the player had before signing up, worked out once
  * @property {Date} [sweepAgainAt]          when housekeeping erases once more. Gone after that sweep
  * @property {Date} expiresAt               MongoDB removes the record after this time
  */
@@ -12,6 +13,7 @@ const deletionSchema = new mongoose.Schema(
   {
     playerId: { type: String, required: true, unique: true },
     requestedAt: { type: Date, required: true },
+    formerIds: { type: [String], default: undefined },
     sweepAgainAt: { type: Date },
     expiresAt: { type: Date, required: true },
   },
@@ -46,12 +48,12 @@ export function createAccountDeletionDao({ connection }) {
     /**
      * Records a deletion. A player recorded already keeps the first record, so asking twice changes nothing.
      *
-     * @param {{ playerId: string, requestedAt: Date, sweepAgainAt: Date, expiresAt: Date }} deletion
+     * @param {{ playerId: string, requestedAt: Date, sweepAgainAt: Date, expiresAt: Date, formerIds?: string[] }} deletion
      */
-    async insert({ playerId, requestedAt, sweepAgainAt, expiresAt }) {
+    async insert({ playerId, requestedAt, sweepAgainAt, expiresAt, formerIds = [] }) {
       await Deletion.updateOne(
         { playerId },
-        { $setOnInsert: { playerId, requestedAt, sweepAgainAt, expiresAt } },
+        { $setOnInsert: { playerId, requestedAt, sweepAgainAt, expiresAt, formerIds } },
         { upsert: true },
       );
     },
@@ -60,13 +62,19 @@ export function createAccountDeletionDao({ connection }) {
      * Deletions whose second sweep is due, the earliest first.
      *
      * @param {{ now: Date, limit: number }} query
-     * @returns {Promise<Array<{ playerId: string, requestedAt: Date }>>}
+     * @returns {Promise<Array<{ playerId: string, requestedAt: Date, formerIds: string[] }>>}
      */
-    listDue: ({ now, limit }) =>
-      Deletion.find({ sweepAgainAt: { $lte: now } }, { _id: 0, playerId: 1, requestedAt: 1 })
+    async listDue({ now, limit }) {
+      const docs = await Deletion.find(
+        { sweepAgainAt: { $lte: now } },
+        { _id: 0, playerId: 1, requestedAt: 1, formerIds: 1 },
+      )
         .sort({ sweepAgainAt: 1 })
         .limit(limit)
-        .lean(),
+        .lean();
+      // A record written before the guest ids were kept has none.
+      return docs.map(({ formerIds = [], ...doc }) => ({ ...doc, formerIds }));
+    },
 
     /** @param {string} playerId */
     async markSwept(playerId) {

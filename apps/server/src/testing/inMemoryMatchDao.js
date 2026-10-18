@@ -84,9 +84,12 @@ export function createInMemoryMatchDao() {
         .map(copy);
     },
 
-    async renamePlayer({ matchId, from, doc }) {
+    async renamePlayer({ matchId, from, doc, unjudged = false }) {
       const stored = matches.get(matchId);
       if (stored === undefined || !stored.players.some((p) => p.playerId === from)) {
+        return false;
+      }
+      if (unjudged && stored.credit !== undefined) {
         return false;
       }
       matches.set(matchId, copy({ ...doc, matchId, schemaVersion: 1 }));

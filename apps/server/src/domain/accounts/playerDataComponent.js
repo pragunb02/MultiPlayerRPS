@@ -47,18 +47,33 @@ const SWEEP_BATCH = 20;
  *   accountComponent: Pick<ReturnType<typeof import("./accountComponent.js").createAccountComponent>, "confirmPassword" | "close" | "profileOf">,
  *   accountDeletionAccessor: Pick<ReturnType<typeof import("../../data/accountDeletionAccessor.js").createAccountDeletionAccessor>, "record" | "listDue" | "markSwept" | "sweepAgainAt">,
  *   participants: ReadonlyArray<PlayerDataParticipant>,
+ *   formerIdsOf: (query: { playerId: string }) => Promise<ReadonlyArray<string>>,  the guest ids the player had
+ *     before signing up. Their data is erased too
  * }} deps
  */
-export function createPlayerDataComponent({ accountComponent, accountDeletionAccessor, participants }) {
+export function createPlayerDataComponent({
+  accountComponent,
+  accountDeletionAccessor,
+  participants,
+  formerIdsOf,
+}) {
   assertDefined(accountComponent, "accountComponent");
   assertDefined(accountDeletionAccessor, "accountDeletionAccessor");
+  assertFunction(formerIdsOf, "formerIdsOf");
   participants.forEach(({ name, erasePlayer }) => assertFunction(erasePlayer, `${name}.erasePlayer`));
 
-  /** Every participant in order. Stops at the first failure: the next sweep runs it all again. */
-  async function eraseStores({ playerId, now }) {
+  /**
+   * Every participant in order, under the account id and then under each guest id the player had: a game can be
+   * stored under a guest id after its history moved to the account. Stops at the first failure: the next sweep
+   * runs it all again.
+   */
+  async function eraseStores({ playerId, formerIds, now }) {
     const erased = {};
     for (const participant of participants) {
-      Object.assign(erased, (await participant.erasePlayer({ playerId, now })).erased);
+      for (const id of [playerId, ...formerIds]) {
+        const { erased: counts } = await participant.erasePlayer({ playerId: id, now });
+        for (const [name, count] of Object.entries(counts)) erased[name] = (erased[name] ?? 0) + count;
+      }
     }
     return erased;
   }
@@ -69,22 +84,31 @@ export function createPlayerDataComponent({ accountComponent, accountDeletionAcc
    */
   async function closeAccount({ playerId, password, now }) {
     await accountComponent.confirmPassword({ playerId, password });
+    // Worked out once, before the records that know them are erased, and kept for every later sweep.
+    const formerIds = [...(await formerIdsOf({ playerId }))];
     await accountDeletionAccessor.record({
       playerId,
       requestedAt: now,
       sweepAgainAt: now + SWEEP_AGAIN_AFTER_MS,
       expiresAt: now + DELETION_RECORD_KEPT_MS,
+      formerIds,
     });
     await accountComponent.close({ playerId, now });
+    return { formerIds };
   }
 
-  /** @param {{ playerId: string, now: number }} input */
-  const eraseAccount = async ({ playerId, now }) => ({ erased: await eraseStores({ playerId, now }) });
+  /** @param {{ playerId: string, formerIds: ReadonlyArray<string>, now: number }} input */
+  const eraseAccount = async ({ playerId, formerIds, now }) => ({
+    erased: await eraseStores({ playerId, formerIds, now }),
+  });
 
   return Object.freeze({
     /**
      * Checks the password, records the deletion and deletes the account itself. From here on no session of the
-     * account works, and the deletion is finished for sure: by `eraseAccount` now, or by the sweeps.
+     * account works, and the deletion is finished for sure: by `eraseAccount` now, or by the sweeps. Answers the
+     * guest ids the player had, for `eraseAccount`.
+     *
+     * @returns {Promise<{ formerIds: string[] }>}
      */
     closeAccount,
 
@@ -102,8 +126,8 @@ export function createPlayerDataComponent({ accountComponent, accountDeletionAcc
      * @returns {Promise<{ erased: Record<string, number> }>}
      */
     async deleteAccount({ playerId, password, now }) {
-      await closeAccount({ playerId, password, now });
-      return eraseAccount({ playerId, now });
+      const { formerIds } = await closeAccount({ playerId, password, now });
+      return eraseAccount({ playerId, formerIds, now });
     },
 
     /**
@@ -116,13 +140,13 @@ export function createPlayerDataComponent({ accountComponent, accountDeletionAcc
     async sweepDue({ now }) {
       const completed = [];
       const failed = [];
-      for (const { playerId, requestedAt } of await accountDeletionAccessor.listDue({
+      for (const { playerId, requestedAt, formerIds } of await accountDeletionAccessor.listDue({
         now,
         limit: SWEEP_BATCH,
       })) {
         try {
           await accountComponent.close({ playerId, now });
-          await eraseStores({ playerId, now });
+          await eraseStores({ playerId, formerIds, now });
           if (now < requestedAt + SWEEP_FOR_MS) {
             await accountDeletionAccessor.sweepAgainAt({ playerId, at: now + SWEEP_AGAIN_AFTER_MS });
           } else {

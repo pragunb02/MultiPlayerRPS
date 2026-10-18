@@ -4,6 +4,7 @@ import { assertDefined } from "../utils/assert.js";
  * @typedef {Object} AccountDeletion   domain model (frozen, times in ms): an account that was deleted (CC-035)
  * @property {string} playerId
  * @property {number} requestedAt
+ * @property {ReadonlyArray<string>} formerIds   the guest ids the player had before signing up
  */
 
 /**
@@ -18,11 +19,12 @@ export function createAccountDeletionAccessor({ accountDeletionDao }) {
     /**
      * Records a deletion. A player recorded already keeps the first record.
      *
-     * @param {{ playerId: string, requestedAt: number, sweepAgainAt: number, expiresAt: number }} deletion
+     * @param {{ playerId: string, requestedAt: number, sweepAgainAt: number, expiresAt: number, formerIds?: ReadonlyArray<string> }} deletion
      */
-    record: ({ playerId, requestedAt, sweepAgainAt, expiresAt }) =>
+    record: ({ playerId, requestedAt, sweepAgainAt, expiresAt, formerIds = [] }) =>
       accountDeletionDao.insert({
         playerId,
+        formerIds: [...formerIds],
         requestedAt: new Date(requestedAt),
         sweepAgainAt: new Date(sweepAgainAt),
         expiresAt: new Date(expiresAt),
@@ -35,8 +37,12 @@ export function createAccountDeletionAccessor({ accountDeletionDao }) {
     async listDue({ now, limit }) {
       const docs = await accountDeletionDao.listDue({ now: new Date(now), limit });
       return Object.freeze(
-        docs.map(({ playerId, requestedAt }) =>
-          Object.freeze({ playerId, requestedAt: requestedAt.getTime() }),
+        docs.map(({ playerId, requestedAt, formerIds }) =>
+          Object.freeze({
+            playerId,
+            requestedAt: requestedAt.getTime(),
+            formerIds: Object.freeze([...formerIds]),
+          }),
         ),
       );
     },

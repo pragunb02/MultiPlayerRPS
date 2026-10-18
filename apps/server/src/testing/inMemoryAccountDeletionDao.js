@@ -6,9 +6,15 @@ export function createInMemoryAccountDeletionDao() {
   return Object.freeze({
     ensureIndexes: async () => {},
 
-    async insert({ playerId, requestedAt, sweepAgainAt, expiresAt }) {
+    async insert({ playerId, requestedAt, sweepAgainAt, expiresAt, formerIds = [] }) {
       if (!deletions.has(playerId)) {
-        deletions.set(playerId, { playerId, requestedAt, sweepAgainAt, expiresAt });
+        deletions.set(playerId, {
+          playerId,
+          requestedAt,
+          sweepAgainAt,
+          expiresAt,
+          formerIds: [...formerIds],
+        });
       }
     },
 
@@ -17,7 +23,11 @@ export function createInMemoryAccountDeletionDao() {
         .filter((entry) => entry.sweepAgainAt !== undefined && entry.sweepAgainAt <= now)
         .sort((a, b) => a.sweepAgainAt - b.sweepAgainAt)
         .slice(0, limit)
-        .map(({ playerId, requestedAt }) => ({ playerId, requestedAt }));
+        .map(({ playerId, requestedAt, formerIds }) => ({
+          playerId,
+          requestedAt,
+          formerIds: [...formerIds],
+        }));
     },
 
     async markSwept(playerId) {

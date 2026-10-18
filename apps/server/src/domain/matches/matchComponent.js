@@ -141,7 +141,7 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
       match.players.map((p, index) => [p.playerId, p.playerId === playerId ? "you" : `player-${index + 1}`]),
     );
     const label = (id) => labels.get(id);
-    return {
+    const shown = {
       matchId: match.matchId,
       gameId: match.gameId,
       options: match.options,
@@ -159,6 +159,9 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
         at: new Date(at).toISOString(),
       })),
     };
+    // Any other place a log entry names a player (who asked, who ran out of time) gets the label too, so no kind
+    // of entry, now or later, can carry another player's id into the export.
+    return [...labels].reduce((relabelled, [id, name]) => renamePlayer(relabelled, id, name), shown);
   }
 
   /** Whether another person played in the match, so it stays in their history when this player is deleted. */
@@ -318,9 +321,12 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
           }
           const stand = deletedPlayer(newUuid());
           erased.matchesAnonymised += Number(
+            // A match not judged when it was read is only replaced while it is still not judged, so a verdict
+            // written meanwhile for the other player is never lost. The next read then anonymises it with it.
             await matchAccessor.replaceRenamed({
               from: playerId,
               match: anonymisedMatch(match, { playerId, stand }),
+              unjudged: match.credit === undefined,
             }),
           );
         }

@@ -157,11 +157,12 @@ export function createMatchAccessor({ matchDao }) {
     /**
      * Stores a match's renamed copy, only while `from` still plays in the stored one.
      *
-     * @param {{ from: string, match: Match }} rename
+     * @param {{ from: string, match: Match, unjudged?: boolean }} rename  `unjudged`: only while the stored match
+     *   has no fair play verdict yet
      * @returns {Promise<boolean>} whether it was renamed now
      */
-    replaceRenamed({ from, match }) {
-      return matchDao.renamePlayer({ matchId: match.matchId, from, doc: toDoc(match) });
+    replaceRenamed({ from, match, unjudged = false }) {
+      return matchDao.renamePlayer({ matchId: match.matchId, from, doc: toDoc(match), unjudged });
     },
 
     /**

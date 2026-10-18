@@ -37,7 +37,6 @@ import {
   identityFollowers,
   keepFinishedGameIn,
   matchPipelineSteps,
-  outboxErasure,
   roomErasure,
 } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
@@ -233,9 +232,10 @@ export function createTestApp({
   const playerDataComponent = createPlayerDataComponent({
     accountComponent,
     accountDeletionAccessor,
+    formerIdsOf: playerTransferComponent.guestsOf,
     participants: dataParticipants([
       roomErasure({ roomComponent, domainEvents }),
-      outboxErasure({ outbox, playerTransferComponent }),
+      { name: "pendingMatches", erasePlayer: outbox.erasePlayer },
       {
         name: "sessions",
         erasePlayer: async ({ playerId }) => ({

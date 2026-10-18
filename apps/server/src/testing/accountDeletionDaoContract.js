@@ -23,8 +23,23 @@ export function runAccountDeletionDaoContract(createDao) {
 
     expect(await dao.listDue({ now: later(4), limit: 10 })).toEqual([]);
     expect(await dao.listDue({ now: later(5), limit: 10 })).toEqual([
-      { playerId: "user_0123456789abcdef01234567", requestedAt: AT },
+      { playerId: "user_0123456789abcdef01234567", requestedAt: AT, formerIds: [] },
     ]);
+  });
+
+  it("keeps the guest ids the player had on the record, and none when there were none (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insert(deletion({ formerIds: ["guest_old"] }));
+    await dao.insert(deletion({ playerId: "user_b" }));
+
+    const due = await dao.listDue({ now: later(5), limit: 10 });
+
+    expect(due).toEqual(
+      expect.arrayContaining([
+        { playerId: "user_0123456789abcdef01234567", requestedAt: AT, formerIds: ["guest_old"] },
+        { playerId: "user_b", requestedAt: AT, formerIds: [] },
+      ]),
+    );
   });
 
   it("keeps the first record when the same player is recorded again", async () => {
@@ -34,7 +49,7 @@ export function runAccountDeletionDaoContract(createDao) {
     await dao.insert(deletion({ requestedAt: later(1), sweepAgainAt: later(60) }));
 
     expect(await dao.listDue({ now: later(5), limit: 10 })).toEqual([
-      { playerId: "user_0123456789abcdef01234567", requestedAt: AT },
+      { playerId: "user_0123456789abcdef01234567", requestedAt: AT, formerIds: [] },
     ]);
   });
 

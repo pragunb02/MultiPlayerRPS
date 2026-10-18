@@ -322,4 +322,19 @@ export function runMatchDaoContract(createDao) {
     expect(third).toEqual([]);
     expect(await dao.listPageByPlayer("guest_nobody", { limit: 2 })).toEqual([]);
   });
+
+  it("renames a match not judged yet only while it is still not judged (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insert(matchDoc());
+    const renamed = {
+      ...matchDoc(),
+      players: [{ playerId: "deleted_1", displayName: "Deleted player" }, matchDoc().players[1]],
+    };
+    await dao.judgeOnce({ matchId: matchDoc().matchId, credit: { notCounted: [] } });
+
+    expect(
+      await dao.renamePlayer({ matchId: matchDoc().matchId, from: "guest_a", doc: renamed, unjudged: true }),
+    ).toBe(false);
+    expect(await dao.renamePlayer({ matchId: matchDoc().matchId, from: "guest_a", doc: renamed })).toBe(true);
+  });
 }

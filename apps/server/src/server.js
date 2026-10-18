@@ -498,25 +498,6 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
 }
 
 /**
- * The match pipeline's outbox takes part in deleting an account (CC-035): its records name the player by their
- * account id, and the games they played as a guest before signing up by that guest id. Both get stand-ins. It runs
- * before the guest transfer records, which say which guest ids those are, are erased.
- *
- * @param {{
- *   outbox: Pick<ReturnType<typeof createMatchOutboxComponent>, "erasePlayer">,
- *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "guestsOf">,
- * }} deps
- * @returns {import("./domain/accounts/playerDataComponent.js").PlayerDataParticipant}
- */
-export function outboxErasure({ outbox, playerTransferComponent }) {
-  return {
-    name: "pendingMatches",
-    erasePlayer: async ({ playerId }) =>
-      outbox.erasePlayer({ playerId, formerIds: await playerTransferComponent.guestsOf({ playerId }) }),
-  };
-}
-
-/**
  * Composition root: builds every layer bottom-up, wires dependencies, and starts listening.
  * The only module allowed to know about all layers.
  *
@@ -712,9 +693,10 @@ export async function startServer({
   const playerDataComponent = createPlayerDataComponent({
     accountComponent,
     accountDeletionAccessor,
+    formerIdsOf: playerTransferComponent.guestsOf,
     participants: [
       roomErasure({ roomComponent, domainEvents }),
-      outboxErasure({ outbox, playerTransferComponent }),
+      { name: "pendingMatches", erasePlayer: outbox.erasePlayer },
       {
         name: "sessions",
         erasePlayer: async ({ playerId }) => ({

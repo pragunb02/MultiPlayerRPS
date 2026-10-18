@@ -577,3 +577,53 @@ describe("matchComponent export and erasure details (CC-035)", () => {
     expect(stored.credit.botXp[0]).not.toHaveProperty("withdrawnFrom");
   });
 });
+
+describe("matchComponent export leaves no other player's id anywhere (CC-035 review)", () => {
+  it("labels the ids in every log entry, an accepted request and an idle loss included", async () => {
+    const matches = setup();
+    const log = [
+      { kind: "agree", type: "draw", from: "guest_b", playerId: "guest_a", at: T0 + 1 },
+      { kind: "idle", playerIds: ["guest_b"], at: T0 + 2 },
+    ];
+    await matches.recordFinished({ room: room({ game: { ...room().game, log } }), outcome: WIN_A });
+
+    const [exported] = await matches.exportPlayer({ playerId: "guest_a" });
+
+    expect(JSON.stringify(exported)).not.toContain("guest_b");
+    expect(exported.log).toEqual([
+      { kind: "agree", type: "draw", from: "player-2", player: "you", at: new Date(T0 + 1).toISOString() },
+      { kind: "idle", playerIds: ["player-2"], at: new Date(T0 + 2).toISOString() },
+    ]);
+  });
+});
+
+describe("matchComponent anonymising beside a fair play verdict written meanwhile (CC-035 review)", () => {
+  it("keeps the opponent's verdict when the match is judged between the read and the write", async () => {
+    const accessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
+    let judgedMeanwhile = false;
+    const racing = {
+      ...accessor,
+      async replaceRenamed(rename) {
+        if (!judgedMeanwhile) {
+          judgedMeanwhile = true;
+          await accessor.judgeOnce({
+            matchId: rename.match.matchId,
+            credit: { notCounted: [{ playerId: "guest_b", reason: "hourly-limit" }] },
+          });
+        }
+        return accessor.replaceRenamed(rename);
+      },
+    };
+    const matches = createMatchComponent({
+      matchAccessor: racing,
+      newUuid: () => "00000000-0000-4000-8000-0000000000d1",
+    });
+    await matches.recordFinished({ room: room(), outcome: WIN_A });
+
+    await matches.erasePlayer({ playerId: "guest_a" });
+
+    const stored = await accessor.getById(room().game.matchId);
+    expect(stored.credit).toEqual({ notCounted: [{ playerId: "guest_b", reason: "hourly-limit" }] });
+    expect(stored.players[0].playerId).toBe("deleted_00000000-0000-4000-8000-0000000000d1");
+  });
+});

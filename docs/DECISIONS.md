@@ -91,12 +91,15 @@ the owner may change it.
      longer.
   2. **Every store of DATA.md takes part**, as ADR-014 does for guests: each component that stores data by player id
      exposes `erasePlayer` (and `exportPlayer`), and `playerDataComponent` runs them in the order the composition
-     root lists them: rooms, the match pipeline's outbox (ADR-047, under the account id and every guest id the
-     player had), sessions, matches, progress, gamification, leaderboards, guest transfers. The player's sockets are
+     root lists them: rooms, the match pipeline's outbox (ADR-047), sessions, matches, progress, gamification,
+     leaderboards, guest transfers. Each runs under the account id and then under every guest id the player had
+     before signing up: those ids are worked out once, before anything is erased, and kept on the deletion record,
+     because a game can be stored under a guest id after its history moved. The player's sockets are
      cut as soon as the account itself is closed, before the stores are erased, so no device plays on under it.
   3. **Shared matches are anonymised, not deleted.** The opponent keeps the game. The deleted player's id becomes a
      new random stand-in for each match (`deleted_<uuid>`, "Deleted player"), and the guest id the fair play credit
-     may name (`withdrawnFrom`) is dropped, so nothing joins the anonymous matches back together. A match no other
+     may name (`withdrawnFrom`) is dropped, so nothing joins the anonymous matches back together. A match read
+     before its verdict is only replaced while it still has none, so the opponent's verdict is never lost. A match no other
      person played is deleted. In open rooms a stand-in takes the seat and leaves, so a running game is forfeited to the opponent. A
      stand-in earns nothing.
   4. **The legacy row stays read only and is closed.** Its id goes into `legacy_closures`, so the old password cannot
@@ -106,7 +109,8 @@ the owner may change it.
      pipeline's retries (about 13 minutes), so a game that was ending at that moment cannot write the player back.
      A restore uses the records to delete those accounts again. If erasing fails halfway, the account is closed all
      the same and the sweeps finish the rest.
-  6. **Export needs the password too**, because it carries the email, which no client sees otherwise. At most 3
+  6. **Export needs the password too**, because it carries the email, which no client sees otherwise. Every player
+     id anywhere in an exported match becomes "you" or "player-2" and so on. At most 3
      exports given an hour per account, and at most 5 wrong passwords in 15 minutes for export and deletion
      together. Neither limit counts the other's refusals. Other people appear by display name only, never by id.
   7. **Only a year of birth, optional, from a neutral picker** that starts at "I'd rather not say" and lists every

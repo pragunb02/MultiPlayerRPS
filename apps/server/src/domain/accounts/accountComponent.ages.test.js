@@ -214,6 +214,24 @@ describe("accountComponent password checks and closing (CC-035)", () => {
     ).rejects.toMatchObject({ constructor: UnauthorizedError, message: "Invalid email or password" });
   });
 
+  it("closes every legacy row of the email, also a second one in other capitals", async () => {
+    const twin = { ...LEGACY_SAM, username: "Sam2", email: "SAM@example.com" };
+    const { accounts, deletions } = setup({ legacyUsers: [LEGACY_SAM, twin] });
+    const { identity } = await accounts.login({
+      email: "sam@example.com",
+      password: LEGACY_PASSWORD,
+      now: NOW,
+    });
+
+    await accounts.close({ playerId: identity.id, now: NOW });
+
+    expect(await deletions.isLegacyClosed("legacy-0")).toBe(true);
+    expect(await deletions.isLegacyClosed("legacy-1")).toBe(true);
+    await expect(
+      accounts.login({ email: "SAM@example.com", password: LEGACY_PASSWORD, now: NOW }),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+
   it("lets the email of a closed legacy row sign up afresh, with an empty account", async () => {
     const { accounts } = setup({ legacyUsers: [LEGACY_SAM] });
     const { identity } = await accounts.login({
@@ -252,6 +270,7 @@ describe("accountComponent.close and storage failures (CC-035)", () => {
       accountAccessor: { getById: async () => Promise.reject(failure) },
       legacyUserAccessor: { findByEmail: async () => [] },
       passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }),
+      legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
       accountDeletionAccessor: { closeLegacy: async () => {}, isLegacyClosed: async () => false },
     });
 

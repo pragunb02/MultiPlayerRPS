@@ -52,6 +52,7 @@ function setup({ participants, password = "right" } = {}) {
     accountComponent: accounts,
     accountDeletionAccessor: deletions,
     participants: list,
+    formerIdsOf: async () => [],
   });
   return { component, accounts, calls, deletions, participants: list };
 }
@@ -65,7 +66,7 @@ describe("playerDataComponent.deleteAccount (CC-035)", () => {
     expect(calls).toEqual(["account", "rooms", "matches", "progress"]);
     expect(result).toEqual({ erased: { rooms: 1, matches: 1, progress: 1 } });
     expect(await deletions.listDue({ now: NOW + SWEEP_AGAIN_AFTER_MS, limit: 5 })).toEqual([
-      { playerId: PLAYER, requestedAt: NOW },
+      { playerId: PLAYER, requestedAt: NOW, formerIds: [] },
     ]);
   });
 
@@ -202,9 +203,9 @@ describe("playerDataComponent closing and erasing apart (CC-035)", () => {
   it("closes the account first, so the caller can cut the player's sockets before the stores are erased", async () => {
     const { component, calls } = setup();
 
-    await component.closeAccount({ playerId: PLAYER, password: "right", now: NOW });
+    const { formerIds } = await component.closeAccount({ playerId: PLAYER, password: "right", now: NOW });
     expect(calls).toEqual(["account"]);
-    const { erased } = await component.eraseAccount({ playerId: PLAYER, now: NOW });
+    const { erased } = await component.eraseAccount({ playerId: PLAYER, formerIds, now: NOW });
 
     expect(calls).toEqual(["account", "rooms", "matches", "progress"]);
     expect(erased).toEqual({ rooms: 1, matches: 1, progress: 1 });
@@ -240,5 +241,42 @@ describe("playerDataComponent closing and erasing apart (CC-035)", () => {
     }
 
     expect(SWEEP_FOR_MS).toBeGreaterThan(total + SWEEP_AGAIN_AFTER_MS);
+  });
+});
+
+describe("playerDataComponent and the guest ids the player had (CC-035 review)", () => {
+  it("works the guest ids out once, keeps them, and erases under them too on every sweep", async () => {
+    const erasedIds = [];
+    const participant = {
+      name: "matches",
+      erasePlayer: vi.fn(async ({ playerId }) => {
+        erasedIds.push(playerId);
+        return { erased: {} };
+      }),
+    };
+    const deletions = createAccountDeletionAccessor({
+      accountDeletionDao: createInMemoryAccountDeletionDao(),
+    });
+    let guests = ["guest_old"];
+    const component = createPlayerDataComponent({
+      accountComponent: {
+        confirmPassword: async () => ACCOUNT,
+        close: async () => ({ closed: true }),
+        profileOf: async () => ({ ageGroup: "adult" }),
+      },
+      accountDeletionAccessor: deletions,
+      participants: [participant],
+      // The transfer records go in the first pass, so later asks find none.
+      formerIdsOf: vi.fn(async () => {
+        const found = guests;
+        guests = [];
+        return found;
+      }),
+    });
+
+    await component.deleteAccount({ playerId: PLAYER, password: "right", now: NOW });
+    await component.sweepDue({ now: NOW + SWEEP_AGAIN_AFTER_MS });
+
+    expect(erasedIds).toEqual([PLAYER, "guest_old", PLAYER, "guest_old"]);
   });
 });
