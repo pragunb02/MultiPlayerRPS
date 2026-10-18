@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createAccountDeletionAccessor } from "../../data/accountDeletionAccessor.js";
 import { createInMemoryAccountDeletionDao } from "../../testing/inMemoryAccountDeletionDao.js";
 import { ValidationError } from "../../utils/errors.js";
+import { MATCH_RETRY_POLICY, delayAfter } from "../matches/matchOutboxComponent.js";
 import {
   createPlayerDataComponent,
   DELETION_RECORD_KEPT_MS,
   SWEEP_AGAIN_AFTER_MS,
+  SWEEP_FOR_MS,
 } from "./playerDataComponent.js";
 
 const NOW = Date.UTC(2026, 9, 18, 10);
@@ -101,7 +103,7 @@ describe("playerDataComponent.deleteAccount (CC-035)", () => {
 });
 
 describe("playerDataComponent.sweepDue (CC-035)", () => {
-  it("erases every due deletion again, once, and reports what it did", async () => {
+  it("erases every due deletion again when it is due, and reports what it did", async () => {
     const { component, calls } = setup();
     await component.deleteAccount({ playerId: PLAYER, password: "right", now: NOW });
     calls.length = 0;
@@ -115,7 +117,7 @@ describe("playerDataComponent.sweepDue (CC-035)", () => {
       failed: [],
     });
     expect(calls).toEqual(["account", "rooms", "matches", "progress"]);
-    expect(await component.sweepDue({ now: NOW + 2 * SWEEP_AGAIN_AFTER_MS })).toEqual({
+    expect(await component.sweepDue({ now: NOW + 2 * SWEEP_AGAIN_AFTER_MS - 1 })).toEqual({
       completed: [],
       failed: [],
     });
@@ -193,5 +195,50 @@ describe("playerDataComponent.exportFor (CC-035)", () => {
     await expect(component.exportFor({ playerId: PLAYER, password: "wrong", now: NOW })).rejects.toThrow(
       ValidationError,
     );
+  });
+});
+
+describe("playerDataComponent closing and erasing apart (CC-035)", () => {
+  it("closes the account first, so the caller can cut the player's sockets before the stores are erased", async () => {
+    const { component, calls } = setup();
+
+    await component.closeAccount({ playerId: PLAYER, password: "right", now: NOW });
+    expect(calls).toEqual(["account"]);
+    const { erased } = await component.eraseAccount({ playerId: PLAYER, now: NOW });
+
+    expect(calls).toEqual(["account", "rooms", "matches", "progress"]);
+    expect(erased).toEqual({ rooms: 1, matches: 1, progress: 1 });
+  });
+
+  it("refuses to close with a wrong password, and records nothing", async () => {
+    const { component, calls, deletions } = setup();
+
+    await expect(component.closeAccount({ playerId: PLAYER, password: "wrong", now: NOW })).rejects.toThrow(
+      ValidationError,
+    );
+
+    expect(calls).toEqual([]);
+    expect(await deletions.listDue({ now: NOW + DELETION_RECORD_KEPT_MS, limit: 5 })).toEqual([]);
+  });
+
+  it("sweeps a deletion again every few minutes until the match pipeline's retries are surely over", async () => {
+    const { component, calls } = setup();
+    await component.deleteAccount({ playerId: PLAYER, password: "right", now: NOW });
+    let swept = 0;
+    for (let at = NOW; at <= NOW + SWEEP_FOR_MS + 2 * SWEEP_AGAIN_AFTER_MS; at += SWEEP_AGAIN_AFTER_MS) {
+      swept += (await component.sweepDue({ now: at })).completed.length;
+    }
+
+    expect(swept).toBe(SWEEP_FOR_MS / SWEEP_AGAIN_AFTER_MS);
+    expect(calls.filter((name) => name === "account")).toHaveLength(swept + 1);
+  });
+
+  it("keeps sweeping longer than every retry of the match pipeline together", () => {
+    let total = 0;
+    for (let attempt = 1; attempt < MATCH_RETRY_POLICY.maxAttempts; attempt++) {
+      total += delayAfter(attempt, MATCH_RETRY_POLICY);
+    }
+
+    expect(SWEEP_FOR_MS).toBeGreaterThan(total + SWEEP_AGAIN_AFTER_MS);
   });
 });

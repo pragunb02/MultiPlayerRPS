@@ -33,5 +33,10 @@ export function createInMemoryAccountDeletionDao() {
     },
 
     isLegacyClosed: async (legacyId) => closedLegacy.has(legacyId),
+
+    async sweepAgainAt({ playerId, at }) {
+      const entry = deletions.get(playerId);
+      if (entry !== undefined) deletions.set(playerId, { ...entry, sweepAgainAt: at });
+    },
   });
 }

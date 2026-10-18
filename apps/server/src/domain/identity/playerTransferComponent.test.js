@@ -202,7 +202,9 @@ describe("playerTransferComponent and deleted accounts (CC-035)", () => {
         carriedOver: { xp: 40, matchesPlayed: 2, matches: 2 },
       },
     ]);
+    expect(await component.guestsOf({ playerId: ACCOUNT.id })).toEqual(["guest_a"]);
     expect(await component.erasePlayer({ playerId: ACCOUNT.id })).toEqual({ erased: { transfers: 1 } });
+    expect(await component.guestsOf({ playerId: ACCOUNT.id })).toEqual([]);
     expect(await component.exportPlayer({ playerId: ACCOUNT.id })).toEqual([]);
   });
 

@@ -107,5 +107,23 @@ export function createPendingMatchAccessor({ pendingMatchDao }) {
      */
     done: ({ matchId, at, keepUntil }) =>
       pendingMatchDao.markDone({ matchId, doneAt: new Date(at), expiresAt: new Date(keepUntil) }),
+
+    /**
+     * Every record whose match names the player, whatever its status (CC-035).
+     *
+     * @param {string} playerId
+     * @returns {Promise<ReadonlyArray<Readonly<PendingMatch>>>}
+     */
+    async listForPlayer(playerId) {
+      return Object.freeze((await pendingMatchDao.listByPlayer(playerId)).map(toPendingMatch));
+    },
+
+    /**
+     * Replaces the match inside a record while the player `from` is still in it (CC-035).
+     *
+     * @param {{ matchId: string, from: string, match: Readonly<import("./matchAccessor.js").Match> }} replace
+     * @returns {Promise<boolean>} whether it was replaced now
+     */
+    replaceMatch: (replace) => pendingMatchDao.replaceMatch(replace),
   });
 }

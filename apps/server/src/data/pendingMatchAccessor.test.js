@@ -91,4 +91,15 @@ describe("pendingMatchAccessor", () => {
   it("fails fast without its DAO", () => {
     expect(() => createPendingMatchAccessor({})).toThrow(TypeError);
   });
+
+  it("lists a player's records and replaces the match in one while the player is in it (CC-035)", async () => {
+    const outbox = setup();
+    await outbox.add({ match: MATCH, at: T0 });
+    const renamed = { ...MATCH, players: [{ playerId: "deleted_1", displayName: "Deleted player" }] };
+
+    expect((await outbox.listForPlayer("guest_a")).map((entry) => entry.matchId)).toEqual(["m1"]);
+    expect(await outbox.replaceMatch({ matchId: "m1", from: "guest_a", match: renamed })).toBe(true);
+    expect(await outbox.listForPlayer("guest_a")).toEqual([]);
+    expect((await outbox.get("m1")).match).toEqual(renamed);
+  });
 });

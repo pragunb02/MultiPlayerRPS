@@ -70,4 +70,15 @@ export function runAccountDeletionDaoContract(createDao) {
     expect(await dao.isLegacyClosed("64b7f0c2a1b2c3d4e5f60718")).toBe(true);
     expect(await dao.isLegacyClosed("64b7f0c2a1b2c3d4e5f60719")).toBe(false);
   });
+
+  it("moves a deletion's next sweep to a later time (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insert(deletion());
+
+    await dao.sweepAgainAt({ playerId: "user_0123456789abcdef01234567", at: later(10) });
+    await dao.sweepAgainAt({ playerId: "user_ffffffffffffffffffffffff", at: later(10) });
+
+    expect(await dao.listDue({ now: later(9), limit: 10 })).toEqual([]);
+    expect(await dao.listDue({ now: later(10), limit: 10 })).toHaveLength(1);
+  });
 }

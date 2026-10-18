@@ -22,6 +22,18 @@ describe("accountDeletionAccessor", () => {
     expect(await deletions.listDue({ now: AT + 5, limit: 5 })).toEqual([]);
   });
 
+  it("moves a deletion's next sweep later (CC-035)", async () => {
+    const deletions = createAccountDeletionAccessor({
+      accountDeletionDao: createInMemoryAccountDeletionDao(),
+    });
+    await deletions.record({ playerId: PLAYER, requestedAt: AT, sweepAgainAt: AT, expiresAt: AT + 50 });
+
+    await deletions.sweepAgainAt({ playerId: PLAYER, at: AT + 10 });
+
+    expect(await deletions.listDue({ now: AT + 9, limit: 5 })).toEqual([]);
+    expect(await deletions.listDue({ now: AT + 10, limit: 5 })).toHaveLength(1);
+  });
+
   it("closes a legacy row and recognises it afterwards", async () => {
     const deletions = createAccountDeletionAccessor({
       accountDeletionDao: createInMemoryAccountDeletionDao(),

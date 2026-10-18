@@ -188,6 +188,65 @@ describe("POST /api/account/delete (CC-035)", () => {
   });
 });
 
+describe("the account limits count only what they are for (CC-035)", () => {
+  it("never counts a refused export as a wrong password, so deletion stays open", async () => {
+    const { cookie } = await signedUp();
+
+    for (let i = 0; i < 8; i++) {
+      await call("POST", "/account/export", { body: { password: PASSWORD }, cookie });
+    }
+
+    expect((await call("POST", "/account/delete", { body: { password: PASSWORD }, cookie })).status).toBe(
+      204,
+    );
+  });
+
+  it("never uses up an export on a wrong password", async () => {
+    const { cookie } = await signedUp();
+
+    for (let i = 0; i < 3; i++) {
+      await call("POST", "/account/export", { body: { password: "nope" }, cookie });
+    }
+    const statuses = [];
+    for (let i = 0; i < 3; i++) {
+      statuses.push((await call("POST", "/account/export", { body: { password: PASSWORD }, cookie })).status);
+    }
+
+    expect(statuses).toEqual([200, 200, 200]);
+  });
+
+  it("never counts a malformed request as a wrong password", async () => {
+    const { cookie } = await signedUp();
+
+    for (let i = 0; i < 6; i++) {
+      expect((await call("POST", "/account/delete", { body: { admin: true }, cookie })).status).toBe(400);
+    }
+
+    expect((await call("POST", "/account/delete", { body: { password: PASSWORD }, cookie })).status).toBe(
+      204,
+    );
+  });
+});
+
+describe("a deletion that cannot erase everything at once (CC-035)", () => {
+  it("still closes the account, cuts its connections and answers 204, and leaves the rest to the sweeps", async () => {
+    const failing = { name: "broken", erasePlayer: async () => Promise.reject(new Error("database down")) };
+    const { cookie, identity } = await signedUp({}, { dataParticipants: (list) => [failing, ...list] });
+    const cut = [];
+    server.onAccountDeleted((playerId) => cut.push(playerId));
+
+    const res = await call("POST", "/account/delete", { body: { password: PASSWORD }, cookie });
+
+    expect(res.status).toBe(204);
+    expect(cut).toEqual([identity.id]);
+    expect(server.find("account closed, erasing its data will finish in the next sweep")).toHaveLength(1);
+    expect(
+      (await call("POST", "/auth/login", { body: { email: "riya@example.com", password: PASSWORD } })).status,
+    ).toBe(401);
+    expect((await call("GET", "/session", { cookie })).body).toEqual({ authenticated: false });
+  });
+});
+
 describe("createAccountRoutes", () => {
   it("fails fast without its dependencies", () => {
     expect(() => createAccountRoutes({})).toThrow(TypeError);

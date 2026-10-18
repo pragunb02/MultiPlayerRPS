@@ -289,6 +289,8 @@ export function createRealtimeGateway({
      * @param {string} playerId
      */
     disconnectPlayer(playerId) {
+      // Like a sign out of every device with none kept, so a handshake checked just before is refused too.
+      signOuts.set(playerId, { generation: signOutGeneration(playerId) + 1, keptSessionId: "" });
       io.in(playerRoom(playerId)).disconnectSockets(true);
     },
     /** @returns {{ connections: number, players: number }} realtime connections and connected players, for the gauge */

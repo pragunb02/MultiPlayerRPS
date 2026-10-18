@@ -11,9 +11,10 @@ const TOO_MANY = "Too many attempts, try again later";
 /**
  * The limits on the account settings routes. Each is a business rule, and tests and browser tests may change them.
  *
- * 1. `exports`: data exports per account in an hour (CC-035). An export reads every store of the account.
+ * 1. `exports`: data exports per account in an hour (CC-035). An export reads every store of the account. Only exports
+ *    that were given count, so a mistyped password or a refusal never uses one up.
  * 2. `failedPasswords`: wrong passwords per account in 15 minutes, for export and deletion together, so a borrowed
- *    signed-in browser cannot be used to guess the password.
+ *    signed-in browser cannot be used to guess the password. Only a wrong password counts, never another refusal.
  */
 export const ACCOUNT_LIMITS = Object.freeze({
   exports: Object.freeze({ windowMs: 60 * MINUTE_MS, limit: 3 }),
@@ -40,6 +41,18 @@ function requireExactly(body, fields) {
 
 const playerKey = (req) => `player:${requireIdentity(req.session).id}`;
 
+/** Marks the response of a wrong password, the only answer the password limit counts. */
+async function noteWrongPassword(res, work) {
+  try {
+    return await work();
+  } catch (err) {
+    if (err instanceof ValidationError && err.details?.field === "password") {
+      res.locals.wrongPassword = true;
+    }
+    throw err;
+  }
+}
+
 /**
  * The signed-in player's own account (CC-035, CC-152). Guests get 403, visitors 401.
  *
@@ -51,7 +64,7 @@ const playerKey = (req) => `player:${requireIdentity(req.session).id}`;
  *
  * @param {{
  *   accountComponent: Pick<ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>, "profileOf" | "setBirthYear">,
- *   playerDataComponent: Pick<ReturnType<typeof import("../../domain/accounts/playerDataComponent.js").createPlayerDataComponent>, "deleteAccount" | "exportFor">,
+ *   playerDataComponent: Pick<ReturnType<typeof import("../../domain/accounts/playerDataComponent.js").createPlayerDataComponent>, "closeAccount" | "eraseAccount" | "exportFor">,
  *   onSessionEnded: (sessionId: string) => void,
  *   onAccountDeleted: (playerId: string) => void,   told once an account is gone, so its sockets are disconnected
  *   now?: () => number,
@@ -78,12 +91,18 @@ export function createAccountRoutes({
     requireIdentity(req.session);
     next();
   };
-  const exports = createRateLimit({ ...rules.exports, message: TOO_MANY, keyGenerator: playerKey });
+  const exports = createRateLimit({
+    ...rules.exports,
+    message: TOO_MANY,
+    keyGenerator: playerKey,
+    skipFailedRequests: true,
+  });
   const failedPasswords = createRateLimit({
     ...rules.failedPasswords,
     message: TOO_MANY,
     keyGenerator: playerKey,
     skipSuccessfulRequests: true,
+    requestWasSuccessful: (req, res) => res.locals.wrongPassword !== true,
     headers: false,
   });
 
@@ -104,7 +123,9 @@ export function createAccountRoutes({
     const { password } = requireExactly(req.body, ["password"]);
     const { id: playerId } = requireIdentity(req.session);
     const at = now();
-    const exported = await playerDataComponent.exportFor({ playerId, password, now: at });
+    const exported = await noteWrongPassword(res, () =>
+      playerDataComponent.exportFor({ playerId, password, now: at }),
+    );
     req.log.info({ playerId }, "data exported");
     res.set("Cache-Control", "no-store");
     res.attachment(`classicade-data-${dayOf(at)}.json`);
@@ -114,13 +135,21 @@ export function createAccountRoutes({
   router.post("/account/delete", signedIn, failedPasswords, async (req, res) => {
     const { password } = requireExactly(req.body, ["password"]);
     const { id: playerId } = requireIdentity(req.session);
-    const { erased } = await playerDataComponent.deleteAccount({ playerId, password, now: now() });
+    const at = now();
+    await noteWrongPassword(res, () => playerDataComponent.closeAccount({ playerId, password, now: at }));
+    // The account is gone. Its connections are cut before anything else, so no device can play on under it.
+    onAccountDeleted(playerId);
     const sessionId = req.sessionID;
     await destroySession(req);
     res.clearCookie(SESSION_COOKIE_NAME);
     onSessionEnded(sessionId);
-    onAccountDeleted(playerId);
-    req.log.info({ playerId, erased }, "account deleted");
+    try {
+      const { erased } = await playerDataComponent.eraseAccount({ playerId, now: at });
+      req.log.info({ playerId, erased }, "account deleted");
+    } catch (err) {
+      // The deletion is recorded and the account closed, so the sweeps finish it within minutes (CC-035).
+      req.log.error({ err, playerId }, "account closed, erasing its data will finish in the next sweep");
+    }
     res.status(204).end();
   });
 

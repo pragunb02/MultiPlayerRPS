@@ -17,6 +17,10 @@ export const MINIMUM_ACCOUNT_AGE = 13;
 /** The years this year minus the birth year must reach before the player is surely 18. */
 const SURELY_ADULT = 19;
 
+/** Why an account is refused to someone under 13, said only after they chose a year. */
+export const TOO_YOUNG_MESSAGE =
+  "ClassiCade accounts are for people aged 13 and over. You can keep playing as a guest.";
+
 /** What a public board shows instead of the name of a minor or an account of unknown age. */
 export const HIDDEN_PLAYER_NAME = "Hidden player";
 

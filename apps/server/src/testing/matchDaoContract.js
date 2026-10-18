@@ -298,4 +298,28 @@ export function runMatchDaoContract(createDao) {
 
     await expect(dao.getByMatchId(matchDoc().matchId)).rejects.toThrow(RangeError);
   });
+
+  it("pages a player's matches newest first on end time and id, so a tie at a page edge loses none (CC-035)", async () => {
+    const dao = await createDao();
+    const same = new Date(T0 + 5000);
+    for (const n of [1, 2, 3, 4]) {
+      await dao.insert(matchDoc({ matchId: `m-${n}`, endedAt: n === 1 ? new Date(T0) : same }));
+    }
+
+    const first = await dao.listPageByPlayer("guest_a", { limit: 2 });
+    const last = first.at(-1);
+    const second = await dao.listPageByPlayer("guest_a", {
+      limit: 2,
+      after: { endedAt: last.endedAt, matchId: last.matchId },
+    });
+    const third = await dao.listPageByPlayer("guest_a", {
+      limit: 2,
+      after: { endedAt: second.at(-1).endedAt, matchId: second.at(-1).matchId },
+    });
+
+    expect(first.map((m) => m.matchId)).toEqual(["m-4", "m-3"]);
+    expect(second.map((m) => m.matchId)).toEqual(["m-2", "m-1"]);
+    expect(third).toEqual([]);
+    expect(await dao.listPageByPlayer("guest_nobody", { limit: 2 })).toEqual([]);
+  });
 }

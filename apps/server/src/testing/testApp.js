@@ -37,6 +37,7 @@ import {
   identityFollowers,
   keepFinishedGameIn,
   matchPipelineSteps,
+  outboxErasure,
   roomErasure,
 } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
@@ -88,6 +89,8 @@ import { testConfig } from "./testConfig.js";
  *   pendingMatchDao?: ReturnType<typeof createInMemoryPendingMatchDao>,   the match pipeline's outbox, which a test
  *     can make fail (CC-111)
  *   accountLimits?: object,   the export and password limits of the account routes (CC-035)
+ *   dataParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who takes
+ *     part in deleting an account (e.g. one that fails, CC-035)
  * }} [options]
  */
 export function createTestApp({
@@ -106,6 +109,7 @@ export function createTestApp({
   analyticsDao = createEmptyAnalyticsDao(),
   pendingMatchDao = createInMemoryPendingMatchDao(),
   accountLimits,
+  dataParticipants = (participants) => participants,
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -172,41 +176,6 @@ export function createTestApp({
     matches: matchComponent,
   });
   const sessionAccessor = createSessionAccessor({ sessionDao: createMemoryStoreSessionDao({ store }) });
-  // The same stores, in the same order, as the composition root (CC-035).
-  const playerDataComponent = createPlayerDataComponent({
-    accountComponent,
-    accountDeletionAccessor,
-    participants: [
-      roomErasure({ roomComponent, domainEvents }),
-      {
-        name: "sessions",
-        erasePlayer: async ({ playerId }) => ({
-          erased: { sessions: await sessionAccessor.removePlayer(playerId) },
-        }),
-      },
-      { name: "matches", erasePlayer: matchComponent.erasePlayer, exportPlayer: matchComponent.exportPlayer },
-      {
-        name: "progress",
-        erasePlayer: progressionComponent.erasePlayer,
-        exportPlayer: progressionComponent.exportPlayer,
-      },
-      {
-        name: "gamification",
-        erasePlayer: gamificationComponent.erasePlayer,
-        exportPlayer: gamificationComponent.exportPlayer,
-      },
-      {
-        name: "leaderboards",
-        erasePlayer: leaderboardComponent.erasePlayer,
-        exportPlayer: leaderboardComponent.exportPlayer,
-      },
-      {
-        name: "guestTransfers",
-        erasePlayer: playerTransferComponent.erasePlayer,
-        exportPlayer: playerTransferComponent.exportPlayer,
-      },
-    ],
-  });
   const tasks = createBackgroundTasks({ logger: capture.logger });
   const outbox = createMatchOutboxComponent({
     pendingMatchAccessor: createPendingMatchAccessor({ pendingMatchDao }),
@@ -260,6 +229,42 @@ export function createTestApp({
     now,
   });
   connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks, now });
+  // The same stores, in the same order, as the composition root (CC-035).
+  const playerDataComponent = createPlayerDataComponent({
+    accountComponent,
+    accountDeletionAccessor,
+    participants: dataParticipants([
+      roomErasure({ roomComponent, domainEvents }),
+      outboxErasure({ outbox, playerTransferComponent }),
+      {
+        name: "sessions",
+        erasePlayer: async ({ playerId }) => ({
+          erased: { sessions: await sessionAccessor.removePlayer(playerId) },
+        }),
+      },
+      { name: "matches", erasePlayer: matchComponent.erasePlayer, exportPlayer: matchComponent.exportPlayer },
+      {
+        name: "progress",
+        erasePlayer: progressionComponent.erasePlayer,
+        exportPlayer: progressionComponent.exportPlayer,
+      },
+      {
+        name: "gamification",
+        erasePlayer: gamificationComponent.erasePlayer,
+        exportPlayer: gamificationComponent.exportPlayer,
+      },
+      {
+        name: "leaderboards",
+        erasePlayer: leaderboardComponent.erasePlayer,
+        exportPlayer: leaderboardComponent.exportPlayer,
+      },
+      {
+        name: "guestTransfers",
+        erasePlayer: playerTransferComponent.erasePlayer,
+        exportPlayer: playerTransferComponent.exportPlayer,
+      },
+    ]),
+  });
   const endedSessions = [];
   const endedListeners = [];
   const otherSessionsEnded = [];

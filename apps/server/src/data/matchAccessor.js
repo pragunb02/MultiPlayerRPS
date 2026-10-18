@@ -171,5 +171,21 @@ export function createMatchAccessor({ matchDao }) {
      * @returns {Promise<boolean>} whether it was deleted now
      */
     deleteForPlayer: (which) => matchDao.deleteForPlayer(which),
+
+    /**
+     * A page of a player's matches, newest first on end time and then id (CC-035, the data export).
+     *
+     * @param {string} playerId
+     * @param {{ limit: number, after?: { endedAt: number, matchId: string } }} page  `after` is the last match of
+     *   the page before
+     * @returns {Promise<ReadonlyArray<Readonly<Match>>>}
+     */
+    async listPageForPlayer(playerId, { limit, after }) {
+      const docs = await matchDao.listPageByPlayer(playerId, {
+        limit,
+        ...(after !== undefined && { after: { endedAt: new Date(after.endedAt), matchId: after.matchId } }),
+      });
+      return Object.freeze(docs.map(toMatch));
+    },
   });
 }

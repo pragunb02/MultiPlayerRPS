@@ -4,10 +4,17 @@ const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
 /**
- * Every deletion is erased once more this long after it was asked. That finishes a deletion the server could not
+ * Every deletion is erased again this often after it was asked. That finishes a deletion the server could not
  * complete (a crash or a deploy halfway), and removes anything a game that was ending at that very moment wrote.
  */
 export const SWEEP_AGAIN_AFTER_MS = 5 * MINUTE_MS;
+
+/**
+ * For how long after it was asked a deletion is swept again. A game that ended just before the deletion may still be
+ * retried by the match pipeline for about 13 minutes (MATCH_RETRY_POLICY) and write under the player's id, so the
+ * sweeps go on for longer than that.
+ */
+export const SWEEP_FOR_MS = 30 * MINUTE_MS;
 
 /**
  * How long the record of a deletion is kept: as long as the backups (DATA.md). It names an id that leads nowhere
@@ -32,13 +39,13 @@ const SWEEP_BATCH = 20;
 
 /**
  * A player's right to leave and to take their data with them (CC-035): deleting an account, and exporting it.
- * Deletion asks for the password again, records the deletion first, closes the account, then lets each
- * participant erase what it holds, in the order the composition root lists them. Housekeeping sweeps each deletion
- * again a few minutes later.
+ * Deletion asks for the password again, records the deletion first and closes the account (`closeAccount`). The
+ * caller then cuts the player's connections, and each participant erases what it holds, in the order the composition
+ * root lists them (`eraseAccount`). Housekeeping sweeps each deletion again every few minutes for half an hour.
  *
  * @param {{
  *   accountComponent: Pick<ReturnType<typeof import("./accountComponent.js").createAccountComponent>, "confirmPassword" | "close" | "profileOf">,
- *   accountDeletionAccessor: Pick<ReturnType<typeof import("../../data/accountDeletionAccessor.js").createAccountDeletionAccessor>, "record" | "listDue" | "markSwept">,
+ *   accountDeletionAccessor: Pick<ReturnType<typeof import("../../data/accountDeletionAccessor.js").createAccountDeletionAccessor>, "record" | "listDue" | "markSwept" | "sweepAgainAt">,
  *   participants: ReadonlyArray<PlayerDataParticipant>,
  * }} deps
  */
@@ -47,9 +54,8 @@ export function createPlayerDataComponent({ accountComponent, accountDeletionAcc
   assertDefined(accountDeletionAccessor, "accountDeletionAccessor");
   participants.forEach(({ name, erasePlayer }) => assertFunction(erasePlayer, `${name}.erasePlayer`));
 
-  /** The account, then every participant in order. Stops at the first failure: the next sweep runs it all again. */
-  async function eraseEverything({ playerId, now }) {
-    await accountComponent.close({ playerId, now });
+  /** Every participant in order. Stops at the first failure: the next sweep runs it all again. */
+  async function eraseStores({ playerId, now }) {
     const erased = {};
     for (const participant of participants) {
       Object.assign(erased, (await participant.erasePlayer({ playerId, now })).erased);
@@ -57,25 +63,52 @@ export function createPlayerDataComponent({ accountComponent, accountDeletionAcc
     return erased;
   }
 
+  /**
+   * @param {{ playerId: string, password: unknown, now: number }} input
+   * @throws {import("../../utils/errors.js").ValidationError} with `details.field` "password"
+   */
+  async function closeAccount({ playerId, password, now }) {
+    await accountComponent.confirmPassword({ playerId, password });
+    await accountDeletionAccessor.record({
+      playerId,
+      requestedAt: now,
+      sweepAgainAt: now + SWEEP_AGAIN_AFTER_MS,
+      expiresAt: now + DELETION_RECORD_KEPT_MS,
+    });
+    await accountComponent.close({ playerId, now });
+  }
+
+  /** @param {{ playerId: string, now: number }} input */
+  const eraseAccount = async ({ playerId, now }) => ({ erased: await eraseStores({ playerId, now }) });
+
   return Object.freeze({
     /**
-     * @param {{ playerId: string, password: unknown, now: number }} input
+     * Checks the password, records the deletion and deletes the account itself. From here on no session of the
+     * account works, and the deletion is finished for sure: by `eraseAccount` now, or by the sweeps.
+     */
+    closeAccount,
+
+    /**
+     * Erases or anonymises everything every participant holds for the closed account.
+     *
      * @returns {Promise<{ erased: Record<string, number> }>} what each store removed or anonymised
-     * @throws {import("../../utils/errors.js").ValidationError} with `details.field` "password"
+     */
+    eraseAccount,
+
+    /**
+     * Both at once, for callers with no connections to cut in between.
+     *
+     * @param {{ playerId: string, password: unknown, now: number }} input
+     * @returns {Promise<{ erased: Record<string, number> }>}
      */
     async deleteAccount({ playerId, password, now }) {
-      await accountComponent.confirmPassword({ playerId, password });
-      await accountDeletionAccessor.record({
-        playerId,
-        requestedAt: now,
-        sweepAgainAt: now + SWEEP_AGAIN_AFTER_MS,
-        expiresAt: now + DELETION_RECORD_KEPT_MS,
-      });
-      return { erased: await eraseEverything({ playerId, now }) };
+      await closeAccount({ playerId, password, now });
+      return eraseAccount({ playerId, now });
     },
 
     /**
-     * Housekeeping: erases each deletion whose second sweep is due once more. A sweep that fails stays due.
+     * Housekeeping: erases each deletion whose next sweep is due once more, and plans the next one until
+     * `SWEEP_FOR_MS` after it was asked. A sweep that fails stays due.
      *
      * @param {{ now: number }} input
      * @returns {Promise<{ completed: string[], failed: Array<{ playerId: string, error: unknown }> }>}
@@ -83,10 +116,18 @@ export function createPlayerDataComponent({ accountComponent, accountDeletionAcc
     async sweepDue({ now }) {
       const completed = [];
       const failed = [];
-      for (const { playerId } of await accountDeletionAccessor.listDue({ now, limit: SWEEP_BATCH })) {
+      for (const { playerId, requestedAt } of await accountDeletionAccessor.listDue({
+        now,
+        limit: SWEEP_BATCH,
+      })) {
         try {
-          await eraseEverything({ playerId, now });
-          await accountDeletionAccessor.markSwept(playerId);
+          await accountComponent.close({ playerId, now });
+          await eraseStores({ playerId, now });
+          if (now < requestedAt + SWEEP_FOR_MS) {
+            await accountDeletionAccessor.sweepAgainAt({ playerId, at: now + SWEEP_AGAIN_AFTER_MS });
+          } else {
+            await accountDeletionAccessor.markSwept(playerId);
+          }
           completed.push(playerId);
         } catch (error) {
           failed.push({ playerId, error });

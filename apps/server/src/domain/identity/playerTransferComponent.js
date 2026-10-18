@@ -151,5 +151,13 @@ export function createPlayerTransferComponent({ playerTransferAccessor, particip
     erasePlayer: async ({ playerId }) => ({
       erased: { transfers: await playerTransferAccessor.removeTo(playerId) },
     }),
+
+    /**
+     * The guest ids whose data moved into this account (CC-035): the ids the player played under before signing up.
+     *
+     * @param {{ playerId: string }} query  the account's player id
+     * @returns {Promise<string[]>}
+     */
+    guestsOf: async ({ playerId }) => (await playerTransferAccessor.listTo(playerId)).map(({ from }) => from),
   });
 }

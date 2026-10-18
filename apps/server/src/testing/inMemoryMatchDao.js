@@ -100,5 +100,20 @@ export function createInMemoryMatchDao() {
       }
       return matches.delete(matchId);
     },
+
+    async listPageByPlayer(playerId, { limit, after }) {
+      const newerFirst = (a, b) => b.endedAt - a.endedAt || (b.matchId < a.matchId ? -1 : 1);
+      return [...matches.values()]
+        .filter((m) => has(m, playerId))
+        .filter(
+          (m) =>
+            after === undefined ||
+            m.endedAt < after.endedAt ||
+            (+m.endedAt === +after.endedAt && m.matchId < after.matchId),
+        )
+        .sort(newerFirst)
+        .slice(0, limit)
+        .map(copy);
+    },
   });
 }

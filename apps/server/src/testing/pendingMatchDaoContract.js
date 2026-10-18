@@ -170,4 +170,38 @@ export function runPendingMatchDaoContract(createDao) {
 
     expect((await dao.get("m1")).match.log).toHaveLength(1);
   });
+
+  it("lists every record of a player, pending, done or failed, and nobody else's (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insertIfAbsent(entry("m1"));
+    await dao.insertIfAbsent(entry("m2"));
+    await dao.markDone({ matchId: "m2", doneAt: at(1), expiresAt: at(100) });
+    const other = entry("m3");
+    await dao.insertIfAbsent({
+      ...other,
+      match: { ...other.match, players: [{ playerId: "guest_b", displayName: "Bob" }] },
+    });
+
+    const listed = await dao.listByPlayer("guest_a");
+
+    expect(listed.map((doc) => doc.matchId).sort()).toEqual(["m1", "m2"]);
+    expect(await dao.listByPlayer("guest_nobody")).toEqual([]);
+  });
+
+  it("replaces the match of a record only while the player is still in it (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insertIfAbsent(entry("m1"));
+    const renamed = {
+      ...entry("m1").match,
+      players: [{ playerId: "deleted_1", displayName: "Deleted player" }],
+    };
+
+    expect(await dao.replaceMatch({ matchId: "m1", from: "guest_a", match: renamed })).toBe(true);
+    expect(await dao.replaceMatch({ matchId: "m1", from: "guest_a", match: entry("m1").match })).toBe(false);
+    expect(await dao.replaceMatch({ matchId: "m9", from: "guest_a", match: renamed })).toBe(false);
+
+    const stored = await dao.get("m1");
+    expect(stored.match).toEqual(renamed);
+    expect(stored.status).toBe("pending");
+  });
 }

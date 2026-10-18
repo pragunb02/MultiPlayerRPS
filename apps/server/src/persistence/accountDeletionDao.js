@@ -84,5 +84,14 @@ export function createAccountDeletionDao({ connection }) {
 
     /** @param {string} legacyId */
     isLegacyClosed: async (legacyId) => (await Closure.countDocuments({ legacyId }, { limit: 1 })) === 1,
+
+    /**
+     * Moves the next sweep of a deletion to `at` (CC-035).
+     *
+     * @param {{ playerId: string, at: Date }} next
+     */
+    async sweepAgainAt({ playerId, at }) {
+      await Deletion.updateOne({ playerId }, { $set: { sweepAgainAt: at } });
+    },
   });
 }

@@ -340,3 +340,69 @@ describe("matchOutboxComponent (CC-111)", () => {
     expect(() => createMatchOutboxComponent({ steps: [{ name: "a", run }] })).toThrow(TypeError);
   });
 });
+
+describe("the outbox and deleted accounts (CC-035)", () => {
+  it("gives each record that names the player a new stand-in, pending, done or failed alike", async () => {
+    const uuids = ["00000000-0000-4000-8000-0000000000c1", "00000000-0000-4000-8000-0000000000c2"];
+    const pendingMatchAccessor = createPendingMatchAccessor({
+      pendingMatchDao: createInMemoryPendingMatchDao(),
+    });
+    const outbox = createMatchOutboxComponent({
+      pendingMatchAccessor,
+      steps: [{ name: "record", run: async () => {} }],
+      newUuid: () => uuids.shift(),
+    });
+    const game = (matchId) => ({
+      matchId,
+      players: [
+        { playerId: "user_x", displayName: "riya" },
+        { playerId: "guest_b", displayName: "Bob" },
+      ],
+      log: [{ kind: "move", playerId: "user_x", at: 1 }],
+      result: { result: "win", winners: ["user_x"], reason: "best-of-1" },
+    });
+    await outbox.add({ match: game("m1"), now: T0 });
+    await outbox.add({ match: game("m2"), now: T0 });
+    await outbox.run({ matchId: "m2", now: T0 });
+
+    expect(await outbox.erasePlayer({ playerId: "user_x" })).toEqual({ erased: { pendingMatches: 2 } });
+    expect(await outbox.erasePlayer({ playerId: "user_x" })).toEqual({ erased: { pendingMatches: 0 } });
+
+    const first = (await pendingMatchAccessor.get("m1")).match;
+    const second = (await pendingMatchAccessor.get("m2")).match;
+    expect(first.players[0]).toEqual({
+      playerId: "deleted_00000000-0000-4000-8000-0000000000c1",
+      displayName: "Deleted player",
+    });
+    expect(second.players[0].playerId).toBe("deleted_00000000-0000-4000-8000-0000000000c2");
+    expect(JSON.stringify([first, second])).not.toContain("user_x");
+    expect(JSON.stringify([first, second])).not.toContain("riya");
+    expect(first.players[1]).toEqual({ playerId: "guest_b", displayName: "Bob" });
+  });
+});
+
+describe("the outbox and a deleted player's guest days (CC-035)", () => {
+  it("also gives a stand-in to the records of the guest ids the player had", async () => {
+    const pendingMatchAccessor = createPendingMatchAccessor({
+      pendingMatchDao: createInMemoryPendingMatchDao(),
+    });
+    let n = 0;
+    const outbox = createMatchOutboxComponent({
+      pendingMatchAccessor,
+      steps: [{ name: "record", run: async () => {} }],
+      newUuid: () => `00000000-0000-4000-8000-00000000000${++n}`,
+    });
+    const asGuest = {
+      matchId: "m-guest",
+      players: [{ playerId: "guest_old", displayName: "Guest-1234" }],
+      log: [],
+    };
+    await outbox.add({ match: asGuest, now: T0 });
+
+    expect(await outbox.erasePlayer({ playerId: "user_x", formerIds: ["guest_old"] })).toEqual({
+      erased: { pendingMatches: 1 },
+    });
+
+    expect(JSON.stringify(await pendingMatchAccessor.get("m-guest"))).not.toContain("guest_old");
+  });
+});

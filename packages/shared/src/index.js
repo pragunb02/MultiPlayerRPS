@@ -7,6 +7,7 @@ export {
   HIDDEN_PLAYER_NAME,
   isTooYoungForAccount,
   MINIMUM_ACCOUNT_AGE,
+  TOO_YOUNG_MESSAGE,
 } from "./ages.js";
 export { BOT_CHARACTERS, BOT_DAILY_XP, characterForGame } from "./bots.js";
 export { ACHIEVEMENT_METRICS, ACHIEVEMENT_TIERS, ACHIEVEMENTS, winsOfMetric } from "./achievements.js";

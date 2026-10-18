@@ -10,6 +10,7 @@ import {
   logPipelineOutcome,
   MATCH_STEPS,
   matchPipelineSteps,
+  outboxErasure,
   reportOldEmailSpellings,
   roomErasure,
   startHousekeeping,
@@ -738,5 +739,20 @@ describe("roomErasure (CC-035)", () => {
     expect(roomComponent.erasePlayer).toHaveBeenCalledWith(
       expect.objectContaining({ playerId: "user_x", now: 7 }),
     );
+  });
+});
+
+describe("outboxErasure (CC-035)", () => {
+  it("erases the player from the outbox under their account id and every guest id they had", async () => {
+    const outbox = { erasePlayer: vi.fn(async () => ({ erased: { pendingMatches: 3 } })) };
+    const playerTransferComponent = { guestsOf: vi.fn(async () => ["guest_old"]) };
+    const participant = outboxErasure({ outbox, playerTransferComponent });
+
+    expect(participant.name).toBe("pendingMatches");
+    expect(await participant.erasePlayer({ playerId: "user_x", now: 1 })).toEqual({
+      erased: { pendingMatches: 3 },
+    });
+    expect(playerTransferComponent.guestsOf).toHaveBeenCalledWith({ playerId: "user_x" });
+    expect(outbox.erasePlayer).toHaveBeenCalledWith({ playerId: "user_x", formerIds: ["guest_old"] });
   });
 });

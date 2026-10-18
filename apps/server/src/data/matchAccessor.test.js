@@ -130,4 +130,21 @@ describe("matchAccessor", () => {
     expect(await matches.deleteForPlayer({ matchId: match().matchId, playerId: "guest_a" })).toBe(true);
     await expect(matches.getById(match().matchId)).rejects.toThrow(NotFoundError);
   });
+
+  it("pages a player's matches on end time and id, with ms times (CC-035)", async () => {
+    const matches = setup();
+    await matches.record(match({ matchId: "m-1" }));
+    await matches.record(match({ matchId: "m-2" }));
+
+    const first = await matches.listPageForPlayer("guest_a", { limit: 1 });
+    const second = await matches.listPageForPlayer("guest_a", {
+      limit: 1,
+      after: { endedAt: first[0].endedAt, matchId: first[0].matchId },
+    });
+
+    expect(first.map((m) => m.matchId)).toEqual(["m-2"]);
+    expect(second.map((m) => m.matchId)).toEqual(["m-1"]);
+    expect(second[0].endedAt).toBe(T0 + 5_000);
+    expect(Object.isFrozen(second)).toBe(true);
+  });
 });

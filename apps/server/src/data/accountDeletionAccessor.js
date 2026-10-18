@@ -44,6 +44,9 @@ export function createAccountDeletionAccessor({ accountDeletionDao }) {
     /** @param {string} playerId */
     markSwept: (playerId) => accountDeletionDao.markSwept(playerId),
 
+    /** @param {{ playerId: string, at: number }} next  when the deletion is swept once more */
+    sweepAgainAt: ({ playerId, at }) => accountDeletionDao.sweepAgainAt({ playerId, at: new Date(at) }),
+
     /** @param {{ legacyId: string, at: number }} closure */
     closeLegacy: ({ legacyId, at }) => accountDeletionDao.closeLegacy({ legacyId, closedAt: new Date(at) }),
 

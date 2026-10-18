@@ -267,8 +267,9 @@ of every nightly backup.
 2. **Personal data:** pseudonymous at most. The id leads nowhere once the deletion is done.
 3. **Who can read it:** no client. The owner.
 4. **Kept for:** 30 days, as long as the backups, so a restore can be followed by the same deletions again
-   ([runbooks/backup-restore.md](runbooks/backup-restore.md)). Housekeeping erases each deletion once more 5 minutes
-   after it was asked, which finishes one the server could not complete.
+   ([runbooks/backup-restore.md](runbooks/backup-restore.md)). Housekeeping erases each deletion again every 5
+   minutes for 30 minutes after it was asked: that finishes one the server could not complete, and outlasts the
+   match pipeline's retries (about 13 minutes), so a game that was ending at that moment cannot write the player back.
 5. **Deleted by:** MongoDB's TTL index on `expiresAt`.
 
 ### `legacy_closures`
@@ -296,6 +297,7 @@ describe the stores as they were before CC-035 and are brought in line by CC-248
 | `player_sessions`                           | every session of the account deleted                      | no                                     |
 | `rooms`                                     | seat handed to a stand-in who leaves, a game is forfeited | no (rooms close within 24 hours)       |
 | `matches`                                   | anonymised when another person played, else deleted       | every match, others by name only       |
+| `pending_matches`                           | every record naming the player gets a stand-in            | no (it holds the same games)           |
 | `player_progress`                           | deleted, with the guest markers naming the account        | yes                                    |
 | `player_stats`                              | deleted                                                   | yes                                    |
 | `player_achievements`                       | deleted                                                   | yes                                    |
@@ -308,7 +310,10 @@ describe the stores as they were before CC-035 and are brought in line by CC-248
 
 1. **Anonymised matches.** A match another person played stays in their history. The deleted player's id is replaced
    everywhere in it by a new random stand-in for that match (`deleted_<uuid>`, named "Deleted player"), so the
-   anonymous matches cannot be joined back into one history. A stand-in earns nothing (`models/deletedPlayer.js`).
+   anonymous matches cannot be joined back into one history. The guest id the fair play credit may name
+   (`credit.*.withdrawnFrom`) is dropped for the same reason. A stand-in earns nothing (`models/deletedPlayer.js`).
+   The match pipeline's outbox (`pending_matches`, ADR-047) gets the same stand-ins, under the account id and every
+   guest id the player had, in pending, done and failed records alike.
 2. **Rooms.** In every room the player sits in, a new stand-in takes the seat and leaves at once, so a game that ends
    later cannot write the player's data back.
 

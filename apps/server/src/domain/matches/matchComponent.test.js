@@ -536,3 +536,44 @@ describe("matchComponent and deleted players (CC-035)", () => {
     expect(await matches.exportPlayer({ playerId: "guest_a" })).toHaveLength(102);
   });
 });
+
+describe("matchComponent export and erasure details (CC-035)", () => {
+  it("exports every match even when many share one end time across a page edge", async () => {
+    const matches = setup();
+    for (let i = 0; i < 103; i++) {
+      await matches.recordFinished({
+        room: room({ game: { ...room().game, matchId: `m-${String(i).padStart(3, "0")}` } }),
+        outcome: WIN_A,
+      });
+    }
+
+    const exported = await matches.exportPlayer({ playerId: "guest_a" });
+
+    expect(new Set(exported.map((m) => m.matchId)).size).toBe(103);
+  });
+
+  it("leaves no former guest id in the credit of an anonymised match", async () => {
+    const accessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
+    const matches = createMatchComponent({
+      matchAccessor: accessor,
+      newUuid: () => "00000000-0000-4000-8000-0000000000b1",
+    });
+    await matches.recordFinished({ room: room(), outcome: WIN_A });
+    await accessor.judgeOnce({
+      matchId: room().game.matchId,
+      credit: {
+        notCounted: [{ playerId: "guest_a", reason: "hourly-limit", withdrawnFrom: "guest_old" }],
+        botXp: [{ playerId: "guest_a", xp: 0, left: 0, withdrawnFrom: "guest_old", withdrawnXp: 30 }],
+      },
+    });
+
+    await matches.erasePlayer({ playerId: "guest_a" });
+
+    const stored = await matches.getById(room().game.matchId);
+    expect(JSON.stringify(stored)).not.toContain("guest_old");
+    expect(stored.credit.notCounted).toEqual([
+      { playerId: "deleted_00000000-0000-4000-8000-0000000000b1", reason: "hourly-limit" },
+    ]);
+    expect(stored.credit.botXp[0]).not.toHaveProperty("withdrawnFrom");
+  });
+});

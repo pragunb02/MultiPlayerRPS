@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { HIDDEN_PLAYER_NAME } from "@classicade/shared";
+import { HIDDEN_PLAYER_NAME, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { useServices } from "../../app/servicesContext.js";
 import { Button } from "../../components/Button/Button.jsx";
@@ -34,8 +34,14 @@ function BirthYear({ account }) {
   const [error, setError] = useState("");
   const [tooYoung, setTooYoung] = useState(false);
   const save = useAction(
-    () =>
-      withFieldError(
+    () => {
+      // Checked here first, so a child's year of birth is never sent anywhere (CC-152).
+      if (isTooYoungForAccount({ birthYear: Number(year), currentYear: new Date().getFullYear() })) {
+        setError(TOO_YOUNG_MESSAGE);
+        setTooYoung(true);
+        return undefined;
+      }
+      return withFieldError(
         async () => {
           try {
             await account.setBirthYear(Number(year));
@@ -46,7 +52,8 @@ function BirthYear({ account }) {
         },
         "birthYear",
         setError,
-      ),
+      );
+    },
     { id: "profile.privacy.birth_year" },
   );
   if (account.status === "loading") return <p>Loading…</p>;

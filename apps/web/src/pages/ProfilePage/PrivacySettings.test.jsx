@@ -54,7 +54,24 @@ describe("year of birth on the profile (CC-152)", () => {
     expect(api.setBirthYear).not.toHaveBeenCalled();
   });
 
-  it("keeps the refused year after an under 13 refusal", async () => {
+  it("refuses a child's year in the page, sending nothing, and keeps the year as chosen", async () => {
+    const api = profileApi();
+    const { privacy } = await openPrivacy({ api });
+    const year = String(new Date().getFullYear() - 8);
+
+    await userEvent.selectOptions(await within(privacy).findByLabelText("Year of birth"), year);
+    await userEvent.click(within(privacy).getByRole("button", { name: "Save year" }));
+
+    expect(
+      await within(privacy).findByText(
+        "ClassiCade accounts are for people aged 13 and over. You can keep playing as a guest.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(privacy).getByLabelText("Year of birth")).toBeDisabled();
+    expect(api.setBirthYear).not.toHaveBeenCalled();
+  });
+
+  it("keeps the refused year after an under 13 refusal by the server", async () => {
     const tooYoung = new AppRequestError({
       code: "VALIDATION_FAILED",
       message: "ClassiCade accounts are for people aged 13 and over. You can keep playing as a guest.",
@@ -63,7 +80,8 @@ describe("year of birth on the profile (CC-152)", () => {
     });
     const api = profileApi({ setBirthYear: vi.fn().mockRejectedValue(tooYoung) });
     const { privacy } = await openPrivacy({ api });
-    const year = String(new Date().getFullYear() - 5);
+    // A year the page lets through, which the server refuses all the same here.
+    const year = String(new Date().getFullYear() - 13);
 
     await userEvent.selectOptions(await within(privacy).findByLabelText("Year of birth"), year);
     await userEvent.click(within(privacy).getByRole("button", { name: "Save year" }));

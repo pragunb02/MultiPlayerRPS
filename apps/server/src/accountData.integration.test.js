@@ -177,7 +177,10 @@ describe("account deletion through the real composition root (integration, CC-03
       ]);
       expect(samMatches.map((m) => m.outcomeForYou).sort()).toEqual(["loss", "loss", "win"]);
 
-      const mentions = (docs) => docs.filter((doc) => JSON.stringify(doc).includes(riya.id));
+      // Neither her account id nor the guest id she played under before signing up may be left anywhere.
+      const guestId = guest.body.identity.id;
+      const mentions = (docs) =>
+        docs.filter((doc) => JSON.stringify(doc).includes(riya.id) || JSON.stringify(doc).includes(guestId));
       for (const name of [
         "accounts",
         SESSION_COLLECTION,
@@ -189,10 +192,14 @@ describe("account deletion through the real composition root (integration, CC-03
         "player_quests",
         "leaderboard_entries",
         "player_transfers",
+        "pending_matches",
       ]) {
         expect({ name, left: mentions(await readCollection(uri, name)) }).toEqual({ name, left: [] });
       }
       expect(JSON.stringify(await readCollection(uri, "matches"))).not.toContain(`"riya"`);
+      expect(JSON.stringify(await readCollection(uri, "pending_matches"))).not.toContain(`"riya"`);
+      // The outbox still has every game, the running one finished under the stand-in included.
+      expect((await readCollection(uri, "pending_matches")).length).toBeGreaterThanOrEqual(3);
       expect(await readCollection(uri, "accounts", { email: "riya@example.com" })).toEqual([]);
       expect(await readCollection(uri, "player_transfers")).toEqual([]);
       expect(await readCollection(uri, "player_progress", { mergedInto: riya.id })).toEqual([]);

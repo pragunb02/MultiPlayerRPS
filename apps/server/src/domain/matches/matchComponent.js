@@ -3,6 +3,7 @@ import { renamePlayer } from "@classicade/games";
 import { XP_AWARDS } from "@classicade/shared";
 import { isBotPlayerId } from "../../models/botIdentity.js";
 import { deletedPlayer, earnsNothing } from "../../models/deletedPlayer.js";
+import { anonymisedMatch } from "./anonymise.js";
 import { assertDefined } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
 import { resultFor } from "../progression/progressionComponent.js";
@@ -119,14 +120,15 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
   /** Every match of a player, newest first, a page at a time. */
   async function allMatchesOf(playerId) {
     const matches = [];
-    let before;
+    let after;
     for (;;) {
-      const page = await matchAccessor.listForPlayer(playerId, { limit: HISTORY_PAGE, before });
+      // On the end time and the id, so matches that ended at the same moment are never lost at a page edge.
+      const page = await matchAccessor.listPageForPlayer(playerId, { limit: HISTORY_PAGE, after });
       matches.push(...page);
       if (page.length < HISTORY_PAGE) {
         return matches;
       }
-      before = page.at(-1).endedAt;
+      after = { endedAt: page.at(-1).endedAt, matchId: page.at(-1).matchId };
     }
   }
 
@@ -315,12 +317,11 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
             continue;
           }
           const stand = deletedPlayer(newUuid());
-          const renamed = renamePlayer(match, playerId, stand.id);
-          const players = renamed.players.map((p) =>
-            p.playerId === stand.id ? { ...p, displayName: stand.displayName } : p,
-          );
           erased.matchesAnonymised += Number(
-            await matchAccessor.replaceRenamed({ from: playerId, match: { ...renamed, players } }),
+            await matchAccessor.replaceRenamed({
+              from: playerId,
+              match: anonymisedMatch(match, { playerId, stand }),
+            }),
           );
         }
       }

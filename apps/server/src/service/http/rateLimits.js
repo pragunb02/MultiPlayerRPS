@@ -75,6 +75,8 @@ export function createRateLimit({
   keyGenerator = clientIpKey,
   skip = () => false,
   skipSuccessfulRequests = false,
+  skipFailedRequests = false,
+  requestWasSuccessful,
   headers = true,
 }) {
   return rateLimit({
@@ -83,6 +85,8 @@ export function createRateLimit({
     keyGenerator,
     skip,
     skipSuccessfulRequests,
+    skipFailedRequests,
+    ...(requestWasSuccessful !== undefined && { requestWasSuccessful }),
     standardHeaders: headers ? "draft-7" : false,
     legacyHeaders: false,
     handler: (req, res) =>

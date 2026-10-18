@@ -226,5 +226,27 @@ export function createMatchDao({ connection }) {
       const { deletedCount } = await Match.deleteOne({ matchId, "players.playerId": playerId });
       return deletedCount === 1;
     },
+
+    /**
+     * A page of a player's matches, newest first, ordered on the end time and then the match id, so two matches
+     * that ended at the same moment are never split by a page edge and lost (CC-035, the data export).
+     *
+     * @param {string} playerId
+     * @param {{ limit: number, after?: { endedAt: Date, matchId: string } }} page  `after` is the last match of the
+     *   page before
+     * @returns {Promise<MatchDoc[]>}
+     */
+    listPageByPlayer(playerId, { limit, after }) {
+      const filter = {
+        "players.playerId": playerId,
+        ...(after && {
+          $or: [
+            { endedAt: { $lt: after.endedAt } },
+            { endedAt: after.endedAt, matchId: { $lt: after.matchId } },
+          ],
+        }),
+      };
+      return Match.find(filter, FIELDS).sort({ endedAt: -1, matchId: -1 }).limit(limit).lean();
+    },
   });
 }
