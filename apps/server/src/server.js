@@ -99,7 +99,7 @@ export const MATCH_STEPS = Object.freeze({
 });
 
 /**
- * What happens after a game ends, as one flat list of named steps (CC-111, ADR-034):
+ * What happens after a game ends, as one flat list of named steps (CC-111, ADR-035):
  * 1. Record the match, so XP and the rest only ever come from a stored match.
  * 2. Judge it: a match recorded for a guest who has just signed in moves to their account first (CC-032), then it
  *    is judged once for fair play (CC-095). Every later step gives nothing to a player it does not count for.
@@ -224,7 +224,7 @@ export const keepFinishedGameIn =
     outbox.add({ match: matchComponent.finishedMatch(game), now: now() });
 
 /**
- * After a game ends, its match goes into the match pipeline's outbox and runs at once (CC-111, ADR-034). The
+ * After a game ends, its match goes into the match pipeline's outbox and runs at once (CC-111, ADR-035). The
  * outbox keeps it in MongoDB until every step is done, so a database blip or a crash never loses it. Everything
  * runs as background work, so a slow database never delays a game, and shutdown waits for it.
  *
