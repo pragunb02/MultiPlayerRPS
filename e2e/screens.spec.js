@@ -150,6 +150,12 @@ test.describe("room", () => {
     await signUp(riya, account);
     await expect(riya.page).toHaveURL("/");
     const room = await createRoom(riya, "chess");
+    // The name, its tags and "connected" wrap on a phone, so the room is never wider than the screen (CC-275).
+    // A wider page pushed the header's Menu button off a phone's screen.
+    await expect(riya.page.getByRole("list", { name: "Players" })).toContainText("connected");
+    expect(await riya.page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+      riya.page.viewportSize().width,
+    );
 
     await (await header(riya.page)).getByRole("button", { name: "Log out" }).click();
     await expect(riya.page).toHaveURL("/");
