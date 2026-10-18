@@ -128,9 +128,9 @@ describe("browser engines", () => {
     expect(webkit.match(/E2E_BROWSER: webkit\n/g)).toHaveLength(2);
   });
 
-  it("cancels an older run of a pull request, but never a run on main", async () => {
+  it("cancels an older run of a pull request, but never a run on main, where each commit has its own group", async () => {
     expect(await read(".github/workflows/ci.yml")).toContain(
-      "concurrency:\n  group: ci-${{ github.ref }}\n  cancel-in-progress: ${{ github.event_name == 'pull_request' }}\n",
+      "concurrency:\n  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}\n  cancel-in-progress: ${{ github.event_name == 'pull_request' }}\n",
     );
   });
 

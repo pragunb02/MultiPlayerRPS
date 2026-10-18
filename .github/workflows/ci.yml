@@ -9,10 +9,11 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request cancels its older run. Runs on main are never cancelled, so every merge's browser
-# tests finish and the every-10th-merge stop (ADR-039) can see them (CC-236).
+# A new push to a pull request cancels its older run. Each commit on main gets a group of its own, so no run on main
+# is cancelled or replaced by the next merge's, every merge's browser tests finish, and the every-10th-merge stop
+# (ADR-039) can see them (CC-236). One group per branch would keep only the newest waiting run on main.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

@@ -256,8 +256,10 @@ record, because today one process keeps the games it is running in memory.
   The parts are lists of whole spec files balanced by measured CI time (`e2e/shards.js`), not Playwright's
   `--shard`, which splits by test count. A last job per engine keeps the old check name, merges the reports, and
   passes only when every part passed and every test `playwright test --list` finds ran exactly once. Nothing checks
-  less: no fake clocks, shorter game timings, retries or skipped tests. CI runs on `main` are no longer cancelled
-  by the next merge, so the every-10th-merge stop sees every result. The cost is more jobs per pull request against
+  less: no fake clocks, shorter game timings, retries or skipped tests. Each commit on `main` gets its own CI
+  concurrency group (`github.sha`; pull requests keep one group per branch and cancel older runs), so no run on
+  `main` is cancelled or replaced by the next merge's and the every-10th-merge stop sees every result. Turning off
+  `cancel-in-progress` alone was not enough: a group keeps only its newest waiting run (PR #88 review). The cost is more jobs per pull request against
   the account's 20 runners at once, so parts are added only when the measured times call for them.
 
 ### ADR-038 — Button feedback: every press answers, waiting says so
