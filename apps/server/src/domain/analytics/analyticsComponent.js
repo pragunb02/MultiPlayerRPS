@@ -27,10 +27,14 @@ import {
   topItems,
   weeklyReturning,
 } from "./metrics.js";
+import { yieldToEventLoop } from "../../utils/yieldToEventLoop.js";
+import { northStarOn, statusMoves, statusRows, statusWeeks, statusWindow } from "./playerStatuses.js";
 import { peopleCount, shareOf } from "./privacy.js";
 
 /** How long a report is reused before it is worked out again (CC-233). */
 export const REPORT_TTL_MS = 5 * 60 * 1000;
+/** How many players' statuses are worked out between two pauses for live games (CC-255). */
+export const STATUS_SLICE = 250;
 /** The range the console opens with: the last 30 days, today included. */
 export const DEFAULT_RANGE_DAYS = 30;
 const GAME_IDS = Object.freeze(GAMES.map((game) => game.id));
@@ -57,6 +61,21 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
     to: new Date(startOfDay(addDays(to, 1))),
   });
 
+  /**
+   * The status book of every player, built a slice of players at a time with a pause between slices, because
+   * this server also runs live games and a year of statuses for many players is a lot of work in one go.
+   */
+  async function statusBookOf(players, window) {
+    const rows = [];
+    for (let start = 0; start < players.length; start += STATUS_SLICE) {
+      if (start > 0) {
+        await yieldToEventLoop();
+      }
+      rows.push(...statusRows(players.slice(start, start + STATUS_SLICE), window));
+    }
+    return Object.freeze({ window, rows: Object.freeze(rows) });
+  }
+
   async function build(range, now) {
     const today = dayOf(now);
     const previous = previousRange(range);
@@ -69,24 +88,38 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
         }),
       ).values(),
     ];
-    const [players, facts, previousFacts, signups, previousSignups, achievements, quests, boards] =
-      await Promise.all([
-        analyticsAccessor.listPlayerActivity(),
-        analyticsAccessor.getMatchFacts(momentsOf(range)),
-        analyticsAccessor.getMatchFacts(momentsOf(previous)),
-        analyticsAccessor.listSignups(momentsOf(range)),
-        analyticsAccessor.listSignups(momentsOf(previous)),
-        analyticsAccessor.listAchievementUnlocks(momentsOf(range)),
-        analyticsAccessor.listQuestCompletions(momentsOf(range)),
-        analyticsAccessor.listLeaderboardSizes({ periods: ["all", ...weeks.map((week) => week.id)] }),
-      ]);
+    const headlineWeek = lastFullWeek({ to: range.to, today });
+    const rangeWeeks = bucketsOf({ ...range, bucket: BUCKETS.WEEK });
+    // The headline week's moves and its North Star look back to the Sunday before it, so it is read too.
+    const statusDays = statusWindow({ weeks: [...rangeWeeks, headlineWeek], today });
+    const [
+      players,
+      playerDays,
+      facts,
+      previousFacts,
+      signups,
+      previousSignups,
+      achievements,
+      quests,
+      boards,
+    ] = await Promise.all([
+      analyticsAccessor.listPlayerActivity(),
+      analyticsAccessor.listPlayerDays(momentsOf(statusDays)),
+      analyticsAccessor.getMatchFacts(momentsOf(range)),
+      analyticsAccessor.getMatchFacts(momentsOf(previous)),
+      analyticsAccessor.listSignups(momentsOf(range)),
+      analyticsAccessor.listSignups(momentsOf(previous)),
+      analyticsAccessor.listAchievementUnlocks(momentsOf(range)),
+      analyticsAccessor.listQuestCompletions(momentsOf(range)),
+      analyticsAccessor.listLeaderboardSizes({ periods: ["all", ...weeks.map((week) => week.id)] }),
+    ]);
+    const book = await statusBookOf(playerDays, statusDays);
 
     const active = activeIn(players, range);
     const activeBefore = activeIn(players, previous);
     const converted = sumOf(signups.transfers, (row) => row.withMatches);
     const convertedBefore = sumOf(previousSignups.transfers, (row) => row.withMatches);
     const returning = weeklyReturning(players, { ...range, today });
-    const headlineWeek = lastFullWeek({ to: range.to, today });
     const [weekBefore, fullWeek] = weeklyReturning(players, {
       from: addDays(headlineWeek, -7),
       to: headlineWeek,
@@ -99,6 +132,12 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
       generatedAt: now,
       overview: Object.freeze({
         headlines: Object.freeze([
+          headline({
+            id: "northStar",
+            value: peopleCount(northStarOn(book, addDays(headlineWeek, 6))),
+            previous: peopleCount(northStarOn(book, addDays(headlineWeek, -1))),
+            week: headlineWeek,
+          }),
           headline({
             id: "activePlayers",
             value: peopleCount(active.total),
@@ -132,6 +171,10 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
             previous: conversionRate({ converted: convertedBefore, activeGuests: activeBefore.guests }),
           }),
         ]),
+      }),
+      statuses: Object.freeze({
+        weeks: Object.freeze(statusWeeks(book, { weeks: rangeWeeks, today })),
+        moves: statusMoves(book, { week: headlineWeek }),
       }),
       players: Object.freeze({
         summary: activitySummary(players, range),

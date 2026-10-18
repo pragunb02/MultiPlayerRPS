@@ -9,6 +9,7 @@
   "generatedAt": 1792260673093,
   "overview": {
     "headlines": [
+      { "id": "northStar", "value": 11, "previous": "<5", "change": "hidden", "week": "2025-03-03" },
       { "id": "activePlayers", "value": 16, "previous": 0, "change": "new" },
       { "id": "matches", "value": 21, "previous": 30, "change": -0.3 },
       { "id": "newPlayers", "value": 16, "previous": 16, "change": 0 },
@@ -17,6 +18,86 @@
       { "id": "guestsConverted", "value": 5, "previous": 0, "change": "new" },
       { "id": "conversionRate", "value": 0.3333, "previous": "<5", "change": "hidden" }
     ]
+  },
+  "statuses": {
+    "weeks": [
+      {
+        "week": "2025-03-03",
+        "through": "2025-03-09",
+        "complete": true,
+        "new": 16,
+        "casual": "<5",
+        "regular": 6,
+        "core": 5,
+        "lapsing": 0,
+        "cameBack": "<5",
+        "wentDormant": 0,
+        "northStar": 11
+      }
+    ],
+    "moves": {
+      "week": "2025-03-03",
+      "from": "2025-03-02",
+      "to": "2025-03-09",
+      "rows": [
+        {
+          "from": "notYet",
+          "to": {
+            "new": 16,
+            "casual": 0,
+            "regular": 0,
+            "core": 0,
+            "returning": 0,
+            "lapsing": 0,
+            "dormant": 0
+          }
+        },
+        {
+          "from": "new",
+          "to": { "new": 0, "casual": 0, "regular": 0, "core": 0, "returning": 0, "lapsing": 0, "dormant": 0 }
+        },
+        {
+          "from": "casual",
+          "to": { "new": 0, "casual": 0, "regular": 0, "core": 0, "returning": 0, "lapsing": 0, "dormant": 0 }
+        },
+        {
+          "from": "regular",
+          "to": {
+            "new": 0,
+            "casual": 0,
+            "regular": 0,
+            "core": 5,
+            "returning": 0,
+            "lapsing": "<5",
+            "dormant": 0
+          }
+        },
+        {
+          "from": "core",
+          "to": { "new": 0, "casual": 0, "regular": 0, "core": 0, "returning": 0, "lapsing": 0, "dormant": 0 }
+        },
+        {
+          "from": "returning",
+          "to": { "new": 0, "casual": 0, "regular": 0, "core": 0, "returning": 0, "lapsing": 0, "dormant": 0 }
+        },
+        {
+          "from": "lapsing",
+          "to": { "new": 0, "casual": 0, "regular": 0, "core": 0, "returning": 0, "lapsing": 0, "dormant": 0 }
+        },
+        {
+          "from": "dormant",
+          "to": {
+            "new": 0,
+            "casual": 0,
+            "regular": 0,
+            "core": 0,
+            "returning": 0,
+            "lapsing": 0,
+            "dormant": "not counted"
+          }
+        }
+      ]
+    }
   },
   "players": {
     "summary": { "dailyAverage": 6, "weekly": 16, "monthly": 16, "stickiness": 0.0875 },

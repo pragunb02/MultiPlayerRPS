@@ -18,6 +18,17 @@ export function createAnalyticsAccessor({ analyticsDao }) {
       return Object.freeze(players.map(({ kind, days }) => Object.freeze({ kind, days: freezeAll(days) })));
     },
 
+    /**
+     * @param {{ from: Date, to: Date }} moments
+     * @returns {Promise<ReadonlyArray<import("../domain/analytics/playerStatuses.js").PlayerDays>>}
+     */
+    async listPlayerDays(moments) {
+      const players = await analyticsDao.listPlayerDays(moments);
+      return Object.freeze(
+        players.map(({ kind, days }) => Object.freeze({ kind, days: Object.freeze([...days]) })),
+      );
+    },
+
     /** @param {{ from: Date, to: Date }} moments */
     async getMatchFacts(moments) {
       const facts = await analyticsDao.getMatchFacts(moments);

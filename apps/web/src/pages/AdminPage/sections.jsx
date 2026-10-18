@@ -19,6 +19,12 @@ const bucketName = Object.freeze({ day: "Day", week: "Week from", month: "Month"
 
 /** How each headline is named and shown. */
 const HEADLINES = Object.freeze({
+  northStar: {
+    label: "Regular and Core players",
+    format: formatCount,
+    note: ({ week }) =>
+      `North Star: played 2 or more days in the full week from ${week}, after their first week, against the week before`,
+  },
   activePlayers: { label: "Active players", format: formatCount, note: "Finished at least one match" },
   matches: { label: "Matches finished", format: formatCount, note: "All games" },
   newPlayers: { label: "New players", format: formatCount, note: "First match ever in this period" },
@@ -26,7 +32,7 @@ const HEADLINES = Object.freeze({
     label: "Weekly returning players",
     format: formatCount,
     note: ({ week }) =>
-      `North Star: real play on 3 or more days in the full week from ${week}, against the week before`,
+      `Players with real play on 3 or more days in the full week from ${week}, against the week before`,
   },
   matchesPerPlayer: {
     label: "Matches per player",
@@ -99,7 +105,7 @@ export function Overview({ report }) {
       </p>
       <ChartFigure
         id="weekly-returning"
-        title="Weekly returning players (North Star)"
+        title="Weekly returning players"
         note="Players with a counted match on 3 or more different days of a week, Monday to Sunday, India time. Guardrails: the share who played a person that week, and the share who are accounts."
         range={range}
         rows={returning}

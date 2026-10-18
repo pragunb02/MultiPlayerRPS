@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "./fixtures.js";
-import { OWNER, SEEDED_TOTALS, SEEDED_WEEK } from "./ownerConsole.js";
+import { OWNER, SEEDED_TOTALS, SEEDED_WEEK, STATUS_TOTALS, STATUS_WEEK } from "./ownerConsole.js";
 import { BASE_URL, newAccount } from "./personas.js";
 
 // The owner console (CC-233): the site's owner sees totals of the seeded week, and nobody else can tell that a
@@ -8,6 +8,7 @@ import { BASE_URL, newAccount } from "./personas.js";
 
 const WEEK = `from=${SEEDED_WEEK.from}&to=${SEEDED_WEEK.to}&bucket=day`;
 const LABELS = Object.freeze({
+  northStar: "Regular and Core players",
   activePlayers: "Active players",
   matches: "Matches finished",
   newPlayers: "New players",
@@ -84,6 +85,49 @@ test.describe("owner console", () => {
       "2025-03-04,6,0,6",
     ]);
     expect(csv).not.toMatch(/guest_|user_|Player-/);
+  });
+
+  test("the owner sees the next week's player statuses, how players moved, and exports them as CSV", async ({
+    players,
+  }) => {
+    const owner = await players.open("owner", { secrets: [OWNER.password, OWNER.email] });
+    const { page } = owner;
+    await logIn(owner, OWNER);
+    const STATUS_RANGE = `from=${STATUS_WEEK.from}&to=${STATUS_WEEK.to}&bucket=week`;
+
+    await page.goto(`/admin?${STATUS_RANGE}`);
+    await at(page, `/admin?${STATUS_RANGE}`, "Overview");
+    await expect(tile(page, LABELS.northStar).locator("dd").first()).toHaveText(STATUS_TOTALS.northStar);
+
+    await sections(page).getByRole("link", { name: "Statuses" }).click();
+    await at(page, `/admin/statuses?${STATUS_RANGE}`, "Statuses");
+    await expect(
+      page.getByRole("img", { name: /^Players by status on the last day of each week, 1 bars/ }),
+    ).toBeVisible();
+    const weeks = page.getByRole("table", { name: "Player statuses by week" });
+    await page.getByText("Show as a table").click();
+    await expect(weeks.getByRole("row").nth(1).getByRole("cell")).toHaveText(STATUS_TOTALS.weekRow.slice(1));
+    const moves = page.getByRole("table", { name: "Moves between statuses" });
+    const fromNew = moves.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "New" }) });
+    await expect(fromNew.getByRole("cell").nth(2)).toHaveText(STATUS_TOTALS.newToRegular);
+    await expect(fromNew.getByRole("cell").nth(3)).toHaveText(STATUS_TOTALS.newToCore);
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Export CSV: Player statuses by week" }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe("classicade-player-statuses-2025-03-10-to-2025-03-16.csv");
+    const csv = await readFile(await download.path(), "utf8");
+    expect(csv.split("\r\n")[1]).toBe(STATUS_TOTALS.weekRow.join(","));
+    expect(csv).not.toMatch(/guest_|user_|Player-/);
+
+    await page.goBack();
+    await at(page, `/admin?${STATUS_RANGE}`, "Overview");
+    await page.goForward();
+    await at(page, `/admin/statuses?${STATUS_RANGE}`, "Statuses");
+    await page.reload();
+    await at(page, `/admin/statuses?${STATUS_RANGE}`, "Statuses");
+    await expect(fromNew.getByRole("cell").nth(3)).toHaveText(STATUS_TOTALS.newToCore);
   });
 
   test("a new range from the form is a new address, and Back returns to the week before", async ({
