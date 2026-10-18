@@ -78,72 +78,235 @@ jobs:
           docker run --rm --volume "$PWD:/repo" --workdir /repo --entrypoint shellcheck rhysd/actionlint:1.7.12
           scripts/backup/dump-and-encrypt.sh
 
-  e2e:
-    name: Browser persona tests (desktop + mobile)
+  # The browser suite runs in parts on separate machines, so it takes minutes instead of 20 (CC-236). Each part is
+  # a list of whole spec files balanced by time (e2e/shards.js). The restart tests stop the server, so they have
+  # their own job, one test at a time. The last job merges the parts' reports into one, checks that every test
+  # ran exactly once and passed, and keeps the old check name, so branch protection can require that one check.
+  e2e-parts:
+    name: Browser persona tests (desktop + mobile, part ${{ matrix.part }} of 4)
     runs-on: ubuntu-latest
-    # The suite takes about 18 minutes today, so 20 cancels it as tests are added. 30 until CC-236 makes it fast.
-    timeout-minutes: 30
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/browser-tests-setup
         with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Cache MongoDB binary
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - run: npm ci
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+          browser: chromium
       # Builds the web app, then starts the real server in production config (e2e/playwright.config.js).
-      - run: npm run test:e2e
+      - name: Browser tests, part ${{ matrix.part }} of 4
+        working-directory: e2e
+        run: npx playwright test --project=desktop --project=mobile --workers=2 --reporter=list,blob
         env:
           CI: "true"
-      - name: Playwright report and failure traces
-        if: failure()
+          E2E_SHARD: ${{ matrix.part }}
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: chromium-part-${{ matrix.part }}.zip
+      - name: Report of this part
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
-          path: |
-            e2e/playwright-report/
-            e2e/test-results/
-          retention-days: 14
-
-  # The same browser suite on Firefox, on a laptop screen (CC-184). It takes about as long as the Chromium job and
-  # runs beside it, so it adds no waiting. Not a required check yet: the owner decides when, after a green streak.
-  # WebKit is much slower on GitHub's runners and has its own workflow, webkit.yml.
-  e2e-firefox:
-    name: Browser persona tests (firefox desktop)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Cache MongoDB binary
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - run: npm ci
-      - name: Install Firefox
-        run: npx playwright install --with-deps firefox
-      - run: npm run test:e2e
-        env:
-          CI: "true"
-          E2E_BROWSER: firefox
-      - name: Playwright report and failure traces
+          name: blob-chromium-part-${{ matrix.part }}
+          path: e2e/blob-report/
+          retention-days: 1
+      - name: Failure traces
         if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
+          name: test-results-chromium-part-${{ matrix.part }}
+          path: e2e/test-results/
+          retention-days: 14
+
+  e2e-restarts:
+    name: Browser persona tests (desktop + mobile, restarts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/browser-tests-setup
+        with:
+          browser: chromium
+      # On its own server, so nothing else is cut off. One test at a time, laptop then phone.
+      - name: Restart tests
+        working-directory: e2e
+        run: npx playwright test --project="restart desktop" --project="restart mobile" --no-deps --workers=1 --reporter=list,blob
+        env:
+          CI: "true"
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: chromium-restarts.zip
+      - name: Report of the restart tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: blob-chromium-restarts
+          path: e2e/blob-report/
+          retention-days: 1
+      - name: Failure traces
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-chromium-restarts
+          path: e2e/test-results/
+          retention-days: 14
+
+  e2e:
+    name: Browser persona tests (desktop + mobile)
+    needs: [e2e-parts, e2e-restarts]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: blob-chromium-*
+          path: e2e/all-blob-reports
+          merge-multiple: true
+      - name: One report of every part
+        working-directory: e2e
+        run: npx playwright merge-reports --reporter=html,json all-blob-reports
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: merged.json
+      # The parts together ran exactly the tests Playwright lists, each once. The job page shows each file's time.
+      - name: Every test ran exactly once, and the time of each file
+        working-directory: e2e
+        run: |
+          npx playwright test --list --reporter=json > listed.json
+          node report-summary.mjs "Browser persona tests (desktop + mobile)" listed.json merged.json
+        env:
+          CI: "true"
+      - name: Every part and the restart tests passed
+        if: always()
+        run: test "$PARTS" = success && test "$RESTARTS" = success
+        env:
+          PARTS: ${{ needs.e2e-parts.result }}
+          RESTARTS: ${{ needs.e2e-restarts.result }}
+      - name: Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+  # The same suite on Firefox, on a laptop screen (CC-184), in the same parts. Not a required check yet: the owner
+  # decides when, after a green streak. WebKit is much slower on GitHub's runners and has its own workflow,
+  # webkit.yml.
+  e2e-firefox-parts:
+    name: Browser persona tests (firefox desktop, part ${{ matrix.part }} of 4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/browser-tests-setup
+        with:
+          browser: firefox
+      - name: Browser tests, part ${{ matrix.part }} of 4
+        working-directory: e2e
+        run: npx playwright test --project=firefox --workers=2 --reporter=list,blob
+        env:
+          CI: "true"
+          E2E_BROWSER: firefox
+          E2E_SHARD: ${{ matrix.part }}
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: firefox-part-${{ matrix.part }}.zip
+      - name: Report of this part
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: blob-firefox-part-${{ matrix.part }}
+          path: e2e/blob-report/
+          retention-days: 1
+      - name: Failure traces
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-firefox-part-${{ matrix.part }}
+          path: e2e/test-results/
+          retention-days: 14
+
+  e2e-firefox-restarts:
+    name: Browser persona tests (firefox desktop, restarts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/browser-tests-setup
+        with:
+          browser: firefox
+      - name: Restart tests
+        working-directory: e2e
+        run: npx playwright test --project="restart firefox" --no-deps --workers=1 --reporter=list,blob
+        env:
+          CI: "true"
+          E2E_BROWSER: firefox
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: firefox-restarts.zip
+      - name: Report of the restart tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: blob-firefox-restarts
+          path: e2e/blob-report/
+          retention-days: 1
+      - name: Failure traces
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-firefox-restarts
+          path: e2e/test-results/
+          retention-days: 14
+
+  e2e-firefox:
+    name: Browser persona tests (firefox desktop)
+    needs: [e2e-firefox-parts, e2e-firefox-restarts]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: blob-firefox-*
+          path: e2e/all-blob-reports
+          merge-multiple: true
+      - name: One report of every part
+        working-directory: e2e
+        run: npx playwright merge-reports --reporter=html,json all-blob-reports
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: merged.json
+      - name: Every test ran exactly once, and the time of each file
+        working-directory: e2e
+        run: |
+          npx playwright test --list --reporter=json > listed.json
+          node report-summary.mjs "Browser persona tests (firefox desktop)" listed.json merged.json
+        env:
+          CI: "true"
+          E2E_BROWSER: firefox
+      - name: Every part and the restart tests passed
+        if: always()
+        run: test "$PARTS" = success && test "$RESTARTS" = success
+        env:
+          PARTS: ${{ needs.e2e-firefox-parts.result }}
+          RESTARTS: ${{ needs.e2e-firefox-restarts.result }}
+      - name: Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
           name: playwright-report-firefox
-          path: |
-            e2e/playwright-report/
-            e2e/test-results/
+          path: e2e/playwright-report/
           retention-days: 14
 
   docker:

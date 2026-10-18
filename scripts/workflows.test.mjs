@@ -1,13 +1,23 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
 import { BACKUP_SECRETS } from "./backup/backupConfig.mjs";
 import { DOWN_STEP_NAME } from "./uptime/incident.mjs";
+import { GAMES } from "../e2e/matchStates.js";
+import { RESTARTS, SHARDS } from "../e2e/shards.js";
 
 // The workflow files and the scripts depend on each other by name. These checks keep the two in step, and pin the
 // rules that keep data out of this public repository's logs and artifacts.
 const read = (/** @type {string} */ path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
+
+/** One job of a workflow, from its id to the next job. */
+const job = (/** @type {string} */ workflow, /** @type {string} */ id) => {
+  const start = workflow.indexOf(`\n  ${id}:\n`);
+  if (start < 0) throw new Error(`no job ${id}`);
+  const next = workflow.slice(start + 1).search(/\n {2}[a-z][\w-]*:\n/);
+  return next < 0 ? workflow.slice(start) : workflow.slice(start, start + 1 + next + 1);
+};
 
 describe("uptime workflow", () => {
   it("has the step the next run looks for, running only when the site is down", async () => {
@@ -93,10 +103,9 @@ describe("browser engines", () => {
   it("runs the browser suite on Firefox on every pull request (CC-184)", async () => {
     const ci = await read(".github/workflows/ci.yml");
 
-    expect(ci).toContain("npx playwright install --with-deps firefox");
-    expect(ci).toContain(
-      '      - run: npm run test:e2e\n        env:\n          CI: "true"\n          E2E_BROWSER: firefox\n',
-    );
+    expect(job(ci, "e2e-firefox-parts")).toContain("          browser: firefox\n");
+    expect(job(ci, "e2e-firefox-parts")).toContain("          E2E_BROWSER: firefox\n");
+    expect(job(ci, "e2e-firefox-restarts")).toContain("          E2E_BROWSER: firefox\n");
   });
 
   it("runs WebKit on macOS, Safari's own engine, every night, on demand and when the browser's code changes", async () => {
@@ -119,9 +128,90 @@ describe("browser engines", () => {
     expect(webkit.match(/E2E_BROWSER: webkit\n/g)).toHaveLength(2);
   });
 
-  it("keeps the Chromium job's name, which main requires before a merge", async () => {
-    expect(await read(".github/workflows/ci.yml")).toContain(
-      "name: Browser persona tests (desktop + mobile)\n",
+  it("keeps the names of the Chromium and Firefox checks, which branch protection can require", async () => {
+    const ci = await read(".github/workflows/ci.yml");
+
+    expect(job(ci, "e2e")).toContain("    name: Browser persona tests (desktop + mobile)\n");
+    expect(job(ci, "e2e-firefox")).toContain("    name: Browser persona tests (firefox desktop)\n");
+  });
+});
+
+// CI runs the Chromium and Firefox suites in parts (CC-236, e2e/shards.js). These checks make sure the parts
+// together are the whole suite: every spec file in exactly one part, every part on CI for both engines, the
+// restart tests on their own, and a last job that passes only when all of them passed.
+describe("browser test parts", () => {
+  const ENGINES = [
+    {
+      parts: "e2e-parts",
+      restarts: "e2e-restarts",
+      merge: "e2e",
+      projects: "--project=desktop --project=mobile",
+      blob: "chromium",
+    },
+    {
+      parts: "e2e-firefox-parts",
+      restarts: "e2e-firefox-restarts",
+      merge: "e2e-firefox",
+      projects: "--project=firefox",
+      blob: "firefox",
+    },
+  ];
+  const specFiles = async () =>
+    (await readdir(new URL("../e2e/", import.meta.url))).filter((name) => name.endsWith(".spec.js")).sort();
+
+  it("put every spec file but the restart tests in exactly one part", async () => {
+    const planned = SHARDS.flat();
+
+    expect([...planned].sort()).toEqual((await specFiles()).filter((name) => name !== RESTARTS));
+    expect(new Set(planned).size).toBe(planned.length);
+  });
+
+  it("give every game's press tests a file of its own, so they can run on separate machines", async () => {
+    const files = await specFiles();
+
+    for (const gameId of Object.keys(GAMES)) {
+      const file = `match-shell-presses-${gameId}.spec.js`;
+      expect(files).toContain(file);
+      expect(await read(`e2e/${file}`)).toContain(`pressEveryStateOf("${gameId}");`);
+    }
+  });
+
+  it("all run on CI, for both engines, each part on its own machine", async () => {
+    const ci = await read(".github/workflows/ci.yml");
+    const numbers = SHARDS.map((_, index) => index + 1);
+
+    for (const engine of ENGINES) {
+      const parts = job(ci, engine.parts);
+      expect(parts).toContain(`        part: [${numbers.join(", ")}]\n`);
+      expect(parts).toContain(`part \${{ matrix.part }} of ${SHARDS.length})\n`);
+      expect(parts).toContain("          E2E_SHARD: ${{ matrix.part }}\n");
+      expect(parts).toContain(`        run: npx playwright test ${engine.projects} --workers=`);
+      expect(parts).toContain("      fail-fast: false\n");
+      expect(parts).toContain(`          name: blob-${engine.blob}-part-\${{ matrix.part }}\n`);
+    }
+  });
+
+  it("run the restart tests in a job of their own, one at a time", async () => {
+    const ci = await read(".github/workflows/ci.yml");
+
+    expect(job(ci, "e2e-restarts")).toContain(
+      '--project="restart desktop" --project="restart mobile" --no-deps --workers=1 ',
     );
+    expect(job(ci, "e2e-firefox-restarts")).toContain('--project="restart firefox" --no-deps --workers=1 ');
+  });
+
+  it("pass only when every part and the restart tests passed and every listed test ran exactly once", async () => {
+    const ci = await read(".github/workflows/ci.yml");
+
+    for (const engine of ENGINES) {
+      const merge = job(ci, engine.merge);
+      expect(merge).toContain(`    needs: [${engine.parts}, ${engine.restarts}]\n`);
+      expect(merge).toContain(`          pattern: blob-${engine.blob}-*\n`);
+      expect(merge).toContain("npx playwright test --list --reporter=json > listed.json\n");
+      expect(merge).toContain(" listed.json merged.json\n");
+      expect(merge).toContain('test "$PARTS" = success && test "$RESTARTS" = success');
+      expect(merge).toContain(`          PARTS: \${{ needs.${engine.parts}.result }}\n`);
+      expect(merge).toContain(`          RESTARTS: \${{ needs.${engine.restarts}.result }}\n`);
+    }
   });
 });

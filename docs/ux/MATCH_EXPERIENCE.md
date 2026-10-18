@@ -181,7 +181,7 @@ transfer is CC-113), #42 (decline rewritten for the new room store, no focus jum
 1. Unit tests for every pure shell function: the match phase, requests, notices, scoreboard dots, the outcome text for
    every end reason and viewer, reward queue order, and the button state machine with fake timers.
 2. Server tests for the request lifecycle, expiry, cooldowns, series history and the shutdown notice.
-3. `e2e/match-shell.spec.js`: for every game and every state, a test clicks every control marked `data-cc-control` and
+3. `e2e/matchShellPresses.js` (run by one `match-shell-presses-<game>.spec.js` per game, CC-236): for every game and every state, a test clicks every control marked `data-cc-control` and
    fails if nothing visible changes within 100 ms, or if the other player sees nothing within one second where they
    should. Every state's main controls must be on screen without scrolling at 1280×720 and 390×844.
 4. Two-browser flows for every request: ask, cancel, decline, accept, expire, ask after the opponent left, and the

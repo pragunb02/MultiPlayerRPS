@@ -49,6 +49,8 @@ export default defineConfig({
         // The browser suite's own logic. The rest of e2e/ is browser tests, run by Playwright.
         "e2e/browserNoise.js",
         "e2e/tlsFront.js",
+        "e2e/shards.js",
+        "e2e/reportSummary.js",
       ],
       // Entry points only wire things together (covered indirectly): server index.js, web main.jsx, scripts/bin and
       // the two comment scripts, whose logic is tested in eslint-rules/cssComments.mjs and scripts/commentOnly.mjs.
