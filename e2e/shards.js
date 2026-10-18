@@ -28,6 +28,7 @@ export const SHARDS = Object.freeze([
     "legacy.spec.js", // 7
     "crawler.spec.js", // 4
     "names.spec.js", // 4
+    "privacy.spec.js", // new (CC-035, CC-152), about 25 s locally
   ]),
   // 1078 s
   Object.freeze([
