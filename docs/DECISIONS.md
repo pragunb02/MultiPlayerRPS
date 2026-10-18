@@ -271,6 +271,8 @@ record, because today one process keeps the games it is running in memory.
   the skeptic, and PRs touching auth, sessions, sockets, input validation or personal data keep both reviewers (rule
   8). The strict setting and the full reviews return when the feature phase ends.
 
+- **Amended 2026-10-18 (owner): fast mode ended.** Branch protection requires lint/unit/coverage, Docker and the merged browser jobs (Chromium desktop + mobile, Firefox), with branches up to date; every PR gets both reviewers and the skeptic again; builders run lint, format, coverage and their own browser tests locally. WebKit stays advisory until its known flakes (CC-184 F-8) are fixed.
+
 ### ADR-038 — Button feedback: every press answers, waiting says so
 
 - **Status:** Accepted · 2026-10-17 (CC-164, PR #53, merged behaviour. Design in
