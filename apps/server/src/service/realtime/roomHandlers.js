@@ -57,11 +57,12 @@ async function playerSockets(io, code, playerId) {
  *   io: import("socket.io").Server,
  *   socket: import("socket.io").Socket,
  *   roomComponent: ReturnType<typeof import("../../domain/rooms/roomComponent.js").createRoomComponent>,
+ *   networkOf: (address: string) => import("../../utils/networkKey.js").NetworkNames,
  *   now: () => number,
  *   logger: import("../../utils/logger.js").Logger,
- * }} deps
+ * }} deps  `networkOf` names the socket's address when a room is created (see the gateway)
  */
-export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
+export function createRoomHandlers({ io, socket, roomComponent, networkOf, now, logger }) {
   const identity = socket.data.identity;
 
   /** This tab left the room's page. Another tab of the player may still show the room: then they are still here. */
@@ -76,9 +77,11 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
   return {
     async [SOCKET_EVENTS.ROOM_CREATE](payload) {
       const { gameId, options } = parseCreateRoom(payload);
+      const network = networkOf(socket.data.address);
       const room = await roomComponent.createRoom({
         host: identity,
-        network: socket.data.network,
+        network: network.name,
+        earlierNetworks: network.earlier,
         gameId,
         options,
         now: now(),

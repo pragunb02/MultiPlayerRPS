@@ -92,7 +92,7 @@ export function createInMemoryRoomDao({ betweenClosedReads = async () => {} } = 
 
     countOpen: async () => rooms.size,
 
-    countByNetwork: async (network) => where((doc) => doc.network === network).length,
+    countByNetworks: async (networks) => where((doc) => networks.includes(doc.network)).length,
 
     async countByStatus() {
       const counts = {};

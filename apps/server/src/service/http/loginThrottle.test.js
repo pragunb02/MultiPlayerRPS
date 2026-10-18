@@ -202,6 +202,47 @@ describe("login throttle (CC-117)", () => {
     expect(throttle.remembered()).toEqual({ counts: 2, emails: 2 });
   });
 
+  describe("what it holds (CC-250)", () => {
+    it("holds no email and no address, only keyed hashes", () => {
+      const { throttle, failTimes } = setup();
+      failTimes(3, { email: EMAIL, address: ATTACKER });
+      throttle.succeeded({ email: EMAIL, address: HOME });
+      throttle.succeeded({ email: "sam@example.com", address: HOME });
+
+      const keys = throttle.keys();
+
+      expect(keys.length).toBeGreaterThanOrEqual(5);
+      for (const key of keys) {
+        expect(key).toMatch(/^[\w-]{22}$/);
+        for (const plain of ["riya", "sam", "example", "203.0.113.7", "198.51.100.66"]) {
+          expect(key).not.toContain(plain);
+        }
+      }
+    });
+
+    it("gives the same address a different name for every email, so two emails cannot be linked by it", () => {
+      const { throttle } = setup();
+      throttle.succeeded({ email: EMAIL, address: HOME });
+      throttle.succeeded({ email: "sam@example.com", address: HOME });
+
+      const keys = throttle.keys();
+
+      expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    it("hashes with a random key of its own, so the same login gives other names in another process", () => {
+      const keysWith = (randomKey) => {
+        const throttle = createLoginThrottle({ ...(randomKey && { randomKey }) });
+        throttle.failed({ email: EMAIL, address: ATTACKER });
+        return throttle.keys();
+      };
+
+      expect(keysWith(() => Buffer.alloc(32, 1))).toEqual(keysWith(() => Buffer.alloc(32, 1)));
+      expect(keysWith(() => Buffer.alloc(32, 1))).not.toEqual(keysWith(() => Buffer.alloc(32, 2)));
+      expect(keysWith()).not.toEqual(keysWith());
+    });
+  });
+
   it("waits for real by default", async () => {
     const throttle = createLoginThrottle({
       limits: { ...LOGIN_THROTTLE, failuresPerEmail: 1, slowDownMs: 5 },

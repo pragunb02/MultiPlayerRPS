@@ -188,8 +188,11 @@ export function createRoomAccessor({ roomDao }) {
     /** @returns {Promise<number>} how many rooms are open, cheap enough to ask before every new room (CC-107) */
     countOpen: () => roomDao.countOpen(),
 
-    /** @param {string} network  how many open rooms were opened from this network (CC-107) */
-    countByNetwork: (network) => roomDao.countByNetwork(network),
+    /**
+     * @param {ReadonlyArray<string>} networks  how many open rooms were opened under any of these names of one
+     *   network (CC-107, CC-249)
+     */
+    countByNetworks: (networks) => roomDao.countByNetworks(networks),
 
     /** @returns {Promise<Readonly<Record<"waiting" | "playing" | "finished", number>>>} open rooms per status */
     async countByStatus() {
