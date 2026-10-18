@@ -428,3 +428,111 @@ describe("matchComponent: a guest's history moving to their account (CC-032)", (
     });
   });
 });
+
+describe("matchComponent and deleted players (CC-035)", () => {
+  const ids = ["00000000-0000-4000-8000-0000000000a1", "00000000-0000-4000-8000-0000000000a2"];
+  const erasing = () => {
+    const queue = [...ids];
+    return createMatchComponent({
+      matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }),
+      newUuid: () => queue.shift(),
+    });
+  };
+  const ROCKY = { playerId: "bot_rocky_easy", displayName: "Rocky", connected: true };
+  const finished = (matches, matchId, seats, outcome = WIN_A) =>
+    matches.recordFinished({ room: room({ seats, game: { ...room().game, matchId } }), outcome });
+
+  it("never judges a deleted player's stand-in", async () => {
+    const matches = setup();
+    const stand = { playerId: "deleted_x", displayName: "Deleted player", connected: false };
+    const recorded = await finished(matches, "m-1", [room().seats[0], stand], {
+      ...WIN_A,
+      winners: ["deleted_x"],
+    });
+
+    const judged = await matches.judge(recorded);
+
+    expect(judged.credit.notCounted.map((entry) => entry.playerId)).toEqual(["guest_a"]);
+    expect(judged.credit).not.toHaveProperty("botXp");
+  });
+
+  it("keeps a shared match for the other player with a new anonymous id for each match, and deletes the rest", async () => {
+    const matches = erasing();
+    await finished(matches, "m-shared-1", room().seats);
+    await finished(matches, "m-shared-2", room().seats);
+    await finished(matches, "m-computer", [room().seats[0], ROCKY]);
+    await finished(matches, "m-other", [room().seats[1], ROCKY]);
+
+    const result = await matches.erasePlayer({ playerId: "guest_a" });
+
+    expect(result).toEqual({ erased: { matchesAnonymised: 2, matchesDeleted: 1 } });
+    expect((await matches.listForPlayer({ playerId: "guest_a", limit: 10 })).length).toBe(0);
+    const first = await matches.getById("m-shared-1");
+    const second = await matches.getById("m-shared-2");
+    expect(first.players).toEqual([
+      { playerId: `deleted_${ids[0]}`, displayName: "Deleted player" },
+      { playerId: "guest_b", displayName: "Bob" },
+    ]);
+    expect(first.result.winners).toEqual([`deleted_${ids[0]}`]);
+    expect(first.log[0].playerId).toBe(`deleted_${ids[0]}`);
+    expect(second.players[0].playerId).toBe(`deleted_${ids[1]}`);
+    expect((await matches.listForPlayer({ playerId: "guest_b", limit: 10 })).length).toBe(3);
+    await expect(matches.getById("m-computer")).rejects.toThrow(NotFoundError);
+    expect((await matches.getById("m-other")).players[0].playerId).toBe("guest_b");
+  });
+
+  it("changes nothing when erasing again", async () => {
+    const matches = erasing();
+    await finished(matches, "m-shared-1", room().seats);
+    await matches.erasePlayer({ playerId: "guest_a" });
+
+    expect(await matches.erasePlayer({ playerId: "guest_a" })).toEqual({
+      erased: { matchesAnonymised: 0, matchesDeleted: 0 },
+    });
+  });
+
+  it("exports the player's matches, naming them as you and the others by display name only", async () => {
+    const matches = setup();
+    await finished(matches, "m-shared-1", room().seats);
+    await finished(matches, "m-computer", [room().seats[0], ROCKY], {
+      ...WIN_A,
+      winners: ["bot_rocky_easy"],
+    });
+
+    const exported = await matches.exportPlayer({ playerId: "guest_a" });
+
+    expect(exported).toHaveLength(2);
+    const shared = exported.find((m) => m.matchId === "m-shared-1");
+    expect(shared).toEqual({
+      matchId: "m-shared-1",
+      gameId: "rps",
+      options: { bestOf: 1 },
+      startedAt: new Date(T0).toISOString(),
+      endedAt: new Date(T0 + 9_000).toISOString(),
+      players: [
+        { player: "you", displayName: "Alice" },
+        { player: "player-2", displayName: "Bob" },
+      ],
+      result: { result: "win", winners: ["you"], reason: "best-of-1" },
+      log: [{ kind: "move", player: "you", move: { choice: "rock" }, at: new Date(T0 + 1).toISOString() }],
+    });
+    expect(JSON.stringify(exported)).not.toContain("guest_b");
+    expect(JSON.stringify(exported)).not.toContain("guest_a");
+    const computer = exported.find((m) => m.matchId === "m-computer");
+    expect(computer.players[1]).toEqual({ player: "player-2", displayName: "Rocky", computer: true });
+    expect(computer.result.winners).toEqual(["player-2"]);
+  });
+
+  it("exports nothing for a player without matches, and reads every page of a long history", async () => {
+    const matches = setup();
+    for (let i = 0; i < 102; i++) {
+      await matches.recordFinished({
+        room: room({ game: { ...room().game, matchId: `m-${i}` }, lastActivityAt: T0 + i }),
+        outcome: WIN_A,
+      });
+    }
+
+    expect(await matches.exportPlayer({ playerId: "guest_c" })).toEqual([]);
+    expect(await matches.exportPlayer({ playerId: "guest_a" })).toHaveLength(102);
+  });
+});

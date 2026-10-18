@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { renamePlayer } from "@classicade/games";
 import { XP_AWARDS } from "@classicade/shared";
 import { isBotPlayerId } from "../../models/botIdentity.js";
+import { deletedPlayer, earnsNothing } from "../../models/deletedPlayer.js";
 import { assertDefined } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
 import { resultFor } from "../progression/progressionComponent.js";
@@ -13,13 +15,19 @@ import {
   limitWindowOf,
 } from "./fairPlay.js";
 
+// How many matches one read of a player's history takes.
+const HISTORY_PAGE = 100;
+
 /**
  * Match history: turns finished rooms into permanent match records and answers "what did I play?". Also judges
  * once whether each match counts for its players (CC-095, rules in `fairPlay.js`).
  *
- * @param {{ matchAccessor: ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor> }} deps
+ * @param {{
+ *   matchAccessor: ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor>,
+ *   newUuid?: () => string,   a fresh random id for each deleted player's stand-in (CC-035). Tests pick them
+ * }} deps
  */
-export function createMatchComponent({ matchAccessor }) {
+export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
   assertDefined(matchAccessor, "matchAccessor");
 
   const isPlayer = (match, playerId) => match.players.some((p) => p.playerId === playerId);
@@ -108,6 +116,53 @@ export function createMatchComponent({ matchAccessor }) {
     return match.result.winners.includes(playerId) ? "win" : "loss";
   }
 
+  /** Every match of a player, newest first, a page at a time. */
+  async function allMatchesOf(playerId) {
+    const matches = [];
+    let before;
+    for (;;) {
+      const page = await matchAccessor.listForPlayer(playerId, { limit: HISTORY_PAGE, before });
+      matches.push(...page);
+      if (page.length < HISTORY_PAGE) {
+        return matches;
+      }
+      before = page.at(-1).endedAt;
+    }
+  }
+
+  /**
+   * One match as the player's export shows it: the player is "you", everyone else is "player-2", "player-3" in
+   * seat order with their display name, and no player id appears, so the export carries nobody else's id.
+   */
+  function exported(match, playerId) {
+    const labels = new Map(
+      match.players.map((p, index) => [p.playerId, p.playerId === playerId ? "you" : `player-${index + 1}`]),
+    );
+    const label = (id) => labels.get(id);
+    return {
+      matchId: match.matchId,
+      gameId: match.gameId,
+      options: match.options,
+      startedAt: new Date(match.startedAt).toISOString(),
+      endedAt: new Date(match.endedAt).toISOString(),
+      players: match.players.map((p) => ({
+        player: label(p.playerId),
+        displayName: p.displayName,
+        ...(isBotPlayerId(p.playerId) && { computer: true }),
+      })),
+      result: { ...match.result, winners: match.result.winners.map(label) },
+      log: match.log.map(({ playerId: id, at, ...entry }) => ({
+        ...entry,
+        ...(id !== undefined && { player: label(id) }),
+        at: new Date(at).toISOString(),
+      })),
+    };
+  }
+
+  /** Whether another person played in the match, so it stays in their history when this player is deleted. */
+  const sharedWithAnotherPerson = (match, playerId) =>
+    match.players.some((p) => p.playerId !== playerId && !earnsNothing(p.playerId));
+
   return Object.freeze({
     finishedMatch,
 
@@ -140,7 +195,7 @@ export function createMatchComponent({ matchAccessor }) {
       }
       const notCounted = [];
       const botXp = [];
-      for (const { playerId } of match.players.filter((p) => !isBotPlayerId(p.playerId))) {
+      for (const { playerId } of match.players.filter((p) => !earnsNothing(p.playerId))) {
         const others = await othersFor(match, playerId);
         const verdict = judgeMatch({ match, playerId, others });
         if (!verdict.counted) {
@@ -226,6 +281,55 @@ export function createMatchComponent({ matchAccessor }) {
         renamedNow.push(await matchAccessor.replaceRenamed({ from, match: moved }));
       }
       return { moved: { matches: renamedNow.filter(Boolean).length } };
+    },
+
+    /**
+     * Every match of the player, for their data export (CC-035). Other players appear by display name only.
+     *
+     * @param {{ playerId: string }} query
+     */
+    exportPlayer: async ({ playerId }) =>
+      (await allMatchesOf(playerId)).map((match) => exported(match, playerId)),
+
+    /**
+     * Removes the player from match history (CC-035). A match another person played stays in their history: the
+     * player's id is replaced by a new random stand-in for each match, named "Deleted player". A match nobody else
+     * played (against computer characters only) is deleted. Running it twice changes nothing.
+     *
+     * @param {{ playerId: string }} input
+     * @returns {Promise<{ erased: { matchesAnonymised: number, matchesDeleted: number } }>}
+     */
+    async erasePlayer({ playerId }) {
+      const erased = { matchesAnonymised: 0, matchesDeleted: 0 };
+      // Every match handled leaves the list, so the first page is read until it is empty.
+      for (;;) {
+        const page = await matchAccessor.listForPlayer(playerId, { limit: HISTORY_PAGE });
+        if (page.length === 0) {
+          return { erased };
+        }
+        for (const match of page) {
+          if (!sharedWithAnotherPerson(match, playerId)) {
+            erased.matchesDeleted += (await matchAccessor.deleteForPlayer({
+              matchId: match.matchId,
+              playerId,
+            }))
+              ? 1
+              : 0;
+            continue;
+          }
+          const stand = deletedPlayer(newUuid());
+          const renamed = renamePlayer(match, playerId, stand.id);
+          const players = renamed.players.map((p) =>
+            p.playerId === stand.id ? { ...p, displayName: stand.displayName } : p,
+          );
+          erased.matchesAnonymised += (await matchAccessor.replaceRenamed({
+            from: playerId,
+            match: { ...renamed, players },
+          }))
+            ? 1
+            : 0;
+        }
+      }
     },
   });
 }

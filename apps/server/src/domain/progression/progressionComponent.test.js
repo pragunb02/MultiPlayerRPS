@@ -455,3 +455,30 @@ describe("progressionComponent: a guest's progress moving to their account (CC-0
     expect(published.filter((p) => p.payload.progress.playerId === ACCOUNT.id)).toHaveLength(1);
   });
 });
+
+describe("progressionComponent and deleted players (CC-035)", () => {
+  const STAND = { playerId: "deleted_00000000-0000-4000-8000-000000000009", displayName: "Deleted player" };
+
+  it("gives a deleted player's stand-in no progress, and the other player theirs", async () => {
+    const { progression, published } = setup();
+
+    const updates = await progression.applyMatch(
+      match({ players: [PLAYERS[0], STAND], credit: { notCounted: [] } }),
+    );
+
+    expect(updates.map((u) => u.playerId)).toEqual(["guest_a"]);
+    expect(published).toHaveLength(1);
+    expect((await progression.getProgress(STAND.playerId)).matchesPlayed).toBe(0);
+  });
+
+  it("exports a player's progress and erases it", async () => {
+    const { progression } = setup();
+    await progression.applyMatch(match({ credit: { notCounted: [] } }));
+
+    expect(await progression.exportPlayer({ playerId: "guest_a" })).toEqual(
+      expect.objectContaining({ xp: 30, level: 1, matchesPlayed: 1, wins: 1 }),
+    );
+    expect(await progression.erasePlayer({ playerId: "guest_a" })).toEqual({ erased: { progress: 1 } });
+    expect((await progression.getProgress("guest_a")).xp).toBe(0);
+  });
+});

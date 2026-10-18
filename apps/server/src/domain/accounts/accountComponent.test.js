@@ -14,6 +14,8 @@ import {
 } from "../../utils/errors.js";
 import { createLegacyPasswordChecker } from "../../utils/legacyPassword.js";
 import { createPasswordHasher } from "../../utils/passwordHasher.js";
+import { createAccountDeletionAccessor } from "../../data/accountDeletionAccessor.js";
+import { createInMemoryAccountDeletionDao } from "../../testing/inMemoryAccountDeletionDao.js";
 import { createAccountComponent } from "./accountComponent.js";
 
 const FAST = { N: 2 ** 10, r: 8, p: 1 };
@@ -30,6 +32,8 @@ const LEGACY_SAM = {
   level: 7,
 };
 
+const noDeletions = () =>
+  createAccountDeletionAccessor({ accountDeletionDao: createInMemoryAccountDeletionDao() });
 const legacyAccessor = (legacyUsers = []) =>
   createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao(legacyUsers) });
 
@@ -43,6 +47,7 @@ function setup({ params = FAST, legacyUsers = [] } = {}) {
     legacyUserAccessor,
     passwordHasher,
     legacyPasswords: LEGACY_PASSWORDS,
+    accountDeletionAccessor: noDeletions(),
   });
   return { accounts, accountDao, accountAccessor, legacyUserAccessor, passwordHasher };
 }
@@ -142,6 +147,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor(),
         passwordHasher: { ...passwordHasher, verifyAgainstDummy: dummy },
         legacyPasswords: LEGACY_PASSWORDS,
+        accountDeletionAccessor: noDeletions(),
       });
 
       await expect(accounts.login({ email: "nobody@example.com", password: "whatever123" })).rejects.toThrow(
@@ -159,6 +165,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor(),
         passwordHasher: createPasswordHasher({ params: FAST }),
         legacyPasswords: LEGACY_PASSWORDS,
+        accountDeletionAccessor: noDeletions(),
       });
 
       await current.login({ email: RIYA.email, password: RIYA.password });
@@ -237,6 +244,7 @@ describe("accountComponent", () => {
           verify: slow("bcrypt", (...args) => LEGACY_PASSWORDS.verify(...args)),
           verifyAgainstDummy: slow("bcrypt", (...args) => LEGACY_PASSWORDS.verifyAgainstDummy(...args)),
         },
+        accountDeletionAccessor: noDeletions(),
       });
       const reset = () => {
         Object.assign(work, { scrypt: 0, bcrypt: 0, accountReads: 0, legacyReads: 0 });
@@ -605,6 +613,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: createPasswordHasher({ params: FAST }),
         legacyPasswords: LEGACY_PASSWORDS,
+        accountDeletionAccessor: noDeletions(),
       });
 
       await expect(accounts.login(samLogin)).rejects.toThrow("database unavailable");
@@ -620,6 +629,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: createPasswordHasher({ params: FAST }),
         legacyPasswords: LEGACY_PASSWORDS,
+        accountDeletionAccessor: noDeletions(),
       });
 
       await expect(accounts.login(samLogin)).rejects.toThrow(/No free username/);
@@ -718,6 +728,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: { ...passwordHasher, hash },
         legacyPasswords: LEGACY_PASSWORDS,
+        accountDeletionAccessor: noDeletions(),
       });
       await accounts.signup({ ...RIYA, now: NOW });
       hash.mockClear();

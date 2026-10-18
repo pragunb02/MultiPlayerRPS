@@ -283,6 +283,14 @@ export function createRealtimeGateway({
       io.in(sessionRoom(fromSessionId)).socketsLeave(sessionRoom(fromSessionId));
       io.in(playerRoom(playerId)).except(sessionRoom(toSessionId)).disconnectSockets(true);
     },
+    /**
+     * The player's account was deleted (CC-035): every socket of theirs is disconnected, on every device.
+     *
+     * @param {string} playerId
+     */
+    disconnectPlayer(playerId) {
+      io.in(playerRoom(playerId)).disconnectSockets(true);
+    },
     /** @returns {{ connections: number, players: number }} realtime connections and connected players, for the gauge */
     counts: () => admission.counts(),
     /** Disconnects all sockets and closes the underlying HTTP server. */

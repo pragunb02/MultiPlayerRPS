@@ -55,7 +55,8 @@ const TOO_MANY_ATTEMPTS = "Too many attempts, try again later";
 /**
  * Accounts over HTTP. Logout is `DELETE /api/session`, "who am I" is `GET /api/session`.
  *
- * 1. `POST /auth/signup` with `{ username, email, password }` answers 201 with `{ identity, carriedOver? }`.
+ * 1. `POST /auth/signup` with `{ username, email, password, birthYear? }` answers 201 with `{ identity, carriedOver? }`.
+ *    `birthYear` is left out when the player would rather not say (CC-152).
  * 2. `POST /auth/login` with `{ email, password }` answers 200 with `{ identity, carriedOver? }`.
  * 3. `POST /auth/password` with `{ currentPassword, newPassword }` answers 204, and other devices are signed out.
  * 4. `POST /auth/sign-out-others` with no body answers 204, and other devices are signed out.
@@ -148,8 +149,19 @@ export function createAuthRoutes({
   }
 
   router.post("/auth/signup", perIp, signupPerIp, async (req, res) => {
-    const { username, email, password } = requireFields(req.body, ["username", "email", "password"]);
-    const signedUp = await accountComponent.signup({ username, email, password, now: now() });
+    const { username, email, password, birthYear } = requireFields(req.body, [
+      "username",
+      "email",
+      "password",
+      "birthYear",
+    ]);
+    const signedUp = await accountComponent.signup({
+      username,
+      email,
+      password,
+      ...(birthYear !== undefined && { birthYear }),
+      now: now(),
+    });
     req.log.info({ playerId: signedUp.identity.id }, "account created");
     await signIn(req, res, signedUp, 201);
   });

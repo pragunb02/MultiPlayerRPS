@@ -1,5 +1,5 @@
 import { DAILY_SWEEP_BONUS_XP } from "@classicade/shared";
-import { isBotPlayerId } from "../../models/botIdentity.js";
+import { earnsNothing } from "../../models/deletedPlayer.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { creditFor, hasComputerPlayer } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
@@ -199,13 +199,13 @@ export function createGamificationComponent({
     /**
      * Counts a recorded match for each of its players (after progression applied it): stats and streaks,
      * quests and their bonus XP, then achievements. A player the match doesn't count for (CC-095) gets none of
-     * it, and neither does a computer character (ADR-025). Applying the same match again changes nothing.
+     * it, and neither does a computer character (ADR-025) or a deleted player's stand-in (CC-035). Applying the same match again changes nothing.
      *
      * @param {{ match: Readonly<import("../../data/matchAccessor.js").Match>, now: number }} input
      */
     async applyMatch({ match, now }) {
       for (const { playerId, displayName } of match.players.filter(
-        (p) => !isBotPlayerId(p.playerId) && creditFor(match, p.playerId).counted,
+        (p) => !earnsNothing(p.playerId) && creditFor(match, p.playerId).counted,
       )) {
         await applyForPlayer({ match, playerId, displayName, now });
       }
@@ -294,6 +294,46 @@ export function createGamificationComponent({
       const questDays = await gamificationAccessor.removeQuestDays(from);
       await unlockEarned({ playerId, stats, at: now, matchId: "" });
       return { moved: { achievements, stats: statsMoved, questDays } };
+    },
+
+    /**
+     * The player's stats, unlocks and stored quest days, for their data export (CC-035). Bookkeeping that only
+     * keeps a match from counting twice is left out.
+     *
+     * @param {{ playerId: string }} query
+     */
+    async exportPlayer({ playerId }) {
+      const [stats, unlocks, questDays] = await Promise.all([
+        getStats(playerId),
+        gamificationAccessor.listUnlocks(playerId),
+        gamificationAccessor.listQuestDays(playerId),
+      ]);
+      const { playerId: _id, mergedFrom, ...ownStats } = stats;
+      return {
+        stats: ownStats,
+        achievements: unlocks.map(({ achievementId, unlockedAt, matchId }) => ({
+          achievementId,
+          unlockedAt: new Date(unlockedAt).toISOString(),
+          matchId,
+        })),
+        questDays: questDays.map(({ day, items, sweepAt }) => ({ day, items, sweepAt })),
+      };
+    },
+
+    /**
+     * Deletes the player's stats, quest days and unlocks (CC-035). Running it twice changes nothing.
+     *
+     * @param {{ playerId: string }} input
+     * @returns {Promise<{ erased: { stats: number, questDays: number, achievements: number } }>}
+     */
+    async erasePlayer({ playerId }) {
+      return {
+        erased: {
+          stats: await gamificationAccessor.removeStats(playerId),
+          questDays: await gamificationAccessor.removeQuestDays(playerId),
+          achievements: await gamificationAccessor.removeUnlocks(playerId),
+        },
+      };
     },
   });
 }

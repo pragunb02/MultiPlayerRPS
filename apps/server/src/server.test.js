@@ -11,6 +11,7 @@ import {
   MATCH_STEPS,
   matchPipelineSteps,
   reportOldEmailSpellings,
+  roomErasure,
   startHousekeeping,
 } from "./server.js";
 import { createPendingMatchAccessor } from "./data/pendingMatchAccessor.js";
@@ -384,6 +385,7 @@ describe("startHousekeeping", () => {
   });
 
   const idleTransfers = () => ({ resumePending: vi.fn(async () => ({ completed: [], failed: [] })) });
+  const idleDeletions = () => ({ sweepDue: vi.fn(async () => ({ completed: [], failed: [] })) });
 
   const noRooms = async () => ({ waiting: 0, playing: 0, finished: 0 });
   const noConnections = () => ({ connections: 0, players: 0 });
@@ -396,6 +398,7 @@ describe("startHousekeeping", () => {
     connections = noConnections,
     botDriver = { resume: vi.fn(async () => {}) },
     matchPipeline = idlePipeline(),
+    playerDataComponent = idleDeletions(),
   ) {
     vi.useFakeTimers();
     const capture = captureLogger();
@@ -403,13 +406,51 @@ describe("startHousekeeping", () => {
       roomComponent: { countRooms: noRooms, ...roomComponent },
       playerTransferComponent,
       matchPipeline,
+      playerDataComponent,
       connections,
       botDriver,
       logger: capture.logger,
       now: () => 42,
     });
-    return { housekeeping, playerTransferComponent, botDriver, matchPipeline, ...capture };
+    return {
+      housekeeping,
+      playerTransferComponent,
+      playerDataComponent,
+      botDriver,
+      matchPipeline,
+      ...capture,
+    };
   }
+
+  it("sweeps account deletions again every minute and logs each one by player id (CC-035)", async () => {
+    const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
+    const deletions = {
+      sweepDue: vi.fn(async () => ({
+        completed: ["user_done"],
+        failed: [{ playerId: "user_stuck", error: new Error("still down") }],
+      })),
+    };
+    const { housekeeping, find } = setup(
+      roomComponent,
+      idleTransfers(),
+      noConnections,
+      undefined,
+      undefined,
+      deletions,
+    );
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(deletions.sweepDue).toHaveBeenCalledWith({ now: 42 });
+    expect(find("account deletion swept again")[0].playerId).toBe("user_done");
+    expect(find("account deletion sweep failed")[0]).toEqual(
+      expect.objectContaining({
+        playerId: "user_stuck",
+        err: expect.objectContaining({ message: "still down" }),
+      }),
+    );
+    housekeeping.stop();
+  });
 
   it("lets computer players plan again for every room at each room sweep, and logs a failing run (CC-138)", async () => {
     const roomComponent = { sweepExpired: vi.fn(), expireDue: vi.fn() };
@@ -673,5 +714,29 @@ describe("reportOldEmailSpellings (CC-245)", () => {
         msg: "accounts with non-normal email: 2, legacy users with non-normal email: 0",
       }),
     ]);
+  });
+});
+
+describe("roomErasure (CC-035)", () => {
+  it("hands every room of a deleted player to a new stand-in each, and tells the rooms that changed", async () => {
+    const room = { code: "ROOM22" };
+    const roomComponent = { erasePlayer: vi.fn(async () => [room]) };
+    const domainEvents = new EventEmitter();
+    const updated = [];
+    domainEvents.on(ROOM_EVENTS.UPDATED, (event) => updated.push(event));
+    const uuids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"];
+    const participant = roomErasure({ roomComponent, domainEvents, newUuid: () => uuids.shift() });
+
+    const result = await participant.erasePlayer({ playerId: "user_x", now: 7 });
+
+    expect(participant.name).toBe("rooms");
+    expect(result).toEqual({ erased: { rooms: 1 } });
+    expect(updated).toEqual([{ room }]);
+    const { standIn } = roomComponent.erasePlayer.mock.calls[0][0];
+    expect(standIn().id).toBe("deleted_00000000-0000-4000-8000-000000000001");
+    expect(standIn().id).toBe("deleted_00000000-0000-4000-8000-000000000002");
+    expect(roomComponent.erasePlayer).toHaveBeenCalledWith(
+      expect.objectContaining({ playerId: "user_x", now: 7 }),
+    );
   });
 });

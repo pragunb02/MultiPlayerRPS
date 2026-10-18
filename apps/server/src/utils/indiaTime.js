@@ -35,6 +35,14 @@ export function isDay(text) {
 export const dayOf = (ms) => new Date(ms + INDIA_OFFSET_MS).toISOString().slice(0, 10);
 
 /**
+ * The year in India at a moment. Ages are worked out from it (CC-152).
+ *
+ * @param {number} ms  a moment in milliseconds
+ * @returns {number}
+ */
+export const yearOf = (ms) => Number(dayOf(ms).slice(0, 4));
+
+/**
  * The moment an India day starts (midnight in India, 18:30 UTC the evening before).
  *
  * @param {string} day  "YYYY-MM-DD"

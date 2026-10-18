@@ -19,8 +19,7 @@ const deletionSchema = new mongoose.Schema(
 );
 // MongoDB deletes the record once `expiresAt` has passed.
 deletionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-// Housekeeping: "deletions whose second sweep is due".
-deletionSchema.index({ sweepAgainAt: 1 }, { sparse: true });
+// No index for the sweep: the collection holds at most 30 days of deletions.
 
 // Only the legacy row's id and when it was closed. The row itself is never written (CC-078).
 const closureSchema = new mongoose.Schema(
@@ -42,10 +41,7 @@ export function createAccountDeletionDao({ connection }) {
   const Closure = connection.model("LegacyClosure", closureSchema);
 
   return Object.freeze({
-    ensureIndexes: async () => {
-      await Deletion.syncIndexes();
-      await Closure.syncIndexes();
-    },
+    ensureIndexes: () => Promise.all([Deletion.syncIndexes(), Closure.syncIndexes()]),
 
     /**
      * Records a deletion. A player recorded already keeps the first record, so asking twice changes nothing.
