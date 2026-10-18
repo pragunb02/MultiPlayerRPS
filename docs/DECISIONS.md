@@ -298,6 +298,18 @@ record, because today one process keeps the games it is running in memory.
      checks exactly one: the row in the capitals the player types, otherwise the oldest.
   5. **One message** for every email that cannot be used: "That email can't be used. If it's yours, log in or reset
      your password.", with "log in" linking to `/login` and keeping `next` (CC-238).
+  6. **Old spellings heal in place.** At boot the server reads the stored emails outside plain ASCII (accounts and
+     legacy rows, email field only) and keeps, in memory, those the one spelling changes, by the spelling they
+     become. It logs one line with only the counts: "accounts with non-normal email: N, legacy users with
+     non-normal email: M". Login and sign-up look these up too, in the same single read, so such an account still
+     logs in and its email is still refused at sign-up through either spelling. At its next successful login the
+     account's stored email is rewritten to the one spelling, never onto an email another account already has (that
+     case is logged as a warning, without the email). Every path still runs one scrypt and one bcrypt at the same
+     time, so the fallback adds no timing difference. No owner check is needed before merging: anything left heals
+     at login.
+  7. **Production counts, checked by the owner on 2026-10-18:** accounts with a non-normal email 0, legacy users
+     with a non-normal email 0, legacy users in total 8. The full scan of `users` at each login costs nothing at
+     that size.
 - **Known limit.** Legacy case twins: one address gets one account. Once either twin has opened it, the other twin's
   old row can no longer be used, because checking every row would cost one bcrypt per row and bring back the timing
   leak. A twin who is really a different person is helped by hand, and by password reset once CC-033 exists.

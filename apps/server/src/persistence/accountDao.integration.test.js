@@ -49,6 +49,17 @@ describe("MongoDB account DAO honours the account DAO contract (integration)", (
     );
   });
 
+  it("passes other database errors through when changing an email", async () => {
+    const dao = await createDao();
+
+    const error = await dao
+      .updateEmail({ accountId: "not-an-id", from: "a@b.co", to: "c@d.co" })
+      .catch((err) => err);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(DuplicateKey);
+  });
+
   it("passes other database errors through instead of calling them duplicates", async () => {
     const dao = await createDao();
 

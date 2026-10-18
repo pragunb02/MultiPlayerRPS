@@ -59,6 +59,24 @@ export function runLegacyUserDaoContract(createDao) {
     ]);
   });
 
+  it("also finds rows by their exact stored email, for spellings a query cannot normalise", async () => {
+    const dao = await createDao([
+      ...LEGACY_USERS,
+      { ...LEGACY_USERS[1], username: "wide", email: "ｗide@example.com" },
+    ]);
+
+    expect(await dao.listByEmail("wide@example.com")).toEqual([]);
+    expect(
+      (await dao.listByEmail("wide@example.com", ["ｗide@example.com"])).map((user) => user.username),
+    ).toEqual(["wide"]);
+  });
+
+  it("lists only the legacy emails that are not plain ASCII", async () => {
+    const dao = await createDao([...LEGACY_USERS, { ...LEGACY_USERS[1], email: "ｗide@example.com" }]);
+
+    expect(await dao.listNonAsciiEmails()).toEqual(["ｗide@example.com"]);
+  });
+
   it("returns every row that differs only in case, oldest first", async () => {
     const dao = await createDao([
       ...LEGACY_USERS,

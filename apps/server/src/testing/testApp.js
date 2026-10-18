@@ -58,6 +58,7 @@ import { createInMemoryMatchDao } from "./inMemoryMatchDao.js";
 import { createInMemoryPendingMatchDao } from "./inMemoryPendingMatchDao.js";
 import { createInMemoryPlayerTransferDao } from "./inMemoryPlayerTransferDao.js";
 import { createInMemoryProgressDao } from "./inMemoryProgressDao.js";
+import { reportOldEmailSpellings } from "../server.js";
 import { testConfig } from "./testConfig.js";
 
 /**
@@ -112,9 +113,13 @@ export function createTestApp({
     generateId: () => `00000000-0000-4000-8000-${String(++guestNumber).padStart(12, "0")}`,
     generateGuestSuffix: () => `T${String(guestNumber).padStart(3, "0")}`,
   });
+  const accountAccessor = createAccountAccessor({ accountDao });
+  const legacyUserAccessor = createLegacyUserAccessor({
+    legacyUserDao: createInMemoryLegacyUserDao(legacyUsers),
+  });
   const accountComponent = createAccountComponent({
-    accountAccessor: createAccountAccessor({ accountDao }),
-    legacyUserAccessor: createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao(legacyUsers) }),
+    accountAccessor,
+    legacyUserAccessor,
     passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }), // fast for tests
     legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
   });
@@ -250,6 +255,9 @@ export function createTestApp({
     config,
     store,
     accountDao,
+    /** What the server does at boot with stored emails in an older spelling (CC-245). */
+    loadOldEmailSpellings: () =>
+      reportOldEmailSpellings({ accountAccessor, legacyUserAccessor, logger: capture.logger }),
     sessionMiddleware,
     domainEvents,
     roomComponent,
@@ -292,6 +300,7 @@ export function clockOn(day) {
  */
 export async function startTestServer({ now = Date.now, ...options } = {}) {
   const testApp = createTestApp({ ...options, now });
+  await testApp.loadOldEmailSpellings();
   const server = http.createServer(testApp.app);
   const gateway = createRealtimeGateway({
     httpServer: server,

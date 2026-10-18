@@ -36,13 +36,15 @@ const legacyAccessor = (legacyUsers = []) =>
 function setup({ params = FAST, legacyUsers = [] } = {}) {
   const accountDao = createInMemoryAccountDao();
   const passwordHasher = createPasswordHasher({ params });
+  const accountAccessor = createAccountAccessor({ accountDao });
+  const legacyUserAccessor = legacyAccessor(legacyUsers);
   const accounts = createAccountComponent({
-    accountAccessor: createAccountAccessor({ accountDao }),
-    legacyUserAccessor: legacyAccessor(legacyUsers),
+    accountAccessor,
+    legacyUserAccessor,
     passwordHasher,
     legacyPasswords: LEGACY_PASSWORDS,
   });
-  return { accounts, accountDao, passwordHasher };
+  return { accounts, accountDao, accountAccessor, legacyUserAccessor, passwordHasher };
 }
 
 describe("accountComponent", () => {
@@ -180,7 +182,12 @@ describe("accountComponent", () => {
      * then scrypt one after the other fails, and only code that runs them at the same time passes.
      */
     function counted({
-      legacyUsers = [LEGACY_SAM, { ...LEGACY_SAM, email: "corrupt@example.com", password: "x" }, ...TWINS],
+      legacyUsers = [
+        LEGACY_SAM,
+        { ...LEGACY_SAM, email: "corrupt@example.com", password: "x" },
+        ...TWINS,
+        { ...LEGACY_SAM, username: "wide sam", email: "ｗide.sam@example.com" },
+      ],
     } = {}) {
       let legacyFails = false;
       const accountDao = createInMemoryAccountDao();
@@ -240,13 +247,23 @@ describe("accountComponent", () => {
       const breakLegacy = () => {
         legacyFails = true;
       };
-      return { accounts, work, reset, breakLegacy };
+      return { accounts, work, reset, breakLegacy, accountDao, accountAccessor, legacyUserAccessor, hasher };
     }
 
     const ONE_OF_EACH = { scrypt: 1, bcrypt: 1, accountReads: 1, legacyReads: 1 };
+    const OLD_SPELLING = "ｗide@example.com";
     const signedUpRiya = async (options) => {
       const ctx = counted(options);
       await ctx.accounts.signup({ ...RIYA, now: NOW });
+      // An account made before the one email spelling, stored under the old one (CC-245).
+      await ctx.accountDao.insert({
+        username: "Wide",
+        email: OLD_SPELLING,
+        passwordHash: await ctx.hasher.hash(RIYA.password),
+        createdAt: new Date(NOW),
+      });
+      await ctx.accountAccessor.loadEmailAliases();
+      await ctx.legacyUserAccessor.loadEmailAliases();
       ctx.reset();
       return ctx;
     };
@@ -260,6 +277,14 @@ describe("accountComponent", () => {
       ["a legacy row with a corrupt hash", "corrupt@example.com", "wrong password!"],
       ["one of three legacy rows that differ only in case", "twin@example.com", "wrong password!"],
       ["an email typed in capitals no legacy row has", "tWIN@example.com", "wrong password!"],
+      [
+        "an account under an older spelling, typed the old way, wrong password",
+        OLD_SPELLING,
+        "wrong password!",
+      ],
+      ["an account under an older spelling, typed the old way, right password", OLD_SPELLING, RIYA.password],
+      ["an account under an older spelling, typed the new way", "wide@example.com", "wrong password!"],
+      ["a legacy row under a spelling a query cannot match", "wide.sam@example.com", "wrong password!"],
     ])(
       "reads both stores and runs one scrypt and one bcrypt at the same time for %s",
       async (_, email, password) => {
@@ -330,6 +355,120 @@ describe("accountComponent", () => {
       expect(unknown.cause).toEqual(new Error("legacy store unavailable"));
       expect(work.scrypt).toBe(2);
       expect(work.bcrypt).toBe(2);
+    });
+  });
+
+  // Accounts and legacy rows stored before the one email spelling are found, and accounts heal at login (CC-245).
+  describe("emails stored under an older spelling", () => {
+    const OLD = "ｗide@example.com";
+    const NEW = "wide@example.com";
+
+    async function withStored({ accounts: stored = [], legacyUsers = [] } = {}) {
+      const ctx = setup({ legacyUsers });
+      const made = [];
+      for (const { email, username, password } of stored) {
+        made.push(
+          await ctx.accountDao.insert({
+            username,
+            email,
+            passwordHash: await ctx.passwordHasher.hash(password),
+            createdAt: new Date(NOW),
+          }),
+        );
+      }
+      await ctx.accountAccessor.loadEmailAliases();
+      await ctx.legacyUserAccessor.loadEmailAliases();
+      return { ...ctx, made };
+    }
+
+    it.each([OLD, NEW, " ＷIDE@example.com "])(
+      "logs in to an account stored under the old spelling, typed as %j, and rewrites its email",
+      async (typed) => {
+        const { accounts, accountDao, made } = await withStored({
+          accounts: [{ email: OLD, username: "Wide", password: RIYA.password }],
+        });
+
+        const signedIn = await accounts.login({ email: typed, password: RIYA.password, now: NOW });
+
+        expect(signedIn).toMatchObject({ identity: { displayName: "Wide" }, emailUpdate: "rewritten" });
+        expect((await accountDao.getById(made[0].accountId)).email).toBe(NEW);
+        const again = await accounts.login({ email: NEW, password: RIYA.password, now: NOW });
+        expect(again.emailUpdate).toBeUndefined();
+      },
+    );
+
+    it("leaves the email as it is when another account already has the one spelling", async () => {
+      const { accounts, accountDao, made } = await withStored({
+        accounts: [
+          { email: OLD, username: "Wide", password: RIYA.password },
+          { email: NEW, username: "Other", password: "another password 1" },
+        ],
+      });
+
+      const old = await accounts.login({ email: OLD, password: RIYA.password, now: NOW });
+      const current = await accounts.login({ email: NEW, password: "another password 1", now: NOW });
+
+      expect(old).toMatchObject({ identity: { displayName: "Wide" }, emailUpdate: "collision" });
+      expect(current.identity.displayName).toBe("Other");
+      expect((await accountDao.getById(made[0].accountId)).email).toBe(OLD);
+    });
+
+    it.each([OLD, NEW])(
+      "refuses a sign-up with %j while an account has it under the old spelling",
+      async (email) => {
+        const { accounts } = await withStored({
+          accounts: [{ email: OLD, username: "Wide", password: RIYA.password }],
+        });
+
+        await expect(
+          accounts.signup({ username: "Thief", email, password: RIYA.password, now: NOW }),
+        ).rejects.toMatchObject({
+          constructor: ConflictError,
+          message: EMAIL_UNAVAILABLE,
+          details: { field: "email" },
+        });
+      },
+    );
+
+    it.each([OLD, NEW])(
+      "refuses a sign-up with %j while a legacy row has it under the old spelling",
+      async (email) => {
+        const { accounts } = await withStored({
+          legacyUsers: [{ ...LEGACY_SAM, email: " ｗIDE@Example.com" }],
+        });
+
+        await expect(
+          accounts.signup({ username: "Thief", email, password: RIYA.password, now: NOW }),
+        ).rejects.toMatchObject({
+          constructor: ConflictError,
+          message: EMAIL_UNAVAILABLE,
+          details: { field: "email" },
+        });
+      },
+    );
+
+    it("lets the legacy player behind a row under the old spelling log in", async () => {
+      const { accounts } = await withStored({
+        legacyUsers: [{ ...LEGACY_SAM, email: " ｗIDE@Example.com" }],
+      });
+
+      const signedIn = await accounts.login({ email: NEW, password: LEGACY_PASSWORD, now: NOW });
+
+      expect(signedIn.identity.displayName).toBe("Sam_Lee");
+    });
+
+    it("lets an account with an invisible character, made before sign-up refused them, still log in", async () => {
+      const { accounts } = await withStored({
+        accounts: [{ email: "riya​@example.com", username: "Hidden", password: RIYA.password }],
+      });
+
+      const signedIn = await accounts.login({
+        email: "riya​@example.com",
+        password: RIYA.password,
+        now: NOW,
+      });
+
+      expect(signedIn.identity.displayName).toBe("Hidden");
     });
   });
 

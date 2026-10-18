@@ -22,6 +22,121 @@ describe("accountAccessor", () => {
     expect(await accounts.findByEmail("nobody@example.com")).toEqual([]);
   });
 
+  // Accounts stored under an older email spelling (CC-245).
+  describe("emails stored under an older spelling", () => {
+    async function withOld() {
+      const accountDao = createInMemoryAccountDao();
+      const old = await accountDao.insert({
+        ...account,
+        email: "ｒiya@example.com",
+        createdAt: new Date(NOW),
+      });
+      await accountDao.insert({
+        ...account,
+        username: "Ascii",
+        email: "ascii@example.com",
+        createdAt: new Date(NOW),
+      });
+      await accountDao.insert({
+        ...account,
+        username: "Jose",
+        email: "josé@example.com",
+        createdAt: new Date(NOW),
+      });
+      return { accountDao, old, accounts: createAccountAccessor({ accountDao }) };
+    }
+
+    it("counts only the accounts whose stored email the one spelling changes", async () => {
+      const { accounts } = await withOld();
+
+      expect(await accounts.loadEmailAliases()).toBe(1);
+    });
+
+    it("finds them under the one spelling, and refuses a new account with it", async () => {
+      const { accounts, old } = await withOld();
+      await accounts.loadEmailAliases();
+
+      expect((await accounts.findByEmail("riya@example.com")).map((found) => found.accountId)).toEqual([
+        old.accountId,
+      ]);
+      await expect(accounts.create({ ...account, username: "Thief" })).rejects.toMatchObject({
+        constructor: ConflictError,
+        details: { field: "email" },
+      });
+    });
+
+    it("rewrites one to the one spelling once, and still refuses a new account with it", async () => {
+      const { accounts, accountDao, old } = await withOld();
+      await accounts.loadEmailAliases();
+
+      expect(
+        await accounts.healEmail({ accountId: old.accountId, from: "ｒiya@example.com", to: account.email }),
+      ).toBe("rewritten");
+      expect((await accountDao.getById(old.accountId)).email).toBe(account.email);
+      await expect(accounts.create({ ...account, username: "Thief" })).rejects.toMatchObject({
+        details: { field: "email" },
+      });
+      expect(
+        await accounts.healEmail({ accountId: old.accountId, from: "ｒiya@example.com", to: account.email }),
+      ).toBe("unchanged");
+    });
+
+    it("never rewrites onto another account's email, and passes other failures on", async () => {
+      const { accounts, accountDao, old } = await withOld();
+      await accounts.loadEmailAliases();
+      await accountDao.insert({ ...account, username: "Other", createdAt: new Date(NOW) });
+
+      expect(
+        await accounts.healEmail({ accountId: old.accountId, from: "ｒiya@example.com", to: account.email }),
+      ).toBe("collision");
+      const failing = createAccountAccessor({
+        accountDao: {
+          ...accountDao,
+          updateEmail: async () => {
+            throw new Error("database unavailable");
+          },
+        },
+      });
+      await expect(failing.healEmail({ accountId: old.accountId, from: "x", to: "y" })).rejects.toThrow(
+        "database unavailable",
+      );
+    });
+
+    it("rewrites an old spelling it was not told about at boot", async () => {
+      const { accountDao, old } = await withOld();
+
+      const accounts = createAccountAccessor({ accountDao });
+
+      expect(
+        await accounts.healEmail({ accountId: old.accountId, from: "ｒiya@example.com", to: account.email }),
+      ).toBe("rewritten");
+    });
+
+    it("keeps the other old spellings of the same email after one is rewritten", async () => {
+      const accountDao = createInMemoryAccountDao();
+      const first = await accountDao.insert({
+        ...account,
+        email: "ｒiya@example.com",
+        createdAt: new Date(NOW),
+      });
+      await accountDao.insert({
+        ...account,
+        username: "Two",
+        email: "ｒｉya@example.com",
+        createdAt: new Date(NOW),
+      });
+      const accounts = createAccountAccessor({ accountDao });
+      await accounts.loadEmailAliases();
+
+      await accounts.healEmail({ accountId: first.accountId, from: "ｒiya@example.com", to: account.email });
+
+      expect((await accounts.findByEmail(account.email)).map((found) => found.username).sort()).toEqual([
+        "Riya",
+        "Two",
+      ]);
+    });
+  });
+
   it("translates duplicates into ConflictError naming the field", async () => {
     const accounts = createAccountAccessor({ accountDao: createInMemoryAccountDao() });
     await accounts.create(account);
@@ -41,6 +156,7 @@ describe("accountAccessor", () => {
       accountDao: {
         insert: fail,
         getByEmail: fail,
+        listByEmails: fail,
         getById: fail,
         getSessionVersion: fail,
         bumpSessionVersion: fail,

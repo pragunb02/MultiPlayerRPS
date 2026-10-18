@@ -427,6 +427,30 @@ export function identityFollowers({ roomComponent, playerTransferComponent, doma
 }
 
 /**
+ * Reads, at boot, which stored emails are in a spelling the one email spelling changes (CC-245), so login and
+ * sign-up still find them, and logs only how many there are. Each such account is rewritten at its next login, so
+ * the first number falls to zero over time. Reads only emails outside plain ASCII, and only the email field.
+ *
+ * @param {{
+ *   accountAccessor: Pick<ReturnType<typeof createAccountAccessor>, "loadEmailAliases">,
+ *   legacyUserAccessor: Pick<ReturnType<typeof createLegacyUserAccessor>, "loadEmailAliases">,
+ *   logger: Pick<import("./utils/logger.js").Logger, "info">,
+ * }} deps
+ * @returns {Promise<{ accounts: number, legacyUsers: number }>}
+ */
+export async function reportOldEmailSpellings({ accountAccessor, legacyUserAccessor, logger }) {
+  const [accounts, legacyUsers] = await Promise.all([
+    accountAccessor.loadEmailAliases(),
+    legacyUserAccessor.loadEmailAliases(),
+  ]);
+  logger.info(
+    { accounts, legacyUsers },
+    `accounts with non-normal email: ${accounts}, legacy users with non-normal email: ${legacyUsers}`,
+  );
+  return { accounts, legacyUsers };
+}
+
+/**
  * Composition root: builds every layer bottom-up, wires dependencies, and starts listening.
  * The only module allowed to know about all layers.
  *
@@ -505,6 +529,7 @@ export async function startServer({
   const progressAccessor = createProgressAccessor({ progressDao });
   const accountAccessor = createAccountAccessor({ accountDao });
   const legacyUserAccessor = createLegacyUserAccessor({ legacyUserDao });
+  await reportOldEmailSpellings({ accountAccessor, legacyUserAccessor, logger });
   const playerTransferAccessor = createPlayerTransferAccessor({ playerTransferDao });
   const gamificationAccessor = createGamificationAccessor({ statsDao, questDao, achievementDao });
   const leaderboardAccessor = createLeaderboardAccessor({ leaderboardDao });

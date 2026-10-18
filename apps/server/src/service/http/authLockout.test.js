@@ -102,9 +102,9 @@ describe("failed logins (CC-117)", () => {
     let broken = false;
     const accountDao = {
       ...accounts,
-      getByEmail: async (email) => {
+      listByEmails: async (emails) => {
         if (broken) throw new Error("database down");
-        return accounts.getByEmail(email);
+        return accounts.listByEmails(emails);
       },
     };
     server = await startTestServer({

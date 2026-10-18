@@ -10,6 +10,7 @@ import {
   logPipelineOutcome,
   MATCH_STEPS,
   matchPipelineSteps,
+  reportOldEmailSpellings,
   startHousekeeping,
 } from "./server.js";
 import { createPendingMatchAccessor } from "./data/pendingMatchAccessor.js";
@@ -650,5 +651,27 @@ describe("identityFollowers", () => {
     await onIdentityChanged({ previous: undefined, identity: undefined });
 
     expect(roomComponent.giveUpWaitingSeats).not.toHaveBeenCalled();
+  });
+});
+
+describe("reportOldEmailSpellings (CC-245)", () => {
+  it("logs one line with only the two counts, never an email", async () => {
+    const { logger, entries } = captureLogger();
+
+    const counts = await reportOldEmailSpellings({
+      accountAccessor: { loadEmailAliases: async () => 2 },
+      legacyUserAccessor: { loadEmailAliases: async () => 0 },
+      logger,
+    });
+
+    expect(counts).toEqual({ accounts: 2, legacyUsers: 0 });
+    expect(entries).toEqual([
+      expect.objectContaining({
+        level: 30,
+        accounts: 2,
+        legacyUsers: 0,
+        msg: "accounts with non-normal email: 2, legacy users with non-normal email: 0",
+      }),
+    ]);
   });
 });

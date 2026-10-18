@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, send } from "../../testing/socketClients.js";
+import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { startTestServer } from "../../testing/testApp.js";
+import { createPasswordHasher } from "../../utils/passwordHasher.js";
 
 let server;
 const clients = createSocketClients(() => server.baseUrl);
@@ -205,8 +207,14 @@ describe("auth routes", () => {
   // A store failing behind a login answers the usual 401, so it says nothing about the email, but it is logged
   // as an error so it is not missed (CC-245).
   it("logs a legacy store failure behind a login that answered the usual 401", async () => {
+    // Read fine once at boot, then the store fails.
+    let booted = false;
     const failing = {
       filter() {
+        if (!booted) {
+          booted = true;
+          return [];
+        }
         throw new Error("legacy store unavailable");
       },
     };
@@ -221,6 +229,41 @@ describe("auth routes", () => {
     expect(logged).toMatchObject({ level: 50, err: { message: "legacy store unavailable" } });
     expect(JSON.stringify(logged)).not.toContain("nobody@example.com");
   });
+
+  // Accounts stored under an older email spelling are rewritten at login, and the logs hold no email (CC-245).
+  it.each([
+    [[], "stored email rewritten to the one spelling", 30],
+    [
+      ["riya@example.com"],
+      "stored email left in an older spelling: another account already has the one spelling",
+      40,
+    ],
+  ])(
+    "logs what happened to an old spelling at login, without the email (%#)",
+    async (taken, message, level) => {
+      const accountDao = createInMemoryAccountDao();
+      const hasher = createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } });
+      const passwordHash = await hasher.hash(RIYA.password);
+      await accountDao.insert({
+        username: "Riya",
+        email: "ｒiya@example.com",
+        passwordHash,
+        createdAt: new Date(),
+      });
+      for (const email of taken) {
+        await accountDao.insert({ username: "Other", email, passwordHash, createdAt: new Date() });
+      }
+      server = await startTestServer({ accountDao });
+
+      const login = await post("/api/auth/login", { email: "ｒiya@example.com", password: RIYA.password });
+
+      expect(login.status).toBe(200);
+      expect(login.body).not.toHaveProperty("emailUpdate");
+      const [logged] = server.find(message);
+      expect(logged).toMatchObject({ level, playerId: login.body.identity.id });
+      expect(JSON.stringify(server.entries)).not.toContain("iya@example.com");
+    },
+  );
 
   it("never logs passwords or emails", async () => {
     server = await startTestServer();

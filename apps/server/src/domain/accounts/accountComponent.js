@@ -1,5 +1,11 @@
 import { ACCOUNT_MESSAGES, IDENTITY_KINDS } from "@classicade/shared";
-import { parseEmail, parsePassword, parseUsername } from "../../models/credentials.js";
+import {
+  parseEmail,
+  parseLoginEmail,
+  parsePassword,
+  parseUsername,
+  previousEmailSpelling,
+} from "../../models/credentials.js";
 import { createIdentity, isAccountId } from "../../models/identity.js";
 import { normaliseLegacyUsername, usernameCandidates } from "../../models/legacyUsername.js";
 import { assertDefined } from "../../utils/assert.js";
@@ -34,7 +40,10 @@ const identityOf = (account) =>
  * What signing up or logging in gives: who the player is now, and the account's session version, which the new
  * session keeps so a later "sign out other devices" or password change can end it (CC-116).
  *
- * @typedef {{ identity: Readonly<import("../../models/identity.js").Identity>, sessionVersion: number }} SignIn
+ * When the account's email was stored under an older spelling, the login rewrites it to the one spelling, and
+ * `emailUpdate` says how that went (CC-245): "rewritten", or "collision" when another account already has it.
+ *
+ * @typedef {{ identity: Readonly<import("../../models/identity.js").Identity>, sessionVersion: number, emailUpdate?: "rewritten" | "collision" }} SignIn
  */
 
 /** @param {Readonly<import("../../data/accountAccessor.js").Account>} account @returns {Readonly<SignIn>} */
@@ -81,7 +90,10 @@ export function createAccountComponent({
           throw err;
         }
         if (err.details?.field === "email") {
-          const [migrated] = await accountAccessor.findByEmail(email);
+          const [migrated] = accountToCheck(await accountAccessor.findByEmail(email), {
+            normalised: email,
+            typed: email,
+          });
           if (!(await passwordHasher.verify(password, migrated.passwordHash))) {
             throw new UnauthorizedError(INVALID_LOGIN, { cause: err });
           }
@@ -90,6 +102,24 @@ export function createAccountComponent({
       }
     }
     throw new Error(`No free username for a migrated legacy account after ${USERNAME_ATTEMPTS} attempts`);
+  }
+
+  /**
+   * The one account a login checks. Almost always there is one. An account made before the one email spelling may
+   * be stored under an older spelling, and another account may have the new one. Then the account stored exactly
+   * as the player types it (trimmed and lower-cased, the old way) is checked, else the one in the one spelling.
+   * Exactly one is checked, so the time taken stays the same (CC-245).
+   *
+   * @param {ReadonlyArray<Readonly<import("../../data/accountAccessor.js").Account>>} accounts
+   * @param {{ normalised: string, typed: string }} email
+   */
+  function accountToCheck(accounts, { normalised, typed }) {
+    const previous = previousEmailSpelling(typed);
+    const typedTheOldWay = accounts.filter(
+      (account) => account.email === previous && previous !== normalised,
+    );
+    const current = accounts.filter((account) => account.email === normalised);
+    return [...typedTheOldWay, ...current, ...accounts].slice(0, 1);
   }
 
   /**
@@ -190,14 +220,15 @@ export function createAccountComponent({
     async login({ email, password, now }) {
       let normalised;
       try {
-        normalised = { email: parseEmail(email), password: parsePassword(password) };
+        normalised = { email: parseLoginEmail(email), password: parsePassword(password) };
       } catch {
         throw new UnauthorizedError(INVALID_LOGIN);
       }
-      const [[account], legacy] = await Promise.all([
+      const [accounts, legacy] = await Promise.all([
         accountAccessor.findByEmail(normalised.email),
         legacyRowsOf(normalised.email),
       ]);
+      const [account] = accountToCheck(accounts, { normalised: normalised.email, typed: String(email) });
       if (account === undefined) {
         const typed = String(email).normalize("NFKC").trim();
         return signInOf(await loginLegacyUser(normalised, legacy, typed, now));
@@ -214,6 +245,17 @@ export function createAccountComponent({
           account.accountId,
           await passwordHasher.hash(normalised.password),
         );
+      }
+      if (account.email !== normalised.email) {
+        const outcome = await accountAccessor.healEmail({
+          accountId: account.accountId,
+          from: account.email,
+          to: normalised.email,
+        });
+        return Object.freeze({
+          ...signInOf(account),
+          ...(outcome !== "unchanged" && { emailUpdate: outcome }),
+        });
       }
       return signInOf(account);
     },

@@ -28,6 +28,22 @@ describe("legacyUserAccessor", () => {
     expect(found.every((user) => Object.isFrozen(user))).toBe(true);
   });
 
+  // A query can fold case and spaces, not Unicode forms, so those rows are read once and found by their exact text.
+  it("counts and finds the legacy rows stored in a spelling a query cannot normalise (CC-245)", async () => {
+    const legacy = createLegacyUserAccessor({
+      legacyUserDao: createInMemoryLegacyUserDao([
+        ...LEGACY_USERS,
+        { username: "wide", email: " ｗIDE@Example.com", password: LEGACY_USERS[0].password },
+        { username: "jose", email: "josé@example.com", password: LEGACY_USERS[0].password },
+      ]),
+    });
+
+    expect(await legacy.findByEmail("wide@example.com")).toEqual([]);
+    expect(await legacy.loadEmailAliases()).toBe(1);
+    expect((await legacy.findByEmail("wide@example.com")).map((user) => user.username)).toEqual(["wide"]);
+    expect((await legacy.findByEmail("josé@example.com")).map((user) => user.username)).toEqual(["jose"]);
+  });
+
   it("passes storage failures on instead of reporting nobody", async () => {
     const legacy = createLegacyUserAccessor({
       legacyUserDao: {

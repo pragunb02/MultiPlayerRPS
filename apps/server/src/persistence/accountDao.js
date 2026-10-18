@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import { DuplicateKey } from "./errors.js";
 
 const DUPLICATE_KEY_CODE = 11000;
+// Any character outside plain ASCII.
+const NON_ASCII = "[^\\x00-\\x7F]";
 
 /**
  * @typedef {Object} AccountDoc
@@ -79,6 +81,52 @@ export function createAccountDao({ connection }) {
         throw new RangeError("No account for that email");
       }
       return toDoc(doc);
+    },
+
+    /**
+     * @param {string[]} emails  exact stored spellings
+     * @returns {Promise<AccountDoc[]>} the accounts stored under any of them, oldest first
+     */
+    async listByEmails(emails) {
+      const docs = await Account.find({ email: { $in: emails } })
+        .sort({ _id: 1 })
+        .lean();
+      return docs.map(toDoc);
+    },
+
+    /**
+     * Accounts whose stored email has a character outside plain ASCII. Only those can be stored in a spelling the
+     * one email spelling would change (CC-245), so this reads few rows, and only their id and email.
+     *
+     * @returns {Promise<Array<{ accountId: string, email: string }>>}
+     */
+    async listNonAsciiEmails() {
+      const docs = await Account.find({ email: { $regex: NON_ASCII } }, { email: 1 }).lean();
+      return docs.map((doc) => ({ accountId: doc._id.toHexString(), email: doc.email }));
+    },
+
+    /**
+     * Changes an account's stored email, only while it is still `from`.
+     *
+     * @param {{ accountId: string, from: string, to: string }} change
+     * @returns {Promise<boolean>} whether it changed
+     * @throws {DuplicateKey} with `field` "email" when another account already has `to`
+     */
+    async updateEmail({ accountId, from, to }) {
+      try {
+        const { modifiedCount } = await Account.updateOne(
+          { _id: accountId, email: from },
+          { $set: { email: to } },
+        );
+        return modifiedCount === 1;
+      } catch (err) {
+        if (err.code === DUPLICATE_KEY_CODE) {
+          throw Object.assign(new DuplicateKey("email already registered", { cause: err }), {
+            field: "email",
+          });
+        }
+        throw err;
+      }
     },
 
     /** @throws {RangeError} when absent */

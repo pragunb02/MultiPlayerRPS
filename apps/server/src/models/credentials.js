@@ -67,6 +67,30 @@ export function parseEmail(raw) {
 }
 
 /**
+ * The email of a login, in the one spelling. Like `parseEmail`, but it lets invisible characters through: an
+ * account made before sign-up refused them must still be able to log in (CC-245).
+ *
+ * @param {unknown} raw
+ * @returns {string}
+ * @throws {ValidationError} when it does not look like an email at all
+ */
+export function parseLoginEmail(raw) {
+  const email = normaliseEmail(raw);
+  if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) {
+    throw invalid("email", "Enter a valid email address");
+  }
+  return email;
+}
+
+/**
+ * How the email was stored before the one spelling: trimmed and lower-cased only (CC-245).
+ *
+ * @param {string} raw
+ * @returns {string}
+ */
+export const previousEmailSpelling = (raw) => raw.trim().toLowerCase();
+
+/**
  * @param {unknown} raw
  * @returns {string} the password, unchanged (never trimmed or logged)
  */
@@ -78,4 +102,23 @@ export function parsePassword(raw) {
     throw invalid("password", "Passwords cannot be only spaces");
   }
   return raw;
+}
+
+/**
+ * The stored emails that the one email spelling changes, by the spelling they normalise to. A query can match
+ * case and spaces, but not Unicode forms, so these are looked up by their exact stored text instead (CC-245).
+ *
+ * @param {string[]} emails  stored emails
+ * @param {(email: string) => string} plain  how a query already matches a stored email
+ * @returns {Map<string, string[]>}
+ */
+export function aliasesOf(emails, plain) {
+  const aliases = new Map();
+  for (const email of emails) {
+    const normalised = normaliseEmail(email);
+    if (normalised !== plain(email)) {
+      aliases.set(normalised, [...(aliases.get(normalised) ?? []), email]);
+    }
+  }
+  return aliases;
 }

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../utils/errors.js";
 import {
+  aliasesOf,
   normaliseEmail,
+  parseLoginEmail,
+  previousEmailSpelling,
   parseEmail,
   parsePassword,
   parseUsername,
@@ -90,6 +93,27 @@ describe("credentials", () => {
     expect(normaliseEmail(" \uff32iya@Example.com ")).toBe("riya@example.com");
     expect(normaliseEmail("not an email")).toBe("not an email");
     expect(normaliseEmail(undefined)).toBe("");
+  });
+
+  it("lets a login email hold an invisible character, for accounts made before sign-up refused them", () => {
+    expect(parseLoginEmail(" Riya\u200b@Example.com")).toBe("riya\u200b@example.com");
+    expect(fieldOf(() => parseLoginEmail("not an email"))).toBe("email");
+    expect(fieldOf(() => parseLoginEmail(`${"x".repeat(250)}@a.co`))).toBe("email");
+  });
+
+  it("spells an email the way it was stored before the one spelling: trimmed and lower-cased only", () => {
+    expect(previousEmailSpelling(" \uff32iya@Example.com ")).toBe("\uff52iya@example.com");
+  });
+
+  it("groups stored emails the one spelling changes by the spelling they become", () => {
+    const aliases = aliasesOf(
+      ["\uff52iya@example.com", "\uff52\uff49ya@example.com", "plain@example.com", "Upper@example.com"],
+      (email) => email.toLowerCase(),
+    );
+
+    expect([...aliases]).toEqual([
+      ["riya@example.com", ["\uff52iya@example.com", "\uff52\uff49ya@example.com"]],
+    ]);
   });
 
   it("keeps passwords exactly as typed", () => {

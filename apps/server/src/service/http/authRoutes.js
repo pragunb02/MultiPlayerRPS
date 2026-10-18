@@ -172,6 +172,16 @@ export function createAuthRoutes({
     }
     loginThrottle.succeeded(attempt);
     req.log.info({ playerId: loggedIn.identity.id }, "logged in");
+    // An account stored under an older email spelling is rewritten at its login (CC-245). The logs never hold the
+    // email, only that it happened, and a warning when another account already had the new spelling.
+    if (loggedIn.emailUpdate === "rewritten") {
+      req.log.info({ playerId: loggedIn.identity.id }, "stored email rewritten to the one spelling");
+    } else if (loggedIn.emailUpdate === "collision") {
+      req.log.warn(
+        { playerId: loggedIn.identity.id },
+        "stored email left in an older spelling: another account already has the one spelling",
+      );
+    }
     await signIn(req, res, loggedIn, 200);
   });
 

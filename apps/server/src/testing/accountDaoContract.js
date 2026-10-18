@@ -66,6 +66,45 @@ export function runAccountDaoContract(createDao) {
     expect(refused.reason).toMatchObject({ constructor: DuplicateKey, field });
   });
 
+  // Accounts made before the one email spelling may be stored in another one (CC-245).
+  it("lists the accounts stored under any of several spellings, oldest first", async () => {
+    const dao = await createDao();
+    const old = await dao.insert(account({ email: "ｒiya@example.com" }));
+    const current = await dao.insert(account({ username: "Other", email: "riya@example.com" }));
+    await dao.insert(account({ username: "Third", email: "third@example.com" }));
+
+    const found = await dao.listByEmails(["riya@example.com", "ｒiya@example.com"]);
+
+    expect(found.map((doc) => doc.accountId)).toEqual([old.accountId, current.accountId]);
+    expect(await dao.listByEmails(["nobody@example.com"])).toEqual([]);
+  });
+
+  it("lists only the ids and emails of accounts whose email is not plain ASCII", async () => {
+    const dao = await createDao();
+    const old = await dao.insert(account({ email: "josé@example.com" }));
+    await dao.insert(account({ username: "Other", email: "jose@example.com" }));
+
+    expect(await dao.listNonAsciiEmails()).toEqual([{ accountId: old.accountId, email: "josé@example.com" }]);
+  });
+
+  it("changes a stored email only while it is still the old one, and never onto another account's", async () => {
+    const dao = await createDao();
+    const old = await dao.insert(account({ email: "ｒiya@example.com" }));
+    const other = await dao.insert(account({ username: "Other", email: "other@example.com" }));
+
+    expect(
+      await dao.updateEmail({ accountId: old.accountId, from: "wrong@example.com", to: "x@example.com" }),
+    ).toBe(false);
+    await expect(
+      dao.updateEmail({ accountId: old.accountId, from: "ｒiya@example.com", to: "other@example.com" }),
+    ).rejects.toMatchObject({ constructor: DuplicateKey, field: "email" });
+    expect(
+      await dao.updateEmail({ accountId: old.accountId, from: "ｒiya@example.com", to: "riya@example.com" }),
+    ).toBe(true);
+    expect((await dao.getById(old.accountId)).email).toBe("riya@example.com");
+    expect((await dao.getById(other.accountId)).email).toBe("other@example.com");
+  });
+
   it("throws for unknown emails and ids", async () => {
     const dao = await createDao();
 
