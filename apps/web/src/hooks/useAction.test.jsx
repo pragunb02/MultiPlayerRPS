@@ -16,7 +16,7 @@ describe("useAction (CC-164)", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("waits quietly at first, then shows a spinner after 150 ms without an answer", async () => {
+  it("waits quietly at first: no spinner at 399 ms, the spinner at 400 ms without an answer", async () => {
     const answer = later();
     const { result } = renderHook(() => useAction(() => answer.promise, { id: "room.rematch" }));
 
@@ -24,11 +24,109 @@ describe("useAction (CC-164)", () => {
       result.current.run();
     });
     expect(result.current).toMatchObject({ id: "room.rematch", phase: ACTION_PHASES.SENDING, busy: true });
-    act(() => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AFTER_MS - 1));
+    act(() => vi.advanceTimersByTime(399));
     expect(result.current.phase).toBe(ACTION_PHASES.SENDING);
     act(() => vi.advanceTimersByTime(1));
 
     expect(result.current).toMatchObject({ phase: ACTION_PHASES.PENDING, busy: true });
+    expect(ACTION_TIMING).toMatchObject({ PENDING_AFTER_MS: 400, PENDING_AT_LEAST_MS: 300 });
+  });
+
+  it("never shows the spinner for an answer at 399 ms, which is a usual round trip from India (CC-239)", async () => {
+    const answer = later();
+    const { result } = renderHook(() => useAction(() => answer.promise, { id: "x" }));
+
+    act(() => {
+      result.current.run();
+    });
+    act(() => vi.advanceTimersByTime(399));
+    await act(async () => answer.resolve("ok"));
+    act(() => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AFTER_MS));
+
+    expect(result.current.phase).toBe(ACTION_PHASES.DONE);
+  });
+
+  it("keeps the waiting words at least 300 ms once shown, even when the answer comes at 410 ms (CC-239)", async () => {
+    const answer = later();
+    const { result } = renderHook(() => useAction(() => answer.promise, { id: "x" }));
+
+    let outcome;
+    act(() => {
+      outcome = result.current.run();
+    });
+    act(() => vi.advanceTimersByTime(399));
+    expect(result.current.waitingShown).toBe(false);
+    act(() => vi.advanceTimersByTime(11));
+    expect(result.current.waitingShown).toBe(true);
+    await act(async () => answer.resolve("ok"));
+
+    // The answer itself is in at once: the press is done and nothing is busy. Only the waiting words stay.
+    expect(await outcome).toEqual({ ok: true, value: "ok" });
+    expect(result.current).toMatchObject({ phase: ACTION_PHASES.DONE, busy: false, waitingShown: true });
+    act(() => vi.advanceTimersByTime(289));
+    expect(result.current.waitingShown).toBe(true);
+    act(() => vi.advanceTimersByTime(1));
+    expect(result.current).toMatchObject({ phase: ACTION_PHASES.DONE, busy: false, waitingShown: false });
+    act(() => vi.advanceTimersByTime(ACTION_TIMING.DONE_FOR_MS - 1));
+    expect(result.current.phase).toBe(ACTION_PHASES.DONE);
+    act(() => vi.advanceTimersByTime(1));
+    expect(result.current.phase).toBe(ACTION_PHASES.IDLE);
+  });
+
+  it("shows a failure that comes right after the spinner at once, without holding the waiting words", async () => {
+    const answer = later();
+    const { result } = renderHook(() => useAction(() => answer.promise, { id: "x" }));
+
+    act(() => {
+      result.current.run();
+    });
+    act(() => vi.advanceTimersByTime(410));
+    await act(async () => answer.reject(new Error("Cell taken")));
+
+    expect(result.current).toMatchObject({
+      phase: ACTION_PHASES.FAILED,
+      busy: false,
+      waitingShown: false,
+      error: { message: "Cell taken" },
+    });
+    act(() => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AT_LEAST_MS));
+    expect(result.current.phase).toBe(ACTION_PHASES.FAILED);
+  });
+
+  it("shows an answer at once when the spinner has already been seen for 300 ms", async () => {
+    const answer = later();
+    const { result } = renderHook(() => useAction(() => answer.promise, { id: "x" }));
+
+    act(() => {
+      result.current.run();
+    });
+    act(() => vi.advanceTimersByTime(2_000));
+    expect(result.current.phase).toBe(ACTION_PHASES.PENDING);
+    await act(async () => answer.resolve("ok"));
+
+    expect(result.current.phase).toBe(ACTION_PHASES.DONE);
+  });
+
+  it("starts afresh when pressed again while the last answer still waits for the spinner's 300 ms", async () => {
+    const first = later();
+    const second = later();
+    const fn = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { result } = renderHook(() => useAction(fn, { id: "x" }));
+
+    act(() => {
+      result.current.run();
+    });
+    act(() => vi.advanceTimersByTime(410));
+    await act(async () => first.resolve("ok"));
+    act(() => {
+      result.current.run();
+    });
+    expect(result.current.phase).toBe(ACTION_PHASES.SENDING);
+    act(() => vi.advanceTimersByTime(399));
+
+    // The first press's held answer is gone: it never replaces the second press's phase.
+    expect(result.current.phase).toBe(ACTION_PHASES.SENDING);
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 
   it("is done for 600 ms after a success, then idle again, and answers with the value", async () => {
