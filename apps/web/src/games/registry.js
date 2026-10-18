@@ -1,4 +1,5 @@
 import { GAME_IDS } from "@classicade/shared";
+import { chessActions } from "./chess/chessActions.js";
 import { CHESS_REQUEST_TEXTS, chessReasonPhrase, chessSounds } from "./chess/chessAlerts.js";
 import { ChessOptions } from "./chess/ChessOptions.jsx";
 import { CHESS_HOW_TO_PLAY, RPS_HOW_TO_PLAY, TICTACTOE_HOW_TO_PLAY } from "./howToPlay.js";
@@ -13,9 +14,12 @@ const TicTacToeBoard = lazyBoard(() => import("./tictactoe/TicTacToeBoard.jsx"),
 const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard");
 
 /**
+ * What a game brings to the web app. Every field is optional: a game with only a `Board` plays in the match shell
+ * like any other, and each field it adds fills one more part of the frame (CC-157, ADR-049).
+ *
  * @typedef {Object} GameViewEntry
  * @property {import("react").ComponentType<any>} [Options]  the form for the game's options in the lobby
- * @property {import("react").ComponentType<any>} [Board]    the board in a room
+ * @property {import("react").ComponentType<BoardProps>} [Board]  the board, on the match shell's stage
  * @property {(previous: any, next: any, you: string) => string[]} [soundsFor]  the sounds a change of the game
  *   makes, as ids from SOUNDS (CC-103)
  * @property {Readonly<Record<string, import("./roomUpdates.js").RequestTexts>>} [requestTexts]  the words for
@@ -24,6 +28,24 @@ const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard
  *   in the result headline, such as "by checkmate" (CC-162)
  * @property {ReadonlyArray<import("./howToPlay.js").HowToPlayStep>} [howToPlay]  the lobby's three short steps
  *   for a first-time player (CC-259)
+ * @property {(room: any) => ReadonlyArray<import("../components/MatchShell/matchShell.js").GameAction>} [actions]
+ *   the game's buttons in the action bar while a seated player plays, at most three (Leave takes the fourth place)
+ * @property {(room: any) => { text: string } | undefined} [inGameScore]  the score inside one game, such as the
+ *   rounds of a best-of-3, for the match bar. Undefined when there is none yet
+ * @property {import("react").ComponentType<{ room: any }>} [Panel]  the game's side panel, such as a move list,
+ *   under the players in the side column
+ */
+
+/**
+ * What the shell gives a board: the RoomView, the calls that send a move or a request, and why the viewer cannot
+ * play now ("" when they can, see playReason).
+ *
+ * @typedef {{
+ *   room: any,
+ *   onMove: (move: object) => Promise<unknown>,
+ *   onAsk: (type: string) => Promise<unknown>,
+ *   reason: string,
+ * }} BoardProps
  */
 
 /**
@@ -53,6 +75,7 @@ export const GAME_VIEWS = Object.freeze({
     requestTexts: CHESS_REQUEST_TEXTS,
     reasonPhrase: chessReasonPhrase,
     howToPlay: CHESS_HOW_TO_PLAY,
+    actions: chessActions,
   }),
 });
 

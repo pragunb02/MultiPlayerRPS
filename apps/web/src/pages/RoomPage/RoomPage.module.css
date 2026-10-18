@@ -1,34 +1,4 @@
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-.header h1 {
-  margin: 0;
-  font-size: var(--text-xl);
-}
-.title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 20rem;
-  gap: var(--space-6);
-  margin-top: var(--space-6);
-}
-@media (max-width: 48rem) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-}
-.stage {
-  display: grid;
-  gap: var(--space-4);
-  align-content: start;
-}
+/* What the match shell's stage shows while the room waits for players: the invite, or who the game waits for. */
 .card {
   background: var(--color-surface);
   border: 2px solid var(--color-border);
@@ -46,61 +16,4 @@
 .inviteArt {
   justify-self: center;
   width: 8rem;
-}
-/* The result panel: the reward beat of the game (ADR-012). */
-.outcome {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-3);
-  text-align: center;
-  padding: var(--space-6);
-  border-radius: var(--radius-xl);
-  background: var(--color-primary-soft);
-  border: 2px solid var(--color-primary);
-  box-shadow: var(--glow-primary);
-  animation: outcome-in var(--duration-slow) var(--ease-spring) both;
-}
-.outcome h2 {
-  margin: 0;
-}
-/* The headline and its celebration, announced when the game ends. The buttons under it are not part of it. */
-.headline {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-2);
-}
-/* The panel takes the result's colour: gold for a win, neutral for a loss (the words say which). */
-.win {
-  border-color: var(--color-tier-gold);
-  box-shadow: var(--glow-gold);
-}
-.loss {
-  background: var(--color-surface-raised);
-  border-color: var(--color-border);
-  box-shadow: var(--shadow-sm);
-}
-.again {
-  display: inline-block;
-  padding: var(--space-3) var(--space-6);
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--color-primary-contrast);
-  box-shadow: var(--shadow-press);
-  font-family: var(--font-display);
-  font-weight: 800;
-  text-decoration: none;
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-.again:hover {
-  transform: translateY(-2px);
-}
-.again:active {
-  transform: translateY(2px);
-  box-shadow: var(--shadow-press-small);
-}
-@keyframes outcome-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.75rem) scale(0.97);
-  }
 }
