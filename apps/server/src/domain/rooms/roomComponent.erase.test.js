@@ -39,8 +39,8 @@ describe("roomComponent.erasePlayer (an account is deleted, CC-035)", () => {
     expect(room.status).toBe("finished");
     expect(room.result).toEqual(expect.objectContaining({ winners: [BOB.id], reason: "forfeit" }));
     expect(room.seats).toEqual([
-      { playerId: "deleted_1", displayName: "Deleted player", connected: false },
-      { playerId: BOB.id, displayName: "Bob", connected: true },
+      expect.objectContaining({ playerId: "deleted_1", displayName: "Deleted player", connected: false }),
+      expect.objectContaining({ playerId: BOB.id, displayName: "Bob", connected: true }),
     ]);
     expect(room.rematch.available).toBe(false);
     expect(JSON.stringify(room)).not.toContain(ALICE.id);

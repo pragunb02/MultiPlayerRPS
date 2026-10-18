@@ -206,7 +206,9 @@ describe("deleting your account (CC-035)", () => {
     expect(sessionBroadcast.announce).toHaveBeenCalled();
     expect(url()).toBe("/profile");
     expect(screen.queryByRole("region", { name: "Your data and privacy" })).toBeNull();
-    expect(screen.getByRole("link", { name: "log in" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Your profile" })).getByRole("link", { name: "Log in" }),
+    ).toBeInTheDocument();
   });
 
   it("closes the question and shows a wrong password at the password box", async () => {

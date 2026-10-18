@@ -86,7 +86,9 @@ test.describe("an account holder's data (CC-035)", () => {
     await dialog.getByRole("button", { name: "Delete for good" }).click();
     await expect(riya.page.getByText(/Your account and its data are deleted\./)).toBeVisible();
     await expect(riya.page).toHaveURL("/profile");
-    await expect(riya.page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
+    await expect(
+      riya.page.getByRole("region", { name: "Your profile" }).getByRole("link", { name: "Log in" }),
+    ).toBeVisible();
     await expect(riya.page.getByRole("banner")).not.toContainText(account.username);
     // A reload shows the same: the browser has no account any more.
     await riya.page.reload();

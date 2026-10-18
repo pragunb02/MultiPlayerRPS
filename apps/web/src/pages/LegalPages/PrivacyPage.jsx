@@ -74,8 +74,9 @@ export function PrivacyPage() {
             from the games you play.
           </li>
           <li>
-            <strong>Leaderboards.</strong> Accounts appear on the public leaderboards with their username,
-            level and score. Guests never appear on a leaderboard.
+            <strong>Leaderboards.</strong> Accounts appear on the public leaderboards with their level and
+            score. The username shows only for adults: for anyone under 18, or who has not given a year of
+            birth, the board shows &quot;Hidden player&quot; instead. Guests never appear on a leaderboard.
           </li>
           <li>
             <strong>Moving from guest to account.</strong> If you play as a guest and then sign up or log in,
@@ -166,7 +167,7 @@ export function PrivacyPage() {
             Daily quests are kept for about a week, weekly leaderboard entries for four weeks after the week.
           </li>
           <li>
-            Accounts, match history, progress and achievements are kept until you ask us to delete them. Guest
+            Accounts, match history, progress and achievements are kept until you delete your account. Guest
             progress stays linked to its random id after the session ends, but nobody can sign in as that
             guest again.
           </li>
@@ -186,9 +187,10 @@ export function PrivacyPage() {
       <LegalSection title="7. Your choices and rights">
         <p>
           You can play as a guest without giving us anything about you. You can ask to see the data we hold
-          about you, to correct it, or to delete your account and everything linked to it. Until a delete
-          button exists, ask the owner at the contact address above. Depending on where you live, you may also
-          complain to your data protection authority.
+          about you, to correct it, or to delete your account and everything linked to it. You can download
+          your data or delete your account yourself, as the next section says. For anything else, ask the
+          owner at the contact address above. Depending on where you live, you may also complain to your data
+          protection authority.
         </p>
       </LegalSection>
 
