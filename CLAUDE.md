@@ -17,7 +17,7 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 | [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) | Accepted product vision: personas, loops, phases and order of work, metrics (North Star WRP)     | Direction changes               |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)     | Current vs. target architecture                                                                  | Structure changes               |
 | [docs/BACKLOG.md](docs/BACKLOG.md)               | **Ticket board** — every task as `CC-###` with type, priority, status                            | Tickets added/started/completed |
-| [docs/tickets/](docs/tickets/)                   | One file per non-trivial ticket (`CC-###.md`) from `TEMPLATE.md`                                 | Ticket started / progressed     |
+| [docs/tickets/](docs/tickets/)                   | One file per ticket (`CC-###.md`) from `TEMPLATE.md`, small ones included                        | Ticket started / progressed     |
 | [docs/PROGRESS.md](docs/PROGRESS.md)             | Current phase, in-flight work, dated changelog                                                   | **Every working session**       |
 | [docs/DECISIONS.md](docs/DECISIONS.md)           | Architecture/product decision records (ADRs)                                                     | A decision is made or reversed  |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)         | **Production**: Render settings, env vars, pre/post-merge checks, rollback, incidents            | Deploy setup changes            |
@@ -67,7 +67,8 @@ These rules come first. Where they differ from anything below, they win.
 
 1. Before starting work, read `docs/PROGRESS.md` and the ticket on `docs/BACKLOG.md`.
 2. **No untracked work**: anything new (including bugs found along the way) gets a ticket with the next free ID first.
-3. Starting a ticket: set 🟦 on the board; for anything over ~1 hour create `docs/tickets/CC-###.md` from the template.
+3. Starting a ticket: set 🟦 on the board and create `docs/tickets/CC-###.md` from the template. Every ticket gets a
+   file; a small one (under about an hour) gets Root cause and a short Research note (working agreement rule 4).
 4. Branch `cc-###-short-name`. Every commit message starts with the ticket ID: `CC-007: fix RPS Scissors mismatch (BUG-01)`.
    Multi-ticket commits list all IDs: `CC-003, CC-004: …`.
 5. Finishing: ✅ on the board, update linked findings in `KNOWN_ISSUES.md`, add a dated changelog line in `PROGRESS.md`

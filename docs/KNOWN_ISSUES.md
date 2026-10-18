@@ -4,10 +4,25 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 ## Resolution notes
 
+- **2026-10-18 — docs sync after #65 to #91:**
+  - BUG-16 and BUG-17 fixed by CC-111 and CC-112 (#78): finished games go through a stored outbox with named steps
+    and retries (ADR-047), and a game starts only when every seated player is connected.
+  - BUG-22 fixed by CC-036 (#67): idle limits of 30 s per RPS throw and 60 s per Tic-Tac-Toe move, a claimable win
+    after an opponent is gone 60 s, and a game with no first move in 60 s is cancelled (ADR-034 point 5).
+  - BUG-26 and BUG-27 fixed by CC-158 with CC-036 (#67): a presence chip per seat (connected, thinking, away,
+    reconnecting with a countdown, left) with the presence sound, the player's own "Reconnecting…" banner, and a
+    server restart notice.
+  - BUG-25 in progress: the request banner with a countdown (CC-160, #67) fixes the request half; the always visible
+    series score is CC-161, not built yet.
+  - BUG-41 fixed by CC-254 (#77).
+  - SEC-23 and SEC-24 added from the CC-116 and CC-117 research (#87): the scrypt cost is below OWASP's minimum
+    (CC-260), and no breached or common password check exists (CC-261). The research's smaller gaps are tickets
+    CC-262 to CC-264 and acceptance criteria in CC-033 and CC-049. SEC-20 to SEC-22 stay held by the open PR #69.
+
 - **2026-10-18 — docs audit:** findings that merged tickets listed as "found along the way" are now on this
   list. BUG-42 (CC-115, #74): the alerts tests load the chess board before they start. BUG-43 (CC-086, fixed on
   `main` with CC-053): `index.html` is sent relative to the build folder. BUG-44 (CC-101): the test waits for the
-  guest name first. BUG-41 (CC-254) is fixed in PR #77 with `useEffectEvent` and is in progress until it merges.
+  guest name first. BUG-41 (CC-254) is fixed in PR #77 with `useEffectEvent` (merged the same day).
   IDs BUG-30, BUG-31 and SEC-20 to SEC-22 are held by the open PR #69. BUG-40 is the long-name
   layout bug from CC-237 (#71), to fix in CC-256.
 - **2026-10-18 — CC-115, CC-234:** BUG-20 fixed. Socket.IO does not reconnect after the server ends a socket on
@@ -72,6 +87,8 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | SEC-17 | 🟡     | Signup reveals which emails have accounts (accepted trade-off until email verification)                                               | `accountComponent.js`                                                | CC-118         |
 | SEC-18 | ✅     | No reserved-name or abuse filter on public usernames                                                                                  | `credentials.js`, `leaderboardComponent.js`                          | CC-119         |
 | SEC-19 | ✅     | Wins and XP can be farmed through instant forfeits and repeated games against the same opponent                                       | `roomComponent.js`, `progression.js`, `leaderboardComponent.js`      | CC-095         |
+| SEC-23 | 🔴     | Password hashes use scrypt N=2^15, r=8, p=1, below OWASP's minimum (N=2^17 with p=1, or N=2^15 with p=3)                              | `utils/passwordHasher.js`                                            | CC-260         |
+| SEC-24 | 🔴     | Sign-up and password change accept breached and common passwords                                                                      | `models/credentials.js`, `authRoutes.js`                             | CC-261         |
 
 ## Bugs (`BUG-*`)
 
@@ -92,18 +109,18 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | BUG-13 | ✅     | `handlers` for missing rooms throw (e.g. `rpsRooms[id]` undefined) — swallowed by try/catch, user gets no feedback                                                             | `index.js`                                                             | CC-015         |
 | BUG-14 | ✅     | Joining RPS emits `playersConnectedRPS` twice to the joiner (room broadcast + direct emit)                                                                                     | `index.js` `joinRPSGame`                                               | CC-015         |
 | BUG-15 | ✅     | Per-address rate limits keyed on the proxy's address, so real players shared one small budget                                                                                  | `app.js` (`trust proxy 1`), auth, session and leaderboard limiters     | CC-106         |
-| BUG-16 | 🔴     | A database blip during the post-game work loses the finished match                                                                                                             | `server.js` post-game tasks, `backgroundTasks.js`                      | CC-111         |
-| BUG-17 | 🔴     | A game starts after the host has left the waiting room                                                                                                                         | `roomComponent.js` join                                                | CC-112         |
+| BUG-16 | ✅     | A database blip during the post-game work loses the finished match                                                                                                             | `server.js` post-game tasks, `backgroundTasks.js`                      | CC-111         |
+| BUG-17 | ✅     | A game starts after the host has left the waiting room                                                                                                                         | `roomComponent.js` join                                                | CC-112         |
 | BUG-18 | ✅     | A guest who signs up after a game cannot rematch: seats in finished rooms did not follow the identity                                                                          | `roomComponent.js` `transferPlayer`                                    | CC-113         |
 | BUG-19 | 🔴     | Logging out on one device gives up waiting seats held on all devices                                                                                                           | `server.js` session end, `roomComponent.js`                            | CC-114         |
 | BUG-20 | ✅     | Other tabs go dead after signing in or out                                                                                                                                     | `SessionProvider.jsx`, `socket.js`                                     | CC-115         |
 | BUG-21 | 🔴     | The chess clock shows "0:010.0" just under 10 seconds                                                                                                                          | `useChessClocks.js` `formatClock`                                      | CC-120         |
-| BUG-22 | 🔴     | Games with an idle opponent never end                                                                                                                                          | `roomComponent.js`, `chessEngine.js`                                   | CC-036         |
+| BUG-22 | ✅     | Games with an idle opponent never end                                                                                                                                          | `roomComponent.js`, `chessEngine.js`                                   | CC-036         |
 | BUG-23 | 🔴     | The comment says a rematch alternates who moves first, but the first mover comes from the seed                                                                                 | `roomComponent.js` `requestRematch`                                    | CC-091         |
 | BUG-24 | ✅     | After a game "Play again", the biggest button, opens the lobby: the opponent waiting for a rematch is never told                                                               | `RoomPage.jsx` result (UX audit A1)                                    | CC-162         |
-| BUG-25 | 🔴     | Rematch requests and the series score are easy to miss: no countdown on a request, the series hidden during play                                                               | `RematchPanel.jsx`, `RoomRequests.jsx` (UX audit A2, A4)               | CC-160, CC-161 |
-| BUG-26 | 🔴     | Your own connection drops or the server restarts: clicks do nothing visible and there is no connection indicator                                                               | `useRoom.js`, `RoomPage.jsx` (UX audit A5)                             | CC-158         |
-| BUG-27 | 🔴     | The opponent closes the tab: only "disconnected" in the player list, no countdown and no sound                                                                                 | `Seats`, `RoomPage.jsx` (UX audit A6)                                  | CC-158, CC-036 |
+| BUG-25 | 🟡     | Rematch requests and the series score are easy to miss: no countdown on a request, the series hidden during play                                                               | `RematchPanel.jsx`, `RoomRequests.jsx` (UX audit A2, A4)               | CC-160, CC-161 |
+| BUG-26 | ✅     | Your own connection drops or the server restarts: clicks do nothing visible and there is no connection indicator                                                               | `useRoom.js`, `RoomPage.jsx` (UX audit A5)                             | CC-158         |
+| BUG-27 | ✅     | The opponent closes the tab: only "disconnected" in the player list, no countdown and no sound                                                                                 | `Seats`, `RoomPage.jsx` (UX audit A6)                                  | CC-158, CC-036 |
 | BUG-28 | 🔴     | A first win fires five toasts at once, covering most of a phone screen including the result                                                                                    | `ProgressToasts.jsx`, `GamificationToasts.jsx` (UX audit A9)           | CC-099         |
 | BUG-29 | ✅     | Coming back just as a room closes could answer "Room not found" instead of the reason it closed (two races between closing and reading a room)                                 | `persistence/roomDao.js` closed-room lookup, `roomComponent.js` `load` | CC-204         |
 | BUG-32 | ✅     | The three-games-against-computers limit could be passed with many starts at once and with rematches                                                                            | `botComponent.js` playComputer, acceptRematch                          | CC-138         |
@@ -115,7 +132,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | BUG-38 | ✅     | Match history did not label computer opponents                                                                                                                                 | `matchComponent.js` listForPlayer, profile                             | CC-138         |
 | BUG-39 | ✅     | `useRoom` could replace a newer room view with an older answer                                                                                                                 | `useRoom.js` revision check                                            | CC-138         |
 | BUG-40 | 🔴     | A 20 character username (allowed by sign-up) overflows on mobile: it covers Log out, and a form covers "Sign out other devices"                                                | `components/Layout` header, `ProfilePage` on a narrow screen           | CC-256         |
-| BUG-41 | 🟡     | Any room update behind an open dialog sent keyboard focus back to the dialog's first button ("Got it"): `Modal` ran its focus effect again on every new `onClose`              | `components/Modal/Modal.jsx` focus effect                              | CC-254         |
+| BUG-41 | ✅     | Any room update behind an open dialog sent keyboard focus back to the dialog's first button ("Got it"): `Modal` ran its focus effect again on every new `onClose`              | `components/Modal/Modal.jsx` focus effect                              | CC-254         |
 | BUG-42 | ✅     | `RoomPage.alerts.test.jsx` waited the default 1 s for the lazily loaded chess board, so busy test runs failed                                                                  | `RoomPage.alerts.test.jsx`                                             | CC-115         |
 | BUG-43 | ✅     | Every page answered 500 when the checkout lives under a dot-folder (`~/.worktrees/…`): `res.sendFile` with an absolute path refuses a dot segment. Production was not affected | `service/http/webApp.js` index.html                                    | CC-086, CC-053 |
 | BUG-44 | ✅     | The browser test "a guest is invited to keep their name with an account" was flaky on mobile: it opened `/profile` before the guest session existed                            | `e2e/screens.spec.js`                                                  | CC-101         |
