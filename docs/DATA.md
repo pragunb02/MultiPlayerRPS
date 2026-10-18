@@ -80,13 +80,16 @@ does not.
 
 ### Other legacy collections
 
-The legacy app (deleted in CC-029) also wrote these. The new code never reads, writes or deletes them, so whether
-they still exist in production is not known from the code. **Owner check:** Atlas, Browse Collections.
+The legacy app (deleted in CC-029) also wrote these. The new code never reads, writes or deletes them. **Checked by
+the owner on 2026-10-18:** all four exist in production (database `GameArena`), next to an empty `book` collection, and
+`users` holds 8 legacy players. **Owner decision: they are never deleted** (CC-251); they stay as they are and are part
+of every nightly backup.
 
 | Collection                                 | Held (from the legacy models)                                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
 | `sessions`                                 | legacy express sessions (connect-mongodb-session, cookie age 1 day)                                 |
 | `chessdatas`, `rpsdatas`, `tictactoedatas` | per room: `roomUniqueId`, `player1Name`, `player2Name`, the players' choices, `winner`, `createdAt` |
+| `book`                                     | empty; origin unknown                                                                               |
 
 ### `player_sessions`
 
