@@ -278,12 +278,37 @@ describe("owner console pages", () => {
       "Not playing yet16000000",
     );
     expect(within(table).getByRole("rowheader", { name: "Regular" }).closest("tr")).toHaveTextContent(
-      "Regular0005fewer than 50",
+      "Regular00050fewer than 50",
     );
     expect(within(table).getByRole("rowheader", { name: "Dormant" }).closest("tr")).toHaveTextContent(
       "not counted",
     );
     expect(screen.getByText(/from Sunday 2025-03-02 to Sunday 2025-03-09/)).toBeVisible();
+  });
+
+  it("marks a week that is still going on", async () => {
+    const going = structuredClone(REPORT);
+    going.statuses.weeks[0].complete = false;
+    await openConsole(
+      `/admin/statuses?${WEEK}`,
+      ownerApi({ getAnalytics: vi.fn().mockResolvedValue(going) }),
+    );
+
+    const table = screen.getByRole("table", { name: "Player statuses by week" });
+    expect(within(table).getByRole("rowheader", { name: "2025-03-03" }).closest("tr")).toHaveTextContent(
+      "not yet",
+    );
+  });
+
+  it("says so when no week of the period has started yet", async () => {
+    const future = structuredClone(REPORT);
+    future.statuses.weeks = [];
+    await openConsole(
+      `/admin/statuses?${WEEK}`,
+      ownerApi({ getAnalytics: vi.fn().mockResolvedValue(future) }),
+    );
+
+    expect(screen.getByRole("img", { name: /No week of this period has started yet\./ })).toBeVisible();
   });
 
   it("exports the statuses and the moves as CSV with hidden groups and uncounted cells in words", async () => {

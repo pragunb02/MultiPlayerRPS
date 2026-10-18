@@ -31,7 +31,14 @@ export const ROUTES = Object.freeze({
 });
 
 /** The owner console's pages after its overview, in tab order (CC-233). Each is the URL segment after /admin. */
-export const ADMIN_SECTIONS = Object.freeze(["players", "games", "retention", "conversion", "engagement"]);
+export const ADMIN_SECTIONS = Object.freeze([
+  "statuses",
+  "players",
+  "games",
+  "retention",
+  "conversion",
+  "engagement",
+]);
 
 /** URLs that were public once and must keep working (they redirect to the canonical URL). */
 export const LEGACY_ROUTES = Object.freeze({

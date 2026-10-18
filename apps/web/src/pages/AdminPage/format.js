@@ -1,4 +1,4 @@
-import { ANALYTICS_NOT_KEPT, getGame } from "@classicade/shared";
+import { ANALYTICS_NOT_COUNTED, ANALYTICS_NOT_KEPT, getGame } from "@classicade/shared";
 
 /** What the server sends instead of a group of 1 to 4 people (CC-233). */
 export const FEWER_THAN_MIN = "<5";
@@ -6,6 +6,8 @@ export const FEWER_THAN_MIN = "<5";
 export const FEWER_THAN_MIN_TEXT = "fewer than 5";
 /** What a total whose data has already been removed says, on screen and in exported files. */
 export const NOT_KEPT_TEXT = "no longer kept";
+/** What a count the server could not see in full says, on screen and in exported files (CC-255). */
+export const NOT_COUNTED_TEXT = "not counted";
 
 const INDIA_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -35,6 +37,7 @@ export const addDays = (day, count) =>
  */
 export function formatCount(value) {
   if (value === FEWER_THAN_MIN) return FEWER_THAN_MIN_TEXT;
+  if (value === ANALYTICS_NOT_COUNTED) return NOT_COUNTED_TEXT;
   return value === ANALYTICS_NOT_KEPT ? NOT_KEPT_TEXT : numbers.format(value);
 }
 
@@ -97,6 +100,7 @@ export const FORMATS = Object.freeze({
  */
 export function csvValue(value) {
   if (value === FEWER_THAN_MIN) return FEWER_THAN_MIN_TEXT;
+  if (value === ANALYTICS_NOT_COUNTED) return NOT_COUNTED_TEXT;
   return value === ANALYTICS_NOT_KEPT ? NOT_KEPT_TEXT : value;
 }
 

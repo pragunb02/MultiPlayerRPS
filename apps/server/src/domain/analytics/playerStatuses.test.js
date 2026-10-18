@@ -73,7 +73,7 @@ describe("statusOn", () => {
   });
 
   it("is Casual with 1 day of play in the last 7, Regular with 2 or 3, Core with 4", () => {
-    expect(statusOn(daysBack(LONG_AGO, 0), TODAY)).toBe(STATUSES.CASUAL);
+    expect(statusOn(daysBack(LONG_AGO, 10, 0), TODAY)).toBe(STATUSES.CASUAL);
     expect(statusOn(daysBack(LONG_AGO, 6, 0), TODAY)).toBe(STATUSES.REGULAR);
     expect(statusOn(daysBack(LONG_AGO, 6, 3, 0), TODAY)).toBe(STATUSES.REGULAR);
     expect(statusOn(daysBack(LONG_AGO, 6, 3, 1, 0), TODAY)).toBe(STATUSES.CORE);
@@ -178,7 +178,7 @@ describe("northStarOn", () => {
     const players = [
       player(daysBack(LONG_AGO, 1, 0)),
       player(daysBack(LONG_AGO, 4, 3, 2, 1)),
-      player(daysBack(LONG_AGO, 0)),
+      player(daysBack(LONG_AGO, 10, 0)),
       player(daysBack(3, 0)),
     ];
 

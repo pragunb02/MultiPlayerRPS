@@ -105,6 +105,7 @@ test.describe("owner console", () => {
       page.getByRole("img", { name: /^Players by status on the last day of each week, 1 bars/ }),
     ).toBeVisible();
     const weeks = page.getByRole("table", { name: "Player statuses by week" });
+    await page.getByText("Show as a table").click();
     await expect(weeks.getByRole("row").nth(1).getByRole("cell")).toHaveText(STATUS_TOTALS.weekRow.slice(1));
     const moves = page.getByRole("table", { name: "Moves between statuses" });
     const fromNew = moves.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "New" }) });
@@ -125,7 +126,8 @@ test.describe("owner console", () => {
     await page.goForward();
     await at(page, `/admin/statuses?${STATUS_RANGE}`, "Statuses");
     await page.reload();
-    await expect(weeks.getByRole("row").nth(1).getByRole("cell")).toHaveText(STATUS_TOTALS.weekRow.slice(1));
+    await at(page, `/admin/statuses?${STATUS_RANGE}`, "Statuses");
+    await expect(fromNew.getByRole("cell").nth(3)).toHaveText(STATUS_TOTALS.newToCore);
   });
 
   test("a new range from the form is a new address, and Back returns to the week before", async ({

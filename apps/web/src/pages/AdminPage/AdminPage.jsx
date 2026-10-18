@@ -9,6 +9,7 @@ import { isNotFound, isRetryable } from "../../lib/errors.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import { addDays, indiaToday } from "./format.js";
 import { Conversion, Engagement, Games, Overview, Players, Retention } from "./sections.jsx";
+import { Statuses } from "./statuses.jsx";
 import styles from "./AdminPage.module.css";
 
 /** The tabs, in order: the overview first, then each section. */
@@ -18,6 +19,7 @@ const TABS = Object.freeze([
     section,
     name: section[0].toUpperCase() + section.slice(1),
     Page: {
+      statuses: Statuses,
       players: Players,
       games: Games,
       retention: Retention,

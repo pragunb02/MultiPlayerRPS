@@ -27,6 +27,7 @@ import {
   topItems,
   weeklyReturning,
 } from "./metrics.js";
+import { northStarOn, statusMoves, statusWeeks, statusWindow } from "./playerStatuses.js";
 import { peopleCount, shareOf } from "./privacy.js";
 
 /** How long a report is reused before it is worked out again (CC-233). */
@@ -69,24 +70,37 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
         }),
       ).values(),
     ];
-    const [players, facts, previousFacts, signups, previousSignups, achievements, quests, boards] =
-      await Promise.all([
-        analyticsAccessor.listPlayerActivity(),
-        analyticsAccessor.getMatchFacts(momentsOf(range)),
-        analyticsAccessor.getMatchFacts(momentsOf(previous)),
-        analyticsAccessor.listSignups(momentsOf(range)),
-        analyticsAccessor.listSignups(momentsOf(previous)),
-        analyticsAccessor.listAchievementUnlocks(momentsOf(range)),
-        analyticsAccessor.listQuestCompletions(momentsOf(range)),
-        analyticsAccessor.listLeaderboardSizes({ periods: ["all", ...weeks.map((week) => week.id)] }),
-      ]);
+    const headlineWeek = lastFullWeek({ to: range.to, today });
+    const rangeWeeks = bucketsOf({ ...range, bucket: BUCKETS.WEEK });
+    // The headline week's moves and its North Star look back to the Sunday before it, so it is read too.
+    const statusDays = statusWindow({ weeks: [...rangeWeeks, headlineWeek], today });
+    const [
+      players,
+      playerDays,
+      facts,
+      previousFacts,
+      signups,
+      previousSignups,
+      achievements,
+      quests,
+      boards,
+    ] = await Promise.all([
+      analyticsAccessor.listPlayerActivity(),
+      analyticsAccessor.listPlayerDays(momentsOf(statusDays)),
+      analyticsAccessor.getMatchFacts(momentsOf(range)),
+      analyticsAccessor.getMatchFacts(momentsOf(previous)),
+      analyticsAccessor.listSignups(momentsOf(range)),
+      analyticsAccessor.listSignups(momentsOf(previous)),
+      analyticsAccessor.listAchievementUnlocks(momentsOf(range)),
+      analyticsAccessor.listQuestCompletions(momentsOf(range)),
+      analyticsAccessor.listLeaderboardSizes({ periods: ["all", ...weeks.map((week) => week.id)] }),
+    ]);
 
     const active = activeIn(players, range);
     const activeBefore = activeIn(players, previous);
     const converted = sumOf(signups.transfers, (row) => row.withMatches);
     const convertedBefore = sumOf(previousSignups.transfers, (row) => row.withMatches);
     const returning = weeklyReturning(players, { ...range, today });
-    const headlineWeek = lastFullWeek({ to: range.to, today });
     const [weekBefore, fullWeek] = weeklyReturning(players, {
       from: addDays(headlineWeek, -7),
       to: headlineWeek,
@@ -99,6 +113,12 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
       generatedAt: now,
       overview: Object.freeze({
         headlines: Object.freeze([
+          headline({
+            id: "northStar",
+            value: peopleCount(northStarOn(playerDays, addDays(headlineWeek, 6))),
+            previous: peopleCount(northStarOn(playerDays, addDays(headlineWeek, -1))),
+            week: headlineWeek,
+          }),
           headline({
             id: "activePlayers",
             value: peopleCount(active.total),
@@ -132,6 +152,10 @@ export function createAnalyticsComponent({ analyticsAccessor, cache }) {
             previous: conversionRate({ converted: convertedBefore, activeGuests: activeBefore.guests }),
           }),
         ]),
+      }),
+      statuses: Object.freeze({
+        weeks: Object.freeze(statusWeeks(playerDays, { weeks: rangeWeeks, today })),
+        moves: statusMoves(playerDays, { week: headlineWeek }),
       }),
       players: Object.freeze({
         summary: activitySummary(players, range),
