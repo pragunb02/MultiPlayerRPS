@@ -60,6 +60,7 @@ describe("every control has a stable name (CC-164)", () => {
       "/profile",
       fakeApi({ getSession: async () => USER, getMatches: async () => ({ matches: [] }) }),
     ],
+    ["a profile for a visitor", "/profile", fakeApi()],
     ["an invite for a visitor", "/games/chess/rooms/AB2CD3", fakeApi()],
   ])("on %s", async (_name, path, api) => {
     renderApp({ path, api });

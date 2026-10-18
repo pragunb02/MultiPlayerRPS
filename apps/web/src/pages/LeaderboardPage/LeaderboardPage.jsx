@@ -14,6 +14,9 @@ import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import styles from "./LeaderboardPage.module.css";
 
 const MEDALS = Object.freeze({ 1: "gold", 2: "silver", 3: "bronze" });
+// A board with fewer entries than this looks empty on its own, so it gets the "How to get on the board" panel beside
+// it. It is the leaderboard threshold of ADR-029, until its switch is built (CC-228).
+const FEW_ENTRIES = 25;
 const MINUTE_MS = 60_000;
 /** The picture on each tab: the game's glyph for a game board, a medal for the XP boards (a star if new). Decoration. */
 const TAB_ICONS = Object.freeze({ overall: "trophy", weekly: "calendar" });
@@ -97,51 +100,104 @@ function YouRow({ you, metric, listedRanks }) {
   );
 }
 
+/** What counts on this board, in one short sentence. */
+function whatCounts(info) {
+  if (info.metric === LEADERBOARD_METRICS.WINS) return `Win a game of ${info.name} against another player.`;
+  return info.period === LEADERBOARD_PERIODS.WEEK
+    ? "Earn XP from games and daily quests this week."
+    : "Earn XP from games and daily quests.";
+}
+
+/**
+ * The panel beside a board with few entries (CC-259): how a player gets on it, and one button to start. It holds
+ * rules only, never numbers, so it can't make the site look busier than it is (ADR-029).
+ */
+function HowToGetOn({ info }) {
+  return (
+    <aside className={styles.howTo} aria-labelledby="how-to-get-on">
+      <h2 id="how-to-get-on">How to get on the board</h2>
+      <ol className={styles.steps}>
+        <li>Play with an account. Only accounts are ranked.</li>
+        <li>{whatCounts(info)}</li>
+        <li>Games against the computer never count here.</li>
+      </ol>
+      <Link
+        to={info.gameId === undefined ? paths.home() : paths.game(info.gameId)}
+        className={styles.play}
+        data-cc-control="leaderboard.play"
+      >
+        {info.gameId === undefined ? "Play a game" : `Play ${info.name}`}
+      </Link>
+    </aside>
+  );
+}
+
+/** The board's card: its name and what it counts, with the list (or its loading and error states) inside. */
+function BoardCard({ info, children }) {
+  return (
+    <div className={styles.card}>
+      <h2>{info.metric === LEADERBOARD_METRICS.WINS ? `${info.name} wins` : info.name}</h2>
+      <p className={styles.muted}>{describeBoard(info)}</p>
+      {children}
+    </div>
+  );
+}
+
 function Board({ info }) {
   const board = useLeaderboard(info.id);
   if (board.status === "loading") {
-    return <p aria-busy="true">Loading the leaderboard…</p>;
+    return (
+      <BoardCard info={info}>
+        <p aria-busy="true">Loading the leaderboard…</p>
+      </BoardCard>
+    );
   }
   if (board.status === "error") {
     return (
-      <div role="alert" className={styles.problem}>
-        <p>Couldn't load the leaderboard. {board.error.message}</p>
-        <Button control="leaderboard.retry" variant="secondary" onClick={board.retry}>
-          Try again
-        </Button>
-      </div>
+      <BoardCard info={info}>
+        <div role="alert" className={styles.problem}>
+          <p>Couldn't load the leaderboard. {board.error.message}</p>
+          <Button control="leaderboard.retry" variant="secondary" onClick={board.retry}>
+            Try again
+          </Button>
+        </div>
+      </BoardCard>
     );
   }
   const { entries, you } = board.data;
   const yourRank = you?.listed ? you.rank : 0;
+  const few = entries.length < FEW_ENTRIES;
   return (
-    <>
-      {board.data.board.resetsAt !== undefined && <ResetsIn resetsAt={board.data.board.resetsAt} />}
-      {entries.length === 0 ? (
-        <p className={styles.empty}>No ranked players yet. Win a match to claim #1!</p>
-      ) : (
-        <ol className={styles.list} aria-label={`${info.name} rankings`}>
-          {entries.map((entry) => (
-            <li
-              key={entry.rank}
-              className={[styles.row, styles[MEDALS[entry.rank]], entry.rank === yourRank && styles.you]
-                .filter(Boolean)
-                .join(" ")}
-              aria-current={entry.rank === yourRank ? "true" : undefined}
-            >
-              <Place rank={entry.rank} />
-              <span className={styles.name}>
-                {entry.displayName}
-                {entry.rank === yourRank && <span className={styles.tag}>you</span>}
-              </span>
-              <Level level={entry.level} />
-              <span className={styles.score}>{formatScore(info.metric, entry.score)}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-      <YouRow you={you} metric={info.metric} listedRanks={entries.map((entry) => entry.rank)} />
-    </>
+    <div className={few ? styles.withHowTo : styles.alone}>
+      <BoardCard info={info}>
+        {board.data.board.resetsAt !== undefined && <ResetsIn resetsAt={board.data.board.resetsAt} />}
+        {entries.length === 0 ? (
+          <p className={styles.empty}>No ranked players yet. Win a match to claim #1!</p>
+        ) : (
+          <ol className={styles.list} aria-label={`${info.name} rankings`}>
+            {entries.map((entry) => (
+              <li
+                key={entry.rank}
+                className={[styles.row, styles[MEDALS[entry.rank]], entry.rank === yourRank && styles.you]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-current={entry.rank === yourRank ? "true" : undefined}
+              >
+                <Place rank={entry.rank} />
+                <span className={styles.name}>
+                  {entry.displayName}
+                  {entry.rank === yourRank && <span className={styles.tag}>you</span>}
+                </span>
+                <Level level={entry.level} />
+                <span className={styles.score}>{formatScore(info.metric, entry.score)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+        <YouRow you={you} metric={info.metric} listedRanks={entries.map((entry) => entry.rank)} />
+      </BoardCard>
+      {few && <HowToGetOn info={info} />}
+    </div>
   );
 }
 
@@ -176,11 +232,7 @@ export function LeaderboardPage() {
           ))}
         </ul>
       </nav>
-      <div className={styles.card}>
-        <h2>{info.metric === LEADERBOARD_METRICS.WINS ? `${info.name} wins` : info.name}</h2>
-        <p className={styles.muted}>{describeBoard(info)}</p>
-        <Board key={info.id} info={info} />
-      </div>
+      <Board key={info.id} info={info} />
     </section>
   );
 }

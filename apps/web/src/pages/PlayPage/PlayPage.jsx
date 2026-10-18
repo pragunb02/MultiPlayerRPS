@@ -11,6 +11,7 @@ import { gameView } from "../../games/registry.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useCreateRoom } from "../../hooks/useCreateRoom.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
+import { HowToPlay } from "./HowToPlay.jsx";
 import styles from "./PlayPage.module.css";
 
 /**
@@ -107,6 +108,7 @@ export function PlayPage() {
           </Button>
         </form>
       </div>
+      <HowToPlay gameId={game.id} />
     </section>
   );
 }

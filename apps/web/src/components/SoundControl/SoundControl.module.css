@@ -48,9 +48,9 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-/* Phones have volume buttons, so the slider makes room for the rest of the header there. */
+/* On a phone the controls sit in the header's menu (CC-259), where the slider has the width left over. */
 @media (max-width: 40rem) {
   .volume {
-    display: none;
+    flex: 1;
   }
 }

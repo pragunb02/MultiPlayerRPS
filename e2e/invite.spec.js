@@ -1,4 +1,4 @@
-import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
+import { createRoom, expect, header, joinAsGuest, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
 // Someone opens a friend's invite link without a session (CC-086): they choose how to join — as a guest, by
@@ -238,7 +238,7 @@ test.describe("guest progress carries over to the account (CC-032)", () => {
     await guest.page.getByRole("button", { name: "Play as a guest" }).click();
     await expect(guest.page.getByText(/You're playing as Guest-/)).toBeVisible();
 
-    await guest.page.getByRole("banner").getByRole("link", { name: "Log in" }).click();
+    await (await header(guest.page)).getByRole("link", { name: "Log in" }).click();
     await expect(
       guest.page.getByText("Logging in adds this guest's XP and matches to your account."),
     ).toBeVisible();

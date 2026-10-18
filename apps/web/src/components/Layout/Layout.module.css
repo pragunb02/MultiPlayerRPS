@@ -106,15 +106,106 @@
   transform: translateY(2px);
   box-shadow: var(--shadow-press-accent-small);
 }
+/* The square glyph and the menu button are for phones only. A wide screen shows the wordmark and every control. */
+.mark,
+.menuButton {
+  display: none;
+}
+.menuButton {
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.menuButton:hover,
+.menuButton[aria-expanded="true"] {
+  border-color: var(--color-primary);
+}
+.menuButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.menuButton {
+  position: relative;
+}
+.menuDot {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+.menuIcon {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+/*
+ * A phone gets one row (CC-259): the square glyph, the navigation and the menu button. The player's controls open
+ * under that row, inside the header, and push the page down instead of covering it. So a tap meant for the page
+ * never lands on the menu.
+ */
 @media (max-width: 40rem) {
   .header {
     flex-wrap: wrap;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
+    min-height: 3.5rem;
+    padding: var(--space-2) var(--space-4);
+  }
+  .brand .wordmark {
+    display: none;
+  }
+  .brand .mark {
+    display: block;
+    width: 2rem;
+    height: 2rem;
+  }
+  .brand {
+    flex: none;
+  }
+  /* A zero basis, so the links shrink and scroll sideways instead of pushing the menu button onto a new row. */
+  .nav {
+    flex: 1 1 0;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow-x: auto;
+  }
+  .nav a {
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+  }
+  .menuButton {
+    display: inline-grid;
+    flex: none;
+    margin-left: auto;
   }
   .player {
+    display: none;
+    flex-basis: 100%;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin: var(--space-1) 0 var(--space-2);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+  .player.open {
+    display: flex;
+  }
+  .identity {
+    flex-wrap: wrap;
   }
 }
 .main {
