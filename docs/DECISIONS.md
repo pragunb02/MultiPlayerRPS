@@ -80,8 +80,8 @@ the owner may change it.
 
 ### ADR-048 — Account deletion, data export and the age signal
 
-- **Status:** Accepted by default (owner may change) · 2026-10-18 ([CC-035](tickets/CC-035.md),
-  [CC-152](tickets/CC-152.md)). Points 1, 4, 6 and 9 in particular wait for the owner.
+- **Status:** Accepted · 2026-10-18 by the owner, all points, including hiding every existing name on the public
+  boards until its owner sets a birth year ([CC-035](tickets/CC-035.md), [CC-152](tickets/CC-152.md)).
 - **Context.** Players must be able to leave and take their data with them (FR-ACC-7, the app stores, the DPDP Act
   from 13 May 2027, the GDPR). ADR-028.1 says unknown age means minor, and the public leaderboards showed every
   account's username to anyone. The research, with sources, is in the two tickets.
