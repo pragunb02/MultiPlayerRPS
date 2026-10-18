@@ -100,7 +100,7 @@ jobs:
       # Builds the web app, then starts the real server in production config (e2e/playwright.config.js).
       - name: Browser tests, part ${{ matrix.part }} of 4
         working-directory: e2e
-        run: npx playwright test --project=desktop --project=mobile --workers=2 --reporter=list,blob
+        run: npx playwright test --project=desktop --project=mobile --workers=3 --reporter=list,blob
         env:
           CI: "true"
           E2E_SHARD: ${{ matrix.part }}
@@ -214,7 +214,7 @@ jobs:
           browser: firefox
       - name: Browser tests, part ${{ matrix.part }} of 4
         working-directory: e2e
-        run: npx playwright test --project=firefox --workers=2 --reporter=list,blob
+        run: npx playwright test --project=firefox --workers=3 --reporter=list,blob
         env:
           CI: "true"
           E2E_BROWSER: firefox

@@ -9,50 +9,50 @@
 export const RESTARTS = "restart.spec.js";
 
 /**
- * The parts, with each file's test time on CI, desktop and mobile together (run 39085728868, 2026-10-18). About
- * 600 s each, so about 5 minutes on a machine with two workers.
+ * The parts, with each file's test time on CI in seconds, desktop and mobile together, from the merged report of
+ * CI run 39091677381 (2026-10-18). About 700 s each.
  */
 export const SHARDS = Object.freeze([
-  // 590 s
+  // 699 s
   Object.freeze([
-    "match-shell-presses-chess.spec.js", // 559
-    "attacker.spec.js", // 7
-    "gamification.spec.js", // 7
+    "match-shell-presses-chess.spec.js", // 592
+    "owner.spec.js", // 18
+    "visitor.spec.js", // 17
+    "leaderboard.spec.js", // 14
+    "host-away.spec.js", // 13
+    "gamification.spec.js", // 12
+    "attacker.spec.js", // 10
+    "deploy.spec.js", // 7
     "fairPlay.spec.js", // 6
-    "deploy.spec.js", // 4
-    "legacy.spec.js", // 3
+    "legacy.spec.js", // 5
     "names.spec.js", // 3
-    "crawler.spec.js", // 1
+    "crawler.spec.js", // 2
   ]),
-  // 608 s
+  // 691 s
   Object.freeze([
-    "match-shell-presses-tictactoe.spec.js", // 474
-    "accessibility.spec.js", // 134
+    "match-shell-presses-tictactoe.spec.js", // 509
+    "accessibility.spec.js", // 182, desktop only
   ]),
-  // 605 s
+  // 710 s
   Object.freeze([
-    "match-shell-presses-rps.spec.js", // 420
-    "chess.spec.js", // 185
+    "match-shell-presses-rps.spec.js", // 512
+    "chess.spec.js", // 198
   ]),
-  // 640 s
+  // 690 s
   Object.freeze([
-    "match-shell.spec.js", // 160
-    "save-progress.spec.js", // 62
-    "computer.spec.js", // 53
-    "requests.spec.js", // 39
-    "visual.spec.js", // 39
-    "navigation.spec.js", // 38
-    "invite.spec.js", // 35
-    "rematch.spec.js", // 32
-    "screens.spec.js", // 31
-    "waking-up.spec.js", // 30
-    "sessions.spec.js", // 25
-    "user.spec.js", // 23
-    "guest.spec.js", // 18
-    "host-away.spec.js", // new, about 15
-    "owner.spec.js", // 15
-    "visitor.spec.js", // 13
-    "leaderboard.spec.js", // 11
+    "match-shell.spec.js", // 209
+    "save-progress.spec.js", // 51
+    "navigation.spec.js", // 48
+    "computer.spec.js", // 47
+    "invite.spec.js", // 46
+    "visual.spec.js", // 46
+    "requests.spec.js", // 45
+    "screens.spec.js", // 40
+    "rematch.spec.js", // 39
+    "sessions.spec.js", // 34
+    "waking-up.spec.js", // 33
+    "user.spec.js", // 31
+    "guest.spec.js", // 21
   ]),
 ]);
 
