@@ -128,6 +128,12 @@ describe("browser engines", () => {
     expect(webkit.match(/E2E_BROWSER: webkit\n/g)).toHaveLength(2);
   });
 
+  it("cancels an older run of a pull request, but never a run on main", async () => {
+    expect(await read(".github/workflows/ci.yml")).toContain(
+      "concurrency:\n  group: ci-${{ github.ref }}\n  cancel-in-progress: ${{ github.event_name == 'pull_request' }}\n",
+    );
+  });
+
   it("keeps the names of the Chromium and Firefox checks, which branch protection can require", async () => {
     const ci = await read(".github/workflows/ci.yml");
 
