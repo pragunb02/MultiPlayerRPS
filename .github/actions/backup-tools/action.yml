@@ -23,5 +23,6 @@ runs:
         echo "$tools_dir/bin" >> "$GITHUB_PATH"
         sudo apt-get update --quiet
         sudo apt-get install --yes --quiet --no-install-recommends age
-        "$tools_dir/bin/mongodump" --version | head -n 1
+        # sed reads to the end, unlike head, so mongodump never gets SIGPIPE (exit 141) under pipefail.
+        "$tools_dir/bin/mongodump" --version | sed -n 1p
         age --version
