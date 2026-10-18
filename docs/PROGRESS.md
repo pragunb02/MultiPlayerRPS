@@ -5,7 +5,7 @@
 |               |                                                                                                                                                                                                                                                                                                                                                              |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)                                                                                                                                                                                                                                                              |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-269` · reading guide: [README.md](README.md)                                                                                                                                                                                                                                                       |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-272` · reading guide: [README.md](README.md)                                                                                                                                                                                                                                                       |
 | Current stage | **Stage 0 — Foundation**                                                                                                                                                                                                                                                                                                                                     |
 | Stage health  | 🟢 On track                                                                                                                                                                                                                                                                                                                                                  |
 | In progress   | Open PRs: #82 account deletion, data export and birth year (CC-035, CC-152), #88 browser tests in parallel parts (CC-236), #90 screens with dead space (CC-259), #69 identity duplicates (CC-245, CC-238, waits on owner data). Builder on CC-157 (game shell). CC-049 alerts still open                                                                     |
@@ -31,8 +31,8 @@ agreement still holds.
 
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
-| S0 Foundation   | 🟡 In progress | 63 / 79      |
-| S1 MVP launch   | 🟡 Started     | 45 / 108     |
+| S0 Foundation   | 🟡 In progress | 64 / 79      |
+| S1 MVP launch   | 🟡 Started     | 45 / 111     |
 | S2 Retention    | ⚪ Not started | 5 / 60       |
 | S3 Monetization | ⚪ Not started | 0 / 10       |
 | S4 Scale        | ⚪ Not started | 0 / 6        |
@@ -46,7 +46,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
-| Security (SEC)   | 3    | 1           | 17    |
+| Security (SEC)   | 2    | 1           | 18    |
 | Bugs (BUG)       | 5    | 1           | 36    |
 | Tech debt (DEBT) | 7    | 1           | 12    |
 
@@ -54,6 +54,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-18 — CC-105 — The leaked Atlas password is rotated (owner): the old one is refused, Render's MONGO_URI and the backup secret use the new one, /health shows the database up and a manual backup run succeeded. SEC-12 fixed. Owner: the legacy collections in GameArena are never deleted (CC-251 rescoped to documenting them). New tickets CC-269 (flaky Rocky test), CC-270 (phones scroll sideways after a win), CC-271 (no browser jobs on docs-only PRs).
 - 2026-10-18 — CC-236 — Browser tests run in parallel: Chromium and Firefox each in four duration-balanced parts (e2e/shards.js) plus a restart job, merged into one report under the old check names, which fails unless every listed test ran exactly once. The press tests are one file per game. Playwright browsers are cached. Each commit on main has its own CI concurrency group, so no main run is cancelled or replaced by the next merge. Nothing checks less (#88).
 - 2026-10-18 — Docs sync — Board, progress, findings and decisions brought up to date with #61 to #91. ✅ CC-036, CC-158 to CC-160, CC-207, CC-208 (#67), CC-111, CC-112 (#78), CC-248 to CC-250 (#81), CC-255 (#83), CC-230 (#91), CC-203, CC-184 (#65), CC-254 (#77). 🟦 CC-157, CC-259, CC-236, CC-035, CC-152, CC-245, CC-238. "Research done" noted for CC-157, CC-161, CC-172 (#84), CC-099, CC-163, CC-153, CC-259 (#85), CC-217, CC-051, CC-033, CC-044 (#86). New tickets CC-260 to CC-268 from the #87 and #91 findings (scrypt cost, breached passwords, device list, `__Host-` cookie, second factor, own chess pieces, credits page, copyright deed, PRODUCT_VISION.md §7.1 North Star); CC-033 and CC-049 scopes widened. KNOWN_ISSUES: BUG-16, BUG-17, BUG-22, BUG-26, BUG-27, BUG-41 fixed, BUG-25 in progress, SEC-23 and SEC-24 added. DECISIONS: ADR-047 moved to accepted, ADR-018, ADR-019 and ADR-038 amendments in effect, ADR-039 amended for fast mode (`strict` off). CLAUDE.md and BACKLOG: every ticket gets a file. docs/README.md lists CREDITS.md and art/README.md.
 - 2026-10-18 — CC-099, CC-163, CC-153, CC-259 — Research before code (#85, no code changed): reward choreography as one beat at a time inside the result card (CC-099), words, tones and sounds for every way a game ends (CC-163), arcade polish 2 split into eight PRs with CC-230's art and licence needs (CC-153), and CC-259 added for the screens with dead space (owner report). Twelve owner decisions listed in CC-153.
