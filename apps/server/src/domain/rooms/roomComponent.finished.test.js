@@ -62,6 +62,42 @@ describe("roomComponent.listFinishedGames (CC-111)", () => {
   });
 });
 
+describe("roomComponent: an aborted game is not a match (CC-036, CC-111)", () => {
+  /** Bob never makes the first move, so the game is aborted once the first move limit is over. */
+  async function abortedGame(rooms) {
+    const { code } = await rooms.createRoom({
+      network: "n",
+      host: ALICE,
+      gameId: "race",
+      options: OPTIONS,
+      now: T0,
+    });
+    await rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
+    const abortedAt = T0 + 1 + ROOM_LIFETIMES.firstMoveMs;
+    await rooms.expireDue({ now: abortedAt });
+    expect((await rooms.getRoom(code)).result.result).toBe("aborted");
+    return { code, abortedAt };
+  }
+
+  it("is not listed with the finished games", async () => {
+    const { rooms } = setup();
+    await abortedGame(rooms);
+
+    expect(await rooms.listFinishedGames()).toEqual([]);
+  });
+
+  it("is not kept before a rematch replaces it", async () => {
+    const { rooms, kept } = setup();
+    const { code, abortedAt } = await abortedGame(rooms);
+
+    await rooms.askRequest({ code, playerId: ALICE.id, type: "rematch", now: abortedAt + 1 });
+    const rematch = await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: abortedAt + 2 });
+
+    expect(rematch.status).toBe("playing");
+    expect(kept).toEqual([]);
+  });
+});
+
 describe("roomComponent: a finished game is kept before its room changes (CC-111)", () => {
   it("keeps the game before a rematch replaces it", async () => {
     const { rooms, kept, finishedGame } = setup();

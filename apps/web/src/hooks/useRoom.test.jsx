@@ -98,3 +98,56 @@ describe("useRoom: leaving the page (CC-112)", () => {
     await waitFor(() => expect(leaves(socket)).toHaveLength(1));
   });
 });
+
+const departures = (socket) =>
+  socket.request.mock.calls.filter(
+    ([event]) => event === SOCKET_EVENTS.ROOM_LEAVE || event === SOCKET_EVENTS.ROOM_AWAY,
+  );
+
+describe("useRoom: leaving the page leaves a waiting room, and is away from any other (CC-112, CC-207)", () => {
+  it("only leaves a waiting room, without saying away as well", async () => {
+    const { socket, unmount } = await openRoom();
+
+    unmount();
+
+    expect(departures(socket)).toEqual([[SOCKET_EVENTS.ROOM_LEAVE, { code: CODE, waitingOnly: true }]]);
+  });
+
+  it.each(["playing", "finished"])("is away from a %s room, and keeps the seat", async (status) => {
+    const { socket, unmount } = await openRoom({ joined: view({ status }) });
+
+    unmount();
+
+    expect(departures(socket)).toEqual([[SOCKET_EVENTS.ROOM_AWAY, { code: CODE }]]);
+  });
+
+  it("is away from a waiting room while signing up on the way back to it", async () => {
+    const { socket, unmount } = await openRoom({
+      goingTo: `/signup?next=%2Fgames%2Ftic-tac-toe%2Frooms%2F${CODE}`,
+    });
+
+    unmount();
+
+    expect(departures(socket)).toEqual([[SOCKET_EVENTS.ROOM_AWAY, { code: CODE }]]);
+  });
+
+  it("follows pushed changes: a waiting room whose game started is away, not left", async () => {
+    const { socket, unmount } = await openRoom();
+    act(() => socket.push(SOCKET_EVENTS.ROOM_UPDATED, view({ status: "playing" })));
+
+    unmount();
+
+    expect(departures(socket)).toEqual([[SOCKET_EVENTS.ROOM_AWAY, { code: CODE }]]);
+  });
+
+  it("says nothing for a viewer without a seat, or after the player left", async () => {
+    const watching = await openRoom({ joined: view({ you: "", status: "playing" }) });
+    watching.unmount();
+    const leaving = await openRoom({ joined: view({ status: "playing" }) });
+    await act(() => leaving.result.current.leave());
+    leaving.unmount();
+
+    expect(departures(watching.socket)).toEqual([]);
+    expect(departures(leaving.socket)).toEqual([[SOCKET_EVENTS.ROOM_LEAVE, { code: CODE }]]);
+  });
+});

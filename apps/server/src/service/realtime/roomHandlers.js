@@ -1,4 +1,4 @@
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { ROOM_STATUS, SOCKET_EVENTS } from "@classicade/shared";
 import { ForbiddenError, GoneError, NotFoundError } from "../../utils/errors.js";
 import {
   parseCreateRoom,
@@ -100,6 +100,12 @@ export function createRoomHandlers({ io, socket, roomComponent, now, logger }) {
     async [SOCKET_EVENTS.ROOM_LEAVE](payload) {
       const { code, waitingOnly } = parseLeaveRoom(payload);
       const result = await roomComponent.leaveRoom({ code, playerId: identity.id, now: now(), waitingOnly });
+      if (waitingOnly && !result.closed && result.room.status !== ROOM_STATUS.WAITING) {
+        // Only a closing room page leaves with `waitingOnly`. Its game started a moment before, so the player is
+        // away from it instead of still counting as on its page (CC-112, CC-207).
+        await goAway(code);
+        return { left: false };
+      }
       for (const own of await playerSockets(io, code, identity.id)) {
         own.leave(roomChannel(code));
       }

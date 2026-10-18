@@ -11,6 +11,15 @@ import { useServices } from "../app/servicesContext.js";
 export const newerRoom = (current, incoming) =>
   current?.code === incoming.code && current.revision > incoming.revision ? current : incoming;
 
+const NO_SEAT = "none";
+const WAITING_SEAT = "waiting";
+const GAME_SEAT = "game";
+/** Which seat the viewer holds in a room, as one of the values above. */
+const seatIn = (room) => {
+  if (room === undefined || room.you === "") return NO_SEAT;
+  return room.status === ROOM_STATUS.WAITING ? WAITING_SEAT : GAME_SEAT;
+};
+
 /**
  * One room, kept in sync with the server. Once `enabled` (there is someone to join as) it joins, applies every
  * pushed update for this room, and rejoins after the connection drops and comes back. It never starts a session
@@ -38,12 +47,12 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
     error: undefined,
     closedReason: "",
   });
-  // Whether the viewer holds a seat in this room while it waits for players. A ref, because the cleanup that
-  // leaves the room must see the latest room, not the one from when that effect started.
-  const waitingSeat = useRef(false);
+  // The viewer's seat as the page last heard: none, one in a room that waits for players, or one in a room whose
+  // game has started. A ref, because the cleanup must see the latest room, not the one from when it started.
+  const seat = useRef(NO_SEAT);
   const room = state.room;
   useEffect(() => {
-    waitingSeat.current = room !== undefined && room.you !== "" && room.status === ROOM_STATUS.WAITING;
+    seat.current = seatIn(room);
   }, [room]);
   const pathNow = useRef(currentPath);
   useEffect(() => {
@@ -52,16 +61,20 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
 
   useEffect(
     () => () => {
-      if (!waitingSeat.current || returnsToRoom(pathNow.current(), code)) return;
-      waitingSeat.current = false;
-      // Nothing waits for this answer: the page is gone, and a seat that is gone already needs no leaving. The
-      // game may have started since this page last heard, so the server leaves only a room still waiting.
-      socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code, waitingOnly: true }).catch(() => undefined);
+      const held = seat.current;
+      seat.current = NO_SEAT;
+      if (held === NO_SEAT) return;
+      // Nothing waits for these answers: the page is gone, and a seat that is gone already needs nothing. The game
+      // may have started since this page last heard, so the server leaves only a room still waiting, and counts
+      // the player away from it otherwise.
+      if (held === WAITING_SEAT && !returnsToRoom(pathNow.current(), code)) {
+        socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code, waitingOnly: true }).catch(() => undefined);
+      } else {
+        socket.request(SOCKET_EVENTS.ROOM_AWAY, { code }).catch(() => undefined);
+      }
     },
     [socket, code],
   );
-  // Whether this page holds a seat it has not left, so closing the page should tell the server it is away.
-  const seated = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
@@ -71,18 +84,14 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
     // State changes only in the request's callbacks, after the server answered.
     const join = () =>
       socket.request(SOCKET_EVENTS.ROOM_JOIN, { code }).then(
-        (room) => {
-          seated.current = room.you !== "";
-          return (
-            active &&
-            setState((s) => ({
-              status: "ready",
-              room: newerRoom(s.room, room),
-              error: undefined,
-              closedReason: "",
-            }))
-          );
-        },
+        (room) =>
+          active &&
+          setState((s) => ({
+            status: "ready",
+            room: newerRoom(s.room, room),
+            error: undefined,
+            closedReason: "",
+          })),
         (error) => active && setState({ status: "error", room: undefined, error, closedReason: "" }),
       );
     // Join now if connected; otherwise the "connect" handler below joins once the socket is up.
@@ -107,16 +116,6 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
     };
   }, [socket, code, enabled, joins]);
 
-  useEffect(
-    () => () => {
-      if (!seated.current) return;
-      seated.current = false;
-      // Nothing waits for this answer: the page is already gone, and a room that closed meanwhile has no seat.
-      socket.request(SOCKET_EVENTS.ROOM_AWAY, { code }).catch(() => undefined);
-    },
-    [socket, code],
-  );
-
   /** Sends something that changes the room and shows the room the server answers with. */
   const send = useCallback(
     async (event, payload) => {
@@ -130,8 +129,7 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
   const move = useCallback((payload) => send(SOCKET_EVENTS.GAME_MOVE, { move: payload }), [send]);
 
   const leave = useCallback(async () => {
-    seated.current = false;
-    waitingSeat.current = false;
+    seat.current = NO_SEAT;
     return socket.request(SOCKET_EVENTS.ROOM_LEAVE, { code });
   }, [socket, code]);
 

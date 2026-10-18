@@ -257,6 +257,19 @@ describe("rooms over sockets", () => {
     expect(homeTab.connected).toBe(true);
   });
 
+  it("counts a closing room page as away when its game started a moment before, instead of leaving it (CC-112, CC-207)", async () => {
+    server = await startTestServer();
+    const { alice, bob, code } = await startedRace();
+    const aliceSeesAway = nextUpdate(alice.socket);
+
+    const ack = await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code, waitingOnly: true });
+
+    expect(ack).toEqual({ ok: true, data: { left: false } });
+    const seen = await aliceSeesAway;
+    expect(seen.status).toBe("playing");
+    expect(seen.seats.find((s) => s.playerId === bob.identity.id).presence).toBe("away");
+  });
+
   it("refuses away for a room the player has no seat in", async () => {
     server = await startTestServer();
     const { code } = await startedRace();

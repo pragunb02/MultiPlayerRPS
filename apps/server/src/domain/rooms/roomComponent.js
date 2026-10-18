@@ -194,10 +194,10 @@ export function createRoomComponent({
   /**
    * A finished room holds its game until the match pipeline has it (CC-111). Before the room changes or closes,
    * the game is kept. Keeping a game twice changes nothing, and when keeping fails the change fails with it, so the
-   * game stays in its room for the next try.
+   * game stays in its room for the next try. An aborted game is not a match (CC-036), so there is nothing to keep.
    */
   async function keepGameOf(room) {
-    if (room.status === ROOM_STATUS.FINISHED) {
+    if (room.status === ROOM_STATUS.FINISHED && !isAborted(room)) {
       await keepFinishedGame({ room, outcome: room.result });
     }
   }
@@ -1011,14 +1011,14 @@ export function createRoomComponent({
      * The game of every stored room that is finished, as `room.gameFinished` announced it. The match pipeline adds
      * them again at startup and now and then (CC-111): a game whose announcement was lost to a crash or a database
      * blip still reaches it while its room waits for a rematch. Rooms whose time is up are listed too, because a
-     * game is never lost for being late.
+     * game is never lost for being late. An aborted game is not a match (CC-036), so it is not listed.
      *
      * @returns {Promise<Array<{ room: Readonly<import("../../data/roomAccessor.js").Room>, outcome: object }>>}
      */
     async listFinishedGames() {
       const rooms = await roomAccessor.listAll();
       return rooms
-        .filter((room) => room.status === ROOM_STATUS.FINISHED)
+        .filter((room) => room.status === ROOM_STATUS.FINISHED && !isAborted(room))
         .map((room) => ({ room, outcome: room.result }));
     },
 
