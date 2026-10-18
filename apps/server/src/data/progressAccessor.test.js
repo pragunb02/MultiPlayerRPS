@@ -192,4 +192,18 @@ describe("progressAccessor: a guest's progress moving to an account (CC-032)", (
     expect(again.applied).toBe(false);
     expect((await progress.get("user_1")).xp).toBe(20);
   });
+
+  it("removes a player's progress and the guest markers pointing at them (CC-035)", async () => {
+    const progress = setup();
+    const at = Date.UTC(2026, 9, 16);
+    await progress.applyMatchOnce({
+      playerId: "user_a",
+      matchId: "m1",
+      inc: { xp: 30, matchesPlayed: 1 },
+      at,
+    });
+
+    expect(await progress.removePlayer("user_a")).toBe(1);
+    expect((await progress.get("user_a")).xp).toBe(0);
+  });
 });

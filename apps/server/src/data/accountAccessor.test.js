@@ -187,4 +187,41 @@ describe("accountAccessor", () => {
     await expect(accounts.getSessionVersion("nope")).rejects.toThrow(NotFoundError);
     await expect(accounts.bumpSessionVersion({ accountId: "nope" })).rejects.toThrow(NotFoundError);
   });
+
+  it("keeps a stated birth year and sets one once (CC-152)", async () => {
+    const accounts = createAccountAccessor({ accountDao: createInMemoryAccountDao() });
+    const stated = await accounts.create({ ...account, birthYear: 2001 });
+    const unstated = await accounts.create({ ...account, username: "Arjun", email: "arjun@example.com" });
+
+    expect(stated.birthYear).toBe(2001);
+    expect(await accounts.setBirthYear({ accountId: unstated.accountId, birthYear: 1999 })).toEqual({
+      set: true,
+    });
+    expect(await accounts.setBirthYear({ accountId: unstated.accountId, birthYear: 1990 })).toEqual({
+      set: false,
+    });
+    expect((await accounts.getById(unstated.accountId)).birthYear).toBe(1999);
+    await expect(accounts.setBirthYear({ accountId: "nobody", birthYear: 1999 })).rejects.toThrow(
+      NotFoundError,
+    );
+  });
+
+  it("lists the birth years of the accounts asked for, as a frozen list (CC-152)", async () => {
+    const accounts = createAccountAccessor({ accountDao: createInMemoryAccountDao() });
+    const stated = await accounts.create({ ...account, birthYear: 1990 });
+
+    const years = await accounts.listBirthYears([stated.accountId, "nobody"]);
+
+    expect(years).toEqual([{ accountId: stated.accountId, birthYear: 1990 }]);
+    expect(Object.isFrozen(years)).toBe(true);
+  });
+
+  it("deletes an account, and a second delete reports nothing deleted (CC-035)", async () => {
+    const accounts = createAccountAccessor({ accountDao: createInMemoryAccountDao() });
+    const { accountId } = await accounts.create(account);
+
+    expect(await accounts.delete(accountId)).toEqual({ deleted: true });
+    expect(await accounts.delete(accountId)).toEqual({ deleted: false });
+    await expect(accounts.getById(accountId)).rejects.toThrow(NotFoundError);
+  });
 });

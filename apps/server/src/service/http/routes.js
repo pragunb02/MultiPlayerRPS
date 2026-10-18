@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { GAMES } from "@classicade/shared";
+import { createAccountRoutes } from "./accountRoutes.js";
 import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
@@ -12,7 +13,8 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  * @param {Parameters<typeof createSessionRoutes>[0] & Parameters<typeof createMatchRoutes>[0] & Parameters<typeof createProgressRoutes>[0]
  *   & Parameters<typeof createGamificationRoutes>[0]
  *   & { leaderboardComponent: Parameters<typeof createLeaderboardRoutes>[0]["leaderboardComponent"], leaderboardLimit?: { windowMs: number, limit: number } }
- *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }} deps
+ *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }
+ *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }} deps
  */
 export function apiRouter({
   matchComponent,
@@ -28,6 +30,9 @@ export function apiRouter({
   now,
   analyticsComponent,
   adminAccess,
+  playerDataComponent,
+  onAccountDeleted,
+  accountLimits,
   ...sessionDeps
 }) {
   const router = Router();
@@ -50,6 +55,16 @@ export function apiRouter({
       onIdentityChanged,
       now,
       ...(authLimits && { limits: authLimits }),
+    }),
+  );
+  router.use(
+    createAccountRoutes({
+      accountComponent,
+      playerDataComponent,
+      onSessionEnded: sessionDeps.onSessionEnded,
+      onAccountDeleted,
+      now,
+      ...(accountLimits && { limits: accountLimits }),
     }),
   );
   router.use(createMatchRoutes({ matchComponent }));

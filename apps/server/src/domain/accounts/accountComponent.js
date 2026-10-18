@@ -1,4 +1,12 @@
-import { ACCOUNT_MESSAGES, IDENTITY_KINDS } from "@classicade/shared";
+import {
+  ACCOUNT_MESSAGES,
+  ageGroupFor,
+  AGE_GROUPS,
+  IDENTITY_KINDS,
+  isTooYoungForAccount,
+  TOO_YOUNG_MESSAGE,
+} from "@classicade/shared";
+import { parseBirthYear } from "../../models/birthYear.js";
 import {
   parseEmail,
   parseLoginEmail,
@@ -9,7 +17,14 @@ import {
 import { createIdentity, isAccountId } from "../../models/identity.js";
 import { normaliseLegacyUsername, usernameCandidates } from "../../models/legacyUsername.js";
 import { assertDefined } from "../../utils/assert.js";
-import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from "../../utils/errors.js";
+import { yearOf } from "../../utils/indiaTime.js";
 
 const INVALID_LOGIN = "Invalid email or password";
 const { EMAIL_UNAVAILABLE } = ACCOUNT_MESSAGES;
@@ -22,6 +37,19 @@ function accountIdOf(playerId) {
     throw new ForbiddenError("Only players with an account have a password");
   }
   return playerId.slice(ACCOUNT_ID_PREFIX.length);
+}
+
+/**
+ * A stated birth year, checked against the list the sign-up form offers and the minimum age of an account
+ * (CC-152). The refusal for a child comes only after the choice, so the form itself never hints at an age.
+ */
+function statedBirthYear(value, now) {
+  const currentYear = yearOf(now);
+  const birthYear = parseBirthYear(value, { currentYear });
+  if (isTooYoungForAccount({ birthYear, currentYear })) {
+    throw new ValidationError(TOO_YOUNG_MESSAGE, { details: { field: "birthYear", reason: "too-young" } });
+  }
+  return birthYear;
 }
 
 /** A field error for the password form, so the page can show it next to the right box. */
@@ -62,6 +90,8 @@ const signInOf = (account) =>
  *   legacyUserAccessor: ReturnType<typeof import("../../data/legacyUserAccessor.js").createLegacyUserAccessor>,
  *   passwordHasher: ReturnType<typeof import("../../utils/passwordHasher.js").createPasswordHasher>,
  *   legacyPasswords: ReturnType<typeof import("../../utils/legacyPassword.js").createLegacyPasswordChecker>,
+ *   accountDeletionAccessor: Pick<ReturnType<typeof import("../../data/accountDeletionAccessor.js").createAccountDeletionAccessor>, "closeLegacy" | "isLegacyClosed">,
+ *     the legacy rows whose player deleted their account (CC-035)
  * }} deps
  */
 export function createAccountComponent({
@@ -69,11 +99,33 @@ export function createAccountComponent({
   legacyUserAccessor,
   passwordHasher,
   legacyPasswords,
+  accountDeletionAccessor,
 }) {
   assertDefined(accountAccessor, "accountAccessor");
   assertDefined(legacyUserAccessor, "legacyUserAccessor");
   assertDefined(passwordHasher, "passwordHasher");
   assertDefined(legacyPasswords, "legacyPasswords");
+  assertDefined(accountDeletionAccessor, "accountDeletionAccessor");
+
+  /**
+   * Whether any legacy row of an email still belongs to its legacy player, one whose account was never deleted.
+   * Deleting an account closes every row of its email (CC-035).
+   */
+  async function hasOpenLegacyRow(email) {
+    for (const legacy of await legacyUserAccessor.findByEmail(email)) {
+      if (!(await accountDeletionAccessor.isLegacyClosed(legacy.legacyId))) return true;
+    }
+    return false;
+  }
+
+  /** @returns {Readonly<{ username: string, createdAt: number, birthYear?: number, ageGroup: string }>} */
+  const profile = (account, now) =>
+    Object.freeze({
+      username: account.username,
+      createdAt: account.createdAt,
+      ...(account.birthYear !== undefined && { birthYear: account.birthYear }),
+      ageGroup: ageGroupFor({ birthYear: account.birthYear, currentYear: yearOf(now) }),
+    });
 
   /**
    * Creates the account of a legacy player who just proved their password: same email, the password hashed again
@@ -159,6 +211,10 @@ export function createAccountComponent({
     if (!opened) {
       throw new UnauthorizedError(INVALID_LOGIN);
     }
+    // Its player deleted the account made from it (CC-035). The same answer as a wrong password, after the same work.
+    if (await accountDeletionAccessor.isLegacyClosed(row.legacyId)) {
+      throw new UnauthorizedError(INVALID_LOGIN);
+    }
     return migrateLegacyUser(row, { ...normalised, passwordHash }, now);
   }
 
@@ -185,18 +241,24 @@ export function createAccountComponent({
      * shows, because the player has to be told why it failed. Hiding that too needs the confirmation email of
      * CC-033 (see CC-118).
      *
-     * @param {{ username: unknown, email: unknown, password: unknown, now: number }} input
+     * A birth year is optional. Without one the account's age is unknown and it gets the under 18 defaults
+     * (ADR-028). A player under 13 for the whole year cannot have an account (CC-152).
+     *
+     * @param {{ username: unknown, email: unknown, password: unknown, birthYear?: unknown, now: number }} input
+     *   leave `birthYear` out when the player did not say
      * @returns {Promise<Readonly<SignIn>>}
      */
-    async signup({ username, email, password, now }) {
+    async signup({ username, email, password, birthYear, now }) {
       const credentials = {
         username: parseUsername(username),
         email: parseEmail(email),
         password: parsePassword(password),
+        ...(birthYear !== undefined && { birthYear: statedBirthYear(birthYear, now) }),
       };
       const passwordHash = await passwordHasher.hash(credentials.password);
-      // A legacy player's email stays theirs: they claim it by logging in, nobody can sign up with it.
-      if ((await legacyUserAccessor.findByEmail(credentials.email)).length > 0) {
+      // A legacy player's email stays theirs: they claim it by logging in, nobody can sign up with it. Once its
+      // player deleted their account, the email is free for a new, empty account (CC-035).
+      if (await hasOpenLegacyRow(credentials.email)) {
         throw new ConflictError(EMAIL_UNAVAILABLE, { details: { field: "email" } });
       }
       const account = await accountAccessor.create({
@@ -204,6 +266,7 @@ export function createAccountComponent({
         email: credentials.email,
         passwordHash,
         createdAt: now,
+        ...(credentials.birthYear !== undefined && { birthYear: credentials.birthYear }),
       });
       return signInOf(account);
     },
@@ -313,5 +376,105 @@ export function createAccountComponent({
      */
     signOutOtherDevices: async ({ playerId }) =>
       accountAccessor.bumpSessionVersion({ accountId: accountIdOf(playerId) }),
+
+    /**
+     * What the player's own settings show: the username, when the account was made, the birth year if stated, and
+     * the age group it gives (CC-152).
+     *
+     * @param {{ playerId: string, now: number }} query
+     * @throws {ForbiddenError} for a guest
+     * @throws {NotFoundError} when the account is not there any more
+     */
+    profileOf: async ({ playerId, now }) =>
+      profile(await accountAccessor.getById(accountIdOf(playerId)), now),
+
+    /**
+     * Sets the birth year of an account that has none. Once set it stays: a free change would let a minor unlock
+     * the adult defaults with one click, so a mistake is corrected by the owner on request (CC-152).
+     *
+     * @param {{ playerId: string, birthYear: unknown, now: number }} input
+     * @throws {ValidationError} with `details.field` "birthYear"
+     * @throws {ConflictError} when the year is set already
+     * @throws {ForbiddenError} for a guest
+     * @throws {NotFoundError} when the account is not there any more
+     */
+    async setBirthYear({ playerId, birthYear, now }) {
+      const accountId = accountIdOf(playerId);
+      const year = statedBirthYear(birthYear, now);
+      const { set } = await accountAccessor.setBirthYear({ accountId, birthYear: year });
+      if (!set) {
+        throw new ConflictError("Your year of birth is already set", { details: { field: "birthYear" } });
+      }
+      return profile(await accountAccessor.getById(accountId), now);
+    },
+
+    /**
+     * Which of these players are adults: accounts whose birth year makes them surely 18. Guests, computer
+     * characters and accounts without a year are not (ADR-028).
+     *
+     * @param {{ playerIds: ReadonlyArray<string>, now: number }} query
+     * @returns {Promise<ReadonlySet<string>>}
+     */
+    async adultsAmong({ playerIds, now }) {
+      const accountIds = playerIds.filter(isAccountId).map((id) => id.slice(ACCOUNT_ID_PREFIX.length));
+      if (accountIds.length === 0) {
+        return new Set();
+      }
+      const currentYear = yearOf(now);
+      const years = await accountAccessor.listBirthYears(accountIds);
+      return new Set(
+        years
+          .filter(({ birthYear }) => ageGroupFor({ birthYear, currentYear }) === AGE_GROUPS.ADULT)
+          .map(({ accountId }) => `${ACCOUNT_ID_PREFIX}${accountId}`),
+      );
+    },
+
+    /**
+     * Checks the password of a signed-in player again before something that cannot be undone or that shows their
+     * email (CC-035). Answers what the account itself holds.
+     *
+     * @param {{ playerId: string, password: unknown }} input
+     * @returns {Promise<Readonly<{ username: string, email: string, createdAt: number, birthYear?: number }>>}
+     * @throws {ValidationError} with `details.field` "password"
+     * @throws {ForbiddenError} for a guest
+     * @throws {NotFoundError} when the account is not there any more
+     */
+    async confirmPassword({ playerId, password }) {
+      const account = await accountAccessor.getById(accountIdOf(playerId));
+      const given = typeof password === "string" ? password : "";
+      if (!(await passwordHasher.verify(given, account.passwordHash))) {
+        throw passwordFieldError("password", "That is not your password");
+      }
+      return Object.freeze({
+        username: account.username,
+        email: account.email,
+        createdAt: account.createdAt,
+        ...(account.birthYear !== undefined && { birthYear: account.birthYear }),
+      });
+    },
+
+    /**
+     * Deletes the account itself (CC-035). Every legacy row of its email is closed first, so an old password
+     * cannot make the account again. Every session of the account stops working at its next request, because its
+     * account is gone. Running it again changes nothing.
+     *
+     * @param {{ playerId: string, now: number }} input
+     * @returns {Promise<{ closed: boolean }>} false when the account was gone already
+     */
+    async close({ playerId, now }) {
+      const accountId = accountIdOf(playerId);
+      let account;
+      try {
+        account = await accountAccessor.getById(accountId);
+      } catch (err) {
+        if (err instanceof NotFoundError) return { closed: false };
+        throw err;
+      }
+      for (const legacy of await legacyUserAccessor.findByEmail(account.email)) {
+        await accountDeletionAccessor.closeLegacy({ legacyId: legacy.legacyId, at: now });
+      }
+      const { deleted } = await accountAccessor.delete(accountId);
+      return { closed: deleted };
+    },
   });
 }

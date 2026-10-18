@@ -1,12 +1,13 @@
 import {
   getLeaderboard,
+  HIDDEN_PLAYER_NAME,
   LEADERBOARD_UNLISTED,
   LEADERBOARDS,
   levelForXp,
   XP_AWARDS,
 } from "@classicade/shared";
 import { isAccountId } from "../../models/identity.js";
-import { assertDefined } from "../../utils/assert.js";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
 import { creditFor, hasComputerPlayer } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
@@ -34,9 +35,12 @@ const rankedEntry = ({ xp, level }, stored) => Object.freeze({ xp: xp - stored.u
  *   leaderboardAccessor: ReturnType<typeof import("../../data/leaderboardAccessor.js").createLeaderboardAccessor>,
  *   matchAccessor: Pick<ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor>, "countWins" | "listForPlayer">,
  *   progressAccessor: Pick<ReturnType<typeof import("../../data/progressAccessor.js").createProgressAccessor>, "get">,
+ *   ages: { adultsAmong: (query: { playerIds: string[], now: number }) => Promise<ReadonlySet<string>> },  which
+ *     players are adults. Everyone else's name is hidden on the boards (CC-152)
  * }} deps
  */
-export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor, progressAccessor }) {
+export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor, progressAccessor, ages }) {
+  assertFunction(ages?.adultsAmong, "ages.adultsAmong");
   assertDefined(leaderboardAccessor, "leaderboardAccessor");
   assertDefined(matchAccessor, "matchAccessor");
   assertDefined(progressAccessor, "progressAccessor");
@@ -103,7 +107,8 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
     listBoards: () => LEADERBOARDS.map(({ id, name, metric, period }) => ({ id, name, metric, period })),
 
     /**
-     * One board's current period, best first. Entries carry public fields only — never player ids.
+     * One board's current period, best first. Entries carry public fields only, never player ids. The name of a
+     * minor or of an account of unknown age is hidden, with `hidden: true`. The rank and score stay (ADR-028).
      *
      * @param {{ boardId: string, limit: number, now: number }} query
      * @throws {NotFoundError} for an unknown board
@@ -112,6 +117,8 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
       const info = requireBoard(boardId);
       const { board, period, resetsAt } = storageFor(info, now);
       const top = await leaderboardAccessor.listTop({ board, period, limit });
+      const adults =
+        top.length === 0 ? new Set() : await ages.adultsAmong({ playerIds: top.map((e) => e.playerId), now });
       return {
         board: {
           id: info.id,
@@ -121,9 +128,9 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
           periodId: period,
           ...(resetsAt !== undefined && { resetsAt }),
         },
-        entries: top.map(({ displayName, level, score }, index) => ({
+        entries: top.map(({ playerId, displayName, level, score }, index) => ({
           rank: index + 1,
-          displayName,
+          ...(adults.has(playerId) ? { displayName } : { displayName: HIDDEN_PLAYER_NAME, hidden: true }),
           level,
           score,
         })),
@@ -229,5 +236,32 @@ export function createLeaderboardComponent({ leaderboardAccessor, matchAccessor,
       }
       return { moved: { leaderboardEntries: raised } };
     },
+
+    /**
+     * The player's rows on every board, for their data export (CC-035). The player id is left out.
+     *
+     * @param {{ playerId: string }} query
+     */
+    exportPlayer: async ({ playerId }) =>
+      (await leaderboardAccessor.listForPlayer(playerId)).map(
+        ({ board, period, displayName, level, score, updatedAt }) => ({
+          board,
+          period,
+          displayName,
+          level,
+          score,
+          updatedAt: new Date(updatedAt).toISOString(),
+        }),
+      ),
+
+    /**
+     * Takes the player off every board (CC-035). Running it twice changes nothing.
+     *
+     * @param {{ playerId: string }} input
+     * @returns {Promise<{ erased: { leaderboardEntries: number } }>}
+     */
+    erasePlayer: async ({ playerId }) => ({
+      erased: { leaderboardEntries: await leaderboardAccessor.removePlayer(playerId) },
+    }),
   });
 }

@@ -138,12 +138,13 @@ export function createMatchDao({ connection }) {
      * Replaces a match with its renamed copy — only while `from` is still one of its players, so renaming twice
      * (or concurrently) changes it once.
      *
-     * @param {{ matchId: string, from: string, doc: Omit<MatchDoc, "schemaVersion"> }} rename
+     * @param {{ matchId: string, from: string, doc: Omit<MatchDoc, "schemaVersion">, unjudged?: boolean }} rename
+     *   `unjudged`: only while the stored match has no fair play verdict yet (CC-035)
      * @returns {Promise<boolean>} whether the match was renamed now
      */
-    async renamePlayer({ matchId, from, doc }) {
+    async renamePlayer({ matchId, from, doc, unjudged = false }) {
       const { matchedCount } = await Match.replaceOne(
-        { matchId, "players.playerId": from },
+        { matchId, "players.playerId": from, ...(unjudged && { credit: { $exists: false } }) },
         { ...doc, matchId, schemaVersion: MATCH_SCHEMA_VERSION },
       );
       return matchedCount === 1;
@@ -215,5 +216,38 @@ export function createMatchDao({ connection }) {
       )
         .sort({ endedAt: 1 })
         .lean(),
+
+    /**
+     * Deletes a match, only while `playerId` is still one of its players, so deleting twice changes nothing (CC-035).
+     *
+     * @param {{ matchId: string, playerId: string }} which
+     * @returns {Promise<boolean>} whether the match was deleted now
+     */
+    async deleteForPlayer({ matchId, playerId }) {
+      const { deletedCount } = await Match.deleteOne({ matchId, "players.playerId": playerId });
+      return deletedCount === 1;
+    },
+
+    /**
+     * A page of a player's matches, newest first, ordered on the end time and then the match id, so two matches
+     * that ended at the same moment are never split by a page edge and lost (CC-035, the data export).
+     *
+     * @param {string} playerId
+     * @param {{ limit: number, after?: { endedAt: Date, matchId: string } }} page  `after` is the last match of the
+     *   page before
+     * @returns {Promise<MatchDoc[]>}
+     */
+    listPageByPlayer(playerId, { limit, after }) {
+      const filter = {
+        "players.playerId": playerId,
+        ...(after && {
+          $or: [
+            { endedAt: { $lt: after.endedAt } },
+            { endedAt: after.endedAt, matchId: { $lt: after.matchId } },
+          ],
+        }),
+      };
+      return Match.find(filter, FIELDS).sort({ endedAt: -1, matchId: -1 }).limit(limit).lean();
+    },
   });
 }

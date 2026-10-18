@@ -152,6 +152,30 @@ age --decrypt --identity ~/classicade-backup-key.txt classicade-<time>.archive.g
 
 Changing `MONGO_URI` logs everyone out (sessions are in the database too). Note the incident in docs/DEPLOYMENT.md.
 
+#### Accounts deleted since the backup (CC-035)
+
+A backup made before a player deleted their account still holds that account. Restoring it would bring the account
+back, which the player was promised would not happen. So, **before** restoring, copy two collections from the live
+database, if it can still be read, and put them back afterwards:
+
+1. `account_deletions`: one record per account deleted in the last 30 days (the player id only). The backups are
+   kept 30 days too, so every deletion a backup could undo is in it.
+2. `legacy_closures`: the legacy rows whose player deleted their account (the legacy row id only), kept for ever.
+
+```bash
+mongoexport --uri "<live connection string>" --collection account_deletions --out deletions.json
+mongoexport --uri "<live connection string>" --collection legacy_closures --out closures.json
+# restore the backup as above, then:
+mongoimport --uri "<new connection string>" --collection legacy_closures --mode upsert --upsertFields legacyId --file closures.json
+mongoimport --uri "<new connection string>" --collection account_deletions --mode upsert --upsertFields playerId --file deletions.json
+mongosh "<new connection string>" --eval 'db.account_deletions.updateMany({}, { $set: { sweepAgainAt: new Date() } })'
+```
+
+Within a minute the server's housekeeping deletes each of those accounts again, store by store
+(`playerDataComponent.sweepDue`), and logs "account deletion swept again" for each player id. Delete
+`deletions.json` and `closures.json` afterwards. If the live database cannot be read at all, the deletions of the days
+since the backup cannot be known: say so in the incident note, and delete any account whose player asks again.
+
 ## Rehearsal checklist
 
 Do this after the first backup, then every three months, and after any change to the backup workflow or the

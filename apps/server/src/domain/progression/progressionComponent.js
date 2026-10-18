@@ -1,5 +1,5 @@
 import { levelForXp, MAX_LEVEL, XP_AWARDS, xpForLevel } from "@classicade/shared";
-import { isBotPlayerId } from "../../models/botIdentity.js";
+import { earnsNothing } from "../../models/deletedPlayer.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import {
   botXpLeftAfter,
@@ -117,8 +117,8 @@ export function createProgressionComponent({ progressAccessor, matchAccessor, ev
      */
     async applyMatch(match) {
       const updates = [];
-      // A computer character has no progress of its own (ADR-025).
-      for (const { playerId, displayName } of match.players.filter((p) => !isBotPlayerId(p.playerId))) {
+      // A computer character has no progress of its own (ADR-025), and a deleted player's stand-in gets none (CC-035).
+      for (const { playerId, displayName } of match.players.filter((p) => !earnsNothing(p.playerId))) {
         const result = resultFor(match, playerId);
         const credit = creditFor(match, playerId);
         // Applied even when it adds nothing, so the player hears why exactly once.
@@ -209,5 +209,26 @@ export function createProgressionComponent({ progressAccessor, matchAccessor, ev
       const withdraw = withdrawn.map((match) => withdrawnCredit(match, to.id)).reduce(addTotals, {});
       return progressAccessor.mergeInto({ from, to: to.id, at: now, withdraw });
     },
+
+    /**
+     * The player's progress for their data export (CC-035).
+     *
+     * @param {{ playerId: string }} query
+     */
+    async exportPlayer({ playerId }) {
+      const { playerId: _id, ...progress } = describe(await progressAccessor.get(playerId));
+      return progress;
+    },
+
+    /**
+     * Deletes the player's progress, and the markers of guests who moved into them (CC-035). Running it twice
+     * changes nothing.
+     *
+     * @param {{ playerId: string }} input
+     * @returns {Promise<{ erased: { progress: number } }>}
+     */
+    erasePlayer: async ({ playerId }) => ({
+      erased: { progress: await progressAccessor.removePlayer(playerId) },
+    }),
   });
 }

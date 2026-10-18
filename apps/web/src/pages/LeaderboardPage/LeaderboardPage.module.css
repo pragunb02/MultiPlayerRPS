@@ -273,3 +273,8 @@
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
+/* A minor's or an unknown age's row (CC-152): the place and score show, the name does not. */
+.hidden {
+  font-style: italic;
+  color: var(--color-text-muted);
+}

@@ -205,4 +205,19 @@ export function runProgressDaoContract(createDao) {
 
     expect((await dao.getByPlayer("user_1")).xp).toBe(70);
   });
+
+  it("deletes a player's progress and the guest markers that point at them, nobody else's (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.applyMatchOnce({ playerId: "user_a", matchId: "m1", inc: WIN, at: AT });
+    await dao.applyMatchOnce({ playerId: "guest_g", matchId: "m2", inc: WIN, at: AT });
+    await dao.markMergedInto({ from: "guest_g", to: "user_a", at: AT });
+    await dao.applyMatchOnce({ playerId: "user_b", matchId: "m3", inc: WIN, at: AT });
+
+    expect(await dao.deleteByPlayer("user_a")).toBe(2);
+    expect(await dao.deleteByPlayer("user_a")).toBe(0);
+
+    await expect(dao.getByPlayer("user_a")).rejects.toThrow(RangeError);
+    await expect(dao.getByPlayer("guest_g")).rejects.toThrow(RangeError);
+    expect((await dao.getByPlayer("user_b")).xp).toBe(30);
+  });
 }

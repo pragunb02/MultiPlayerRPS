@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { App } from "../app/App.jsx";
-import { fakeApi, fakeSessionBroadcast, fakeSocket, fakeSound } from "./fakes.js";
+import { fakeApi, fakeDownload, fakeSessionBroadcast, fakeSocket, fakeSound } from "./fakes.js";
 import { LocationProbe } from "./LocationProbe.jsx";
 
 /**
@@ -15,6 +15,7 @@ import { LocationProbe } from "./LocationProbe.jsx";
  *   socket?: object,
  *   sound?: object,
  *   sessionBroadcast?: object,
+ *   download?: object,
  * }} [options]
  */
 export function renderApp({
@@ -24,6 +25,7 @@ export function renderApp({
   socket = fakeSocket(),
   sound = fakeSound(),
   sessionBroadcast = fakeSessionBroadcast(),
+  download = fakeDownload(),
 } = {}) {
   let current = path;
   let navigate;
@@ -35,7 +37,7 @@ export function renderApp({
   };
   const view = render(
     <MemoryRouter initialEntries={[...history, path]} initialIndex={history.length}>
-      <App services={{ api, socket, sound, sessionBroadcast }} />
+      <App services={{ api, socket, sound, sessionBroadcast, download }} />
       <LocationProbe onChange={record} onNavigator={keepNavigator} />
     </MemoryRouter>,
   );
@@ -45,6 +47,7 @@ export function renderApp({
     socket,
     sound,
     sessionBroadcast,
+    download,
     url: () => current,
     back: () => act(() => navigate(-1)),
     forward: () => act(() => navigate(1)),

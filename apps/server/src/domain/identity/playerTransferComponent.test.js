@@ -187,3 +187,38 @@ describe("playerTransferComponent.follow", () => {
     expect(matches.transferPlayer).not.toHaveBeenCalled();
   });
 });
+
+describe("playerTransferComponent and deleted accounts (CC-035)", () => {
+  it("exports the guests that moved into an account without naming the account, and erases them", async () => {
+    const { component } = setup();
+    await component.transfer({ from: "guest_a", to: ACCOUNT, now: T0 });
+
+    expect(await component.exportPlayer({ playerId: ACCOUNT.id })).toEqual([
+      {
+        guest: "guest_a",
+        status: "done",
+        startedAt: new Date(T0).toISOString(),
+        completedAt: new Date(T0).toISOString(),
+        carriedOver: { xp: 40, matchesPlayed: 2, matches: 2 },
+      },
+    ]);
+    expect(await component.guestsOf({ playerId: ACCOUNT.id })).toEqual(["guest_a"]);
+    expect(await component.erasePlayer({ playerId: ACCOUNT.id })).toEqual({ erased: { transfers: 1 } });
+    expect(await component.guestsOf({ playerId: ACCOUNT.id })).toEqual([]);
+    expect(await component.exportPlayer({ playerId: ACCOUNT.id })).toEqual([]);
+  });
+
+  it("exports a transfer still under way without an end", async () => {
+    const accessor = createPlayerTransferAccessor({ playerTransferDao: createInMemoryPlayerTransferDao() });
+    const component = createPlayerTransferComponent({
+      playerTransferAccessor: accessor,
+      participants: [],
+      matches: { transferPlayer: vi.fn(), getById: vi.fn() },
+    });
+    await accessor.start({ from: "guest_b", to: ACCOUNT, at: T0 });
+
+    expect(await component.exportPlayer({ playerId: ACCOUNT.id })).toEqual([
+      { guest: "guest_b", status: "pending", startedAt: new Date(T0).toISOString() },
+    ]);
+  });
+});

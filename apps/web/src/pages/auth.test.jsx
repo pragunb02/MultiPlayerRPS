@@ -588,3 +588,95 @@ describe("ProfilePage", () => {
     expect(await screen.findByRole("link", { name: "Create an account" })).toBeInTheDocument();
   });
 });
+
+describe("SignupPage and the year of birth (CC-152)", () => {
+  const fill = async (user) => {
+    await user.type(screen.getByLabelText("Username"), "Riya");
+    await user.type(screen.getByLabelText("Email"), "riya@example.com");
+    await user.type(screen.getByLabelText("Password"), "correct horse battery");
+  };
+
+  it("offers a neutral year list that starts at I'd rather not say, and sends no year then", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({ signup: vi.fn(async () => ({ identity: USER })) });
+    renderApp({ path: "/signup", api });
+
+    const select = await screen.findByLabelText("Year of birth");
+    const options = within(select)
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(select).toHaveValue("");
+    expect(options[0]).toBe("I'd rather not say");
+    expect(options[1]).toBe(String(new Date().getFullYear()));
+    expect(options).toHaveLength(102);
+    expect(screen.queryByText(/must be|aged 13|under 18|over 18/)).toBeNull();
+
+    await fill(user);
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    await vi.waitFor(() => expect(api.signup).toHaveBeenCalledOnce());
+    expect(api.signup.mock.calls[0][0]).toEqual({
+      username: "Riya",
+      email: "riya@example.com",
+      password: "correct horse battery",
+    });
+  });
+
+  it("sends a chosen year as a number", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({ signup: vi.fn(async () => ({ identity: USER })) });
+    renderApp({ path: "/signup", api });
+
+    await fill(user);
+    await user.selectOptions(screen.getByLabelText("Year of birth"), "1999");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    await vi.waitFor(() => expect(api.signup).toHaveBeenCalledOnce());
+    expect(api.signup.mock.calls[0][0].birthYear).toBe(1999);
+  });
+
+  it("refuses a child's year in the page, without sending it, and keeps the year as chosen", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({ signup: vi.fn() });
+    renderApp({ path: "/signup", api });
+    const year = String(new Date().getFullYear() - 8);
+
+    await fill(user);
+    await user.selectOptions(screen.getByLabelText("Year of birth"), year);
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(
+      await screen.findByText(
+        "ClassiCade accounts are for people aged 13 and over. You can keep playing as a guest.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Year of birth")).toBeDisabled();
+    expect(screen.getByLabelText("Year of birth")).toHaveValue(year);
+    expect(api.signup).not.toHaveBeenCalled();
+  });
+
+  it("after an under 13 refusal by the server keeps the year as chosen and offers guest play instead", async () => {
+    const user = userEvent.setup();
+    const refusal = new AppRequestError({
+      code: "VALIDATION_FAILED",
+      message: "ClassiCade accounts are for people aged 13 and over. You can keep playing as a guest.",
+      status: 400,
+      details: { field: "birthYear", reason: "too-young" },
+    });
+    const api = fakeApi({ signup: vi.fn().mockRejectedValue(refusal) });
+    renderApp({ path: "/signup", api });
+    // A year the page lets through, which the server refuses all the same here.
+    const year = String(new Date().getFullYear() - 13);
+
+    await fill(user);
+    await user.selectOptions(screen.getByLabelText("Year of birth"), year);
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByText(refusal.message)).toBeInTheDocument();
+    expect(screen.getByLabelText("Year of birth")).toBeDisabled();
+    expect(screen.getByLabelText("Year of birth")).toHaveValue(year);
+    expect(screen.getByRole("link", { name: "Play as a guest" })).toHaveAttribute("href", "/");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    expect(api.signup).toHaveBeenCalledOnce();
+  });
+});

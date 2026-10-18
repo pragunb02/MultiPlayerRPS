@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ERROR_CODES } from "@classicade/shared";
+import { ERROR_CODES, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { YEAR_NOT_SAID, YearSelect } from "../../components/YearSelect/YearSelect.jsx";
 import { useSaveProgress } from "../../components/SaveProgress/saveProgressContext.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -37,13 +38,20 @@ function EmailUnavailable({ next }) {
   );
 }
 
+/** What the server is sent: the year as a number, or nothing at all when the player would rather not say. */
+const credentialsOf = ({ birthYear, ...form }) =>
+  birthYear === YEAR_NOT_SAID ? form : { ...form, birthYear: Number(birthYear) };
+
 /** The sign-up form. Field rules are checked as the player types, and the server has the last word. */
 export function SignupPage() {
   const session = useSession();
   const saveProgress = useSaveProgress();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
-  const [form, setForm] = useState({ username: "", email: "", password: "" });
+  const [form, setForm] = useState({ username: "", email: "", password: "", birthYear: "" });
+  // Set when the server refused the year (under 13). The choice then stays as it is for this visit (CC-152).
+  const [tooYoung, setTooYoung] = useState(false);
+  const thisYear = new Date().getFullYear();
   const [touched, setTouched] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -53,16 +61,17 @@ export function SignupPage() {
     async () => {
       setFieldErrors({});
       try {
-        const { carriedOver } = await session.signup(form);
+        const { carriedOver } = await session.signup(credentialsOf(form));
         // One confirmation, with the account's numbers, when guest games came along (CC-097).
         saveProgress.confirmSaved(carriedOver);
         // Signed in: the redirect below takes over on the next render.
       } catch (err) {
         // A problem with one field is shown at that field. Anything else is shown under the button.
         const field = err.details?.field;
-        if (!(field && RULES[field])) throw err;
+        if (!(field && field in form)) throw err;
         const unavailable = field === "email" && err.code === ERROR_CODES.CONFLICT;
         setFieldErrors({ [field]: unavailable ? <EmailUnavailable next={next} /> : err.message });
+        if (err.details.reason === "too-young") setTooYoung(true);
       }
     },
     { id: "auth.signup" },
@@ -71,6 +80,16 @@ export function SignupPage() {
   function submit(event) {
     event.preventDefault();
     setTouched({ username: true, email: true, password: true });
+    // Checked here as well as on the server, so a child's year of birth is never sent anywhere (CC-152).
+    const year = Number(form.birthYear);
+    if (
+      form.birthYear !== YEAR_NOT_SAID &&
+      isTooYoungForAccount({ birthYear: year, currentYear: thisYear })
+    ) {
+      setFieldErrors({ birthYear: TOO_YOUNG_MESSAGE });
+      setTooYoung(true);
+      return;
+    }
     if (Object.keys(RULES).every((field) => RULES[field](form[field]) === "")) {
       signup.run();
     }
@@ -117,10 +136,31 @@ export function SignupPage() {
           error={errorFor("password")}
           hint="At least 8 characters"
         />
+        <YearSelect
+          control="auth.signup.birth_year"
+          currentYear={thisYear}
+          value={form.birthYear}
+          onChange={(birthYear) => setForm((current) => ({ ...current, birthYear }))}
+          error={fieldErrors.birthYear ?? ""}
+          locked={tooYoung}
+        />
+        {tooYoung && (
+          <p className={styles.note}>
+            <Link to={paths.home()} data-cc-control="auth.signup.play_as_guest">
+              Play as a guest
+            </Link>
+          </p>
+        )}
         {session.identity?.kind === "guest" && (
           <p className={styles.note}>Your guest XP, level and match history will move to your new account.</p>
         )}
-        <Button control="auth.signup" type="submit" size="lg" action={signup}>
+        <Button
+          control="auth.signup"
+          type="submit"
+          size="lg"
+          action={signup}
+          reason={tooYoung ? "ClassiCade accounts are for people aged 13 and over" : ""}
+        >
           Create account
         </Button>
       </form>

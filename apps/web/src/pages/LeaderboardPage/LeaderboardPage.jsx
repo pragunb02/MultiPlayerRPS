@@ -1,5 +1,11 @@
 import { Link, useLocation, useParams } from "react-router";
-import { getLeaderboard, LEADERBOARD_METRICS, LEADERBOARD_PERIODS, LEADERBOARDS } from "@classicade/shared";
+import {
+  getLeaderboard,
+  HIDDEN_PLAYER_NAME,
+  LEADERBOARD_METRICS,
+  LEADERBOARD_PERIODS,
+  LEADERBOARDS,
+} from "@classicade/shared";
 import { paths, returnPathFor } from "../../app/paths.js";
 import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
 import { LevelBadge } from "../../art/badges/LevelBadge.jsx";
@@ -184,7 +190,7 @@ function Board({ info }) {
                 aria-current={entry.rank === yourRank ? "true" : undefined}
               >
                 <Place rank={entry.rank} />
-                <span className={styles.name}>
+                <span className={[styles.name, entry.hidden && styles.hidden].filter(Boolean).join(" ")}>
                   {entry.displayName}
                   {entry.rank === yourRank && <span className={styles.tag}>you</span>}
                 </span>
@@ -193,6 +199,12 @@ function Board({ info }) {
               </li>
             ))}
           </ol>
+        )}
+        {entries.some((entry) => entry.hidden) && (
+          <p className={styles.muted}>
+            {HIDDEN_PLAYER_NAME} is a player under 18 or one who has not said their age. Their names stay
+            private.
+          </p>
         )}
         <YouRow you={you} metric={info.metric} listedRanks={entries.map((entry) => entry.rank)} />
       </BoardCard>

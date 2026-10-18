@@ -23,7 +23,13 @@ async function account(username) {
   const res = await fetch(`${server.baseUrl}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, email: `${username}@example.com`, password: "correct horse battery" }),
+    // Adults, so their names show on the public boards (CC-152).
+    body: JSON.stringify({
+      username,
+      email: `${username}@example.com`,
+      password: "correct horse battery",
+      birthYear: 1990,
+    }),
   });
   const cookie = res.headers.get("set-cookie").split(";")[0];
   const { identity } = await res.json();
@@ -154,6 +160,7 @@ describe("leaderboard routes", () => {
         username: "riya",
         email: "riya@example.com",
         password: "correct horse battery",
+        birthYear: 1990,
       }),
     });
     const riya = { cookie: res.headers.get("set-cookie").split(";")[0] };

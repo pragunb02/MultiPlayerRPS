@@ -125,5 +125,39 @@ export function createPlayerTransferComponent({ playerTransferAccessor, particip
       }
       return matches.getById(match.matchId);
     },
+
+    /**
+     * The guests whose data moved into this account, for its data export (CC-035).
+     *
+     * @param {{ playerId: string }} query  the account's player id
+     */
+    exportPlayer: async ({ playerId }) =>
+      (await playerTransferAccessor.listTo(playerId)).map(
+        ({ from, status, createdAt, completedAt, carriedOver }) => ({
+          guest: from,
+          status,
+          startedAt: new Date(createdAt).toISOString(),
+          ...(completedAt !== undefined && { completedAt: new Date(completedAt).toISOString() }),
+          ...(carriedOver !== undefined && { carriedOver: { ...carriedOver } }),
+        }),
+      ),
+
+    /**
+     * Deletes the records of guests who moved into this account (CC-035). They name the account and its username.
+     *
+     * @param {{ playerId: string }} input  the account's player id
+     * @returns {Promise<{ erased: { transfers: number } }>}
+     */
+    erasePlayer: async ({ playerId }) => ({
+      erased: { transfers: await playerTransferAccessor.removeTo(playerId) },
+    }),
+
+    /**
+     * The guest ids whose data moved into this account (CC-035): the ids the player played under before signing up.
+     *
+     * @param {{ playerId: string }} query  the account's player id
+     * @returns {Promise<string[]>}
+     */
+    guestsOf: async ({ playerId }) => (await playerTransferAccessor.listTo(playerId)).map(({ from }) => from),
   });
 }

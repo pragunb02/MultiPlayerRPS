@@ -219,3 +219,34 @@ describe("api client", () => {
     expect(fetchImpl).toHaveBeenCalledWith("/api/games", expect.objectContaining({ method: "GET" }));
   });
 });
+
+describe("api client, the account's data and age (CC-035, CC-152)", () => {
+  it("reads the account and sets a birth year", async () => {
+    const fetchImpl = respond(200, { account: { username: "riya", ageGroup: "adult" } });
+    const api = createApiClient({ fetchImpl });
+
+    expect(await api.getAccount()).toEqual({ username: "riya", ageGroup: "adult" });
+    expect(await api.setBirthYear(1990)).toEqual({ username: "riya", ageGroup: "adult" });
+
+    expect(fetchImpl.mock.calls.map(([url, init]) => [url, init.method, init.body])).toEqual([
+      ["/api/account", "GET", undefined],
+      ["/api/account/birth-year", "PUT", JSON.stringify({ birthYear: 1990 })],
+    ]);
+  });
+
+  it("asks for the data export and the deletion with the password", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, ok: true, json: async () => ({ exportedAt: "2026-10-18" }) })
+      .mockResolvedValueOnce({ status: 204, ok: true, json: async () => ({}) });
+    const api = createApiClient({ fetchImpl });
+
+    expect(await api.exportData("pw")).toEqual({ exportedAt: "2026-10-18" });
+    expect(await api.deleteAccount("pw")).toBeUndefined();
+
+    expect(fetchImpl.mock.calls.map(([url, init]) => [url, init.method, init.body])).toEqual([
+      ["/api/account/export", "POST", JSON.stringify({ password: "pw" })],
+      ["/api/account/delete", "POST", JSON.stringify({ password: "pw" })],
+    ]);
+  });
+});

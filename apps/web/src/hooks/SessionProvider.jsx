@@ -163,6 +163,12 @@ export function SessionProvider({ children }) {
           await api.endSession();
           changedTo(undefined);
         }),
+      // The account is gone and this browser is signed out, like a logout (CC-035).
+      deleteAccount: (password) =>
+        own(async () => {
+          await api.deleteAccount(password);
+          changedTo(undefined);
+        }),
       // Both keep this browser signed in as the same player and sign out every other one (CC-116).
       changePassword: (passwords) => api.changePassword(passwords),
       signOutOtherDevices: () => api.signOutOtherDevices(),

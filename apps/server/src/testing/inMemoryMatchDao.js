@@ -84,13 +84,39 @@ export function createInMemoryMatchDao() {
         .map(copy);
     },
 
-    async renamePlayer({ matchId, from, doc }) {
+    async renamePlayer({ matchId, from, doc, unjudged = false }) {
       const stored = matches.get(matchId);
       if (stored === undefined || !stored.players.some((p) => p.playerId === from)) {
         return false;
       }
+      if (unjudged && stored.credit !== undefined) {
+        return false;
+      }
       matches.set(matchId, copy({ ...doc, matchId, schemaVersion: 1 }));
       return true;
+    },
+
+    async deleteForPlayer({ matchId, playerId }) {
+      const stored = matches.get(matchId);
+      if (stored === undefined || !has(stored, playerId)) {
+        return false;
+      }
+      return matches.delete(matchId);
+    },
+
+    async listPageByPlayer(playerId, { limit, after }) {
+      const newerFirst = (a, b) => b.endedAt - a.endedAt || (b.matchId < a.matchId ? -1 : 1);
+      return [...matches.values()]
+        .filter((m) => has(m, playerId))
+        .filter(
+          (m) =>
+            after === undefined ||
+            m.endedAt < after.endedAt ||
+            (+m.endedAt === +after.endedAt && m.matchId < after.matchId),
+        )
+        .sort(newerFirst)
+        .slice(0, limit)
+        .map(copy);
     },
   });
 }

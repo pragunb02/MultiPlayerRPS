@@ -157,11 +157,36 @@ export function createMatchAccessor({ matchDao }) {
     /**
      * Stores a match's renamed copy, only while `from` still plays in the stored one.
      *
-     * @param {{ from: string, match: Match }} rename
+     * @param {{ from: string, match: Match, unjudged?: boolean }} rename  `unjudged`: only while the stored match
+     *   has no fair play verdict yet
      * @returns {Promise<boolean>} whether it was renamed now
      */
-    replaceRenamed({ from, match }) {
-      return matchDao.renamePlayer({ matchId: match.matchId, from, doc: toDoc(match) });
+    replaceRenamed({ from, match, unjudged = false }) {
+      return matchDao.renamePlayer({ matchId: match.matchId, from, doc: toDoc(match), unjudged });
+    },
+
+    /**
+     * Deletes a match only while `playerId` still plays in it (CC-035).
+     *
+     * @param {{ matchId: string, playerId: string }} which
+     * @returns {Promise<boolean>} whether it was deleted now
+     */
+    deleteForPlayer: (which) => matchDao.deleteForPlayer(which),
+
+    /**
+     * A page of a player's matches, newest first on end time and then id (CC-035, the data export).
+     *
+     * @param {string} playerId
+     * @param {{ limit: number, after?: { endedAt: number, matchId: string } }} page  `after` is the last match of
+     *   the page before
+     * @returns {Promise<ReadonlyArray<Readonly<Match>>>}
+     */
+    async listPageForPlayer(playerId, { limit, after }) {
+      const docs = await matchDao.listPageByPlayer(playerId, {
+        limit,
+        ...(after !== undefined && { after: { endedAt: new Date(after.endedAt), matchId: after.matchId } }),
+      });
+      return Object.freeze(docs.map(toMatch));
     },
   });
 }

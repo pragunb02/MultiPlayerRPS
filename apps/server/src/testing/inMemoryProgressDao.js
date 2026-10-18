@@ -60,5 +60,13 @@ export function createInMemoryProgressDao() {
       }
       return { playerId, ...totalsOf(doc), updatedAt: new Date(doc.updatedAt) };
     },
+
+    async deleteByPlayer(playerId) {
+      const gone = [...players.entries()]
+        .filter(([id, doc]) => id === playerId || doc.mergedInto === playerId)
+        .map(([id]) => id);
+      gone.forEach((id) => players.delete(id));
+      return gone.length;
+    },
   });
 }

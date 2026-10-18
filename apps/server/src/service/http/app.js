@@ -23,6 +23,9 @@ import { createWebAppRouter } from "./webApp.js";
  *   progressionComponent: ReturnType<typeof import("../../domain/progression/progressionComponent.js").createProgressionComponent>,
  *   gamificationComponent: ReturnType<typeof import("../../domain/gamification/gamificationComponent.js").createGamificationComponent>,
  *   accountComponent: ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>,
+ *   playerDataComponent: ReturnType<typeof import("../../domain/accounts/playerDataComponent.js").createPlayerDataComponent>,
+ *   onAccountDeleted: (playerId: string) => void,  told once an account is deleted, so its sockets are cut (CC-035)
+ *   accountLimits?: Parameters<typeof import("./accountRoutes.js").createAccountRoutes>[0]["limits"],
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
  *   onOtherSessionsEnded: (which: { playerId: string, fromSessionId: string, toSessionId: string }) => void,  told
@@ -47,6 +50,9 @@ export function createHttpApp({
   progressionComponent,
   gamificationComponent,
   accountComponent,
+  playerDataComponent,
+  onAccountDeleted,
+  accountLimits,
   authLimits,
   onSessionEnded,
   onOtherSessionsEnded,
@@ -116,6 +122,9 @@ export function createHttpApp({
       leaderboardLimit,
       analyticsComponent,
       adminAccess,
+      playerDataComponent,
+      onAccountDeleted,
+      accountLimits,
     }),
   );
 

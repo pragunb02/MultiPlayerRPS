@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { deletedPlayer } from "../../models/deletedPlayer.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { anonymisedMatch } from "./anonymise.js";
 
 /**
  * How the match pipeline retries (CC-111, ADR-047). A failed attempt waits `firstDelayMs`, then twice as long after
@@ -81,9 +84,15 @@ function checkSteps(steps) {
  *   pendingMatchAccessor: ReturnType<typeof import("../../data/pendingMatchAccessor.js").createPendingMatchAccessor>,
  *   steps: ReadonlyArray<MatchStep>,
  *   policy?: Readonly<typeof MATCH_RETRY_POLICY>,
+ *   newUuid?: () => string,   a fresh random id for each deleted player's stand-in (CC-035). Tests pick them
  * }} deps
  */
-export function createMatchOutboxComponent({ pendingMatchAccessor, steps, policy = MATCH_RETRY_POLICY }) {
+export function createMatchOutboxComponent({
+  pendingMatchAccessor,
+  steps,
+  policy = MATCH_RETRY_POLICY,
+  newUuid = randomUUID,
+}) {
   assertDefined(pendingMatchAccessor, "pendingMatchAccessor");
   checkSteps(steps);
   const running = new Set();
@@ -184,6 +193,32 @@ export function createMatchOutboxComponent({ pendingMatchAccessor, steps, policy
       } finally {
         batchRunning = false;
       }
+    },
+
+    /**
+     * A deleted player leaves the outbox too (CC-035). Every record that names them, pending, done or failed, gets
+     * a new stand-in in its match, so a step that runs later writes the stand-in, never the player, and nothing
+     * here keeps their id or name. The same goes for the guest ids they played under before signing up: the games
+     * of those days are still here under the guest id. Running it twice changes nothing.
+     *
+     * @param {{ playerId: string, formerIds?: ReadonlyArray<string> }} input  `formerIds`: the player's guest ids
+     * @returns {Promise<{ erased: { pendingMatches: number } }>}
+     */
+    async erasePlayer({ playerId, formerIds = [] }) {
+      let replaced = 0;
+      for (const id of [playerId, ...formerIds]) {
+        for (const { matchId, match } of await pendingMatchAccessor.listForPlayer(id)) {
+          const stand = deletedPlayer(newUuid());
+          replaced += Number(
+            await pendingMatchAccessor.replaceMatch({
+              matchId,
+              from: id,
+              match: anonymisedMatch(match, { playerId: id, stand }),
+            }),
+          );
+        }
+      }
+      return { erased: { pendingMatches: replaced } };
     },
   });
 }

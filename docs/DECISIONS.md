@@ -2,7 +2,7 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-051** (ADR-048 is held by open PR #82). A later change to a decision is a dated
+reused; the next free ID is **ADR-051**. A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -77,6 +77,56 @@ the owner may change it.
      presence, clocks and moves in a side column; phones get a compact match header, the request banner takes the
      match bar's row while open, and the result is a non-blocking bottom sheet. 360x800 is added as a design and
      test viewport, `viewport-fit=cover` with safe-area padding everywhere.
+
+### ADR-048 — Account deletion, data export and the age signal
+
+- **Status:** Accepted · 2026-10-18 by the owner, all points, including hiding every existing name on the public
+  boards until its owner sets a birth year ([CC-035](tickets/CC-035.md), [CC-152](tickets/CC-152.md)).
+- **Context.** Players must be able to leave and take their data with them (FR-ACC-7, the app stores, the DPDP Act
+  from 13 May 2027, the GDPR). ADR-028.1 says unknown age means minor, and the public leaderboards showed every
+  account's username to anyone. The research, with sources, is in the two tickets.
+- **Decision.**
+  1. **Deletion is immediate**, with the password again and a confirmation that lists what goes and what stays. No
+     grace period: we have no confirmed email to warn the player with (CC-033), and a grace period keeps everything
+     longer.
+  2. **Every store of DATA.md takes part**, as ADR-014 does for guests: each component that stores data by player id
+     exposes `erasePlayer` (and `exportPlayer`), and `playerDataComponent` runs them in the order the composition
+     root lists them: rooms, the match pipeline's outbox (ADR-047), sessions, matches, progress, gamification,
+     leaderboards, guest transfers. Each runs under the account id and then under every guest id the player had
+     before signing up: those ids are worked out once, before anything is erased, and kept on the deletion record,
+     because a game can be stored under a guest id after its history moved. The player's sockets are
+     cut as soon as the account itself is closed, before the stores are erased, so no device plays on under it.
+  3. **Shared matches are anonymised, not deleted.** The opponent keeps the game. The deleted player's id becomes a
+     new random stand-in for each match (`deleted_<uuid>`, "Deleted player"), and the guest id the fair play credit
+     may name (`withdrawnFrom`) is dropped, so nothing joins the anonymous matches back together. A match read
+     before its verdict is only replaced while it still has none, so the opponent's verdict is never lost. A match no other
+     person played is deleted. In open rooms a stand-in takes the seat and leaves, so a running game is forfeited to the opponent. A
+     stand-in earns nothing.
+  4. **The legacy row stays read only and is closed.** Its id goes into `legacy_closures`, so the old password cannot
+     make the account again. The email can sign up afresh.
+  5. **A record of each deletion is kept 30 days** (`account_deletions`: the player id and times only), the same as
+     the backups. Housekeeping erases each deletion again every 5 minutes for 30 minutes, longer than the match
+     pipeline's retries (about 13 minutes), so a game that was ending at that moment cannot write the player back.
+     A restore uses the records to delete those accounts again. If erasing fails halfway, the account is closed all
+     the same and the sweeps finish the rest.
+  6. **Export needs the password too**, because it carries the email, which no client sees otherwise. Every player
+     id anywhere in an exported match becomes "you" or "player-2" and so on. At most 3
+     exports given an hour per account, and at most 5 wrong passwords in 15 minutes for export and deletion
+     together. Neither limit counts the other's refusals. Other people appear by display name only, never by id.
+  7. **Only a year of birth, optional, from a neutral picker** that starts at "I'd rather not say" and lists every
+     year back 100 years. No date, no hint at any age.
+  8. **Age groups from the year alone.** Adult only when surely 18 (this year minus the birth year is 19 or more).
+     Turning 18 this year, a minor, or no year: the minor defaults. Under 13 for the whole year: no account, refused
+     in the page before anything is sent and again by the server.
+  9. **The year is set once.** A correction goes through the owner, so a minor cannot unlock the adult defaults with
+     one click. **The year is stored, not only the group**: a minor becomes an adult on a date the year gives, without
+     being asked again, and the parental consent step (ADR-028.9) needs the age. A child's year (under 13) is never
+     sent: the sign-up page and the profile both refuse it before any request.
+  10. **The default that exists today:** leaderboards show "Hidden player" for every account that is not an adult,
+      worked out when the board is read. Every later social feature reads the same age group.
+- **Consequences.** On release every existing account is of unknown age, so every name on the public boards is
+  hidden until its owner gives a year. Rule 8(3) of the DPDP Rules (a year of processing logs) is for the lawyer's
+  review before 13 May 2027. Guests are not covered by deletion (no password): CC-098 removes old guest data.
 
 ### ADR-047 — Finished games go through a stored outbox with named steps and retries
 

@@ -287,4 +287,54 @@ export function runMatchDaoContract(createDao) {
     expect(listed.map((m) => m.matchId)).toEqual(["m-capped"]);
     expect(listed[0].credit).toEqual(botXp({ withdrawnFrom: "guest_a", withdrawnXp: 20 }));
   });
+
+  it("deletes a match only while the player is still in it (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insert(matchDoc());
+
+    expect(await dao.deleteForPlayer({ matchId: matchDoc().matchId, playerId: "guest_c" })).toBe(false);
+    expect(await dao.deleteForPlayer({ matchId: matchDoc().matchId, playerId: "guest_a" })).toBe(true);
+    expect(await dao.deleteForPlayer({ matchId: matchDoc().matchId, playerId: "guest_a" })).toBe(false);
+
+    await expect(dao.getByMatchId(matchDoc().matchId)).rejects.toThrow(RangeError);
+  });
+
+  it("pages a player's matches newest first on end time and id, so a tie at a page edge loses none (CC-035)", async () => {
+    const dao = await createDao();
+    const same = new Date(T0 + 5000);
+    for (const n of [1, 2, 3, 4]) {
+      await dao.insert(matchDoc({ matchId: `m-${n}`, endedAt: n === 1 ? new Date(T0) : same }));
+    }
+
+    const first = await dao.listPageByPlayer("guest_a", { limit: 2 });
+    const last = first.at(-1);
+    const second = await dao.listPageByPlayer("guest_a", {
+      limit: 2,
+      after: { endedAt: last.endedAt, matchId: last.matchId },
+    });
+    const third = await dao.listPageByPlayer("guest_a", {
+      limit: 2,
+      after: { endedAt: second.at(-1).endedAt, matchId: second.at(-1).matchId },
+    });
+
+    expect(first.map((m) => m.matchId)).toEqual(["m-4", "m-3"]);
+    expect(second.map((m) => m.matchId)).toEqual(["m-2", "m-1"]);
+    expect(third).toEqual([]);
+    expect(await dao.listPageByPlayer("guest_nobody", { limit: 2 })).toEqual([]);
+  });
+
+  it("renames a match not judged yet only while it is still not judged (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insert(matchDoc());
+    const renamed = {
+      ...matchDoc(),
+      players: [{ playerId: "deleted_1", displayName: "Deleted player" }, matchDoc().players[1]],
+    };
+    await dao.judgeOnce({ matchId: matchDoc().matchId, credit: { notCounted: [] } });
+
+    expect(
+      await dao.renamePlayer({ matchId: matchDoc().matchId, from: "guest_a", doc: renamed, unjudged: true }),
+    ).toBe(false);
+    expect(await dao.renamePlayer({ matchId: matchDoc().matchId, from: "guest_a", doc: renamed })).toBe(true);
+  });
 }

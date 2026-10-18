@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { LevelBadge } from "../../art/badges/LevelBadge.jsx";
@@ -18,6 +18,7 @@ import { useMatchHistory } from "../../hooks/useMatchHistory.js";
 import { useProgress } from "../../hooks/useProgress.js";
 import { useSession } from "../../hooks/useSession.js";
 import { AccountSettings } from "./AccountSettings.jsx";
+import { PrivacySettings } from "./PrivacySettings.jsx";
 import styles from "./ProfilePage.module.css";
 import { VisitorProfile } from "./VisitorProfile.jsx";
 
@@ -151,6 +152,8 @@ function PlayerConsole({ guest }) {
 /** Your level, stats and match history, for guests and account holders alike. Account holders also get their account settings. */
 export function ProfilePage() {
   const session = useSession();
+  // Set by the deletion on this page, so the visitor it leaves behind is told it worked (CC-035).
+  const accountDeleted = useLocation().state?.accountDeleted === true;
   if (session.status === "loading") {
     return (
       <>
@@ -160,7 +163,16 @@ export function ProfilePage() {
     );
   }
   if (session.identity === undefined) {
-    return <VisitorProfile />;
+    return (
+      <>
+        {accountDeleted && (
+          <p role="status" className={styles.notice}>
+            Your account and its data are deleted. Copies in our encrypted backups are gone within 30 days.
+          </p>
+        )}
+        <VisitorProfile />
+      </>
+    );
   }
   return (
     <section className={styles.page}>
@@ -181,6 +193,7 @@ export function ProfilePage() {
       <h2>Recent matches</h2>
       <MatchHistory you={session.identity.id} />
       {session.identity.kind === "user" && <AccountSettings />}
+      {session.identity.kind === "user" && <PrivacySettings />}
     </section>
   );
 }

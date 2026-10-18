@@ -516,3 +516,46 @@ describe("createGamificationComponent", () => {
     }
   });
 });
+
+describe("gamificationComponent and deleted players (CC-035)", () => {
+  const STAND = { playerId: "deleted_00000000-0000-4000-8000-000000000009", displayName: "Deleted player" };
+
+  it("counts nothing for a deleted player's stand-in", async () => {
+    const { finish, gamification, pushed } = setup();
+
+    await finish(match({ players: [ALICE, STAND], winner: STAND.playerId }));
+
+    expect(pushed(GAMIFICATION_EVENTS.ACHIEVEMENTS_UNLOCKED, STAND.playerId)).toEqual([]);
+    expect(await gamification.exportPlayer({ playerId: STAND.playerId })).toEqual({
+      stats: expect.objectContaining({ winsByGame: {}, matchesByGame: {} }),
+      achievements: [],
+      questDays: [],
+    });
+  });
+
+  it("exports a player's stats, unlocks and quest days, then erases all of them", async () => {
+    const { finish, gamification } = setup();
+    await finish(match());
+    await gamification.getQuests({ playerId: ALICE.playerId, now: T });
+
+    const exported = await gamification.exportPlayer({ playerId: ALICE.playerId });
+
+    expect(exported.stats.winsByGame).toEqual({ rps: 1 });
+    expect(exported.stats).not.toHaveProperty("playerId");
+    expect(exported.achievements.map((a) => a.achievementId)).toEqual(["first-match", "first-win"]);
+    expect(exported.questDays).toEqual([
+      expect.objectContaining({ day: "2026-10-16", items: expect.any(Array) }),
+    ]);
+    expect(exported.questDays[0]).not.toHaveProperty("recentKeys");
+    expect(exported.questDays[0]).not.toHaveProperty("playerId");
+
+    expect(await gamification.erasePlayer({ playerId: ALICE.playerId })).toEqual({
+      erased: { stats: 1, questDays: 1, achievements: 2 },
+    });
+    expect(await gamification.exportPlayer({ playerId: ALICE.playerId })).toEqual({
+      stats: expect.objectContaining({ winsByGame: {} }),
+      achievements: [],
+      questDays: [],
+    });
+  });
+});

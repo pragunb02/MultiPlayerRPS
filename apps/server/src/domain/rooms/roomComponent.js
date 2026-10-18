@@ -483,6 +483,31 @@ export function createRoomComponent({
     );
   }
 
+  /**
+   * The room with every trace of player `from` given to `to`: the seat (disconnected until `to` joins), the host
+   * role, the series, the result, the rematch and the game.
+   */
+  function handedOver(room, from, to, now) {
+    const seats = room.seats.map((seat) =>
+      seat.playerId === from ? { playerId: to.id, displayName: to.displayName, connected: false } : seat,
+    );
+    return {
+      ...withSeats(room, seats, now),
+      hostId: room.hostId === from ? to.id : room.hostId,
+      ...(room.series && { series: renamePlayer(room.series, from, to.id) }),
+      ...(room.result && { result: renamePlayer(room.result, from, to.id) }),
+      ...(room.rematch && { rematch: renamePlayer(room.rematch, from, to.id) }),
+      ...(room.requests && { requests: renamePlayer(room.requests, from, to.id) }),
+      ...(room.game && {
+        game: {
+          ...room.game,
+          state: renamePlayer(room.game.state, from, to.id),
+          log: renamePlayer(room.game.log, from, to.id),
+        },
+      }),
+    };
+  }
+
   /** Runs `work` for each room, skipping rooms that closed in the meantime. Answers what `work` answered. */
   async function eachRoom(rooms, work) {
     const results = [];
@@ -1005,30 +1030,36 @@ export function createRoomComponent({
               // The account's own seat stays, so the room never empties here.
               return room.status === ROOM_STATUS.WAITING ? leaving(room, from, now) : room;
             }
-            const seats = room.seats.map((seat) =>
-              seat.playerId === from
-                ? { playerId: to.id, displayName: to.displayName, connected: false }
-                : seat,
-            );
-            return {
-              ...withSeats(room, seats, now),
-              hostId: room.hostId === from ? to.id : room.hostId,
-              ...(room.series && { series: renamePlayer(room.series, from, to.id) }),
-              ...(room.result && { result: renamePlayer(room.result, from, to.id) }),
-              ...(room.rematch && { rematch: renamePlayer(room.rematch, from, to.id) }),
-              ...(room.requests && { requests: renamePlayer(room.requests, from, to.id) }),
-              ...(room.game && {
-                game: {
-                  ...room.game,
-                  state: renamePlayer(room.game.state, from, to.id),
-                  log: renamePlayer(room.game.log, from, to.id),
-                },
-              }),
-            };
+            return handedOver(room, from, to, now);
           },
         }),
       );
       return results.filter((result) => result.changed).map((result) => result.room);
+    },
+
+    /**
+     * The player deleted their account (CC-035). In every room they sit in, an anonymous stand-in takes their place
+     * first and then leaves: a running game is forfeited, so the other player wins and the match is recorded with
+     * the stand-in, a waiting seat is given up, and a finished room loses its rematch. Nothing in a room names the
+     * player afterwards, and a game that ends later cannot write their data back.
+     *
+     * @param {{ playerId: string, standIn: () => Readonly<{ id: string, displayName: string }>, now: number }} input
+     *   `standIn` makes a new stand-in for each room
+     * @returns {Promise<Array<Readonly<import("../../data/roomAccessor.js").Room>>>} rooms that changed and are still open
+     */
+    async erasePlayer({ playerId, standIn, now }) {
+      const results = await eachRoom(await roomAccessor.listBySeat(playerId), (stored) =>
+        change({
+          code: stored.code,
+          now,
+          decide(room) {
+            if (seatOf(room, playerId) === undefined) return room;
+            const stand = standIn();
+            return leaving(handedOver(room, playerId, stand, now), stand.id, now);
+          },
+        }),
+      );
+      return results.filter((result) => !result.closed && result.changed).map((result) => result.room);
     },
 
     /** @param {string} code */

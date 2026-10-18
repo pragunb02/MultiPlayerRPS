@@ -117,5 +117,13 @@ export function createQuestDao({ connection }) {
       const { deletedCount } = await QuestDay.deleteMany({ playerId });
       return deletedCount;
     },
+
+    /**
+     * Every quest day of one player still stored, oldest first, for their data export (CC-035).
+     *
+     * @param {string} playerId
+     * @returns {Promise<QuestDayDoc[]>}
+     */
+    listByPlayer: (playerId) => QuestDay.find({ playerId }, FIELDS).sort({ day: 1 }).lean(),
   });
 }

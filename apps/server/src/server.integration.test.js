@@ -461,7 +461,13 @@ describe("signing in from a guest session (integration)", () => {
 
 describe("a guest's progress moving to their account through the real composition root (integration, CC-032)", () => {
   const json = { "Content-Type": "application/json" };
-  const RIYA = { username: "Riya", email: "riya@example.com", password: "correct horse battery" };
+  // An adult, so the name shows on the public boards (CC-152).
+  const RIYA = {
+    username: "Riya",
+    email: "riya@example.com",
+    password: "correct horse battery",
+    birthYear: 1990,
+  };
 
   async function guest(url) {
     const res = await fetch(`${url}/api/session/guest`, { method: "POST" });
@@ -749,7 +755,13 @@ describe("leaderboards and rematches through the real composition root (integrat
     const res = await fetch(`${url}/api/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email: `${username}@example.com`, password: "correct horse battery" }),
+      // Adults, so their names show on the public boards (CC-152).
+      body: JSON.stringify({
+        username,
+        email: `${username}@example.com`,
+        password: "correct horse battery",
+        birthYear: 1990,
+      }),
     });
     const cookie = res.headers.get("set-cookie").split(";")[0];
     return { cookie, identity: (await res.json()).identity, socket: await socketFor(url, cookie) };

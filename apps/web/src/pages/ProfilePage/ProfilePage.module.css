@@ -178,3 +178,10 @@
 .console h2 {
   margin: 0;
 }
+/* Said once after the account was deleted (CC-035). */
+.notice {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  font-weight: 700;
+}

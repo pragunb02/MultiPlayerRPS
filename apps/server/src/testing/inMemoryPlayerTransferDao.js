@@ -41,5 +41,18 @@ export function createInMemoryPlayerTransferDao() {
     async listByFrom(froms) {
       return froms.filter((from) => transfers.has(from)).map((from) => copy(transfers.get(from)));
     },
+
+    async listByTo(accountPlayerId) {
+      return [...transfers.values()]
+        .filter((doc) => doc.to.id === accountPlayerId)
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .map(copy);
+    },
+
+    async deleteByTo(accountPlayerId) {
+      const gone = [...transfers.values()].filter((doc) => doc.to.id === accountPlayerId);
+      gone.forEach((doc) => transfers.delete(doc.from));
+      return gone.length;
+    },
   });
 }

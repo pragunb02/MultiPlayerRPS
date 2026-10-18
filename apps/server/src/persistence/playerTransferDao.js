@@ -110,5 +110,25 @@ export function createPlayerTransferDao({ connection }) {
     listByFrom(froms) {
       return Transfer.find({ from: { $in: froms } }, FIELDS).lean();
     },
+
+    /**
+     * The transfers into one account, oldest first, for its data export (CC-035).
+     *
+     * @param {string} accountPlayerId
+     * @returns {Promise<PlayerTransferDoc[]>}
+     */
+    listByTo: (accountPlayerId) =>
+      Transfer.find({ "to.id": accountPlayerId }, FIELDS).sort({ createdAt: 1 }).lean(),
+
+    /**
+     * Deletes the transfers into one account (CC-035).
+     *
+     * @param {string} accountPlayerId
+     * @returns {Promise<number>} transfers removed
+     */
+    async deleteByTo(accountPlayerId) {
+      const { deletedCount } = await Transfer.deleteMany({ "to.id": accountPlayerId });
+      return deletedCount;
+    },
   });
 }

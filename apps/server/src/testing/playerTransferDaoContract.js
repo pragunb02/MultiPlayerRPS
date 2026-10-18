@@ -89,4 +89,29 @@ export function runPlayerTransferDaoContract(createDao) {
     expect(found).toEqual([expect.objectContaining({ from: "guest_b", status: "done" })]);
     expect(await dao.listByFrom([])).toEqual([]);
   });
+
+  it("lists and deletes the transfers into one account, nobody else's (CC-035)", async () => {
+    const dao = await createDao();
+    await dao.insertPending({ from: "guest_a", to: ACCOUNT, createdAt: T0 });
+    await dao.markDone({ from: "guest_a", completedAt: at(1), carriedOver: MOVED });
+    await dao.insertPending({ from: "guest_b", to: ACCOUNT, createdAt: at(2) });
+    const other = { ...ACCOUNT, id: "user_ffffffffffffffffffffffff", displayName: "Arjun" };
+    await dao.insertPending({ from: "guest_c", to: other, createdAt: at(3) });
+
+    const listed = await dao.listByTo(ACCOUNT.id);
+    expect(listed.map((transfer) => transfer.from)).toEqual(["guest_a", "guest_b"]);
+    expect(listed[0]).toEqual({
+      from: "guest_a",
+      to: ACCOUNT,
+      status: "done",
+      createdAt: T0,
+      completedAt: at(1),
+      carriedOver: MOVED,
+    });
+
+    expect(await dao.deleteByTo(ACCOUNT.id)).toBe(2);
+    expect(await dao.deleteByTo(ACCOUNT.id)).toBe(0);
+    expect(await dao.listByTo(ACCOUNT.id)).toEqual([]);
+    expect((await dao.getByFrom("guest_c")).to.id).toBe(other.id);
+  });
 }

@@ -73,5 +73,18 @@ export function createLeaderboardAccessor({ leaderboardDao }) {
       const ahead = await leaderboardDao.countAhead({ board, period, ...entry });
       return Object.freeze({ rank: ahead + 1, score: entry.score });
     },
+
+    /**
+     * Every entry of one player, on every board and period, for their data export (CC-035).
+     *
+     * @param {string} playerId
+     * @returns {Promise<ReadonlyArray<Readonly<LeaderboardEntry & BoardRef>>>}
+     */
+    async listForPlayer(playerId) {
+      return Object.freeze((await leaderboardDao.listByPlayer(playerId)).map(toEntry));
+    },
+
+    /** @param {string} playerId @returns {Promise<number>} entries removed (CC-035) */
+    removePlayer: (playerId) => leaderboardDao.deleteByPlayer(playerId),
   });
 }

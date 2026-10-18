@@ -26,8 +26,25 @@ export function runLegacyUserDaoContract(createDao) {
     const dao = await createDao(LEGACY_USERS);
 
     expect(await dao.listByEmail("riya@example.com")).toEqual([
-      { username: "Riya Sharma", email: "Riya@Example.com", passwordHash: LEGACY_USERS[0].password },
+      {
+        username: "Riya Sharma",
+        email: "Riya@Example.com",
+        passwordHash: LEGACY_USERS[0].password,
+        legacyId: expect.any(String),
+      },
     ]);
+  });
+
+  it("names each legacy row by a stable id of its own, so a closed row can be told apart (CC-035)", async () => {
+    const dao = await createDao(LEGACY_USERS);
+
+    const [riya] = await dao.listByEmail("riya@example.com");
+    const [again] = await dao.listByEmail("riya@example.com");
+    const [bob] = await dao.listByEmail("bob@example.com");
+
+    expect(riya.legacyId).not.toBe("");
+    expect(again.legacyId).toBe(riya.legacyId);
+    expect(bob.legacyId).not.toBe(riya.legacyId);
   });
 
   it("finds nobody for unknown emails and for rows without a password", async () => {
@@ -55,7 +72,12 @@ export function runLegacyUserDaoContract(createDao) {
     const dao = await createDao([{ ...LEGACY_USERS[1], email: "  Bob@Example.com " }]);
 
     expect(await dao.listByEmail("bob@example.com")).toEqual([
-      { username: "bob", email: "  Bob@Example.com ", passwordHash: LEGACY_USERS[1].password },
+      {
+        username: "bob",
+        email: "  Bob@Example.com ",
+        passwordHash: LEGACY_USERS[1].password,
+        legacyId: expect.any(String),
+      },
     ]);
   });
 

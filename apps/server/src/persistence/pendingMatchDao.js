@@ -108,5 +108,28 @@ export function createPendingMatchDao({ connection }) {
         { $set: { status: "done", doneAt, expiresAt } },
       );
     },
+
+    /**
+     * Every record whose match names the player, whatever its status (CC-035, account deletion).
+     *
+     * @param {string} playerId
+     * @returns {Promise<PendingMatchDoc[]>}
+     */
+    listByPlayer: (playerId) => pending.find({ "match.players.playerId": playerId }, WITHOUT_ID).toArray(),
+
+    /**
+     * Replaces the match inside a record, only while the player `from` is still in it, so replacing twice changes it
+     * once (CC-035, account deletion).
+     *
+     * @param {{ matchId: string, from: string, match: Record<string, unknown> }} replace
+     * @returns {Promise<boolean>} whether it was replaced now
+     */
+    async replaceMatch({ matchId, from, match }) {
+      const { modifiedCount } = await pending.updateOne(
+        { matchId, "match.players.playerId": from },
+        { $set: { match: structuredClone(match) } },
+      );
+      return modifiedCount === 1;
+    },
   });
 }

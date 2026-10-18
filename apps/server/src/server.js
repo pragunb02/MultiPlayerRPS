@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -5,6 +6,7 @@ import http from "node:http";
 import { BOTS, createBotRegistry, createEngineRegistry, ENGINES } from "@classicade/games";
 import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
+import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
 import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
 import { createGamificationAccessor } from "./data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "./data/leaderboardAccessor.js";
@@ -15,6 +17,7 @@ import { createPlayerTransferAccessor } from "./data/playerTransferAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createAccountComponent } from "./domain/accounts/accountComponent.js";
+import { createPlayerDataComponent } from "./domain/accounts/playerDataComponent.js";
 import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/analyticsComponent.js";
 import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botComponent.js";
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
@@ -35,7 +38,9 @@ import {
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
 import { roomLifetimes } from "./domain/rooms/roomLifetimes.js";
 import { roomLimits } from "./domain/rooms/roomLimits.js";
+import { deletedPlayer } from "./models/deletedPlayer.js";
 import { createAccountDao } from "./persistence/accountDao.js";
+import { createAccountDeletionDao } from "./persistence/accountDeletionDao.js";
 import { createAchievementDao } from "./persistence/achievementDao.js";
 import { createAnalyticsDao } from "./persistence/analyticsDao.js";
 import { connectDatabase } from "./persistence/database.js";
@@ -47,6 +52,7 @@ import { createPlayerTransferDao } from "./persistence/playerTransferDao.js";
 import { createProgressDao } from "./persistence/progressDao.js";
 import { createQuestDao } from "./persistence/questDao.js";
 import { createRoomDao } from "./persistence/roomDao.js";
+import { createSessionDao } from "./persistence/sessionDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
 import { createStatsDao } from "./persistence/statsDao.js";
 import { createHttpApp } from "./service/http/app.js";
@@ -61,6 +67,7 @@ import { createTtlCache } from "./utils/ttlCache.js";
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_ENDED = "sessionEnded";
 const OTHER_SESSIONS_ENDED = "otherSessionsEnded";
+const ACCOUNT_DELETED = "accountDeleted";
 const ROOM_SWEEP_INTERVAL_MS = 60_000;
 const GAUGE_INTERVAL_MS = 60_000;
 const CLOCK_TICK_INTERVAL_MS = 1_000;
@@ -69,6 +76,7 @@ const TRANSFER_RESUME_INTERVAL_MS = 60_000;
 const MATCH_PIPELINE_INTERVAL_MS = 5_000;
 // How often finished rooms are checked for a game the match pipeline never got (CC-111).
 const FINISHED_ROOMS_INTERVAL_MS = 60_000;
+const DELETION_SWEEP_INTERVAL_MS = 60_000;
 // Owner console reports kept at once: one per range the owner looked at in the last 5 minutes.
 const ANALYTICS_CACHED_REPORTS = 20;
 
@@ -316,7 +324,7 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
  * Periodic work: close idle rooms, apply game deadlines that have passed (a chess flag falling while nobody
  * moves), finish moving guests' data to their accounts where that was interrupted (CC-032), and keep the match
  * pipeline going (CC-111): games whose next attempt is due every few seconds, finished rooms whose game it never
- * got every minute. With the room sweep, computer players plan again for every room, so one whose plan was dropped
+ * got every minute. Each account deletion is swept once more a few minutes after it was asked (CC-035). With the room sweep, computer players plan again for every room, so one whose plan was dropped
  * after the database kept failing still moves (CC-138). A failing run is logged and the next one still happens.
  * Timers don't keep the process alive.
  *
@@ -327,6 +335,7 @@ export function connectLeaderboardBonuses({ domainEvents, leaderboardComponent, 
  *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "sweepExpired" | "expireDue" | "countRooms">,
  *   playerTransferComponent: Pick<ReturnType<typeof createPlayerTransferComponent>, "resumePending">,
  *   matchPipeline: ReturnType<typeof connectMatchPipeline>,
+ *   playerDataComponent: Pick<ReturnType<typeof createPlayerDataComponent>, "sweepDue">,
  *   connections: () => { connections: number, players: number },
  *   botDriver: Pick<ReturnType<typeof createBotDriver>, "resume">,
  *   logger: Logger,
@@ -341,6 +350,7 @@ export function startHousekeeping({
   roomComponent,
   playerTransferComponent,
   matchPipeline,
+  playerDataComponent,
   connections,
   botDriver,
   logger,
@@ -380,6 +390,17 @@ export function startHousekeeping({
       FINISHED_ROOMS_INTERVAL_MS,
       () => matchPipeline.addFinishedRooms(),
       "adding finished games to the match pipeline failed",
+    ),
+    every(
+      DELETION_SWEEP_INTERVAL_MS,
+      async () => {
+        const { completed, failed } = await playerDataComponent.sweepDue({ now: now() });
+        completed.forEach((playerId) => logger.info({ playerId }, "account deletion swept again"));
+        failed.forEach(({ playerId, error }) =>
+          logger.error({ err: error, playerId }, "account deletion sweep failed"),
+        );
+      },
+      "sweeping account deletions failed",
     ),
     every(
       GAUGE_INTERVAL_MS,
@@ -451,6 +472,32 @@ export async function reportOldEmailSpellings({ accountAccessor, legacyUserAcces
 }
 
 /**
+ * Rooms take part in deleting an account (CC-035): in every room the player sits in, a new anonymous stand-in takes
+ * their seat and leaves, and everyone in those rooms sees the change.
+ *
+ * @param {{
+ *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "erasePlayer">,
+ *   domainEvents: import("node:events").EventEmitter,
+ *   newUuid?: () => string,
+ * }} deps
+ * @returns {import("./domain/accounts/playerDataComponent.js").PlayerDataParticipant}
+ */
+export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID }) {
+  return {
+    name: "rooms",
+    async erasePlayer({ playerId, now }) {
+      const rooms = await roomComponent.erasePlayer({
+        playerId,
+        standIn: () => deletedPlayer(newUuid()),
+        now,
+      });
+      rooms.forEach((room) => domainEvents.emit(ROOM_EVENTS.UPDATED, { room }));
+      return { erased: { rooms: rooms.length } };
+    },
+  };
+}
+
+/**
  * Composition root: builds every layer bottom-up, wires dependencies, and starts listening.
  * The only module allowed to know about all layers.
  *
@@ -508,6 +555,8 @@ export async function startServer({
   const leaderboardDao = createLeaderboardDao({ connection: database.connection });
   const analyticsDao = createAnalyticsDao({ connection: database.connection }); // read-only, CC-233
   const pendingMatchDao = createPendingMatchDao({ connection: database.connection });
+  const accountDeletionDao = createAccountDeletionDao({ connection: database.connection });
+  const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
       roomDao,
@@ -520,6 +569,7 @@ export async function startServer({
       achievementDao,
       leaderboardDao,
       pendingMatchDao,
+      accountDeletionDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -535,6 +585,8 @@ export async function startServer({
   const leaderboardAccessor = createLeaderboardAccessor({ leaderboardDao });
   const analyticsAccessor = createAnalyticsAccessor({ analyticsDao });
   const pendingMatchAccessor = createPendingMatchAccessor({ pendingMatchDao });
+  const accountDeletionAccessor = createAccountDeletionAccessor({ accountDeletionDao });
+  const sessionAccessor = createSessionAccessor({ sessionDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -545,6 +597,7 @@ export async function startServer({
     legacyUserAccessor,
     passwordHasher: createPasswordHasher(),
     legacyPasswords: createLegacyPasswordChecker(),
+    accountDeletionAccessor,
   });
   const matchComponent = createMatchComponent({ matchAccessor });
   const progressionComponent = createProgressionComponent({
@@ -562,6 +615,7 @@ export async function startServer({
     leaderboardAccessor,
     matchAccessor,
     progressAccessor,
+    ages: accountComponent,
   });
   // Everything stored by player id moves with a guest who signs in (ADR-014), in this order. Leaderboards go
   // last: they are recomputed from the progress and matches that have moved by then.
@@ -634,6 +688,44 @@ export async function startServer({
     now,
   });
   connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks, now });
+  // Deleting an account reaches every store of DATA.md, in this order (CC-035). Rooms go first, so a game the
+  // player was in ends under a stand-in before the stores that game would write to are erased.
+  const playerDataComponent = createPlayerDataComponent({
+    accountComponent,
+    accountDeletionAccessor,
+    formerIdsOf: playerTransferComponent.guestsOf,
+    participants: [
+      roomErasure({ roomComponent, domainEvents }),
+      { name: "pendingMatches", erasePlayer: outbox.erasePlayer },
+      {
+        name: "sessions",
+        erasePlayer: async ({ playerId }) => ({
+          erased: { sessions: await sessionAccessor.removePlayer(playerId) },
+        }),
+      },
+      { name: "matches", erasePlayer: matchComponent.erasePlayer, exportPlayer: matchComponent.exportPlayer },
+      {
+        name: "progress",
+        erasePlayer: progressionComponent.erasePlayer,
+        exportPlayer: progressionComponent.exportPlayer,
+      },
+      {
+        name: "gamification",
+        erasePlayer: gamificationComponent.erasePlayer,
+        exportPlayer: gamificationComponent.exportPlayer,
+      },
+      {
+        name: "leaderboards",
+        erasePlayer: leaderboardComponent.erasePlayer,
+        exportPlayer: leaderboardComponent.exportPlayer,
+      },
+      {
+        name: "guestTransfers",
+        erasePlayer: playerTransferComponent.erasePlayer,
+        exportPlayer: playerTransferComponent.exportPlayer,
+      },
+    ],
+  });
 
   // Rooms are stored, so they outlive this process (CC-101). First, a game that finished just before a crash
   // reaches the match pipeline while its room still shows it (CC-111). Nobody is connected to a process that has
@@ -676,8 +768,10 @@ export async function startServer({
     progressionComponent,
     gamificationComponent,
     accountComponent,
+    playerDataComponent,
     now,
     onSessionEnded: (sessionId) => sessionEvents.emit(SESSION_ENDED, sessionId),
+    onAccountDeleted: (playerId) => sessionEvents.emit(ACCOUNT_DELETED, playerId),
     onOtherSessionsEnded: (which) => sessionEvents.emit(OTHER_SESSIONS_ENDED, which),
     checkSession,
     onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
@@ -700,11 +794,13 @@ export async function startServer({
   });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
   sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
+  sessionEvents.on(ACCOUNT_DELETED, (playerId) => gateway.disconnectPlayer(playerId));
 
   const housekeeping = startHousekeeping({
     roomComponent,
     playerTransferComponent,
     matchPipeline,
+    playerDataComponent,
     connections: gateway.counts,
     botDriver,
     logger,

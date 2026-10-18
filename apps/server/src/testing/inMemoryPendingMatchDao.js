@@ -50,5 +50,18 @@ export function createInMemoryPendingMatchDao() {
     async markDone({ matchId, doneAt, expiresAt }) {
       change(matchId, (doc) => doc.status === "pending", { status: "done", doneAt, expiresAt });
     },
+
+    async listByPlayer(playerId) {
+      return [...records.values()]
+        .filter((doc) => doc.match.players.some((p) => p.playerId === playerId))
+        .map(copy);
+    },
+
+    async replaceMatch({ matchId, from, match }) {
+      const doc = records.get(matchId);
+      if (doc === undefined || !doc.match.players.some((p) => p.playerId === from)) return false;
+      records.set(matchId, copy({ ...doc, match }));
+      return true;
+    },
   });
 }

@@ -3,7 +3,8 @@
  * migrate players lazily at their first login on the new stack; this DAO deliberately has no write methods,
  * so the new server can never alter legacy data.
  *
- * @typedef {{ username: string, email: string, passwordHash: string }} LegacyUserDoc
+ * @typedef {{ username: string, email: string, passwordHash: string, legacyId: string }} LegacyUserDoc  `legacyId` is
+ *   the row's MongoDB id as hex, which names the row without its email (CC-035)
  */
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -38,7 +39,7 @@ export function createLegacyUserDao({ connection }) {
               { email: { $in: storedAs } },
             ],
           },
-          { projection: { _id: 0, username: 1, email: 1, password: 1 } },
+          { projection: { _id: 1, username: 1, email: 1, password: 1 } },
         )
         .sort({ _id: 1 })
         .limit(MAX_ROWS_PER_EMAIL)
@@ -49,6 +50,7 @@ export function createLegacyUserDao({ connection }) {
           username: String(doc.username ?? ""),
           email: String(doc.email),
           passwordHash: doc.password,
+          legacyId: String(doc._id),
         }));
     },
 

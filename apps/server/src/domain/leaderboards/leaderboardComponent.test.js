@@ -38,13 +38,21 @@ function match({ winner = ALICE, loser = BOB, gameId = "rps", endedAt = NOW, rea
   };
 }
 
-function setup() {
+/** `adults`: the player ids that are adults. Without it, everyone is, so names show as before CC-152. */
+function setup({ adults } = {}) {
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
+  const asked = [];
   const boards = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
     matchAccessor,
     progressAccessor,
+    ages: {
+      adultsAmong: async ({ playerIds, now }) => {
+        asked.push({ playerIds, now });
+        return new Set(adults ?? playerIds);
+      },
+    },
   });
   /** Brings a player's stored XP to `xp`, as progression has done by the time the boards step runs. */
   const progressTo = async (player, xp) => {
@@ -69,7 +77,7 @@ function setup() {
     return recorded;
   };
   const entries = async (boardId, now = NOW) => (await boards.getBoard({ boardId, limit: 50, now })).entries;
-  return { boards, play, entries, matchAccessor, progressAccessor, progressTo };
+  return { boards, play, entries, matchAccessor, progressAccessor, progressTo, asked };
 }
 
 describe("leaderboardComponent", () => {
@@ -318,6 +326,7 @@ describe("leaderboardComponent", () => {
         },
         matchAccessor: {},
         progressAccessor: {},
+        ages: { adultsAmong: async () => new Set() },
       });
 
       await expect(boards.standingFor({ boardId: "overall", viewer: ALICE, now: NOW })).rejects.toBe(failure);
@@ -491,5 +500,66 @@ describe("leaderboardComponent", () => {
     expect(() => createLeaderboardComponent({ leaderboardAccessor: {}, matchAccessor: {} })).toThrow(
       TypeError,
     );
+  });
+});
+
+describe("leaderboardComponent and minors (CC-152)", () => {
+  it("fails fast without a way to tell adults", () => {
+    expect(() =>
+      createLeaderboardComponent({ leaderboardAccessor: {}, matchAccessor: {}, progressAccessor: {} }),
+    ).toThrow(TypeError);
+  });
+
+  it("shows the name of an adult and hides the name of a minor or an unknown age, keeping rank and score", async () => {
+    const { play, entries, asked } = setup({ adults: [ALICE.id] });
+    await play({ winner: ALICE, loser: BOB }, [
+      [ALICE, 60],
+      [BOB, 10],
+    ]);
+
+    const listed = await entries("overall");
+
+    expect(listed).toEqual([
+      { rank: 1, displayName: "alice", level: 2, score: 60 },
+      { rank: 2, displayName: "Hidden player", hidden: true, level: 1, score: 10 },
+    ]);
+    expect(asked.at(-1)).toEqual({ playerIds: [ALICE.id, BOB.id], now: NOW });
+  });
+
+  it("asks nothing about ages for an empty board", async () => {
+    const { entries, asked } = setup({ adults: [] });
+
+    expect(await entries("overall")).toEqual([]);
+    expect(asked).toEqual([]);
+  });
+});
+
+describe("leaderboardComponent and deleted accounts (CC-035)", () => {
+  it("exports a player's rows on every board without their id, then erases them", async () => {
+    const { boards, play } = setup();
+    await play({ winner: ALICE, loser: BOB }, [
+      [ALICE, 30],
+      [BOB, 10],
+    ]);
+
+    const exported = await boards.exportPlayer({ playerId: ALICE.id });
+
+    expect(exported).toEqual(
+      expect.arrayContaining([
+        {
+          board: "xp",
+          period: "all",
+          displayName: "alice",
+          level: 1,
+          score: 30,
+          updatedAt: new Date(NOW).toISOString(),
+        },
+        expect.objectContaining({ board: "wins:rps", period: "all", score: 1 }),
+      ]),
+    );
+    expect(JSON.stringify(exported)).not.toContain(ALICE.id);
+    const { erased } = await boards.erasePlayer({ playerId: ALICE.id });
+    expect(erased.leaderboardEntries).toBe(exported.length);
+    expect(await boards.exportPlayer({ playerId: ALICE.id })).toEqual([]);
   });
 });
