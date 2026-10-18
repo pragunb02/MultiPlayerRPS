@@ -43,7 +43,8 @@ These rules come first. Where they differ from anything below, they win.
    issue is never cut or deferred without the owner.
 4. **Research before code.** Every ticket starts with a Research section in its ticket file before any code: how our
    code does it today, how other products do it (with sources), and what is best for ClassiCade. Coding starts after
-   that section is written.
+   that section is written. A small fix under an hour (one-line hotfix, test fix) still gets a ticket file with Root
+   cause and a short Research note, written before the PR is merged.
 5. **Document everything.** Decisions go in `docs/DECISIONS.md`, research in the ticket or `docs/investigations/`,
    changes in `docs/PROGRESS.md`. Nothing decided only in chat.
 6. **Steady, not frantic.** At most six builders run at once, and only on independent work (no shared files).

@@ -1,0 +1,134 @@
+/*
+ * Bit's paint (CC-230). Tokens only, so the drawing follows the design system and needs no style attribute (ADR-012).
+ * Bit uses the neon inks, which look the same in both themes, with a 3 px ink outline so it reads on light and dark.
+ */
+.bit {
+  display: inline-block;
+  overflow: visible;
+  vertical-align: middle;
+}
+
+.cabinet {
+  fill: var(--color-primary);
+  stroke: var(--color-art-ink);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.screen {
+  fill: var(--color-art-ink);
+}
+.ink {
+  fill: var(--color-art-ink);
+}
+.hub {
+  fill: var(--color-art-white);
+}
+.slot {
+  fill: var(--color-neon-gold);
+}
+.highlight {
+  fill: var(--color-glow-white);
+}
+
+.ball {
+  fill: var(--color-neon-accent);
+  stroke: var(--color-art-ink);
+  stroke-width: 3;
+}
+.glow {
+  fill: var(--color-neon-accent);
+  opacity: 0.3;
+}
+.sparks {
+  fill: none;
+  stroke: var(--color-neon-gold);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* Arms and the antenna stick are body colour inside an ink edge, and the wheels have a body colour rim, so the
+ * robot keeps its shape on the dark theme, where ink alone would disappear. */
+.limbEdge {
+  fill: none;
+  stroke: var(--color-art-ink);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+.limb {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.wheel {
+  fill: var(--color-art-ink);
+  stroke: var(--color-primary);
+  stroke-width: 3;
+}
+.buttonGold,
+.buttonTeal {
+  stroke: var(--color-art-ink);
+  stroke-width: 3;
+}
+.buttonGold {
+  fill: var(--color-neon-gold);
+}
+.buttonTeal {
+  fill: var(--color-neon-tictactoe);
+}
+
+/* The face is pixels on the screen: filled squares, and strokes with square ends for the lines. */
+.pixels {
+  fill: var(--color-neon-xp);
+}
+.lines {
+  fill: none;
+  stroke: var(--color-neon-xp);
+  stroke-width: 4;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+/*
+ * Motion runs once when Bit appears and then rests, because nothing loops forever (ADR-012). It only exists when the
+ * component adds `alive`, which it leaves out with reduced motion. The resting style is the final one, so a stopped
+ * animation looks right.
+ */
+.figure {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.alive {
+  animation: bit-hop var(--duration-celebrate) var(--ease-spring) both;
+}
+.alive .glow {
+  animation: bit-glow 400ms var(--ease-in-out) 3 both;
+}
+.alive .dots rect {
+  animation: bit-dot 400ms var(--ease-in-out) 3 both;
+}
+.alive .dots rect:nth-child(2) {
+  animation-delay: 130ms;
+}
+.alive .dots rect:nth-child(3) {
+  animation-delay: 260ms;
+}
+
+@keyframes bit-hop {
+  30% {
+    transform: translateY(-4px);
+  }
+  60% {
+    transform: none;
+  }
+}
+@keyframes bit-glow {
+  50% {
+    opacity: 0.75;
+  }
+}
+@keyframes bit-dot {
+  50% {
+    opacity: 0.3;
+  }
+}
