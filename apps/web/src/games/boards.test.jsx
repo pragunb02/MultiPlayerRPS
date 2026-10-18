@@ -2,6 +2,7 @@ import { act, fireEvent, render as renderPlain, screen, within } from "@testing-
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { ACTION_TIMING } from "../hooks/useAction.js";
 import { AppRequestError } from "../lib/errors.js";
 import { gameView } from "./registry.js";
 import { RpsBoard } from "./rps/RpsBoard.jsx";
@@ -113,7 +114,7 @@ describe("RpsBoard", () => {
       render(<RpsBoard room={room(rpsView())} onMove={() => new Promise(() => {})} />);
 
       await act(async () => fireEvent.click(screen.getByRole("button", { name: /paper/i })));
-      await act(async () => vi.advanceTimersByTime(200));
+      await act(async () => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AFTER_MS));
 
       expect(screen.getByRole("button", { name: /paper/i })).toHaveAttribute("aria-busy", "true");
       expect(screen.getByRole("button", { name: /rock/i })).not.toHaveAttribute("aria-busy");
@@ -309,7 +310,7 @@ describe("TicTacToeBoard", () => {
       render(<TicTacToeBoard room={room(tttView())} onMove={() => new Promise(() => {})} />);
 
       await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "top right: empty" })));
-      await act(async () => vi.advanceTimersByTime(200));
+      await act(async () => vi.advanceTimersByTime(ACTION_TIMING.PENDING_AFTER_MS));
       fireEvent.click(screen.getByRole("gridcell", { name: "bottom left: empty" }));
 
       expect(screen.getByRole("gridcell", { name: "top right: X, sending" })).toHaveAttribute(
@@ -317,6 +318,54 @@ describe("TicTacToeBoard", () => {
         "true",
       );
       expect(screen.getByText("Sending your move")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows a refusal that comes just after the spinner at once, and takes the next press (CC-239)", async () => {
+    vi.useFakeTimers();
+    try {
+      let refuse;
+      const onMove = vi
+        .fn()
+        .mockImplementationOnce(() => new Promise((resolve, reject) => (refuse = reject)))
+        .mockResolvedValue({});
+      render(<TicTacToeBoard room={room(tttView())} onMove={onMove} />);
+
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "top right: empty" })));
+      await act(async () => vi.advanceTimersByTime(410));
+      await act(async () =>
+        refuse(new AppRequestError({ code: "VALIDATION_FAILED", message: "Cell taken", status: 400 })),
+      );
+
+      // The answer is in: the refusal shows now, not when the spinner's 300 ms are up.
+      expect(screen.getByText("Cell taken")).toBeInTheDocument();
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "bottom left: empty" })));
+      expect(onMove).toHaveBeenLastCalledWith({ cell: 6 });
+      expect(screen.queryByText("Sending your move")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("takes the next press at once after a success that comes just after the spinner (CC-239)", async () => {
+    vi.useFakeTimers();
+    try {
+      let answer;
+      const onMove = vi
+        .fn()
+        .mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+        .mockResolvedValue({});
+      render(<TicTacToeBoard room={room(tttView())} onMove={onMove} />);
+
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "top right: empty" })));
+      await act(async () => vi.advanceTimersByTime(410));
+      await act(async () => answer({}));
+      await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "bottom left: empty" })));
+
+      expect(onMove).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText("Sending your move")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

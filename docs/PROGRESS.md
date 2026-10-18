@@ -5,7 +5,7 @@
 |               |                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Production    | https://nocapgaming.onrender.com (Render, auto-deploys `main`) — [DEPLOYMENT.md](DEPLOYMENT.md)                                                                                                                                                                                                                                                                        |
-| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-259` (CC-256 is held by PR #71) · reading guide: [README.md](README.md)                                                                                                                                                                                                                                      |
+| Process       | Ticket board: [BACKLOG.md](BACKLOG.md) · next free ID `CC-259` · reading guide: [README.md](README.md)                                                                                                                                                                                                                                                                 |
 | Current stage | **Stage 0 — Foundation**                                                                                                                                                                                                                                                                                                                                               |
 | Stage health  | 🟢 On track                                                                                                                                                                                                                                                                                                                                                            |
 | In progress   | Open PRs: #67 requests and presence (CC-036, CC-158 to CC-160, CC-207, CC-208), #69 identity duplicates (CC-245, CC-238), #71 invite flake and Sending (CC-237, CC-239), #77 plain fairness words (CC-254), #78 seats and match outbox (CC-111, CC-112), #65 CI test infrastructure (CC-203, CC-184). Also CC-049 error tracking and alerts, CC-236 fast browser suite |
@@ -17,7 +17,7 @@
 | Stage           | Status         | Done / Total |
 | --------------- | -------------- | ------------ |
 | S0 Foundation   | 🟡 In progress | 61 / 79      |
-| S1 MVP launch   | 🟡 Started     | 30 / 102     |
+| S1 MVP launch   | 🟡 Started     | 32 / 103     |
 | S2 Retention    | ⚪ Not started | 4 / 55       |
 | S3 Monetization | ⚪ Not started | 0 / 10       |
 | S4 Scale        | ⚪ Not started | 0 / 6        |
@@ -32,12 +32,16 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 1    | 1           | 17    |
-| Bugs (BUG)       | 10   | 1           | 30    |
+| Bugs (BUG)       | 11   | 1           | 30    |
 | Tech debt (DEBT) | 7    | 1           | 12    |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
+
+- 2026-10-18 — CC-157, CC-161, CC-172 — Research before code for the game shell, the series scoreboard and the match layout ([CC-157](tickets/CC-157.md), [CC-161](tickets/CC-161.md), [CC-172](tickets/CC-172.md)), accounting for open #67: a slot contract on the existing registry, series history stored in the room (last 20 games), a frame sized with `svh` and container query units, a non-modal bottom sheet result on phones, 360×800 as a target. No code; owner decisions listed in each file.
+- 2026-10-18 — CC-239 — "Sending…" shows after 400 ms instead of 150 ms (a usual round trip from India is 250 to 350 ms, so it flashed on almost every press) and stays at least 300 ms once shown. Only the words are held: the phase, `busy` and a refusal follow the answer at once, so boards take the next move straight away. The press and the click sound are unchanged. MATCH_EXPERIENCE.md, CC-164, ENGINEERING.md and PRODUCT_VISION.md updated. Research and sources in docs/tickets/CC-239.md.
+- 2026-10-18 — CC-237 — The invite.spec login test flake was the test data, not a race: random base 36 usernames sometimes spelled a reserved or rude word ("cpu" in `riya_cp8um06316`) and sign-up refused them (about 1 run in 30). Test usernames are now digits only, checked against the server's `parseUsername` by `e2e/personas.test.js`. Also fixed a second race found while proving it: the CC-107 guest test went on before Leave room had reached the lobby. Test names stay 15 characters: 20 character names (allowed by sign-up) break the mobile header and profile, now CC-256 and BUG-40.
 
 - 2026-10-18 — CC-258 — Ticket for the navigation.spec.js:197 flake on main (about 2 runs in 12): a progress fetch for the previous identity races the log out and the leak check sees a 401. Owner: branch protection requires PRs to be up to date with main for the fast checks (ADR-039 amendment).
 - 2026-10-18 — Docs audit — Every decision written down: ADR-030 (session lifetime, CC-116) and ADR-035 to ADR-044 (abuse limits, owner console, email identity pending #69, button feedback with the CC-239 timing pending #71, working agreement and CI policy, bots as pure strategies, our own chess engine, head tags and previews, uptime, backups) from tickets and PR bodies; open ADR-045 and ADR-046 for the owner; amendments to ADR-005 (checked, still current), ADR-016 (stay on Motion), ADR-018 and ADR-019 (pending #67), ADR-021 (rolling 24 hours, CC-095 defaults), ADR-023 (privacy contact) and ADR-025 (the #61 rules). ADRs in number order. New: [README.md](README.md) reading guide and [games/BOTS.md](games/BOTS.md). ARCHITECTURE.md brought up to date. Board: CC-115, CC-234, CC-235, CC-179 ✅, CC-111 and CC-112 🟦 (#78), CC-257 added and ✅ (#79), CC-258 added (navigation.spec.js flake: a progress fetch races the log out). KNOWN_ISSUES: BUG-41 to BUG-44. Four ideas added to IDEAS.md.

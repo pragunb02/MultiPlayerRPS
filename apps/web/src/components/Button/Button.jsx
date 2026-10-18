@@ -8,8 +8,8 @@ import styles from "./Button.module.css";
  * underneath, hidden, so the button keeps its width and nothing around it jumps.
  */
 function Layers({ action, pendingLabel, doneLabel, children }) {
-  const pending = action.phase === ACTION_PHASES.PENDING;
-  const done = action.phase === ACTION_PHASES.DONE && doneLabel !== "";
+  const pending = action.waitingShown;
+  const done = action.phase === ACTION_PHASES.DONE && !pending && doneLabel !== "";
   const hide = (hidden) => (hidden ? "true" : undefined);
   return (
     <span className={styles.stack}>
@@ -61,8 +61,8 @@ function Failure({ action, control }) {
  *
  * 1. Pressed: the face goes down at once, and the subtle click sound plays (CC-103) unless `data-sound` says
  *    otherwise.
- * 2. Waiting: with an `action` (see useAction) still on its way after 150 ms, a spinner and `pendingLabel` take
- *    the label's place and the button is marked busy.
+ * 2. Waiting: with an `action` (see useAction) still on its way after 400 ms, a spinner and `pendingLabel` take
+ *    the label's place and the button is marked busy. Once shown they stay at least 300 ms, so they never flash.
  * 3. Done: the change the press made is the answer. Where nothing else changes, `doneLabel` shows with a check
  *    for a moment.
  * 4. Disabled with a reason: with a `reason` the button cannot act but stays focusable. The reason shows on
@@ -100,7 +100,7 @@ export function Button({
   const tipId = useId();
   const explanation = useExplanation();
   const blocked = reason !== "";
-  const pending = action?.phase === ACTION_PHASES.PENDING;
+  const pending = action?.waitingShown === true;
 
   function press(event) {
     if (blocked) {

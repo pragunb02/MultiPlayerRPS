@@ -664,7 +664,7 @@ These follow the UK Children's Code: high privacy by default, no nudges to weake
 **Motion principles.**
 
 1. Motion explains a change of state. Nothing moves just to decorate.
-2. Every press responds within 100 ms. A wait longer than 150 ms gets a spinner (CC-164).
+2. Every press responds within 100 ms. A wait longer than 400 ms gets a spinner, shown at least 300 ms (CC-164, CC-239).
 3. UI transitions take 300 ms or less. A celebration takes 1.5 seconds or less, and a tap skips it.
 4. Celebrations play one beat at a time, from a queue (CC-099).
 5. Reduced motion swaps movement for a fade, and every animated state also has words.

@@ -67,6 +67,26 @@ record, because today one process keeps the games it is running in memory.
 
 ## Accepted decisions
 
+### ADR-049 — The game shell, the series scoreboard and the match layout
+
+- **Status:** Accepted · 2026-10-18 (owner accepted every recommendation in [CC-157](tickets/CC-157.md),
+  [CC-161](tickets/CC-161.md) and [CC-172](tickets/CC-172.md))
+- **Decision.**
+  1. CC-157 starts after #67 merges. Order: CC-157, CC-161, CC-172, then CC-166, CC-167, CC-168 move each game onto
+     the shell.
+  2. One `MatchShell` with slots (request banner, match bar, presence, board, side panel, action bar, result,
+     announcer). Games plug in through optional fields on the existing `GAME_VIEWS` registry; game actions are data
+     the shell renders, and the shell's confirm dialog replaces per-game ones (chess resign).
+  3. Shell animations use CSS keyframes, not Motion, so the RPS and Tic-Tac-Toe downloads stay small.
+  4. Series history is stored with the room (`series.history`, the last 20 games, oldest first). Amends ADR-015
+     point 7; DATA.md gets the field. The score counts wins, draws are half dots with no "½" in the numbers, and it
+     shows from game 1. For RPS the series counts matches; rounds are a second line. Head-to-head across rooms is
+     out of scope.
+  5. Layout: the match frame uses `svh` (with `vh` fallback) and a board sized by container queries; desktop puts
+     presence, clocks and moves in a side column; phones get a compact match header, the request banner takes the
+     match bar's row while open, and the result is a non-blocking bottom sheet. 360x800 is added as a design and
+     test viewport, `viewport-fit=cover` with safe-area padding everywhere.
+
 ### ADR-044 — Backups: age-encrypted mongodump to an S3-compatible bucket, from GitHub Actions
 
 - **Status:** Accepted · 2026-10-17 (proposed in [CC-108](tickets/CC-108.md), merged in PR #45. Runbook:
