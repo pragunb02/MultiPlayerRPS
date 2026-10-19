@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import path from "node:path";
 import { LOG_LEVELS } from "../utils/logger.js";
 
@@ -6,12 +7,18 @@ const MIN_SESSION_SECRET_LENGTH = 32;
 const DEV_ALLOWED_ORIGINS = ["http://localhost:4000", "http://localhost:5173"];
 const MAX_TRUST_PROXY_HOPS = 5;
 const ADMIN_ACCOUNT_ID = /^user_[0-9a-f]{24}$/;
+// This machine only. Render and the Docker image set HOST=0.0.0.0, because their platform proxy or published port
+// has to reach the process (see DEPLOYMENT.md, CC-287).
+const DEFAULT_HOST = "127.0.0.1";
+const HOSTNAME_LABEL = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i;
+const MAX_HOSTNAME_LENGTH = 253;
 
 /**
  * @typedef {Object} Config
  * @property {"development" | "test" | "production"} env
  * @property {boolean} isProduction
  * @property {number} port
+ * @property {string} host            the address the server listens on, an IP address or a hostname (default 127.0.0.1, this machine only)
  * @property {string} logLevel
  * @property {string} mongoUri
  * @property {string} sessionSecret
@@ -26,7 +33,7 @@ const ADMIN_ACCOUNT_ID = /^user_[0-9a-f]{24}$/;
  * Throws with every problem listed, so a misconfigured deploy fails at boot instead of at first request.
  *
  * Required: MONGO_URI, SESSION_SECRET (≥ 32 chars); ALLOWED_ORIGINS in production.
- * Documented defaults: NODE_ENV=development, PORT=4000, LOG_LEVEL=info (silent when NODE_ENV=test),
+ * Documented defaults: NODE_ENV=development, PORT=4000, HOST=127.0.0.1 in every environment, LOG_LEVEL=info (silent when NODE_ENV=test),
  * ALLOWED_ORIGINS=http://localhost:4000,http://localhost:5173 outside production,
  * TRUST_PROXY_HOPS=1 in production and 0 elsewhere. Optional: WEB_DIST_DIR (serve the built web app),
  * ADMIN_ACCOUNT_IDS (who may open the owner console, empty by default).
@@ -47,6 +54,8 @@ export function loadConfig(env) {
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
     errors.push(`PORT must be an integer between 0 and 65535 (got "${env.PORT}")`);
   }
+
+  const host = parseHost(env.HOST, { errors });
 
   const logLevel = env.LOG_LEVEL ?? (nodeEnv === "test" ? "silent" : "info");
   if (!LOG_LEVELS.includes(logLevel)) {
@@ -84,6 +93,7 @@ export function loadConfig(env) {
     env: /** @type {Config["env"]} */ (nodeEnv),
     isProduction,
     port,
+    host,
     logLevel,
     mongoUri,
     sessionSecret,
@@ -93,6 +103,43 @@ export function loadConfig(env) {
     trustProxyHops,
     adminAccountIds,
   });
+}
+
+/**
+ * The address the server listens on. Without HOST the server is reachable from this machine only, so a laptop
+ * running the server never shares it with the rest of the network by accident. A platform whose proxy must reach
+ * the process sets HOST=0.0.0.0 (Render, the Docker image). A typo fails the boot, because a server that listens
+ * somewhere unexpected is either unreachable or open to more people than intended.
+ *
+ * @param {string | undefined} raw  an IPv4 or IPv6 address, for example "0.0.0.0" or "::1", or a hostname such as "localhost"
+ * @param {{ errors: string[] }} context
+ * @returns {string}
+ */
+function parseHost(raw, { errors }) {
+  if (raw === undefined) {
+    return DEFAULT_HOST;
+  }
+  const host = raw.trim();
+  if (isIP(host) === 0 && !isHostname(host)) {
+    errors.push(`HOST must be an IP address or a hostname, for example 127.0.0.1 or 0.0.0.0 (got "${raw}")`);
+    return DEFAULT_HOST;
+  }
+  return host;
+}
+
+/**
+ * A hostname made of DNS labels: letters, digits and inner hyphens, at most 63 characters each. The last label may
+ * not be all digits, because no top level domain is, so a broken IP address such as 999.1.1.1 is refused.
+ *
+ * @param {string} value
+ */
+function isHostname(value) {
+  const labels = value.split(".");
+  return (
+    value.length <= MAX_HOSTNAME_LENGTH &&
+    labels.every((label) => HOSTNAME_LABEL.test(label)) &&
+    !/^\d+$/.test(labels[labels.length - 1])
+  );
 }
 
 /**
