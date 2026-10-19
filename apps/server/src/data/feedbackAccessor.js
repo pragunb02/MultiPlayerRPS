@@ -40,7 +40,12 @@ export function createFeedbackAccessor({ feedbackDao }) {
     async add({ at, ...fields }) {
       const when = new Date(at);
       return toFeedback(
-        await feedbackDao.insert({ ...fields, status: FEEDBACK_STATUSES[0], createdAt: when, updatedAt: when }),
+        await feedbackDao.insert({
+          ...fields,
+          status: FEEDBACK_STATUSES[0],
+          createdAt: when,
+          updatedAt: when,
+        }),
       );
     },
 
@@ -59,6 +64,23 @@ export function createFeedbackAccessor({ feedbackDao }) {
           }),
         }),
       ),
+
+    /**
+     * @param {string} feedbackId
+     * @returns {Promise<Readonly<Feedback>>}
+     * @throws {NotFoundError} when there is no such item
+     */
+    async get(feedbackId) {
+      try {
+        return toFeedback(await feedbackDao.getById(feedbackId));
+      } catch (err) {
+        if (err instanceof RangeError) throw new NotFoundError("No such feedback", { cause: err });
+        throw err;
+      }
+    },
+
+    /** @param {string} feedbackId @returns {Promise<boolean>} whether it was there to delete */
+    remove: async (feedbackId) => (await feedbackDao.deleteById(feedbackId)) > 0,
 
     /**
      * @param {{ feedbackId: string, status: string, at: number }} change

@@ -135,6 +135,27 @@ export function runFeedbackDaoContract(createDao) {
     ).rejects.toThrow(RangeError);
   });
 
+  it("reads one item by its id, and throws for an id it does not have", async () => {
+    const dao = await createDao();
+    const item = feedbackRecord({ replyEmail: "riya@example.com" });
+    await dao.insert(item);
+
+    expect(await dao.getById(item.feedbackId)).toEqual(item);
+    await expect(dao.getById("00000000-0000-4000-a000-0000000000ff")).rejects.toThrow(RangeError);
+  });
+
+  it("deletes one item and nothing else, and deleting it again deletes nothing", async () => {
+    const dao = await createDao();
+    const gone = feedbackRecord({ seconds: 1 });
+    const kept = feedbackRecord({ seconds: 2 });
+    await dao.insert(gone);
+    await dao.insert(kept);
+
+    expect(await dao.deleteById(gone.feedbackId)).toBe(1);
+    expect(await dao.deleteById(gone.feedbackId)).toBe(0);
+    expect(await dao.list({ where: {}, limit: 10 })).toEqual([kept]);
+  });
+
   it("never hands out its own copy, so a caller cannot change what is stored", async () => {
     const dao = await createDao();
     const item = feedbackRecord();

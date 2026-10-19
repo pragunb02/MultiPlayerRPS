@@ -12,6 +12,7 @@ import { DEFAULT_LEADERBOARD_ID, gameForSlug, getGame } from "@classicade/shared
  *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
  *   /privacy  /terms                   the privacy policy and the terms of use
  *   /admin  /admin/:section?from=…&to=…&bucket=…   the owner console (CC-233), not found for anyone but an admin
+ *   /admin/feedback?type=…&status=…    the console's feedback inbox (CC-290)
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
@@ -28,6 +29,7 @@ export const ROUTES = Object.freeze({
   TERMS: "terms",
   ADMIN: "admin",
   ADMIN_SECTION: "admin/:section",
+  ADMIN_FEEDBACK: "admin/feedback",
 });
 
 /** The owner console's pages after its overview, in tab order (CC-233). Each is the URL segment after /admin. */
@@ -140,7 +142,21 @@ export const paths = Object.freeze({
    * @param {{ from?: string, to?: string, bucket?: string }} [range]
    */
   admin: (section, range = {}) => `/admin${section ? `/${section}` : ""}${rangeQuery(range)}`,
+  /**
+   * The console's feedback inbox (CC-290), with its filters.
+   *
+   * @param {{ type?: string, status?: string }} [filters]  each left out for all
+   */
+  adminFeedback: (filters = {}) => `/admin/feedback${filterQuery(filters)}`,
 });
+
+function filterQuery(filters) {
+  const params = new URLSearchParams(
+    ["type", "status"].filter((key) => filters[key] !== undefined).map((key) => [key, filters[key]]),
+  );
+  const text = params.toString();
+  return text === "" ? "" : `?${text}`;
+}
 
 function rangeQuery(range) {
   const params = new URLSearchParams(

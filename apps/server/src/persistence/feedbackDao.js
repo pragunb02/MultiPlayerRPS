@@ -84,6 +84,28 @@ export function createFeedbackDao({ connection }) {
         .lean(),
 
     /**
+     * @param {string} feedbackId
+     * @returns {Promise<FeedbackDoc>}
+     * @throws {RangeError} when there is no such item
+     */
+    async getById(feedbackId) {
+      const doc = await Feedback.findOne({ feedbackId }, FIELDS).lean();
+      if (doc === null) {
+        throw new RangeError(`No feedback ${feedbackId}`);
+      }
+      return doc;
+    },
+
+    /**
+     * @param {string} feedbackId
+     * @returns {Promise<number>} items deleted: 0 when it was not there
+     */
+    async deleteById(feedbackId) {
+      const { deletedCount } = await Feedback.deleteOne({ feedbackId });
+      return deletedCount;
+    },
+
+    /**
      * @param {{ feedbackId: string, status: string, updatedAt: Date }} change
      * @returns {Promise<FeedbackDoc>} the item after the change
      * @throws {RangeError} when there is no such item

@@ -54,6 +54,7 @@ export function App({ services }) {
                     <Route path={ROUTES.TERMS} element={<TermsPage />} />
                     <Route path={ROUTES.ADMIN} element={<AdminRoute />} />
                     <Route path={ROUTES.ADMIN_SECTION} element={<AdminRoute />} />
+                    <Route path={ROUTES.ADMIN_FEEDBACK} element={<AdminRoute page="feedback" />} />
                     {/* Old URLs stay valid: each page replaces them with its canonical URL. */}
                     <Route path={LEGACY_ROUTES.GAME} element={<PlayPage />} />
                     <Route path={LEGACY_ROUTES.ROOM} element={<RoomPage />} />

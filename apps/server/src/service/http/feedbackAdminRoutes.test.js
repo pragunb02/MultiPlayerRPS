@@ -24,6 +24,8 @@ async function inbox(items = []) {
   const feedbackComponent = createFeedbackComponent({
     feedbackAccessor: createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() }),
     ages: { adultsAmong: async () => new Set() },
+    // The items here are sent by visitors, and some carry a reply email.
+    replyEmailOnlyForAdults: false,
     newFeedbackId: () => `00000000-0000-4000-a000-${String(++counter).padStart(12, "0")}`,
   });
   for (const item of items) {
@@ -51,9 +53,11 @@ async function inbox(items = []) {
   return { app, feedbackComponent };
 }
 
-const as = (req, identity) => (identity === undefined ? req : req.set("X-Test-Identity", JSON.stringify(identity)));
+const as = (req, identity) =>
+  identity === undefined ? req : req.set("X-Test-Identity", JSON.stringify(identity));
 const get = (app, path, identity) => as(request(app).get(path), identity);
 const patch = (app, path, body, identity) => as(request(app).patch(path).send(body), identity);
+const remove = (app, path, identity) => as(request(app).delete(path), identity);
 
 const item = (fields = {}) => ({
   type: "bug",
@@ -79,10 +83,20 @@ describe("GET /api/admin/feedback (CC-290)", () => {
       feedbackId: expect.any(String),
       kind: "visitor",
       status: "new",
+      hasReplyEmail: false,
       createdAt: T0 + 2000,
       updatedAt: T0 + 2000,
     });
     expect(res.body).not.toHaveProperty("next");
+  });
+
+  it("never lists a reply email, only whether an item has one", async () => {
+    const { app } = await inbox([item({ replyEmail: "riya@example.com" })]);
+
+    const res = await get(app, "/api/admin/feedback", ADMIN);
+
+    expect(res.body.items[0].hasReplyEmail).toBe(true);
+    expect(JSON.stringify(res.body)).not.toContain("riya@example.com");
   });
 
   it("filters by type and by status", async () => {
@@ -142,6 +156,77 @@ describe("GET /api/admin/feedback (CC-290)", () => {
   });
 });
 
+describe("GET /api/admin/feedback/:feedbackId (CC-290)", () => {
+  it("answers an admin the whole item, the reply email included, never cached", async () => {
+    const { app, feedbackComponent } = await inbox([item({ replyEmail: "riya@example.com" })]);
+    const [{ feedbackId }] = (await feedbackComponent.list({ where: {}, limit: 1 })).items;
+
+    const res = await get(app, `/api/admin/feedback/${feedbackId}`, ADMIN);
+
+    expect(res.status).toBe(200);
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.body.item).toEqual(expect.objectContaining({ feedbackId, replyEmail: "riya@example.com" }));
+  });
+
+  it("answers 404 for an item that is not there and 400 for an id that is not one", async () => {
+    const { app } = await inbox();
+
+    expect((await get(app, "/api/admin/feedback/00000000-0000-4000-a000-0000000000ff", ADMIN)).status).toBe(404);
+    expect((await get(app, "/api/admin/feedback/not-an-id", ADMIN)).status).toBe(400);
+  });
+
+  it.each([
+    ["a visitor", undefined],
+    ["a guest", GUEST],
+    ["an account that is not an admin", PLAYER],
+  ])("answers %s 404 without the item", async (_, identity) => {
+    const { app, feedbackComponent } = await inbox([item({ replyEmail: "riya@example.com" })]);
+    const [{ feedbackId }] = (await feedbackComponent.list({ where: {}, limit: 1 })).items;
+
+    const res = await get(app, `/api/admin/feedback/${feedbackId}`, identity);
+
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(res.body)).not.toContain("riya@example.com");
+  });
+});
+
+describe("DELETE /api/admin/feedback/:feedbackId (CC-290)", () => {
+  it("deletes an item for good and answers 204", async () => {
+    const { app, feedbackComponent } = await inbox([item({ message: "gone" }), item({ message: "kept" })]);
+    const [{ feedbackId }] = (await feedbackComponent.list({ where: {}, limit: 2 })).items.filter(
+      (each) => each.message === "gone",
+    );
+
+    const res = await remove(app, `/api/admin/feedback/${feedbackId}`, ADMIN);
+
+    expect(res.status).toBe(204);
+    expect((await feedbackComponent.list({ where: {}, limit: 10 })).items.map((each) => each.message)).toEqual([
+      "kept",
+    ]);
+    expect((await remove(app, `/api/admin/feedback/${feedbackId}`, ADMIN)).status).toBe(404);
+  });
+
+  it("answers 400 for an id that is not one", async () => {
+    const { app } = await inbox();
+
+    expect((await remove(app, "/api/admin/feedback/not-an-id", ADMIN)).status).toBe(400);
+  });
+
+  it.each([
+    ["a visitor", undefined],
+    ["a guest", GUEST],
+    ["an account that is not an admin", PLAYER],
+  ])("answers %s 404 and deletes nothing", async (_, identity) => {
+    const { app, feedbackComponent } = await inbox([item()]);
+    const [{ feedbackId }] = (await feedbackComponent.list({ where: {}, limit: 1 })).items;
+
+    const res = await remove(app, `/api/admin/feedback/${feedbackId}`, identity);
+
+    expect(res.status).toBe(404);
+    expect((await feedbackComponent.list({ where: {}, limit: 1 })).items).toHaveLength(1);
+  });
+});
+
 describe("PATCH /api/admin/feedback/:feedbackId (CC-290)", () => {
   it("moves an item to another status and answers it as it is now", async () => {
     const { app, feedbackComponent } = await inbox([item()]);
@@ -152,14 +237,21 @@ describe("PATCH /api/admin/feedback/:feedbackId (CC-290)", () => {
 
     expect(read.status).toBe(200);
     expect(read.headers["cache-control"]).toBe("no-store");
-    expect(read.body.item).toEqual(expect.objectContaining({ feedbackId, status: "read", updatedAt: T0 + 61_000 }));
+    expect(read.body.item).toEqual(
+      expect.objectContaining({ feedbackId, status: "read", updatedAt: T0 + 61_000 }),
+    );
     expect(back.body.item.status).toBe("new");
   });
 
   it("answers 404 for an item that is not there", async () => {
     const { app } = await inbox();
 
-    const res = await patch(app, "/api/admin/feedback/00000000-0000-4000-a000-0000000000ff", { status: "done" }, ADMIN);
+    const res = await patch(
+      app,
+      "/api/admin/feedback/00000000-0000-4000-a000-0000000000ff",
+      { status: "done" },
+      ADMIN,
+    );
 
     expect(res.status).toBe(404);
   });

@@ -46,6 +46,7 @@ does not.
 | [`leaderboard_entries`](#leaderboard_entries)         | yes for accounts: username, level, score (public)                     | all time boards for ever, weekly boards 28 days after the week | MongoDB TTL index (weekly only)          |
 | [`player_transfers`](#player_transfers)               | pseudonymous: guest id, account id and username                       | for ever                                                       | nothing                                  |
 | [`player_blocks`](#player_blocks)                     | pseudonymous: both player ids, the blocked player's name then         | until unblocked, or either account is deleted                  | unblocking, account deletion             |
+| [`feedback`](#feedback)                               | the message as typed, and a reply email from an adult who gave one    | 180 days after it was sent                                     | MongoDB TTL index                        |
 | [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)           | until the player deletes the account                           | account deletion (CC-035)                |
 | [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                             | 30 days                                                        | MongoDB TTL index                        |
 | [`legacy_closures`](#legacy_closures)                 | pseudonymous: the id of a legacy row whose player deleted the account | for ever                                                       | nothing                                  |
@@ -262,6 +263,31 @@ ADR-053)
    blocker saw (ADR-014). A guest who never signs in keeps their blocks as long as other guest data (CC-098).
 5. **Deleted by:** unblocking (`DELETE /api/blocks/:blockId`), and account deletion, on either side.
 
+### `feedback`
+
+`apps/server/src/persistence/feedbackDao.js`, rules in `apps/server/src/domain/feedback/feedbackComponent.js` and
+`apps/server/src/service/http/feedbackRoutes.js` (CC-290, ADR-059)
+
+1. **Holds:** one document per item sent with the Feedback button: `feedbackId` (random), `type` (bug, idea or
+   other), `message` (plain text, at most 1000 characters, control characters other than new lines and tabs
+   removed), `replyEmail` (only when an adult account gave one), `page` (the route pattern such as
+   `/games/chess/rooms/:code`, never a room code, a name, a query or a hash), `build` (the web build, such as
+   `0.1.0+3f9c2ab`), `device` (phone, tablet or desktop), `kind` (visitor, guest or account, from the session),
+   `status` (new, read or done), `createdAt` and `updatedAt`. Indexes: unique on `feedbackId`, TTL on `createdAt`,
+   and `createdAt` with `feedbackId` for the newest first list.
+2. **Not stored:** the player id, the session id, the IP address or any hash of it, the user agent, the screen size,
+   the language or the referrer. Nothing joins an item to a player.
+3. **Personal data:** whatever the player types in the message (the dialog asks them to leave out names, phone
+   numbers and passwords), and the reply email when given. A reply email is taken only from an account whose birth
+   year makes it an adult (ADR-028.1, ADR-048.8): the server refuses it from anyone else.
+4. **Who can read it:** no client except an admin, through the owner console's inbox (`GET /api/admin/feedback`,
+   `ADMIN_ACCOUNT_IDS`, ADR-036). The owner.
+5. **Kept for:** 180 days after it was sent (`FEEDBACK_KEEP_DAYS`), then MongoDB's TTL index removes it (within about
+   a minute). Marking an item read or done does not change when it goes.
+6. **Deleted by:** MongoDB's TTL index on `createdAt`. Because no player id is stored, account deletion and the data
+   export cannot find a player's feedback and do not take part (ADR-048.2 covers stores kept by player id). A
+   request to delete one sooner goes through the privacy contact, and the owner deletes it in the database.
+
 ### `accounts.birthYear`
 
 `apps/server/src/persistence/accountDao.js`, the rule in `packages/shared/src/ages.js` (CC-152)
@@ -324,6 +350,7 @@ describe the stores as they were before CC-035 and are brought in line by CC-248
 | `leaderboard_entries`                       | deleted                                                   | yes, without the player id             |
 | `player_transfers`                          | deleted                                                   | yes                                    |
 | `player_blocks`                             | deleted on either side                                    | the blocks the player made, by name    |
+| `feedback`                                  | not reached: no player id is stored, the TTL removes it   | no (nothing joins it to the player)    |
 | server memory (login throttle, rate limits) | not reached, forgotten at the next deploy or restart      | no                                     |
 | server logs (Render)                        | not reached, ids only, 7 or 14 days                       | no                                     |
 | backups                                     | not reached, age out within 30 days                       | no                                     |
@@ -342,16 +369,16 @@ describe the stores as they were before CC-035 and are brought in line by CC-248
 Kept in the server process only. A restart, a deploy or the free plan's sleep forgets all of it. Nothing here is
 written to MongoDB, except the network hash, which is also stored in `rooms`.
 
-| What                        | Holds                                                                                                                                                                              | Kept for                                                                         | Code                                                              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| HTTP rate limits            | request counts per IP address (`ip:<address>`, IPv6 grouped by /56) or per session id                                                                                              | the window: 1 minute (API), 15 minutes (auth, guest sessions), 1 hour (sign-ups) | `service/http/rateLimits.js`, `authRoutes.js`, `sessionRoutes.js` |
-| Login throttle              | failed logins per email and address, failed logins per email, and the addresses that signed in to each email, up to 10. Only keyed hashes are kept, never the email or the address | failures 15 minutes, known addresses 30 days                                     | `service/http/loginThrottle.js` (CC-117)                          |
-| Socket admission            | open connections per session id and per address, an event budget per player id                                                                                                     | while connected, and until the budget refills                                    | `service/realtime/socketAdmission.js`                             |
-| Network hash                | today's and yesterday's random keys, and the socket's address key, from which a room's hash is worked out when it is created                                                       | a key until the second UTC midnight after its day, the address while connected   | `utils/networkKey.js`, `realtime/gateway.js`                      |
-| Session renewals            | session ids being renewed by their own player                                                                                                                                      | 5 seconds                                                                        | `service/http/session.js`                                         |
-| Sign-outs                   | per player id, how often they signed out other devices and which session stayed                                                                                                    | the process's life                                                               | `service/realtime/gateway.js`                                     |
-| Requests in flight          | per socket, events still being handled                                                                                                                                             | until answered                                                                   | `service/realtime/connections.js`                                 |
-| Background tasks and timers | post-game work (match, progression, gamification, leaderboards), the room sweep (1 minute), game deadlines (1 second), transfer resume (1 minute), the room gauge (1 minute)       | until done                                                                       | `utils/backgroundTasks.js`, `server.js`                           |
+| What                        | Holds                                                                                                                                                                              | Kept for                                                                                                                                           | Code                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| HTTP rate limits            | request counts per IP address (`ip:<address>`, IPv6 grouped by /56) or per session id, and one count of feedback for the whole site                                                | the window: 1 minute (API), 15 minutes (auth, guest sessions), 1 hour (sign-ups), 1 hour (feedback), 1 day (the site's feedback count, no address) | `service/http/rateLimits.js`, `authRoutes.js`, `sessionRoutes.js` |
+| Login throttle              | failed logins per email and address, failed logins per email, and the addresses that signed in to each email, up to 10. Only keyed hashes are kept, never the email or the address | failures 15 minutes, known addresses 30 days                                                                                                       | `service/http/loginThrottle.js` (CC-117)                          |
+| Socket admission            | open connections per session id and per address, an event budget per player id                                                                                                     | while connected, and until the budget refills                                                                                                      | `service/realtime/socketAdmission.js`                             |
+| Network hash                | today's and yesterday's random keys, and the socket's address key, from which a room's hash is worked out when it is created                                                       | a key until the second UTC midnight after its day, the address while connected                                                                     | `utils/networkKey.js`, `realtime/gateway.js`                      |
+| Session renewals            | session ids being renewed by their own player                                                                                                                                      | 5 seconds                                                                                                                                          | `service/http/session.js`                                         |
+| Sign-outs                   | per player id, how often they signed out other devices and which session stayed                                                                                                    | the process's life                                                                                                                                 | `service/realtime/gateway.js`                                     |
+| Requests in flight          | per socket, events still being handled                                                                                                                                             | until answered                                                                                                                                     | `service/realtime/connections.js`                                 |
+| Background tasks and timers | post-game work (match, progression, gamification, leaderboards), the room sweep (1 minute), game deadlines (1 second), transfer resume (1 minute), the room gauge (1 minute)       | until done                                                                                                                                         | `utils/backgroundTasks.js`, `server.js`                           |
 
 Personal data: yes. The HTTP rate limits and socket admission hold IP addresses for minutes, or while a socket is
 connected. The login throttle holds no email and no address: its keys are HMAC-SHA-256 hashes with a random key made
@@ -392,7 +419,7 @@ No other cookie, localStorage, sessionStorage or IndexedDB key is used in `apps/
       signed out", "session ended by the server" (player id), every socket line (socket id and player id), room
       lines (room code, game, status, close reason), match lines (match id, game, reason, how many players), "socket
       refused" (error code, whether a cookie was sent), "player blocked" and "player unblocked" (the blocker's id
-      only, never who was blocked), the room gauge, and errors with their stack.
+      only, never who was blocked), "feedback received" (the feedback type only, never the message or who sent it), the room gauge, and errors with their stack.
    3. Redacted wherever they appear in a logged object: `password`, `token`, `accessToken`, `refreshToken`,
       `sessionId`, `email`, `secret`, and the cookie, authorization and set-cookie headers.
 2. **No IP addresses or emails** are written by the app. Redaction works on keys, so a value inside an error message
@@ -427,8 +454,9 @@ No other cookie, localStorage, sessionStorage or IndexedDB key is used in `apps/
 4. Analytics, page views, presses or funnels. There is no telemetry yet (CC-173 to CC-178, the catalogue in
    [analytics/EVENTS.md](analytics/EVENTS.md) is proposed). ADR-034 decided it will be anonymous counts only, first
    party, with an opt out. No third-party analytics.
-5. Chat or any free text from players. Display names are the only text a player chooses, and they pass the name
-   filter (ADR-022).
+5. Chat or any free text between players. Display names are the only text other players see, and they pass the name
+   filter (ADR-022). The only other free text is feedback to the owner (`feedback` above), which no other player
+   ever sees.
 
 ## Coming (not on `main` yet)
 

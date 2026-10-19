@@ -50,7 +50,13 @@ async function account(app, { birthYear } = {}) {
   return player;
 }
 
-const stored = async (testApp) => (await testApp.feedbackComponent.list({ where: {}, limit: 50 })).items;
+/** Every stored item with everything it holds, newest first. */
+const stored = async ({ feedbackComponent }) =>
+  Promise.all(
+    (await feedbackComponent.list({ where: {}, limit: 50 })).items.map(({ feedbackId }) =>
+      feedbackComponent.get({ feedbackId }),
+    ),
+  );
 const generous = Object.freeze({ windowMs: 60_000, limit: 1000 });
 
 describe("POST /api/feedback (CC-290)", () => {
@@ -88,7 +94,18 @@ describe("POST /api/feedback (CC-290)", () => {
     expect(text).not.toContain("127.0.0.1");
     expect(text).not.toContain("TestPhone");
     expect(Object.keys((await stored(testApp))[0]).sort()).toEqual(
-      ["build", "createdAt", "device", "feedbackId", "kind", "message", "page", "status", "type", "updatedAt"].sort(),
+      [
+        "build",
+        "createdAt",
+        "device",
+        "feedbackId",
+        "kind",
+        "message",
+        "page",
+        "status",
+        "type",
+        "updatedAt",
+      ].sort(),
     );
   });
 
@@ -142,9 +159,25 @@ describe("POST /api/feedback (CC-290)", () => {
   it("removes control characters other than new lines and tabs, and keeps Windows new lines as one", async () => {
     const testApp = createTestApp();
 
-    await browser(testApp.app).post("/feedback", feedback({ message: " Line one\r\nline\ttwo\u0000\u0007\u001b " }));
+    await browser(testApp.app).post(
+      "/feedback",
+      feedback({ message: " Line one\r\nline\ttwo\u0000\u0007\u001b " }),
+    );
 
     expect((await stored(testApp))[0].message).toBe("Line one\nline\ttwo");
+  });
+
+  it("masks an email address or an Indian mobile number typed in the message before it is stored", async () => {
+    const testApp = createTestApp();
+
+    await browser(testApp.app).post(
+      "/feedback",
+      feedback({ message: "WhatsApp me on +91 98765 43210 or 9876543210, or mail riya.s@example.co.in" }),
+    );
+
+    expect((await stored(testApp))[0].message).toBe(
+      "WhatsApp me on [phone removed] or [phone removed], or mail [email removed]",
+    );
   });
 
   it("keeps markup as the characters typed: it is plain text, never HTML", async () => {
@@ -159,7 +192,10 @@ describe("POST /api/feedback (CC-290)", () => {
   it("takes a message of exactly the longest length", async () => {
     const testApp = createTestApp();
 
-    const res = await browser(testApp.app).post("/feedback", feedback({ message: "a".repeat(FEEDBACK_MESSAGE_MAX) }));
+    const res = await browser(testApp.app).post(
+      "/feedback",
+      feedback({ message: "a".repeat(FEEDBACK_MESSAGE_MAX) }),
+    );
 
     expect(res.status).toBe(201);
   });
@@ -173,7 +209,11 @@ describe("POST /api/feedback (CC-290)", () => {
     ["a message that is not text", feedback({ message: 42 }), "message"],
     ["an empty message", feedback({ message: "" }), "message"],
     ["a message of only spaces and control characters", feedback({ message: " \n\u0000 " }), "message"],
-    ["a message one character too long", feedback({ message: "a".repeat(FEEDBACK_MESSAGE_MAX + 1) }), "message"],
+    [
+      "a message one character too long",
+      feedback({ message: "a".repeat(FEEDBACK_MESSAGE_MAX + 1) }),
+      "message",
+    ],
     ["a page with a query", feedback({ page: "/games/chess?next=/x" }), "page"],
     ["a page with a hash", feedback({ page: "/profile#matches" }), "page"],
     ["a page holding a room code", feedback({ page: "/games/chess/rooms/AB2CD3" }), "page"],

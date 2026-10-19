@@ -158,12 +158,17 @@ function parseInboxQuery(query) {
   return { where, ...(query.before !== undefined && { before: parseCursor(query.before) }) };
 }
 
-function parseStatusChange(params, body) {
+function parseFeedbackId(params) {
   if (!UUID_PATTERN.test(params.feedbackId)) throw invalid("feedbackId", "Invalid feedback id");
+  return params.feedbackId;
+}
+
+function parseStatusChange(params, body) {
+  const feedbackId = parseFeedbackId(params);
   if (!isPlainObject(body) || Object.keys(body).some((key) => key !== "status")) {
     throw new ValidationError("Send only the new status", { details: { fields: ["status"] } });
   }
-  return { feedbackId: params.feedbackId, status: oneOf(FEEDBACK_STATUSES, "status")(body.status) };
+  return { feedbackId, status: oneOf(FEEDBACK_STATUSES, "status")(body.status) };
 }
 
 /**
@@ -173,9 +178,12 @@ function parseStatusChange(params, body) {
  *    answers 201 `{ feedback: { feedbackId, status, createdAt } }`. 400 for anything else in the body, 429 over a
  *    limit. The kind of sender comes from the session.
  * 2. `GET /feedback/form` answers `{ form: { replyEmail } }`: whether this sender may leave an email for a reply.
- * 3. `GET /admin/feedback?type=&status=&before=` answers an admin `{ items, next? }`, newest first, 50 at a time.
- * 4. `PATCH /admin/feedback/:feedbackId` with `{ status }` answers an admin `{ item }`.
- *    Everyone else gets the console's 404 on both (ADR-036).
+ * 3. `GET /admin/feedback?type=&status=&before=` answers an admin `{ items, next? }`, newest first, 50 at a time,
+ *    without reply emails (`hasReplyEmail` says whether there is one).
+ * 4. `GET /admin/feedback/:feedbackId` answers an admin `{ item }` with everything, the reply email included.
+ * 5. `PATCH /admin/feedback/:feedbackId` with `{ status }` answers an admin `{ item }` as the list shows it.
+ * 6. `DELETE /admin/feedback/:feedbackId` deletes the item for good and answers an admin 204.
+ *    Everyone else gets the console's 404 on all four (ADR-036).
  *
  * @param {{
  *   feedbackComponent: ReturnType<typeof import("../../domain/feedback/feedbackComponent.js").createFeedbackComponent>,
@@ -234,6 +242,17 @@ export function createFeedbackRoutes({ feedbackComponent, requireAdmin, now = Da
       ...(before !== undefined && { before }),
     });
     res.json({ items, ...(next !== undefined && { next: cursorText(next) }) });
+  });
+
+  router.get("/admin/feedback/:feedbackId", requireAdmin, async (req, res) => {
+    const item = await feedbackComponent.get({ feedbackId: parseFeedbackId(req.params) });
+    res.json({ item });
+  });
+
+  router.delete("/admin/feedback/:feedbackId", requireAdmin, async (req, res) => {
+    await feedbackComponent.remove({ feedbackId: parseFeedbackId(req.params) });
+    req.log.info("feedback deleted");
+    res.status(204).end();
   });
 
   router.patch("/admin/feedback/:feedbackId", requireAdmin, async (req, res) => {

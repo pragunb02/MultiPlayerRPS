@@ -25,7 +25,22 @@
   display: inline-flex;
   gap: var(--space-4);
 }
-.footer a {
+.footer a,
+.feedback {
   color: var(--color-text);
   font-weight: 700;
+}
+/* It opens a dialog, so it is a button, drawn like the links beside it. */
+.feedback {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.feedback:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
 }

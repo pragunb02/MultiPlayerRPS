@@ -7,7 +7,8 @@ export function createInMemoryFeedbackDao() {
     b.createdAt - a.createdAt || (a.feedbackId < b.feedbackId ? 1 : a.feedbackId > b.feedbackId ? -1 : 0);
   const sorted = (test) => [...items.values()].filter(test).sort(newestFirst);
   const olderThan = (doc, { createdAt, feedbackId }) =>
-    doc.createdAt < createdAt || (doc.createdAt.getTime() === createdAt.getTime() && doc.feedbackId < feedbackId);
+    doc.createdAt < createdAt ||
+    (doc.createdAt.getTime() === createdAt.getTime() && doc.feedbackId < feedbackId);
   const matches = (doc, where) => Object.entries(where).every(([key, value]) => doc[key] === value);
 
   return Object.freeze({
@@ -22,6 +23,16 @@ export function createInMemoryFeedbackDao() {
       sorted((doc) => matches(doc, where) && (before === undefined || olderThan(doc, before)))
         .slice(0, limit)
         .map(copy),
+
+    async getById(feedbackId) {
+      const doc = items.get(feedbackId);
+      if (doc === undefined) {
+        throw new RangeError(`No feedback ${feedbackId}`);
+      }
+      return copy(doc);
+    },
+
+    deleteById: async (feedbackId) => (items.delete(feedbackId) ? 1 : 0),
 
     async setStatus({ feedbackId, status, updatedAt }) {
       const doc = items.get(feedbackId);

@@ -84,6 +84,15 @@ export function PrivacyPage() {
             never told, and only you can see your list.
           </li>
           <li>
+            <strong>Feedback.</strong> When you send feedback, we store its type, your message, the page you
+            were on (never a room code or a name), the app version, the kind of device (phone, tablet or
+            computer) and whether you were a visitor, a guest or signed in. We never store your player id,
+            your IP address or your browser details with it. A signed-in adult who asks for a reply can leave
+            an email address, and we keep it with the message. Feedback is deleted 180 days after it was sent.
+            It is not linked to your account, so it is not in your data export and deleting your account
+            cannot find it: to have it deleted sooner, ask the owner at the contact address above.
+          </li>
+          <li>
             <strong>Moving from guest to account.</strong> If you play as a guest and then sign up or log in,
             your guest progress and match history move to your account. We keep a note that the move happened
             so it is never done twice.

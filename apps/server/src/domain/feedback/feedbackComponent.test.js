@@ -39,12 +39,28 @@ describe("feedbackComponent (CC-290)", () => {
   it("stores what was sent with the sender's kind, as new, and never the player id", async () => {
     const { component } = setUp();
 
-    const sent = await component.submit({ sender: { kind: "guest", playerId: GUEST }, feedback: feedback(), now: T0 });
+    const sent = await component.submit({
+      sender: { kind: "guest", playerId: GUEST },
+      feedback: feedback(),
+      now: T0,
+    });
 
-    expect(sent).toEqual({ feedbackId: "00000000-0000-4000-a000-000000000001", status: "new", createdAt: T0 });
+    expect(sent).toEqual({
+      feedbackId: "00000000-0000-4000-a000-000000000001",
+      status: "new",
+      createdAt: T0,
+    });
     const { items } = await component.list({ where: {}, limit: 10 });
     expect(items).toEqual([
-      { ...feedback(), feedbackId: sent.feedbackId, kind: "guest", status: "new", createdAt: T0, updatedAt: T0 },
+      {
+        ...feedback(),
+        feedbackId: sent.feedbackId,
+        kind: "guest",
+        status: "new",
+        hasReplyEmail: false,
+        createdAt: T0,
+        updatedAt: T0,
+      },
     ]);
     expect(JSON.stringify(items)).not.toContain(GUEST);
   });
@@ -66,7 +82,10 @@ describe("feedbackComponent (CC-290)", () => {
       now: T0,
     });
 
-    expect((await component.list({ where: {}, limit: 10 })).items[0].replyEmail).toBe("riya@example.com");
+    const [listed] = (await component.list({ where: {}, limit: 10 })).items;
+    expect(listed).not.toHaveProperty("replyEmail");
+    expect(listed.hasReplyEmail).toBe(true);
+    expect((await component.get({ feedbackId: listed.feedbackId })).replyEmail).toBe("riya@example.com");
     expect(asked).toEqual([{ playerIds: [ADULT], now: T0 }]);
   });
 
@@ -74,22 +93,29 @@ describe("feedbackComponent (CC-290)", () => {
     ["an account of unknown age", { kind: "account", playerId: UNKNOWN_AGE }],
     ["a guest", { kind: "guest", playerId: GUEST }],
     ["a visitor", { kind: "visitor" }],
-  ])("refuses a reply email from %s, who may be a child (ADR-028.1), and stores nothing", async (_, sender) => {
-    const { component } = setUp();
+  ])(
+    "refuses a reply email from %s, who may be a child (ADR-028.1), and stores nothing",
+    async (_, sender) => {
+      const { component } = setUp();
 
-    const error = await component
-      .submit({ sender, feedback: feedback({ replyEmail: "kid@example.com" }), now: T0 })
-      .catch((err) => err);
+      const error = await component
+        .submit({ sender, feedback: feedback({ replyEmail: "kid@example.com" }), now: T0 })
+        .catch((err) => err);
 
-    expect(error).toBeInstanceOf(ValidationError);
-    expect(error.details).toEqual({ field: "replyEmail" });
-    expect((await component.list({ where: {}, limit: 10 })).items).toEqual([]);
-  });
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error.details).toEqual({ field: "replyEmail" });
+      expect((await component.list({ where: {}, limit: 10 })).items).toEqual([]);
+    },
+  );
 
   it("asks nobody's age when no reply email is given", async () => {
     const { component, asked } = setUp();
 
-    await component.submit({ sender: { kind: "account", playerId: UNKNOWN_AGE }, feedback: feedback(), now: T0 });
+    await component.submit({
+      sender: { kind: "account", playerId: UNKNOWN_AGE },
+      feedback: feedback(),
+      now: T0,
+    });
 
     expect(asked).toEqual([]);
   });
@@ -97,11 +123,15 @@ describe("feedbackComponent (CC-290)", () => {
   it("answers whether a sender may ask for a reply", async () => {
     const { component } = setUp();
 
-    expect(await component.canAskForReply({ sender: { kind: "account", playerId: ADULT }, now: T0 })).toBe(true);
-    expect(await component.canAskForReply({ sender: { kind: "account", playerId: UNKNOWN_AGE }, now: T0 })).toBe(
+    expect(await component.canAskForReply({ sender: { kind: "account", playerId: ADULT }, now: T0 })).toBe(
+      true,
+    );
+    expect(
+      await component.canAskForReply({ sender: { kind: "account", playerId: UNKNOWN_AGE }, now: T0 }),
+    ).toBe(false);
+    expect(await component.canAskForReply({ sender: { kind: "guest", playerId: GUEST }, now: T0 })).toBe(
       false,
     );
-    expect(await component.canAskForReply({ sender: { kind: "guest", playerId: GUEST }, now: T0 })).toBe(false);
     expect(await component.canAskForReply({ sender: { kind: "visitor" }, now: T0 })).toBe(false);
   });
 
@@ -132,7 +162,11 @@ describe("feedbackComponent (CC-290)", () => {
 
   it("moves an item to another status", async () => {
     const { component } = setUp();
-    const { feedbackId } = await component.submit({ sender: { kind: "visitor" }, feedback: feedback(), now: T0 });
+    const { feedbackId } = await component.submit({
+      sender: { kind: "visitor" },
+      feedback: feedback(),
+      now: T0,
+    });
 
     const item = await component.setStatus({ feedbackId, status: "done", now: T0 + 5 });
 
@@ -160,11 +194,64 @@ describe("feedbackComponent (CC-290)", () => {
       now: T0,
     });
 
-    expect((await component.list({ where: {}, limit: 1 })).items[0].replyEmail).toBe("riya@example.com");
+    expect((await component.list({ where: {}, limit: 1 })).items[0].hasReplyEmail).toBe(true);
+  });
+
+  it("masks emails and phone numbers in the message before it is stored, and keeps the reply email as given", async () => {
+    const { component } = setUp();
+
+    const { feedbackId } = await component.submit({
+      sender: { kind: "account", playerId: ADULT },
+      feedback: feedback({
+        message: "Call +91 98765 43210 or mail riya@example.com",
+        replyEmail: "riya@example.com",
+      }),
+      now: T0,
+    });
+
+    const stored = await component.get({ feedbackId });
+    expect(stored.message).toBe("Call [phone removed] or mail [email removed]");
+    expect(stored.replyEmail).toBe("riya@example.com");
+  });
+
+  it("reads one item with everything, and answers NotFoundError for one that is not there", async () => {
+    const { component } = setUp();
+    const { feedbackId } = await component.submit({ sender: { kind: "visitor" }, feedback: feedback(), now: T0 });
+
+    expect(await component.get({ feedbackId })).toEqual(expect.objectContaining({ feedbackId, ...feedback() }));
+    await expect(component.get({ feedbackId: "00000000-0000-4000-a000-0000000000ff" })).rejects.toThrow(
+      NotFoundError,
+    );
+  });
+
+  it("deletes an item for good, and answers NotFoundError when it is not there", async () => {
+    const { component } = setUp();
+    const { feedbackId } = await component.submit({ sender: { kind: "visitor" }, feedback: feedback(), now: T0 });
+
+    await component.remove({ feedbackId });
+
+    expect((await component.list({ where: {}, limit: 10 })).items).toEqual([]);
+    await expect(component.remove({ feedbackId })).rejects.toThrow(NotFoundError);
+  });
+
+  it("answers a status change without the reply email, as the list does", async () => {
+    const { component } = setUp();
+    const { feedbackId } = await component.submit({
+      sender: { kind: "account", playerId: ADULT },
+      feedback: feedback({ replyEmail: "riya@example.com" }),
+      now: T0,
+    });
+
+    const item = await component.setStatus({ feedbackId, status: "read", now: T0 });
+
+    expect(item).not.toHaveProperty("replyEmail");
+    expect(item.hasReplyEmail).toBe(true);
   });
 
   it("checks its dependencies when it is made", () => {
-    expect(() => createFeedbackComponent({ feedbackAccessor: undefined, ages: { adultsAmong: () => {} } })).toThrow();
+    expect(() =>
+      createFeedbackComponent({ feedbackAccessor: undefined, ages: { adultsAmong: () => {} } }),
+    ).toThrow();
     expect(() => createFeedbackComponent({ feedbackAccessor: {}, ages: {} })).toThrow();
   });
 });

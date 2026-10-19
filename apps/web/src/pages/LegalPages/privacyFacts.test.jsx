@@ -77,6 +77,11 @@ const FACTS = [
     page: /We do not count how you use the site\. If we ever do, it will be anonymous counts on our own server/,
   },
   {
+    fact: "feedback is kept 180 days, without a player id or an address",
+    data: "| [`feedback`](#feedback) | the message as typed, and a reply email from an adult who gave one | 180 days after it was sent |",
+    page: /We never store your player id, your IP address or your browser details with it\..*Feedback is deleted 180 days after it was sent/,
+  },
+  {
     fact: "blocks are kept until unblocked or an account is deleted",
     data: "Kept until the blocker unblocks, or either account is deleted",
     page: /we store that you blocked them, the name they had and when, until you unblock them or either account is deleted/,

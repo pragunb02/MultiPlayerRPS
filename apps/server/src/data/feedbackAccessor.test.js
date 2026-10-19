@@ -60,10 +60,28 @@ describe("feedbackAccessor (CC-290)", () => {
     ).rejects.toThrow(NotFoundError);
   });
 
+  it("reads one item, and answers NotFoundError for one that is not there", async () => {
+    const feedback = createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() });
+    const stored = await feedback.add(item({ replyEmail: "riya@example.com" }));
+
+    expect(await feedback.get(stored.feedbackId)).toEqual(stored);
+    await expect(feedback.get("00000000-0000-4000-a000-0000000000ff")).rejects.toThrow(NotFoundError);
+  });
+
+  it("removes an item and says whether it was there", async () => {
+    const feedback = createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() });
+    const stored = await feedback.add(item());
+
+    expect(await feedback.remove(stored.feedbackId)).toBe(true);
+    expect(await feedback.remove(stored.feedbackId)).toBe(false);
+  });
+
   it("passes other storage failures through", async () => {
-    const broken = { ...createInMemoryFeedbackDao(), setStatus: async () => Promise.reject(new Error("down")) };
+    const down = async () => Promise.reject(new Error("down"));
+    const broken = { ...createInMemoryFeedbackDao(), setStatus: down, getById: down };
     const feedback = createFeedbackAccessor({ feedbackDao: broken });
 
     await expect(feedback.setStatus({ feedbackId: "x", status: "done", at: T0 })).rejects.toThrow("down");
+    await expect(feedback.get("x")).rejects.toThrow("down");
   });
 });

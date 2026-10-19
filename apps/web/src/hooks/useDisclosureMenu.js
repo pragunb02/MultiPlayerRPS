@@ -16,6 +16,7 @@ const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), selec
  * @returns {{
  *   open: boolean,
  *   toggle: () => void,
+ *   close: () => void,
  *   buttonRef: import("react").RefObject<HTMLButtonElement | null>,
  *   panelRef: import("react").RefObject<HTMLElement | null>,
  * }}
@@ -57,5 +58,5 @@ export function useDisclosureMenu() {
     };
   }, [open, close]);
 
-  return { open, toggle, buttonRef, panelRef };
+  return { open, toggle, close, buttonRef, panelRef };
 }

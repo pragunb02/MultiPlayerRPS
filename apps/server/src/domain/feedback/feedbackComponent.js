@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { ValidationError } from "../../utils/errors.js";
+import { NotFoundError, ValidationError } from "../../utils/errors.js";
+import { maskContacts } from "./maskContacts.js";
 
 /**
  * Who may leave an email for a reply. Unknown age counts as a child (ADR-028.1), and a child's email is personal data
@@ -16,6 +17,12 @@ export const REPLY_EMAIL_ONLY_FOR_ADULTS = true;
  *   already checked for shape by the service layer
  * @typedef {{ createdAt: number, feedbackId: string }} FeedbackCursor   the last item of a page
  */
+
+/**
+ * An item as the inbox lists it: everything but the reply email, which only the item's own view shows
+ * (ADR-059). `hasReplyEmail` says whether there is one.
+ */
+const listed = ({ replyEmail, ...item }) => Object.freeze({ ...item, hasReplyEmail: replyEmail !== undefined });
 
 /**
  * In-app feedback (CC-290, ADR-059). Anyone can send it, visitors included. Nothing stored names the player: only
@@ -54,7 +61,8 @@ export function createFeedbackComponent({
     canAskForReply,
 
     /**
-     * Stores one item as new.
+     * Stores one item as new. Email addresses and phone numbers in the message are masked first, so contact details
+     * typed by mistake never reach the database. The reply email, which the player chose to give, is kept as given.
      *
      * @param {{ sender: FeedbackSender, feedback: FeedbackInput, now: number }} input
      * @returns {Promise<Readonly<{ feedbackId: string, status: string, createdAt: number }>>}
@@ -68,6 +76,7 @@ export function createFeedbackComponent({
       }
       const item = await feedbackAccessor.add({
         ...feedback,
+        message: maskContacts(feedback.message),
         feedbackId: newFeedbackId(),
         kind: sender.kind,
         at: now,
@@ -76,7 +85,8 @@ export function createFeedbackComponent({
     },
 
     /**
-     * The owner's inbox, newest first. One more item than asked is read, to know whether an older page exists.
+     * The owner's inbox, newest first, without reply emails. One more item than asked is read, to know whether an
+     * older page exists.
      *
      * @param {{ where: { type?: string, status?: string }, limit: number, before?: FeedbackCursor }} query
      * @returns {Promise<Readonly<{ items: ReadonlyArray<Readonly<import("../../data/feedbackAccessor.js").Feedback>>, next?: FeedbackCursor }>>}
@@ -88,7 +98,7 @@ export function createFeedbackComponent({
         limit: limit + 1,
         ...(before !== undefined && { before }),
       });
-      const items = Object.freeze(found.slice(0, limit));
+      const items = Object.freeze(found.slice(0, limit).map(listed));
       const last = items.at(-1);
       return Object.freeze({
         items,
@@ -97,9 +107,32 @@ export function createFeedbackComponent({
     },
 
     /**
-     * @param {{ feedbackId: string, status: string, now: number }} change
-     * @throws {import("../../utils/errors.js").NotFoundError} when there is no such item
+     * One item with everything it holds, the reply email included, for its own view in the inbox.
+     *
+     * @param {{ feedbackId: string }} query
+     * @throws {NotFoundError} when there is no such item
      */
-    setStatus: ({ feedbackId, status, now }) => feedbackAccessor.setStatus({ feedbackId, status, at: now }),
+    get: ({ feedbackId }) => feedbackAccessor.get(feedbackId),
+
+    /**
+     * Moves an item to another status, and answers it as the list shows it.
+     *
+     * @param {{ feedbackId: string, status: string, now: number }} change
+     * @throws {NotFoundError} when there is no such item
+     */
+    setStatus: async ({ feedbackId, status, now }) =>
+      listed(await feedbackAccessor.setStatus({ feedbackId, status, at: now })),
+
+    /**
+     * Deletes an item for good, so the owner can remove anything that holds personal details.
+     *
+     * @param {{ feedbackId: string }} query
+     * @throws {NotFoundError} when there is no such item
+     */
+    async remove({ feedbackId }) {
+      if (!(await feedbackAccessor.remove(feedbackId))) {
+        throw new NotFoundError("No such feedback");
+      }
+    },
   });
 }

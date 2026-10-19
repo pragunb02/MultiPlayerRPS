@@ -190,6 +190,11 @@ export function AdminPage() {
               </Link>
             </li>
           ))}
+          <li>
+            <Link to={paths.adminFeedback()} className={styles.tab} data-cc-control="admin.tab.feedback">
+              Feedback
+            </Link>
+          </li>
         </ul>
       </nav>
       {analytics.status === "loading" && (
