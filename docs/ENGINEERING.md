@@ -199,6 +199,14 @@ Rules:
     sees the production headers and the `Secure` cookie unchanged. Branch on `formFactor(testInfo)`, never on the
     project name. Engine wording the `players` fixture lets pass lives in `e2e/browserNoise.js`, each rule as
     narrow as the words allow and unit tested.
+15. **Screenshot baselines** (CC-155, ADR-056). `e2e/baselines.visual.js` compares the main screens at 1280×720 and
+    390×844, light and dark, with the PNGs in `e2e/visual-baselines/`. They are made and compared only in the pinned
+    Playwright image, never on a laptop's own browser: `npm run test:visual` (Docker) compares, and after a change to
+    the look made on purpose `npm run test:visual:update` or the `Visual baselines (update)` workflow (Actions tab,
+    "Use workflow from" the ticket branch, and the ticket ID) writes the changed images. Review every changed image in the pull request before
+    approving it. New screens get a baseline there. Anything that changes between runs is given a stand-in or painted
+    from script in that spec (Playwright's own `mask` is blocked by the CSP), never accepted by a looser threshold.
+    On failure the CI job keeps the expected, actual and diff images, a video and a trace for 14 days.
 
 ---
 
