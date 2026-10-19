@@ -248,9 +248,10 @@ describe("visual baselines (CC-155)", () => {
     expect(workflow).toMatch(/\npermissions:\n {2}contents: read\n/);
     expect(render).not.toContain("permissions:");
     expect(render).toContain("persist-credentials: false");
-    expect(render).toContain("grep -Eq '^cc-[0-9]{3}-[a-z0-9-]+$'");
+    expect(render).toContain("grep -Eq '^refs/heads/cc-[0-9]{3}-[a-z0-9-]+$'");
+    // Run on the branch itself: checking out another ref would run its code with main's caches (CodeQL).
+    expect(workflow).not.toMatch(/inputs\.branch|ref: \$\{\{/);
     expect(render).toContain("--update-snapshots=changed");
-    expect(render).not.toMatch(/cache: |actions\/cache/);
     expect(commit).toContain("    permissions:\n      contents: write\n");
     expect(commit).not.toMatch(/npm|npx|node /);
     expect(commit).toContain('git commit --quiet --message "$TICKET: ');

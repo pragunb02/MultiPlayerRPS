@@ -50,7 +50,7 @@ the owner may change it.
   3. Run-to-run data is made the same without loosening any check: names get same-length stand-ins, clocks, dates,
      quests, the invite link and run-dependent XP are painted from script (CSP-safe), toasts are hidden, reduced
      motion holds the resting look. `maxDiffPixels: 8`, no ratio. The `players` fixture's checks still apply.
-  4. Updates: `npm run test:visual:update`, or the `Visual baselines (update)` workflow, which renders without write
+  4. Updates: `npm run test:visual:update`, or the `Visual baselines (update)` workflow run on the ticket branch itself, which renders without write
      access and commits the changed images to the ticket branch. A person reviews the image diffs and pushes next.
   5. Videos and traces only of failing tests, in the visual job. The four-part suites stay without video so their
      100 ms checks are not loaded further.
