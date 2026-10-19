@@ -64,6 +64,20 @@ describe("page head for crawlers and link previews", () => {
     }
   });
 
+  it("previews a shared link like the clean page, so the channel marker never makes a second page (CC-279)", async () => {
+    for (const via of ["wa", "share", "copy", "unknown"]) {
+      const game = await crawl(`/games/chess?via=${via}`);
+      const room = await crawl(`/games/chess/rooms/AB2CD3?via=${via}`);
+
+      expect(game.status).toBe(200);
+      expect(tag(game.text, "property", "og:url")).toBe(`${ORIGIN}/games/chess`);
+      expect(game.text).toContain(`<link rel="canonical" href="${ORIGIN}/games/chess" data-server-head>`);
+      expect(room.status).toBe(200);
+      expect(tag(room.text, "property", "og:url")).toBe(`${ORIGIN}/games/chess/rooms/AB2CD3`);
+      expect(tag(room.text, "name", "robots")).toBe("noindex");
+    }
+  });
+
   it("previews a room of a game this build does not know in general words, without asking whether it exists", async () => {
     const res = await crawl("/games/ludo/rooms/ZZ9ZZ9");
 
