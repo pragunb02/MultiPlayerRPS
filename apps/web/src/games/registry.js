@@ -1,12 +1,21 @@
 import { GAME_IDS } from "@classicade/shared";
 import { chessActions } from "./chess/chessActions.js";
-import { CHESS_REQUEST_TEXTS, chessReasonPhrase, chessSounds } from "./chess/chessAlerts.js";
+import {
+  CHESS_OUTCOME_TEXT,
+  CHESS_REQUEST_TEXTS,
+  chessReasonPhrase,
+  chessSounds,
+} from "./chess/chessAlerts.js";
 import { ChessOptions } from "./chess/ChessOptions.jsx";
 import { CHESS_HOW_TO_PLAY, RPS_HOW_TO_PLAY, TICTACTOE_HOW_TO_PLAY } from "./howToPlay.js";
 import { lazyBoard } from "./lazyBoard.js";
-import { rpsReasonPhrase, rpsSounds } from "./rps/rpsAlerts.js";
+import { RPS_OUTCOME_TEXT, rpsReasonPhrase, rpsSounds } from "./rps/rpsAlerts.js";
 import { RpsOptions } from "./rps/RpsOptions.jsx";
-import { tictactoeReasonPhrase, tictactoeSounds } from "./tictactoe/tictactoeAlerts.js";
+import {
+  TICTACTOE_OUTCOME_TEXT,
+  tictactoeReasonPhrase,
+  tictactoeSounds,
+} from "./tictactoe/tictactoeAlerts.js";
 
 // Boards load on demand: a player only downloads the game they open (chess brings chess.js).
 const RpsBoard = lazyBoard(() => import("./rps/RpsBoard.jsx"), "RpsBoard");
@@ -26,6 +35,8 @@ const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard
  *   the requests a player of this game can send the other during play, such as a draw offer (CC-159)
  * @property {(reason: string) => string} [reasonPhrase]  how a game ended, worded to follow "You won" or "Draw"
  *   in the result headline, such as "by checkmate" (CC-162)
+ * @property {import("./outcomeLine.js").OutcomeText} [outcomeText]  the words of the game's endings in the
+ *   outcome moment, and a computer character's tip after a loss (CC-163). Without it the moment uses plain words
  * @property {ReadonlyArray<import("./howToPlay.js").HowToPlayStep>} [howToPlay]  the lobby's three short steps
  *   for a first-time player (CC-259)
  * @property {(room: any) => ReadonlyArray<import("../components/MatchShell/matchShell.js").GameAction>} [actions]
@@ -60,12 +71,14 @@ export const GAME_VIEWS = Object.freeze({
     Board: RpsBoard,
     soundsFor: rpsSounds,
     reasonPhrase: rpsReasonPhrase,
+    outcomeText: RPS_OUTCOME_TEXT,
     howToPlay: RPS_HOW_TO_PLAY,
   }),
   [GAME_IDS.TIC_TAC_TOE]: Object.freeze({
     Board: TicTacToeBoard,
     soundsFor: tictactoeSounds,
     reasonPhrase: tictactoeReasonPhrase,
+    outcomeText: TICTACTOE_OUTCOME_TEXT,
     howToPlay: TICTACTOE_HOW_TO_PLAY,
   }),
   [GAME_IDS.CHESS]: Object.freeze({
@@ -74,6 +87,7 @@ export const GAME_VIEWS = Object.freeze({
     soundsFor: chessSounds,
     requestTexts: CHESS_REQUEST_TEXTS,
     reasonPhrase: chessReasonPhrase,
+    outcomeText: CHESS_OUTCOME_TEXT,
     howToPlay: CHESS_HOW_TO_PLAY,
     actions: chessActions,
   }),

@@ -61,7 +61,13 @@ const BOARD = Object.freeze({
   rps: [at("rps.choice")],
   chess: ['main [role="timer"]', at("chess.square"), at("chess.offer_draw"), at("chess.resign")],
 });
-const RESULT = ["#result-heading", at("room.rematch.ask"), at("room.new_opponent")];
+// The result: its headline and the outcome line under it (CC-163), and the two ways to play on.
+const RESULT = [
+  "#result-heading",
+  "main [data-cc-outcome-line]",
+  at("room.rematch.ask"),
+  at("room.new_opponent"),
+];
 const MAIN_CONTROLS = Object.freeze({
   waiting: () => [at("invite.copy")],
   "my-turn": (gameId) => BOARD[gameId],
@@ -186,5 +192,75 @@ test.describe("a game that brings only a board plugs into the match shell", () =
     await expect(ending.locator('[data-cc-control="room.rematch.ask"]')).toBeVisible();
     expect(await controls(ending)).toEqual(["room.rematch.ask", "room.new_opponent", "room.leave"]);
     await expect(slot(clicker, "stage").locator('[data-cc-control="ttt.cell"]')).toHaveCount(9);
+  });
+});
+
+// The outcome moments (CC-163): each way a game ends has its own tone, words and effect. A win earned on the board
+// gets confetti, a loss dims the board once, a win by forfeit stays quiet, and with reduced motion the words stay
+// while nothing moves.
+test.describe("outcome moments", () => {
+  const result = (player) => player.page.locator('main [data-cc-slot="result"]');
+  const effects = (player) => player.page.locator("[data-effect]");
+
+  test("a win on the board celebrates, and the loser gets kind words and a dimmed board", async ({
+    players,
+  }) => {
+    const pair = await openPair(players);
+    const { clicker, other } = await statesFor("tictactoe")["my-turn"](pair);
+
+    await GAMES.tictactoe.win(clicker, other);
+
+    await expect(result(clicker)).toHaveAttribute("data-cc-tone", "win");
+    await expect(result(clicker).locator("[data-cc-stamp]")).toHaveText("Victory!");
+    await expect(clicker.page.locator("[data-effect='confetti']")).toHaveCount(1);
+    await expect(result(other)).toHaveAttribute("data-cc-tone", "gentle-loss");
+    await expect(result(other).locator("#result-heading")).toHaveText("You lost to three in a row");
+    await expect(result(other).locator("[data-cc-outcome-line]")).toContainText(
+      "They got three first. Watch their lines.",
+    );
+    await expect(result(other).locator("[data-cc-stamp]")).toHaveCount(0);
+    await expect(other.page.locator("main [data-cc-effect='dim']")).toHaveCount(1);
+    await expect(other.page.locator("[data-effect='confetti']")).toHaveCount(0);
+  });
+
+  test("a win because the opponent left is quiet: a trophy and no confetti", async ({ players }) => {
+    const pair = await openPair(players);
+    const { clicker, other } = await statesFor("tictactoe")["my-turn"](pair);
+
+    await other.page.locator('main [data-cc-control="room.leave"]').click();
+    await other.page.locator('[data-cc-control="room.leave.confirm"]').click();
+
+    await expect(result(clicker).locator("#result-heading")).toHaveText("You won by forfeit");
+    await expect(result(clicker)).toHaveAttribute("data-cc-tone", "quiet-win");
+    await expect(result(clicker).locator("[data-cc-outcome-line]")).toContainText("left the game.");
+    await expect(result(clicker).locator("[data-cc-icon='trophy']")).toHaveCount(1);
+    await expect(clicker.page.locator("[data-effect='confetti']")).toHaveCount(0);
+  });
+
+  test("with reduced motion the same words show and nothing moves", async ({ players }) => {
+    const pair = await openPair(players);
+    const { clicker, other } = await statesFor("tictactoe")["my-turn"](pair);
+    for (const player of [clicker, other]) {
+      await player.page.emulateMedia({ reducedMotion: "reduce" });
+    }
+
+    await GAMES.tictactoe.win(clicker, other);
+
+    await expect(result(clicker).locator("[data-cc-stamp]")).toHaveText("Victory!");
+    await expect(result(clicker).locator("[data-cc-outcome-line]")).toContainText("Nice line.");
+    await expect(result(other).locator("[data-cc-outcome-line]")).toContainText(
+      "They got three first. Watch their lines.",
+    );
+    for (const player of [clicker, other]) {
+      await expect(effects(player)).toHaveCount(0);
+      const moving = await player.page
+        .locator("main *")
+        .evaluateAll(
+          (elements) => elements.filter((e) => getComputedStyle(e).animationName !== "none").length,
+        );
+      expect(moving, `${player.name}: nothing animates`).toBe(0);
+    }
+    // The loser's board still softens: it is one still change, so reduced motion keeps it.
+    await expect(other.page.locator("main [data-cc-effect='dim']")).toHaveCSS("filter", "saturate(0.35)");
   });
 });

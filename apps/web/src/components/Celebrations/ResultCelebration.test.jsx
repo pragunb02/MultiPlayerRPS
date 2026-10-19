@@ -58,7 +58,7 @@ function GrabToasts() {
  * Renders the result as a signed-in guest, once the session is ready. The result goes on screen only after that,
  * so a test can switch to fake timers first and the moment's own timer runs on them.
  */
-async function celebrate(room, { socket = fakeSocket(), beforeResult = () => undefined } = {}) {
+async function celebrate(room, { socket = fakeSocket(), beforeResult = () => undefined, live = true } = {}) {
   const ui = (withResult) => (
     <ServicesProvider
       services={{
@@ -72,7 +72,7 @@ async function celebrate(room, { socket = fakeSocket(), beforeResult = () => und
         <ToastProvider displayMs={10_000}>
           <MatchProgressProvider>
             <GrabToasts />
-            {withResult && <ResultCelebration room={room} moment={outcomeMoment(room)} />}
+            {withResult && <ResultCelebration room={room} moment={outcomeMoment(room)} live={live} />}
             <SessionStatus />
           </MatchProgressProvider>
         </ToastProvider>
@@ -157,6 +157,14 @@ describe("ResultCelebration", () => {
 
     act(() => vi.advanceTimersByTime(1));
     expect(toastText()).toBe("+30 XPBob left the room");
+  });
+
+  it("holds nothing for a result that was already over when the page opened (a reload)", async () => {
+    await celebrate(finished(), { beforeResult: () => vi.useFakeTimers(), live: false });
+
+    act(() => toasts.show("+30 XP", { category: "reward" }));
+
+    expect(toastText()).toBe("+30 XP");
   });
 
   it("never holds back what matters more than the result: a lost connection shows at once", async () => {

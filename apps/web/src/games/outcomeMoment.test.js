@@ -325,9 +325,18 @@ describe("outcomeMoment: a computer character's tip after a loss", () => {
     );
   });
 
-  it("keeps the game's words for a character this version does not know", () => {
+  it.each([
+    ["rps", "best-of-3", "Good game. Want another?"],
+    ["tictactoe", "three-in-a-row", "They got three first. Watch their lines."],
+    ["chess", "checkmate", "Good game. Want another?"],
+  ])("keeps the %s words for a character this version does not know", (gameId, reason, english) => {
     const seats = [ALICE, computer("zed", "hard")];
-    expect(outcomeMoment(finished("rps", win("b", "best-of-3"), { seats })).line.english).toBe(
+    expect(outcomeMoment(finished(gameId, win("b", reason), { seats })).line.english).toBe(english);
+  });
+
+  it("keeps the plain words after a loss to a computer in a game with no tips", () => {
+    const seats = [ALICE, computer("zed", "hard")];
+    expect(outcomeMoment(finished("ludo", win("b", "home-run"), { seats })).line.english).toBe(
       "Good game. Want another?",
     );
   });

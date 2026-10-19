@@ -18,7 +18,8 @@ const ACTION_FACTOR = 2;
  * Every toast belongs to a notification category (CC-208). The same message of a category is not shown twice
  * within the category's rate limit. While something more important is on screen (a request holds the request
  * category, see `hold`), toasts of lower categories wait and show once it is gone, so a question is never buried
- * under rewards.
+ * under rewards. A toast's `onShow` runs when it really shows, so an effect or a sound that belongs to it (the
+ * level-up burst) waits with it (CC-163).
  */
 export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
   const [toasts, setToasts] = useState([]);
@@ -47,6 +48,7 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
   const display = useCallback(
     (toast) => {
       setToasts((current) => [...current, toast]);
+      toast.onShow?.();
       const timer = setTimeout(
         () => {
           timers.current.delete(timer);
@@ -60,7 +62,7 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
   );
 
   const show = useCallback(
-    (message, { tone = "info", art, action, category = CATEGORIES.SYSTEM } = {}) => {
+    (message, { tone = "info", art, action, category = CATEGORIES.SYSTEM, onShow } = {}) => {
       const { priority, minGapMs } = categoryOf(category);
       const key = `${category}:${message}`;
       const last = recent.current.get(key);
@@ -69,7 +71,7 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
       }
       const id = ++nextId.current;
       recent.current.set(key, { id, at: Date.now() });
-      const toast = { id, message, tone, art, action, priority };
+      const toast = { id, message, tone, art, action, priority, onShow };
       if (priority < heldPriority()) {
         waiting.current = [...waiting.current, toast];
       } else {

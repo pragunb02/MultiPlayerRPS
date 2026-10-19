@@ -91,6 +91,26 @@ describe("ToastProvider", () => {
       expect(shown()).toBe("Connection lost+30 XPBob is back");
     });
 
+    it("tells a toast when it really shows, so what belongs to it waits with it (CC-163)", () => {
+      vi.useFakeTimers({ now: 0 });
+      const toast = capture();
+      const shownNow = vi.fn();
+      const shownLater = vi.fn();
+      let release;
+
+      act(() => toast.show("Link copied", { onShow: shownNow }));
+      expect(shownNow).toHaveBeenCalledOnce();
+
+      act(() => {
+        release = toast.hold("result");
+      });
+      act(() => toast.show("Level up!", { category: "reward", onShow: shownLater }));
+      expect(shownLater).not.toHaveBeenCalled();
+
+      act(() => release());
+      expect(shownLater).toHaveBeenCalledOnce();
+    });
+
     it("keeps holding while another hold of the same kind is still on", () => {
       vi.useFakeTimers({ now: 0 });
       const toast = capture();
