@@ -27,6 +27,7 @@ export const SHARDS = Object.freeze([
     "fairPlay.spec.js", // 9
     "legacy.spec.js", // 7
     "crawler.spec.js", // 4
+    "share.spec.js", // new (CC-217), about 10 s locally
     "names.spec.js", // 4
     "privacy.spec.js", // new (CC-035, CC-152), about 25 s locally
   ]),
@@ -35,6 +36,7 @@ export const SHARDS = Object.freeze([
     "match-shell-presses-tictactoe.spec.js", // 875
     "accessibility.spec.js", // 203, desktop only
     "dead-space.spec.js", // new (CC-259), not measured yet
+    "layout-width.spec.js", // new (CC-256, CC-270), about 15 s a phone size locally
   ]),
   // 1106 s
   Object.freeze([

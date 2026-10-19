@@ -239,8 +239,8 @@ The Step column is the step of the build order in section 6; tickets in the same
 
 | Step | Ticket       | What                                                                                    | In or out                                                      | Pri | Phase | Status                 |
 | ---- | ------------ | --------------------------------------------------------------------------------------- | -------------------------------------------------------------- | --- | ----- | ---------------------- |
-| 1    | CC-270       | Effects past the phone's edge after a win                                               | In                                                             | P1  | 1     | ⬜ Todo                |
-| 1    | CC-256       | 20 character name breaks the phone header and profile                                   | In                                                             | P1  | 1     | ⬜ Todo                |
+| 1    | CC-270       | Effects past the phone's edge after a win                                               | In                                                             | P1  | 1     | ✅ Done                |
+| 1    | CC-256       | 20 character name breaks the phone header and profile                                   | In                                                             | P1  | 1     | ✅ Done                |
 | 1    | CC-155       | Visual regression baselines, light and dark, desktop and phone                          | In (test)                                                      | P1  | 2     | ⬜ Todo                |
 | 1    | CC-267       | Lawyer-drafted assignment deed for commissioned art                                     | In (moved in, section 5)                                       | P2  | 2     | ⬜ Todo                |
 | 2    | CC-163       | Outcome moments: tone, words, sound, effect per reason                                  | In (writes into the shell's result slot)                       | P1  | 1     | ⬜ Todo, research done |
