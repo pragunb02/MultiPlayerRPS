@@ -47,7 +47,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 2    | 1           | 18    |
-| Bugs (BUG)       | 5    | 1           | 36    |
+| Bugs (BUG)       | 4    | 1           | 37    |
 | Tech debt (DEBT) | 7    | 1           | 12    |
 
 ## Changelog

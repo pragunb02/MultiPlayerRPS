@@ -15,10 +15,13 @@ const PHONES = Object.freeze([
 /**
  * Records, on every frame, the widest the page has been since the last `resetWidest`, and what stood past the
  * right edge then. A burst of confetti or a level-up lasts about a second, so one look at the end could miss it.
+ * It also notes, on the same frames, when the level-up burst was first drawn and when it was gone again, so a test
+ * can wait for the whole burst to have been recorded. A reset of the widest width keeps those two notes.
  */
 function recordWidest() {
   const empty = () => ({ scrollWidth: 0, innerWidth: 0, past: [] });
   window.__widest = empty();
+  window.__levelUp = { seen: false, ended: false };
   window.__resetWidest = () => {
     window.__widest = empty();
   };
@@ -28,6 +31,9 @@ function recordWidest() {
   };
   const look = () => {
     const { scrollWidth, clientWidth } = document.documentElement;
+    const burst = document.querySelector('[data-effect="level-up"]') !== null;
+    if (burst) window.__levelUp.seen = true;
+    if (!burst && window.__levelUp.seen) window.__levelUp.ended = true;
     if (scrollWidth > window.__widest.scrollWidth || innerWidth > window.__widest.innerWidth) {
       const past = [...document.querySelectorAll("body *")]
         .filter((element) => element.getBoundingClientRect().right > clientWidth + 0.5)
@@ -152,8 +158,12 @@ for (const phone of PHONES) {
       await expectFits(guest.page, "result after the first loss (guest)");
       await winOnce(riya, guest, expectFits);
     }
-    // Checked after the level-up burst has played and cleared itself, with every frame of it recorded.
-    await expect(page.locator('[data-effect="level-up"]')).toHaveCount(0, { timeout: 5_000 });
+    // Checked only once the page itself drew the level-up burst and then removed it (about 1.5 s, BURST_MS in
+    // ProgressToasts.jsx), so every frame of the burst is in the record. Nothing resets the record in between.
+    await expect
+      .poll(() => page.evaluate(() => window.__levelUp), { timeout: 15_000 })
+      .toEqual({ seen: true, ended: true });
+    await expect(page.locator('[data-effect="level-up"]')).toHaveCount(0);
     await expect((await header(page)).getByRole("progressbar", { name: /^Level 2:/ })).toBeVisible();
     await expectFits(page, "result after a win with a level-up");
     await expectFits(guest.page, "result after a loss (guest)");
