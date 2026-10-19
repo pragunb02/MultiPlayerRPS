@@ -53,7 +53,8 @@ describe("containerScript", () => {
 
     expect(script).toContain("npx playwright test -c playwright.visual.config.js\n");
     expect(script).not.toContain("--update-snapshots");
-    expect(script).not.toContain("/repo/e2e/visual-baselines\n");
+    // The checkout's baselines are never touched when comparing: not copied over, not removed, not given away.
+    expect(script).not.toMatch(/visual-baselines/);
     expect(script).toContain("cp -R visual-results visual-report /repo/e2e/");
   });
 

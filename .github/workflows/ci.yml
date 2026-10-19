@@ -322,6 +322,9 @@ jobs:
   # on purpose, run the "Visual baselines (update)" workflow on the branch, or `npm run test:visual:update`.
   visual:
     name: Visual baselines (advisory)
+    # Pull requests only. On a push to main a visual diff would turn main's CI red, and a red main stops every
+    # merge, which an advisory check must not do. A PR is compared before it merges, so main loses nothing.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     container:

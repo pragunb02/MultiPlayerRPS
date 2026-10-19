@@ -228,6 +228,8 @@ describe("visual baselines (CC-155)", () => {
     const visual = job(await read(".github/workflows/ci.yml"), "visual");
 
     expect(visual).toContain("    name: Visual baselines (advisory)\n");
+    // Advisory on main too: a push to main never runs it, so a visual diff can never turn main red.
+    expect(visual).toContain("    if: github.event_name == 'pull_request'\n");
     expect(visual).toContain("        run: npx playwright test -c playwright.visual.config.js --workers=2\n");
     expect(visual).toContain("        if: failure()\n        uses: actions/upload-artifact@v7");
     expect(visual).toContain("          path: e2e/visual-results/\n          retention-days: 14\n");
@@ -248,7 +250,15 @@ describe("visual baselines (CC-155)", () => {
     expect(workflow).toMatch(/\npermissions:\n {2}contents: read\n/);
     expect(render).not.toContain("permissions:");
     expect(render).toContain("persist-credentials: false");
-    expect(render).toContain("grep -Eq '^refs/heads/cc-[0-9]{3}-[a-z0-9-]+$'");
+    // The whole value is matched, not one line of it, so a ticket with a second line cannot reach the commit
+    // message. Both jobs check, and each check runs in bash, where `=~` is defined.
+    for (const each of [render, commit]) {
+      expect(each).toContain('[[ "$TICKET" =~ ^CC-[0-9]{3}$ ]]');
+      expect(each).toContain("        shell: bash\n");
+      expect(each).toContain("          TICKET: ${{ inputs.ticket }}\n");
+    }
+    expect(render).toContain('[[ "$GITHUB_REF" =~ ^refs/heads/cc-[0-9]{3}-[a-z0-9-]+$ ]]');
+    expect(workflow).not.toContain("grep -Eq");
     // Run on the branch itself: checking out another ref would run its code with main's caches (CodeQL).
     expect(workflow).not.toMatch(/inputs\.branch|ref: \$\{\{/);
     expect(render).toContain("--update-snapshots=changed");

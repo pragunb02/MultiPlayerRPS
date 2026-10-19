@@ -29,6 +29,9 @@ const CACHES = Object.freeze([
  */
 export function containerScript({ update }) {
   const testArgs = update ? "--update-snapshots=changed" : "";
+  // Only an update touches the checkout's baselines. A comparison leaves them exactly as they are.
+  const copiedBack = ["/repo/e2e/visual-results", "/repo/e2e/visual-report"];
+  if (update) copiedBack.push("/repo/e2e/visual-baselines");
   return [
     "set -u",
     "mkdir -p /work",
@@ -42,7 +45,7 @@ export function containerScript({ update }) {
     "cp -R visual-results visual-report /repo/e2e/ 2>/dev/null",
     ...(update ? ["rm -rf /repo/e2e/visual-baselines", "cp -R visual-baselines /repo/e2e/"] : []),
     // Files written by the container belong to root on Linux. They are given back to the person running this.
-    'chown -R "$HOST_UID:$HOST_GID" /repo/e2e/visual-results /repo/e2e/visual-report /repo/e2e/visual-baselines 2>/dev/null',
+    `chown -R "$HOST_UID:$HOST_GID" ${copiedBack.join(" ")} 2>/dev/null`,
     'exit "$status"',
   ].join("\n");
 }

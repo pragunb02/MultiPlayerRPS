@@ -34,10 +34,13 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host --init
     steps:
+      # `[[ =~ ]]` matches the whole value. grep would pass a value whose first line matches and whose next line
+      # carries something else into the commit message.
       - name: Only a ticket branch, with a ticket ID
+        shell: bash
         run: |
-          printf '%s' "$GITHUB_REF" | grep -Eq '^refs/heads/cc-[0-9]{3}-[a-z0-9-]+$' || { echo "::error::run it on a ticket branch such as cc-123-short-name, never main"; exit 1; }
-          printf '%s' "$TICKET" | grep -Eq '^CC-[0-9]{3}$' || { echo "::error::ticket must look like CC-123"; exit 1; }
+          [[ "$GITHUB_REF" =~ ^refs/heads/cc-[0-9]{3}-[a-z0-9-]+$ ]] || { echo "::error::run it on a ticket branch such as cc-123-short-name, never main"; exit 1; }
+          [[ "$TICKET" =~ ^CC-[0-9]{3}$ ]] || { echo "::error::ticket must look like CC-123"; exit 1; }
         env:
           TICKET: ${{ inputs.ticket }}
       - uses: actions/checkout@v7
@@ -83,7 +86,10 @@ jobs:
           name: visual-baselines
           path: e2e/visual-baselines
       - name: Commit and push, if anything changed
+        shell: bash
         run: |
+          # Checked again here, where the ticket goes into the commit message.
+          [[ "$TICKET" =~ ^CC-[0-9]{3}$ ]] || { echo "::error::ticket must look like CC-123"; exit 1; }
           git add --all e2e/visual-baselines
           if git diff --cached --quiet; then
             echo "The baselines already match this branch. Nothing to commit." >> "$GITHUB_STEP_SUMMARY"
