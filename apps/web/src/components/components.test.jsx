@@ -197,11 +197,11 @@ describe("ShareRoom", () => {
     withToasts(<ShareRoom code="AB2CD3" gameId="chess" origin="https://classicade.app" />);
 
     expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveValue(
-      "https://classicade.app/games/chess/rooms/AB2CD3",
+      "https://classicade.app/games/chess/rooms/AB2CD3?via=copy",
     );
     await user.click(screen.getByRole("button", { name: "Copy link" }));
 
-    expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3");
+    expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3?via=copy");
     // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Link copied"));
   });
@@ -212,7 +212,7 @@ describe("ShareRoom", () => {
     const link = screen.getByRole("link", { name: /WhatsApp/ });
 
     const message =
-      "Ek game ho jaaye? ClassiCade pe Chess khelo, link kholo aur seedha khelo:\nPlay Chess with me on ClassiCade — room AB2CD3\nFree hai, login nahi chahiye.\nFree, no login needed.\nhttps://classicade.app/games/chess/rooms/AB2CD3";
+      "Ek game ho jaaye? ClassiCade pe Chess khelo, link kholo aur seedha khelo:\nPlay Chess with me on ClassiCade — room AB2CD3\nFree hai, login nahi chahiye.\nFree, no login needed.\nhttps://classicade.app/games/chess/rooms/AB2CD3?via=wa";
     expect(link).toHaveAttribute("href", `https://wa.me/?text=${encodeURIComponent(message)}`);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -228,7 +228,7 @@ describe("ShareRoom", () => {
     meta.remove();
 
     expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveValue(
-      "https://canonical.example/games/chess/rooms/AB2CD3",
+      "https://canonical.example/games/chess/rooms/AB2CD3?via=copy",
     );
   });
 
@@ -242,6 +242,19 @@ describe("ShareRoom", () => {
 
     expect(share).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining("Play Chess with me") }),
+    );
+  });
+
+  it("hands the share sheet the room's link marked as a share sheet link (CC-279)", async () => {
+    const user = userEvent.setup();
+    const share = vi.fn().mockResolvedValue();
+    vi.stubGlobal("navigator", { ...navigator, share });
+    withToasts(<ShareRoom code="AB2CD3" gameId="chess" origin="https://classicade.app" />);
+
+    await user.click(screen.getByRole("button", { name: "Share…" }));
+
+    expect(share).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://classicade.app/games/chess/rooms/AB2CD3?via=share" }),
     );
   });
 
@@ -296,7 +309,7 @@ describe("ShareRoom", () => {
 
     await user.click(screen.getByRole("button", { name: "Share…" }));
 
-    expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3");
+    expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3?via=copy");
     // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Link copied"));
   });

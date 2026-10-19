@@ -2,8 +2,8 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-061**. Reserved for open work (2026-10-20): ADR-056
-(CC-155, #104), ADR-057 (CC-253), ADR-058 (CC-163), ADR-059 (CC-290) and ADR-060 (CC-291). A later change to a decision is a dated
+reused; the next free ID is **ADR-065**. Reserved for open work (2026-10-20): ADR-057
+(CC-253), ADR-058 (CC-163), ADR-059 (CC-290), ADR-060 (CC-291), ADR-061 (CC-144), ADR-062 (CC-042) and ADR-064 (CC-297). A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -120,6 +120,34 @@ the owner may change it.
      checks for its first week.
 - **Not chosen.** Chromatic, Percy or Argos (an account and a secret in a public repository, per-snapshot pricing
   over a free tier), baselines per platform (three sets to keep in step), a trace of every passing test.
+
+### ADR-063 — Render's settings live in `render.yaml`, secrets stay in Render
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 (from [CC-294](tickets/CC-294.md), research in
+  its Research section). Nothing changes in production until the owner links the Blueprint (DEPLOYMENT.md,
+  "Render Blueprint").
+- **Context.** Every Render setting lived only in the dashboard, unreviewed. Auto-deploy had stayed on "On Commit"
+  without anyone noticing. Render Blueprints read a `render.yaml` and adopt an existing service by its name. Render
+  keeps env vars the file leaves out and ignores `sync: false` keys on every later sync, but resets a few omitted
+  fields (build filters, PR previews, root directory) and overwrites dashboard values that differ from the file.
+- **Decision.**
+  1. `render.yaml` at the repo root declares the one web service `NoCapGaming` with every setting the dashboard has:
+     `runtime: node`, `plan: free`, `region: oregon`, `branch: main`, the build and start commands,
+     `healthCheckPath: /health`, `autoDeployTrigger: checksPass`.
+  2. Settings that are not secret are plain values in the file and change only by pull request: `NODE_ENV`, `HOST`,
+     `LOG_LEVEL`, `ALLOWED_ORIGINS`, `WEB_DIST_DIR`, `TRUST_PROXY_HOPS`. Secrets are `sync: false` with no value:
+     `MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`. `PORT` belongs to Render and is not declared.
+  3. A unit test keeps the file honest: the service settings, every env var name `loadConfig` reads declared (and
+     nothing else), every secret `sync: false`, and the plain values passing `loadConfig` in production.
+  4. Render's published JSON Schema checks the file with Ajv in a CI job that runs on pull requests only. It needs
+     render.com, and with "After CI Checks Pass" a failed check on a `main` commit would stop that deploy.
+  5. The owner links it from the dashboard after comparing the review screen with the dashboard (DEPLOYMENT.md).
+     Builders never call Render's API.
+- **Consequences.** A change to production's build, start, health check, auto-deploy or plain env vars is now a
+  reviewed diff. A new env var in config cannot merge without a line in `render.yaml`. After linking, a dashboard
+  edit to a field in the file is overwritten on the next sync. Secrets are still set by hand in the dashboard, and
+  a new secret must be added there by hand too (Render ignores new `sync: false` keys after the first sync). Two new
+  dev dependencies, `yaml` and `ajv`.
 
 ### ADR-055 — Operations telemetry: our own metrics and named log lines to Grafana Cloud, no personal data
 
