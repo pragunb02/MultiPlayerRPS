@@ -1,4 +1,4 @@
-import { PREVIEW_IMAGE, PUBLIC_PAGE_PATHS, SITE_NAME } from "@classicade/shared";
+import { PREVIEW_IMAGE, PUBLIC_PAGE_PATHS, SITE_NAME, SITE_ORIGIN_META } from "@classicade/shared";
 
 /** Marks the tags written here, so the web app can remove them once it runs (apps/web/src/app/serverHead.js). */
 const MARK = "data-server-head";
@@ -17,9 +17,23 @@ export const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (char) => E
 
 const meta = (key, name, content) => `<meta ${key}="${name}" content="${escapeHtml(content)}" ${MARK}>`;
 
+/** The preview image types we draw, by file extension. `og:image:type` must name the file's real type. */
+const IMAGE_TYPES = Object.freeze({ ".jpg": "image/jpeg", ".png": "image/png" });
+
+/** The type of a preview image, from its file name. */
+function imageType(imagePath) {
+  const extension = imagePath.slice(imagePath.lastIndexOf("."));
+  if (!Object.hasOwn(IMAGE_TYPES, extension)) {
+    throw new Error(`No preview image type for ${imagePath}`);
+  }
+  return IMAGE_TYPES[extension];
+}
+
 /**
  * The head tags of one page for crawlers and link previews, which read the HTML without running scripts: the
  * title, the description, the canonical URL or a request not to list the page, Open Graph and Twitter card tags.
+ * Last comes the site's own address, which the web app puts in the links it shares. It comes from the server's
+ * settings, never from the request, so a request with a forged Host header cannot change a shared link.
  *
  * @param {{ page: Readonly<import("@classicade/shared").PageInfo>, origin: string }} options
  *   origin: the site's own address, e.g. https://classicade.example, since previews need absolute URLs
@@ -40,7 +54,7 @@ export function renderPageHead({ page, origin }) {
     meta("property", "og:description", page.description),
     meta("property", "og:url", url),
     meta("property", "og:image", image),
-    meta("property", "og:image:type", "image/png"),
+    meta("property", "og:image:type", imageType(page.image)),
     meta("property", "og:image:width", String(PREVIEW_IMAGE.width)),
     meta("property", "og:image:height", String(PREVIEW_IMAGE.height)),
     meta("property", "og:image:alt", page.imageAlt),
@@ -49,6 +63,7 @@ export function renderPageHead({ page, origin }) {
     meta("name", "twitter:description", page.description),
     meta("name", "twitter:image", image),
     meta("name", "twitter:image:alt", page.imageAlt),
+    `<meta name="${SITE_ORIGIN_META}" content="${escapeHtml(new URL(origin).origin)}">`,
   ].join("\n    ");
 }
 
