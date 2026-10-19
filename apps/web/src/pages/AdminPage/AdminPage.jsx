@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { ANALYTICS_MAX_RANGE_DAYS, SITE_NAME } from "@classicade/shared";
-import { ADMIN_SECTIONS, paths } from "../../app/paths.js";
+import { paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { useAnalytics } from "../../hooks/useAnalytics.js";
 import { useNow } from "../../hooks/useNow.js";
@@ -10,24 +10,21 @@ import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import { addDays, indiaToday } from "./format.js";
 import { Conversion, Engagement, Games, Overview, Players, Retention } from "./sections.jsx";
 import { Statuses } from "./statuses.jsx";
+import { ConsoleTabs } from "./ConsoleTabs.jsx";
+import { CONSOLE_PAGES, CONSOLE_VIEWS } from "./consolePages.js";
 import styles from "./AdminPage.module.css";
 
-/** The tabs, in order: the overview first, then each section. */
-const TABS = Object.freeze([
-  { section: undefined, name: "Overview", Page: Overview },
-  ...ADMIN_SECTIONS.map((section) => ({
-    section,
-    name: section[0].toUpperCase() + section.slice(1),
-    Page: {
-      statuses: Statuses,
-      players: Players,
-      games: Games,
-      retention: Retention,
-      conversion: Conversion,
-      engagement: Engagement,
-    }[section],
-  })),
-]);
+/** The page that draws each part of the totals, by its id in CONSOLE_PAGES. */
+const SECTION_PAGES = Object.freeze({
+  overview: Overview,
+  statuses: Statuses,
+  players: Players,
+  games: Games,
+  retention: Retention,
+  conversion: Conversion,
+  engagement: Engagement,
+});
+const TOTALS_PAGES = CONSOLE_PAGES.filter((page) => page.view === CONSOLE_VIEWS.TOTALS);
 const PRESETS = Object.freeze([7, 30, 90, 365]);
 /** The range the server reports on when the address has none: the 30 days that end today. */
 const DEFAULT_RANGE_DAYS = 30;
@@ -155,11 +152,12 @@ export function AdminPage() {
   const asked = rangeFrom(search);
   const analytics = useAnalytics(asked);
   const now = useNow(60_000);
-  const tab = TABS.find((candidate) => candidate.section === section);
+  const tab = TOTALS_PAGES.find((candidate) => candidate.section === section);
 
   if (tab === undefined || (analytics.status === "error" && isNotFound(analytics.error))) {
     return <NotFoundPage />;
   }
+  const Page = SECTION_PAGES[tab.id];
   const { report } = analytics;
   const query = { from: asked.from, to: asked.to, bucket: asked.bucket };
   // Without a report the form starts from the range that was asked for, so a refused range can be corrected.
@@ -176,27 +174,7 @@ export function AdminPage() {
           smaller than 5 are shown as “fewer than 5”. Days are India time.
         </p>
       </header>
-      <nav aria-label="Console sections">
-        <ul className={styles.tabs}>
-          {TABS.map((candidate) => (
-            <li key={candidate.name}>
-              <Link
-                to={paths.admin(candidate.section, query)}
-                className={styles.tab}
-                aria-current={candidate === tab ? "page" : undefined}
-                data-cc-control={`admin.tab.${candidate.section ?? "overview"}`}
-              >
-                {candidate.name}
-              </Link>
-            </li>
-          ))}
-          <li>
-            <Link to={paths.adminFeedback()} className={styles.tab} data-cc-control="admin.tab.feedback">
-              Feedback
-            </Link>
-          </li>
-        </ul>
-      </nav>
+      <ConsoleTabs current={tab.id} range={query} />
       {analytics.status === "loading" && (
         <p className={styles.status} role="status">
           Counting…
@@ -228,7 +206,7 @@ export function AdminPage() {
             refreshed every 5 minutes.
           </p>
           <div className={styles.body}>
-            <tab.Page report={report} />
+            <Page report={report} />
           </div>
         </>
       )}

@@ -42,9 +42,9 @@ const FACTS = [
     page: /keyed hashes made with a random key, never the email or the address itself/,
   },
   {
-    fact: "the HTTP rate limits keep addresses for 1 minute to 1 hour",
+    fact: "the HTTP rate limits keep addresses for 1 minute to 1 day",
     data: "the window: 1 minute (API), 15 minutes (auth, guest sessions), 1 hour (sign-ups)",
-    page: /counts recent requests and connections per IP address, for 1 minute to 1 hour/,
+    page: /counts recent requests and connections per IP address, for 1 minute to 1 day/,
   },
   {
     fact: "backups are kept 30 days",

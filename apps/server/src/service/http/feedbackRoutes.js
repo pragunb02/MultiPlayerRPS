@@ -1,10 +1,14 @@
 import { Router } from "express";
+import { ipKeyGenerator } from "express-rate-limit";
 import {
   FEEDBACK_DEVICES,
+  FEEDBACK_KEEP_DAYS,
+  FEEDBACK_KIND,
   FEEDBACK_MESSAGE_MAX,
   FEEDBACK_STATUSES,
   FEEDBACK_TYPES,
   IDENTITY_KINDS,
+  isFeedbackPage,
 } from "@classicade/shared";
 import { parseEmail } from "../../models/credentials.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
@@ -13,6 +17,23 @@ import { createRateLimit } from "./rateLimits.js";
 import { requireIdentity } from "./session.js";
 
 const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * How much of the database feedback may fill at most, and the most one item can take: a message of 1000 characters
+ * of three bytes each, the longest email, page and build, and the other fields. The free database tier has 512 MB.
+ */
+export const FEEDBACK_STORAGE_BUDGET_BYTES = 200 * 1024 * 1024;
+export const FEEDBACK_ITEM_MAX_BYTES = 4096;
+
+// Items kept at once are at most the daily cap times the days each is kept, so this cap keeps them inside the budget.
+const SITE_DAILY_LIMIT = Math.floor(
+  FEEDBACK_STORAGE_BUDGET_BYTES / (FEEDBACK_KEEP_DAYS * FEEDBACK_ITEM_MAX_BYTES),
+);
+
+// The daily share counts a whole IPv6 /48, the block a home or an office is usually given, so one network cannot
+// take more shares by moving through its addresses.
+const DAILY_IPV6_BLOCK = 48;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // The inbox shows this many at a time.
 const PAGE_SIZE = 50;
@@ -23,13 +44,16 @@ const PAGE_SIZE = 50;
  *
  * 1. `perSession`: items per guest or account session in an hour. More than anyone writes, too few to flood with.
  * 2. `perAddress`: items per network address in an hour, so new guests or no session at all buy no more.
- * 3. `site`: items stored for the whole site in a day, so many addresses together cannot fill the database. Only
- *    stored items count here.
+ * 3. `perAddressDaily`: items per network in a day, an IPv6 /48 counted as one. A tenth of the site's cap at most, so
+ *    one network alone can never use up the day for everyone.
+ * 4. `site`: items stored for the whole site in a day, worked out from the storage budget, so many networks together
+ *    cannot fill the database. Only stored items count here.
  */
 export const FEEDBACK_LIMITS = Object.freeze({
   perSession: Object.freeze({ windowMs: HOUR_MS, limit: 5 }),
   perAddress: Object.freeze({ windowMs: HOUR_MS, limit: 20 }),
-  site: Object.freeze({ windowMs: 24 * HOUR_MS, limit: 300 }),
+  perAddressDaily: Object.freeze({ windowMs: DAY_MS, limit: 25 }),
+  site: Object.freeze({ windowMs: DAY_MS, limit: SITE_DAILY_LIMIT }),
 });
 
 const isPlainObject = (value) =>
@@ -60,14 +84,9 @@ function parseMessage(value) {
   return message;
 }
 
-// A page is a route pattern: "/", or segments that are lower case words, `:placeholders` or `*`. Room codes, names
-// and ids always hold capitals, digits or other characters, so they cannot pass. The page builds the pattern
-// itself, and this is the second check.
-const PAGE_PATTERN = /^\/$|^(?:\/(?:[a-z]+(?:-[a-z]+)*|:[a-z]+|\*))+$/;
-const MAX_PAGE_LENGTH = 100;
-
+// The page builds the route pattern itself, and this is the second check, with the same shared rule.
 function parsePage(value) {
-  if (typeof value !== "string" || value.length > MAX_PAGE_LENGTH || !PAGE_PATTERN.test(value)) {
+  if (!isFeedbackPage(value)) {
     throw invalid("page", "page must be a route pattern without codes, names or a query");
   }
   return value;
@@ -124,9 +143,10 @@ function parseFeedback(body) {
 
 /** Who is sending, from the session alone. The page never says. */
 function senderOf(session) {
-  if (session.identity === undefined) return { kind: "visitor" };
+  if (session.identity === undefined) return { kind: FEEDBACK_KIND.VISITOR };
   const identity = requireIdentity(session);
-  return { kind: identity.kind === IDENTITY_KINDS.USER ? "account" : "guest", playerId: identity.id };
+  const kind = identity.kind === IDENTITY_KINDS.USER ? FEEDBACK_KIND.ACCOUNT : FEEDBACK_KIND.GUEST;
+  return { kind, playerId: identity.id };
 }
 
 const INBOX_QUERY = Object.freeze({
@@ -210,6 +230,12 @@ export function createFeedbackRoutes({ feedbackComponent, requireAdmin, now = Da
     message: "A lot of feedback came from your network, try again in an hour",
     headers: false,
   });
+  const perAddressDaily = createRateLimit({
+    ...rules.perAddressDaily,
+    message: "A lot of feedback came from your network today, try again tomorrow",
+    keyGenerator: (req) => `net48:${ipKeyGenerator(/** @type {string} */ (req.ip), DAILY_IPV6_BLOCK)}`,
+    headers: false,
+  });
   const site = createRateLimit({
     ...rules.site,
     message: "We have had a lot of feedback today, try again tomorrow",
@@ -219,7 +245,7 @@ export function createFeedbackRoutes({ feedbackComponent, requireAdmin, now = Da
   });
 
   // The session's own limit first, so the address counts only what it let through, and the site only what was stored.
-  router.post("/feedback", perSession, perAddress, site, async (req, res) => {
+  router.post("/feedback", perSession, perAddress, perAddressDaily, site, async (req, res) => {
     const feedback = parseFeedback(req.body);
     const sender = senderOf(req.session);
     const sent = await feedbackComponent.submit({ sender, feedback, now: now() });

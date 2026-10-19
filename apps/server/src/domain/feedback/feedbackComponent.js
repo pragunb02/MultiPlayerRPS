@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { FEEDBACK_KIND } from "@classicade/shared";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NotFoundError, ValidationError } from "../../utils/errors.js";
 import { maskContacts } from "./maskContacts.js";
@@ -49,7 +50,7 @@ export function createFeedbackComponent({
   /** @param {{ sender: FeedbackSender, now: number }} query */
   async function canAskForReply({ sender, now }) {
     if (!replyEmailOnlyForAdults) return true;
-    if (sender.kind !== "account") return false;
+    if (sender.kind !== FEEDBACK_KIND.ACCOUNT) return false;
     return (await ages.adultsAmong({ playerIds: [sender.playerId], now })).has(sender.playerId);
   }
 

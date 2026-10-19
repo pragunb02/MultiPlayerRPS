@@ -193,6 +193,49 @@ describe("the Feedback dialog (CC-290)", () => {
     expect(api.sendFeedback.mock.calls[1][0].replyEmail).toBe("riya@example.com");
   });
 
+  it("forgets the draft and the email when the player logs out, so the next person on the phone sees neither", async () => {
+    const ADULT = { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "Riya" };
+    const getFeedbackForm = vi
+      .fn()
+      .mockResolvedValueOnce({ replyEmail: true })
+      .mockResolvedValue({ replyEmail: false });
+    const api = fakeApi({ getSession: async () => ADULT, getFeedbackForm });
+    const user = userEvent.setup();
+    renderApp({ api });
+    const banner = screen.getByRole("banner");
+    const footer = screen.getByRole("contentinfo");
+    await user.click(await within(footer).findByRole("button", { name: "Feedback" }));
+    await user.type(message(), "My private thought");
+    await user.type(
+      await screen.findByRole("textbox", { name: "Email me back (optional)" }),
+      "riya@example.com",
+    );
+    await user.keyboard("{Escape}");
+
+    await user.click(await within(banner).findByRole("button", { name: "Log out" }));
+    await within(banner).findByRole("link", { name: "Log in" });
+    await user.click(within(footer).getByRole("button", { name: "Feedback" }));
+
+    expect(message()).toHaveValue("");
+    await vi.waitFor(() => expect(getFeedbackForm).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("textbox", { name: /Email me back/ })).toBeNull();
+    expect(document.body).not.toHaveTextContent("riya@example.com");
+  });
+
+  it("hides the email field again on every opening until the server answers", async () => {
+    const getFeedbackForm = vi
+      .fn()
+      .mockResolvedValueOnce({ replyEmail: true })
+      .mockReturnValue(new Promise(() => {}));
+    const { user } = await openFromFooter({ api: fakeApi({ getFeedbackForm }) });
+    await screen.findByRole("textbox", { name: "Email me back (optional)" });
+
+    await user.keyboard("{Escape}");
+    await user.click(within(screen.getByRole("contentinfo")).getByRole("button", { name: "Feedback" }));
+
+    expect(screen.queryByRole("textbox", { name: /Email me back/ })).toBeNull();
+  });
+
   it.each([
     ["the server says no", vi.fn().mockResolvedValue({ replyEmail: false })],
     ["the question failed", vi.fn().mockRejectedValue(new Error("down"))],

@@ -47,8 +47,10 @@ export function useFeedbackInbox({ type, status }) {
 
   const loadOlder = useCallback(async () => {
     const { items, next } = await api.getFeedbackInbox({ ...JSON.parse(query), before: current.next });
-    setResult((shown) => ({ ...shown, items: [...shown.items, ...items], next }));
-  }, [api, query, current.next]);
+    // The filters may have changed while the page was on its way. It belongs to the list it was asked for, so it is
+    // dropped when that list is no longer the one shown.
+    setResult((shown) => (shown.key === key ? { ...shown, items: [...shown.items, ...items], next } : shown));
+  }, [api, query, key, current.next]);
 
   const setStatus = useCallback(
     async (feedbackId, next) => {

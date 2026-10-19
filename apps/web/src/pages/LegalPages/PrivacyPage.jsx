@@ -159,10 +159,10 @@ export function PrivacyPage() {
         <p>Their servers may be outside your country, including in the United States.</p>
         <p>
           To stop one person from flooding the site, the server counts recent requests and connections per IP
-          address, for 1 minute to 1 hour, and for as long as a connection stays open. To protect accounts
-          from password guessing, it also counts wrong passwords for 15 minutes, and it remembers for 30 days
-          which networks signed in to each account, up to 10 per account, so a network you use is never slowed
-          down during an attack on your account. For logins it keeps only keyed hashes made with a random key,
+          address, for 1 minute to 1 day, and for as long as a connection stays open. To protect accounts from
+          password guessing, it also counts wrong passwords for 15 minutes, and it remembers for 30 days which
+          networks signed in to each account, up to 10 per account, so a network you use is never slowed down
+          during an attack on your account. For logins it keeps only keyed hashes made with a random key,
           never the email or the address itself. All of this lives in the server&apos;s memory only, is not
           saved anywhere, and is forgotten when the server restarts.
         </p>

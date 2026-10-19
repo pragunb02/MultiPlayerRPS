@@ -1,8 +1,9 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, GUEST } from "../../testing/fakes.js";
+import REPORT from "../../testing/analyticsReport.json";
 import { renderApp } from "../../testing/render.jsx";
 
 // CC-290: the owner's feedback inbox in the console.
@@ -251,6 +252,28 @@ describe("the feedback inbox (CC-290)", () => {
     expect(screen.queryByRole("button", { name: "Older" })).toBeNull();
   });
 
+  it("drops an older page that arrives after the filters changed", async () => {
+    let answerOlder;
+    const api = ownerApi({
+      getFeedbackInbox: vi.fn(async (query) => {
+        if (query.before !== undefined) return new Promise((resolve) => (answerOlder = resolve));
+        return query.type === "idea"
+          ? { items: [item({ message: "An idea" })] }
+          : { items: [item({ message: "Page one" })], next: "1_x" };
+      }),
+    });
+    const { user } = await openInbox({ api });
+    await screen.findByText("Page one");
+
+    await user.click(screen.getByRole("button", { name: "Older" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Type" }), "idea");
+    await screen.findByText("An idea");
+    await act(async () => answerOlder({ items: [item({ message: "Old page of all types" })] }));
+
+    expect(screen.queryByText("Old page of all types")).toBeNull();
+    expect(entries()).toHaveLength(1);
+  });
+
   it("says what went wrong and tries again on request", async () => {
     const api = ownerApi({
       getFeedbackInbox: vi
@@ -268,10 +291,31 @@ describe("the feedback inbox (CC-290)", () => {
     expect(await screen.findByText("Back again")).toBeInTheDocument();
   });
 
-  it("is a tab of the console", async () => {
-    const api = ownerApi();
-    await openInbox({ api });
+  it("shows the same console tabs as every other console page, with Feedback as the current one", async () => {
+    const tabNames = () =>
+      within(screen.getByRole("navigation", { name: "Console sections" }))
+        .getAllByRole("link")
+        .map((link) => [link.textContent, link.getAttribute("aria-current")]);
+    const api = ownerApi({ getAnalytics: vi.fn().mockResolvedValue(REPORT) });
+    const inbox = renderApp({ path: "/admin/feedback", api });
+    await screen.findByRole("heading", { name: "Feedback" });
+    const onInbox = tabNames();
+    inbox.unmount();
+    renderApp({ path: "/admin", api });
+    await screen.findByRole("heading", { name: "Owner console" });
 
-    expect(screen.getByRole("link", { name: "Totals" })).toHaveAttribute("href", "/admin");
+    expect(onInbox.map(([name]) => name)).toEqual(tabNames().map(([name]) => name));
+    expect(onInbox.map(([name]) => name)).toEqual([
+      "Overview",
+      "Statuses",
+      "Players",
+      "Games",
+      "Retention",
+      "Conversion",
+      "Engagement",
+      "Feedback",
+    ]);
+    expect(onInbox.filter(([, current]) => current === "page")).toEqual([["Feedback", "page"]]);
+    expect(screen.getByRole("link", { name: "Feedback" })).toHaveAttribute("href", "/admin/feedback");
   });
 });

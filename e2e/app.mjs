@@ -22,6 +22,7 @@ const limits = {
   // Feedback keeps its real limit per session (CC-290). The ones per address and for the site are raised.
   feedback: {
     perAddress: { windowMs: 60_000, limit: 10_000 },
+    perAddressDaily: { windowMs: 60_000, limit: 10_000 },
     site: { windowMs: 60_000, limit: 10_000 },
   },
 };

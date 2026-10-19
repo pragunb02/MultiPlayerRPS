@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { GAMES, isFeedbackPage, LEADERBOARDS } from "@classicade/shared";
+import { ADMIN_SECTIONS, LEGACY_ROUTES, ROUTES } from "../../app/paths.js";
 import { deviceClass, feedbackPage } from "./feedbackContext.js";
 
 describe("feedbackPage: the page as a route pattern, never a code, a name or a query (CC-290)", () => {
@@ -31,6 +33,33 @@ describe("feedbackPage: the page as a route pattern, never a code, a name or a q
 
   it("is the same for any letter case of a game page, without keeping the typed spelling", () => {
     expect(feedbackPage("/Games/Chess")).toBe("/games/chess");
+  });
+});
+
+describe("every page the dialog can name passes the server's check, the same shared rule (CC-290)", () => {
+  const pages = [
+    "/",
+    "/no/such/page",
+    ...[...Object.values(ROUTES), ...Object.values(LEGACY_ROUTES)].map((route) => `/${route}`),
+    ...GAMES.flatMap((game) => [
+      `/games/${game.slug}`,
+      `/games/${game.slug}/rooms/AB2CD3`,
+      `/play/${game.id}`,
+      `/play/${game.slug}`,
+    ]),
+    ...LEADERBOARDS.map((board) => `/leaderboards/${board.id}`),
+    ...ADMIN_SECTIONS.map((section) => `/admin/${section}`),
+  ];
+
+  it.each(pages)("%s", (pathname) => {
+    expect(isFeedbackPage(feedbackPage(pathname))).toBe(true);
+  });
+
+  it("keeps every game's and every board's own name, digits and all, rather than a placeholder", () => {
+    for (const game of GAMES) expect(feedbackPage(`/games/${game.slug}`)).toBe(`/games/${game.slug}`);
+    for (const board of LEADERBOARDS) {
+      expect(feedbackPage(`/leaderboards/${board.id}`)).toBe(`/leaderboards/${board.id}`);
+    }
   });
 });
 

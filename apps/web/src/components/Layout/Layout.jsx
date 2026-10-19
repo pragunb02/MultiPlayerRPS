@@ -175,7 +175,12 @@ export function Layout() {
       <PageAnnouncer />
       <SiteFooter onFeedback={openFeedback} />
       {/* Outside the menu, which a phone hides while it is closed, so the footer can open it too. */}
-      <FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      {/* A new dialog for each player: a draft and its email never pass to whoever uses the phone next. */}
+      <FeedbackDialog
+        key={identity?.id ?? "visitor"}
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
     </div>
   );
 }

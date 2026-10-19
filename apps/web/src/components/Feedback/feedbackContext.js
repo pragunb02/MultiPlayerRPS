@@ -1,5 +1,5 @@
 import { matchRoutes } from "react-router";
-import { gameForSlug, getLeaderboard } from "@classicade/shared";
+import { FEEDBACK_DEVICE, gameForSlug, getLeaderboard } from "@classicade/shared";
 import { ADMIN_SECTIONS, LEGACY_ROUTES, ROUTES } from "../../app/paths.js";
 
 /**
@@ -52,11 +52,11 @@ const TABLET_BELOW = 1100;
  *
  * @param {{ shortSide: number, coarsePointer: boolean }} screenInfo  the screen's shorter side in CSS pixels, and
  *   whether the main pointer is a finger
- * @returns {"phone" | "tablet" | "desktop"}
+ * @returns {string} a FEEDBACK_DEVICE value
  */
 export function deviceClass({ shortSide, coarsePointer }) {
-  if (!coarsePointer || shortSide >= TABLET_BELOW) return "desktop";
-  return shortSide < PHONE_BELOW ? "phone" : "tablet";
+  if (!coarsePointer || shortSide >= TABLET_BELOW) return FEEDBACK_DEVICE.DESKTOP;
+  return shortSide < PHONE_BELOW ? FEEDBACK_DEVICE.PHONE : FEEDBACK_DEVICE.TABLET;
 }
 
 /**

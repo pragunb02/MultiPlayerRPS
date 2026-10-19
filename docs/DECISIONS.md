@@ -72,9 +72,12 @@ the owner may change it.
      desktop), the kind of sender (visitor, guest, account, from the session) and a status (new, read, done). No
      player id, session id, IP address or hash of one, and no user agent. The lists are in
      `packages/shared/src/feedback.js`, so a new type or status is one line.
-  2. **Contacts masked before saving.** Every email address and phone number in the message (10 or more digits,
-     Indian mobiles with +91, 91 or 0 in front included) becomes `[email removed]` or `[phone removed]` before it is
-     stored (`domain/feedback/maskContacts.js`). The dialog says so.
+  2. **Contacts masked before saving.** Digits of any script (Devanagari, Bengali, full width) are stored as plain
+     digits. Then every email address, and every phone shape (an optional +91, 91 or 0, then 10 digits in groups of 3
+     to 5 with at most one space, hyphen, dot, comma, slash or underscore between groups, never across a line)
+     becomes `[email removed]` or `[phone removed]` before it is stored (`domain/feedback/maskContacts.js`). Scores,
+     dates and times have groups too short to match. A number written in another shape, such as a landline in
+     brackets, is not caught: the dialog asks players to leave contact details out, and the owner can delete an item.
   3. **A reply email only from adults.** "Email me back" shows only to an account whose birth year makes it surely
      an adult (ADR-048.8), and the server refuses a reply email from anyone else, because a minor's email needs a
      parent's consent under the DPDP Act. It is stored as given, as the player chose to give it.
@@ -82,8 +85,11 @@ the owner may change it.
      a theme and to reply, and nobody's words kept for ever. The owner can delete any item sooner from the inbox.
   5. **Not part of deletion or export.** ADR-048.2 covers the stores kept by player id. This store has none, so it
      cannot find a player's feedback, by design. A request goes through the privacy contact and the owner's Delete.
-  6. **Limits in the style of ADR-035.** 5 an hour per session, 20 an hour per address (visitors included), 300 a day
-     for the whole site (only stored items count). In memory, as the other limits.
+  6. **Limits in the style of ADR-035.** 5 an hour per session, 20 an hour per address (visitors included), 25 a
+     day per network (an IPv6 /48 counted as one), and a daily cap for the whole site worked out from storage: a
+     budget of 200 MB over 180 days at 4 KB at most per item, which is 284 a day (only stored items count). One
+     network can take at most a tenth of a day, so it alone can never close feedback for everyone. In memory, as the
+     other limits.
   7. **The owner reads it in the console** at `/admin/feedback`, behind the same allowlist and the same 404 for
      everyone else (ADR-036.1). Every value is shown as text, never as HTML. The list carries no reply email, only
      whether there is one. The address is sent for one item at a time, when the owner opens its details.
@@ -98,6 +104,10 @@ the owner may change it.
 - **Consequences.** DATA.md and the privacy page list the store. The owner decides three defaults in the ticket: the
   adults-only reply email (one line, `REPLY_EMAIL_ONLY_FOR_ADULTS`), the 180 days (`FEEDBACK_KEEP_DAYS`) and the
   limits (`FEEDBACK_LIMITS`). The lawyer's review (ADR-048 consequences) should include free text from minors.
+  **Accepted residual risk:** many networks together (more than eleven /48s in a day, or a botnet) can still use up
+  the site's daily cap. Feedback then refuses everyone with "try again tomorrow" until the window ends. Games, rooms
+  and accounts are not affected, and nothing is stored beyond the budget. A restart forgets the counts, as for every
+  other limit.
 
 ### ADR-056 — Screenshot baselines in one pinned container, reviewed in the pull request
 

@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { FEEDBACK_STATUSES, FEEDBACK_TYPES, SITE_NAME } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { useServices } from "../../app/servicesContext.js";
@@ -10,6 +10,7 @@ import { useAction } from "../../hooks/useAction.js";
 import { useFeedbackInbox } from "../../hooks/useFeedbackInbox.js";
 import { isNotFound, isRetryable } from "../../lib/errors.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
+import { ConsoleTabs } from "./ConsoleTabs.jsx";
 import consoleStyles from "./AdminPage.module.css";
 import styles from "./FeedbackInbox.module.css";
 
@@ -202,25 +203,7 @@ export function FeedbackInbox() {
           deleted 180 days after it was sent.
         </p>
       </header>
-      <nav aria-label="Console sections">
-        <ul className={consoleStyles.tabs}>
-          <li>
-            <Link to={paths.admin()} className={consoleStyles.tab} data-cc-control="admin.tab.totals">
-              Totals
-            </Link>
-          </li>
-          <li>
-            <Link
-              to={paths.adminFeedback()}
-              className={consoleStyles.tab}
-              aria-current="page"
-              data-cc-control="admin.tab.feedback"
-            >
-              Feedback
-            </Link>
-          </li>
-        </ul>
-      </nav>
+      <ConsoleTabs current="feedback" />
       <div className={consoleStyles.range} role="group" aria-label="Filters">
         <Filter
           label="Type"

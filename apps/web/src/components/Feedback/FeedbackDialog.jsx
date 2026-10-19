@@ -1,6 +1,6 @@
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { useLocation } from "react-router";
-import { FEEDBACK_MESSAGE_MAX, FEEDBACK_TYPES } from "@classicade/shared";
+import { FEEDBACK_DEFAULT_TYPE, FEEDBACK_MESSAGE_MAX, FEEDBACK_TYPES } from "@classicade/shared";
 import { APP_BUILD } from "../../app/build.js";
 import { useServices } from "../../app/servicesContext.js";
 import { useAction } from "../../hooks/useAction.js";
@@ -11,7 +11,7 @@ import { currentDevice, feedbackPage } from "./feedbackContext.js";
 import { countText, FEEDBACK_TEXT, FEEDBACK_TYPE_LABELS } from "./feedbackText.js";
 import styles from "./FeedbackDialog.module.css";
 
-const EMPTY = Object.freeze({ type: FEEDBACK_TYPES[0], message: "", replyEmail: "" });
+const EMPTY = Object.freeze({ type: FEEDBACK_DEFAULT_TYPE, message: "", replyEmail: "" });
 
 /** A Hinglish line with its English line under it, as CC-217 shows them. */
 function Lines({ text, className = "" }) {
@@ -44,20 +44,23 @@ function useReplyEmail(open) {
       cancelled = true;
     };
   }, [api, open]);
-  return allowed;
+  // Forgotten when the dialog closes, so the next opening shows no email field until the server answers again.
+  const forget = useCallback(() => setAllowed(false), []);
+  return [allowed, forget];
 }
 
 /**
  * The Feedback dialog (CC-290): a type, a message of at most 1000 characters with a live count, an optional reply
  * email for adults, then a thank-you. It attaches the page's route pattern, the build and a coarse device class, and
- * nothing that says who the player is. The message is kept while the dialog is closed, until it is sent.
+ * nothing that says who the player is. The message is kept while the dialog is closed, until it is sent. The page
+ * draws a new dialog for each player, so on a shared phone the next person never sees a draft or an email.
  *
  * @param {{ open: boolean, onClose: () => void }} props
  */
 export function FeedbackDialog({ open, onClose }) {
   const { api } = useServices();
   const { pathname } = useLocation();
-  const replyEmailAllowed = useReplyEmail(open);
+  const [replyEmailAllowed, forgetReplyEmail] = useReplyEmail(open);
   const [draft, setDraft] = useState(EMPTY);
   const [missing, setMissing] = useState(false);
   const [sent, setSent] = useState(false);
@@ -98,6 +101,7 @@ export function FeedbackDialog({ open, onClose }) {
   }
 
   function close() {
+    forgetReplyEmail();
     setSent(false);
     onClose();
   }

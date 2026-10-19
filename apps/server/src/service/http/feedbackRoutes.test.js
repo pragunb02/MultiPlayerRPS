@@ -1,7 +1,8 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { ERROR_CODES, FEEDBACK_MESSAGE_MAX } from "@classicade/shared";
+import { ERROR_CODES, FEEDBACK_KEEP_DAYS, FEEDBACK_MESSAGE_MAX } from "@classicade/shared";
 import { createTestApp } from "../../testing/testApp.js";
+import { FEEDBACK_ITEM_MAX_BYTES, FEEDBACK_LIMITS, FEEDBACK_STORAGE_BUDGET_BYTES } from "./feedbackRoutes.js";
 
 // CC-290, ADR-059: anyone can send feedback. What is stored never names the player, and the limits hold per
 // session, per address and for the whole site.
@@ -283,6 +284,68 @@ describe("GET /api/feedback/form (CC-290)", () => {
 });
 
 describe("limits on feedback (CC-290, ADR-035)", () => {
+  it("sizes the site's daily cap from the storage it may use over the 180 days", () => {
+    const largest = {
+      feedbackId: "00000000-0000-4000-a000-000000000001",
+      type: "other",
+      message: "\u20ac".repeat(FEEDBACK_MESSAGE_MAX),
+      replyEmail: `${"a".repeat(64)}@${"b".repeat(185)}.com`,
+      page: `/${"a".repeat(99)}`,
+      build: "0".repeat(40),
+      device: "desktop",
+      kind: "account",
+      status: "done",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    expect(Buffer.byteLength(JSON.stringify(largest))).toBeLessThanOrEqual(FEEDBACK_ITEM_MAX_BYTES);
+    expect(FEEDBACK_LIMITS.site.limit).toBe(
+      Math.floor(FEEDBACK_STORAGE_BUDGET_BYTES / (FEEDBACK_KEEP_DAYS * FEEDBACK_ITEM_MAX_BYTES)),
+    );
+    expect(FEEDBACK_LIMITS.site.windowMs).toBe(FEEDBACK_LIMITS.perAddressDaily.windowMs);
+    // One address takes at most a tenth of a day's share, so it alone can never close feedback for everyone.
+    expect(FEEDBACK_LIMITS.perAddressDaily.limit * 10).toBeLessThanOrEqual(FEEDBACK_LIMITS.site.limit);
+  });
+
+  it("stops one address at its daily share, long before the site's cap, and other addresses still can", async () => {
+    const testApp = createTestApp({
+      env: { TRUST_PROXY_HOPS: "1" },
+      feedbackLimits: { perSession: generous, perAddress: generous },
+    });
+    const visitor = browser(testApp.app, "203.0.113.7");
+
+    const statuses = [];
+    for (let i = 0; i <= FEEDBACK_LIMITS.perAddressDaily.limit; i++) {
+      statuses.push((await visitor.post("/feedback", feedback())).status);
+    }
+    const elsewhere = await browser(testApp.app, "198.51.100.9").post("/feedback", feedback());
+
+    expect(statuses.filter((status) => status === 201)).toHaveLength(FEEDBACK_LIMITS.perAddressDaily.limit);
+    expect(statuses.at(-1)).toBe(429);
+    expect(elsewhere.status).toBe(201);
+  });
+
+  it("counts a whole IPv6 /48 as one address for the daily share", async () => {
+    const testApp = createTestApp({
+      env: { TRUST_PROXY_HOPS: "1" },
+      feedbackLimits: {
+        perSession: generous,
+        perAddress: generous,
+        perAddressDaily: { windowMs: 60_000, limit: 2 },
+      },
+    });
+
+    const sameNetwork = [];
+    for (const address of ["2001:db8:1:100::1", "2001:db8:1:200::1", "2001:db8:1:300::1"]) {
+      sameNetwork.push((await browser(testApp.app, address).post("/feedback", feedback())).status);
+    }
+    const otherNetwork = await browser(testApp.app, "2001:db8:2::1").post("/feedback", feedback());
+
+    expect(sameNetwork).toEqual([201, 201, 429]);
+    expect(otherNetwork.status).toBe(201);
+  });
+
   it("answers 429 once one session sends too many, and another session from the same address still can", async () => {
     const testApp = createTestApp({
       feedbackLimits: { perSession: { windowMs: 60_000, limit: 2 }, perAddress: generous, site: generous },

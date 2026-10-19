@@ -1,4 +1,4 @@
-import { FEEDBACK_STATUSES } from "@classicade/shared";
+import { FEEDBACK_INITIAL_STATUS } from "@classicade/shared";
 import { assertDefined } from "../utils/assert.js";
 import { NotFoundError } from "../utils/errors.js";
 
@@ -32,7 +32,7 @@ export function createFeedbackAccessor({ feedbackDao }) {
 
   return Object.freeze({
     /**
-     * Stores a new item. Every item starts as the first status, "new".
+     * Stores a new item. Every item starts in FEEDBACK_INITIAL_STATUS.
      *
      * @param {Omit<Feedback, "status" | "createdAt" | "updatedAt"> & { at: number }} item
      * @returns {Promise<Readonly<Feedback>>}
@@ -42,7 +42,7 @@ export function createFeedbackAccessor({ feedbackDao }) {
       return toFeedback(
         await feedbackDao.insert({
           ...fields,
-          status: FEEDBACK_STATUSES[0],
+          status: FEEDBACK_INITIAL_STATUS,
           createdAt: when,
           updatedAt: when,
         }),

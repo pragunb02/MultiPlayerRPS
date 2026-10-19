@@ -2,11 +2,12 @@ import { Suspense } from "react";
 import { lazyBoard } from "../../games/lazyBoard.js";
 import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
+import { CONSOLE_VIEWS } from "./consolePages.js";
 
 // Downloaded only when an admin opens the console, so nobody else ever loads its code.
 const AdminPage = lazyBoard(() => import("./AdminPage.jsx"), "AdminPage");
 const FeedbackInbox = lazyBoard(() => import("./FeedbackInbox.jsx"), "FeedbackInbox");
-const PAGES = Object.freeze({ totals: AdminPage, feedback: FeedbackInbox });
+const PAGES = Object.freeze({ [CONSOLE_VIEWS.TOTALS]: AdminPage, [CONSOLE_VIEWS.FEEDBACK]: FeedbackInbox });
 
 const Waiting = () => (
   <p role="status" aria-live="polite">
@@ -18,10 +19,10 @@ const Waiting = () => (
  * The owner console's address (CC-233). For anyone but an admin it is the ordinary "not found" page, the same
  * as the server's 404, so the console's existence is not revealed. The server checks again on every request.
  *
- * @param {{ page?: "totals" | "feedback" }} props  the totals and their sections, or the feedback inbox (CC-290)
+ * @param {{ view: string }} props  a CONSOLE_VIEWS value: the totals and their sections, or the feedback inbox (CC-290)
  */
-export function AdminRoute({ page = "totals" }) {
-  const Page = PAGES[page];
+export function AdminRoute({ view }) {
+  const Page = PAGES[view];
   const access = useAdminAccess();
   if (access === ADMIN_ACCESS.CHECKING) {
     return <Waiting />;
