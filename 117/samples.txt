@@ -1,0 +1,17 @@
+{
+  "invite": "https://localhost:4993/games/chess/rooms/HKPFUX?via=copy",
+  "whatsappMessage": "Ek game ho jaaye? ClassiCade pe Chess khelo, link kholo aur seedha khelo:\nPlay Chess with me on ClassiCade — room HKPFUX\nFree hai, login nahi chahiye.\nFree, no login needed.\nhttps://localhost:4993/games/chess/rooms/HKPFUX?via=wa",
+  "landing": {
+    "opened": "/games/chess?via=wa",
+    "addressAfter": "/games/chess",
+    "entry": "shared_link",
+    "via": "wa",
+    "canonical": "https://localhost:4993/games/chess",
+    "webStorage": {
+      "local": 0,
+      "session": 0
+    }
+  }
+}{
+  "invite": "https://localhost:4993/games/chess/rooms/JCMEZ8"
+}
