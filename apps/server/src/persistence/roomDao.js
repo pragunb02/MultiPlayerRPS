@@ -235,5 +235,24 @@ export function createRoomDao({ connection, betweenClosedReads = async () => {} 
         .toArray();
       return Object.fromEntries(groups.map((group) => [group._id, group.rooms]));
     },
+
+    /**
+     * Open rooms per game and status, for the operations gauge (ADR-055). One aggregation, read only.
+     *
+     * @returns {Promise<Array<{ gameId: string, status: string, rooms: number }>>} only pairs that have any
+     */
+    async countByGameAndStatus() {
+      const groups = await rooms
+        .aggregate([
+          { $match: { ...OPEN } },
+          { $group: { _id: { gameId: "$gameId", status: "$status" }, rooms: { $sum: 1 } } },
+        ])
+        .toArray();
+      return groups.map(({ _id, rooms: count }) => ({
+        gameId: _id.gameId,
+        status: _id.status,
+        rooms: count,
+      }));
+    },
   });
 }
