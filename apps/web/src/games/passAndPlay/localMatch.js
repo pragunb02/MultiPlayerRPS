@@ -85,6 +85,22 @@ export function createLocalMatch({ engine, clock, rng }) {
 
   const withState = (session, state) => freeze({ ...session, state, at: clock.now() });
 
+  /** Plays `move` for `playerId`, checked by the engine. A refusal comes back in the engine's words. */
+  function moveAs(session, { playerId, move }) {
+    if (finished(session)) {
+      return { ok: false, error: { code: MOVE_REJECTIONS.GAME_OVER, message: "The game is over" } };
+    }
+    const now = clock.now();
+    const checked = engine.validateMove(session.state, playerId, move, { now });
+    if (!checked.ok) {
+      return { ok: false, error: { code: checked.reason, message: checked.message } };
+    }
+    return {
+      ok: true,
+      session: withState(session, engine.applyMove(session.state, playerId, checked.value, { now })),
+    };
+  }
+
   return Object.freeze({
     /**
      * A new game between two names.
@@ -112,20 +128,29 @@ export function createLocalMatch({ engine, clock, rng }) {
      * @param {unknown} move  what the board sends, as it would send it to the server
      * @returns {{ ok: true, session: LocalSession } | { ok: false, error: { code: string, message: string } }}
      */
-    move(session, move) {
-      if (finished(session)) {
-        return { ok: false, error: { code: MOVE_REJECTIONS.GAME_OVER, message: "The game is over" } };
-      }
-      const now = clock.now();
-      const playerId = holder(session);
-      const checked = engine.validateMove(session.state, playerId, move, { now });
-      if (!checked.ok) {
-        return { ok: false, error: { code: checked.reason, message: checked.message } };
-      }
-      return {
-        ok: true,
-        session: withState(session, engine.applyMove(session.state, playerId, checked.value, { now })),
-      };
+    move: (session, move) => moveAs(session, { playerId: holder(session), move }),
+
+    /**
+     * Plays a move for a named player, whoever holds the phone, such as resigning a chess game while the other side
+     * thinks. The engine decides whether that player may send it now, as the server does in a room.
+     *
+     * @param {LocalSession} session
+     * @param {{ playerId: string, move: unknown }} input
+     * @returns {{ ok: true, session: LocalSession } | { ok: false, error: { code: string, message: string } }}
+     */
+    moveAs,
+
+    /**
+     * How the game would end if `playerId` made `move` now, without playing it, so a confirmation can say who wins.
+     * Undefined when the engine would refuse the move.
+     *
+     * @param {LocalSession} session
+     * @param {{ playerId: string, move: unknown }} input
+     * @returns {import("@classicade/games").Outcome | undefined}
+     */
+    outcomeIf(session, input) {
+      const result = moveAs(session, input);
+      return result.ok ? outcomeOf(result.session) : undefined;
     },
 
     /**
@@ -201,6 +226,8 @@ export function createLocalMatch({ engine, clock, rng }) {
           graceUntil: 0,
         })),
         you,
+        // Both players look at this one screen, so boards name the players instead of saying "You".
+        sharedScreen: true,
         requests: [],
         requestsLeft: {},
         askAgainAt: {},

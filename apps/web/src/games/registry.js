@@ -2,8 +2,9 @@ import { GAME_IDS } from "@classicade/shared";
 import { chessActions } from "./chess/chessActions.js";
 import { CHESS_REQUEST_TEXTS, chessReasonPhrase, chessSounds } from "./chess/chessAlerts.js";
 import { ChessOptions } from "./chess/ChessOptions.jsx";
+import { chessTurnLabel } from "./chess/chessPassAndPlay.js";
 import { CHESS_HOW_TO_PLAY, RPS_HOW_TO_PLAY, TICTACTOE_HOW_TO_PLAY } from "./howToPlay.js";
-import { lazyBoard } from "./lazyBoard.js";
+import { lazyBoard, lazyEngine } from "./lazyBoard.js";
 import { rpsReasonPhrase, rpsSounds } from "./rps/rpsAlerts.js";
 import { rpsHandOverNote } from "./rps/rpsPassAndPlay.js";
 import { RpsOptions } from "./rps/RpsOptions.jsx";
@@ -16,17 +17,18 @@ const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard
 
 // The engines for pass and play load the same way, only when two people start a game on one phone (CC-223).
 const RPS_PASS_AND_PLAY = Object.freeze({
-  loadEngine: () => import("@classicade/games/rps").then((module) => module.rpsEngine),
+  loadEngine: lazyEngine(() => import("@classicade/games/rps"), "rpsEngine"),
   handOver: true,
   handOverNote: rpsHandOverNote,
 });
 const TICTACTOE_PASS_AND_PLAY = Object.freeze({
-  loadEngine: () => import("@classicade/games/tictactoe").then((module) => module.tictactoeEngine),
+  loadEngine: lazyEngine(() => import("@classicade/games/tictactoe"), "tictactoeEngine"),
   handOver: false,
 });
 const CHESS_PASS_AND_PLAY = Object.freeze({
-  loadEngine: () => import("@classicade/games/chess").then((module) => module.chessEngine),
+  loadEngine: lazyEngine(() => import("@classicade/games/chess"), "chessEngine"),
   handOver: false,
+  turnLabel: chessTurnLabel,
 });
 
 /**
@@ -64,6 +66,8 @@ const CHESS_PASS_AND_PLAY = Object.freeze({
  *   a "pass the phone" screen covers the board whenever the phone must go to the other player
  * @property {(room: any) => string} [handOverNote]  what that screen says about the last turn, which both players
  *   may see, such as how the last round went. "" when there is nothing to say
+ * @property {(room: any) => string} [turnLabel]  whose turn it is in the match bar, such as "Asha (White) to move".
+ *   Without it the bar says "Asha's turn"
  */
 
 /**

@@ -114,7 +114,8 @@ export function ChessBoard({
   const seatName = (playerId) =>
     room.seats.find((seat) => seat.playerId === playerId)?.displayName ?? "Opponent";
   const names = { w: seatName(byColour("w")), b: seatName(byColour("b")) };
-  const shownName = (colour) => (colour === yourColour ? "You" : names[colour]);
+  // On one phone both players read the same board, so each bar names its player instead of saying "You" (CC-223).
+  const shownName = (colour) => (colour === yourColour && !room.sharedScreen ? "You" : names[colour]);
 
   const running = playing && view.lastMoveAt > 0 ? view.fen.split(" ")[1] : "";
   const clocks = useChessClocks({

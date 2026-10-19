@@ -42,6 +42,17 @@ describe("useLocalMatch", () => {
     expect(result.current.room.game.outcome).toMatchObject({ reason: "timeout", winners: ["player-1"] });
   });
 
+  it("plays a move for a named player, and rejects one the engine refuses for them", async () => {
+    const { result } = renderHook(() => useLocalMatch({ engine: chessEngine, names: NAMES, options: {} }));
+
+    await expect(result.current.moveAs("player-2", { type: "move", from: "e7", to: "e5" })).rejects.toThrow(
+      "Wait for your turn",
+    );
+    await act(() => result.current.moveAs("player-2", { type: "resign" }));
+
+    expect(result.current.room.game.outcome).toMatchObject({ winners: ["player-1"] });
+  });
+
   it("sets no timer for a game without a clock", () => {
     renderHook(() => useLocalMatch({ engine: tictactoeEngine, names: NAMES, options: {} }));
 

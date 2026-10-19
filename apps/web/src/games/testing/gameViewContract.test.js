@@ -44,11 +44,14 @@ describe("checkGameViewContract", () => {
   });
 
   it("finds a pass and play part of the wrong shape", () => {
-    expect(check({ passAndPlay: { loadEngine: "rps", handOver: "yes", handOverNote: "" } })).toEqual([
+    expect(
+      check({ passAndPlay: { loadEngine: "rps", handOver: "yes", handOverNote: "", turnLabel: 1 } }),
+    ).toEqual([
       "passAndPlay must be frozen",
       "passAndPlay.loadEngine must be a function",
       "passAndPlay.handOver must be true or false",
       "passAndPlay.handOverNote must be a function",
+      "passAndPlay.turnLabel must be a function",
     ]);
   });
 

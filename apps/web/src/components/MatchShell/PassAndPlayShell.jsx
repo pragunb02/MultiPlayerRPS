@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { ROOM_STATUS } from "@classicade/shared";
 import { resultHeadline } from "../../games/outcomeText.js";
+import { forWhomLine } from "../../games/passAndPlay/forWhomLine.js";
 import { textsFor } from "../../games/roomUpdates.js";
 import { nameOf } from "../../games/roomView.js";
 import { useLocalMatch } from "../../hooks/useLocalMatch.js";
 import { Button } from "../Button/Button.jsx";
 import { outcomeFor } from "../Celebrations/outcome.js";
+import { Modal } from "../Modal/Modal.jsx";
+import { useAnnounce } from "./announceContext.js";
 import { ConfirmDialog } from "./ConfirmDialog.jsx";
 import { MatchFrame, MatchStage } from "./MatchFrame.jsx";
 import styles from "./MatchShell.module.css";
@@ -17,12 +20,41 @@ export const NOT_COUNTED_NOTE = "Not counted: games on one phone give no XP, que
 const otherName = (room, playerId) => room.seats.find((seat) => seat.playerId !== playerId).displayName;
 
 /**
+ * When a new screen appears in place of the last one, focus moves to it and its words are read out politely, so a
+ * keyboard or screen reader user is not left on a button that is gone. Only when it appears: later changes of the
+ * words, such as the next turn on the same board, leave the focus where the player put it.
+ *
+ * @param {string} words  what is read out
+ */
+function useShownAndRead(words) {
+  const target = useRef(null);
+  const announce = useAnnounce();
+  const shown = useEffectEvent(() => {
+    target.current.focus();
+    announce(words);
+  });
+  useEffect(() => shown(), []);
+  return target;
+}
+
+/** The board's place on the stage, named by whose turn it is. It takes the focus when it comes back. */
+function TurnRegion({ label, children }) {
+  const region = useShownAndRead(label);
+  return (
+    <section ref={region} tabIndex={-1} aria-label={label} className={passStyles.turn}>
+      {children}
+    </section>
+  );
+}
+
+/**
  * The screen that covers the board while the phone changes hands (CC-223). It names who takes the phone, tells the
  * other player to look away, and says how the last turn went when the game has something both may see. The board
  * is not in the page while it shows, so a secret choice is never on screen for the wrong person.
  */
 function HandOver({ room, holder, note, onReady }) {
   const name = nameOf(room, holder);
+  const heading = useShownAndRead(`Pass the phone to ${name}`);
   return (
     <section
       className={`${styles.card} ${passStyles.handOver}`}
@@ -30,7 +62,9 @@ function HandOver({ room, holder, note, onReady }) {
       data-cc-slot="hand-over"
     >
       {note !== "" && <p className={passStyles.note}>{note}</p>}
-      <h2 id="hand-over-heading">Pass the phone to {name}</h2>
+      <h2 id="hand-over-heading" ref={heading} tabIndex={-1}>
+        Pass the phone to {name}
+      </h2>
       <p>
         {otherName(room, holder)}, look away. {name} chooses next, and the choice stays hidden.
       </p>
@@ -42,48 +76,96 @@ function HandOver({ room, holder, note, onReady }) {
 }
 
 /**
- * A game action as a button, for two people on one phone. A move, such as resigning, goes to the engine at once,
- * after the game's own confirmation when it has one. A request, such as a draw offer, is answered in person: the
- * dialog asks the other player, and only their yes reaches the engine.
+ * The confirmation of a move that asks first, such as resigning, when two people share the phone. Either player may
+ * be the one pressing it, so the dialog offers it for each player the engine would allow, and says for each how the
+ * game would then end: "Resign for Asha: Ben wins."
  */
-function LocalAction({ room, action, onMove, onAccept }) {
+function ForWhomDialog({ room, action, outcomeIf, onClose, onMoveAs }) {
+  const { confirm, intent } = action;
+  const choices = room.seats
+    .map((seat, index) => ({ seat, index, outcome: outcomeIf(seat.playerId, intent.move) }))
+    .filter((choice) => choice.outcome !== undefined);
+  const labelFor = (seat) => `${confirm.confirmLabel} for ${seat.displayName}`;
+  return (
+    <Modal
+      open
+      title={confirm.title}
+      onClose={onClose}
+      actions={
+        <>
+          <Button control={`${action.control}.keep`} variant="secondary" onClick={onClose}>
+            {confirm.keepLabel}
+          </Button>
+          {choices.map(({ seat, index }) => (
+            <Button
+              key={seat.playerId}
+              control={`${action.control}.as_${index + 1}`}
+              onClick={() => {
+                onClose();
+                onMoveAs(seat.playerId, intent.move);
+              }}
+            >
+              {labelFor(seat)}
+            </Button>
+          ))}
+        </>
+      }
+    >
+      <ul className={passStyles.choices}>
+        {choices.map(({ seat, outcome }) => (
+          <li key={seat.playerId}>{forWhomLine({ room, label: labelFor(seat), outcome })}</li>
+        ))}
+      </ul>
+    </Modal>
+  );
+}
+
+/**
+ * A game action as a button, for two people on one phone. A move without a confirmation goes to the engine at once
+ * for the player holding the phone. A move with one, such as resigning, asks for whom it is (ForWhomDialog). A
+ * request, such as a draw offer, is answered in person: the dialog asks the other player, and only their yes reaches
+ * the engine.
+ */
+function LocalAction({ room, action, match }) {
   const [open, setOpen] = useState(false);
   const { intent } = action;
   const asking = intent.type === "ask";
+  const close = () => setOpen(false);
+  const press = () => (asking || action.confirm ? setOpen(true) : match.move(intent.move));
   const texts = asking ? textsFor(room.gameId, intent.requestType) : undefined;
-  const confirm = asking
-    ? {
-        title: texts.title,
-        body: `${texts.question(nameOf(room, room.you))} ${otherName(room, room.you)}, do you accept?`,
-        confirmLabel: "Accept",
-        keepLabel: "Decline",
-      }
-    : action.confirm;
-  const run = () => (asking ? onAccept(intent.requestType) : onMove(intent.move));
   return (
     <>
       <Button
         control={action.control}
         variant={action.variant ?? "secondary"}
         reason={action.reason}
-        onClick={() => (confirm ? setOpen(true) : run())}
+        onClick={press}
       >
         {action.label}
       </Button>
-      {confirm && (
+      {asking && (
         <ConfirmDialog
           open={open}
-          title={confirm.title}
-          body={confirm.body}
+          title={texts.title}
+          body={`${texts.question(nameOf(room, room.you))} ${otherName(room, room.you)}, do you accept?`}
           keepControl={`${action.control}.keep`}
           confirmControl={`${action.control}.confirm`}
-          keepLabel={confirm.keepLabel}
-          confirmLabel={confirm.confirmLabel}
-          onClose={() => setOpen(false)}
+          keepLabel="Decline"
+          confirmLabel="Accept"
+          onClose={close}
           onConfirm={() => {
-            setOpen(false);
-            run();
+            close();
+            match.accept(intent.requestType);
           }}
+        />
+      )}
+      {!asking && open && (
+        <ForWhomDialog
+          room={room}
+          action={action}
+          outcomeIf={match.outcomeIf}
+          onClose={close}
+          onMoveAs={match.moveAs}
         />
       )}
     </>
@@ -94,7 +176,7 @@ function LocalAction({ room, action, onMove, onAccept }) {
  * The buttons of a local game. While it is on: the game's own actions and Leave, which asks first because the game
  * is not kept. At the end: Play again with the same names, and Back to the lobby.
  */
-function LocalActionBar({ room, game, onMove, onAccept, onPlayAgain, onLeave }) {
+function LocalActionBar({ room, game, match, onLeave }) {
   const [leaving, setLeaving] = useState(false);
   const playing = room.status === ROOM_STATUS.PLAYING;
   const own = playing && game.actions ? game.actions(room) : [];
@@ -104,10 +186,10 @@ function LocalActionBar({ room, game, onMove, onAccept, onPlayAgain, onLeave }) 
       data-cc-slot="action-bar"
     >
       {own.map((action) => (
-        <LocalAction key={action.control} room={room} action={action} onMove={onMove} onAccept={onAccept} />
+        <LocalAction key={action.control} room={room} action={action} match={match} />
       ))}
       {!playing && (
-        <Button control="pass.play_again" size="lg" onClick={onPlayAgain}>
+        <Button control="pass.play_again" size="lg" onClick={match.playAgain}>
           Play again
         </Button>
       )}
@@ -161,6 +243,9 @@ export function PassAndPlayShell({ gameId, gameName, game, engine, names, option
   const covered = game.passAndPlay.handOver && match.covered;
   const note = game.passAndPlay.handOverNote?.(room) ?? "";
   const phase = finished ? "finished" : covered ? "hand-over" : "playing";
+  const turn = finished
+    ? "Not counted"
+    : (game.passAndPlay.turnLabel?.(room) ?? `${nameOf(room, holder)}'s turn`);
 
   return (
     <MatchFrame
@@ -168,7 +253,7 @@ export function PassAndPlayShell({ gameId, gameName, game, engine, names, option
       gameId={gameId}
       gameName={gameName}
       phase={phase}
-      score={finished ? "Not counted" : `${nameOf(room, holder)}'s turn`}
+      score={turn}
       result={
         finished
           ? {
@@ -186,19 +271,12 @@ export function PassAndPlayShell({ gameId, gameName, game, engine, names, option
         covered ? (
           <HandOver room={room} holder={holder} note={note} onReady={match.uncover} />
         ) : (
-          <MatchStage room={room} game={game} onMove={match.move} onAsk={askNobody} reconnecting={false} />
+          <TurnRegion key={room.game.number} label={finished ? "The board" : turn}>
+            <MatchStage room={room} game={game} onMove={match.move} onAsk={askNobody} reconnecting={false} />
+          </TurnRegion>
         )
       }
-      actionBar={
-        <LocalActionBar
-          room={room}
-          game={game}
-          onMove={match.move}
-          onAccept={match.accept}
-          onPlayAgain={match.playAgain}
-          onLeave={onLeave}
-        />
-      }
+      actionBar={<LocalActionBar room={room} game={game} match={match} onLeave={onLeave} />}
       side={
         <div className={`${styles.card} ${passStyles.players}`} data-cc-slot="presence">
           <h2>Players</h2>

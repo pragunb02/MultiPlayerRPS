@@ -129,6 +129,7 @@ describe("the room view a board is drawn from", () => {
       gameId: "rps",
       status: "playing",
       you: P2,
+      sharedScreen: true,
       hostId: "",
       players: { min: 2, max: 2 },
       requests: [],
@@ -249,6 +250,39 @@ describe("chess clocks and requests", () => {
     const session = match.start({ names: NAMES, options: {} });
 
     expect(() => match.accept(session, "draw")).toThrow(TypeError);
+  });
+
+  it("lets the player who is not to move resign too, and the side to move wins", () => {
+    const { match } = controllerFor(chessEngine);
+    const session = match.start({ names: NAMES, options: {} });
+
+    const result = match.moveAs(session, { playerId: P2, move: { type: "resign" } });
+
+    expect(match.holder(session)).toBe(P1);
+    expect(match.roomView(result.session).game.outcome).toMatchObject({ result: "win", winners: [P1] });
+  });
+
+  it("refuses a move for a player when the engine refuses it, such as a board move out of turn", () => {
+    const { match } = controllerFor(chessEngine);
+    const session = match.start({ names: NAMES, options: {} });
+
+    const result = match.moveAs(session, { playerId: P2, move: { type: "move", from: "e7", to: "e5" } });
+
+    expect(result).toMatchObject({ ok: false, error: { code: "NOT_YOUR_TURN" } });
+  });
+
+  it("tells what a move would end in without playing it, for the confirmation", () => {
+    const { match } = controllerFor(chessEngine);
+    const session = match.start({ names: NAMES, options: {} });
+
+    expect(match.outcomeIf(session, { playerId: P1, move: { type: "resign" } })).toMatchObject({
+      status: "finished",
+      winners: [P2],
+    });
+    expect(match.outcomeIf(session, { playerId: P2, move: { type: "move", from: "e7", to: "e5" } })).toBe(
+      undefined,
+    );
+    expect(match.holder(session)).toBe(P1);
   });
 
   it("lets the side to move resign, and the other side wins", () => {

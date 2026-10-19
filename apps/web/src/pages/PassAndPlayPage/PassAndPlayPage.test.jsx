@@ -141,6 +141,23 @@ describe("Rock Paper Scissors on one phone", () => {
     expect(networkCalls(app)).toBe(before);
   });
 
+  it("moves focus to each new screen and reads it out politely", async () => {
+    const user = userEvent.setup();
+    await startGame(user, { slug: "rock-paper-scissors" });
+    const polite = () => document.querySelector("[data-cc-slot='announcer'] [aria-live='polite']");
+
+    expect(screen.getByRole("heading", { name: "Pass the phone to Asha" })).toHaveFocus();
+    expect(polite()).toHaveTextContent("Pass the phone to Asha");
+    await user.click(screen.getByRole("button", { name: "I'm Asha, show my turn" }));
+
+    expect(await screen.findByRole("region", { name: "Asha's turn" })).toHaveFocus();
+    expect(polite()).toHaveTextContent("Asha's turn");
+    await user.click(await screen.findByRole("button", { name: "Rock" }));
+
+    expect(screen.getByRole("heading", { name: "Pass the phone to Ben" })).toHaveFocus();
+    expect(polite()).toHaveTextContent("Pass the phone to Ben");
+  });
+
   it("plays again with the same names, covered again from the start", async () => {
     const user = userEvent.setup();
     renderApp({ path: "/games/rock-paper-scissors/pass-and-play" });
@@ -236,7 +253,7 @@ describe("Chess on one phone", () => {
     expect(firstSquare()).toHaveAccessibleName(/^a8/);
     await move(user, "f2", "f3");
     expect(firstSquare()).toHaveAccessibleName(/^a8/);
-    expect(within(matchBar()).getByText("Ben's turn")).toBeInTheDocument();
+    expect(within(matchBar()).getByText("Ben (Black) to move")).toBeInTheDocument();
     await move(user, "e7", "e5");
     await move(user, "g2", "g4");
     await move(user, "d8", "h4");
@@ -245,18 +262,49 @@ describe("Chess on one phone", () => {
     expect(networkCalls(app)).toBe(before);
   });
 
-  it("lets the side to move resign after asking", async () => {
+  it("asks who resigns, names who then wins, and lets the side to move resign", async () => {
     const user = userEvent.setup();
     vi.spyOn(Math, "random").mockReturnValue(0);
     await startGame(user, { slug: "chess" });
 
     await user.click(await screen.findByRole("button", { name: "Resign" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Resign for Asha: Ben wins.");
+    expect(dialog).toHaveTextContent("Resign for Ben: Asha wins.");
     await user.click(screen.getByRole("button", { name: "Keep playing" }));
     expect(phase()).toBe("playing");
     await user.click(screen.getByRole("button", { name: "Resign" }));
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Resign" }));
+    await user.click(screen.getByRole("button", { name: "Resign for Asha" }));
 
     expect(screen.getByRole("heading", { level: 2, name: "Ben won by resignation" })).toBeInTheDocument();
+  });
+
+  it("lets the player who is not to move resign as well", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    await startGame(user, { slug: "chess" });
+
+    await user.click(await screen.findByRole("button", { name: "Resign" }));
+    await user.click(screen.getByRole("button", { name: "Resign for Ben" }));
+
+    expect(screen.getByRole("heading", { level: 2, name: "Asha won by resignation" })).toBeInTheDocument();
+  });
+
+  it("names both players on the board, never You, and says who moves with which colour", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    await startGame(user, { slug: "chess" });
+    const stage = document.querySelector("[data-cc-slot='stage']");
+
+    expect(within(matchBar()).getByText("Asha (White) to move")).toBeInTheDocument();
+    expect(within(stage).queryByText("You")).not.toBeInTheDocument();
+    expect(within(stage).queryByText("Your turn")).not.toBeInTheDocument();
+    expect(within(stage).getByText("Asha")).toBeInTheDocument();
+    expect(within(stage).getByText("Ben")).toBeInTheDocument();
+    await move(user, "e2", "e4");
+
+    expect(within(matchBar()).getByText("Ben (Black) to move")).toBeInTheDocument();
+    expect(within(stage).queryByText("You")).not.toBeInTheDocument();
   });
 
   it("ends in a draw only when the other player accepts in person", async () => {

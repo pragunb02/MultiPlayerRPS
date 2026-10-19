@@ -41,6 +41,20 @@ export function useLocalMatch({ engine, names, options }) {
     [match, session],
   );
 
+  /** A move for a named player, such as resigning while the other side is to move. A refusal rejects, as above. */
+  const moveAs = useCallback(
+    async (playerId, raw) => {
+      const result = match.moveAs(session, { playerId, move: raw });
+      if (!result.ok) throw new AppRequestError(result.error);
+      setSession(result.session);
+    },
+    [match, session],
+  );
+  const outcomeIf = useCallback(
+    (playerId, raw) => match.outcomeIf(session, { playerId, move: raw }),
+    [match, session],
+  );
+
   const accept = useCallback((type) => setSession(match.accept(session, type)), [match, session]);
   const uncover = useCallback(() => setSession(match.uncover(session)), [match, session]);
   const playAgain = useCallback(() => setSession(match.playAgain(session)), [match, session]);
@@ -50,6 +64,8 @@ export function useLocalMatch({ engine, names, options }) {
     holder: match.holder(session),
     covered: match.covered(session),
     move,
+    moveAs,
+    outcomeIf,
     accept,
     uncover,
     playAgain,

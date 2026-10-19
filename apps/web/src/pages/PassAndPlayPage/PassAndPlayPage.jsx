@@ -9,13 +9,34 @@ import { gameView } from "../../games/registry.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import styles from "./PassAndPlayPage.module.css";
 
-/** The game's pure engine, loaded once the page opens, or undefined while it loads. */
+const NOT_LOADED = Object.freeze({ engine: undefined, failed: false });
+
+/**
+ * The game's pure engine, loaded once the page opens. `engine` is undefined while it loads, and `failed` turns true
+ * when the download fails, for example on a phone that lost its connection after the lobby opened. `retry` tries
+ * again. While the page reloads for a newer version the load never settles, so the page just keeps waiting.
+ */
 function useEngine(passAndPlay) {
-  const [engine, setEngine] = useState(undefined);
+  const [attempt, setAttempt] = useState(0);
+  const [load, setLoad] = useState(NOT_LOADED);
   useEffect(() => {
-    passAndPlay.loadEngine().then(setEngine);
-  }, [passAndPlay]);
-  return engine;
+    passAndPlay.loadEngine().then(
+      (engine) => setLoad({ engine, failed: false }),
+      () => setLoad({ engine: undefined, failed: true }),
+    );
+  }, [passAndPlay, attempt]);
+  const retry = () => {
+    setLoad(NOT_LOADED);
+    setAttempt(attempt + 1);
+  };
+  return { ...load, retry };
+}
+
+/** Why Start cannot be pressed yet, in the player's words, or "" when it can. */
+function startReason({ load, names }) {
+  if (load.failed) return "The game could not load";
+  if (load.engine === undefined) return "Loading the game";
+  return names.ok ? "" : names.reason;
 }
 
 /**
@@ -24,13 +45,13 @@ function useEngine(passAndPlay) {
  */
 function PassAndPlay({ game, entry }) {
   const navigate = useNavigate();
-  const engine = useEngine(entry.passAndPlay);
+  const load = useEngine(entry.passAndPlay);
   const [typed, setTyped] = useState(["", ""]);
   const [options, setOptions] = useState({});
   const [started, setStarted] = useState(undefined);
   const { Options } = entry;
   const names = checkNames(typed);
-  const reason = engine === undefined ? "Loading the game" : names.ok ? "" : names.reason;
+  const reason = startReason({ load, names });
 
   // Leaving replaces this page, so Back from the lobby does not come back to a game that is gone.
   const leave = () => navigate(paths.game(game.id), { replace: true });
@@ -41,7 +62,7 @@ function PassAndPlay({ game, entry }) {
         gameId={game.id}
         gameName={game.name}
         game={entry}
-        engine={engine}
+        engine={load.engine}
         names={started.names}
         options={started.options}
         onLeave={leave}
@@ -78,6 +99,14 @@ function PassAndPlay({ game, entry }) {
         {Options && <Options value={options} onChange={setOptions} />}
         <p className={styles.small}>Names stay on this phone. Nothing about the game is sent or saved.</p>
         <p className={styles.small}>{NOT_COUNTED_NOTE}</p>
+        {load.failed && (
+          <div className={styles.failure}>
+            <p role="alert">The game could not load. Check your connection and try again.</p>
+            <Button control="pass.retry" variant="secondary" onClick={load.retry}>
+              Try again
+            </Button>
+          </div>
+        )}
         <Button control="pass.start" type="submit" size="lg" reason={reason}>
           Start game
         </Button>

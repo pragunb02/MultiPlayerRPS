@@ -95,8 +95,10 @@ function passAndPlayProblems(passAndPlay) {
   if (typeof passAndPlay.loadEngine !== "function")
     problems.push("passAndPlay.loadEngine must be a function");
   if (typeof passAndPlay.handOver !== "boolean") problems.push("passAndPlay.handOver must be true or false");
-  if (passAndPlay.handOverNote !== undefined && typeof passAndPlay.handOverNote !== "function") {
-    problems.push("passAndPlay.handOverNote must be a function");
+  for (const field of ["handOverNote", "turnLabel"]) {
+    if (passAndPlay[field] !== undefined && typeof passAndPlay[field] !== "function") {
+      problems.push(`passAndPlay.${field} must be a function`);
+    }
   }
   return problems;
 }
