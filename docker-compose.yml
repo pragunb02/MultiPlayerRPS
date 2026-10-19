@@ -27,6 +27,8 @@ services:
       mongo:
         condition: service_healthy
     ports:
+      # This machine only. The image listens on 0.0.0.0 inside the container (HOST in the Dockerfile), so this
+      # line is what keeps the app off the network (CC-287).
       - "127.0.0.1:4000:4000"
     environment:
       # Development mode: plain-HTTP cookies on localhost (production cookies need HTTPS, as on Render).
