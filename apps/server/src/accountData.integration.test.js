@@ -193,6 +193,7 @@ describe("account deletion through the real composition root (integration, CC-03
         "leaderboard_entries",
         "player_transfers",
         "pending_matches",
+        "chess_ratings",
       ]) {
         expect({ name, left: mentions(await readCollection(uri, name)) }).toEqual({ name, left: [] });
       }

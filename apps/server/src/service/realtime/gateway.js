@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { GAMIFICATION_EVENTS } from "../../domain/gamification/gamificationComponent.js";
 import { PROGRESSION_EVENTS } from "../../domain/progression/progressionComponent.js";
+import { CHESS_RATING_EVENTS } from "../../domain/ratings/chessRatingComponent.js";
 import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
 import { roomLimits } from "../../domain/rooms/roomLimits.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
@@ -11,6 +12,7 @@ import { addressKey, clientAddress } from "../http/rateLimits.js";
 import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
 import { createBotHandlers } from "./botHandlers.js";
+import { createRatingHandlers } from "./ratingHandlers.js";
 import { trackConnections } from "./connections.js";
 import {
   broadcastRoom,
@@ -51,7 +53,9 @@ const playerRoom = playerChannel;
  *   limits?: Readonly<import("../../domain/rooms/roomLimits.js").RoomLimits>,
  *   now?: () => number,
  *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
- * }} deps  without `botComponent` nobody can start a game against a computer character (CC-138)
+ *   chessRatingComponent?: Pick<ReturnType<typeof import("../../domain/ratings/chessRatingComponent.js").createChessRatingComponent>, "ratingsOf">,
+ * }} deps  without `botComponent` nobody can start a game against a computer character (CC-138), and without
+ *   `chessRatingComponent` no tab can ask for a room's ratings (CC-042)
  */
 export function createRealtimeGateway({
   httpServer,
@@ -66,6 +70,7 @@ export function createRealtimeGateway({
   limits = roomLimits(),
   now = Date.now,
   botComponent,
+  chessRatingComponent,
 }) {
   assertDefined(httpServer, "httpServer");
   assertDefined(sessionMiddleware, "sessionMiddleware");
@@ -199,6 +204,7 @@ export function createRealtimeGateway({
         ...createRoomHandlers({ io, socket, roomComponent, networkOf, now, logger: socketLogger }),
         ...(botComponent &&
           createBotHandlers({ socket, botComponent, roomComponent, networkOf, now, logger: socketLogger })),
+        ...(chessRatingComponent && createRatingHandlers({ socket, roomComponent, chessRatingComponent })),
       },
       socketLogger,
       { allow: () => admission.allowEvent(identity.id) },
@@ -240,6 +246,11 @@ export function createRealtimeGateway({
       });
     },
   );
+
+  // Domain to transport: a rated game changed the chess ratings, so everyone with the room open sees them (CC-042).
+  domainEvents.on(CHESS_RATING_EVENTS.UPDATED, ({ roomCode, matchId, ratings }) => {
+    io.to(roomChannel(roomCode)).emit(SOCKET_EVENTS.RATING_UPDATED, { matchId, ratings });
+  });
 
   // Domain → transport: achievements, quests and streaks go to every tab of the player concerned only (CC-054).
   domainEvents.on(GAMIFICATION_EVENTS.ACHIEVEMENTS_UNLOCKED, ({ playerId, achievements }) => {

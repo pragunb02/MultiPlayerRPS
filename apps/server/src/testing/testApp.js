@@ -6,6 +6,7 @@ import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "../data/blockAccessor.js";
+import { createChessRatingAccessor } from "../data/chessRatingAccessor.js";
 import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
@@ -31,6 +32,7 @@ import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardCo
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createMatchOutboxComponent } from "../domain/matches/matchOutboxComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
+import { createChessRatingComponent } from "../domain/ratings/chessRatingComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
 import {
@@ -54,6 +56,7 @@ import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.js";
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
+import { createInMemoryChessRatingDao } from "./inMemoryChessRatingDao.js";
 import { createMemoryStoreSessionDao } from "./memoryStoreSessionDao.js";
 import {
   createInMemoryAchievementDao,
@@ -177,11 +180,16 @@ export function createTestApp({
     progressionComponent,
     events: domainEvents,
   });
+  const chessRatingComponent = createChessRatingComponent({
+    chessRatingAccessor: createChessRatingAccessor({ chessRatingDao: createInMemoryChessRatingDao() }),
+    events: domainEvents,
+  });
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,
     participants: transferParticipants([
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
+      { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
@@ -198,6 +206,7 @@ export function createTestApp({
       progressionComponent,
       gamificationComponent,
       leaderboardComponent,
+      chessRatingComponent,
       logger: capture.logger,
     }),
   });
@@ -261,6 +270,11 @@ export function createTestApp({
         name: "progress",
         erasePlayer: progressionComponent.erasePlayer,
         exportPlayer: progressionComponent.exportPlayer,
+      },
+      {
+        name: "chessRatings",
+        erasePlayer: chessRatingComponent.erasePlayer,
+        exportPlayer: chessRatingComponent.exportPlayer,
       },
       {
         name: "gamification",
@@ -342,6 +356,7 @@ export function createTestApp({
     playerTransferComponent,
     gamificationComponent,
     leaderboardComponent,
+    chessRatingComponent,
     blockComponent,
     matchPipeline,
     playerDataComponent,
@@ -392,6 +407,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     now,
     ...(options.roomLimits && { limits: options.roomLimits }),
     botComponent: testApp.botComponent,
+    chessRatingComponent: testApp.chessRatingComponent,
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));

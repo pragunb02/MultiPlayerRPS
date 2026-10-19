@@ -56,7 +56,7 @@ the owner may change it.
 - **Consequences.** The web app depends on `@classicade/games`. A new game gets pass and play by adding a
   `passAndPlay` entry to its registry entry. Untimed chess and rotated pieces are in IDEAS.md.
 
-### ADR-062 — The chess rating: one game per period, a seventh outbox step, the guest move and the level seed
+### ADR-062 — The chess rating: one game per period, a sixth outbox step, the guest move and the level seed
 
 - **Status:** Open · 2026-10-20, proposed ([CC-042](tickets/CC-042.md), research with sources there). Built in the
   CC-042 pull request; the owner accepts it with the merge. It fills in ADR-027 and amends ADR-047 point 1.
@@ -75,7 +75,7 @@ the owner may change it.
   5. **The level seed.** A counted game against Queen Vee sets the start of a person with no rated game yet:
      Beginner 1200, Club player 1500, Strong 1800, deviation 350. The latest pick wins. It never moves a rating
      that has a rated game. Accepted by default (owner may change the three numbers).
-  6. **A seventh outbox step, "apply chess ratings"**, after judge and independent of progression. Each player's
+  6. **A sixth outbox step, "apply chess ratings"**, after judge and independent of progression. Each player's
      document in `chess_ratings` keeps the last 200 changes as `{ matchId, before, after }` and a `revision`. A
      retry rates the second player against the first player's stored `before`, and every write is guarded by the
      revision it read, so a lost race fails the step and the outbox runs it again. No other player's id is stored.
