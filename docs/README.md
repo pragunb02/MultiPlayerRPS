@@ -20,7 +20,7 @@ the commands are in [CLAUDE.md](../CLAUDE.md) at the root of the repository.
    The vision sets the order now.
 8. [GROWTH.md](GROWTH.md) — the growth plan: being found, sharing, day 2, notification caps, launch sequence.
 9. [IDEAS.md](IDEAS.md) — the parking lot for new ideas during the feature freeze. Not tickets, not started.
-10. [domains/SOCIAL_AND_SHARING.md](domains/SOCIAL_AND_SHARING.md) — the Social and sharing domain (proposed,
+10. [domains/SOCIAL_AND_SHARING.md](domains/SOCIAL_AND_SHARING.md) — the Social and sharing domain (accepted,
     ADR-051): scope, boundaries, principles, research, its tickets in build order and the owner's decisions.
 
 ## 3. How it is built

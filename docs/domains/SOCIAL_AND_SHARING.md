@@ -240,13 +240,13 @@ Status is from [BACKLOG.md](../BACKLOG.md) on 2026-10-19. "Order" is the build o
 
 | Order | Ticket | Title (short)                                                        | In or out                                   | Status          | Phase |
 | ----- | ------ | -------------------------------------------------------------------- | ------------------------------------------- | --------------- | ----- |
-| 1     | CC-217 | WhatsApp share cards, button, Hinglish text, no minor or guest names | In                                          | ⬜ Todo         | 1     |
-| 2     | CC-044 | Block, mute (the rule), report, reports queue, grievance contact     | In (safety folded in, §2.3)                 | ⬜ Todo         | 1     |
-| 3     | CC-051 | Quick match: "Find a person", 4 s, honest fallback                   | In (pairing; the room is Match experience)  | ⬜ Todo         | 1     |
-| 4     | CC-279 | Share links carry a channel marker for the k-factor (proposed)       | In (Growth reads it)                        | ⬜ Todo         | 1     |
-| 5     | CC-223 | Pass and play on one phone                                           | In                                          | ⬜ Todo         | 1     |
-| 6     | CC-100 | Invite chooser focus ring on page load                               | In (small bug)                              | ⬜ Todo         | 2     |
-| 7     | CC-253 | Room views send player ids: decide before public profiles            | In (shared with Match experience)           | ⬜ Todo         | 0     |
+| 1     | CC-253 | Room views send player ids: opaque per-room seat ids first           | In (shared with Match experience)           | ⬜ Todo         | 0     |
+| 2     | CC-217 | WhatsApp share cards, button, Hinglish text, no minor or guest names | In                                          | ⬜ Todo         | 1     |
+| 3     | CC-044 | Block, mute (the rule), report, reports queue, grievance contact     | In (safety folded in, §2.3)                 | ⬜ Todo         | 1     |
+| 4     | CC-051 | Quick match: "Find a person", 4 s, honest fallback                   | In (pairing; the room is Match experience)  | ⬜ Todo         | 1     |
+| 5     | CC-279 | Share links carry a channel marker for the k-factor (proposed)       | In (Growth reads it)                        | ⬜ Todo         | 1     |
+| 6     | CC-223 | Pass and play on one phone                                           | In                                          | ⬜ Todo         | 1     |
+| 7     | CC-100 | Invite chooser focus ring on page load                               | In (small bug)                              | ⬜ Todo         | 2     |
 | 8     | CC-139 | Persistent challenges at `/challenge/:id`, honest expired page       | In                                          | ⬜ Todo         | 2     |
 | 9     | CC-147 | Notifications inbox, then an email digest                            | In (the channel; reminder content is Prog.) | ⬜ Todo         | 2     |
 | 10    | CC-034 | Public profile, avatars                                              | In                                          | ⬜ Todo         | 2     |
@@ -319,6 +319,9 @@ rule 1, asked for by the owner). Each has a ticket file with a Research section.
 
 Phase 0 still comes first for the whole board (BACKLOG.md "Order of work"). Within this domain:
 
+0. **First, phase 0:** CC-253, opaque per-room seat ids (ADR-051.9). A quick match stranger relies on them, so they
+   ship before CC-051, and before public profiles (CC-034). It touches the room view, so its PR does not run in
+   parallel with CC-044's block PR, which also changes `roomComponent`.
 1. **Group A, phase 1 (in parallel, no shared files):**
    - CC-217 (ShareRoom, the result block, `og/` images).
    - CC-044 PR 1, blocks (`roomComponent` seat and rematch refusals, `Seats` menu, a new store).
@@ -327,8 +330,7 @@ Phase 0 still comes first for the whole board (BACKLOG.md "Order of work"). With
    - CC-044 PR 2, reports and the queue, with the owner named as Grievance Officer (ADR-051.4).
    - CC-051 "Find a person", after CC-044's block PR, live only after both CC-044 PRs (ADR-028.8).
    - CC-279, after CC-217's text PR and the telemetry client (CC-174).
-3. **Group C, phase 2 start (in parallel):** CC-253 (opaque per-room seat ids, ADR-051.9), CC-139
-   (challenges), CC-147 (inbox), CC-100 (small).
+3. **Group C, phase 2 start (in parallel):** CC-139 (challenges), CC-147 (inbox), CC-100 (small).
 4. **Group D:** CC-034 then CC-278 (same profile files, so in sequence), in parallel with CC-169 (emotes, after
    CC-153's mascot) and CC-222 (turn-based, after CC-147 and CC-224).
 5. **Group E:** CC-277 (after CC-139), CC-052 (after CC-034, CC-139, CC-278), then CC-140 (after CC-052).
