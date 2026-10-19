@@ -269,7 +269,8 @@ describe("ShareRoom", () => {
     await user.click(screen.getByRole("button", { name: "Share…" }));
 
     expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3");
-    expect(await screen.findByRole("status")).toHaveTextContent("Link copied");
+    // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Link copied"));
   });
 
   it("closing the share sheet without sharing is not an error", async () => {
