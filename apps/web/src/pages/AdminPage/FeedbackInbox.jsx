@@ -221,7 +221,7 @@ export function FeedbackInbox() {
           </li>
         </ul>
       </nav>
-      <form className={consoleStyles.range} aria-label="Filters" onSubmit={(event) => event.preventDefault()}>
+      <div className={consoleStyles.range} role="group" aria-label="Filters">
         <Filter
           label="Type"
           name="type"
@@ -238,7 +238,7 @@ export function FeedbackInbox() {
           labels={FEEDBACK_STATUS_LABELS}
           onChange={change}
         />
-      </form>
+      </div>
       {inbox.status === "loading" && (
         <p className={consoleStyles.status} role="status">
           Loading…

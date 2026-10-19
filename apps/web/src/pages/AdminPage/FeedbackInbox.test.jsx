@@ -172,6 +172,9 @@ describe("the feedback inbox (CC-290)", () => {
         name: "Cancel",
       }),
     );
+    await user.click(within(entry).getByRole("button", { name: "Delete" }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(api.deleteFeedback).not.toHaveBeenCalled();
     await user.click(within(entry).getByRole("button", { name: "Delete" }));
     await user.click(
@@ -211,7 +214,7 @@ describe("the feedback inbox (CC-290)", () => {
   it("marks an item read, then done, and shows its new status", async () => {
     const first = item();
     const api = ownerApi({
-      getFeedbackInbox: vi.fn().mockResolvedValue({ items: [first] }),
+      getFeedbackInbox: vi.fn().mockResolvedValue({ items: [first, item({ message: "Untouched" })] }),
       setFeedbackStatus: vi.fn(async (feedbackId, status) => ({ ...first, status })),
     });
     const { user } = await openInbox({ api });
@@ -223,6 +226,7 @@ describe("the feedback inbox (CC-290)", () => {
 
     await within(entry).findByText("Done");
     expect(within(entry).getByRole("button", { name: "Mark new" })).toBeInTheDocument();
+    expect(within(screen.getAllByRole("article")[1]).getByText("New")).toBeInTheDocument();
     expect(api.setFeedbackStatus.mock.calls).toEqual([
       [first.feedbackId, "read"],
       [first.feedbackId, "done"],

@@ -131,6 +131,8 @@ describe("GET /api/admin/feedback (CC-290)", () => {
     ["an unknown parameter", "?limit=500"],
     ["a cursor that is not one", "?before=yesterday"],
     ["a type given twice", "?type=bug&type=idea"],
+    ["a cursor given twice", "?before=1_x&before=2_y"],
+    ["a cursor whose id is not one", `?before=1_${"-".repeat(36)}`],
   ])("answers 400 for %s", async (_, query) => {
     const { app } = await inbox();
 

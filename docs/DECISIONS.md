@@ -60,8 +60,8 @@ the owner may change it.
 
 ### ADR-059 — In-app feedback: unlinked, masked, 180 days, reply email for adults only, and the console's first per-person view
 
-- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-290](tickets/CC-290.md)). The number was
-  given by the coordinator.
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-290](tickets/CC-290.md)), the number reserved
+  for it on the board.
 - **Context.** The owner is sharing the site with friends and wants their feedback from inside the app. Free text from
   players is new: until now display names were the only text a player chose (DATA.md). Many players may be children
   (ADR-028.1: unknown age is a minor), the database is a free tier, and the owner console has so far shown only
