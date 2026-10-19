@@ -117,8 +117,8 @@ of every nightly backup.
 `apps/server/src/persistence/roomDao.js`, lifetimes in `apps/server/src/domain/rooms/roomLifetimes.js` (CC-101)
 
 1. **Holds:** the room `code`, `gameId`, `options`, `status`, `hostId`, the seats (`playerId`, `displayName`,
-   `connected`), the running game (match id, seed, the engine's full state including hidden choices, and a `log` of
-   every move and forfeit with the player id and the time), `result`, `rematch` (who asked, who declined, the name of
+   `connected`), the running game (match id, seed, the player ids it started with (`players`, CC-253), the engine's
+   full state including hidden choices, and a `log` of every move and forfeit with the player id and the time), `result`, `rematch` (who asked, who declined, the name of
    a player who left), `series` (wins per player id), `createdAt`, `lastActivityAt`, `dueAt`, `expiresAt`, and
    `network`.
 2. **`network`** is a keyed hash of the host's network address: HMAC-SHA-256, cut to 16 hex characters
@@ -134,9 +134,11 @@ of every nightly backup.
    close. Rooms stored before CC-249 hold a hash keyed with `SESSION_SECRET`. They keep working, stop counting for
    the cap, and are gone within 24 hours, but backups taken before CC-249 keep them for up to 30 days.
 3. **Personal data:** pseudonymous.
-4. **Who can read it:** everyone who opens the room's link while it is open gets the room view: every seat's player id
-   and display name, the host id, and the game view (seated players see their own view, others the spectator view).
-   `network` and hidden game state never leave the server. The owner.
+4. **Who can read it:** everyone who opens the room's link while it is open gets the room view: every seat's display
+   name and seat id, which seat is the host, and the game view (seated players see their own view, others the
+   spectator view). A seat id is a keyed hash of the room and the player (ADR-057, CC-253), so no player id, and no
+   account's creation time, reaches anyone through a room. The seat ids are worked out for each view and never
+   stored. Player ids, `network` and hidden game state never leave the server. The owner.
 5. **Kept for:**
 
    | Room state                           | Closes                                           | Constant          |

@@ -6,6 +6,7 @@ import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { ConflictError, ForbiddenError, GoneError, NotFoundError } from "../../utils/errors.js";
 import { createRoomComponent, ROOM_EVENTS } from "./roomComponent.js";
 import { ROOM_LIFETIMES } from "./roomLifetimes.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 const BOB = Object.freeze({ kind: "guest", id: "guest_b", displayName: "Bob" });
@@ -14,12 +15,21 @@ const T0 = 1_000_000;
 // The game in finishedGame() ends at T0 + 3, and the rematch window counts from then.
 const UNTIL = T0 + 3 + ROOM_LIFETIMES.rematchWindowMs;
 const REMATCH = "rematch";
+/** The seat id a room view shows for a player (CC-253). */
+const seatOf = (room, playerId) => TEST_SEAT_IDS.seatIdOf(room, playerId);
+/** A request as a room view shows it: its players named by seat id. */
+const seen = (room, request) => ({
+  ...request,
+  from: seatOf(room, request.from),
+  to: seatOf(room, request.to),
+});
 
 /** Room component over the real accessor + in-memory DAO; match ids m1, m2, … */
 function setup() {
   const published = [];
   let matchNumber = 0;
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine]),
     events: { emit: (event, payload) => event !== ROOM_EVENTS.CHANGED && published.push({ event, payload }) },
@@ -64,11 +74,13 @@ describe("roomComponent rematch (CC-037, CC-159)", () => {
   it("offers a rematch once a game is played out", async () => {
     const { rooms, code } = await finishedGame();
 
-    const view = rooms.viewFor(await rooms.getRoom(code), ALICE.id);
+    const room = await rooms.getRoom(code);
+
+    const view = rooms.viewFor(room, ALICE.id);
 
     expect(view.rematch).toEqual({ available: true, until: UNTIL });
     expect(view.requests).toEqual([]);
-    expect(view.series).toEqual({ games: 1, wins: { [ALICE.id]: 1 } });
+    expect(view.series).toEqual({ games: 1, wins: { [seatOf(room, ALICE.id)]: 1 } });
   });
 
   it("opens a request for a minute, addressed to the opponent, without moving the end of the rematch window", async () => {
@@ -77,7 +89,7 @@ describe("roomComponent rematch (CC-037, CC-159)", () => {
     const room = await ask(rooms, { code, playerId: BOB.id, now: T0 + 4 });
 
     expect(room.status).toBe("finished");
-    expect(rooms.viewFor(room, ALICE.id).requests).toEqual([rematchRequest()]);
+    expect(rooms.viewFor(room, ALICE.id).requests).toEqual([seen(room, rematchRequest())]);
     expect(rooms.viewFor(room, ALICE.id).rematch.until).toBe(UNTIL);
     expect(published.at(-1)).toEqual({
       event: ROOM_EVENTS.REQUESTS_CHANGED,
@@ -118,6 +130,7 @@ describe("roomComponent rematch (CC-037, CC-159)", () => {
       matchId: "m2",
       number: 2,
       seed: 42,
+      players: [BOB.id, ALICE.id],
       startedAt: T0 + 5,
       state: expect.any(Object),
       log: [],
@@ -127,10 +140,10 @@ describe("roomComponent rematch (CC-037, CC-159)", () => {
     expect(room.series).toEqual({ games: 1, wins: { [ALICE.id]: 1 } });
     // Both players see that it was accepted, for a moment.
     expect(rooms.viewFor(room, BOB.id).requests).toEqual([
-      rematchRequest({ state: "accepted", endedAt: T0 + 5 }),
+      seen(room, rematchRequest({ state: "accepted", endedAt: T0 + 5 })),
     ]);
     // Seed 42 lets the second seat start: now Alice, last game Bob. The first move alternates.
-    expect(rooms.viewFor(room, ALICE.id).game.activePlayers).toEqual([ALICE.id]);
+    expect(rooms.viewFor(room, ALICE.id).game.activePlayers).toEqual([seatOf(room, ALICE.id)]);
     expect(rooms.viewFor(room, ALICE.id).game.number).toBe(2);
     expect(published.filter((p) => p.event === ROOM_EVENTS.GAME_FINISHED)).toHaveLength(1);
   });
@@ -157,7 +170,7 @@ describe("roomComponent rematch (CC-037, CC-159)", () => {
       expect.objectContaining({
         status: "finished",
         rematch: { available: true, until: T0 + 7 + ROOM_LIFETIMES.rematchWindowMs },
-        series: { games: 2, wins: { [ALICE.id]: 1, [BOB.id]: 1 } },
+        series: { games: 2, wins: { [seatOf(room, ALICE.id)]: 1, [seatOf(room, BOB.id)]: 1 } },
       }),
     );
   });
@@ -305,7 +318,7 @@ describe("roomComponent declining a rematch (CC-104, CC-159)", () => {
     expect(rooms.viewFor(room, BOB.id)).toEqual(
       expect.objectContaining({
         rematch: { available: true, until: UNTIL },
-        requests: [rematchRequest({ state: "declined", endedAt: T0 + 5 })],
+        requests: [seen(room, rematchRequest({ state: "declined", endedAt: T0 + 5 }))],
         // Bob may ask again once the cooldown is over, and the page can say when.
         askAgainAt: { rematch: T0 + 5 + ROOM_LIFETIMES.reaskCooldownMs },
       }),

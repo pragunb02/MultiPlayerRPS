@@ -8,6 +8,7 @@ import { ConflictError, ServerBusyError } from "../../utils/errors.js";
 import { createRoomComponent } from "./roomComponent.js";
 import { ROOM_LIFETIMES } from "./roomLifetimes.js";
 import { roomLimits } from "./roomLimits.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 const BOB = Object.freeze({ kind: "guest", id: "guest_b", displayName: "Bob" });
@@ -18,6 +19,7 @@ const nextCode = () => `R${String(++codeNumber).padStart(5, "0")}`;
 
 function setup(limits = {}) {
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine]),
     events: { emit: () => {} },

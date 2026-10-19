@@ -21,7 +21,7 @@ async function chessGame(timeControl = "bullet-1+0") {
   const alice = await clients.player();
   const bob = await clients.player();
   const room = await startRoom(alice, bob, { gameId: "chess", options: { timeControl } });
-  return { alice, bob, ...room };
+  return { alice, bob, ...room, seat: { alice: room.seat.host, bob: room.seat.guest } };
 }
 
 const move = (player, code, from, to) =>
@@ -29,8 +29,8 @@ const move = (player, code, from, to) =>
 
 describe("Chess over sockets", () => {
   it("plays fool's mate to a server-decided checkmate both players see", async () => {
-    const { alice, bob, code, hostStart } = await chessGame();
-    expect(hostStart.game.view.colors).toEqual({ [bob.identity.id]: "w", [alice.identity.id]: "b" });
+    const { seat, alice, bob, code, hostStart } = await chessGame();
+    expect(hostStart.game.view.colors).toEqual({ [seat.bob]: "w", [seat.alice]: "b" });
 
     await move(bob, code, "f2", "f3");
     await move(alice, code, "e7", "e5");
@@ -38,7 +38,7 @@ describe("Chess over sockets", () => {
     const bobSeesMate = nextEvent(bob.socket);
     const final = await move(alice, code, "d8", "h4");
 
-    const outcome = { status: "finished", result: "win", winners: [alice.identity.id], reason: "checkmate" };
+    const outcome = { status: "finished", result: "win", winners: [seat.alice], reason: "checkmate" };
     expect(final.data.game.outcome).toEqual(outcome);
     const bobView = await bobSeesMate;
     expect(bobView.game.outcome).toEqual(outcome);
@@ -53,7 +53,7 @@ describe("Chess over sockets", () => {
   });
 
   it("ends the game when a player resigns", async () => {
-    const { alice, bob, code } = await chessGame();
+    const { seat, alice, bob, code } = await chessGame();
     const bobSeesResignation = nextEvent(bob.socket);
 
     await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { type: "resign" } });
@@ -61,13 +61,13 @@ describe("Chess over sockets", () => {
     expect((await bobSeesResignation).game.outcome).toEqual({
       status: "finished",
       result: "win",
-      winners: [bob.identity.id],
+      winners: [seat.bob],
       reason: "resignation",
     });
   });
 
   it("flags a player who stops moving, and pushes the result to both sides (BUG-07)", async () => {
-    const { alice, bob, code } = await chessGame("bullet-1+0");
+    const { seat, alice, bob, code } = await chessGame("bullet-1+0");
     await move(bob, code, "e2", "e4"); // clocks start; Black (alice) now has 60 s
     const aliceSeesFlag = nextEvent(alice.socket);
     const bobSeesFlag = nextEvent(bob.socket);
@@ -75,7 +75,7 @@ describe("Chess over sockets", () => {
     now += 60_000;
     await server.roomComponent.expireDue({ now });
 
-    const outcome = { status: "finished", result: "win", winners: [bob.identity.id], reason: "timeout" };
+    const outcome = { status: "finished", result: "win", winners: [seat.bob], reason: "timeout" };
     expect((await aliceSeesFlag).game.outcome).toEqual(outcome);
     expect((await bobSeesFlag).game.view.clocks.b).toBe(0);
   });
@@ -107,11 +107,11 @@ describe("Chess over sockets", () => {
   );
 
   it("tells the offerer when the opponent declines a draw, and the game goes on (CC-104, CC-159)", async () => {
-    const { alice, bob, code } = await chessGame();
+    const { seat, alice, bob, code } = await chessGame();
     const aliceSeesOffer = nextEvent(alice.socket);
     await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "draw" });
     expect((await aliceSeesOffer).requests).toEqual([
-      expect.objectContaining({ type: "draw", from: bob.identity.id, state: "open" }),
+      expect.objectContaining({ type: "draw", from: seat.bob, state: "open" }),
     ]);
 
     const bobSeesAnswer = nextEvent(bob.socket);

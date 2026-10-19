@@ -6,6 +6,7 @@ import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { ConflictError, ForbiddenError } from "../../utils/errors.js";
 import { createRoomComponent, ROOM_EVENTS } from "./roomComponent.js";
 import { ROOM_LIFETIMES } from "./roomLifetimes.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 // Presence (CC-158, CC-207) and the rules that follow from it (CC-036): away and offline seats, a finished room
 // that lets go of a player who stays away, claiming the win from an opponent who never came back, idle limits and
@@ -23,6 +24,7 @@ function setup() {
   const published = [];
   let matchNumber = 0;
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine, timedRace, rpsEngine]),
     events: { emit: (event, payload) => published.push({ event, payload }) },
@@ -48,8 +50,10 @@ async function finished() {
   return ctx;
 }
 
+/** The seat id a room view shows for a player (CC-253). */
+const seatOf = (room, playerId) => TEST_SEAT_IDS.seatIdOf(room, playerId);
 const seatView = (rooms, room, playerId) =>
-  rooms.viewFor(room, playerId).seats.find((seat) => seat.playerId === playerId);
+  rooms.viewFor(room, playerId).seats.find((seat) => seat.playerId === seatOf(room, playerId));
 const updates = (published) => published.filter(({ event }) => event === ROOM_EVENTS.UPDATED);
 
 describe("roomComponent presence (CC-158, CC-207)", () => {
@@ -58,7 +62,7 @@ describe("roomComponent presence (CC-158, CC-207)", () => {
 
     const away = await rooms.playerAway({ code, playerId: ALICE.id, now: T0 + 5 });
     expect(seatView(rooms, away, ALICE.id)).toEqual({
-      playerId: ALICE.id,
+      playerId: seatOf(away, ALICE.id),
       displayName: "Alice",
       connected: false,
       presence: "away",
@@ -374,11 +378,12 @@ describe("roomComponent requests for every page (CC-207)", () => {
 
     expect(await rooms.seatedRooms({ playerId: ALICE.id })).toEqual([asked]);
     expect(await rooms.seatedRooms({ playerId: "guest_x" })).toEqual([]);
-    expect(rooms.requestsView(asked)).toEqual({
+    expect(rooms.requestsView(asked, ALICE.id)).toEqual({
       code,
       gameId: "race",
-      names: { [ALICE.id]: "Alice", [BOB.id]: "Bob" },
-      requests: asked.requests,
+      you: seatOf(asked, ALICE.id),
+      names: { [seatOf(asked, ALICE.id)]: "Alice", [seatOf(asked, BOB.id)]: "Bob" },
+      requests: [{ ...asked.requests[0], from: seatOf(asked, BOB.id), to: seatOf(asked, ALICE.id) }],
     });
   });
 
@@ -426,7 +431,7 @@ describe("roomComponent requests for every page (CC-207)", () => {
     const { requests, ...old } = await rooms.getRoom(code);
 
     expect(requests).toBeUndefined();
-    expect(rooms.requestsView(old).requests).toEqual([]);
+    expect(rooms.requestsView(old, ALICE.id).requests).toEqual([]);
   });
 });
 

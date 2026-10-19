@@ -6,7 +6,6 @@ import { useServices } from "../../app/servicesContext.js";
 import { textsFor } from "../../games/roomUpdates.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useReconnecting } from "../../hooks/useReconnecting.js";
-import { useSession } from "../../hooks/useSession.js";
 import { useSiteRequests } from "../../hooks/useSiteRequests.js";
 import { useSound } from "../../hooks/useSound.js";
 import { useTabAlert } from "../../hooks/useTurnAlert.js";
@@ -22,15 +21,16 @@ const gameName = (gameId) => getGame(gameId)?.name ?? "a game";
 
 /**
  * The requests a player was asked in rooms whose page they are not on (CC-207), and how the ones they asked ended.
- * On the room's own page the request banner shows them instead.
+ * On the room's own page the request banner shows them instead. Each push names the players by seat id, and `you`
+ * is the player's own seat in that room (CC-253).
  */
-function useElsewhere(me) {
+function useElsewhere() {
   const rooms = useSiteRequests();
   const { pathname } = useLocation();
   const elsewhere = Object.values(rooms).filter((room) => pathname !== paths.room(room.gameId, room.code));
   const asked = elsewhere.flatMap((room) =>
     room.requests
-      .filter((request) => request.state === REQUEST_STATES.OPEN && request.to === me)
+      .filter((request) => request.state === REQUEST_STATES.OPEN && request.to === room.you)
       .map((request) => ({ room, request, key: keyOf(room.code, request) })),
   );
   return { rooms, pathname, asked };
@@ -40,7 +40,7 @@ function useElsewhere(me) {
  * Tells the asker, on whatever page they are, how their request ended when they are not on its room's page: the
  * other player said yes (with the way back to the game), said no, or did not answer in time.
  */
-function useAnswerToasts({ rooms, pathname, me }) {
+function useAnswerToasts({ rooms, pathname }) {
   const toast = useToast();
   const before = useRef(rooms);
 
@@ -54,7 +54,9 @@ function useAnswerToasts({ rooms, pathname, me }) {
       );
       const ended = room.requests.filter(
         (request) =>
-          request.from === me && request.state !== REQUEST_STATES.OPEN && open.has(keyOf(room.code, request)),
+          request.from === room.you &&
+          request.state !== REQUEST_STATES.OPEN &&
+          open.has(keyOf(room.code, request)),
       );
       for (const request of ended) {
         const texts = textsFor(room.gameId, request.type);
@@ -140,13 +142,11 @@ function SitePopup({ room, request, reason }) {
  * it. While a question waits, reward toasts wait too (CC-208). The asker hears how it ended in a toast.
  */
 export function SiteRequests() {
-  const session = useSession();
-  const me = session.identity?.id ?? "";
-  const { rooms, pathname, asked } = useElsewhere(me);
+  const { rooms, pathname, asked } = useElsewhere();
   const sound = useSound();
   const reconnecting = useReconnecting();
   const heard = useRef(new Set());
-  useAnswerToasts({ rooms, pathname, me });
+  useAnswerToasts({ rooms, pathname });
   useHold(CATEGORIES.REQUEST, asked.length > 0);
   useTabAlert(
     asked.length > 0,

@@ -9,12 +9,14 @@ import { installVisibility } from "../../testing/visibility.js";
 // Requests that reach a player on any page (CC-207): the question with Accept and go and Decline, a chime and the
 // tab title, and for the asker a toast saying how it ended.
 
-const BOB = "guest_b";
+// Pushes name players by their seat ids in the room, never by player ids (CC-253).
+const ME = "seatOfTheGuest00000000";
+const BOB = "seatOfBob0000000000000";
 const T = 1_000_000;
 const request = (overrides = {}) => ({
   type: "rematch",
   from: BOB,
-  to: GUEST.id,
+  to: ME,
   createdAt: T,
   expiresAt: T + 60_000,
   state: "open",
@@ -24,7 +26,8 @@ const request = (overrides = {}) => ({
 const pushed = (requests, overrides = {}) => ({
   code: "AB2CD3",
   gameId: "chess",
-  names: { [GUEST.id]: GUEST.displayName, [BOB]: "Bob" },
+  you: ME,
+  names: { [ME]: GUEST.displayName, [BOB]: "Bob" },
   requests,
   serverTime: T,
   ...overrides,
@@ -50,6 +53,18 @@ const question = () => screen.queryByRole("region", { name: "Rematch?" });
 
 describe("SiteRequests (CC-207)", () => {
   afterEach(() => vi.useRealTimers());
+
+  it("knows which requests are the player's by the seat the push names as theirs (CC-253)", async () => {
+    const { push } = await openHome();
+
+    push(pushed([request()], { code: "AB2CD4", you: BOB }));
+    expect(question()).not.toBeInTheDocument();
+    push(pushed([request({ to: GUEST.id })], { code: "AB2CD5" }));
+    expect(question()).not.toBeInTheDocument();
+    push(pushed([request()]));
+
+    expect(question()).toHaveAccessibleDescription("Bob wants a rematch at Chess");
+  });
 
   it("asks a player on another page, with a chime and an urgent announcement", async () => {
     const { push, sound } = await openHome();
@@ -148,7 +163,7 @@ describe("SiteRequests (CC-207)", () => {
   it("shows nothing for requests the player asked, or that are not addressed to them", async () => {
     const { push } = await openHome();
 
-    push(pushed([request({ from: GUEST.id, to: BOB }), request({ from: "guest_x", to: "guest_y" })]));
+    push(pushed([request({ from: ME, to: BOB }), request({ from: "guest_x", to: "guest_y" })]));
 
     expect(question()).toBeNull();
   });
@@ -184,7 +199,7 @@ describe("SiteRequests (CC-207)", () => {
   });
 
   it("tells the asker on another page how their request ended", async () => {
-    const mine = request({ from: GUEST.id, to: BOB });
+    const mine = request({ from: ME, to: BOB });
     const { push } = await openHome();
     push(pushed([mine]));
 
@@ -206,7 +221,7 @@ describe("SiteRequests (CC-207)", () => {
   });
 
   it("gives the asker the way back to the room after a decline too", async () => {
-    const mine = request({ from: GUEST.id, to: BOB });
+    const mine = request({ from: ME, to: BOB });
     const { push } = await openHome();
     push(pushed([mine]));
 
@@ -221,7 +236,7 @@ describe("SiteRequests (CC-207)", () => {
 
   it("closes the toast with the way back when the asker presses Close", async () => {
     const user = userEvent.setup();
-    const mine = request({ from: GUEST.id, to: BOB });
+    const mine = request({ from: ME, to: BOB });
     const { push } = await openHome();
     push(pushed([mine]));
     push(pushed([{ ...mine, state: "expired", endedAt: T + 1 }]));
@@ -233,7 +248,7 @@ describe("SiteRequests (CC-207)", () => {
   });
 
   it("says nothing about the asker's own withdrawal, and names an opponent it does not know", async () => {
-    const mine = request({ from: GUEST.id, to: BOB });
+    const mine = request({ from: ME, to: BOB });
     const { push } = await openHome();
     push(pushed([mine], { names: {} }));
 
@@ -246,7 +261,7 @@ describe("SiteRequests (CC-207)", () => {
   });
 
   it("tells the asker nothing on the room's own page, where the banner says it", async () => {
-    const mine = request({ from: GUEST.id, to: BOB });
+    const mine = request({ from: ME, to: BOB });
     const { push } = await openHome({ path: "/games/chess/rooms/AB2CD3" });
     push(pushed([mine]));
 

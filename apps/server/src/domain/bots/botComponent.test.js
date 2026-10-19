@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOTS, createBotRegistry } from "@classicade/games";
 import { GAME_IDS, ROOM_REQUEST_TYPES } from "@classicade/shared";
 import { botRooms, NETWORK, PERSON } from "../../testing/botRooms.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 import { ConflictError, GoneError, ValidationError } from "../../utils/errors.js";
 import { ROOM_EVENTS } from "../rooms/roomComponent.js";
 import { assertCharactersPlayable, createBotComponent, MAX_COMPUTER_GAMES } from "./botComponent.js";
@@ -22,13 +23,13 @@ describe("botComponent.playComputer", () => {
     expect(room.hostId).toBe(PERSON.id);
     expect(rooms.viewFor(room, PERSON.id).seats).toEqual([
       expect.objectContaining({
-        playerId: PERSON.id,
+        playerId: TEST_SEAT_IDS.seatIdOf(room, PERSON.id),
         displayName: "Alice",
         connected: true,
         presence: "here",
       }),
       expect.objectContaining({
-        playerId: id,
+        playerId: TEST_SEAT_IDS.seatIdOf(room, id),
         displayName: name,
         connected: true,
         presence: "here",

@@ -5,6 +5,7 @@ import { createRoomAccessor } from "../../data/roomAccessor.js";
 import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { createRoomComponent, ROOM_EVENTS } from "./roomComponent.js";
 import { ROOM_LIFETIMES } from "./roomLifetimes.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 const BOB = Object.freeze({ kind: "guest", id: "guest_b", displayName: "Bob" });
@@ -21,6 +22,7 @@ function setup() {
   const control = { failKeeping: 0 };
   const codes = ["ROOM22", "ROOM33"];
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine]),
     events: { emit: (event, payload) => published.push({ event, payload }) },

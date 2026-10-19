@@ -35,6 +35,33 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-057 — Room views name players by opaque per-room seat ids
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-253](tickets/CC-253.md), CC-241 F11,
+  ADR-051.9)
+- **Context.** Every room view and request push sent every seat's player id to everyone in the room, spectators
+  included. An account's player id is a MongoDB ObjectId, whose first 4 bytes are its creation time, and the same id
+  in every room lets anyone follow a player from room to room. Quick match (CC-051) will seat strangers.
+- **Decision.**
+  1. Every player in a room view (`viewFor`) and in a request push (`requestsView`) is named by a seat id:
+     HMAC-SHA-256 of `[roomCode, createdAt, playerId]` under a key derived from `SESSION_SECRET` with the label
+     "classicade room seat ids", the first 16 bytes in base64url (22 characters). It is the same through rematches
+     and restarts, different in every other room, and cannot be worked out or turned back without the key.
+  2. Nothing is stored: the seat id is worked out for each view, so rooms already in MongoDB need no migration and a
+     rollback leaves nothing behind. A room records the players its game started with (`game.players`), so a player
+     who left a finished game is still renamed.
+  3. The view keeps its field names. `you` is the viewer's own seat id ("" without a seat). Every player id in the
+     view, the engine's own view included, is replaced as a value and as a key.
+  4. `POST /api/blocks` keeps `{ roomCode, seat, seatId }`. The server works out the seat id of the person in that
+     seat and blocks only when it matches. A `seatId` that is not 22 base64url characters is refused with 400.
+  5. A deleted player's stand-in is labelled `deleted: true` on its seat.
+  6. Later features that show one player another (public profiles CC-034, chat and emotes CC-169, spectating CC-056,
+     quick match CC-051, challenges CC-277) name the other player by a seat id or an id made for that purpose, never
+     by a player id.
+- **Consequences.** A guest who signs in during a game, or a deleted player's stand-in, is a new player id and so
+  gets a new seat id, as they get a new name. Rotating `SESSION_SECRET` gives open rooms new seat ids. Match history
+  still sends past opponents' player ids to the participants: it needs its own ticket.
+
 ### ADR-055 — Operations telemetry: our own metrics and named log lines to Grafana Cloud, no personal data
 
 - **Status:** Accepted · 2026-10-20 (owner, every recommendation below; research in
