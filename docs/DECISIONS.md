@@ -2,7 +2,7 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-054** (ADR-052 is taken by PR #98). A later change to a decision is a dated
+reused; the next free ID is **ADR-054**. A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -64,6 +64,31 @@ the owner may change it.
   can still guess why they were refused, as on Lichess. That is accepted. A blocked guest who clears their cookies is
   a new guest, which no block can follow.
 
+### ADR-052 — The look and feel domain: scope, moves, new tickets and five choices
+
+- **Status:** Accepted · 2026-10-19 (owner, every recommendation in [domains/LOOK_AND_FEEL.md](domains/LOOK_AND_FEEL.md), PR #98)
+- **Context.** The owner asked for the look and feel domain to be defined, with every ticket in it and what is
+  missing. The research and reasons are in the domain file, sections 3 and 5.
+- **Decision.**
+  1. Scope as in section 1 of the domain file, widened to the art pipeline and the microcopy of feel moments.
+  2. Five new tickets as an exception to the feature freeze: CC-280 appearance settings, CC-281 motion tokens,
+     CC-282 loading states, CC-283 icon set, CC-284 haptics.
+  3. Moves: CC-092 narrowed (page transitions to CC-153d, exits and card flips to CC-281) and then closed; CC-153g
+     (emotes, which is CC-169) and CC-153h (win cards) to Social and sharing; CC-156's unlock rules to CC-143;
+     CC-205's event quests and badges to seasons (CC-055); CC-194 and CC-265 to CC-267 into this domain.
+  4. The build order in section 6 of the domain file.
+  5. Default theme: follow the phone's (OS) setting, as today, not dark by default.
+  6. The theme and motion choice lives in a new allowed localStorage key `cc.look`
+     (`{"theme":"system"|"dark"|"light","motion":"system"|"reduced"}`), added to `STORAGE_ALLOWLIST` in
+     `e2e/fixtures.js` with a checker, and applied before the first paint by a same-origin `/theme.js` in `<head>`
+     (CSP-safe). No cookie. This amends ADR-018 point 4, which allowed only `cc.sound`.
+  7. Amends ADR-050 point 4: page transitions through React's `<ViewTransition>` if it is in the stable `react` we
+     ship, because React Router deprecated its `viewTransition` prop; the router prop otherwise.
+  8. Haptics on for three moments (your turn, a placed move, a win), with a switch next to sound inside `cc.sound`.
+  9. Icons drawn by us in the arcade style.
+- **Not changed.** ADR-012, ADR-016 and ADR-018 stand otherwise: CSS on SVG, Motion only on chess, synthesised
+  sound, no sound refresh.
+
 ### ADR-051 — The Social and sharing domain: scope, safety inside it, and the answers to #86
 
 - **Status:** Accepted · 2026-10-19 (owner). Proposed in [domains/SOCIAL_AND_SHARING.md](domains/SOCIAL_AND_SHARING.md),
@@ -117,6 +142,11 @@ the owner may change it.
      (owner).
   7. Order: CC-259 and CC-163 first, CC-099 after #67 (inside today's result section if CC-157 is not ready),
      CC-153 in eight PRs.
+
+**Amended · 2026-10-19** (owner, ADR-052 point 7). Point 4: page transitions go through React's
+`<ViewTransition>` around the route outlet if it is in the stable `react` we ship, because React Router deprecated
+its `viewTransition` prop for React 19.3 and later. The router prop is used only if `<ViewTransition>` is not in
+stable React. Still the browser's View Transitions, still no added bundle.
 
 ### ADR-049 — The game shell, the series scoreboard and the match layout
 
@@ -382,6 +412,8 @@ record, because today one process keeps the games it is running in memory.
   8). The strict setting and the full reviews return when the feature phase ends.
 
 - **Amended 2026-10-18 (owner): fast mode ended.** Branch protection requires eight checks with branches up to date: lint/unit/coverage, Docker, the merged browser jobs (Chromium desktop + mobile, Firefox), the backup round trip, actionlint, and CodeQL for JavaScript and for Actions; every PR gets both reviewers and the skeptic again; builders run lint, format, coverage and their own browser tests locally. WebKit stays advisory until its open flakes (CC-273) are fixed.
+
+- **Amended 2026-10-19 (owner): PR evidence.** Every pull request shows its change working in the template's Evidence section: UI screenshots (desktop 1280×720 and phone 390×844, before and after) on the `pr-evidence` branch, request and response for API or socket changes, and the tests added. Test accounts only, because the repository is public.
 
 ### ADR-038 — Button feedback: every press answers, waiting says so
 
@@ -999,6 +1031,11 @@ about two hundred lines.
 `cc.sound` stays the one key and gets an extended shape: `muted` and `volume` as before, plus `categories`, an
 on or off switch and a volume for each of the six notification categories. Old values without `categories` still
 read. The checker in the storage allowlist (`e2e/fixtures.js`) follows the new shape, and no new key is added.
+
+**Amended · 2026-10-19** (owner, ADR-052 point 6. **In effect when CC-280 merges**). Point 4: a second key,
+`cc.look`, with the exact shape `{"theme":"system"|"dark"|"light","motion":"system"|"reduced"}`, joins the storage
+allowlist with its own checker. It is a preference of this browser and holds nothing about the player or a game.
+The haptics switch (CC-284) goes inside `cc.sound`, not into a new key.
 
 ### ADR-017 — Rooms are stored in MongoDB, with explicit lifetimes
 
