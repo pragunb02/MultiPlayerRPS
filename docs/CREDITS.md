@@ -45,14 +45,18 @@ recorded, and a faithful render adds no new copyright.
 
 ## Our own image files
 
-| File                                         | What                                                      | Author     | Licence               | Source                                                         | Added      |
-| -------------------------------------------- | --------------------------------------------------------- | ---------- | --------------------- | -------------------------------------------------------------- | ---------- |
-| `apps/web/public/favicon.svg`                | Browser tab icon, the joystick glyph (same as `LogoMark`) | ClassiCade | LicenseRef-ClassiCade | Drawn for ClassiCade in CC-087                                 | 2026-10-16 |
-| `apps/web/public/favicon-turn.svg`           | Tab icon with a gold badge while it is your turn          | ClassiCade | LicenseRef-ClassiCade | Drawn for ClassiCade in CC-104                                 | 2026-10-16 |
-| `apps/web/public/og/classicade.png`          | Link preview card for the site                            | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-047) | 2026-10-16 |
-| `apps/web/public/og/rock-paper-scissors.png` | Link preview card for Rock Paper Scissors                 | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-047) | 2026-10-16 |
-| `apps/web/public/og/tic-tac-toe.png`         | Link preview card for Tic-Tac-Toe                         | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-047) | 2026-10-16 |
-| `apps/web/public/og/chess.png`               | Link preview card for Chess                               | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-047) | 2026-10-16 |
+| File                                                  | What                                                                       | Author     | Licence               | Source                                                         | Added      |
+| ----------------------------------------------------- | -------------------------------------------------------------------------- | ---------- | --------------------- | -------------------------------------------------------------- | ---------- |
+| `apps/web/public/favicon.svg`                         | Browser tab icon, the joystick glyph (same as `LogoMark`)                  | ClassiCade | LicenseRef-ClassiCade | Drawn for ClassiCade in CC-087                                 | 2026-10-16 |
+| `apps/web/public/favicon-turn.svg`                    | Tab icon with a gold badge while it is your turn                           | ClassiCade | LicenseRef-ClassiCade | Drawn for ClassiCade in CC-104                                 | 2026-10-16 |
+| `apps/web/public/og/classicade.png`                   | Link preview card for the site (first release, kept online for old shares) | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-047) | 2026-10-16 |
+| `apps/web/public/og/rock-paper-scissors.png`          | Link preview card for Rock Paper Scissors                                  | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-047) | 2026-10-16 |
+| `apps/web/public/og/tic-tac-toe.png`                  | Link preview card for Tic-Tac-Toe                                          | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-047) | 2026-10-16 |
+| `apps/web/public/og/chess.png`                        | Link preview card for Chess                                                | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-047) | 2026-10-16 |
+| `apps/web/public/og/classicade.71b95fd0.jpg`          | Link preview card for the site, JPEG under 150 KB                          | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-217) | 2026-10-20 |
+| `apps/web/public/og/rock-paper-scissors.801640cf.jpg` | Link preview card for Rock Paper Scissors, JPEG under 150 KB               | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-217) | 2026-10-20 |
+| `apps/web/public/og/tic-tac-toe.fd57d332.jpg`         | Link preview card for Tic-Tac-Toe, JPEG under 150 KB                       | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-217) | 2026-10-20 |
+| `apps/web/public/og/chess.b756bac7.jpg`               | Link preview card for Chess, JPEG under 150 KB                             | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-217) | 2026-10-20 |
 
 ## Our own art drawn in code
 
