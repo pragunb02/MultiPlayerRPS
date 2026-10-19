@@ -3,7 +3,7 @@
 How ClassiCade looks, moves and sounds: the arcade identity, Bit and the art, animation and effects, sound feel,
 loading and empty states, page transitions, responsive polish, themes and reduced motion. This file sets the scope,
 the rules, the research, every ticket in the domain and the order to build them. Written 2026-10-19 (research and
-planning only, no code). The owner confirms the decisions marked **owner to confirm** (decision record ADR-052).
+planning only, no code). The owner accepted every decision on 2026-10-19 (ADR-052).
 
 ## 1. Purpose and scope
 
@@ -182,7 +182,7 @@ characters (ADR-016 amendment point 2). No change to ADR-016.
 - **Seasonal skins** (CC-205, vision §5.13 point 5: colours and board art only, never layout) need the same hook: one
   attribute on `<html>` that switches a token set.
 - **Our take:** CC-280: a theme choice (system, dark, light) and a motion choice (system, reduced), with the
-  `data-theme` hook CC-205 reuses. Where the choice is stored is an owner decision (section 8).
+  `data-theme` hook CC-205 reuses. The choice is kept in the allowed `cc.look` key (section 8, decision 6).
 
 ### 3.8 Loading and empty states
 
@@ -269,7 +269,7 @@ CC-148, CC-216, CC-123 (Platform and growth); CC-143, CC-055, CC-063, CC-212 (Pr
 
 ## 5. Proposed new tickets and moves
 
-### New tickets (⬜ Todo, owner to confirm, because the working agreement's feature freeze allows new feature tickets only with the owner)
+### New tickets (⬜ Todo, accepted by the owner on 2026-10-19 as an exception to the feature freeze)
 
 | Ticket | Title                                                                                                      | Why (one line)                                                                                                                                    |
 | ------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -326,19 +326,19 @@ list pages (CC-282), first route at or under 150 KB gzip (CC-135).
 
 ## 8. Decisions
 
-Recorded as ADR-052 (open until the owner answers).
+Recorded as ADR-052, accepted by the owner on 2026-10-19 with every recommendation.
 
-| #   | Decision                                                                                                                                                                                                                                                          | Status                                      |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| 1   | The domain's scope and boundaries as in section 1, widened to the art pipeline and the microcopy of feel moments                                                                                                                                                  | Owner to confirm                            |
-| 2   | The five new tickets CC-280 to CC-284 go on the board as ⬜ Todo, an exception to the feature freeze (rule 1 of the working agreement)                                                                                                                            | Owner to confirm                            |
-| 3   | The moves in section 5 (CC-092 narrowed and closed, CC-153 g and h to Social, CC-156 and CC-205 narrowed, CC-265 to CC-267 and CC-194 in)                                                                                                                         | Owner to confirm                            |
-| 4   | The build order in section 6                                                                                                                                                                                                                                      | Owner to confirm                            |
-| 5   | **Default theme**: follow the OS as today (recommended: it respects the player's own setting and costs nothing), or dark by default as the vision §5.13 says                                                                                                      | Owner to confirm                            |
-| 6   | **Where the theme and motion choice is kept**: a second allowed localStorage key `cc.look` read by a small same-origin `/theme.js` in `<head>` (recommended: no cookie, no server change, CSP-safe), or a cookie the server reads to write `data-theme` (ADR-042) | Owner to confirm                            |
-| 7   | **Page transitions** (amends ADR-050 point 4): React's `<ViewTransition>` if it is in the stable `react` we ship, because React Router deprecated its `viewTransition` prop; the router prop otherwise                                                            | Owner to confirm                            |
-| 8   | **Haptics default**: on for the three moments with a switch next to sound (recommended), or off until the player turns it on                                                                                                                                      | Owner to confirm                            |
-| 9   | **Icons**: drawn by us (recommended), or copied from an MIT set (Heroicons, Phosphor or Tabler) with a CREDITS row. Lucide (ISC) only after adding ISC to the allowlist                                                                                           | Owner to confirm                            |
-| 10  | Stack unchanged: CSS on SVG, Motion only on chess, Lottie only as `lottie_light` for real artist animation, no sound refresh                                                                                                                                      | Taken (follows ADR-012, ADR-016, ADR-018)   |
-| 11  | Budgets and principles in section 2 bind every ticket in the domain                                                                                                                                                                                               | Taken (from ADR-012, ADR-050, vision §6.11) |
-| 12  | CC-259 is done (#90); the board row is flipped at the next docs sync                                                                                                                                                                                              | Taken (fact)                                |
+| #   | Decision                                                                                                                                                                                                                                                                                                               | Status                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| 1   | The domain's scope and boundaries as in section 1, widened to the art pipeline and the microcopy of feel moments                                                                                                                                                                                                       | Accepted · 2026-10-19 (owner)               |
+| 2   | The five new tickets CC-280 to CC-284 go on the board as ⬜ Todo, an exception to the feature freeze (rule 1 of the working agreement)                                                                                                                                                                                 | Accepted · 2026-10-19 (owner)               |
+| 3   | The moves in section 5 (CC-092 narrowed and closed, CC-153 g and h to Social, CC-156 and CC-205 narrowed, CC-265 to CC-267 and CC-194 in)                                                                                                                                                                              | Accepted · 2026-10-19 (owner)               |
+| 4   | The build order in section 6                                                                                                                                                                                                                                                                                           | Accepted · 2026-10-19 (owner)               |
+| 5   | **Default theme**: follow the phone's (OS) setting, as today, not dark by default                                                                                                                                                                                                                                      | Accepted · 2026-10-19 (owner)               |
+| 6   | **Where the choice is kept**: a new allowed localStorage key `cc.look`, `{"theme":"system"\|"dark"\|"light","motion":"system"\|"reduced"}`, added to `STORAGE_ALLOWLIST` with a checker and read before the first paint by a small same-origin `/theme.js` in `<head>`. No cookie, no server change, CSP-safe (CC-280) | Accepted · 2026-10-19 (owner)               |
+| 7   | **Page transitions** (amends ADR-050 point 4): React's `<ViewTransition>` if it is in the stable `react` we ship, because React Router deprecated its `viewTransition` prop; the router prop otherwise                                                                                                                 | Accepted · 2026-10-19 (owner)               |
+| 8   | **Haptics**: on for the three moments (your turn, a placed move, a win), with a switch next to sound (CC-284)                                                                                                                                                                                                          | Accepted · 2026-10-19 (owner)               |
+| 9   | **Icons**: drawn by us in the arcade style (CC-283)                                                                                                                                                                                                                                                                    | Accepted · 2026-10-19 (owner)               |
+| 10  | Stack unchanged: CSS on SVG, Motion only on chess, Lottie only as `lottie_light` for real artist animation, no sound refresh                                                                                                                                                                                           | Taken (follows ADR-012, ADR-016, ADR-018)   |
+| 11  | Budgets and principles in section 2 bind every ticket in the domain                                                                                                                                                                                                                                                    | Taken (from ADR-012, ADR-050, vision §6.11) |
+| 12  | CC-259 is done (#90); the board row is flipped at the next docs sync                                                                                                                                                                                                                                                   | Taken (fact)                                |

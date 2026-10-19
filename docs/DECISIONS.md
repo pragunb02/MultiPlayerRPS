@@ -8,29 +8,6 @@ the owner may change it.
 
 ## Open decisions
 
-### ADR-052 — The look and feel domain: scope, moves, new tickets and five choices
-
-- **Status:** Open · 2026-10-19 (from [domains/LOOK_AND_FEEL.md](domains/LOOK_AND_FEEL.md), owner to decide)
-- **Context.** The owner asked for the look and feel domain to be defined, with every ticket in it and what is
-  missing. The research and reasons are in the domain file, sections 3 and 5.
-- **Recommendation.**
-  1. Scope as in section 1 of the domain file, widened to the art pipeline and the microcopy of feel moments.
-  2. Five new tickets as an exception to the feature freeze: CC-280 appearance settings, CC-281 motion tokens,
-     CC-282 loading states, CC-283 icon set, CC-284 haptics.
-  3. Moves: CC-092 narrowed (page transitions to CC-153d, exits and card flips to CC-281) and then closed; CC-153g
-     (emotes, which is CC-169) and CC-153h (win cards) to Social and sharing; CC-156's unlock rules to CC-143;
-     CC-205's event quests and badges to seasons (CC-055); CC-194 and CC-265 to CC-267 into this domain.
-  4. The build order in section 6 of the domain file.
-  5. Default theme: follow the OS, as today (the vision §5.13 says dark by default).
-  6. Theme and motion choice in a second allowed storage key `cc.look`, applied before the first paint by a
-     same-origin `/theme.js` (CSP-safe), not a cookie.
-  7. Amends ADR-050 point 4: page transitions through React's `<ViewTransition>` if it is in the stable `react` we
-     ship, because React Router deprecated its `viewTransition` prop; the router prop otherwise.
-  8. Haptics on for three moments, with a switch next to sound.
-  9. Icons drawn by us (or copied from an MIT set with a credits row; Lucide is ISC and not on the allowlist).
-- **Not changed.** ADR-012, ADR-016 and ADR-018 stand: CSS on SVG, Motion only on chess, synthesised sound, no
-  sound refresh.
-
 ### ADR-046 — Our own screen in front of Render's cold start page
 
 - **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)
@@ -57,6 +34,31 @@ the owner may change it.
 - **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
 
 ## Accepted decisions
+
+### ADR-052 — The look and feel domain: scope, moves, new tickets and five choices
+
+- **Status:** Accepted · 2026-10-19 (owner, every recommendation in [domains/LOOK_AND_FEEL.md](domains/LOOK_AND_FEEL.md), PR #98)
+- **Context.** The owner asked for the look and feel domain to be defined, with every ticket in it and what is
+  missing. The research and reasons are in the domain file, sections 3 and 5.
+- **Decision.**
+  1. Scope as in section 1 of the domain file, widened to the art pipeline and the microcopy of feel moments.
+  2. Five new tickets as an exception to the feature freeze: CC-280 appearance settings, CC-281 motion tokens,
+     CC-282 loading states, CC-283 icon set, CC-284 haptics.
+  3. Moves: CC-092 narrowed (page transitions to CC-153d, exits and card flips to CC-281) and then closed; CC-153g
+     (emotes, which is CC-169) and CC-153h (win cards) to Social and sharing; CC-156's unlock rules to CC-143;
+     CC-205's event quests and badges to seasons (CC-055); CC-194 and CC-265 to CC-267 into this domain.
+  4. The build order in section 6 of the domain file.
+  5. Default theme: follow the phone's (OS) setting, as today, not dark by default.
+  6. The theme and motion choice lives in a new allowed localStorage key `cc.look`
+     (`{"theme":"system"|"dark"|"light","motion":"system"|"reduced"}`), added to `STORAGE_ALLOWLIST` in
+     `e2e/fixtures.js` with a checker, and applied before the first paint by a same-origin `/theme.js` in `<head>`
+     (CSP-safe). No cookie. This amends ADR-018 point 4, which allowed only `cc.sound`.
+  7. Amends ADR-050 point 4: page transitions through React's `<ViewTransition>` if it is in the stable `react` we
+     ship, because React Router deprecated its `viewTransition` prop; the router prop otherwise.
+  8. Haptics on for three moments (your turn, a placed move, a win), with a switch next to sound inside `cc.sound`.
+  9. Icons drawn by us in the arcade style.
+- **Not changed.** ADR-012, ADR-016 and ADR-018 stand otherwise: CSS on SVG, Motion only on chess, synthesised
+  sound, no sound refresh.
 
 ### ADR-050 — Rewards one beat at a time, outcome moments, Bit and the empty screens
 
@@ -962,6 +964,11 @@ about two hundred lines.
 `cc.sound` stays the one key and gets an extended shape: `muted` and `volume` as before, plus `categories`, an
 on or off switch and a volume for each of the six notification categories. Old values without `categories` still
 read. The checker in the storage allowlist (`e2e/fixtures.js`) follows the new shape, and no new key is added.
+
+**Amended · 2026-10-19** (owner, ADR-052 point 6. **In effect when CC-280 merges**). Point 4: a second key,
+`cc.look`, with the exact shape `{"theme":"system"|"dark"|"light","motion":"system"|"reduced"}`, joins the storage
+allowlist with its own checker. It is a preference of this browser and holds nothing about the player or a game.
+The haptics switch (CC-284) goes inside `cc.sound`, not into a new key.
 
 ### ADR-017 — Rooms are stored in MongoDB, with explicit lifetimes
 
