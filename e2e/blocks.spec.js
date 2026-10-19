@@ -45,6 +45,12 @@ test.describe("blocks", () => {
     await alice.page.getByRole("button", { name: `Block ${bobName}` }).click();
     const dialog = alice.page.getByRole("dialog", { name: `Block ${bobName}?` });
     await expect(dialog).toContainText(`${bobName} is not told.`);
+    // The dialog covers the whole page, not only the seat it was opened from.
+    const backdrop = await dialog.evaluate((element) => {
+      const { width, height } = element.parentElement.getBoundingClientRect();
+      return { width: Math.round(width), height: Math.round(height) };
+    });
+    expect(backdrop).toEqual(alice.page.viewportSize());
     await dialog.getByRole("button", { name: "Block", exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect(alice.page.getByText(`You blocked ${bobName}.`)).toBeVisible();

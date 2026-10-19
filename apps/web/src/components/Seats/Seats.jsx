@@ -75,63 +75,53 @@ const canBlock = (room, seat) =>
   room.you !== "" && seat.playerId !== room.you && !isComputer(seat) && !seat.playerId.startsWith("deleted_");
 
 /**
- * The Block button of one seat and the question it asks first (CC-044, ADR-053). The block is silent: the other
- * player is told nothing, and the toast is for the viewer only.
+ * The question asked before a block, and the block itself (CC-044, ADR-053). The block is silent: the other player
+ * is told nothing, and the toast is for the viewer only. It is drawn after the list of seats, not inside a seat: a
+ * seat slides in with an animation, and a dialog inside it would be held to the seat's box instead of covering the
+ * page.
  *
- * @param {{ room: { code: string }, seat: { displayName: string }, index: number, onBlocked: () => void }} props
+ * @param {{ room: { code: string }, seat: { playerId: string, displayName: string }, index: number, onClose: () => void, onBlocked: () => void }} props
  *   `index` is the seat's place in the room's seats, which is how the server is told who to block
  */
-function BlockSeat({ room, seat, index, onBlocked }) {
+function BlockDialog({ room, seat, index, onClose, onBlocked }) {
   const blockPlayer = useBlockPlayer();
   const toast = useToast();
-  const [asking, setAsking] = useState(false);
   const name = seat.displayName;
   const confirm = useAction(
     async () => {
       await blockPlayer({ roomCode: room.code, seat: index });
-      setAsking(false);
+      onClose();
       toast.show(`You blocked ${name}.`, { tone: "info" });
       onBlocked();
     },
     { id: "room.seat.block.confirm" },
   );
   return (
-    <>
-      <Button
-        control="room.seat.block"
-        variant="ghost"
-        className={styles.block}
-        aria-label={`Block ${name}`}
-        onClick={() => setAsking(true)}
-      >
-        Block
-      </Button>
-      <Modal
-        open={asking}
-        title={`Block ${name}?`}
-        onClose={() => setAsking(false)}
-        actions={
-          <>
-            <Button control="room.seat.block.cancel" variant="secondary" onClick={() => setAsking(false)}>
-              Cancel
-            </Button>
-            <Button
-              control="room.seat.block.confirm"
-              variant="accent"
-              action={confirm}
-              pendingLabel="Blocking…"
-            >
-              Block
-            </Button>
-          </>
-        }
-      >
-        <p>
-          You won&apos;t be put in a room with {name} again, and there are no rematches between you. {name} is
-          not told. You can unblock them on your profile.
-        </p>
-      </Modal>
-    </>
+    <Modal
+      open
+      title={`Block ${name}?`}
+      onClose={onClose}
+      actions={
+        <>
+          <Button control="room.seat.block.cancel" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            control="room.seat.block.confirm"
+            variant="accent"
+            action={confirm}
+            pendingLabel="Blocking…"
+          >
+            Block
+          </Button>
+        </>
+      }
+    >
+      <p>
+        You won&apos;t be put in a room with {name} again, and there are no rematches between you. {name} is
+        not told. You can unblock them on your profile.
+      </p>
+    </Modal>
   );
 }
 
@@ -147,6 +137,8 @@ export function Seats({ room }) {
   const notice = usePresenceNotice(room);
   // Blocked from this page. The server keeps the block. This only changes what the seat shows until the page goes.
   const [blocked, setBlocked] = useState(() => new Set());
+  // The seat the viewer pressed Block on, and its place in the seats, while the question is open.
+  const [asking, setAsking] = useState(undefined);
   return (
     <>
       <ul className={styles.seats} aria-label="Players">
@@ -162,12 +154,15 @@ export function Seats({ room }) {
               <span className={styles.tag}>blocked</span>
             ) : (
               canBlock(room, seat) && (
-                <BlockSeat
-                  room={room}
-                  seat={seat}
-                  index={index}
-                  onBlocked={() => setBlocked((current) => new Set([...current, seat.playerId]))}
-                />
+                <Button
+                  control="room.seat.block"
+                  variant="ghost"
+                  className={styles.block}
+                  aria-label={`Block ${seat.displayName}`}
+                  onClick={() => setAsking({ seat, index })}
+                >
+                  Block
+                </Button>
               )
             )}
           </li>
@@ -178,6 +173,15 @@ export function Seats({ room }) {
           </li>
         ))}
       </ul>
+      {asking !== undefined && (
+        <BlockDialog
+          room={room}
+          seat={asking.seat}
+          index={asking.index}
+          onClose={() => setAsking(undefined)}
+          onBlocked={() => setBlocked((current) => new Set([...current, asking.seat.playerId]))}
+        />
+      )}
       <p className="visually-hidden" role="status">
         {notice}
       </p>
