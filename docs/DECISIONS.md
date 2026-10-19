@@ -2,7 +2,8 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-056**. A later change to a decision is a dated
+reused; the next free ID is **ADR-060**. Reserved for open work (2026-10-20): ADR-056
+(CC-155, #104), ADR-057 (CC-253), ADR-058 (CC-163) and ADR-059 (CC-290). A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -740,6 +741,9 @@ record, because today one process keeps the games it is running in memory.
   4. Later: a postal address that is not a home address, as email law requires, before any marketing or recap email
      (transactional email such as password reset is exempt), and a decision on whether to put a card on Render before
      any burst post.
+- **Amended 2026-10-20 (owner).** CC-123 (the brand domain) no longer waits for the launch list in point 1: it is
+  built right after CC-290 and CC-291, because the email service (CC-293) needs the domain for SPF and DKIM, and
+  email save (CC-292) and password reset (CC-033) need the email service.
 
 ### ADR-031 — Notification channels and caps
 
