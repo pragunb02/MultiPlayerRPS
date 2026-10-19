@@ -62,8 +62,12 @@ function isSoundSetting(raw) {
 }
 
 export const test = base.extend({
-  players: async ({ browser, baseURL }, use) => {
+  players: async ({ browser, baseURL }, use, testInfo) => {
     const opened = [];
+    // Playwright records a video only of its own `page`, not of the browsers opened here. So when a project asks
+    // for video (the visual baselines, CC-155), each person's browser is recorded here, and the recording is kept
+    // only when the test fails.
+    const recordVideo = wantsVideo(testInfo) ? { dir: testInfo.outputPath("videos") } : undefined;
 
     async function open(name, { secrets = [] } = {}) {
       const context = await browser.newContext({
@@ -71,6 +75,7 @@ export const test = base.extend({
         // The certificate is made for this run only (tlsFront.js). Test code only, the app is unchanged.
         ignoreHTTPSErrors: true,
         extraHTTPHeaders: { "X-Forwarded-Proto": "https" },
+        recordVideo,
       });
       const page = await context.newPage();
       const record = { problems: [], urls: [], socketFrames: [], expected: [] };
@@ -149,12 +154,50 @@ export const test = base.extend({
 
     await use({ open });
 
-    for (const player of opened.filter((p) => !p.closed)) {
-      await checkClean(player);
-      await player.context.close();
+    let clean = false;
+    try {
+      for (const player of opened.filter((p) => !p.closed)) {
+        await checkClean(player);
+        await player.context.close();
+      }
+      clean = true;
+    } finally {
+      if (recordVideo) {
+        await keepVideosOfFailure({
+          opened,
+          testInfo,
+          failed: !clean || testInfo.status !== testInfo.expectedStatus,
+        });
+      }
     }
   },
 });
+
+/** Whether the project records video (`use.video` set and not "off"). */
+function wantsVideo(testInfo) {
+  const { video } = testInfo.project.use;
+  const mode = typeof video === "object" ? video.mode : video;
+  return mode !== undefined && mode !== "off";
+}
+
+/**
+ * Attaches each person's video to the report when the test failed, and deletes them when it passed. A recording
+ * is written when its browser closes, so every browser is closed first.
+ */
+async function keepVideosOfFailure({ opened, testInfo, failed }) {
+  for (const player of opened) {
+    await player.context.close();
+    const video = player.page.video();
+    if (failed) {
+      await testInfo.attach(`video of ${player.name}`, {
+        path: await video.path(),
+        contentType: "video/webm",
+      });
+    } else {
+      await video.delete();
+    }
+  }
+}
 
 async function checkClean({ name, page, context, record, secrets }) {
   expect(record.problems, `${name}: console, page errors, CSP and failed requests`).toEqual([]);

@@ -2,8 +2,8 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-060**. Reserved for open work (2026-10-20): ADR-056
-(CC-155, #104), ADR-057 (CC-253), ADR-058 (CC-163) and ADR-059 (CC-290). A later change to a decision is a dated
+reused; the next free ID is **ADR-061**. Reserved for open work (2026-10-20): ADR-056
+(CC-155, #104), ADR-057 (CC-253), ADR-058 (CC-163), ADR-059 (CC-290) and ADR-060 (CC-291). A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -96,6 +96,30 @@ the owner may change it.
   `LEADERBOARD_UNLISTED.GUEST` is gone. Account deletion and export (ADR-048) are unchanged: they already erase under
   every former guest id. If a flood of guests pushes real players down, the owner can hide guest rows from the
   public list or ask for several counted games before a guest is listed, both changes to `getBoard` alone.
+
+### ADR-056 — Screenshot baselines in one pinned container, reviewed in the pull request
+
+- **Status:** Taken · 2026-10-20 (CC-155, builder). Whether the check becomes required is the owner's decision after
+  a week of advisory runs.
+- **Context.** Assertions cannot see a broken layout or colour. The app uses system fonts only, so the same page
+  draws differently on a Mac, on an Ubuntu runner and in another image. Playwright's own masks and animation
+  switches add a `<style>` element, which our CSP (`style-src 'self'`) blocks.
+- **Decision.**
+  1. `e2e/baselines.visual.js` (own config, not one of the four parts) compares 14 screens and states at 1280×720 and
+     390×844, light and dark, full page: 56 PNGs in `e2e/visual-baselines/`, reviewed in git.
+  2. Made and compared only in `mcr.microsoft.com/playwright:v1.64.1-noble` (CI `container:`, the update workflow,
+     `npm run test:visual` through Docker as `linux/amd64`). A test pins the tag to the installed Playwright.
+  3. Run-to-run data is made the same without loosening any check: names get same-length stand-ins, clocks, dates,
+     quests, the invite link and run-dependent XP are painted from script (CSP-safe), toasts are hidden, reduced
+     motion holds the resting look. `maxDiffPixels: 8`, no ratio. The `players` fixture's checks still apply.
+  4. Updates: `npm run test:visual:update`, or the `Visual baselines (update)` workflow run on the ticket branch itself, which renders without write
+     access and commits the changed images to the ticket branch. A person reviews the image diffs and pushes next.
+  5. Videos and traces only of failing tests, in the visual job. The four-part suites stay without video so their
+     100 ms checks are not loaded further.
+  6. Advisory first: `Visual baselines (advisory)` runs on every pull request but is not one of the eight required
+     checks for its first week.
+- **Not chosen.** Chromatic, Percy or Argos (an account and a secret in a public repository, per-snapshot pricing
+  over a free tier), baselines per platform (three sets to keep in step), a trace of every passing test.
 
 ### ADR-055 — Operations telemetry: our own metrics and named log lines to Grafana Cloud, no personal data
 
