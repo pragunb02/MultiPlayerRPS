@@ -1,12 +1,15 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { GAMES, PUBLIC_PAGE_PATHS } from "@classicade/shared";
+import { GAMES, gamePreviewImage, getGame, PUBLIC_PAGE_PATHS, SITE_PREVIEW_IMAGE } from "@classicade/shared";
 import { createTestApp } from "../../testing/testApp.js";
 import { TEST_WEB_BUILD } from "../../testing/testConfig.js";
 import { createWebAppRouter } from "./webApp.js";
 
 const ORIGIN = "https://classicade.example";
+const CHESS_IMAGE = gamePreviewImage(getGame("chess"));
+// WhatsApp reads the head only within the first 300 KB of the page (CC-217).
+const HEAD_LIMIT_BYTES = 300 * 1024;
 
 /** Nobody is an admin unless a test says so (CC-233). The session is faked by a header. */
 const ADMIN_PAGE = Object.freeze({
@@ -40,9 +43,9 @@ describe("page head for crawlers and link previews", () => {
     expect(res.text).toContain("<title data-server-head>Join my Chess game on ClassiCade</title>");
     expect(tag(res.text, "property", "og:title")).toBe("Join my Chess game on ClassiCade");
     expect(tag(res.text, "property", "og:url")).toBe(`${ORIGIN}/games/chess/rooms/AB2CD3`);
-    expect(tag(res.text, "property", "og:image")).toBe(`${ORIGIN}/og/chess.png`);
+    expect(tag(res.text, "property", "og:image")).toBe(`${ORIGIN}${CHESS_IMAGE}`);
     expect(tag(res.text, "name", "twitter:card")).toBe("summary_large_image");
-    expect(tag(res.text, "name", "twitter:image")).toBe(`${ORIGIN}/og/chess.png`);
+    expect(tag(res.text, "name", "twitter:image")).toBe(`${ORIGIN}${CHESS_IMAGE}`);
     expect(tag(res.text, "name", "robots")).toBe("noindex");
     expect(res.text).not.toContain('rel="canonical"');
   });
@@ -66,7 +69,7 @@ describe("page head for crawlers and link previews", () => {
 
     expect(res.status).toBe(200);
     expect(tag(res.text, "property", "og:title")).toBe("Join my game on ClassiCade");
-    expect(tag(res.text, "property", "og:image")).toBe(`${ORIGIN}/og/classicade.png`);
+    expect(tag(res.text, "property", "og:image")).toBe(`${ORIGIN}${SITE_PREVIEW_IMAGE}`);
   });
 
   it("replaces the build's default title and description instead of adding a second one", async () => {
@@ -190,5 +193,29 @@ describe("the site's own address", () => {
     const res = await request(app).get("/games/chess").set("Accept", "text/html");
 
     expect(tag(res.text, "property", "og:url")).toBe("https://one.example/games/chess");
+  });
+
+  it("never comes from the request's own headers, which anyone can set (CC-217)", async () => {
+    const res = await crawl("/games/chess")
+      .set("Host", "evil.example")
+      .set("X-Forwarded-Host", "evil.example")
+      .set("X-Forwarded-Proto", "http")
+      .set("Origin", "https://evil.example");
+
+    expect(tag(res.text, "name", "classicade:site-origin")).toBe(ORIGIN);
+    expect(tag(res.text, "property", "og:url")).toBe(`${ORIGIN}/games/chess`);
+    expect(tag(res.text, "property", "og:image")).toBe(`${ORIGIN}${CHESS_IMAGE}`);
+    expect(res.text).not.toContain("evil.example");
+  });
+
+  it("is written into every page for the app's share links, and the head ends inside the first 300 KB", async () => {
+    for (const path of ["/", "/games/chess", "/games/chess/rooms/AB2CD3", "/no/such/page"]) {
+      const res = await crawl(path);
+
+      expect(tag(res.text, "name", "classicade:site-origin"), path).toBe(ORIGIN);
+      expect(Buffer.byteLength(res.text.slice(0, res.text.indexOf("</head>")))).toBeLessThan(
+        HEAD_LIMIT_BYTES,
+      );
+    }
   });
 });

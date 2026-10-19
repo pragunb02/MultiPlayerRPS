@@ -13,6 +13,7 @@ import { PageTitle } from "../PageTitle.jsx";
 import { RequestBanner } from "../RequestBanner/RequestBanner.jsx";
 import { SaveProgressCard } from "../SaveProgress/SaveProgressCard.jsx";
 import { Seats } from "../Seats/Seats.jsx";
+import { ShareResult } from "../ShareResult/ShareResult.jsx";
 import { ActionBar } from "./ActionBar.jsx";
 import { MatchAnnouncer } from "./MatchAnnouncer.jsx";
 import { sendIntent, shellLayout } from "./matchShell.js";
@@ -54,7 +55,8 @@ function Stage({ room, game, onMove, onAsk, reconnecting }) {
  * 2. Match bar: the game's name and, when the game has one, the score inside the game (`inGameScore`).
  * 3. Stage: the game's `Board`, or the invite while the room waits for players.
  * 4. Action bar: the game's `actions` and Leave, under the board. At the end it moves into the result.
- * 5. Result: the headline and its celebration at the end, with the action bar under it.
+ * 5. Result: the headline and its celebration at the end, with the action bar under it and the result share at the
+ *    bottom (CC-217).
  * 6. Presence and panel, in the side column: who is in the room and the game's own `Panel`.
  * 7. Announcer: one polite and one urgent screen reader region. The result is read out urgently.
  *
@@ -144,6 +146,7 @@ export function MatchShell({
                   <h2 id="result-heading">{resultHeadline(room)}</h2>
                 </div>
                 {actionBar}
+                <ShareResult room={room} />
               </section>
             )}
             <div className={styles.stage} data-cc-slot="stage">
