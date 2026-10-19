@@ -24,7 +24,7 @@ const seat = (player, extra = {}) => ({ playerId: player.id, displayName: player
 /** Open rooms by code. A code in `closed` answers GoneError, any other unknown code NotFoundError. */
 function fakeRooms(rooms = {}, closed = []) {
   return {
-    async getRoom(code) {
+    async getByCode(code) {
       if (closed.includes(code)) throw new GoneError("This room has closed");
       if (!Object.hasOwn(rooms, code)) throw new NotFoundError("Room not found");
       return rooms[code];
@@ -99,7 +99,10 @@ describe("blockComponent: who can be blocked (CC-044, ADR-053)", () => {
         OTHER2: { code: "OTHER2", seats: [seat(ARJUN), seat(STRANGER)] },
         BOTS22: {
           code: "BOTS22",
-          seats: [seat(RIYA), { playerId: "bot_rocky_easy", displayName: "Rocky", bot: { character: "rocky" } }],
+          seats: [
+            seat(RIYA),
+            { playerId: "bot_rocky_easy", displayName: "Rocky", bot: { character: "rocky" } },
+          ],
         },
         DELE22: {
           code: "DELE22",
@@ -113,7 +116,7 @@ describe("blockComponent: who can be blocked (CC-044, ADR-053)", () => {
 
     expect(refusal).toBeInstanceOf(NotFoundError);
     expect(refusal.message).toBe("You can only block someone you played with");
-    expect(refusal.details).toBeUndefined();
+    expect(refusal.details).toEqual({});
     expect(await dao.listInvolving(RIYA.id)).toEqual([]);
   });
 
@@ -137,7 +140,7 @@ describe("blockComponent: who can be blocked (CC-044, ADR-053)", () => {
     const blocks = createBlockComponent({
       blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
       rooms: {
-        getRoom: async () => {
+        getByCode: async () => {
           throw failing;
         },
       },
@@ -158,7 +161,9 @@ describe("blockComponent: blocks are silent and work both ways (ADR-053)", () =>
     await blocks.block({ blocker: RIYA, target: { roomCode: "ROOM22", seat: 1 }, now: T0 });
     await blocks.block({ blocker: ARJUN, target: { roomCode: "ARJ222", seat: 1 }, now: T0 });
 
-    expect([...(await blocks.blockedWith({ playerId: RIYA.id }))].sort()).toEqual([ARJUN.id, GUEST.id].sort());
+    expect([...(await blocks.blockedWith({ playerId: RIYA.id }))].sort()).toEqual(
+      [ARJUN.id, GUEST.id].sort(),
+    );
     expect([...(await blocks.blockedWith({ playerId: GUEST.id }))]).toEqual([RIYA.id]);
     expect([...(await blocks.blockedWith({ playerId: STRANGER.id }))]).toEqual([]);
     expect(await blocks.eitherBlocked({ a: GUEST.id, b: RIYA.id })).toBe(true);
@@ -185,7 +190,11 @@ describe("blockComponent: blocks are silent and work both ways (ADR-053)", () =>
 
   it("unblocks only the blocker's own block, and answers not found for anyone else's", async () => {
     const { blocks } = setup({ rooms: sharedRoom });
-    const { blockId } = await blocks.block({ blocker: RIYA, target: { roomCode: "ROOM22", seat: 1 }, now: T0 });
+    const { blockId } = await blocks.block({
+      blocker: RIYA,
+      target: { roomCode: "ROOM22", seat: 1 },
+      now: T0,
+    });
 
     await expect(blocks.unblock({ blockerId: GUEST.id, blockId })).rejects.toThrow(NotFoundError);
     expect(await blocks.eitherBlocked({ a: RIYA.id, b: GUEST.id })).toBe(true);
@@ -251,7 +260,9 @@ describe("blockComponent: blocks follow a guest who signs in (ADR-014)", () => {
 
     await blocks.transferPlayer({ from: GUEST.id, to: RIYA, now: T0 + 2 });
 
-    expect((await blocks.listFor({ blockerId: RIYA.id })).map((block) => block.displayName)).toEqual(["Arjun"]);
+    expect((await blocks.listFor({ blockerId: RIYA.id })).map((block) => block.displayName)).toEqual([
+      "Arjun",
+    ]);
   });
 });
 

@@ -36,7 +36,8 @@ function setup(blocks) {
     blocks,
   });
   const open = async (host) =>
-    (await rooms.createRoom({ network: "net-a", host, gameId: "race", options: { target: 3 }, now: T0 })).code;
+    (await rooms.createRoom({ network: "net-a", host, gameId: "race", options: { target: 3 }, now: T0 }))
+      .code;
   return { rooms, open };
 }
 
@@ -62,7 +63,7 @@ describe("roomComponent: blocked players are never seated together (CC-044)", ()
     const full = new ConflictError("This room is full");
     expect(refusal).toEqual(full);
     expect(refusal.code).toBe(full.code);
-    expect(refusal.details).toBeUndefined();
+    expect(refusal.details).toEqual({});
     expect((await rooms.getRoom(code)).seats.map((seat) => seat.playerId)).toEqual([ALICE.id]);
   });
 
@@ -115,7 +116,7 @@ describe("roomComponent: blocked players are never rematched (CC-044)", () => {
         .catch((err) => err);
 
       expect(refusal).toEqual(new ConflictError("A rematch is not possible now"));
-      expect(refusal.details).toBeUndefined();
+      expect(refusal.details).toEqual({});
     }
     expect((await rooms.getRoom(code)).requests ?? []).toEqual([]);
   });
@@ -130,9 +131,9 @@ describe("roomComponent: blocked players are never rematched (CC-044)", () => {
     await expect(
       rooms.answerRequest({ code, playerId: ALICE.id, type: REMATCH, answer: "accept", now: T0 + 11 }),
     ).rejects.toEqual(new ConflictError("A rematch is not possible now"));
-    await expect(
-      rooms.askRequest({ code, playerId: ALICE.id, type: REMATCH, now: T0 + 12 }),
-    ).rejects.toEqual(new ConflictError("A rematch is not possible now"));
+    await expect(rooms.askRequest({ code, playerId: ALICE.id, type: REMATCH, now: T0 + 12 })).rejects.toEqual(
+      new ConflictError("A rematch is not possible now"),
+    );
 
     const room = await rooms.getRoom(code);
     expect(room.status).toBe("finished");

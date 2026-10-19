@@ -45,6 +45,7 @@ does not.
 | [`player_quests`](#player_quests)                     | pseudonymous                                                          | 8 days after the quest day                                     | MongoDB TTL index, the guest transfer    |
 | [`leaderboard_entries`](#leaderboard_entries)         | yes for accounts: username, level, score (public)                     | all time boards for ever, weekly boards 28 days after the week | MongoDB TTL index (weekly only)          |
 | [`player_transfers`](#player_transfers)               | pseudonymous: guest id, account id and username                       | for ever                                                       | nothing                                  |
+| [`player_blocks`](#player_blocks)                     | pseudonymous: both player ids, the blocked player's name then         | until unblocked, or either account is deleted                  | unblocking, account deletion             |
 | [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)           | until the player deletes the account                           | account deletion (CC-035)                |
 | [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                             | 30 days                                                        | MongoDB TTL index                        |
 | [`legacy_closures`](#legacy_closures)                 | pseudonymous: the id of a legacy row whose player deleted the account | for ever                                                       | nothing                                  |
@@ -244,6 +245,23 @@ of every nightly backup.
 4. **Kept for:** for ever, so the move is never done twice (ADR-014).
 5. **Deleted by:** nothing.
 
+### `player_blocks`
+
+`apps/server/src/persistence/blockDao.js`, rules in `apps/server/src/domain/blocks/blockComponent.js` (CC-044,
+ADR-053)
+
+1. **Holds:** one document per block: `blockId` (random), `blockerId`, `blockedId`, `blockedName` (the display name
+   the blocked player had at that moment) and `createdAt`. At most 500 per blocker: the oldest goes. Guests and
+   accounts alike. Indexes: unique on `blockerId` and `blockedId`, on `blockedId`, unique on `blockId`.
+2. **Personal data:** pseudonymous, plus a display name. It says that one player chose not to meet another.
+3. **Who can read it:** the blocker, as a list of names and dates without ids (`GET /api/blocks`, the profile, the
+   data export). The blocked player never: no answer, list or export tells them, and a room refuses them with the
+   same words as a full room. The server reads it before it seats or rematches two players. The owner.
+4. **Kept for:** as long as the block lasts. Kept until the blocker unblocks, or either account is deleted. A guest's
+   blocks move to the account they sign in to, and the blocks on a guest move with them, keeping the name the
+   blocker saw (ADR-014). A guest who never signs in keeps their blocks as long as other guest data (CC-098).
+5. **Deleted by:** unblocking (`DELETE /api/blocks/:blockId`), and account deletion, on either side.
+
 ### `accounts.birthYear`
 
 `apps/server/src/persistence/accountDao.js`, the rule in `packages/shared/src/ages.js` (CC-152)
@@ -305,6 +323,7 @@ describe the stores as they were before CC-035 and are brought in line by CC-248
 | `player_quests`                             | deleted                                                   | yes                                    |
 | `leaderboard_entries`                       | deleted                                                   | yes, without the player id             |
 | `player_transfers`                          | deleted                                                   | yes                                    |
+| `player_blocks`                             | deleted on either side                                    | the blocks the player made, by name    |
 | server memory (login throttle, rate limits) | not reached, forgotten at the next deploy or restart      | no                                     |
 | server logs (Render)                        | not reached, ids only, 7 or 14 days                       | no                                     |
 | backups                                     | not reached, age out within 30 days                       | no                                     |
@@ -372,7 +391,8 @@ No other cookie, localStorage, sessionStorage or IndexedDB key is used in `apps/
    2. Events with ids: "guest session created", "account created", "logged in", "password changed", "other sessions
       signed out", "session ended by the server" (player id), every socket line (socket id and player id), room
       lines (room code, game, status, close reason), match lines (match id, game, reason, how many players), "socket
-      refused" (error code, whether a cookie was sent), the room gauge, and errors with their stack.
+      refused" (error code, whether a cookie was sent), "player blocked" and "player unblocked" (the blocker's id
+      only, never who was blocked), the room gauge, and errors with their stack.
    3. Redacted wherever they appear in a logged object: `password`, `token`, `accessToken`, `refreshToken`,
       `sessionId`, `email`, `secret`, and the cookie, authorization and set-cookie headers.
 2. **No IP addresses or emails** are written by the app. Redaction works on keys, so a value inside an error message

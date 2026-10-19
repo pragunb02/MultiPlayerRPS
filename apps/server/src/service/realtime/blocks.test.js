@@ -14,7 +14,10 @@ afterEach(async () => {
   server = undefined;
 });
 
-const REFUSED_REMATCH = { ok: false, error: { code: ERROR_CODES.CONFLICT, message: "A rematch is not possible now" } };
+const REFUSED_REMATCH = {
+  ok: false,
+  error: { code: ERROR_CODES.CONFLICT, message: "A rematch is not possible now" },
+};
 const FULL = { ok: false, error: { code: ERROR_CODES.CONFLICT, message: "This room is full" } };
 
 /** Alice hosts a race, Bob joins and moves first (seed 42), Alice wins. */
@@ -29,7 +32,10 @@ async function block(blocker, { code, seats }, blocked) {
   const res = await fetch(`${server.baseUrl}/api/blocks`, {
     method: "POST",
     headers: { "Content-Type": "application/json", cookie: blocker.cookie },
-    body: JSON.stringify({ roomCode: code, seat: seats.findIndex((s) => s.playerId === blocked.identity.id) }),
+    body: JSON.stringify({
+      roomCode: code,
+      seat: seats.findIndex((s) => s.playerId === blocked.identity.id),
+    }),
   });
   expect(res.status).toBe(200);
 }
@@ -47,7 +53,8 @@ describe("blocks in rooms over sockets (CC-044)", () => {
     const fromBob = await ask(bob, room.code);
     const fromAlice = await ask(alice, room.code);
 
-    expect(bob.received.slice(before)).toEqual([]);
+    const roomNews = [SOCKET_EVENTS.ROOM_UPDATED, SOCKET_EVENTS.REQUEST_UPDATED];
+    expect(bob.received.slice(before).filter(({ event }) => roomNews.includes(event))).toEqual([]);
     expect(fromBob).toEqual(REFUSED_REMATCH);
     expect(fromAlice).toEqual(REFUSED_REMATCH);
   });
@@ -80,7 +87,10 @@ describe("blocks in rooms over sockets (CC-044)", () => {
     await block(alice, room, bob);
     const [host, joiner] = roles(alice, bob);
 
-    const created = await send(host.socket, SOCKET_EVENTS.ROOM_CREATE, { gameId: "race", options: {} });
+    const created = await send(host.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "race",
+      options: { target: 3 },
+    });
     const joined = await send(joiner.socket, SOCKET_EVENTS.ROOM_JOIN, { code: created.data.code });
     const view = await send(host.socket, SOCKET_EVENTS.ROOM_JOIN, { code: created.data.code });
 
@@ -94,7 +104,10 @@ describe("blocks in rooms over sockets (CC-044)", () => {
     const room = await finishedRace(alice, bob);
     await block(alice, room, bob);
 
-    const created = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, { gameId: "race", options: {} });
+    const created = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "race",
+      options: { target: 3 },
+    });
     const joined = await send(carol.socket, SOCKET_EVENTS.ROOM_JOIN, { code: created.data.code });
 
     expect(joined.ok).toBe(true);

@@ -58,7 +58,11 @@ describe("POST /api/blocks (CC-044)", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
-      block: { blockId: expect.any(String), displayName: bob.identity.displayName, blockedAt: expect.any(Number) },
+      block: {
+        blockId: expect.any(String),
+        displayName: bob.identity.displayName,
+        blockedAt: expect.any(Number),
+      },
     });
     expect(JSON.stringify(res.body)).not.toContain(bob.identity.id);
     expect(await list(alice)).toEqual([res.body.block]);
@@ -146,11 +150,17 @@ describe("POST /api/blocks (CC-044)", () => {
         body: { password: PASSWORD },
         cookie: signedUp.cookie,
       });
-      const fresh = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, { gameId: "race", options: {} });
+      const fresh = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+        gameId: "race",
+        options: { target: 3 },
+      });
       const bobSocket = await clients.openSocket(signedUp.cookie);
       const refused = await send(bobSocket, SOCKET_EVENTS.ROOM_JOIN, { code: fresh.data.code });
       // A room that really is full: every seat taken while the host is away, so the game waits (CC-112).
-      const full = await send(carol.socket, SOCKET_EVENTS.ROOM_CREATE, { gameId: "race", options: {} });
+      const full = await send(carol.socket, SOCKET_EVENTS.ROOM_CREATE, {
+        gameId: "race",
+        options: { target: 3 },
+      });
       await send(carol.socket, SOCKET_EVENTS.ROOM_AWAY, { code: full.data.code });
       const dave = await clients.player();
       await send(dave.socket, SOCKET_EVENTS.ROOM_JOIN, { code: full.data.code });
@@ -159,8 +169,14 @@ describe("POST /api/blocks (CC-044)", () => {
       expect(await list({ cookie: signedUp.cookie })).toEqual([]);
       expect(exported.body.blocks).toEqual([]);
       expect(JSON.stringify(exported.body)).not.toContain(alice.identity.id);
-      expect(JSON.stringify(exported.body)).not.toContain(alice.identity.displayName);
-      expect(tooLate).toEqual({ ok: false, error: { code: ERROR_CODES.CONFLICT, message: "This room is full" } });
+      // Alice's name is in the game they played, as for any opponent, and nowhere else.
+      const { matches, ...rest } = exported.body;
+      expect(JSON.stringify(rest)).not.toContain(alice.identity.displayName);
+      expect(matches).toHaveLength(1);
+      expect(tooLate).toEqual({
+        ok: false,
+        error: { code: ERROR_CODES.CONFLICT, message: "This room is full" },
+      });
       expect(refused).toEqual(tooLate);
     });
   });
@@ -174,7 +190,10 @@ describe("GET and DELETE /api/blocks (CC-044)", () => {
     const { body } = await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
 
     const res = await call("DELETE", `/blocks/${body.block.blockId}`, { cookie: alice.cookie });
-    const fresh = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, { gameId: "race", options: {} });
+    const fresh = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "race",
+      options: { target: 3 },
+    });
     const joined = await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: fresh.data.code });
 
     expect(res.status).toBe(204);
@@ -189,7 +208,9 @@ describe("GET and DELETE /api/blocks (CC-044)", () => {
     const { body } = await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
 
     const theirs = await call("DELETE", `/blocks/${body.block.blockId}`, { cookie: bob.cookie });
-    const madeUp = await call("DELETE", "/blocks/00000000-0000-4000-9000-000000000000", { cookie: bob.cookie });
+    const madeUp = await call("DELETE", "/blocks/00000000-0000-4000-9000-000000000000", {
+      cookie: bob.cookie,
+    });
     const notAnId = await call("DELETE", "/blocks/abc", { cookie: bob.cookie });
 
     expect([theirs.status, madeUp.status]).toEqual([404, 404]);
@@ -257,7 +278,10 @@ describe("blocks follow a guest who signs in, and go with a deleted account (ADR
     });
     const aliceSocket = await clients.openSocket(aliceAccount.cookie);
     const bobSocket = await clients.openSocket(bobAccount.cookie);
-    const fresh = await send(aliceSocket, SOCKET_EVENTS.ROOM_CREATE, { gameId: "race", options: {} });
+    const fresh = await send(aliceSocket, SOCKET_EVENTS.ROOM_CREATE, {
+      gameId: "race",
+      options: { target: 3 },
+    });
     const refused = await send(bobSocket, SOCKET_EVENTS.ROOM_JOIN, { code: fresh.data.code });
 
     expect((await list({ cookie: aliceAccount.cookie })).map((each) => each.displayName).sort()).toEqual(
@@ -279,8 +303,14 @@ describe("blocks follow a guest who signs in, and go with a deleted account (ADR
     const other = await finishedRace(carol, riya);
     await block(carol, { roomCode: other.code, seat: seatOf(other.seats, riya) });
 
-    const exported = await call("POST", "/account/export", { body: { password: PASSWORD }, cookie: riya.cookie });
-    const deleted = await call("POST", "/account/delete", { body: { password: PASSWORD }, cookie: riya.cookie });
+    const exported = await call("POST", "/account/export", {
+      body: { password: PASSWORD },
+      cookie: riya.cookie,
+    });
+    const deleted = await call("POST", "/account/delete", {
+      body: { password: PASSWORD },
+      cookie: riya.cookie,
+    });
 
     expect(exported.body.blocks).toEqual([
       { displayName: bob.identity.displayName, blockedAt: expect.any(String) },

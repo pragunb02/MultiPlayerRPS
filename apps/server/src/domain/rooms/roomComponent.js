@@ -82,6 +82,13 @@ const ABORTED = Object.freeze({
   reason: ROOM_END_REASONS.ABORTED,
 });
 const isAborted = (room) => room.result?.result === ROOM_END_REASONS.ABORTED;
+// Without a block store nobody is blocked. Tests that are not about blocks build rooms without one.
+const NOBODY = Object.freeze(new Set());
+const NOBODY_BLOCKED = Object.freeze({ blockedWith: async () => NOBODY });
+// A blocked pair is refused a seat with exactly the answer a full room gets, and a rematch with an answer that says
+// no more than "no", so neither refusal tells a player that they were blocked (ADR-053).
+const FULL = "This room is full";
+const NO_REMATCH_NOW = "A rematch is not possible now";
 /** The people seated in a room before or after a change, each once. A computer player hears nothing. */
 const playersOf = (before, after) => [
   ...new Set(
@@ -123,10 +130,12 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  *   generateMatchId?: () => string,
  *   botTurns?: Pick<ReturnType<typeof import("../bots/botTurns.js").createBotTurns>, "settle" | "checkMove" | "fairness">,
  *   keepFinishedGame?: (game: { room: Readonly<import("../../data/roomAccessor.js").Room>, outcome: object }) => Promise<unknown>,
+ *   blocks?: { blockedWith: (query: { playerId: string }) => Promise<ReadonlySet<string>> },
  * }} deps  lifetimes, limits and generators can be given so tests are short and exact. `botTurns` are the rules for
  *   computer players (CC-138, CC-225). Without them no room ever seats one. `keepFinishedGame` stores a finished
  *   game for the match pipeline (CC-111). It runs before every change to a finished room, so a game is never
- *   replaced by a rematch or closed with its room before it is safe. Without it nothing is kept
+ *   replaced by a rematch or closed with its room before it is safe. Without it nothing is kept. `blocks` answers
+ *   the players on either side of a block with someone (CC-044): they are never seated together or rematched
  */
 export function createRoomComponent({
   roomAccessor,
@@ -139,6 +148,7 @@ export function createRoomComponent({
   generateMatchId = randomUUID,
   botTurns = NO_BOT_TURNS,
   keepFinishedGame = async () => {},
+  blocks = NOBODY_BLOCKED,
 }) {
   assertDefined(roomAccessor, "roomAccessor");
   assertDefined(engines, "engines");
@@ -149,6 +159,7 @@ export function createRoomComponent({
   assertFunction(generateSeed, "generateSeed");
   assertFunction(generateMatchId, "generateMatchId");
   assertFunction(keepFinishedGame, "keepFinishedGame");
+  assertFunction(blocks?.blockedWith, "blocks.blockedWith");
 
   const engineFor = (room) => engines.get(room.gameId);
   const seatOf = (room, playerId) => room.seats.find((seat) => seat.playerId === playerId);
@@ -170,6 +181,15 @@ export function createRoomComponent({
     });
   const rulesOf = (room) => (type) => ruleFor({ type, engine: engineFor(room), lifetimes });
   const settled = (room, now) => settleRequests(room, { now, rules: rulesOf(room), lifetimes });
+  /** The players on either side of a block with `playerId`, read only for a rematch: no other request needs them. */
+  const blockedForRematch = (playerId, type) =>
+    type === ROOM_REQUEST_TYPES.REMATCH ? blocks.blockedWith({ playerId }) : NOBODY;
+  /** A rematch between a blocked pair is refused without saying why (CC-044). */
+  const refuseBlockedRematch = (room, playerId, blocked) => {
+    if (room.seats.some((seat) => seat.playerId !== playerId && blocked.has(seat.playerId))) {
+      throw new ConflictError(NO_REMATCH_NOW);
+    }
+  };
 
   /**
    * Adds what storage needs to find the room again at the right moment: when something next happens in it by
@@ -642,11 +662,15 @@ export function createRoomComponent({
      * player is connected, so it may start when the last player who was away comes back. A computer player
      * (CC-138) keeps its `bot` label on the seat, so every view shows it as one.
      *
+     * A player is never seated with someone on either side of a block with them (CC-044). They are told the room
+     * is full, as they would be if it were.
+     *
      * @param {{ code: string, player: import("../../models/identity.js").Identity | import("../../models/botIdentity.js").BotIdentity, now: number }} input
      * @throws {GoneError} when the room has closed, with the reason in `details`
      */
-    joinRoom: ({ code, player, now }) =>
-      changedRoom({
+    joinRoom: async ({ code, player, now }) => {
+      const blocked = await blocks.blockedWith({ playerId: player.id });
+      return changedRoom({
         code,
         now,
         decide(room) {
@@ -658,9 +682,12 @@ export function createRoomComponent({
           if (!waiting) {
             throw new ConflictError("This game has already started");
           }
-          // Every seat is taken, and the game waits for a player who is away.
-          if (room.seats.length === engineFor(room).players.max) {
-            throw new ConflictError("This room is full");
+          // Every seat is taken, and the game waits for a player who is away. Or someone here is blocked with them.
+          if (
+            room.seats.length === engineFor(room).players.max ||
+            room.seats.some((seat) => blocked.has(seat.playerId))
+          ) {
+            throw new ConflictError(FULL);
           }
           const seated = withSeats(
             room,
@@ -679,7 +706,8 @@ export function createRoomComponent({
           );
           return startWhenReady(seated, now);
         },
-      }),
+      });
+    },
 
     /**
      * Applies a move through the game engine. Rule violations become ValidationErrors carrying the reason.
@@ -745,16 +773,19 @@ export function createRoomComponent({
      * @throws {ForbiddenError} for someone without a seat
      * @throws {ValidationError} for a kind of request this game does not have
      * @throws {ConflictError} at the wrong moment, while their own request is open, during the cooldown after
-     *   the last one, once the limit is used up, or when a rematch is no longer possible
+     *   the last one, once the limit is used up, or when a rematch is no longer possible, which includes a
+     *   rematch with someone on either side of a block with the player (CC-044)
      * @throws {GoneError} when the room closed
      */
-    askRequest: ({ code, playerId, type, now }) =>
-      changedRoom({
+    askRequest: async ({ code, playerId, type, now }) => {
+      const blocked = await blockedForRematch(playerId, type);
+      return changedRoom({
         code,
         now,
         decide(stored) {
           requireSeat(stored, playerId);
           const room = settled(stored, now);
+          refuseBlockedRematch(room, playerId, blocked);
           const theirs = openRequest(room, type);
           if (theirs !== undefined && theirs.to === playerId) {
             return accepting(room, theirs, now);
@@ -769,7 +800,8 @@ export function createRoomComponent({
           const rule = rulesOf(room)(type);
           return { ...addRequest(room, { playerId, type, now, rule, lifetimes }), lastActivityAt: now };
         },
-      }),
+      });
+    },
 
     /**
      * Answers an open request (CC-159): the player asked accepts or declines it, the player who asked withdraws
@@ -780,11 +812,13 @@ export function createRoomComponent({
      *   a REQUEST_ANSWERS value
      * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>}
      * @throws {ForbiddenError} for someone without a seat, or an answer that is not theirs to give
-     * @throws {ConflictError} when no such request is open any more
+     * @throws {ConflictError} when no such request is open any more, or for accepting a rematch with someone on
+     *   either side of a block with the player (CC-044). Declining and withdrawing still work
      * @throws {GoneError} when the room closed
      */
-    answerRequest: ({ code, playerId, type, answer, now }) =>
-      changedRoom({
+    answerRequest: async ({ code, playerId, type, answer, now }) => {
+      const blocked = answer === REQUEST_ANSWERS.ACCEPT ? await blockedForRematch(playerId, type) : NOBODY;
+      return changedRoom({
         code,
         now,
         decide(stored) {
@@ -796,13 +830,15 @@ export function createRoomComponent({
           }
           requireAnswerer({ request, playerId, byAsker: answer === REQUEST_ANSWERS.WITHDRAW });
           if (answer === REQUEST_ANSWERS.ACCEPT) {
+            refuseBlockedRematch(room, playerId, blocked);
             return accepting(room, request, now);
           }
           const state =
             answer === REQUEST_ANSWERS.DECLINE ? REQUEST_STATES.DECLINED : REQUEST_STATES.WITHDRAWN;
           return { ...endRequest(room, { request, state, now }), lastActivityAt: now };
         },
-      }),
+      });
+    },
 
     /**
      * Marks a player's seat as offline: they lost their connection. They keep the seat and can rejoin.

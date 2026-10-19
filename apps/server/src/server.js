@@ -7,6 +7,7 @@ import { BOTS, createBotRegistry, createEngineRegistry, ENGINES } from "@classic
 import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
+import { createBlockAccessor } from "./data/blockAccessor.js";
 import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
 import { createGamificationAccessor } from "./data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "./data/leaderboardAccessor.js";
@@ -21,6 +22,7 @@ import { createPlayerDataComponent } from "./domain/accounts/playerDataComponent
 import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/analyticsComponent.js";
 import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botComponent.js";
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
+import { createBlockComponent } from "./domain/blocks/blockComponent.js";
 import { createBotTurns } from "./domain/bots/botTurns.js";
 import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
 import { createThinkingQueue } from "./domain/bots/thinkingQueue.js";
@@ -44,6 +46,7 @@ import { createAccountDeletionDao } from "./persistence/accountDeletionDao.js";
 import { createAchievementDao } from "./persistence/achievementDao.js";
 import { createAnalyticsDao } from "./persistence/analyticsDao.js";
 import { connectDatabase } from "./persistence/database.js";
+import { createBlockDao } from "./persistence/blockDao.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
@@ -504,7 +507,7 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number } },
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
@@ -556,6 +559,7 @@ export async function startServer({
   const analyticsDao = createAnalyticsDao({ connection: database.connection }); // read-only, CC-233
   const pendingMatchDao = createPendingMatchDao({ connection: database.connection });
   const accountDeletionDao = createAccountDeletionDao({ connection: database.connection });
+  const blockDao = createBlockDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -570,6 +574,7 @@ export async function startServer({
       leaderboardDao,
       pendingMatchDao,
       accountDeletionDao,
+      blockDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -587,6 +592,7 @@ export async function startServer({
   const pendingMatchAccessor = createPendingMatchAccessor({ pendingMatchDao });
   const accountDeletionAccessor = createAccountDeletionAccessor({ accountDeletionDao });
   const sessionAccessor = createSessionAccessor({ sessionDao });
+  const blockAccessor = createBlockAccessor({ blockDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -600,6 +606,11 @@ export async function startServer({
     accountDeletionAccessor,
   });
   const matchComponent = createMatchComponent({ matchAccessor });
+  const blockComponent = createBlockComponent({
+    blockAccessor,
+    rooms: roomAccessor,
+    matches: matchComponent,
+  });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
     matchAccessor,
@@ -625,6 +636,7 @@ export async function startServer({
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
+      { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ],
     matches: matchComponent,
@@ -664,6 +676,7 @@ export async function startServer({
     limits: limitsOfRooms,
     botTurns,
     keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
+    blocks: blockComponent,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const botDriver = createBotDriver({
@@ -724,6 +737,7 @@ export async function startServer({
         erasePlayer: playerTransferComponent.erasePlayer,
         exportPlayer: playerTransferComponent.exportPlayer,
       },
+      { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
     ],
   });
 
@@ -760,6 +774,8 @@ export async function startServer({
     guestLimit: limits.guest,
     leaderboardLimit: limits.leaderboard,
     apiLimit: limits.api,
+    blockLimits: limits.blocks,
+    blockComponent,
     leaderboardComponent,
     analyticsComponent,
     sessionMiddleware,
