@@ -438,6 +438,9 @@ would need a session, the integration tests a replica set, and the room DAO alre
 M0's 100 operations a second. One new collection with three indexes. A second instance (CC-061) needs a lease in the
 record, because today one process keeps the games it is running in memory.
 
+**Amended · 2026-10-20** (CC-042, ADR-062, open until the merge). A sixth step, "apply chess ratings", needs only
+judge. Its writes are guarded by a revision, so a lost race fails the step and the retries above run it again.
+
 ### ADR-044 — Backups: age-encrypted mongodump to an S3-compatible bucket, from GitHub Actions
 
 - **Status:** Accepted · 2026-10-17 (proposed in [CC-108](tickets/CC-108.md), merged in PR #45. Runbook:

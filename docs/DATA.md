@@ -30,30 +30,31 @@ does not.
 
 ## Summary
 
-| Store                                                 | Personal data                                                         | Kept for                                                       | Deleted by                               |
-| ----------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------- |
-| [`accounts`](#accounts)                               | yes: username, email, password hash                                   | for ever                                                       | nothing (no deletion yet, CC-035)        |
-| [`users` (legacy, read only)](#users-legacy)          | yes: username, email, bcrypt hash, legacy level                       | for ever                                                       | nothing (the new server never writes it) |
-| [Other legacy collections](#other-legacy-collections) | yes, if they still exist: names and choices per room                  | unknown                                                        | nothing                                  |
-| [`player_sessions`](#player_sessions)                 | pseudonymous: player id, display name                                 | 30 days after the last visit                                   | MongoDB TTL index, logout                |
-| [`rooms`](#rooms)                                     | pseudonymous: ids, names, every move, network hash                    | 30 minutes to 24 hours after the last activity (table below)   | the room sweep, every minute             |
-| [`closed_rooms`](#closed_rooms)                       | no                                                                    | 24 hours                                                       | the room sweep                           |
-| [`matches`](#matches)                                 | pseudonymous: ids, names, every move with its time                    | for ever                                                       | nothing                                  |
-| [`player_progress`](#player_progress)                 | pseudonymous: XP and results                                          | for ever (a guest's stays as a marker after moving)            | nothing                                  |
-| [`player_stats`](#player_stats)                       | pseudonymous: results, streaks                                        | for ever (a guest's is removed when it moves to an account)    | the guest transfer                       |
-| [`player_achievements`](#player_achievements)         | pseudonymous                                                          | for ever (a guest's move to the account)                       | the guest transfer                       |
-| [`player_quests`](#player_quests)                     | pseudonymous                                                          | 8 days after the quest day                                     | MongoDB TTL index, the guest transfer    |
-| [`leaderboard_entries`](#leaderboard_entries)         | yes for accounts: username, level, score (public)                     | all time boards for ever, weekly boards 28 days after the week | MongoDB TTL index (weekly only)          |
-| [`player_transfers`](#player_transfers)               | pseudonymous: guest id, account id and username                       | for ever                                                       | nothing                                  |
-| [`player_blocks`](#player_blocks)                     | pseudonymous: both player ids, the blocked player's name then         | until unblocked, or either account is deleted                  | unblocking, account deletion             |
-| [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)           | until the player deletes the account                           | account deletion (CC-035)                |
-| [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                             | 30 days                                                        | MongoDB TTL index                        |
-| [`legacy_closures`](#legacy_closures)                 | pseudonymous: the id of a legacy row whose player deleted the account | for ever                                                       | nothing                                  |
-| [Server memory](#server-memory)                       | yes: IP addresses (rate limits, connections), keyed hashes            | seconds to 30 days, and never past a restart or deploy         | a restart, pruning                       |
-| [`cc.sid` cookie](#the-ccsid-cookie)                  | pseudonymous: a random session id                                     | 30 days after the last response                                | the browser, logout                      |
-| [`cc.sound`](#ccsound-in-localstorage)                | no                                                                    | until the browser's site data is cleared                       | the browser                              |
-| [Server logs](#server-logs)                           | pseudonymous: player ids, room codes; Render's own lines may hold IPs | Render's plan: 7 days on Hobby, 14 on Pro                      | Render                                   |
-| [Backups](#backups)                                   | yes: everything in MongoDB                                            | 30 days                                                        | the bucket's lifecycle rule              |
+| Store                                                 | Personal data                                                         | Kept for                                                                | Deleted by                               |
+| ----------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------- |
+| [`accounts`](#accounts)                               | yes: username, email, password hash                                   | for ever                                                                | nothing (no deletion yet, CC-035)        |
+| [`users` (legacy, read only)](#users-legacy)          | yes: username, email, bcrypt hash, legacy level                       | for ever                                                                | nothing (the new server never writes it) |
+| [Other legacy collections](#other-legacy-collections) | yes, if they still exist: names and choices per room                  | unknown                                                                 | nothing                                  |
+| [`player_sessions`](#player_sessions)                 | pseudonymous: player id, display name                                 | 30 days after the last visit                                            | MongoDB TTL index, logout                |
+| [`rooms`](#rooms)                                     | pseudonymous: ids, names, every move, network hash                    | 30 minutes to 24 hours after the last activity (table below)            | the room sweep, every minute             |
+| [`closed_rooms`](#closed_rooms)                       | no                                                                    | 24 hours                                                                | the room sweep                           |
+| [`matches`](#matches)                                 | pseudonymous: ids, names, every move with its time                    | for ever                                                                | nothing                                  |
+| [`player_progress`](#player_progress)                 | pseudonymous: XP and results                                          | for ever (a guest's stays as a marker after moving)                     | nothing                                  |
+| [`chess_ratings`](#chess_ratings)                     | pseudonymous: chess rating and its last 200 changes                   | until the account is deleted (a guest's stays as a marker after moving) | account deletion (CC-035)                |
+| [`player_stats`](#player_stats)                       | pseudonymous: results, streaks                                        | for ever (a guest's is removed when it moves to an account)             | the guest transfer                       |
+| [`player_achievements`](#player_achievements)         | pseudonymous                                                          | for ever (a guest's move to the account)                                | the guest transfer                       |
+| [`player_quests`](#player_quests)                     | pseudonymous                                                          | 8 days after the quest day                                              | MongoDB TTL index, the guest transfer    |
+| [`leaderboard_entries`](#leaderboard_entries)         | yes for accounts: username, level, score (public)                     | all time boards for ever, weekly boards 28 days after the week          | MongoDB TTL index (weekly only)          |
+| [`player_transfers`](#player_transfers)               | pseudonymous: guest id, account id and username                       | for ever                                                                | nothing                                  |
+| [`player_blocks`](#player_blocks)                     | pseudonymous: both player ids, the blocked player's name then         | until unblocked, or either account is deleted                           | unblocking, account deletion             |
+| [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)           | until the player deletes the account                                    | account deletion (CC-035)                |
+| [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                             | 30 days                                                                 | MongoDB TTL index                        |
+| [`legacy_closures`](#legacy_closures)                 | pseudonymous: the id of a legacy row whose player deleted the account | for ever                                                                | nothing                                  |
+| [Server memory](#server-memory)                       | yes: IP addresses (rate limits, connections), keyed hashes            | seconds to 30 days, and never past a restart or deploy                  | a restart, pruning                       |
+| [`cc.sid` cookie](#the-ccsid-cookie)                  | pseudonymous: a random session id                                     | 30 days after the last response                                         | the browser, logout                      |
+| [`cc.sound`](#ccsound-in-localstorage)                | no                                                                    | until the browser's site data is cleared                                | the browser                              |
+| [Server logs](#server-logs)                           | pseudonymous: player ids, room codes; Render's own lines may hold IPs | Render's plan: 7 days on Hobby, 14 on Pro                               | Render                                   |
+| [Backups](#backups)                                   | yes: everything in MongoDB                                            | 30 days                                                                 | the bucket's lifecycle rule              |
 
 ## MongoDB collections
 
@@ -188,6 +189,22 @@ of every nightly backup.
 4. **Kept for:** for ever. A guest's document stays as a marker naming the account after the guest signs in
    (ADR-014), so a late match still reaches the account.
 5. **Deleted by:** nothing.
+
+### `chess_ratings`
+
+`apps/server/src/persistence/chessRatingDao.js` (CC-042, ADR-062)
+
+1. **Holds:** `playerId`, the Glicko-2 `rating`, `deviation` and `volatility`, `games` (rated games played),
+   `lastRatedAt`, `seed` (the level picked against Queen Vee that set the start, while no game is rated),
+   `changes` (the last 200: `matchId`, `at`, the rating before and after, and `superseded` for the changes of a
+   rating that lost when a guest moved into an account), `revision`, `mergedFrom` (guests merged into an account),
+   `mergedInto` (on a guest that moved), `updatedAt`. No other player's id.
+2. **Personal data:** pseudonymous.
+3. **Who can read it:** the player and everyone in a chess room they sit in (`rating:room`, `rating:updated`), only
+   as the rounded rating, deviation, games and the room's change. The data export. The owner.
+4. **Kept for:** until the account is deleted. A guest's document stays as a marker naming the account after the
+   guest signs in (ADR-014), so a late game is rated on the account.
+5. **Deleted by:** account deletion, with the markers of the guests who moved into it (CC-035).
 
 ### `player_stats`
 
