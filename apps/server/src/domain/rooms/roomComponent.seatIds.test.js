@@ -233,6 +233,20 @@ describe("room views name players by seat id (CC-253)", () => {
     expect(wire([forAlice, forBob])).not.toContain(BOB.id);
   });
 
+  it("hides every player of a room stored before CC-253, whose game does not list its players", async () => {
+    const { rooms, seatIds } = setup();
+    const code = await finishedRps(rooms);
+    const { players, ...game } = (await rooms.getRoom(code)).game;
+    const stored = { ...(await rooms.getRoom(code)), game };
+
+    const view = rooms.viewFor(stored, BOB.id);
+
+    expect(players).toEqual([ALICE.id, BOB.id]);
+    expect(view.you).toBe(seatIds.seatIdOf(stored, BOB.id));
+    expect(wire(view)).not.toContain(ALICE.id);
+    expect(wire(view)).not.toContain(BOB.id);
+  });
+
   it("records who a game started with, so the players stay known after seats change", async () => {
     const { rooms } = setup();
     const code = await rpsGame(rooms);
