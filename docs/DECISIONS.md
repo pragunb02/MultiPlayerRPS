@@ -2,11 +2,34 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-051**. A later change to a decision is a dated
+reused; the next free ID is **ADR-053**. A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
 ## Open decisions
+
+### ADR-052 — The look and feel domain: scope, moves, new tickets and five choices
+
+- **Status:** Open · 2026-10-19 (from [domains/LOOK_AND_FEEL.md](domains/LOOK_AND_FEEL.md), owner to decide)
+- **Context.** The owner asked for the look and feel domain to be defined, with every ticket in it and what is
+  missing. The research and reasons are in the domain file, sections 3 and 5.
+- **Recommendation.**
+  1. Scope as in section 1 of the domain file, widened to the art pipeline and the microcopy of feel moments.
+  2. Five new tickets as an exception to the feature freeze: CC-280 appearance settings, CC-281 motion tokens,
+     CC-282 loading states, CC-283 icon set, CC-284 haptics.
+  3. Moves: CC-092 narrowed (page transitions to CC-153d, exits and card flips to CC-281) and then closed; CC-153g
+     (emotes, which is CC-169) and CC-153h (win cards) to Social and sharing; CC-156's unlock rules to CC-143;
+     CC-205's event quests and badges to seasons (CC-055); CC-194 and CC-265 to CC-267 into this domain.
+  4. The build order in section 6 of the domain file.
+  5. Default theme: follow the OS, as today (the vision §5.13 says dark by default).
+  6. Theme and motion choice in a second allowed storage key `cc.look`, applied before the first paint by a
+     same-origin `/theme.js` (CSP-safe), not a cookie.
+  7. Amends ADR-050 point 4: page transitions through React's `<ViewTransition>` if it is in the stable `react` we
+     ship, because React Router deprecated its `viewTransition` prop; the router prop otherwise.
+  8. Haptics on for three moments, with a switch next to sound.
+  9. Icons drawn by us (or copied from an MIT set with a credits row; Lucide is ISC and not on the allowlist).
+- **Not changed.** ADR-012, ADR-016 and ADR-018 stand: CSS on SVG, Motion only on chess, synthesised sound, no
+  sound refresh.
 
 ### ADR-046 — Our own screen in front of Render's cold start page
 
