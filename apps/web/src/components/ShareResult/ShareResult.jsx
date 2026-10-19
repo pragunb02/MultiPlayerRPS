@@ -23,7 +23,7 @@ export function ShareResult({ room, origin = siteOrigin() }) {
     async () => {
       if (typeof navigator.share === "function") {
         try {
-          await navigator.share({ title: "ClassiCade", text: share.text, url: share.url });
+          await navigator.share({ title: "ClassiCade", text: share.text, url: share.shareUrl });
           return;
         } catch (error) {
           // The player closed the share sheet, so there is nothing to do. Any other refusal, such as a browser that
@@ -48,7 +48,7 @@ export function ShareResult({ room, origin = siteOrigin() }) {
     <div className={styles.share} data-cc-slot="share">
       <p className={styles.preview}>{share.line}</p>
       <div className={styles.buttons}>
-        <WhatsAppLink message={share.message} control="result.whatsapp" />
+        <WhatsAppLink message={share.whatsappMessage} control="result.whatsapp" />
         <Button control="result.share" variant="secondary" action={send}>
           Share result
         </Button>

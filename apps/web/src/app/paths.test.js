@@ -8,6 +8,7 @@ import {
   returnPathFor,
   returnsToRoom,
   safeNext,
+  withShareChannel,
 } from "./paths.js";
 
 describe("paths", () => {
@@ -32,6 +33,25 @@ describe("paths", () => {
     expect(paths.login("/")).toBe("/login");
     expect(paths.login("/games/chess/rooms/AB2CD3")).toBe("/login?next=%2Fgames%2Fchess%2Frooms%2FAB2CD3");
     expect(paths.signup("https://evil.example")).toBe("/signup");
+  });
+});
+
+describe("withShareChannel (CC-279)", () => {
+  it.each(["wa", "share", "copy"])("marks a shared link with via=%s and no other parameter", (channel) => {
+    const link = new URL(withShareChannel("https://classicade.example/games/chess", channel));
+
+    expect(link.origin + link.pathname).toBe("https://classicade.example/games/chess");
+    expect([...link.searchParams]).toEqual([["via", channel]]);
+  });
+
+  it("puts the marker after the room's address, so the invite still opens the room", () => {
+    expect(withShareChannel("https://classicade.example/games/chess/rooms/AB2CD3", "copy")).toBe(
+      "https://classicade.example/games/chess/rooms/AB2CD3?via=copy",
+    );
+  });
+
+  it.each(["telegram", "", "u_5f2a9c"])("refuses a channel not on the list (%j)", (channel) => {
+    expect(() => withShareChannel("https://classicade.example/games/chess", channel)).toThrow(RangeError);
   });
 });
 

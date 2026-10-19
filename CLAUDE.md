@@ -81,7 +81,15 @@ These rules come first. Where they differ from anything below, they win.
    during its first week; the owner decides whether to require it. **Merging to `main` deploys to
    production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
    dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging (DEPLOYMENT.md).
+   **Temporary (owner, 2026-10-20):** during the feature phase merges do not wait for CI and branch protection
+   requires no checks. CI still runs on every PR and push, and Render deploys only commits whose checks pass. The
+   owner restores the required checks after the feature phase.
 8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
+9. **Parallel agents (owner, 2026-10-20, from research):** at most 5 builders at once on one machine. Each starts
+   from fresh `main` (never another open PR) with the files and APIs it owns listed in its brief. Locally a builder
+   runs only the tests its change touches (`vitest related … --maxWorkers=2`, one or two Playwright specs with
+   `--workers=1`); CI runs everything and is the source of truth. Reviews block only on correctness, security or a
+   missing requirement; design findings below high severity become follow-up tickets.
 
 ## History
 
