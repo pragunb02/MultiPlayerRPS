@@ -5,6 +5,7 @@ import { ChessOptions } from "./chess/ChessOptions.jsx";
 import { CHESS_HOW_TO_PLAY, RPS_HOW_TO_PLAY, TICTACTOE_HOW_TO_PLAY } from "./howToPlay.js";
 import { lazyBoard } from "./lazyBoard.js";
 import { rpsReasonPhrase, rpsSounds } from "./rps/rpsAlerts.js";
+import { rpsHandOverNote } from "./rps/rpsPassAndPlay.js";
 import { RpsOptions } from "./rps/RpsOptions.jsx";
 import { tictactoeReasonPhrase, tictactoeSounds } from "./tictactoe/tictactoeAlerts.js";
 
@@ -12,6 +13,21 @@ import { tictactoeReasonPhrase, tictactoeSounds } from "./tictactoe/tictactoeAle
 const RpsBoard = lazyBoard(() => import("./rps/RpsBoard.jsx"), "RpsBoard");
 const TicTacToeBoard = lazyBoard(() => import("./tictactoe/TicTacToeBoard.jsx"), "TicTacToeBoard");
 const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard");
+
+// The engines for pass and play load the same way, only when two people start a game on one phone (CC-223).
+const RPS_PASS_AND_PLAY = Object.freeze({
+  loadEngine: () => import("@classicade/games/rps").then((module) => module.rpsEngine),
+  handOver: true,
+  handOverNote: rpsHandOverNote,
+});
+const TICTACTOE_PASS_AND_PLAY = Object.freeze({
+  loadEngine: () => import("@classicade/games/tictactoe").then((module) => module.tictactoeEngine),
+  handOver: false,
+});
+const CHESS_PASS_AND_PLAY = Object.freeze({
+  loadEngine: () => import("@classicade/games/chess").then((module) => module.chessEngine),
+  handOver: false,
+});
 
 /**
  * What a game brings to the web app. Every field is optional: a game with only a `Board` plays in the match shell
@@ -34,6 +50,20 @@ const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard
  *   rounds of a best-of-3, for the match bar. Undefined when there is none yet
  * @property {import("react").ComponentType<{ room: any }>} [Panel]  the game's side panel, such as a move list,
  *   under the players in the side column
+ * @property {PassAndPlay} [passAndPlay]  how two people play the game on one phone (CC-223). A game without it has
+ *   no pass and play
+ */
+
+/**
+ * What a game brings to pass and play (CC-223).
+ *
+ * @typedef {Object} PassAndPlay
+ * @property {() => Promise<Readonly<import("@classicade/games").GameEngine<any, any, any>>>} loadEngine  the game's
+ *   pure engine, loaded on demand like the board, so a game never downloads another game's rules
+ * @property {boolean} handOver  whether a move stays secret until both have moved, as in Rock Paper Scissors. Then
+ *   a "pass the phone" screen covers the board whenever the phone must go to the other player
+ * @property {(room: any) => string} [handOverNote]  what that screen says about the last turn, which both players
+ *   may see, such as how the last round went. "" when there is nothing to say
  */
 
 /**
@@ -61,12 +91,14 @@ export const GAME_VIEWS = Object.freeze({
     soundsFor: rpsSounds,
     reasonPhrase: rpsReasonPhrase,
     howToPlay: RPS_HOW_TO_PLAY,
+    passAndPlay: RPS_PASS_AND_PLAY,
   }),
   [GAME_IDS.TIC_TAC_TOE]: Object.freeze({
     Board: TicTacToeBoard,
     soundsFor: tictactoeSounds,
     reasonPhrase: tictactoeReasonPhrase,
     howToPlay: TICTACTOE_HOW_TO_PLAY,
+    passAndPlay: TICTACTOE_PASS_AND_PLAY,
   }),
   [GAME_IDS.CHESS]: Object.freeze({
     Options: ChessOptions,
@@ -76,6 +108,7 @@ export const GAME_VIEWS = Object.freeze({
     reasonPhrase: chessReasonPhrase,
     howToPlay: CHESS_HOW_TO_PLAY,
     actions: chessActions,
+    passAndPlay: CHESS_PASS_AND_PLAY,
   }),
 });
 

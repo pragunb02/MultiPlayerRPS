@@ -36,6 +36,7 @@ export const SHARDS = Object.freeze([
     "accessibility.spec.js", // 203, desktop only
     "dead-space.spec.js", // new (CC-259), not measured yet
     "layout-width.spec.js", // new (CC-256, CC-270), about 15 s a phone size locally
+    "pass-and-play.spec.js", // new (CC-223), about 30 s locally
   ]),
   // 1106 s
   Object.freeze([

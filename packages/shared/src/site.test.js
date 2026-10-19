@@ -56,6 +56,19 @@ describe("describePage", () => {
     expect(describePage("/play/rps").path).toBe("/games/rock-paper-scissors");
   });
 
+  it("describes pass and play for every game, never listed, at its canonical path (CC-223)", () => {
+    expect(describePage("/games/rps/Pass-And-Play")).toMatchObject({
+      found: true,
+      indexable: false,
+      title: "Rock Paper Scissors on one phone · ClassiCade",
+      path: "/games/rock-paper-scissors/pass-and-play",
+      image: "/og/rock-paper-scissors.png",
+    });
+    expect(describePage("/games/ludo/pass-and-play")).toMatchObject({ found: false });
+    expect(describePage("/play/chess/pass-and-play")).toMatchObject({ found: false });
+    expect(describePage("/games/chess/pass-and-play").description.length).toBeLessThanOrEqual(160);
+  });
+
   it("invites to a room by the game its URL names, with an upper case code, never listed", () => {
     const invite = describePage("/games/chess/rooms/ab2cd3");
 

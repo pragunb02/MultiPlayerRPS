@@ -91,6 +91,18 @@ const lobby = (game, indexable) =>
     ...withGameImage(game),
   });
 
+/**
+ * Two people playing on one phone (CC-223). Nothing about the game is on the server, so the page is the same for
+ * everyone and is not listed: the lobby is the page to find.
+ */
+const passAndPlay = (game) =>
+  page({
+    title: `${game.name} on one phone · ${SITE_NAME}`,
+    description: `Play ${game.name} with someone beside you, taking turns on one phone. Free, no account needed, and nothing is saved.`,
+    path: `/games/${game.slug}/pass-and-play`,
+    ...withGameImage(game),
+  });
+
 /** A room's URL names its game, so the preview can say which game without asking whether the room exists. */
 const room = (game, code) =>
   game === undefined
@@ -179,6 +191,14 @@ function match(segments) {
     if (rest.length === 1 && game !== undefined) {
       // Only the canonical lobby URL is listed, old and mistyped spellings are sent there by the app.
       return lobby(game, head === "games" && rest[0] === game.slug);
+    }
+    if (
+      head === "games" &&
+      rest.length === 2 &&
+      rest[1].toLowerCase() === "pass-and-play" &&
+      game !== undefined
+    ) {
+      return passAndPlay(game);
     }
     const isRoom = head === "games" && rest.length === 3 && rest[1].toLowerCase() === "rooms";
     const code = isRoom ? roomCodeOf(rest[2]) : undefined;

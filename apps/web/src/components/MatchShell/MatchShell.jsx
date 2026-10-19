@@ -1,20 +1,17 @@
-import { Suspense } from "react";
 import { getGame } from "@classicade/shared";
-import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { resultHeadline } from "../../games/outcomeText.js";
 import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
-import { gameNumber, matchPhase, playReason, PLAY_REASONS } from "../../games/roomView.js";
+import { gameNumber, matchPhase, PLAY_REASONS } from "../../games/roomView.js";
 import { useAction } from "../../hooks/useAction.js";
 import { outcomeFor } from "../Celebrations/outcome.js";
 import { ResultCelebration } from "../Celebrations/ResultCelebration.jsx";
 import { ClaimWin } from "../ClaimWin/ClaimWin.jsx";
 import { ComputerNote } from "../ComputerNote/ComputerNote.jsx";
-import { PageTitle } from "../PageTitle.jsx";
 import { RequestBanner } from "../RequestBanner/RequestBanner.jsx";
 import { SaveProgressCard } from "../SaveProgress/SaveProgressCard.jsx";
 import { Seats } from "../Seats/Seats.jsx";
 import { ActionBar } from "./ActionBar.jsx";
-import { MatchAnnouncer } from "./MatchAnnouncer.jsx";
+import { MatchFrame, MatchStage } from "./MatchFrame.jsx";
 import { sendIntent, shellLayout } from "./matchShell.js";
 import styles from "./MatchShell.module.css";
 
@@ -22,27 +19,6 @@ import styles from "./MatchShell.module.css";
 function requestState(room) {
   if (incomingRequests(room).length > 0) return "incoming";
   return outgoingRequests(room).length > 0 ? "outgoing" : "none";
-}
-
-/** The game's board, loaded on demand. A rematch is a new game in this room: a fresh board, not the last one's. */
-function Stage({ room, game, onMove, onAsk, reconnecting }) {
-  const { Board } = game;
-  if (Board === undefined) {
-    return (
-      <p className={styles.card}>The {getGame(room.gameId)?.name ?? "game"} board is not available yet.</p>
-    );
-  }
-  return (
-    <Suspense fallback={<p aria-busy="true">Loading the board…</p>}>
-      <Board
-        key={gameNumber(room)}
-        room={room}
-        onMove={onMove}
-        onAsk={onAsk}
-        reason={playReason(room, { reconnecting })}
-      />
-    </Suspense>
-  );
 }
 
 /**
@@ -118,58 +94,53 @@ export function MatchShell({
   );
 
   return (
-    <MatchAnnouncer urgent={layout.result ? resultHeadline(room) : ""}>
-      <section className={styles.shell} data-cc-phase={matchPhase(room)} data-cc-request={requestState(room)}>
-        <PageTitle>{`${gameName} · Room ${room.code}`}</PageTitle>
-        <RequestBanner room={room} onAction={act} onNewOpponent={bannerNewOpponent} reason={offline} />
-        <ClaimWin room={room} onClaim={onClaimWin} reason={offline} />
-        <header className={styles.matchBar} data-cc-slot="match-bar">
-          <h1 className={styles.title}>
-            <GameIcon gameId={room.gameId} size={32} />
-            {gameName}
-          </h1>
-          {score !== undefined && <p className={styles.score}>{score.text}</p>}
-        </header>
-
-        <div className={styles.layout}>
-          <div className={styles.main}>
-            {layout.result && (
-              <section
-                className={`${styles.outcome} ${styles[outcomeFor(room)]}`}
-                aria-labelledby="result-heading"
-                data-cc-slot="result"
-              >
-                <div className={styles.headline}>
-                  <ResultCelebration room={room} />
-                  <h2 id="result-heading">{resultHeadline(room)}</h2>
-                </div>
-                {actionBar}
-              </section>
-            )}
-            <div className={styles.stage} data-cc-slot="stage">
-              {layout.stage === "waiting" ? (
-                waiting
-              ) : (
-                <Stage room={room} game={game} onMove={onMove} onAsk={onAsk} reconnecting={reconnecting} />
-              )}
-              {layout.result && <SaveProgressCard room={room} game={gameNumber(room)} />}
-            </div>
-            {layout.actionBar === "under-stage" && actionBar}
+    <MatchFrame
+      pageTitle={`${gameName} · Room ${room.code}`}
+      gameId={room.gameId}
+      gameName={gameName}
+      phase={matchPhase(room)}
+      request={requestState(room)}
+      banner={
+        <>
+          <RequestBanner room={room} onAction={act} onNewOpponent={bannerNewOpponent} reason={offline} />
+          <ClaimWin room={room} onClaim={onClaimWin} reason={offline} />
+        </>
+      }
+      score={score?.text}
+      result={
+        layout.result
+          ? {
+              tone: outcomeFor(room),
+              headline: resultHeadline(room),
+              celebration: <ResultCelebration room={room} />,
+            }
+          : undefined
+      }
+      stage={
+        <>
+          {layout.stage === "waiting" ? (
+            waiting
+          ) : (
+            <MatchStage room={room} game={game} onMove={onMove} onAsk={onAsk} reconnecting={reconnecting} />
+          )}
+          {layout.result && <SaveProgressCard room={room} game={gameNumber(room)} />}
+        </>
+      }
+      actionBar={actionBar}
+      side={
+        <>
+          <div className={styles.presence} data-cc-slot="presence">
+            <h2 className="visually-hidden">Players</h2>
+            <Seats room={room} />
+            <ComputerNote room={room} />
           </div>
-          <aside className={styles.side}>
-            <div className={styles.presence} data-cc-slot="presence">
-              <h2 className="visually-hidden">Players</h2>
-              <Seats room={room} />
-              <ComputerNote room={room} />
+          {Panel !== undefined && layout.stage === "board" && (
+            <div data-cc-slot="panel">
+              <Panel room={room} />
             </div>
-            {Panel !== undefined && layout.stage === "board" && (
-              <div data-cc-slot="panel">
-                <Panel room={room} />
-              </div>
-            )}
-          </aside>
-        </div>
-      </section>
-    </MatchAnnouncer>
+          )}
+        </>
+      }
+    />
   );
 }
