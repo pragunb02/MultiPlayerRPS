@@ -2,7 +2,7 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-054**. A later change to a decision is a dated
+reused; the next free ID is **ADR-056**. A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -33,7 +33,7 @@ the owner may change it.
 - **Context:** Ratings, leaderboards, friends, payments are relational; matches/moves fit documents.
 - **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
 
-### ADR-053 — Pass and play runs in the browser on the pure engines and never counts
+### ADR-054 — Pass and play runs in the browser on the pure engines and never counts
 
 - **Status:** Open · 2026-10-20, proposed ([CC-223](tickets/CC-223.md), research with sources there). Built in the
   CC-223 pull request; the owner accepts it with the merge.
