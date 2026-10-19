@@ -89,7 +89,7 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     /**
      * Blocks the player in a seat of a room both sit in (CC-044). The server never takes a player id.
      *
-     * @param {{ roomCode: string, seat: number }} target
+     * @param {{ roomCode: string, seat: number, seatId: string }} target
      */
     blockPlayer: async (target) => (await request("POST", "/blocks", target)).block,
     /** Removes one of this player's blocks (CC-044). */

@@ -84,11 +84,14 @@ const ABORTED = Object.freeze({
 const isAborted = (room) => room.result?.result === ROOM_END_REASONS.ABORTED;
 // Without a block store nobody is blocked. Tests that are not about blocks build rooms without one.
 const NOBODY = Object.freeze(new Set());
-const NOBODY_BLOCKED = Object.freeze({ blockedWith: async () => NOBODY });
-// A blocked pair is refused a seat with exactly the answer a full room gets, and a rematch with an answer that says
-// no more than "no", so neither refusal tells a player that they were blocked (ADR-053).
+const NO_RELATIONS = Object.freeze({ blocked: NOBODY, blockedBy: NOBODY });
+const NOBODY_BLOCKED = Object.freeze({
+  blockedWith: async () => NOBODY,
+  relationsOf: async () => NO_RELATIONS,
+});
+// A blocked pair is refused a seat with exactly the answer a full room gets, so the refusal never tells a player
+// that they were blocked (ADR-053).
 const FULL = "This room is full";
-const NO_REMATCH_NOW = "A rematch is not possible now";
 /** The people seated in a room before or after a change, each once. A computer player hears nothing. */
 const playersOf = (before, after) => [
   ...new Set(
@@ -130,7 +133,10 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  *   generateMatchId?: () => string,
  *   botTurns?: Pick<ReturnType<typeof import("../bots/botTurns.js").createBotTurns>, "settle" | "checkMove" | "fairness">,
  *   keepFinishedGame?: (game: { room: Readonly<import("../../data/roomAccessor.js").Room>, outcome: object }) => Promise<unknown>,
- *   blocks?: { blockedWith: (query: { playerId: string }) => Promise<ReadonlySet<string>> },
+ *   blocks?: {
+ *     blockedWith: (query: { playerId: string }) => Promise<ReadonlySet<string>>,
+ *     relationsOf: (query: { playerId: string }) => Promise<Readonly<{ blocked: ReadonlySet<string>, blockedBy: ReadonlySet<string> }>>,
+ *   },
  * }} deps  lifetimes, limits and generators can be given so tests are short and exact. `botTurns` are the rules for
  *   computer players (CC-138, CC-225). Without them no room ever seats one. `keepFinishedGame` stores a finished
  *   game for the match pipeline (CC-111). It runs before every change to a finished room, so a game is never
@@ -160,6 +166,7 @@ export function createRoomComponent({
   assertFunction(generateMatchId, "generateMatchId");
   assertFunction(keepFinishedGame, "keepFinishedGame");
   assertFunction(blocks?.blockedWith, "blocks.blockedWith");
+  assertFunction(blocks?.relationsOf, "blocks.relationsOf");
 
   const engineFor = (room) => engines.get(room.gameId);
   const seatOf = (room, playerId) => room.seats.find((seat) => seat.playerId === playerId);
@@ -181,14 +188,19 @@ export function createRoomComponent({
     });
   const rulesOf = (room) => (type) => ruleFor({ type, engine: engineFor(room), lifetimes });
   const settled = (room, now) => settleRequests(room, { now, rules: rulesOf(room), lifetimes });
-  /** The players on either side of a block with `playerId`, read only for a rematch: no other request needs them. */
-  const blockedForRematch = (playerId, type) =>
-    type === ROOM_REQUEST_TYPES.REMATCH ? blocks.blockedWith({ playerId }) : NOBODY;
-  /** A rematch between a blocked pair is refused without saying why (CC-044). */
-  const refuseBlockedRematch = (room, playerId, blocked) => {
-    if (room.seats.some((seat) => seat.playerId !== playerId && blocked.has(seat.playerId))) {
-      throw new ConflictError(NO_REMATCH_NOW);
-    }
+  /** Who `playerId` blocked and who blocked them, read only for a rematch: no other request needs it. */
+  const relationsForRematch = (playerId, type) =>
+    type === ROOM_REQUEST_TYPES.REMATCH ? blocks.relationsOf({ playerId }) : NO_RELATIONS;
+  /**
+   * What saying yes to a rematch does between a blocked pair (CC-044, ADR-053). It never starts a game, and the
+   * blocked player sees only what any opponent could do. The blocker's yes is a no, so the player who asked sees a
+   * decline. The blocked player's yes finds the question taken back, as if the blocker had withdrawn it. Answers
+   * undefined for a pair with no block, whose yes is a yes.
+   */
+  const blockedAnswer = (relations, request) => {
+    if (relations.blocked.has(request.from)) return REQUEST_STATES.DECLINED;
+    if (relations.blockedBy.has(request.from)) return REQUEST_STATES.WITHDRAWN;
+    return undefined;
   };
 
   /**
@@ -773,22 +785,26 @@ export function createRoomComponent({
      * @throws {ForbiddenError} for someone without a seat
      * @throws {ValidationError} for a kind of request this game does not have
      * @throws {ConflictError} at the wrong moment, while their own request is open, during the cooldown after
-     *   the last one, once the limit is used up, or when a rematch is no longer possible, which includes a
-     *   rematch with someone on either side of a block with the player (CC-044)
+     *   the last one, once the limit is used up, or when a rematch is no longer possible. Between a blocked pair
+     *   (CC-044) asking back never starts a game: the other's request ends the way `blockedAnswer` says, and this
+     *   one is asked as if that had happened first
      * @throws {GoneError} when the room closed
      */
     askRequest: async ({ code, playerId, type, now }) => {
-      const blocked = await blockedForRematch(playerId, type);
+      const relations = await relationsForRematch(playerId, type);
       return changedRoom({
         code,
         now,
         decide(stored) {
           requireSeat(stored, playerId);
-          const room = settled(stored, now);
-          refuseBlockedRematch(room, playerId, blocked);
+          let room = settled(stored, now);
           const theirs = openRequest(room, type);
           if (theirs !== undefined && theirs.to === playerId) {
-            return accepting(room, theirs, now);
+            const ended = blockedAnswer(relations, theirs);
+            if (ended === undefined) {
+              return accepting(room, theirs, now);
+            }
+            room = endRequest(room, { request: theirs, state: ended, now });
           }
           if (
             type === ROOM_REQUEST_TYPES.REMATCH &&
@@ -812,12 +828,15 @@ export function createRoomComponent({
      *   a REQUEST_ANSWERS value
      * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>}
      * @throws {ForbiddenError} for someone without a seat, or an answer that is not theirs to give
-     * @throws {ConflictError} when no such request is open any more, or for accepting a rematch with someone on
-     *   either side of a block with the player (CC-044). Declining and withdrawing still work
+     * Between a blocked pair (CC-044) accepting a rematch never starts a game: it ends the request the way
+     * `blockedAnswer` says, so the blocked player sees a decline or a withdrawal, as anyone might give them.
+     *
+     * @throws {ConflictError} when no such request is open any more
      * @throws {GoneError} when the room closed
      */
     answerRequest: async ({ code, playerId, type, answer, now }) => {
-      const blocked = answer === REQUEST_ANSWERS.ACCEPT ? await blockedForRematch(playerId, type) : NOBODY;
+      const relations =
+        answer === REQUEST_ANSWERS.ACCEPT ? await relationsForRematch(playerId, type) : NO_RELATIONS;
       return changedRoom({
         code,
         now,
@@ -829,12 +848,14 @@ export function createRoomComponent({
             throw new ConflictError("That request is no longer open");
           }
           requireAnswerer({ request, playerId, byAsker: answer === REQUEST_ANSWERS.WITHDRAW });
-          if (answer === REQUEST_ANSWERS.ACCEPT) {
-            refuseBlockedRematch(room, playerId, blocked);
+          const blockedEnd =
+            answer === REQUEST_ANSWERS.ACCEPT ? blockedAnswer(relations, request) : undefined;
+          if (answer === REQUEST_ANSWERS.ACCEPT && blockedEnd === undefined) {
             return accepting(room, request, now);
           }
           const state =
-            answer === REQUEST_ANSWERS.DECLINE ? REQUEST_STATES.DECLINED : REQUEST_STATES.WITHDRAWN;
+            blockedEnd ??
+            (answer === REQUEST_ANSWERS.DECLINE ? REQUEST_STATES.DECLINED : REQUEST_STATES.WITHDRAWN);
           return { ...endRequest(room, { request, state, now }), lastActivityAt: now };
         },
       });

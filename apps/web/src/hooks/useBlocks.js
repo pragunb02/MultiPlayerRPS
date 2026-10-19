@@ -5,7 +5,7 @@ import { useServices } from "../app/servicesContext.js";
  * Blocks a player in a seat of the room this player sits in (CC-044). The server checks that both sit there, and
  * never takes a player id.
  *
- * @returns {(target: { roomCode: string, seat: number }) => Promise<{ blockId: string, displayName: string, blockedAt: number }>}
+ * @returns {(target: { roomCode: string, seat: number, seatId: string }) => Promise<{ blockId: string, displayName: string, blockedAt: number }>}
  */
 export function useBlockPlayer() {
   const { api } = useServices();

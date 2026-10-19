@@ -1,8 +1,9 @@
 import { expect, header, test } from "./fixtures.js";
 
-// Two guests who just played (CC-044, ADR-053). Alice blocks Bob from his seat. From then on a rematch between them
-// is refused like any other refusal, Bob cannot sit in Alice's next room and is told only that it is full, and Bob
-// is never told he was blocked. Once Alice unblocks him from her profile, he can join again.
+// Two guests who just played (CC-044, ADR-053). Alice blocks Bob from his seat. From then on no rematch starts
+// between them, and Bob sees only what any opponent could do: Alice declining. Bob cannot sit in Alice's next room and
+// is told only that it is full, and is never told he was blocked. Once Alice unblocks him from her profile, he can
+// join again.
 
 /** A guest from the home page's button, the way in that needs no invite link. */
 async function asGuest(player) {
@@ -24,12 +25,12 @@ async function openRps(host) {
 const choices = (player) => player.page.getByRole("group", { name: "Your choice" });
 
 test.describe("blocks", () => {
-  test("after a block the rematch is refused like any refusal, the pair can't sit together, and unblocking undoes it", async ({
+  test("after a block a rematch looks declined, the pair can't sit together, and unblocking undoes it", async ({
     players,
   }) => {
     const alice = await players.open("alice");
     const bob = await players.open("bob");
-    await asGuest(alice);
+    const aliceName = await asGuest(alice);
     const bobName = await asGuest(bob);
     const invite = await openRps(alice);
     await bob.page.goto(invite);
@@ -56,15 +57,15 @@ test.describe("blocks", () => {
     await expect(alice.page.getByText(`You blocked ${bobName}.`)).toBeVisible();
     await expect(alice.page.getByRole("list", { name: "Players" }).getByText("blocked")).toBeVisible();
 
-    // A rematch is refused for both, without a reason, the way any refused press is shown.
+    // Bob asks for a rematch as anyone would. Even when Alice says yes, no game starts: Bob sees a plain decline.
     await bob.page.getByRole("button", { name: "Rematch" }).click();
-    await expect(
-      bob.page.getByRole("alert").filter({ hasText: "A rematch is not possible now" }),
-    ).toBeVisible();
-    await alice.page.getByRole("button", { name: "Rematch" }).click();
-    await expect(
-      alice.page.getByRole("alert").filter({ hasText: "A rematch is not possible now" }),
-    ).toBeVisible();
+    await expect(bob.page.getByText(`Waiting for ${aliceName}…`)).toBeVisible();
+    await alice.page.getByRole("button", { name: "Accept rematch" }).click();
+    await expect(bob.page.getByText(`${aliceName} declined the rematch.`)).toBeVisible();
+    for (const player of [alice, bob]) {
+      await expect(player.page.getByRole("heading", { name: /^You (won|lost)/ })).toBeVisible();
+      await expect(choices(player)).toHaveCount(0);
+    }
 
     // Bob cannot sit in Alice's next room. He is told it is full, as for any full room.
     await alice.page.getByRole("button", { name: "Leave room" }).click();
@@ -97,7 +98,9 @@ test.describe("blocks", () => {
     const code = new URL(invite).pathname.split("/").at(-1);
     mallory.expect(404, "/api/blocks");
 
-    const refused = await mallory.page.request.post("/api/blocks", { data: { roomCode: code, seat: 0 } });
+    const refused = await mallory.page.request.post("/api/blocks", {
+      data: { roomCode: code, seat: 0, seatId: "guest_00000000-0000-4000-8000-000000000000" },
+    });
 
     expect(refused.status()).toBe(404);
     expect((await refused.json()).error).toEqual(

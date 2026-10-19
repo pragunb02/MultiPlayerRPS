@@ -14,10 +14,6 @@ afterEach(async () => {
   server = undefined;
 });
 
-const REFUSED_REMATCH = {
-  ok: false,
-  error: { code: ERROR_CODES.CONFLICT, message: "A rematch is not possible now" },
-};
 const FULL = { ok: false, error: { code: ERROR_CODES.CONFLICT, message: "This room is full" } };
 
 /** Alice hosts a race, Bob joins and moves first (seed 42), Alice wins. */
@@ -35,6 +31,7 @@ async function block(blocker, { code, seats }, blocked) {
     body: JSON.stringify({
       roomCode: code,
       seat: seats.findIndex((s) => s.playerId === blocked.identity.id),
+      seatId: blocked.identity.id,
     }),
   });
   expect(res.status).toBe(200);
@@ -43,38 +40,45 @@ async function block(blocker, { code, seats }, blocked) {
 const ask = (player, code) => send(player.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
 
 describe("blocks in rooms over sockets (CC-044)", () => {
-  it("refuses a rematch from either player after a block, and tells the blocked player nothing when it is made", async () => {
+  it("tells the blocked player nothing when the block is made, and their rematch request opens as anyone's", async () => {
     server = await startTestServer();
     const [alice, bob] = [await clients.player(), await clients.player()];
     const room = await finishedRace(alice, bob);
     const before = bob.received.length;
 
     await block(alice, room, bob);
-    const fromBob = await ask(bob, room.code);
-    const fromAlice = await ask(alice, room.code);
-
     const roomNews = [SOCKET_EVENTS.ROOM_UPDATED, SOCKET_EVENTS.REQUEST_UPDATED];
-    expect(bob.received.slice(before).filter(({ event }) => roomNews.includes(event))).toEqual([]);
-    expect(fromBob).toEqual(REFUSED_REMATCH);
-    expect(fromAlice).toEqual(REFUSED_REMATCH);
+    const toldAtBlock = bob.received.slice(before).filter(({ event }) => roomNews.includes(event));
+    const fromBob = await ask(bob, room.code);
+
+    expect(toldAtBlock).toEqual([]);
+    expect(fromBob.ok).toBe(true);
+    expect(fromBob.data.requests).toEqual([
+      expect.objectContaining({ from: bob.identity.id, state: "open" }),
+    ]);
   });
 
-  it("lets the blocked player's earlier rematch request end unanswered, because the blocker cannot accept it", async () => {
+  it("shows the blocked player the blocker's accept as a plain decline, and starts no game", async () => {
     server = await startTestServer();
     const [alice, bob] = [await clients.player(), await clients.player()];
     const room = await finishedRace(alice, bob);
     const aliceSees = nextEvent(alice.socket);
     await ask(bob, room.code);
     await aliceSees;
-
     await block(alice, room, bob);
+
+    const bobSees = nextEvent(bob.socket);
     const accepted = await send(alice.socket, SOCKET_EVENTS.ROOM_ANSWER, {
       code: room.code,
       type: "rematch",
       answer: "accept",
     });
+    const pushed = await bobSees;
 
-    expect(accepted).toEqual(REFUSED_REMATCH);
+    expect(accepted.ok).toBe(true);
+    expect(accepted.data.status).toBe("finished");
+    expect(pushed.status).toBe("finished");
+    expect(pushed.requests).toEqual([expect.objectContaining({ from: bob.identity.id, state: "declined" })]);
   });
 
   it.each([

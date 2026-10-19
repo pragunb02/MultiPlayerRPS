@@ -147,10 +147,14 @@ export function createTestApp({
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const matchComponent = createMatchComponent({ matchAccessor });
   const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
+  const playerTransferAccessor = createPlayerTransferAccessor({
+    playerTransferDao: createInMemoryPlayerTransferDao(),
+  });
   const blockComponent = createBlockComponent({
     blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
     rooms: roomAccessor,
     matches: matchComponent,
+    transfers: playerTransferAccessor,
   });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -174,9 +178,7 @@ export function createTestApp({
     events: domainEvents,
   });
   const playerTransferComponent = createPlayerTransferComponent({
-    playerTransferAccessor: createPlayerTransferAccessor({
-      playerTransferDao: createInMemoryPlayerTransferDao(),
-    }),
+    playerTransferAccessor,
     participants: transferParticipants([
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },

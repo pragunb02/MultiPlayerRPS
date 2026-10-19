@@ -9,6 +9,8 @@ const MINUTE_MS = 60 * 1000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // Seats are positions in a room or a match. No game has more than a few players.
 const MAX_SEAT = 7;
+// The id the room view shows for a seat: today the player id, opaque per room once CC-253 lands.
+const SEAT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * The limits on blocking and unblocking together (ADR-053). Each is a business rule, and tests and browser tests
@@ -30,7 +32,8 @@ const isPlainObject = (value) =>
   Object.getPrototypeOf(value) === Object.prototype;
 
 /**
- * Who to block: `{ roomCode, seat }` or `{ matchId, seat }`, and nothing else. A player id is never accepted, so
+ * Who to block: `{ roomCode, seat, seatId }` or `{ matchId, seat }`, and nothing else. A player id alone is never
+ * enough: `seatId` only confirms who the page saw in that seat of a room the caller sits in. So
  * nobody can name a player they never met.
  *
  * @returns {import("../../domain/blocks/blockComponent.js").BlockTarget}
@@ -40,7 +43,8 @@ function parseTarget(body) {
     throw new ValidationError("Send a JSON object");
   }
   const reference = "roomCode" in body ? "roomCode" : "matchId";
-  const unknown = Object.keys(body).filter((key) => key !== reference && key !== "seat");
+  const fields = reference === "roomCode" ? ["roomCode", "seat", "seatId"] : ["matchId", "seat"];
+  const unknown = Object.keys(body).filter((key) => !fields.includes(key));
   if (unknown.length > 0) {
     throw new ValidationError("Send a room code or a match id, and a seat", { details: { fields: unknown } });
   }
@@ -51,7 +55,10 @@ function parseTarget(body) {
     });
   }
   if (reference === "roomCode") {
-    return { roomCode: parseRoomCode(body.roomCode), seat };
+    if (typeof body.seatId !== "string" || !SEAT_ID_PATTERN.test(body.seatId)) {
+      throw new ValidationError("Say who sits in that seat", { details: { field: "seatId" } });
+    }
+    return { roomCode: parseRoomCode(body.roomCode), seat, seatId: body.seatId };
   }
   if (typeof body.matchId !== "string" || !UUID_PATTERN.test(body.matchId)) {
     throw new ValidationError("Invalid match id", { details: { field: "matchId" } });
@@ -63,7 +70,7 @@ function parseTarget(body) {
  * Blocks (CC-044, ADR-053), for guests and accounts alike. Visitors get 401.
  *
  * 1. `GET /blocks` answers `{ blocks: [{ blockId, displayName, blockedAt }] }`, the player's own blocks, newest first.
- * 2. `POST /blocks` with `{ roomCode, seat }` or `{ matchId, seat }` blocks the player in that seat, and answers
+ * 2. `POST /blocks` with `{ roomCode, seat, seatId }` or `{ matchId, seat }` blocks the player in that seat, and answers
  *    `{ block }`. Anyone the server did not see the caller play with gets 404.
  * 3. `DELETE /blocks/:blockId` removes one of the player's own blocks and answers 204. Anyone else's gets 404.
  *
@@ -101,7 +108,9 @@ export function createBlockRoutes({ blockComponent, now = Date.now, limits = {} 
     res.json({ blocks: await blockComponent.listFor({ blockerId }) });
   });
 
-  router.post("/blocks", signedIn, perAddress, perPlayer, async (req, res) => {
+  // The player's own limit first, so the network's budget counts only what it let through. One player hammering the
+  // route can then use up at most their own share of a school's or a carrier's address.
+  router.post("/blocks", signedIn, perPlayer, perAddress, async (req, res) => {
     const target = parseTarget(req.body);
     const blocker = requireIdentity(req.session);
     const block = await blockComponent.block({ blocker, target, now: now() });
@@ -110,7 +119,7 @@ export function createBlockRoutes({ blockComponent, now = Date.now, limits = {} 
     res.json({ block });
   });
 
-  router.delete("/blocks/:blockId", signedIn, perAddress, perPlayer, async (req, res) => {
+  router.delete("/blocks/:blockId", signedIn, perPlayer, perAddress, async (req, res) => {
     const { blockId } = req.params;
     if (!UUID_PATTERN.test(blockId)) {
       throw new ValidationError("Invalid block id", { details: { field: "blockId" } });

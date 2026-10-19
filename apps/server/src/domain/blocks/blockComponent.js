@@ -23,8 +23,10 @@ const viewOf = (block) =>
   Object.freeze({ blockId: block.blockId, displayName: block.blockedName, blockedAt: block.createdAt });
 
 /**
- * @typedef {{ roomCode: string, seat: number } | { matchId: string, seat: number }} BlockTarget   who to block, by
- *   a seat in an open room or among the players of a stored match. Never by a player id.
+ * @typedef {{ roomCode: string, seat: number, seatId: string } | { matchId: string, seat: number }} BlockTarget   who
+ *   to block, by a seat in an open room or among the players of a stored match. A room's seats move (a player leaves,
+ *   another joins, a rematch swaps them), so a room seat also carries `seatId`, the id the room view showed for that
+ *   seat, and the block goes ahead only while the seat still holds that person. A match's players never move.
  */
 
 /**
@@ -36,22 +38,36 @@ const viewOf = (block) =>
  *   blockAccessor: ReturnType<typeof import("../../data/blockAccessor.js").createBlockAccessor>,
  *   rooms: { getByCode: (code: string) => Promise<Readonly<{ seats: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
  *   matches: { getForPlayer: (query: { matchId: string, playerId: string }) => Promise<Readonly<{ players: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
+ *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom" | "listTo">,
  *   newBlockId?: () => string,
  *   limit?: number,
  * }} deps  `rooms` is the room accessor: the room component reads blocks itself, so it cannot be read here. A
- *   room that has closed is gone from it. `matches` is the match component. `limit` is for tests only
+ *   room that has closed is gone from it. `matches` is the match component. `transfers` are the guests who signed
+ *   in: a block that names a guest after that guest became an account still applies to the account (ADR-014).
+ *   `limit` is for tests only
  */
 export function createBlockComponent({
   blockAccessor,
   rooms,
   matches,
+  transfers,
   newBlockId = randomUUID,
   limit = MAX_BLOCKS_PER_PLAYER,
 }) {
   assertDefined(blockAccessor, "blockAccessor");
   assertFunction(rooms?.getByCode, "rooms.getByCode");
   assertFunction(matches?.getForPlayer, "matches.getForPlayer");
+  assertFunction(transfers?.listFrom, "transfers.listFrom");
+  assertFunction(transfers?.listTo, "transfers.listTo");
   assertFunction(newBlockId, "newBlockId");
+
+  /** Each id as it is now: a guest who signed in is their account. Other ids stay as they are. */
+  async function accountsOf(playerIds) {
+    const moved = new Map(
+      (await transfers.listFrom([...new Set(playerIds)])).map((transfer) => [transfer.from, transfer.to.id]),
+    );
+    return (id) => moved.get(id) ?? id;
+  }
 
   /** The people a reference points at: the seats of an open room or the players of a stored match. */
   async function playersOf(target, blockerId) {
@@ -74,6 +90,7 @@ export function createBlockComponent({
     if (
       !players.some((player) => player.playerId === blockerId) ||
       person === undefined ||
+      ("seatId" in target && person.playerId !== target.seatId) ||
       !isOtherPerson(person.playerId, blockerId)
     ) {
       throw notPlayedWith();
@@ -81,10 +98,31 @@ export function createBlockComponent({
     return person;
   }
 
+  /**
+   * Who this player blocked, and who blocked them. A block stored under a guest id the player had, or under the
+   * guest id of someone who has signed in since, counts for the account: a guest's blocks move when they sign in,
+   * but one can land on the guest id just after (ADR-014).
+   */
+  async function relationsOf({ playerId }) {
+    const ownIds = [playerId, ...(await transfers.listTo(playerId)).map((transfer) => transfer.from)];
+    const blocks = (await Promise.all(ownIds.map((id) => blockAccessor.listInvolving(id)))).flat();
+    const own = new Set(ownIds);
+    const current = await accountsOf(blocks.flatMap((block) => [block.blockerId, block.blockedId]));
+    const blocked = blocks
+      .filter((block) => own.has(block.blockerId))
+      .map((block) => current(block.blockedId));
+    const blockedBy = blocks
+      .filter((block) => own.has(block.blockedId))
+      .map((block) => current(block.blockerId));
+    // A guest who blocked the account they became is no block at all.
+    const others = (ids) => new Set(ids.filter((id) => !own.has(id)));
+    return Object.freeze({ blocked: others(blocked), blockedBy: others(blockedBy) });
+  }
+
   /** Every player on either side of a block with this one. */
   async function blockedWith({ playerId }) {
-    const blocks = await blockAccessor.listInvolving(playerId);
-    return new Set(blocks.map((block) => (block.blockerId === playerId ? block.blockedId : block.blockerId)));
+    const { blocked, blockedBy } = await relationsOf({ playerId });
+    return new Set([...blocked, ...blockedBy]);
   }
 
   return Object.freeze({
@@ -98,10 +136,14 @@ export function createBlockComponent({
      */
     async block({ blocker, target, now }) {
       const person = await personAt(target, blocker.id);
+      // The guest at the seat may have signed in since the seat was read, and their blocks have moved already. So
+      // this one goes straight to the account (ADR-014).
+      const blockedId = (await accountsOf([person.playerId]))(person.playerId);
+      if (blockedId === blocker.id) throw notPlayedWith();
       const { created, block } = await blockAccessor.add({
         blockId: newBlockId(),
         blockerId: blocker.id,
-        blockedId: person.playerId,
+        blockedId,
         blockedName: person.displayName,
         at: now,
       });
@@ -138,6 +180,16 @@ export function createBlockComponent({
      * @returns {Promise<ReadonlySet<string>>}
      */
     blockedWith,
+
+    /**
+     * Who the player blocked and who blocked them, apart. Rooms need the direction to answer a rematch between a
+     * blocked pair as a person would: the blocker's yes becomes a no, and the blocked player finds the question
+     * taken back (ADR-053).
+     *
+     * @param {{ playerId: string }} query
+     * @returns {Promise<Readonly<{ blocked: ReadonlySet<string>, blockedBy: ReadonlySet<string> }>>}
+     */
+    relationsOf,
 
     /**
      * Whether either player blocked the other.

@@ -610,6 +610,7 @@ export async function startServer({
     blockAccessor,
     rooms: roomAccessor,
     matches: matchComponent,
+    transfers: playerTransferAccessor,
   });
   const progressionComponent = createProgressionComponent({
     progressAccessor,

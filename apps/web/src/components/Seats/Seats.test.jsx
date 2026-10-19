@@ -188,11 +188,35 @@ describe("Seats: blocking from a seat (CC-044)", () => {
     await userEvent.click(blockButton());
     await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Block" }));
 
-    expect(api.blockPlayer).toHaveBeenCalledWith({ roomCode: "ROOM22", seat: 0 });
+    expect(api.blockPlayer).toHaveBeenCalledWith({ roomCode: "ROOM22", seat: 0, seatId: "guest_a" });
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(toast.show).toHaveBeenCalledWith("You blocked Alice.", { tone: "info" });
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("Alicehostconnectedblocked");
     expect(blockButton()).toBeNull();
+  });
+
+  it.each([
+    ["the seats swap for a rematch", [BOB, ALICE]],
+    ["Alice leaves and Carol takes her seat", [seat({ playerId: "guest_c", displayName: "Carol" }), BOB]],
+    ["Alice leaves", [BOB]],
+  ])("closes the question when %s, so nobody else is ever blocked by it", async (_, seatsNow) => {
+    const { api, update } = mount(blockable());
+    await userEvent.click(blockButton());
+    expect(screen.getByRole("dialog", { name: "Block Alice?" })).toBeVisible();
+
+    update(blockable({ seats: seatsNow }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(api.blockPlayer).not.toHaveBeenCalled();
+  });
+
+  it("keeps the question open while the seats stay as they were, such as a presence change", async () => {
+    mount(blockable()).update(
+      blockable({ seats: [{ ...ALICE, connected: false, presence: "offline" }, BOB] }),
+    );
+    await userEvent.click(blockButton());
+
+    expect(screen.getByRole("dialog", { name: "Block Alice?" })).toBeVisible();
   });
 
   it("shows the server's refusal under the button and keeps the question open", async () => {

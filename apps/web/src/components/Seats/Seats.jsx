@@ -81,7 +81,8 @@ const canBlock = (room, seat) =>
  * page.
  *
  * @param {{ room: { code: string }, seat: { playerId: string, displayName: string }, index: number, onClose: () => void, onBlocked: () => void }} props
- *   `index` is the seat's place in the room's seats, which is how the server is told who to block
+ *   `index` is the seat's place in the room's seats. The server is told the place and who the page shows there, and
+ *   blocks nobody if that seat holds someone else by the time the request arrives
  */
 function BlockDialog({ room, seat, index, onClose, onBlocked }) {
   const blockPlayer = useBlockPlayer();
@@ -89,7 +90,7 @@ function BlockDialog({ room, seat, index, onClose, onBlocked }) {
   const name = seat.displayName;
   const confirm = useAction(
     async () => {
-      await blockPlayer({ roomCode: room.code, seat: index });
+      await blockPlayer({ roomCode: room.code, seat: index, seatId: seat.playerId });
       onClose();
       toast.show(`You blocked ${name}.`, { tone: "info" });
       onBlocked();
@@ -137,8 +138,14 @@ export function Seats({ room }) {
   const notice = usePresenceNotice(room);
   // Blocked from this page. The server keeps the block. This only changes what the seat shows until the page goes.
   const [blocked, setBlocked] = useState(() => new Set());
-  // The seat the viewer pressed Block on, and its place in the seats, while the question is open.
+  // The seat the viewer pressed Block on, and who sat where at that moment, while the question is open.
   const [asking, setAsking] = useState(undefined);
+  const seating = room.seats.map((seat) => seat.playerId).join(" ");
+  // Someone left, joined or the seats swapped (a rematch) while the question was open. The question may now be about
+  // someone else's seat, so it closes and the player can press Block again on the seat they mean.
+  if (asking !== undefined && asking.seating !== seating) {
+    setAsking(undefined);
+  }
   return (
     <>
       <ul className={styles.seats} aria-label="Players">
@@ -159,7 +166,7 @@ export function Seats({ room }) {
                   variant="ghost"
                   className={styles.block}
                   aria-label={`Block ${seat.displayName}`}
-                  onClick={() => setAsking({ seat, index })}
+                  onClick={() => setAsking({ seat, index, seating })}
                 >
                   Block
                 </Button>
@@ -173,7 +180,7 @@ export function Seats({ room }) {
           </li>
         ))}
       </ul>
-      {asking !== undefined && (
+      {asking !== undefined && asking.seating === seating && (
         <BlockDialog
           room={room}
           seat={asking.seat}

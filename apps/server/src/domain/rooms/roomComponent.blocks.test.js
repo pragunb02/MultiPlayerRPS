@@ -6,21 +6,27 @@ import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { ConflictError } from "../../utils/errors.js";
 import { createRoomComponent } from "./roomComponent.js";
 
-// CC-044, ADR-053: a blocked pair is never seated together and never rematched, both ways, and the refusal says
-// nothing a refusal for any other reason would not say.
+// CC-044, ADR-053: a blocked pair is never seated together and never rematched, both ways. The blocked player can
+// never tell a block from what anyone might do: a full room, or an opponent who declines or withdraws.
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 const BOB = Object.freeze({ kind: "guest", id: "guest_b", displayName: "Bob" });
 const CAROL = Object.freeze({ kind: "guest", id: "guest_c", displayName: "Carol" });
 const T0 = 1_000_000;
 const REMATCH = "rematch";
 
-/** Blocks between pairs of player ids, as the block component answers them. */
+/** Blocks as `[blocker, blocked]` pairs of player ids, answered the way the block component answers them. */
 function fakeBlocks(pairs = []) {
   const all = [...pairs];
+  const relationsOf = async ({ playerId }) => ({
+    blocked: new Set(all.filter(([a]) => a === playerId).map(([, b]) => b)),
+    blockedBy: new Set(all.filter(([, b]) => b === playerId).map(([a]) => a)),
+  });
   return {
     add: (a, b) => all.push([a, b]),
+    relationsOf,
     async blockedWith({ playerId }) {
-      return new Set(all.flatMap(([a, b]) => (a === playerId ? [b] : b === playerId ? [a] : [])));
+      const { blocked, blockedBy } = await relationsOf({ playerId });
+      return new Set([...blocked, ...blockedBy]);
     },
   };
 }
@@ -100,62 +106,105 @@ describe("roomComponent: blocked players are never seated together (CC-044)", ()
   });
 });
 
-describe("roomComponent: blocked players are never rematched (CC-044)", () => {
-  it.each([
-    ["the winner blocked the loser", [ALICE.id, BOB.id]],
-    ["the loser blocked the winner", [BOB.id, ALICE.id]],
-  ])("refuses a rematch asked by either player when %s, without saying why", async (_, pair) => {
-    const blocks = fakeBlocks();
-    const { rooms, open } = setup(blocks);
-    const code = await finishedGame(rooms, open);
-    blocks.add(...pair);
+/** What a player can see of a room's rematch: its status and its requests. */
+const seen = (room) => ({ status: room.status, requests: room.requests ?? [] });
 
-    for (const player of [ALICE, BOB]) {
-      const refusal = await rooms
-        .askRequest({ code, playerId: player.id, type: REMATCH, now: T0 + 10 })
-        .catch((err) => err);
+/** The same finished game twice: in one Alice blocked Bob after it, in the other nobody blocked anyone. */
+async function blockedAndControl() {
+  const blocks = fakeBlocks();
+  const blocked = setup(blocks);
+  const control = setup(fakeBlocks());
+  const codes = [
+    await finishedGame(blocked.rooms, blocked.open),
+    await finishedGame(control.rooms, control.open),
+  ];
+  blocks.add(ALICE.id, BOB.id);
+  return { blocked: { ...blocked, code: codes[0] }, control: { ...control, code: codes[1] } };
+}
 
-      expect(refusal).toEqual(new ConflictError("A rematch is not possible now"));
-      expect(refusal.details).toEqual({});
+const asks = ({ rooms, code }, player, now) =>
+  rooms.askRequest({ code, playerId: player.id, type: REMATCH, now });
+const answers = ({ rooms, code }, player, answer, now) =>
+  rooms.answerRequest({ code, playerId: player.id, type: REMATCH, answer, now });
+
+describe("roomComponent: blocked players are never rematched, and cannot tell (CC-044)", () => {
+  it("opens the blocked player's request as it opens anyone's", async () => {
+    const { blocked, control } = await blockedAndControl();
+
+    const theirs = await asks(blocked, BOB, T0 + 10);
+    const anyones = await asks(control, BOB, T0 + 10);
+
+    expect(seen(theirs)).toEqual(seen(anyones));
+  });
+
+  it("turns the blocker's accept into a decline, exactly what the blocked player sees when anyone declines", async () => {
+    const { blocked, control } = await blockedAndControl();
+    await asks(blocked, BOB, T0 + 10);
+    await asks(control, BOB, T0 + 10);
+
+    const accepted = await answers(blocked, ALICE, "accept", T0 + 20);
+    const declined = await answers(control, ALICE, "decline", T0 + 20);
+
+    expect(seen(accepted)).toEqual(seen(declined));
+    expect(accepted.status).toBe("finished");
+  });
+
+  it("turns the blocker asking back into a decline of the blocked player's request and a request of their own", async () => {
+    const { blocked, control } = await blockedAndControl();
+    await asks(blocked, BOB, T0 + 10);
+    await asks(control, BOB, T0 + 10);
+
+    const askedBack = await asks(blocked, ALICE, T0 + 20);
+    await answers(control, ALICE, "decline", T0 + 20);
+    const declinedThenAsked = await asks(control, ALICE, T0 + 20);
+
+    expect(seen(askedBack)).toEqual(seen(declinedThenAsked));
+  });
+
+  it("ends the blocker's earlier request as withdrawn when the blocked player accepts it, as if the blocker withdrew", async () => {
+    const { blocked, control } = await blockedAndControl();
+    // Alice asked before she blocked Bob.
+    for (const side of [blocked, control]) await asks(side, ALICE, T0 + 10);
+
+    const accepted = await answers(blocked, BOB, "accept", T0 + 20);
+    const withdrawn = await answers(control, ALICE, "withdraw", T0 + 20);
+
+    expect(seen(accepted)).toEqual(seen(withdrawn));
+  });
+
+  it("ends it the same way when the blocked player answers by asking for a rematch too", async () => {
+    const { blocked, control } = await blockedAndControl();
+    for (const side of [blocked, control]) await asks(side, ALICE, T0 + 10);
+
+    const askedToo = await asks(blocked, BOB, T0 + 20);
+    await answers(control, ALICE, "withdraw", T0 + 20);
+    const afterWithdraw = await asks(control, BOB, T0 + 20);
+
+    expect(seen(askedToo)).toEqual(seen(afterWithdraw));
+  });
+
+  it("refuses a blocked player's next request with the same words as anyone's (the cooldown after a no)", async () => {
+    const { blocked, control } = await blockedAndControl();
+    for (const side of [blocked, control]) {
+      await asks(side, BOB, T0 + 10);
+      await answers(side, ALICE, side === blocked ? "accept" : "decline", T0 + 20);
     }
-    expect((await rooms.getRoom(code)).requests ?? []).toEqual([]);
+
+    const again = await asks(blocked, BOB, T0 + 21).catch((err) => err);
+    const anyone = await asks(control, BOB, T0 + 21).catch((err) => err);
+
+    expect(again).toBeInstanceOf(ConflictError);
+    expect(again).toEqual(anyone);
+    expect(again.details).toEqual(anyone.details);
   });
 
-  it("refuses to accept a rematch asked before the block, and leaves it to end unanswered", async () => {
-    const blocks = fakeBlocks();
-    const { rooms, open } = setup(blocks);
-    const code = await finishedGame(rooms, open);
-    await rooms.askRequest({ code, playerId: BOB.id, type: REMATCH, now: T0 + 10 });
-    blocks.add(ALICE.id, BOB.id);
+  it("still lets the blocked player withdraw their own request", async () => {
+    const { blocked } = await blockedAndControl();
+    await asks(blocked, BOB, T0 + 10);
 
-    await expect(
-      rooms.answerRequest({ code, playerId: ALICE.id, type: REMATCH, answer: "accept", now: T0 + 11 }),
-    ).rejects.toEqual(new ConflictError("A rematch is not possible now"));
-    await expect(rooms.askRequest({ code, playerId: ALICE.id, type: REMATCH, now: T0 + 12 })).rejects.toEqual(
-      new ConflictError("A rematch is not possible now"),
-    );
+    const withdrawn = await answers(blocked, BOB, "withdraw", T0 + 11);
 
-    const room = await rooms.getRoom(code);
-    expect(room.status).toBe("finished");
-    expect(room.requests).toEqual([expect.objectContaining({ from: BOB.id, state: "open" })]);
-  });
-
-  it("still lets the blocker decline, and the blocked player withdraw", async () => {
-    const blocks = fakeBlocks();
-    const { rooms, open } = setup(blocks);
-    const code = await finishedGame(rooms, open);
-    await rooms.askRequest({ code, playerId: BOB.id, type: REMATCH, now: T0 + 10 });
-    blocks.add(ALICE.id, BOB.id);
-
-    const declined = await rooms.answerRequest({
-      code,
-      playerId: ALICE.id,
-      type: REMATCH,
-      answer: "decline",
-      now: T0 + 11,
-    });
-
-    expect(declined.requests).toEqual([expect.objectContaining({ state: "declined" })]);
+    expect(withdrawn.requests).toEqual([expect.objectContaining({ state: "withdrawn" })]);
   });
 
   it("rematches players without a block between them as before", async () => {

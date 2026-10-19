@@ -47,6 +47,12 @@ async function finishedRace(alice, bob) {
 }
 
 const seatOf = (seats, player) => seats.findIndex((seat) => seat.playerId === player.identity.id);
+/** A seat of an open room as the page names it: its place, and the id the room view showed for it. */
+const inRoom = (roomCode, seats, player) => ({
+  roomCode,
+  seat: seatOf(seats, player),
+  seatId: player.identity.id,
+});
 
 describe("POST /api/blocks (CC-044)", () => {
   it("blocks the other player of a room both sit in, and answers the record without any player id", async () => {
@@ -54,7 +60,7 @@ describe("POST /api/blocks (CC-044)", () => {
     const [alice, bob] = [await clients.player(), await clients.player()];
     const { code, seats } = await finishedRace(alice, bob);
 
-    const res = await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
+    const res = await block(alice, inRoom(code, seats, bob));
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
@@ -96,15 +102,18 @@ describe("POST /api/blocks (CC-044)", () => {
       const { code, matchId, seats } = await finishedRace(alice, bob);
 
       const answers = [
-        await block(mallory, { roomCode: code, seat: seatOf(seats, alice) }),
+        await block(mallory, inRoom(code, seats, alice)),
         await block(mallory, { matchId, seat: 0 }),
-        await block(mallory, { roomCode: "ZZZZZZ", seat: 0 }),
+        await block(mallory, { roomCode: "ZZZZZZ", seat: 0, seatId: alice.identity.id }),
         await block(mallory, { matchId: "99999999-2222-4333-8444-555555555555", seat: 0 }),
-        await block(alice, { roomCode: code, seat: seatOf(seats, alice) }),
-        await block(alice, { roomCode: code, seat: 7 }),
+        await block(alice, inRoom(code, seats, alice)),
+        await block(alice, { roomCode: code, seat: 7, seatId: bob.identity.id }),
+        // The seat no longer holds the person the page named: someone else, or the seats moved.
+        await block(alice, { roomCode: code, seat: seatOf(seats, bob), seatId: mallory.identity.id }),
+        await block(alice, { roomCode: code, seat: seatOf(seats, alice), seatId: bob.identity.id }),
       ];
 
-      expect(answers.map((res) => res.status)).toEqual([404, 404, 404, 404, 404, 404]);
+      expect(answers.map((res) => res.status)).toEqual(answers.map(() => 404));
       expect(answers.map(error)).toEqual(answers.map(() => NOT_PLAYED));
       expect(await list(mallory)).toEqual([]);
       expect(await list(alice)).toEqual([]);
@@ -117,12 +126,24 @@ describe("POST /api/blocks (CC-044)", () => {
 
       const answers = [
         await block(alice, { playerId: bob.identity.id }),
-        await block(alice, { roomCode: code, seat: 1, blockerId: bob.identity.id }),
-        await block(alice, { roomCode: code, seat: 1, matchId: "11111111-2222-4333-8444-555555555555" }),
-        await block(alice, { roomCode: code, seat: "1" }),
-        await block(alice, { roomCode: code, seat: -1 }),
-        await block(alice, { roomCode: "nope", seat: 1 }),
+        await block(alice, { ...inRoom(code, [], bob), seat: 1, blockerId: bob.identity.id }),
+        await block(alice, {
+          ...inRoom(code, [], bob),
+          seat: 1,
+          matchId: "11111111-2222-4333-8444-555555555555",
+        }),
+        await block(alice, { ...inRoom(code, [], bob), seat: "1" }),
+        await block(alice, { ...inRoom(code, [], bob), seat: -1 }),
+        await block(alice, { ...inRoom("nope", [], bob), seat: 1 }),
         await block(alice, { matchId: "not-a-match", seat: 1 }),
+        // A room seat must say who the page saw there, and a match seat needs no more than its place.
+        await block(alice, { roomCode: code, seat: 1 }),
+        await block(alice, { roomCode: code, seat: 1, seatId: 7 }),
+        await block(alice, {
+          matchId: "11111111-2222-4333-8444-555555555555",
+          seat: 1,
+          seatId: bob.identity.id,
+        }),
         await block(alice, [code, 1]),
       ];
 
@@ -140,7 +161,7 @@ describe("POST /api/blocks (CC-044)", () => {
       server = await startTestServer();
       const [alice, bob, carol] = [await clients.player(), await clients.player(), await clients.player()];
       const { code, seats } = await finishedRace(alice, bob);
-      await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
+      await block(alice, inRoom(code, seats, bob));
       const signedUp = await call("POST", "/auth/signup", {
         body: { username: "Bobby", email: "bobby@example.com", password: PASSWORD },
         cookie: bob.cookie,
@@ -187,7 +208,7 @@ describe("GET and DELETE /api/blocks (CC-044)", () => {
     server = await startTestServer();
     const [alice, bob] = [await clients.player(), await clients.player()];
     const { code, seats } = await finishedRace(alice, bob);
-    const { body } = await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
+    const { body } = await block(alice, inRoom(code, seats, bob));
 
     const res = await call("DELETE", `/blocks/${body.block.blockId}`, { cookie: alice.cookie });
     const fresh = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
@@ -205,7 +226,7 @@ describe("GET and DELETE /api/blocks (CC-044)", () => {
     server = await startTestServer();
     const [alice, bob] = [await clients.player(), await clients.player()];
     const { code, seats } = await finishedRace(alice, bob);
-    const { body } = await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
+    const { body } = await block(alice, inRoom(code, seats, bob));
 
     const theirs = await call("DELETE", `/blocks/${body.block.blockId}`, { cookie: bob.cookie });
     const madeUp = await call("DELETE", "/blocks/00000000-0000-4000-9000-000000000000", {
@@ -232,13 +253,13 @@ describe("rate limits on blocking (CC-044)", () => {
     server = await startTestServer({ blockLimits: { perPlayer: { windowMs: 60_000, limit: 3 } } });
     const [alice, bob] = [await clients.player(), await clients.player()];
     const { code, seats } = await finishedRace(alice, bob);
-    const target = { roomCode: code, seat: seatOf(seats, bob) };
+    const target = inRoom(code, seats, bob);
 
     const first = await block(alice, target);
     await call("DELETE", `/blocks/${first.body.block.blockId}`, { cookie: alice.cookie });
     await block(alice, target);
     const limited = await block(alice, target);
-    const otherPlayer = await block(bob, { roomCode: code, seat: seatOf(seats, alice) });
+    const otherPlayer = await block(bob, inRoom(code, seats, alice));
 
     expect(limited.status).toBe(429);
     expect(limited.body.error.code).toBe(ERROR_CODES.RATE_LIMITED);
@@ -246,14 +267,33 @@ describe("rate limits on blocking (CC-044)", () => {
     expect(otherPlayer.status).toBe(200);
   });
 
+  it("counts for the network only what the player's own limit let through, so one player cannot lock a network out", async () => {
+    server = await startTestServer({
+      blockLimits: {
+        perPlayer: { windowMs: 60_000, limit: 2 },
+        perAddress: { windowMs: 60_000, limit: 3 },
+      },
+    });
+    const [alice, bob] = [await clients.player(), await clients.player()];
+    const { code, seats } = await finishedRace(alice, bob);
+
+    const flood = [];
+    for (let i = 0; i < 6; i++)
+      flood.push((await block(alice, { roomCode: "ZZZZZZ", seat: 0, seatId: "x" })).status);
+    const bobBlocks = await block(bob, inRoom(code, seats, alice));
+
+    expect(flood).toEqual([404, 404, 429, 429, 429, 429]);
+    expect(bobBlocks.status).toBe(200);
+  });
+
   it("limits a network address too, so new guests buy no more", async () => {
     server = await startTestServer({ blockLimits: { perAddress: { windowMs: 60_000, limit: 2 } } });
     const [alice, bob] = [await clients.player(), await clients.player()];
     const { code, seats } = await finishedRace(alice, bob);
 
-    await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
-    await block(bob, { roomCode: code, seat: seatOf(seats, alice) });
-    const limited = await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
+    await block(alice, inRoom(code, seats, bob));
+    await block(bob, inRoom(code, seats, alice));
+    const limited = await block(alice, inRoom(code, seats, bob));
 
     expect(limited.status).toBe(429);
   });
@@ -264,9 +304,9 @@ describe("blocks follow a guest who signs in, and go with a deleted account (ADR
     server = await startTestServer();
     const [alice, bob, carol] = [await clients.player(), await clients.player(), await clients.player()];
     const { code, seats } = await finishedRace(alice, bob);
-    await block(alice, { roomCode: code, seat: seatOf(seats, bob) });
+    await block(alice, inRoom(code, seats, bob));
     const other = await finishedRace(carol, alice);
-    await block(alice, { roomCode: other.code, seat: seatOf(other.seats, carol) });
+    await block(alice, inRoom(other.code, other.seats, carol));
 
     const aliceAccount = await call("POST", "/auth/signup", {
       body: { username: "Alicia", email: "alicia@example.com", password: PASSWORD },
@@ -299,9 +339,9 @@ describe("blocks follow a guest who signs in, and go with a deleted account (ADR
     riya.socket = await clients.openSocket(riya.cookie);
     const [bob, carol] = [await clients.player(), await clients.player()];
     const { code, seats } = await finishedRace(riya, bob);
-    await block(riya, { roomCode: code, seat: seatOf(seats, bob) });
+    await block(riya, inRoom(code, seats, bob));
     const other = await finishedRace(carol, riya);
-    await block(carol, { roomCode: other.code, seat: seatOf(other.seats, riya) });
+    await block(carol, inRoom(other.code, other.seats, riya));
 
     const exported = await call("POST", "/account/export", {
       body: { password: PASSWORD },
