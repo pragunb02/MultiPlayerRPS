@@ -9,7 +9,7 @@
 | Current stage | **Stage 0 — Foundation**                                                                                                                                                                                                                                                                                                                                     |
 | Stage health  | 🟢 On track                                                                                                                                                                                                                                                                                                                                                  |
 | In progress   | Open PRs: #82 account deletion, data export and birth year (CC-035, CC-152), #88 browser tests in parallel parts (CC-236), #90 screens with dead space (CC-259), #69 identity duplicates (CC-245, CC-238, waits on owner data). Builder on CC-157 (game shell). CC-049 alerts still open                                                                     |
-| Blocked on    | Owner: the three Atlas counts for #69, `ADMIN_ACCOUNT_IDS` on Render (owner console), rotating the Atlas password (CC-105), and the #86 decisions (email provider, Grievance Officer, quick match hours)                                                                                                                                                     |
+| Blocked on    | Owner: the three Atlas counts for #69, `ADMIN_ACCOUNT_IDS` on Render (owner console), rotating the Atlas password (CC-105), and the #86 email provider decision (the Grievance Officer and quick match hours were answered in ADR-051)                                                                                                                       |
 | Next up       | Phase 0 of the accepted [PRODUCT_VISION.md](PRODUCT_VISION.md): CC-105 (owner rotates the leaked Atlas password) and CC-122 (staging); the new security P1s CC-260 (scrypt cost) and CC-261 (breached passwords). Then the top 10 on the board, starting with the game shell (CC-157, CC-161, CC-172). Hosting (CC-028, CC-227) waits for an ADR-005 trigger |
 
 ### Status on 2026-10-18
@@ -23,7 +23,7 @@ DATA.md, a daily random network key and a hashed login throttle (#81); art credi
 slow bot tests nightly and Firefox and WebKit runs (#65); research for CC-217, CC-051, CC-033, CC-044 (#86) and CC-099, CC-163, CC-153, CC-259 (#85, decisions in ADR-050). **In flight:** #82 (CC-035, CC-152), #88 (CC-236), #90
 (CC-259), #69 (CC-245, CC-238), and a builder on the game shell (CC-157). **Waiting on
 the owner:** the three Atlas counts #69 needs, setting `ADMIN_ACCOUNT_IDS` so the console opens, rotating the
-Atlas password (CC-105, SEC-12), and the #86 decisions (email provider, Grievance Officer, quick match hours).
+Atlas password (CC-105, SEC-12), and the #86 email provider decision (the Grievance Officer and quick match hours were answered on 2026-10-19, ADR-051).
 **New work is paused** until the PRs in flight land and the owner answers these; the feature freeze of the working
 agreement still holds.
 
@@ -54,6 +54,8 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-19 — ADR-051, CC-043, CC-068, CC-149, CC-056 — Owner accepted the Social and sharing domain (ADR-051 Accepted): safety inside it, the owner named as Grievance Officer (`grievance@<domain>` after CC-123, GitHub private reporting until then), "Find a person" at every hour, one chess 3+2 pool, minors' friends only mutual and only with people met through a link or pass and play, no free text in reports. CC-043 and CC-068 closed as replaced, CC-149 cut, CC-056 moved to Match experience. Still open: the Hinglish lines and an adult's name on share cards. SECURITY.md gets a Grievances section (24 h and 15 days, the interim channel), CC-044 moves to phase 1 and CC-253 comes first in the domain order.
+- 2026-10-19 — ADR-051, CC-277, CC-278, CC-279 — Social and sharing domain defined (docs only, #97): scope and boundaries, safety and moderation kept inside it, research (Lichess kid mode and preferences, Roblox Trusted Connections, Duolingo Friend Streak, Wordle, Ludo King), its 23 tickets in build order with parallel groups, three new tickets (recent opponents, privacy and safety settings, a share channel marker for k), proposed moves (close CC-043 and CC-068, cut CC-149, CC-056 to Match experience) and the owner's decisions, including the Grievance Officer and quick match hours from #86.
 - 2026-10-19 — CC-285 — Main was red from 00:00 UTC: the leaderboard routes were wired without the injected clock, so a test that fixes the date got the real ISO week. routes.js now passes `now`, as every other route does.
 - 2026-10-18 — CC-276 — The required backup round trip failed at random with exit 141: `mongodump --version | head -n 1` under pipefail. sed reads to the end instead, so mongodump never gets SIGPIPE.
 - 2026-10-18 — ADR-039 — Owner: fast mode ended. Every check is required again (lint/unit/coverage, Docker, Chromium and Firefox browser suites), branches must be up to date, full reviews on every PR. CLAUDE.md rules 6, 7 and 8 restored.
