@@ -285,6 +285,12 @@ record, because today one process keeps the games it is running in memory.
   on the server (they would drift apart).
 - **Consequences.** `site.js` must agree with the URL shapes in `paths.js` (ADR-011), and a test checks that they
   do. The PNGs are about 300 KB each, which some apps find large; compressing them is a follow-up.
+- **Amended 2026-10-20 ([CC-217](tickets/CC-217.md)).** Point 4: the cards are now JPEGs under 150 KB (a test fails
+  at 300 KB), drawn by the same script, and each file name carries the start of the image's hash
+  (`/og/chess.b756bac7.jpg`, listed in `packages/shared/src/previewImages.js`), because chat apps keep an image by
+  its address. The first release's PNGs stay online for messages sent before. `og:image:type` follows the file.
+  Point 3: the server also writes the site's public address into every page (`classicade:site-origin`), so the web
+  app builds the links players share on it and never on the address the page was opened at or on request headers.
 
 ### ADR-041 — Our own small chess engine for the bots; chess.js stays the referee
 

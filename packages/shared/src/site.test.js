@@ -64,7 +64,7 @@ describe("describePage", () => {
       indexable: false,
       title: "Join my Chess game on ClassiCade",
       path: "/games/chess/rooms/AB2CD3",
-      image: "/og/chess.png",
+      image: expect.stringMatching(/^\/og\/chess\.[0-9a-f]{8}\.jpg$/),
     });
   });
 

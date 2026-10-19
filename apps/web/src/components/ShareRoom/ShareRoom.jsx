@@ -1,21 +1,23 @@
-import { getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
+import { siteOrigin } from "../../app/siteOrigin.js";
 import { useAction } from "../../hooks/useAction.js";
+import { inviteText, shareMessage } from "../../lib/shareText.js";
 import { Button } from "../Button/Button.jsx";
 import { useToast } from "../Toast/toastContext.js";
+import { WhatsAppLink } from "../WhatsAppLink/WhatsAppLink.jsx";
 import styles from "./ShareRoom.module.css";
 
 /**
- * Invite a friend: the room link, copy to clipboard, and the device's share sheet where available.
- * The message names the actual game (the legacy app said "Tic Tac Toe" for every game — BUG-12).
+ * Invite a friend: the room link, copy to clipboard, WhatsApp (CC-217), and the device's share sheet where
+ * available. The message names the actual game (the legacy app said "Tic Tac Toe" for every game, BUG-12). The link
+ * is on the site's own address, whichever address this page was opened at.
  *
- * @param {{ code: string, gameId: string, origin?: string }} props
+ * @param {{ code: string, gameId: string, origin?: string }} props  origin: the site's own address
  */
-export function ShareRoom({ code, gameId, origin = window.location.origin }) {
+export function ShareRoom({ code, gameId, origin = siteOrigin() }) {
   const toast = useToast();
   const url = `${origin}${paths.room(gameId, code)}`;
-  const gameName = getGame(gameId)?.name ?? "a game";
-  const text = `Play ${gameName} with me on ClassiCade — room ${code}`;
+  const text = inviteText({ gameId, code });
   const canShare = typeof navigator.share === "function";
 
   const copy = useAction(
@@ -55,6 +57,7 @@ export function ShareRoom({ code, gameId, origin = window.location.origin }) {
         <Button control="invite.copy" action={copy} doneLabel="Copied">
           Copy link
         </Button>
+        <WhatsAppLink message={shareMessage({ text, url })} control="invite.whatsapp" />
         {canShare && (
           <Button control="invite.share" variant="secondary" action={share}>
             Share…

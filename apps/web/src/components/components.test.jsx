@@ -177,6 +177,32 @@ describe("ShareRoom", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Link copied");
   });
 
+  it("offers WhatsApp with the invite and the room's link, in a new tab (CC-217)", () => {
+    withToasts(<ShareRoom code="AB2CD3" gameId="chess" origin="https://classicade.app" />);
+
+    const link = screen.getByRole("link", { name: /WhatsApp/ });
+
+    const message =
+      "Play Chess with me on ClassiCade — room AB2CD3\nFree, no login needed.\nhttps://classicade.app/games/chess/rooms/AB2CD3";
+    expect(link).toHaveAttribute("href", `https://wa.me/?text=${encodeURIComponent(message)}`);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAttribute("data-cc-control", "invite.whatsapp");
+  });
+
+  it("builds the invite on the site's own address, not the one this page was opened at (CC-217)", () => {
+    const meta = document.createElement("meta");
+    meta.setAttribute("name", "classicade:site-origin");
+    meta.setAttribute("content", "https://canonical.example");
+    document.head.append(meta);
+    withToasts(<ShareRoom code="AB2CD3" gameId="chess" />);
+    meta.remove();
+
+    expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveValue(
+      "https://canonical.example/games/chess/rooms/AB2CD3",
+    );
+  });
+
   it("names the actual game in the share text (regression: BUG-12)", async () => {
     const user = userEvent.setup();
     const share = vi.fn().mockResolvedValue();

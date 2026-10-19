@@ -241,7 +241,7 @@ Status is from [BACKLOG.md](../BACKLOG.md) on 2026-10-19. "Order" is the build o
 | Order | Ticket | Title (short)                                                        | In or out                                   | Status          | Phase |
 | ----- | ------ | -------------------------------------------------------------------- | ------------------------------------------- | --------------- | ----- |
 | 1     | CC-253 | Room views send player ids: opaque per-room seat ids first           | In (shared with Match experience)           | ⬜ Todo         | 0     |
-| 2     | CC-217 | WhatsApp share cards, button, Hinglish text, no minor or guest names | In                                          | ⬜ Todo         | 1     |
+| 2     | CC-217 | WhatsApp share cards, button, Hinglish text, no minor or guest names | In                                          | 🟦 In progress  | 1     |
 | 3     | CC-044 | Block, mute (the rule), report, reports queue, grievance contact     | In (safety folded in, §2.3)                 | ⬜ Todo         | 1     |
 | 4     | CC-051 | Quick match: "Find a person", 4 s, honest fallback                   | In (pairing; the room is Match experience)  | ⬜ Todo         | 1     |
 | 5     | CC-279 | Share links carry a channel marker for the k-factor (proposed)       | In (Growth reads it)                        | ⬜ Todo         | 1     |
