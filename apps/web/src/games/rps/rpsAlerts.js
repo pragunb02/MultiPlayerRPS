@@ -43,7 +43,7 @@ const BEST_OF = Object.freeze({
 
 /**
  * What Rock Paper Scissors adds to the outcome moments (CC-163): the words of a best of N, and Rocky's tip after a
- * loss, from how Rocky plays at that level. The Hinglish lines are drafts for the owner (docs/tickets/CC-163.md).
+ * loss, from how Rocky plays at that level. The owner accepted these lines on 2026-10-20 (docs/tickets/CC-163.md).
  *
  * @type {import("../outcomeLine.js").OutcomeText}
  */

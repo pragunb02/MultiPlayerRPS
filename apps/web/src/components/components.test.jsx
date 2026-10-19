@@ -196,6 +196,21 @@ describe("Modal", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("draws itself on the page's body, so no style of where it is opened can trap or grey it (CC-163)", () => {
+    // A filter (the softened board after a loss) makes an element the frame of any fixed child inside it.
+    render(
+      <div data-testid="softened" className="dimmed">
+        <Modal open title="How we keep it fair" onClose={() => {}} actions={<button>Got it</button>}>
+          <p>Sealed first.</p>
+        </Modal>
+      </div>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "How we keep it fair" });
+    expect(screen.getByTestId("softened")).not.toContainElement(dialog);
+    expect(dialog.parentElement.parentElement).toBe(document.body);
+  });
+
   it("renders nothing when closed", () => {
     render(
       <Modal open={false} title="x" onClose={() => {}} actions={null}>

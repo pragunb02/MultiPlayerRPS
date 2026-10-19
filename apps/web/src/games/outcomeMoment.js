@@ -70,7 +70,7 @@ export const ENDINGS = Object.freeze({
   watched: Object.freeze({ tone: TONES.EVEN, stamp: "Game over", effect: "none", icon: "", sound: "" }),
 });
 
-// The Hinglish lines below are drafts for the owner to change (docs/tickets/CC-163.md, "Lines shipped").
+// The owner accepted these lines on 2026-10-20, in Hinglish and English, with "tum" (docs/tickets/CC-163.md).
 
 /** The words of the room's own endings, the same in every game (CC-036). Both are wins not earned on the board. */
 const roomWords = wordsFrom({

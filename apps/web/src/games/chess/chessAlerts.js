@@ -72,7 +72,7 @@ const NOBODY_COULD_WIN = {
   drew: () => line("Yeh game koi nahi jeet sakta tha.", "Nobody could win that one."),
 };
 
-/** The words of each chess ending (CC-163). The Hinglish lines are drafts for the owner (docs/tickets/CC-163.md). */
+/** The words of each chess ending (CC-163), accepted by the owner on 2026-10-20 (docs/tickets/CC-163.md). */
 const OUTCOME_WORDS = {
   [END.CHECKMATE]: {
     won: () => line("Ekdum saaf finish.", "Clean finish."),
@@ -80,7 +80,7 @@ const OUTCOME_WORDS = {
   },
   [END.RESIGNATION]: {
     won: ({ loser }) => line(`${loser} ne haar maan li.`, `${loser} resigned.`),
-    lost: () => line("Naya board lagayein?", "Fresh board?"),
+    lost: () => line("Naya board lagaoge?", "Fresh board?"),
     watched: ({ loser }) => line(`${loser} ne haar maan li.`, `${loser} resigned.`),
   },
   [END.TIMEOUT]: {

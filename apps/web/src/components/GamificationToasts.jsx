@@ -32,7 +32,9 @@ export function GamificationToasts() {
 
   useEffect(() => {
     const offUnlocks = socket.on(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, ({ achievements }) => {
-      achievements.forEach((achievement) =>
+      // The confetti and the chime come with the first unlock's toast, once for the group. When the toasts wait (a
+      // result or a question holds the screen), they wait too, so nothing celebrates over a loss (CC-163).
+      achievements.forEach((achievement, index) =>
         toast.show(`Achievement unlocked: ${achievement.name}`, {
           tone: "success",
           category: CATEGORIES.REWARD,
@@ -42,21 +44,31 @@ export function GamificationToasts() {
               tier={TIERS.has(achievement.tier) ? achievement.tier : "bronze"}
             />
           ),
+          ...(index === 0
+            ? {
+                onShow: () => {
+                  setCelebration({ id: ++next.current, kind: "unlock" });
+                  sound.play(SOUNDS.ACHIEVEMENT);
+                },
+              }
+            : {}),
         }),
       );
-      if (achievements.length > 0) {
-        setCelebration({ id: ++next.current, kind: "unlock" });
-        sound.play(SOUNDS.ACHIEVEMENT);
-      }
     });
     const offQuestXp = socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, ({ source, key, xpGained }) => {
       if (source !== "quest") return;
       toast.show(
         key.endsWith(SWEEP_SUFFIX) ? `Daily sweep! +${xpGained} XP` : `Quest complete! +${xpGained} XP`,
-        { tone: "success", category: CATEGORIES.REWARD, art: <AchievementIcon name="scroll" tier="gold" /> },
+        {
+          tone: "success",
+          category: CATEGORIES.REWARD,
+          art: <AchievementIcon name="scroll" tier="gold" />,
+          onShow: () => {
+            setCelebration({ id: ++next.current, kind: "quest", xp: xpGained });
+            sound.play(SOUNDS.ACHIEVEMENT);
+          },
+        },
       );
-      setCelebration({ id: ++next.current, kind: "quest", xp: xpGained });
-      sound.play(SOUNDS.ACHIEVEMENT);
     });
     return () => {
       offUnlocks();

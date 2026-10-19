@@ -32,7 +32,7 @@ export const tictactoeReasonPhrase = (reason) => REASON_PHRASES[reason] ?? "";
 
 /**
  * What Tic-Tac-Toe adds to the outcome moments (CC-163): the words of each ending, and Pip's tip after a loss. The
- * Hinglish lines are drafts for the owner (docs/tickets/CC-163.md).
+ * owner accepted these lines on 2026-10-20 (docs/tickets/CC-163.md).
  *
  * @type {import("../outcomeLine.js").OutcomeText}
  */

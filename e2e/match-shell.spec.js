@@ -1,6 +1,6 @@
 import { expect, formFactor, header, test } from "./fixtures.js";
 import { answerTo, arm, installProbe } from "./controlProbe.js";
-import { GAMES, openPair, phaseIs, SITE_REQUESTS, statesFor } from "./matchStates.js";
+import { computerStatesFor, GAMES, openPair, phaseIs, SITE_REQUESTS, statesFor } from "./matchStates.js";
 import { allStatesFor, ANSWER_MS, NOT_PRESSED, putAway } from "./matchShellPresses.js";
 
 // The match shell around every game (CC-164, CC-170, CC-172): every press in the header and footer answers within
@@ -201,6 +201,36 @@ test.describe("a game that brings only a board plugs into the match shell", () =
 test.describe("outcome moments", () => {
   const result = (player) => player.page.locator('main [data-cc-slot="result"]');
   const effects = (player) => player.page.locator("[data-effect]");
+
+  // The softened board must not trap a dialog opened from it (review of #113): the dialog's backdrop is drawn on the
+  // page's body, covers the whole window, and keeps the result card's buttons out of reach while it is open.
+  test("after a loss to Rocky, the fairness dialog covers the whole page", async ({ players }) => {
+    test.setTimeout(120_000);
+    const pair = await openPair(players);
+    const { clicker } = await computerStatesFor("rps")["computer finished"](pair);
+    const { page } = clicker;
+    await expect(page.locator("main [data-cc-effect='dim']")).toHaveCount(1);
+
+    await page.locator('main [data-cc-control="rps.fairness"]').click();
+    const dialog = page.getByRole("dialog", { name: "How we keep it fair" });
+    await expect(dialog).toBeVisible();
+
+    const backdrop = await dialog.evaluate((element) => {
+      const cover = element.parentElement;
+      const box = cover.getBoundingClientRect();
+      const button = document.querySelector('[data-cc-control="room.rematch.ask"]');
+      button.scrollIntoView({ block: "center" });
+      const rematch = button.getBoundingClientRect();
+      const top = document.elementFromPoint(rematch.x + rematch.width / 2, rematch.y + rematch.height / 2);
+      return {
+        onBody: cover.parentElement === document.body,
+        inDim: cover.closest("[data-cc-effect='dim']") !== null,
+        covers: box.top <= 0 && box.left <= 0 && box.right >= innerWidth && box.bottom >= innerHeight,
+        rematchCovered: top !== null && !top.closest('[data-cc-control="room.rematch.ask"]'),
+      };
+    });
+    expect(backdrop).toEqual({ onBody: true, inDim: false, covers: true, rematchCovered: true });
+  });
 
   test("a win on the board celebrates, and the loser gets kind words and a dimmed board", async ({
     players,
