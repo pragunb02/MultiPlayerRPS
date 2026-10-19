@@ -28,7 +28,7 @@ test.describe("crawler and link preview bot", () => {
     expect(tag(html, "name", "twitter:card")).toBe("summary_large_image");
     const image = await request.get(tag(html, "property", "og:image"));
     expect(image.status()).toBe(200);
-    expect(image.headers()["content-type"]).toBe("image/png");
+    expect(image.headers()["content-type"]).toBe("image/jpeg");
   });
 
   test("reads the page's own title and description as the first words of the body, before the loading screen", async ({
@@ -61,7 +61,7 @@ test.describe("crawler and link preview bot", () => {
     expect(html).toContain("<title data-server-head>Join my Chess game on ClassiCade</title>");
     expect(tag(html, "property", "og:title")).toBe("Join my Chess game on ClassiCade");
     expect(tag(html, "property", "og:url")).toBe(room.invite);
-    expect(tag(html, "property", "og:image")).toMatch(/\/og\/chess\.png$/);
+    expect(tag(html, "property", "og:image")).toMatch(/\/og\/chess\.[0-9a-f]{8}\.jpg$/);
     expect(tag(html, "name", "robots")).toBe("noindex");
     // The preview neither took a seat nor said anything about who is in the room.
     await expect(host.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
