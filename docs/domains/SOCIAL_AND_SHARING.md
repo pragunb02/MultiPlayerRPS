@@ -1,8 +1,8 @@
 # Domain: Social and sharing
 
-Status: proposed on 2026-10-19 for the owner (research and planning only, no app code). The owner asked for two
-domains to be defined first; this is one of them. Decisions marked **owner to confirm** are the owner's call and are
-also recorded as the open ADR-051 in [DECISIONS.md](../DECISIONS.md). Sources were read on 2026-10-19 unless another
+Status: accepted by the owner on 2026-10-19 (ADR-051 in [DECISIONS.md](../DECISIONS.md)), research and planning
+only, no app code. The owner asked for two domains to be defined first; this is one of them. The owner's answers are
+in §9; two points stay open there. Sources were read on 2026-10-19 unless another
 date is given. "General knowledge" carries a confidence level, as in the rest of `docs/`.
 
 ## 1. Purpose and scope
@@ -71,7 +71,7 @@ ticket never adds an event: it uses `control_pressed` names and asks Growth for 
 
 ### 2.3 Against Safety and moderation: not a separate domain, for now
 
-**Decision (recommended, owner to confirm): safety and moderation live inside Social and sharing.**
+**Decision (accepted by the owner, ADR-051.2): safety and moderation live inside Social and sharing.**
 
 1. **Every safety rule we have is about contact between players.** Block, mute and report exist because quick
    match, challenges, friends, circles and emotes exist (ADR-028.8 makes them a prerequisite). Splitting them off
@@ -203,7 +203,7 @@ player find someone from a past game and add or invite them, without search by n
 
 1. **Share the result, not a reward.** Wordle's loop worked with no incentive. Duolingo's reward referrals added
    about 3% (cited in PRODUCT_VISION.md), and coin rewards come close to stakes under the Online Gaming Act. So
-   CC-149 (referral rewards) should be cut, not deferred (owner to confirm).
+   CC-149 (referral rewards) is cut, not deferred (ADR-051.3).
 2. **The player sends, we never send.** `wa.me` opens WhatsApp with our text and the player picks the chat. No
    contact upload, no "invite all", no auto-post. Contact upload is also personal data of third parties the player
    cannot consent for (DPDP, general knowledge, high confidence).
@@ -267,10 +267,10 @@ Status is from [BACKLOG.md](../BACKLOG.md) on 2026-10-19. "Order" is the build o
 | —     | CC-152 | Birth year and under-18 defaults (hidden names)                      | Out (Accounts), read by every ticket here   | 🟦 (merged #82) | 2     |
 | —     | CC-023 | Share menu                                                           | In                                          | ✅ Done         | —     |
 | —     | CC-047 | Link previews and head tags                                          | In (shared with Growth)                     | ✅ Done         | —     |
-| —     | CC-043 | Share result cards; emotes                                           | Close: replaced by CC-217 and CC-169 (§7)   | ⬜ Todo         | 2     |
-| —     | CC-068 | Clubs/groups                                                         | Close: replaced by CC-214 (§7)              | ⬜ Todo         | —     |
-| —     | CC-149 | Referral rewards with abuse caps                                     | Cut recommended (§7)                        | ⬜ Todo         | Defer |
-| —     | CC-056 | Spectating                                                           | Out: move to Match experience (§7)          | ⬜ Todo         | Defer |
+| —     | CC-043 | Share result cards; emotes                                           | Closed: replaced by CC-217 and CC-169 (§7)  | ⬜ Todo         | Cut   |
+| —     | CC-068 | Clubs/groups                                                         | Closed: replaced by CC-214 (§7)             | ⬜ Todo         | Cut   |
+| —     | CC-149 | Referral rewards with abuse caps                                     | Cut (§7)                                    | ⬜ Todo         | Cut   |
+| —     | CC-056 | Spectating                                                           | Out: moved to Match experience (§7)         | ⬜ Todo         | Defer |
 | —     | CC-185 | Rename prompt for names that break the rules                         | Out (Accounts); reports feed it             | ⬜ Todo         | 2     |
 | —     | CC-058 | Social login                                                         | Out (Accounts)                              | ⬜ Todo         | Defer |
 | —     | CC-059 | Admin console roles and feature flags                                | Out (owner console); bans wait for it       | ⬜ Todo         | 3     |
@@ -301,13 +301,13 @@ rule 1, asked for by the owner). Each has a ticket file with a Research section.
 3. **A grievance page.** Also in CC-044 (the contact on the terms and privacy pages), and it needs CC-123's domain.
 4. **Search by name, contact import, a public circle directory, chat.** The research says no (§3.5, §4.3, ADR-028).
 
-## 7. Proposed moves
+## 7. Moves (accepted, done on the board)
 
 1. **Close CC-043 as replaced.** Its two halves are now CC-217 (share cards) and CC-169 (emotes), with the rules of
    ADR-028.6 and .7. Keeping it open counts the same work twice. Same pattern as CC-068.
-2. **Close CC-068 as replaced by CC-214** (its row already says so; it is still ⬜ and counted as open).
+2. **Close CC-068 as replaced by CC-214** (its title already said so; its Phase is now Cut, so it no longer counts as planned work).
 3. **Cut CC-149 (referral rewards)** instead of Defer: GROWTH.md §3.8 and the stakes risk say no rewards for
-   referrals (owner to confirm).
+   referrals.
 4. **Move CC-056 (spectating) to Match experience.** Watching a game is a room feature (a spectator seat already
    exists in `room_joined.as`). Social only decides who may watch whom later (friends only, never a minor's game for
    strangers), which goes in CC-278.
@@ -324,10 +324,10 @@ Phase 0 still comes first for the whole board (BACKLOG.md "Order of work"). With
    - CC-044 PR 1, blocks (`roomComponent` seat and rematch refusals, `Seats` menu, a new store).
    - CC-223 (pass and play, on the game shell).
 2. **Group B, phase 1, after A:**
-   - CC-044 PR 2, reports and the queue (needs the owner's Grievance Officer answer).
+   - CC-044 PR 2, reports and the queue, with the owner named as Grievance Officer (ADR-051.4).
    - CC-051 "Find a person", after CC-044's block PR, live only after both CC-044 PRs (ADR-028.8).
    - CC-279, after CC-217's text PR and the telemetry client (CC-174).
-3. **Group C, phase 2 start (in parallel):** CC-253 (a decision, then opaque seat ids if chosen), CC-139
+3. **Group C, phase 2 start (in parallel):** CC-253 (opaque per-room seat ids, ADR-051.9), CC-139
    (challenges), CC-147 (inbox), CC-100 (small).
 4. **Group D:** CC-034 then CC-278 (same profile files, so in sequence), in parallel with CC-169 (emotes, after
    CC-153's mascot) and CC-222 (turn-based, after CC-147 and CC-224).
@@ -341,19 +341,20 @@ CC-044, CC-051. The rest get theirs when started.
 
 ## 9. Decisions
 
-Recorded together as the open **ADR-051** in [DECISIONS.md](../DECISIONS.md).
+The owner answered on 2026-10-19. The answers are recorded as the accepted **ADR-051** in
+[DECISIONS.md](../DECISIONS.md).
 
-| #   | Decision                                                                                                                                              | Recommendation                                                                                                                     | Status                 |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| 1   | The domain's scope and boundaries (§1, §2)                                                                                                            | As written                                                                                                                         | Owner to confirm       |
-| 2   | Safety and moderation inside this domain, not its own (§2.3)                                                                                          | Inside, revisit on free text, a second moderator or about 20 reports a week                                                        | Owner to confirm       |
-| 3   | **Grievance Officer (open from #86).** Who handles reports and whose name is published, with 24 h to acknowledge and 15 days to close (IT Rules 2021) | The owner at first, with a role address `grievance@<domain>` after CC-123; until then the in-app report only, and the page says so | Owner to decide        |
-| 4   | **Quick match hours (open from #86).** "Find a person" shown at every hour, or only 19:00 to 23:00 IST                                                | Every hour: the honest "Nobody is free" costs 4 s, and the ADR-029 gate can only measure hours where the button exists             | Owner to decide        |
-| 5   | Chess quick time controls (from #86): 3+2 and 10+0, or one pool while the crowd is tiny                                                               | One pool (3+2) until the find-a-person gate opens for chess, so players are not split                                              | Owner to decide        |
-| 6   | The Hinglish share lines, and whether an English line stays beside them (CC-217)                                                                      | The owner writes them; keep a short English line                                                                                   | Owner to decide        |
-| 7   | Can minors have friends? ADR-028.2 does not say; the vision's social loop says "adults, mutual accept"                                                | Yes, mutual, but only with someone they met through a link or pass and play, never from quick match, and never findable            | Owner to confirm       |
-| 8   | What a stranger sees in a quick match room: the username or "Player 2"                                                                                | The chosen, filtered username (needed to recognise and report), with opaque seat ids (CC-253)                                      | Owner to confirm       |
-| 9   | "Play again with" for minors (CC-277)                                                                                                                 | Listed for everyone, but a minor can challenge again only players met through a link, never quick match strangers                  | Owner to confirm       |
-| 10  | Close CC-043 and CC-068 as replaced; cut CC-149; move CC-056 to Match experience (§7)                                                                 | Yes                                                                                                                                | Owner to confirm       |
-| 11  | Free text in reports for adults (from CC-044)                                                                                                         | Not now; revisit with decision 2                                                                                                   | Owner to decide        |
-| 12  | An adult's own name on their share card, after CC-152                                                                                                 | Off by default, a choice per share, never the opponent's name                                                                      | Owner to decide, later |
+| #   | Decision                                                                                                                    | Answer                                                                                                                                           | Status             |
+| --- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| 1   | The domain's scope and boundaries (§1, §2)                                                                                  | As written                                                                                                                                       | Accepted           |
+| 2   | Safety and moderation inside this domain, not its own (§2.3)                                                                | Inside. Revisit on free text, a second moderator or about 20 reports a week                                                                      | Accepted           |
+| 3   | **Grievance Officer (from #86).** Who handles reports and whose name is published, 24 h to acknowledge and 15 days to close | The owner, by name. `grievance@<domain>` after CC-123; until then GitHub private vulnerability reporting (SECURITY.md) besides the in-app report | Accepted           |
+| 4   | **Quick match hours (from #86).** "Find a person" at every hour, or only 19:00 to 23:00 IST                                 | Every hour, with the honest "Nobody is free" fallback                                                                                            | Accepted           |
+| 5   | Chess quick time controls (from #86)                                                                                        | One 3+2 pool                                                                                                                                     | Accepted           |
+| 6   | The Hinglish share lines, and whether an English line stays beside them (CC-217)                                            | The owner writes them (recommended: keep a short English line)                                                                                   | Open               |
+| 7   | Can minors have friends?                                                                                                    | Only by mutual accept, only with people met through a link or pass and play, never from quick match, and never findable by name                  | Accepted           |
+| 8   | What a stranger sees in a quick match room                                                                                  | The chosen, filtered username, with opaque per-room seat ids (CC-253)                                                                            | Accepted           |
+| 9   | "Play again with" for minors (CC-277)                                                                                       | Listed for everyone; a minor can challenge again only players met through a link, never quick match strangers                                    | Accepted           |
+| 10  | Close CC-043 and CC-068 as replaced, cut CC-149, move CC-056 to Match experience (§7)                                       | Yes, done on the board                                                                                                                           | Accepted           |
+| 11  | Free text in reports for adults (from CC-044)                                                                               | No, not for now                                                                                                                                  | Accepted           |
+| 12  | An adult's own name on their share card, after CC-152                                                                       | Recommended: off by default, a choice per share, never the opponent's name                                                                       | Open, decide later |

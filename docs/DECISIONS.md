@@ -8,31 +8,6 @@ the owner may change it.
 
 ## Open decisions
 
-### ADR-051 — The Social and sharing domain: scope, safety inside it, and its open questions
-
-- **Status:** Open · 2026-10-19 (proposed in [domains/SOCIAL_AND_SHARING.md](domains/SOCIAL_AND_SHARING.md), owner
-  to decide)
-- **Context.** The owner asked for the domains to be defined, Social and sharing first among two. Its tickets were
-  spread over the board, some twice (CC-043 beside CC-217 and CC-169, CC-068 beside CC-214), and three questions
-  from #86 are still open.
-- **Proposed.**
-  1. Scope and boundaries as in the domain file §1 and §2: the line with Match experience is the room, Growth
-     measures what Social builds, Accounts owns the age signal that Social reads.
-  2. Safety and moderation (block, mute, report, the reports queue, the grievance contact) live inside this domain,
-     not as their own, until there is free text, a second moderator or about 20 reports a week.
-  3. Close CC-043 and CC-068 as replaced, cut CC-149 (referral rewards), move CC-056 (spectating) to Match
-     experience.
-  4. Minors may have friends, mutual only, with people met through a link or pass and play, never from quick match,
-     and never findable by name. A minor can challenge again (CC-277) only people met through a link.
-  5. A quick match stranger sees the chosen, filtered username, with opaque seat ids (CC-253).
-- **For the owner.** (1) The Grievance Officer: the owner at first, with `grievance@<domain>` after CC-123, 24 hours
-  to acknowledge and 15 days to close. (2) "Find a person" at every hour (recommended) or only 19:00 to 23:00 IST.
-  (3) One chess quick pool (3+2) while the crowd is tiny (recommended) or 3+2 and 10+0. (4) The Hinglish share
-  lines. (5) Free text in reports for adults: not now (recommended). (6) Later: an adult's own name on a share card,
-  off by default.
-- **Consequences.** When accepted, the domain file's ticket list and order become the plan for these tickets, and
-  this record becomes Accepted with the owner's answers.
-
 ### ADR-046 — Our own screen in front of Render's cold start page
 
 - **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)
@@ -59,6 +34,37 @@ the owner may change it.
 - **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
 
 ## Accepted decisions
+
+### ADR-051 — The Social and sharing domain: scope, safety inside it, and the answers to #86
+
+- **Status:** Accepted · 2026-10-19 (owner). Proposed in [domains/SOCIAL_AND_SHARING.md](domains/SOCIAL_AND_SHARING.md),
+  PR #97. Two points stay open: the Hinglish share lines and an adult's own name on a share card.
+- **Context.** The owner asked for the domains to be defined, Social and sharing first among two. Its tickets were
+  spread over the board, some twice (CC-043 beside CC-217 and CC-169, CC-068 beside CC-214), and three questions
+  from #86 were still open.
+- **Decision.**
+  1. **Scope and boundaries** as in the domain file §1 and §2: the line with Match experience is the room, Growth
+     measures what Social builds, Accounts owns the age signal that Social reads.
+  2. **Safety and moderation live inside this domain** (block, mute, report, the reports queue, the grievance
+     contact), not as their own, until there is free text, a second moderator or about 20 reports a week.
+  3. **Board moves.** CC-043 and CC-068 are closed as replaced (by CC-217 and CC-169, and by CC-214). CC-149
+     (referral rewards) is cut. CC-056 (spectating) moves to Match experience. New tickets CC-277, CC-278 and CC-279.
+  4. **Grievance Officer: the owner, by name**, published on the terms and privacy pages, with
+     `grievance@<domain>` once CC-123 brings the domain. Until then the contact is GitHub private vulnerability
+     reporting (SECURITY.md) besides the in-app report. 24 hours to acknowledge, 15 days to close (IT Rules 2021).
+  5. **"Find a person" is shown at every hour**, with the honest "Nobody is free" fallback (CC-051).
+  6. **One chess quick match pool, 3+2**, while the crowd is small.
+  7. **Minors and friends.** A minor may have friends only by mutual accept, only with people met through a link or
+     pass and play, never from quick match, and a minor is never findable by name.
+  8. **Challenge again (CC-277).** A minor, or a player whose opponent is a minor, can challenge again only someone
+     met in a room joined by a link, never a quick match stranger.
+  9. **What a quick match stranger sees:** the chosen, filtered username, with opaque per-room seat ids (CC-253).
+  10. **No free text in reports** for now. Revisit with point 2.
+- **Still open.** The Hinglish share lines (CC-217, the owner writes them). An adult's own name on their share card
+  after CC-152 (recommended: off by default, a choice per share, never the opponent's name).
+- **Consequences.** The domain file's ticket list and build order are the plan for these tickets. CC-044 publishes
+  the owner's name as Grievance Officer. CC-051 builds one chess pool and no hour limit. CC-052 and CC-278 enforce the
+  minors' friend rule.
 
 ### ADR-050 — Rewards one beat at a time, outcome moments, Bit and the empty screens
 
