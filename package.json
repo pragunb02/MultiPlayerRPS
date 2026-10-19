@@ -24,7 +24,9 @@
     "test:all": "vitest run --coverage",
     "dev:web": "npm run dev -w @classicade/web",
     "build:web": "npm run build -w @classicade/web",
-    "test:e2e": "npm test -w @classicade/e2e"
+    "test:e2e": "npm test -w @classicade/e2e",
+    "load:test": "node scripts/bin/load-test.mjs",
+    "load:charts": "node scripts/bin/load-charts.mjs"
   },
   "license": "ISC",
   "devDependencies": {
