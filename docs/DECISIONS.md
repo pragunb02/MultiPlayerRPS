@@ -2,8 +2,8 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-060**. Reserved for open work (2026-10-20): ADR-056
-(CC-155, #104), ADR-057 (CC-253), ADR-058 (CC-163) and ADR-059 (CC-290). A later change to a decision is a dated
+reused; the next free ID is **ADR-061**. Reserved for open work (2026-10-20): ADR-056
+(CC-155, #104), ADR-057 (CC-253), ADR-058 (CC-163), ADR-059 (CC-290) and ADR-060 (CC-291). A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
