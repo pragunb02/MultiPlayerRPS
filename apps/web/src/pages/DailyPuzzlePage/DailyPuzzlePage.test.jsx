@@ -138,6 +138,26 @@ describe("the daily chess puzzle page (CC-144)", () => {
     expect(api.startGuest).not.toHaveBeenCalled();
   });
 
+  it("says why a press does nothing: the other side's piece, an illegal square, a move on its way", async () => {
+    const api = fakeApi({
+      getSession: vi.fn().mockResolvedValue(GUEST),
+      getDailyPuzzle: vi.fn().mockResolvedValue(view()),
+      playDailyMove: vi.fn(() => new Promise(() => {})),
+    });
+    await open(api);
+    const user = userEvent.setup();
+
+    await user.click(square("d6"));
+    expect(await screen.findByText("Pick one of the black pieces")).toBeVisible();
+    await user.click(square("f8"));
+    await user.click(square("a1"));
+    expect(await screen.findByText("That move is not allowed")).toBeVisible();
+    await user.click(square("f8"));
+    await user.click(square("d8"));
+    await user.click(square("g8"));
+    expect(await screen.findByText("Sending your move")).toBeVisible();
+  });
+
   it("gives a hint on request and says how many are left", async () => {
     const api = fakeApi({
       getSession: vi.fn().mockResolvedValue(GUEST),

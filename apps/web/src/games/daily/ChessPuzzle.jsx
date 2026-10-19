@@ -1,6 +1,5 @@
 import { Chess } from "chess.js";
 import { useMemo, useState } from "react";
-import { DAILY_PUZZLE_STATUS } from "@classicade/shared";
 import { MotionProvider } from "../../components/Motion/MotionProvider.jsx";
 import { useExplanation } from "../../hooks/useExplanation.js";
 import { ReasonLine } from "../BoardFeedback.jsx";
@@ -22,8 +21,8 @@ const NO_MOVE = Object.freeze({ fen: "", move: { from: "", to: "" } });
  *   interactive: boolean,
  *   reason: string,
  *   onMove: (move: { from: string, to: string, promotion?: string }) => Promise<unknown>,
- * }} props  puzzle: the server's view of today's puzzle. reason: why the board cannot take a move now, empty when
- *   it can
+ * }} props  puzzle: the server's view of today's puzzle. interactive: whether the player may move now. reason: why
+ *   not, said when a square is pressed
  */
 export function ChessPuzzle({ puzzle, interactive, reason, onMove }) {
   const { position } = puzzle;
@@ -39,7 +38,8 @@ export function ChessPuzzle({ puzzle, interactive, reason, onMove }) {
     shown === undefined
       ? { from: position.lastMove.from, to: position.lastMove.to, flags: "", key: `${position.line.length}` }
       : undefined;
-  const open = interactive && sent.fen === "" && puzzle.status !== DAILY_PUZZLE_STATUS.SOLVED;
+  const sending = sent.fen !== "";
+  const open = interactive && !sending;
 
   async function play(move) {
     setSent({ fen: position.fen, move });
@@ -56,7 +56,7 @@ export function ChessPuzzle({ puzzle, interactive, reason, onMove }) {
     } else if (why === "illegal") {
       explanation.explain("That move is not allowed");
     } else {
-      explanation.explain(reason === "" ? "Sending your move" : reason);
+      explanation.explain(sending ? "Sending your move" : reason);
     }
   }
 
