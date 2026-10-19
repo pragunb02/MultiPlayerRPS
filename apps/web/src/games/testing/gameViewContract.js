@@ -87,6 +87,22 @@ function scoreProblems(entry, room, name) {
     : [`inGameScore for ${name}: the same room gave a different answer`];
 }
 
+/** What is wrong with the pass and play part of an entry (CC-223). A game without it has no pass and play. */
+function passAndPlayProblems(passAndPlay) {
+  if (passAndPlay === undefined) return [];
+  const problems = [];
+  if (!Object.isFrozen(passAndPlay)) problems.push("passAndPlay must be frozen");
+  if (typeof passAndPlay.loadEngine !== "function")
+    problems.push("passAndPlay.loadEngine must be a function");
+  if (typeof passAndPlay.handOver !== "boolean") problems.push("passAndPlay.handOver must be true or false");
+  for (const field of ["handOverNote", "turnLabel"]) {
+    if (passAndPlay[field] !== undefined && typeof passAndPlay[field] !== "function") {
+      problems.push(`passAndPlay.${field} must be a function`);
+    }
+  }
+  return problems;
+}
+
 /**
  * Everything wrong with a GAME_VIEWS entry, checked against sample rooms of the game. Empty when it passes.
  *
@@ -110,6 +126,7 @@ export function checkGameViewContract({ entry, rooms }) {
   if (entry.requestTexts !== undefined && !Object.isFrozen(entry.requestTexts)) {
     problems.push("requestTexts must be frozen");
   }
+  problems.push(...passAndPlayProblems(entry.passAndPlay));
   if (problems.length > 0) return problems;
   for (const [name, room] of Object.entries(rooms)) {
     try {

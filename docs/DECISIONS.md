@@ -33,6 +33,28 @@ the owner may change it.
 - **Context:** Ratings, leaderboards, friends, payments are relational; matches/moves fit documents.
 - **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
 
+### ADR-054 — Pass and play runs in the browser on the pure engines and never counts
+
+- **Status:** Open · 2026-10-20, proposed ([CC-223](tickets/CC-223.md), research with sources there). Built in the
+  CC-223 pull request; the owner accepts it with the merge.
+- **Context.** FR-GAME-8 asks for pass and play on one phone for all three games, results not counted. Every game
+  today is a server room, and the server is the authority so that a result can be trusted (ADR-021).
+- **Decision.**
+  1. A pass and play game runs entirely in the browser with the same pure engine from `@classicade/games` that the
+     server uses (one export per engine, loaded on demand). No room is created and nothing about the game is sent:
+     no socket event and no API call for any move. Tests assert it.
+  2. It never counts. No XP, quests, streaks, achievements, boards or match history, by construction: the server
+     never learns of the game. The result says "Not counted".
+  3. Names are typed on the phone and kept only in page memory. Never sent, never in the URL or web storage.
+  4. A game that keeps a move secret (`passAndPlay.handOver` in the client registry, today only RPS) covers the
+     board with a "pass the phone" screen whenever the phone must change hands. The board is not in the page
+     while it is covered.
+  5. Chess keeps the board still, White at the bottom, with the manual flip (lichess's default, chess.com's choice).
+  6. The match layout is `MatchFrame`, filled by the room's `MatchShell` and by `PassAndPlayShell` (amends ADR-049
+     point 2: one frame, two shells).
+- **Consequences.** The web app depends on `@classicade/games`. A new game gets pass and play by adding a
+  `passAndPlay` entry to its registry entry. Untimed chess and rotated pieces are in IDEAS.md.
+
 ## Accepted decisions
 
 ### ADR-055 — Operations telemetry: our own metrics and named log lines to Grafana Cloud, no personal data

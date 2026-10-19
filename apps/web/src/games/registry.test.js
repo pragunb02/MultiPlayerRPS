@@ -43,6 +43,26 @@ for (const [gameId, entry] of Object.entries(GAME_VIEWS)) {
   describeGameViewContract(gameId, { entry, rooms: roomsFor(gameId) });
 }
 
+describe("pass and play in the registry (CC-223)", () => {
+  it.each(Object.values(GAME_IDS))("loads the pure engine of %s on demand", async (gameId) => {
+    const engine = await GAME_VIEWS[gameId].passAndPlay.loadEngine();
+
+    expect(engine.id).toBe(gameId);
+  });
+
+  it("covers the board between turns only in the game that keeps a move secret", () => {
+    const handOver = Object.fromEntries(
+      Object.entries(GAME_VIEWS).map(([gameId, entry]) => [gameId, entry.passAndPlay.handOver]),
+    );
+
+    expect(handOver).toEqual({
+      [GAME_IDS.RPS]: true,
+      [GAME_IDS.TIC_TAC_TOE]: false,
+      [GAME_IDS.CHESS]: false,
+    });
+  });
+});
+
 describe("gameView", () => {
   it("gives every game in the registry its entry", () => {
     expect(gameView(GAME_IDS.CHESS)).toBe(GAME_VIEWS[GAME_IDS.CHESS]);

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { characterForGame, ROOM_CODE_LENGTH } from "@classicade/shared";
 import { gameForSlug, paths } from "../../app/paths.js";
 import { GameArt } from "../../art/games/GameArt.jsx";
@@ -16,7 +16,8 @@ import styles from "./PlayPage.module.css";
 
 /**
  * One game's lobby. The main action plays the game's computer character at once, at the level picked with one tap
- * (CC-221). Below it: create a room with the game's options to invite a friend, or join a friend's room by code.
+ * (CC-221). Below it: create a room with the game's options to invite a friend, join a friend's room by code, or
+ * play with someone beside you on this phone, which is not counted (CC-223).
  * Each button shows a spinner while the server works and explains a failure under it. Join room says what is
  * missing while the code is not complete (CC-164).
  */
@@ -49,7 +50,7 @@ export function PlayPage() {
   if (location.pathname !== paths.game(game.id)) {
     return <Navigate to={paths.game(game.id)} replace />;
   }
-  const { Options } = gameView(game.id);
+  const { Options, passAndPlay } = gameView(game.id);
   const character = characterForGame(game.id);
 
   function join(event) {
@@ -107,6 +108,19 @@ export function PlayPage() {
             Join room
           </Button>
         </form>
+        {passAndPlay && (
+          <div className={styles.panel}>
+            <h2>Pass and play</h2>
+            <p className={styles.note}>Two players, one phone. Not counted, nothing is sent or saved.</p>
+            <Link
+              to={paths.passAndPlay(game.id)}
+              className={styles.link}
+              data-cc-control="lobby.pass_and_play"
+            >
+              Play on this phone
+            </Link>
+          </div>
+        )}
       </div>
       <HowToPlay gameId={game.id} />
     </section>
