@@ -1,0 +1,32 @@
+$ curl -sk -H "Accept: text/html" -H "User-Agent: WhatsApp/2.23.20.0 A" https://localhost:4984/games/rock-paper-scissors
+  (local e2e server, E2E_PORT=4984; the preview tags of the head)
+    <title data-server-head>Play Rock Paper Scissors with a friend on ClassiCade</title>
+    <meta name="description" content="Play Rock Paper Scissors online with a friend: start a room, send the link and play in seconds. Free, nothing to install, no account needed." data-server-head>
+    <link rel="canonical" href="https://localhost:4984/games/rock-paper-scissors" data-server-head>
+    <meta property="og:site_name" content="ClassiCade" data-server-head>
+    <meta property="og:type" content="website" data-server-head>
+    <meta property="og:title" content="Play Rock Paper Scissors with a friend on ClassiCade" data-server-head>
+    <meta property="og:description" content="Play Rock Paper Scissors online with a friend: start a room, send the link and play in seconds. Free, nothing to install, no account needed." data-server-head>
+    <meta property="og:url" content="https://localhost:4984/games/rock-paper-scissors" data-server-head>
+    <meta property="og:image" content="https://localhost:4984/og/rock-paper-scissors.801640cf.jpg" data-server-head>
+    <meta property="og:image:type" content="image/jpeg" data-server-head>
+    <meta property="og:image:width" content="1200" data-server-head>
+    <meta property="og:image:height" content="630" data-server-head>
+    <meta property="og:image:alt" content="Rock Paper Scissors on ClassiCade" data-server-head>
+    <meta name="twitter:card" content="summary_large_image" data-server-head>
+    <meta name="twitter:title" content="Play Rock Paper Scissors with a friend on ClassiCade" data-server-head>
+    <meta name="twitter:description" content="Play Rock Paper Scissors online with a friend: start a room, send the link and play in seconds. Free, nothing to install, no account needed." data-server-head>
+    <meta name="twitter:image" content="https://localhost:4984/og/rock-paper-scissors.801640cf.jpg" data-server-head>
+    <meta name="twitter:image:alt" content="Rock Paper Scissors on ClassiCade" data-server-head>
+    <meta name="classicade:site-origin" content="https://localhost:4984">
+
+$ curl -sk -o /dev/null -w "%{http_code} %{content_type} %{size_download}" https://localhost:4984<path>
+/og/rock-paper-scissors.801640cf.jpg  200 image/jpeg 69879
+/og/classicade.png                    200 image/png  391824   (retired, kept online)
+/og/rock-paper-scissors.png           200 image/png  303838   (retired, kept online)
+/og/tic-tac-toe.png                   200 image/png  297667   (retired, kept online)
+/og/chess.png                         200 image/png  289218   (retired, kept online)
+
+$ curl -sk -H "Accept: text/html" -H "Host: evil.example" -H "X-Forwarded-Host: evil.example" https://localhost:4984/games/chess | grep -E "og:url|site-origin"
+    <meta property="og:url" content="https://localhost:4984/games/chess" data-server-head>
+    <meta name="classicade:site-origin" content="https://localhost:4984">
