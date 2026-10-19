@@ -527,7 +527,7 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  *   pipeline. Integration tests move the clock, let computer players act at once and make a pipeline step fail or
  *   stop, and browser tests shorten lifetimes to watch a room close, raise the connections per address (every
  *   test player shares one) and fill the server on purpose.
- * @returns {Promise<{ server: http.Server, port: number, close: () => Promise<void> }>}
+ * @returns {Promise<{ server: http.Server, host: string, port: number, close: () => Promise<void> }>}
  */
 export async function startServer({
   config,
@@ -840,8 +840,9 @@ export async function startServer({
   };
 
   try {
-    const port = await listen(server, config.port);
-    return { server, port, close };
+    const { host, port } = await listen(server, { port: config.port, host: config.host });
+    logger.info({ host, port, env: config.env }, "server listening");
+    return { server, host, port, close };
   } catch (err) {
     keyRotation.stop();
     botDriver.stop();
@@ -851,16 +852,20 @@ export async function startServer({
 }
 
 /**
+ * Listens on the configured address only. Leaving the host out would make Node listen on every network
+ * interface (CC-287).
+ *
  * @param {http.Server} server
- * @param {number} port
- * @returns {Promise<number>} the bound port (useful when `port` is 0)
+ * @param {{ port: number, host: string }} where
+ * @returns {Promise<{ host: string, port: number }>} the address and port actually bound (the port matters when `port` is 0)
  */
-function listen(server, port) {
+function listen(server, { port, host }) {
   return new Promise((resolve, reject) => {
     server.once("error", reject);
-    server.listen(port, () => {
+    server.listen(port, host, () => {
       server.off("error", reject);
-      resolve(/** @type {import("node:net").AddressInfo} */ (server.address()).port);
+      const bound = /** @type {import("node:net").AddressInfo} */ (server.address());
+      resolve({ host: bound.address, port: bound.port });
     });
   });
 }

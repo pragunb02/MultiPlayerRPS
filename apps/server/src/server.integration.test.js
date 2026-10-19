@@ -77,6 +77,35 @@ describe("startServer (integration)", () => {
     expect(app.find("database connection closed")).toHaveLength(1);
   });
 
+  it("listens on loopback only by default and says where in the startup log (CC-287)", async () => {
+    const app = await start();
+
+    try {
+      expect(app.server.address()).toEqual(expect.objectContaining({ address: "127.0.0.1", family: "IPv4" }));
+      expect(app.host).toBe("127.0.0.1");
+      expect(app.find("server listening")).toEqual([
+        expect.objectContaining({ host: "127.0.0.1", port: app.port, env: "test" }),
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("listens on the configured HOST (CC-287)", async () => {
+    const app = await start(testConfig({ MONGO_URI: mongo.uri(`it-${++dbCounter}`), HOST: "::1" }));
+
+    try {
+      expect(app.server.address()).toEqual(expect.objectContaining({ address: "::1", family: "IPv6" }));
+      expect(app.find("server listening")).toEqual([
+        expect.objectContaining({ host: "::1", port: app.port }),
+      ]);
+      const res = await fetch(`http://[::1]:${app.port}/health`);
+      expect(res.status).toBe(200);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("stores guest sessions in MongoDB, not in memory", async () => {
     const app = await start();
     try {
