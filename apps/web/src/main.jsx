@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
+import { takeLanding } from "./app/landing.js";
 import { removeServerHead } from "./app/serverHead.js";
 import { recoverFromStaleBuild } from "./app/staleBuild.js";
 import { noteWaitingScreen } from "./app/wakingUp.js";
@@ -16,6 +17,8 @@ import "./styles/global.css";
 // Composition root of the web app: the only place real clients are created.
 // First of all, because it may change the address before the router reads it (CC-181).
 recoverFromStaleBuild({ window, now: () => Date.now() });
+// Also before the router, which must never see the share channel marker or keep it in the history (CC-279).
+takeLanding({ window, document });
 const sound = createSoundPlayer({
   // Older Safari only has the prefixed name. Without either, creating the context throws and the app stays silent.
   createContext: () => new (window.AudioContext ?? window.webkitAudioContext)(),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GAMES, ROOM_END_REASONS } from "@classicade/shared";
-import { resultText } from "../lib/shareText.js";
+import { resultText, withFreeLine } from "../lib/shareText.js";
 import { resultShare, resultShareOf } from "./resultShare.js";
 
 const ORIGIN = "https://classicade.example";
@@ -98,7 +98,7 @@ describe("resultShare", () => {
 
       for (const secret of secretsOf(room)) {
         expect(share.message).not.toContain(secret);
-        expect(decodeURIComponent(share.whatsapp)).not.toContain(secret);
+        expect(share.whatsappMessage).not.toContain(secret);
       }
       expect(share.message).not.toMatch(/@|u_|guest_|bot_/);
     },
@@ -114,9 +114,31 @@ describe("resultShare", () => {
 
     const share = resultShare(room, { origin: ORIGIN });
 
-    expect(share.url).toBe(`${ORIGIN}/games/${game.slug}`);
-    expect(share.message.endsWith(`\n${share.url}`)).toBe(true);
-    expect(share.whatsapp).toBe(`https://wa.me/?text=${encodeURIComponent(share.message)}`);
+    const page = `${ORIGIN}/games/${game.slug}`;
+    expect(share.shareUrl).toBe(`${page}?via=share`);
+    expect(share.message.endsWith(`\n${page}?via=copy`)).toBe(true);
+    expect(share.whatsappMessage).toBe(`${withFreeLine(share.line)}\n${page}?via=wa`);
+  });
+
+  it("marks each link with its channel only, never an id or anything else (CC-279)", () => {
+    const room = finishedRoom({
+      gameId: "chess",
+      viewer: AUDIENCES.adult,
+      against: "person",
+      outcome: "win",
+    });
+
+    const share = resultShare(room, { origin: ORIGIN });
+
+    const lastLine = (text) => new URL(text.split("\n").at(-1));
+    const links = [
+      ["share", new URL(share.shareUrl)],
+      ["copy", lastLine(share.message)],
+      ["wa", lastLine(share.whatsappMessage)],
+    ];
+    for (const [channel, link] of links) {
+      expect([...link.searchParams]).toEqual([["via", channel]]);
+    }
   });
 
   it("is the same text for a guest, a minor and an adult in the same game", () => {
