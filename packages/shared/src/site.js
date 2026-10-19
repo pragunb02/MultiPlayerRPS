@@ -1,5 +1,6 @@
 import { GAMES, getGameBySlug } from "./games.js";
 import { getLeaderboard, LEADERBOARDS } from "./leaderboards.js";
+import { PREVIEW_IMAGE_FILES } from "./previewImages.js";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "./rooms.js";
 
 /**
@@ -13,14 +14,42 @@ import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "./rooms.js";
 
 export const SITE_NAME = "ClassiCade";
 
+/**
+ * The name of the head tag in which the server tells the web app the site's own address, for the links it shares
+ * (CC-217). The server writes it from its settings, never from the request. It is not marked as a server tag, so it
+ * stays in the page after the app takes the other server tags out.
+ */
+export const SITE_ORIGIN_META = "classicade:site-origin";
+
 /** Size of every preview image in /og, the size link previews show best. */
 export const PREVIEW_IMAGE = Object.freeze({ width: 1200, height: 630 });
 
-/** The preview image for pages that are not about one game. */
-export const SITE_PREVIEW_IMAGE = "/og/classicade.png";
+/**
+ * How many hex characters of the image's SHA-256 hash its file name carries, such as `chess.1a2b3c4d.jpg`. A
+ * changed image gets a new name, because chat apps keep a preview image by its address (CC-217).
+ */
+export const PREVIEW_IMAGE_HASH_LENGTH = 8;
 
-/** @param {Readonly<import("./games.js").GameInfo>} game */
-export const gamePreviewImage = (game) => `/og/${game.slug}.png`;
+/** The preview image for pages that are not about one game. */
+export const SITE_PREVIEW_IMAGE = PREVIEW_IMAGE_FILES.classicade;
+
+/**
+ * The preview images of the first release (CC-047), PNGs over 300 KB that WhatsApp may skip. No page names them
+ * any more, but they stay online, because messages sent before still point at them (CC-217).
+ */
+export const RETIRED_PREVIEW_IMAGES = Object.freeze([
+  "/og/classicade.png",
+  "/og/rock-paper-scissors.png",
+  "/og/tic-tac-toe.png",
+  "/og/chess.png",
+]);
+
+/**
+ * The game's preview image. A test in apps/web/og fails when a game has none.
+ *
+ * @param {Readonly<import("./games.js").GameInfo>} game
+ */
+export const gamePreviewImage = (game) => PREVIEW_IMAGE_FILES[game.slug];
 
 // Earlier URL segments for games, from the legacy app (`/games/rockpaperscissors`) and from game ids (`/play/rps`).
 const LEGACY_GAME_SLUGS = Object.freeze({

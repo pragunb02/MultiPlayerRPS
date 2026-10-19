@@ -27,6 +27,7 @@ export const SHARDS = Object.freeze([
     "fairPlay.spec.js", // 9
     "legacy.spec.js", // 7
     "crawler.spec.js", // 4
+    "share.spec.js", // new (CC-217), about 10 s locally
     "names.spec.js", // 4
     "privacy.spec.js", // new (CC-035, CC-152), about 25 s locally
   ]),

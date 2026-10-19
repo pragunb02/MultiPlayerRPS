@@ -59,12 +59,13 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  *   request?: string,
  *   banner?: import("react").ReactNode,
  *   score?: string,
- *   result?: { tone: string, headline: string, celebration?: import("react").ReactNode, note?: import("react").ReactNode },
+ *   result?: { tone: string, headline: string, celebration?: import("react").ReactNode, note?: import("react").ReactNode, footer?: import("react").ReactNode },
  *   stage: import("react").ReactNode,
  *   actionBar: import("react").ReactNode,
  *   side: import("react").ReactNode,
  * }} props  `phase` and `request` are written on the frame for tests and telemetry. `result` is given once the
- *   game is over, and its `tone` is one of the card's colours: win, loss, draw or watched
+ *   game is over, and its `tone` is one of the card's colours: win, loss, draw or watched. Its `footer` goes under the
+ *   action bar inside the card, such as the share buttons
  */
 export function MatchFrame({
   pageTitle,
@@ -106,6 +107,7 @@ export function MatchFrame({
                   {result.note}
                 </div>
                 {actionBar}
+                {result.footer}
               </section>
             )}
             <div className={styles.stage} data-cc-slot="stage">

@@ -10,6 +10,7 @@ import { ComputerNote } from "../ComputerNote/ComputerNote.jsx";
 import { RequestBanner } from "../RequestBanner/RequestBanner.jsx";
 import { SaveProgressCard } from "../SaveProgress/SaveProgressCard.jsx";
 import { Seats } from "../Seats/Seats.jsx";
+import { ShareResult } from "../ShareResult/ShareResult.jsx";
 import { ActionBar } from "./ActionBar.jsx";
 import { MatchFrame, MatchStage } from "./MatchFrame.jsx";
 import { sendIntent, shellLayout } from "./matchShell.js";
@@ -113,6 +114,7 @@ export function MatchShell({
               tone: outcomeFor(room),
               headline: resultHeadline(room),
               celebration: <ResultCelebration room={room} />,
+              footer: <ShareResult room={room} />,
             }
           : undefined
       }
