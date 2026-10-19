@@ -2,7 +2,7 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-057**. A later change to a decision is a dated
+reused; the next free ID is **ADR-056**. A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -58,6 +58,96 @@ the owner may change it.
      checks for its first week.
 - **Not chosen.** Chromatic, Percy or Argos (an account and a secret in a public repository, per-snapshot pricing
   over a free tier), baselines per platform (three sets to keep in step), a trace of every passing test.
+
+### ADR-055 — Operations telemetry: our own metrics and named log lines to Grafana Cloud, no personal data
+
+- **Status:** Accepted · 2026-10-20 (owner, every recommendation below; research in
+  [CC-286](tickets/CC-286.md#research-written-before-any-code)). Nothing is sent until the code pull request merges
+  and the owner sets the env vars in Render (CC-286, Owner checklist).
+- **Context.** Logs live only in Render for 7 to 14 days, nothing measures latency per socket event or route, and
+  the two alert lines (`room gauge`, ADR-035; `match pipeline failed`, ADR-047) raise nothing. The free Render
+  instance has 0.1 CPU and 512 MB and cannot host a Collector. ADR-034 keeps product analytics first party; this
+  record is about how the server runs, not about players. The default OpenTelemetry instrumentations would export
+  the player's IP, user agent and raw paths (HTTP) and the session id, player id and room code (Socket.IO room
+  names), need an experimental loader flag for our ES modules, and on a 0.1 CPU container cut the peak request
+  rate to about a third (CC-286 sections 2.2, 2.5 and 2.6).
+- **Decision.**
+  1. **What is sent.** Only instruments our code creates, with the OpenTelemetry metrics API and SDK, no
+     auto-instrumentation and no loader hook:
+     1. `http.server.request.duration` (ms histogram): `http.route` (Express's matched template, `unmatched`
+        otherwise), `http.request.method`, `http.response.status_class` (`2xx` to `5xx`).
+     2. `socket.event.duration` (ms histogram): `socket.event` (from `SOCKET_EVENTS`), `outcome` (`ok`, `refused`
+        for a typed error, `failed` for a handler error, `rate_limited`). Timed in `registerHandlers`.
+     3. `rooms.open` and `realtime.connections` (gauges from the existing room gauge): `game` (catalogue id),
+        `status` (room status).
+     4. `match_pipeline.attempts` and `match_pipeline.failed` (counters): `step` (the five ADR-047 step names).
+     5. `nodejs.eventloop.delay` p50 and p99, `process.memory.rss` and `heap_used`, from `perf_hooks` and
+        `process.memoryUsage()`.
+     6. `telemetry.scrubbed` (counter): `signal`, `key`. It counts values the scrubber replaced (point 7).
+     7. **Log records, named lines only:** warnings and errors written by the server's own code, and the alert
+        lines, with the message (a fixed string from our code), level, and these fields when present: `errorCode`,
+        `event`, `route`, `game`, `step`, `attempts`, `status`, `error.type` (the error class). Nothing else.
+     8. Resource: `service.name` `classicade-server`, `service.version` (the commit), `deployment.environment.name`.
+        No resource detectors.
+  2. **What is never sent.** Player ids, display names, emails, IP addresses (or a count of them), user agents,
+     cookies, session ids, socket ids, room codes, match ids, raw paths and query strings, request ids, error
+     messages and stacks, and any field not listed in point 1. Traces are not sent (`OTEL_TRACES_EXPORTER` is not
+     read, there is no tracer provider). Budget: about 3 000 active series (10 000 free) and well under 1 GB of
+     logs a month (50 GB free).
+  3. **Where it goes and how long it is kept.** A Grafana Cloud free stack in the India region (AWS `ap-south-1`),
+     or Singapore (AWS `ap-southeast-1`) if a free stack cannot be made in India, over OTLP/HTTP straight from the
+     server, every 60 seconds. Grafana keeps it 14 days. The full log lines stay in
+     Render as today, and Render stays the record for the log retention decision (CC-252).
+  4. **Env vars, off when unset.** `OTEL_EXPORTER_OTLP_ENDPOINT` (the stack's `https://otlp-gateway-…/otlp`; unset
+     means no SDK is started and the API stays a no-op) and `OTEL_EXPORTER_OTLP_HEADERS`
+     (`Authorization=Basic …`, a token whose access policy only writes metrics and logs). Both are set in Render
+     only, never in the repository, `.env.example` gets the names with empty values, and the config refuses to
+     boot with one set and not the other, or with an endpoint that is not `https://` in production, naming the
+     variable and never its value. Optional standard names: `OTEL_SDK_DISABLED=true` (off, keeping the secrets),
+     `OTEL_LOGS_EXPORTER=none` (metrics only), `OTEL_METRIC_EXPORT_INTERVAL` (default 60000). `OTEL_SERVICE_NAME`
+     and `OTEL_RESOURCE_ATTRIBUTES` are ignored, so the resource stays the one in point 1.8.
+  5. **Dashboards** (one dashboard, its JSON kept in the repository): p50 and p95 per socket event; p50 and p95 per
+     route; error rate (5xx share of requests, `failed` share of socket events, refusals by outcome); event-loop
+     delay p50 and p99; RSS and heap against the 512 MB line; outbox attempts and failures per step; open rooms per
+     game and status against the 2 000 cap, and connections; and `telemetry.scrubbed`, which should stay at zero.
+  6. **Alerts to the owner** (Grafana-managed rules, an email contact point to the owner's address kept in Grafana,
+     not in the repository; no data counts as OK, so a sleeping instance pages nobody, ADR-043 still covers down):
+     1. **A finished game failed for good:** any `match_pipeline.failed` in the last 15 minutes. Fires at once.
+     2. **Errors:** server errors above 5 % of requests plus socket events over 10 minutes, with at least 20 of them.
+     3. **Strain:** RSS above 435 MB (85 % of 512), event-loop p99 above 250 ms, or open rooms above 1 600 (80 % of
+        the cap), for 10 minutes.
+  7. **How the guarantee is kept.** A View with `createAllowListAttributesProcessor` per instrument; every value
+     from a closed set; a scrubbing wrapper around each exporter that checks every key and value again and replaces
+     anything else with `other` (counted in `telemetry.scrubbed`); and a test that wires an in-memory exporter into
+     the integration suites, checks every exported key and value against the allowlist, and plants canaries (an
+     email, an `X-Forwarded-For` address, a player id, a session cookie, a room code) that must appear nowhere in
+     the serialized export. A new attribute fails the test until it is added to the allowlist on purpose.
+  8. **How to switch it off.** Set `OTEL_SDK_DISABLED=true` or remove `OTEL_EXPORTER_OTLP_ENDPOINT` in Render (the
+     service restarts without it). In a hurry, revoke the token in Grafana: exports fail, a warning is logged at
+     most once a minute, and the game is unaffected. Export never blocks a request, and a failure never crashes the
+     server.
+  9. **Privacy page and DATA.md, in the code pull request.** Privacy page section 5 names Grafana Labs (Grafana
+     Cloud, India region) as a fourth service that receives counts and timings about how the server runs and
+     warnings by type, never IPs, emails, player ids, names, room codes, cookies or sessions, kept 14 days; section
+     6 adds the 14 days. DATA.md gets an "Operations telemetry" row and section listing point 1's keys (personal
+     data: no), its "Coming" item 4 is replaced, and `privacyFacts.test.jsx` checks the new sentences.
+- **Alternatives.** The default auto-instrumentations with a denylist (the session id and IPs leave by default, an
+  experimental loader flag, and three to four times the CPU per request). A Collector (no free place to run it). Self-hosted Grafana OSS (needs a 2 to 4 GB VM
+  and its upkeep; later, by changing the endpoint). Axiom free (a good runner-up for logs). Better Stack free (3
+  days). Sentry free for errors (stacks may hold an email, F10; revisit in CC-049). Nothing at all (no latency
+  numbers for ADR-005's triggers and no alerts).
+- **Consequences.** Five to six small dependencies (`@opentelemetry/api`, `sdk-metrics`, `sdk-logs`,
+  `resources` and the OTLP/HTTP exporters, no third-party packages under them). About 5 to 15 MB of memory and a fifth of the peak request rate on 0.1 CPU, far above today's load. No change to
+  Render's start command. A free stack can be suspended without notice under Grafana's terms, so nothing depends on
+  it. Because nothing personal is sent, Grafana Labs is not a processor of personal data under the DPDP Act, and
+  deletion (CC-035) does not reach it. The same timers give CC-240 its server-side numbers. Traces, if ever wanted,
+  need a new decision (sampling, a Collector, and their own allowlist).
+- **Owner decisions (2026-10-20, each as recommended).**
+  1. Operations telemetry may go to a third party when it carries no personal data (points 1, 2 and 7).
+  2. Grafana Cloud free, India region (AWS `ap-south-1`), Singapore as the fallback. Axiom stays the runner-up.
+  3. Metrics and named warning and error lines only. No traces, until a new decision.
+  4. The three alerts in point 6, by email to the owner.
+  5. The stack is opened by the owner only, with two-factor sign-in.
 
 ### ADR-052 — The look and feel domain: scope, moves, new tickets and five choices
 
