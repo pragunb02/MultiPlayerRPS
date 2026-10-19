@@ -1,19 +1,27 @@
 ## Invite (waiting room)
-Play Rock Paper Scissors with me on ClassiCade — room HPPYCN
+Ek game ho jaaye? ClassiCade pe Rock Paper Scissors khelo, link kholo aur seedha khelo:
+Play Rock Paper Scissors with me on ClassiCade — room Y96TSP
+Free hai, login nahi chahiye.
 Free, no login needed.
-https://localhost:4984/games/rock-paper-scissors/rooms/HPPYCN
+https://localhost:4984/games/rock-paper-scissors/rooms/Y96TSP
 
 ## Result, win against a person (guest vs guest)
-🏆 I won a game of Rock Paper Scissors on ClassiCade. Your turn!
+🏆 Maine Rock Paper Scissors jeeta! Ab tumhari baari:
+I won a game of Rock Paper Scissors on ClassiCade. Your turn!
+Free hai, login nahi chahiye.
 Free, no login needed.
 https://localhost:4984/games/rock-paper-scissors
 
 ## Result, loss against a person (guest vs guest)
-🎯 I played Rock Paper Scissors on ClassiCade and lost. Can you do better?
+🎯 Aaj Rock Paper Scissors mein haar mili. Badla loge?
+I played Rock Paper Scissors on ClassiCade and lost. Can you do better?
+Free hai, login nahi chahiye.
 Free, no login needed.
 https://localhost:4984/games/rock-paper-scissors
 
 ## Result against Rocky (You lost the best of 3)
-🎯 Rocky beat me at Rock Paper Scissors on ClassiCade. Can you beat Rocky?
+🎯 Rock Paper Scissors mein Rocky ne mujhe hara diya. Badla loge?
+Rocky beat me at Rock Paper Scissors on ClassiCade. Can you beat Rocky?
+Free hai, login nahi chahiye.
 Free, no login needed.
 https://localhost:4984/games/rock-paper-scissors
