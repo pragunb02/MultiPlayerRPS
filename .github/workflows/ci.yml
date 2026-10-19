@@ -353,21 +353,19 @@ jobs:
     steps:
       - name: Host
         run: |
-          uname -a
-          grep -m1 "model name" /proc/cpuinfo
-          grep -m1 -o -w "avx\|avx2\|avx512f" /proc/cpuinfo | sort -u | tr '\n' ' '; echo
-          cat /proc/sys/vm/max_map_count
-          docker version --format '{{.Server.Version}}'
-      - name: Start each candidate image and print its log
+          uname -r
+          cat /proc/version_signature || true
+      - name: Soak each candidate for a minute and more with writes
         run: |
-          for image in mongo:8 mongo:8.2 mongo:8.0 mongo:7.0; do
+          for image in mongo:8.2.12 mongo:7.0.45; do
             echo "::group::$image"
-            docker pull -q "$image"
-            docker image inspect "$image" --format '{{index .RepoDigests 0}} {{.Config.Env}}'
             docker run -d --name probe "$image" > /dev/null
-            sleep 6
+            sleep 5
+            docker exec probe mongosh --quiet --eval 'for (let i = 0; i < 100000; i++) { db.t.insertOne({ i, s: "x".repeat(200) }) } print(db.t.countDocuments())' || true
+            sleep 60
             docker ps -a --filter name=probe --format '{{.Status}}'
-            docker logs probe 2>&1 | tail -n 25
+            docker exec probe mongosh --quiet --eval 'db.adminCommand("ping").ok' || true
+            docker logs probe 2>&1 | grep -E '"s":"(F|E|W)"' | head -n 20
             docker rm -f probe > /dev/null
             echo "::endgroup::"
           done
