@@ -62,3 +62,12 @@ export {
   SITE_ORIGIN_META,
   SITE_PREVIEW_IMAGE,
 } from "./site.js";
+export {
+  DAILY_PUZZLE_KINDS,
+  DAILY_PUZZLE_MARKS,
+  DAILY_PUZZLE_OUTCOMES,
+  DAILY_PUZZLE_REFUSALS,
+  DAILY_PUZZLE_STATUS,
+  DAILY_PUZZLES,
+  getDailyPuzzle,
+} from "./dailyPuzzles.js";

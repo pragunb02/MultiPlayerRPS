@@ -28,6 +28,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   accountLimits?: Parameters<typeof import("./accountRoutes.js").createAccountRoutes>[0]["limits"],
  *   blockComponent: ReturnType<typeof import("../../domain/blocks/blockComponent.js").createBlockComponent>,
  *   blockLimits?: Parameters<typeof import("./blockRoutes.js").createBlockRoutes>[0]["limits"],
+ *   dailyPuzzleComponent: ReturnType<typeof import("../../domain/dailyPuzzles/dailyPuzzleComponent.js").createDailyPuzzleComponent>,
+ *   dailyPuzzleLimit?: { windowMs: number, limit: number },   moves and hints per player (CC-144)
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
  *   onOtherSessionsEnded: (which: { playerId: string, fromSessionId: string, toSessionId: string }) => void,  told
@@ -57,6 +59,8 @@ export function createHttpApp({
   accountLimits,
   blockComponent,
   blockLimits,
+  dailyPuzzleComponent,
+  dailyPuzzleLimit,
   authLimits,
   onSessionEnded,
   onOtherSessionsEnded,
@@ -131,6 +135,8 @@ export function createHttpApp({
       accountLimits,
       blockComponent,
       blockLimits,
+      dailyPuzzleComponent,
+      dailyPuzzleLimit,
     }),
   );
 
