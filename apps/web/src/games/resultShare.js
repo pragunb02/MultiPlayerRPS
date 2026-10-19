@@ -1,7 +1,7 @@
-import { BOT_CHARACTERS, ROOM_END_REASONS } from "@classicade/shared";
-import { paths } from "../app/paths.js";
+import { BOT_CHARACTERS, ROOM_END_REASONS, SHARE_CHANNELS } from "@classicade/shared";
+import { paths, withShareChannel } from "../app/paths.js";
 import { outcomeFor } from "../components/Celebrations/outcome.js";
-import { resultText, shareMessage, whatsappUrl, withFreeLine } from "../lib/shareText.js";
+import { resultText, shareMessage, withFreeLine } from "../lib/shareText.js";
 import { isAborted } from "./outcomeText.js";
 
 /**
@@ -52,17 +52,24 @@ export function resultShareOf(room) {
 }
 
 /**
- * The result share of a finished room: the text, the game page's link (a finished room closes soon, so the link
- * never names it), the whole message and WhatsApp's link for it.
+ * The result share of a finished room: the text, and the game page's link (a finished room closes soon, so the link
+ * never names it) once for each way it can leave, each marked with its channel (CC-279).
  *
  * @param {any} room  a finished RoomView
  * @param {{ origin: string }} site  the site's own address (app/siteOrigin.js)
- * @returns {{ line: string, text: string, url: string, message: string, whatsapp: string }}
- *   line: the result alone. text: the result and the free line, for a share sheet that takes the link apart
+ * @returns {{ line: string, text: string, shareUrl: string, message: string, whatsappMessage: string }}
+ *   line: the result alone. text: the result and the free line, for the share sheet, which gets `shareUrl` apart.
+ *   message: the whole message with the copied link. whatsappMessage: the same with WhatsApp's own link
  */
 export function resultShare(room, { origin }) {
   const line = resultText(resultShareOf(room));
-  const url = `${origin}${paths.game(room.gameId)}`;
-  const message = shareMessage({ text: line, url });
-  return { line, text: withFreeLine(line), url, message, whatsapp: whatsappUrl(message) };
+  const page = `${origin}${paths.game(room.gameId)}`;
+  const messageVia = (channel) => shareMessage({ text: line, url: withShareChannel(page, channel) });
+  return {
+    line,
+    text: withFreeLine(line),
+    shareUrl: withShareChannel(page, SHARE_CHANNELS.SHARE_SHEET),
+    message: messageVia(SHARE_CHANNELS.COPY),
+    whatsappMessage: messageVia(SHARE_CHANNELS.WHATSAPP),
+  };
 }
