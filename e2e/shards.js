@@ -35,6 +35,7 @@ export const SHARDS = Object.freeze([
     "match-shell-presses-tictactoe.spec.js", // 875
     "accessibility.spec.js", // 203, desktop only
     "dead-space.spec.js", // new (CC-259), not measured yet
+    "layout-width.spec.js", // new (CC-256, CC-270), about 15 s a phone size locally
   ]),
   // 1106 s
   Object.freeze([
