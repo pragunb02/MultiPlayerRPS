@@ -255,7 +255,8 @@ test("Rock Paper Scissors while choosing, and the result after a win", async ({ 
   const arrived = (event) => host.record.socketFrames.some((frame) => frame.includes(`"${event}"`));
   await expect.poll(() => arrived("progress:updated") && arrived("quests:updated")).toBe(true);
   const progress = [
-    host.page.getByRole("banner").getByRole("progressbar"),
+    // The header's level chip: the badge, "Lv 2" and the bar, which together are the progress bar's parent.
+    host.page.getByRole("banner").getByRole("progressbar").locator(".."),
     host.page
       .getByRole("list", { name: "What you'd keep" })
       .getByRole("listitem")
