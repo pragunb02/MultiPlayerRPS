@@ -52,9 +52,10 @@ These rules come first. Where they differ from anything below, they win.
    `main` stays green: a red `main` is fixed before anything else merges. **Fast mode ended 2026-10-18 (owner):** every check is required again, branches must be up to date, and builders run their own gates in full.
 7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (the growth plan, `docs/GROWTH.md`,
    added by PR #60) and the owner's admin console are in scope.
-8. **Two reviews before every merge.** Every pull request is reviewed before merge by two reviewer agents in
-   parallel: a code reviewer (correctness, tests, the working agreement and comment style, regressions) and a
-   security reviewer (auth, sessions, sockets, input, data exposure, secrets). Each finding is checked by a second
+8. **Reviews before every merge.** Every pull request is reviewed before merge by reviewer agents in parallel: a
+   code reviewer (correctness, tests, the working agreement and comment style, regressions), a security reviewer
+   (auth, sessions, sockets, input, data exposure, secrets) and, for any change players can see, a design reviewer
+   (phone and desktop layouts, plain words, accessibility, the look and feel domain). Each finding is checked by a second
    agent that tries to refute it. Confirmed findings are fixed, or written down with a reason, before the merge.
 
 ### Workflow rules
@@ -76,7 +77,8 @@ These rules come first. Where they differ from anything below, they win.
    suites on Chromium (desktop + mobile) and Firefox; the backup round trip; actionlint (all in
    `.github/workflows/ci.yml`); and CodeQL for JavaScript and for Actions (GitHub's CodeQL setup, not ci.yml). WebKit
    runs nightly, on demand and on PRs that change `apps/web`, `packages/shared` or `e2e`; it is advisory until its
-   open flakes (CC-273) are fixed. **Merging to `main` deploys to
+   open flakes (CC-273) are fixed. `Visual baselines (advisory)` (CC-155) runs on every PR and is not required
+   during its first week; the owner decides whether to require it. **Merging to `main` deploys to
    production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
    dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging (DEPLOYMENT.md).
 8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
@@ -113,6 +115,8 @@ npm run test:coverage  # with coverage gates (ENGINEERING.md §4)
 npm run test:all       # every test incl. the slow-tagged bot games, as the nightly workflow does (CC-203)
 npm run test:e2e       # browser persona tests (first time: npx playwright install chromium)
 E2E_BROWSER=webkit npm run test:e2e   # the same on firefox or webkit (npx playwright install webkit, CC-184)
+npm run test:visual    # screenshot baselines, in the pinned Playwright image through Docker (CC-155)
+npm run test:visual:update  # rewrite the baselines that changed, then review the images in the PR
 npm audit              # must be 0 high/critical
 ./scripts/issue-counts.sh  # issue counts for PROGRESS.md (never hand-edit them)
 ```

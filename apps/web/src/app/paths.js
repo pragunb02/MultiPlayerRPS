@@ -7,6 +7,7 @@ import { DEFAULT_LEADERBOARD_ID, gameForSlug, getGame } from "@classicade/shared
  *   /                                  home: what ClassiCade is + the game catalog
  *   /games/:slug                       a game's lobby: start a room or join one by code
  *   /games/:slug/rooms/:code           a room (code upper-case); the invite link
+ *   /games/:slug/pass-and-play         two people on one phone, nothing sent or kept (CC-223)
  *   /login?next=…  /signup?next=…      account pages; `next` = where to return afterwards
  *   /profile                           your progress and match history (guests and accounts)
  *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
@@ -20,6 +21,7 @@ import { DEFAULT_LEADERBOARD_ID, gameForSlug, getGame } from "@classicade/shared
 export const ROUTES = Object.freeze({
   GAME: "games/:slug",
   ROOM: "games/:slug/rooms/:code",
+  PASS_AND_PLAY: "games/:slug/pass-and-play",
   LOGIN: "login",
   SIGNUP: "signup",
   PROFILE: "profile",
@@ -126,6 +128,8 @@ export const paths = Object.freeze({
   game: (gameId) => `/games/${slugOf(gameId)}`,
   /** @param {string} gameId @param {string} code */
   room: (gameId, code) => `/games/${slugOf(gameId)}/rooms/${encodeURIComponent(normaliseRoomCode(code))}`,
+  /** @param {string} gameId */
+  passAndPlay: (gameId) => `/games/${slugOf(gameId)}/pass-and-play`,
   /** @param {string} [next] */
   login: (next) => withNext("/login", next),
   /** @param {string} [next] */

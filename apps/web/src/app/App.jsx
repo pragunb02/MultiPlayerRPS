@@ -13,6 +13,7 @@ import { PrivacyPage } from "../pages/LegalPages/PrivacyPage.jsx";
 import { TermsPage } from "../pages/LegalPages/TermsPage.jsx";
 import { LoginPage } from "../pages/LoginPage/LoginPage.jsx";
 import { NotFoundPage } from "../pages/NotFoundPage/NotFoundPage.jsx";
+import { PassAndPlayPage } from "../pages/PassAndPlayPage/PassAndPlayPage.jsx";
 import { PlayPage } from "../pages/PlayPage/PlayPage.jsx";
 import { ProfilePage } from "../pages/ProfilePage/ProfilePage.jsx";
 import { RoomPage } from "../pages/RoomPage/RoomPage.jsx";
@@ -42,6 +43,7 @@ export function App({ services }) {
                     <Route index element={<HomePage />} />
                     <Route path={ROUTES.GAME} element={<PlayPage />} />
                     <Route path={ROUTES.ROOM} element={<RoomPage />} />
+                    <Route path={ROUTES.PASS_AND_PLAY} element={<PassAndPlayPage />} />
                     <Route path={ROUTES.LOGIN} element={<LoginPage />} />
                     <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
                     <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
