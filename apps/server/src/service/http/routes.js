@@ -71,7 +71,11 @@ export function apiRouter({
   router.use(createProgressRoutes({ progressionComponent }));
   router.use(createGamificationRoutes({ gamificationComponent, now }));
   router.use(
-    createLeaderboardRoutes({ leaderboardComponent, ...(leaderboardLimit && { limit: leaderboardLimit }) }),
+    createLeaderboardRoutes({
+      leaderboardComponent,
+      now,
+      ...(leaderboardLimit && { limit: leaderboardLimit }),
+    }),
   );
 
   router.use(createAdminRoutes({ analyticsComponent, requireAdmin: adminAccess.requireAdmin, now }));
