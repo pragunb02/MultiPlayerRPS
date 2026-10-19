@@ -2,7 +2,8 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-056**. A later change to a decision is a dated
+reused; the next free ID is **ADR-060**. Reserved for open work (2026-10-20): ADR-056
+(CC-155, #104), ADR-057 (CC-253), ADR-058 (CC-163) and ADR-059 (CC-290). A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -32,6 +33,28 @@ the owner may change it.
 - **Status:** Open
 - **Context:** Ratings, leaderboards, friends, payments are relational; matches/moves fit documents.
 - **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
+
+### ADR-054 — Pass and play runs in the browser on the pure engines and never counts
+
+- **Status:** Open · 2026-10-20, proposed ([CC-223](tickets/CC-223.md), research with sources there). Built in the
+  CC-223 pull request; the owner accepts it with the merge.
+- **Context.** FR-GAME-8 asks for pass and play on one phone for all three games, results not counted. Every game
+  today is a server room, and the server is the authority so that a result can be trusted (ADR-021).
+- **Decision.**
+  1. A pass and play game runs entirely in the browser with the same pure engine from `@classicade/games` that the
+     server uses (one export per engine, loaded on demand). No room is created and nothing about the game is sent:
+     no socket event and no API call for any move. Tests assert it.
+  2. It never counts. No XP, quests, streaks, achievements, boards or match history, by construction: the server
+     never learns of the game. The result says "Not counted".
+  3. Names are typed on the phone and kept only in page memory. Never sent, never in the URL or web storage.
+  4. A game that keeps a move secret (`passAndPlay.handOver` in the client registry, today only RPS) covers the
+     board with a "pass the phone" screen whenever the phone must change hands. The board is not in the page
+     while it is covered.
+  5. Chess keeps the board still, White at the bottom, with the manual flip (lichess's default, chess.com's choice).
+  6. The match layout is `MatchFrame`, filled by the room's `MatchShell` and by `PassAndPlayShell` (amends ADR-049
+     point 2: one frame, two shells).
+- **Consequences.** The web app depends on `@classicade/games`. A new game gets pass and play by adding a
+  `passAndPlay` entry to its registry entry. Untimed chess and rotated pieces are in IDEAS.md.
 
 ## Accepted decisions
 
@@ -742,6 +765,9 @@ record, because today one process keeps the games it is running in memory.
   4. Later: a postal address that is not a home address, as email law requires, before any marketing or recap email
      (transactional email such as password reset is exempt), and a decision on whether to put a card on Render before
      any burst post.
+- **Amended 2026-10-20 (owner).** CC-123 (the brand domain) no longer waits for the launch list in point 1: it is
+  built right after CC-290 and CC-291, because the email service (CC-293) needs the domain for SPF and DKIM, and
+  email save (CC-292) and password reset (CC-033) need the email service.
 
 ### ADR-031 — Notification channels and caps
 

@@ -52,9 +52,10 @@ These rules come first. Where they differ from anything below, they win.
    `main` stays green: a red `main` is fixed before anything else merges. **Fast mode ended 2026-10-18 (owner):** every check is required again, branches must be up to date, and builders run their own gates in full.
 7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (the growth plan, `docs/GROWTH.md`,
    added by PR #60) and the owner's admin console are in scope.
-8. **Two reviews before every merge.** Every pull request is reviewed before merge by two reviewer agents in
-   parallel: a code reviewer (correctness, tests, the working agreement and comment style, regressions) and a
-   security reviewer (auth, sessions, sockets, input, data exposure, secrets). Each finding is checked by a second
+8. **Reviews before every merge.** Every pull request is reviewed before merge by reviewer agents in parallel: a
+   code reviewer (correctness, tests, the working agreement and comment style, regressions), a security reviewer
+   (auth, sessions, sockets, input, data exposure, secrets) and, for any change players can see, a design reviewer
+   (phone and desktop layouts, plain words, accessibility, the look and feel domain). Each finding is checked by a second
    agent that tries to refute it. Confirmed findings are fixed, or written down with a reason, before the merge.
 
 ### Workflow rules

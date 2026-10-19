@@ -1,0 +1,52 @@
+/* The pass and play setup (CC-223): two names and the game's options, in one card like the lobby's. */
+.page {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 32rem;
+}
+.page h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+}
+.lead {
+  margin: 0;
+}
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+.panel label {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 700;
+}
+.panel input,
+.panel select {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.small {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+/* The game did not download: what happened and Try again, above Start. */
+.failure {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+.failure p {
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: 700;
+}
