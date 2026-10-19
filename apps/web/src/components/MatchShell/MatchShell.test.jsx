@@ -337,8 +337,64 @@ describe("MatchShell at the end", () => {
 
     update(finished());
 
-    expect(urgent()).toHaveTextContent("You won by resignation");
+    expect(urgent()).toHaveTextContent(/^You won by resignation\. .+ Bob resigned\.$/);
     expect(board).toHaveFocus();
+  });
+
+  it("puts the outcome's line under the headline, the Hinglish line first and the English one under it (CC-163)", () => {
+    mount(finished());
+
+    const line = within(slot("result")).getByTestId("outcome-line");
+    expect([...line.children].map((each) => each.textContent)).toEqual([
+      "Bob ne haar maan li.",
+      "Bob resigned.",
+    ]);
+    expect(slot("result").querySelector("h2 + [data-testid='outcome-line']")).toBe(line);
+  });
+
+  it.each([
+    ["a win played to the end", WIN, "win"],
+    ["a win by forfeit", { ...WIN, reason: "forfeit" }, "quiet-win"],
+    ["a loss", { ...WIN, winners: [BOB.playerId] }, "gentle-loss"],
+    ["a draw", { status: "finished", result: "draw", winners: [], reason: "agreement" }, "even"],
+  ])("gives the result card the tone of %s", (_case, outcome, tone) => {
+    mount(
+      finished({ game: { view: {}, activePlayers: [], outcome, number: 1, turnEndsAt: 0, matchId: "m1" } }),
+    );
+
+    expect(slot("result")).toHaveAttribute("data-cc-tone", tone);
+  });
+
+  it("dims only the board after a loss, never the save progress card or the buttons", () => {
+    const loss = { ...WIN, winners: [BOB.playerId] };
+    mount(
+      finished({
+        game: { view: {}, activePlayers: [], outcome: loss, number: 1, turnEndsAt: 0, matchId: "m1" },
+      }),
+    );
+
+    const dimmed = slot("stage").querySelectorAll("[data-cc-effect='dim']");
+    expect(dimmed).toHaveLength(1);
+    expect(dimmed[0]).toHaveTextContent("Board for game 1");
+    expect(dimmed[0]).toHaveClass("dimmed");
+    expect(slot("result").querySelector("[data-cc-effect='dim']")).toBeNull();
+  });
+
+  it.each([
+    ["a win", WIN],
+    ["a draw", { status: "finished", result: "draw", winners: [], reason: "agreement" }],
+  ])("leaves the board as it is after %s", (_case, outcome) => {
+    mount(
+      finished({ game: { view: {}, activePlayers: [], outcome, number: 1, turnEndsAt: 0, matchId: "m1" } }),
+    );
+
+    expect(document.querySelector("[data-cc-effect='dim']")).toBeNull();
+  });
+
+  it("does not dim a board that is still being played", () => {
+    mount(roomView());
+
+    expect(document.querySelector("[data-cc-effect='dim']")).toBeNull();
   });
 
   it("finds a new opponent and leaves without asking", async () => {

@@ -179,18 +179,22 @@ describe("RoomPage", () => {
   });
 
   it.each([
-    [{ result: "win", winners: [GUEST.id], reason: "three-in-a-row" }, "Victory!", true],
-    [{ result: "win", winners: ["guest_b"], reason: "three-in-a-row" }, "Defeat", false],
-  ])("celebrates the result: banner, and confetti for a win (%o)", async (outcome, banner, confetti) => {
-    openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
+    [{ result: "win", winners: [GUEST.id], reason: "three-in-a-row" }, "Victory!", true, "win"],
+    [{ result: "win", winners: ["guest_b"], reason: "three-in-a-row" }, "", false, "gentle-loss"],
+  ])(
+    "celebrates the result in its tone: a stamp and confetti for a win, no stamp after a loss (%o)",
+    async (outcome, stamp, confetti, tone) => {
+      openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
 
-    expect(await screen.findByText(banner)).toBeInTheDocument();
-    expect(Boolean(document.querySelector("[data-effect='confetti']"))).toBe(confetti);
-    // The status region still says the result in words; the banner is decoration.
-    const result = screen.getByRole("heading", { name: confetti ? "You won!" : "You lost" });
-    // The result panel takes the outcome's colour.
-    expect(result.closest("section")).toHaveClass(confetti ? "win" : "loss");
-  });
+      // The result heading says it in words. The stamp over it is decoration.
+      const result = await screen.findByRole("heading", { name: confetti ? "You won!" : "You lost" });
+      expect(Boolean(document.querySelector("[data-effect='confetti']"))).toBe(confetti);
+      expect(screen.queryByText("Defeat")).not.toBeInTheDocument();
+      if (stamp !== "") expect(screen.getByText(stamp)).toBeInTheDocument();
+      // The result panel takes the outcome's tone.
+      expect(result.closest("section")).toHaveAttribute("data-cc-tone", tone);
+    },
+  );
 
   it("shows the game's icon in the room title and invite art while waiting", async () => {
     openRoom();
