@@ -14,8 +14,10 @@ import { materialBalance, opposite, positionWithMove, replayGame } from "./chess
 import { GameOver } from "./GameOver.jsx";
 import { MoveList } from "./MoveList.jsx";
 import { LOW_TIME_MS, PlayerBar } from "./PlayerBar.jsx";
+import { RatingBadge, RatingChanges } from "./Rating.jsx";
 import { useBoardInput } from "./useBoardInput.js";
 import { useChessClocks } from "./useChessClocks.js";
+import { useRoomRatings } from "./useRoomRatings.js";
 import styles from "./ChessBoard.module.css";
 
 const FORM_FIELDS = new Set(["INPUT", "SELECT", "TEXTAREA"]);
@@ -116,6 +118,9 @@ export function ChessBoard({
   const names = { w: seatName(byColour("w")), b: seatName(byColour("b")) };
   // On one phone both players read the same board, so each bar names its player instead of saying "You" (CC-223).
   const shownName = (colour) => (colour === yourColour && !room.sharedScreen ? "You" : names[colour]);
+  const ratings = useRoomRatings(room);
+  const ratingOf = (colour) => ratings.get(byColour(colour));
+  const rated = ["w", "b"].filter((colour) => ratingOf(colour) !== undefined);
 
   const running = playing && view.lastMoveAt > 0 ? view.fen.split(" ")[1] : "";
   const clocks = useChessClocks({
@@ -186,6 +191,7 @@ export function ChessBoard({
       live={playing}
       captured={balance.captured[colour]}
       advantage={balance.advantage[colour]}
+      badge={ratingOf(colour) && <RatingBadge rating={ratingOf(colour)} />}
     />
   );
   const lowOnTime = playing && yourColour !== "" && clocks[yourColour] < LOW_TIME_MS;
@@ -229,7 +235,11 @@ export function ChessBoard({
 
         <aside className={styles.panel}>
           {room.status === "finished" && (
-            <GameOver room={room} names={names} yourColour={yourColour} site={site} />
+            <GameOver room={room} names={names} yourColour={yourColour} site={site}>
+              <RatingChanges
+                players={rated.map((colour) => ({ name: shownName(colour), rating: ratingOf(colour) }))}
+              />
+            </GameOver>
           )}
           <MoveList moves={timeline.slice(1).map((p) => p.san)} ply={shown} latest={latest} onGoTo={goTo} />
         </aside>
