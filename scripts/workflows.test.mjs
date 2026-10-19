@@ -222,3 +222,38 @@ describe("browser test parts", () => {
     }
   });
 });
+
+describe("visual baselines (CC-155)", () => {
+  it("compare on every pull request in an advisory job that keeps the differences, videos and traces", async () => {
+    const visual = job(await read(".github/workflows/ci.yml"), "visual");
+
+    expect(visual).toContain("    name: Visual baselines (advisory)\n");
+    expect(visual).toContain("        run: npx playwright test -c playwright.visual.config.js --workers=2\n");
+    expect(visual).toContain("        if: failure()\n        uses: actions/upload-artifact@v7");
+    expect(visual).toContain("          path: e2e/visual-results/\n          retention-days: 14\n");
+  });
+
+  it("record a video and a trace of a failing test", async () => {
+    const { default: config } = await import("../e2e/playwright.visual.config.js");
+
+    expect(config.use).toMatchObject({ video: "retain-on-failure", trace: "retain-on-failure" });
+    expect(config.retries).toBe(0);
+  });
+
+  it("are updated only on a ticket branch, and the branch's code never runs with a token that can push", async () => {
+    const workflow = await read(".github/workflows/visual-update.yml");
+    const render = job(workflow, "render");
+    const commit = job(workflow, "commit");
+
+    expect(workflow).toMatch(/\npermissions:\n {2}contents: read\n/);
+    expect(render).not.toContain("permissions:");
+    expect(render).toContain("persist-credentials: false");
+    expect(render).toContain("grep -Eq '^cc-[0-9]{3}-[a-z0-9-]+$'");
+    expect(render).toContain("--update-snapshots=changed");
+    expect(commit).toContain("    permissions:\n      contents: write\n");
+    expect(commit).not.toMatch(/npm|npx|node /);
+    expect(commit).toContain('git commit --quiet --message "$TICKET: ');
+    // Inputs reach shell scripts only through the environment, never pasted into the script.
+    expect(workflow).not.toMatch(/run: .*\$\{\{ inputs\./);
+  });
+});

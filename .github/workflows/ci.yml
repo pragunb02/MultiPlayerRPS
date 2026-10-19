@@ -316,6 +316,50 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 14
 
+  # Screenshot baselines of the main screens, light and dark, laptop and phone (CC-155). They run inside the pinned
+  # Playwright image (VISUAL_IMAGE in scripts/visual/docker.mjs), so the fonts and the browser are the ones the baselines
+  # were made with. Advisory for its first week: not a required check until the owner decides. To accept a change
+  # on purpose, run the "Visual baselines (update)" workflow on the branch, or `npm run test:visual:update`.
+  visual:
+    name: Visual baselines (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host --init
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-visual-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - name: Compare every screen with its baseline
+        working-directory: e2e
+        run: npx playwright test -c playwright.visual.config.js --workers=2
+        env:
+          CI: "true"
+      - name: Visual report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-report
+          path: e2e/visual-report/
+          retention-days: 14
+      # The expected, actual and diff image of each screen that changed, with a video and a trace of its test.
+      - name: Differences, videos and traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-results
+          path: e2e/visual-results/
+          retention-days: 14
+
   docker:
     name: Docker image builds and serves (docker compose)
     runs-on: ubuntu-latest

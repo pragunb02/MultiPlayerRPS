@@ -1,0 +1,118 @@
+# Regenerates the screenshot baselines on a pull request's branch and commits them there for review (CC-155).
+# Run it from the Actions tab ("Run workflow") after a change to the look made on purpose. A person then reviews the
+# image diffs in the pull request's Files tab. A commit pushed by this workflow does not start CI by itself (GitHub
+# does not run workflows for its own token's pushes), so the reviewer's next push, after looking at the images,
+# runs the checks again.
+#
+# Two jobs, so the branch's code never runs with a token that can push: the first makes the images inside the
+# pinned Playwright image with read-only access, the second only copies them into a commit.
+name: Visual baselines (update)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Pull request branch to update, for example cc-153-arcade-polish (never main)"
+        required: true
+        type: string
+      ticket:
+        description: "Ticket the change belongs to, for example CC-153 (starts the commit message)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-update-${{ inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  render:
+    name: Make the baselines in the CI image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host --init
+    steps:
+      - name: Only a ticket branch, with a ticket ID
+        run: |
+          printf '%s' "$BRANCH" | grep -Eq '^cc-[0-9]{3}-[a-z0-9-]+$' || { echo "::error::branch must look like cc-123-short-name, not main"; exit 1; }
+          printf '%s' "$TICKET" | grep -Eq '^CC-[0-9]{3}$' || { echo "::error::ticket must look like CC-123"; exit 1; }
+        env:
+          BRANCH: ${{ inputs.branch }}
+          TICKET: ${{ inputs.ticket }}
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-visual-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      # Writes the images that differ and the missing ones. The others stay as they were.
+      - name: Make the baselines
+        working-directory: e2e
+        run: npx playwright test -c playwright.visual.config.js --workers=2 --update-snapshots=changed
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines
+          path: e2e/visual-baselines/
+          retention-days: 7
+      - name: Visual report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-update-report
+          path: e2e/visual-report/
+          retention-days: 14
+
+  commit:
+    name: Commit the baselines to the branch
+    needs: render
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.branch }}
+      - name: Replace the baselines with the new ones
+        run: rm -rf e2e/visual-baselines
+      - uses: actions/download-artifact@v8
+        with:
+          name: visual-baselines
+          path: e2e/visual-baselines
+      - name: Commit and push, if anything changed
+        run: |
+          git add --all e2e/visual-baselines
+          if git diff --cached --quiet; then
+            echo "The baselines already match this branch. Nothing to commit." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet --message "$TICKET: update the visual baselines (workflow run $RUN_ID)"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          {
+            echo "Updated baselines on \`$BRANCH\`:"
+            echo
+            git show --stat --format= HEAD
+            echo
+            echo "Review the images in the pull request's Files tab. CI does not run on this commit by itself:"
+            echo "push the next commit once the images are approved."
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          BRANCH: ${{ inputs.branch }}
+          TICKET: ${{ inputs.ticket }}
+          RUN_ID: ${{ github.run_id }}
