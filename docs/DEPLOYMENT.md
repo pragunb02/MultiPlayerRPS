@@ -16,16 +16,19 @@ These settings, and every env var that is not a secret, are also written in [`re
 owner links it as a Blueprint, the file is what Render applies. Until then the dashboard is. See
 [Render Blueprint](#render-blueprint-cc-294).
 
-| Setting           | Value                                                                                                                                                                                                                                                       |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Build Command     | `npm ci --include=dev && npm run build:web` — exact lockfile install, then the web build (Vite is a dev dependency, so `--include=dev` even with `NODE_ENV=production`)                                                                                     |
-| Start Command     | `npm start` — runs `apps/server/src/index.js`                                                                                                                                                                                                               |
-| Health Check Path | `/health` — 200 only when the database is connected; a failing new deploy is never promoted                                                                                                                                                                 |
-| Auto-Deploy       | **After CI Checks Pass**: Render deploys a commit on `main` only when every GitHub check on it passed (success, neutral or skipped). A failed check on a merge commit means that commit is not deployed: fix `main`, and the next green commit deploys      |
-| Node version      | from `.nvmrc`                                                                                                                                                                                                                                               |
-| Listen address    | Environment → `HOST=0.0.0.0`. Render requires every web service to listen on 0.0.0.0 and the port in `PORT`; the server's own default is 127.0.0.1 (CC-287), which Render's proxy cannot reach, so without this setting every deploy fails its health check |
+| Setting           | Value                                                                                                                                                                                                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build Command     | `npm ci --include=dev && npm run build:web` — exact lockfile install, then the web build (Vite is a dev dependency, so `--include=dev` even with `NODE_ENV=production`)                                                                                          |
+| Start Command     | `npm start` — runs `apps/server/src/index.js`                                                                                                                                                                                                                    |
+| Health Check Path | `/health` — 200 only when the database is connected; a failing new deploy is never promoted                                                                                                                                                                      |
+| Auto-Deploy       | **After CI Checks Pass**: Render deploys a commit on `main` only when every GitHub check on it passed (success, neutral or skipped). A failed check on a merge commit means that commit is not deployed: fix `main`, and the next green commit deploys           |
+| Node version      | from `.nvmrc`                                                                                                                                                                                                                                                    |
+| Listen address    | `HOST=0.0.0.0` (in `render.yaml`). Render requires every web service to listen on 0.0.0.0 and the port in `PORT`; the server's own default is 127.0.0.1 (CC-287), which Render's proxy cannot reach, so without this setting every deploy fails its health check |
 
 ### Environment variables (dashboard → Environment)
+
+Once the Blueprint is linked, only the secrets (`MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`) are set in the
+dashboard. Every other value below lives in `render.yaml` and changes by pull request.
 
 | Variable            | Required      | Notes                                                                                                                                                                                                                                                                       |
 | ------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -135,7 +138,8 @@ Do these on a laptop, in the dashboard only. Nothing is applied before step 8.
 The server listens on `HOST`, default `127.0.0.1`, so `npm start` or `npm run dev:server` on a laptop is reachable
 from that laptop only. Render needs `HOST=0.0.0.0` ("Every Render web service must bind to a port on host 0.0.0.0",
 render.com/docs/web-services). The Docker image sets `HOST=0.0.0.0` inside the container, and `docker-compose.yml`
-publishes its port on `127.0.0.1` only. Rollout order for the change that added it:
+publishes its port on `127.0.0.1` only. Rollout order for the change that added it (done 2026-10-20, before the
+Blueprint: `HOST` is now in `render.yaml`, so once the Blueprint is linked it changes by pull request only):
 
 1. Render → Environment: add `HOST` = `0.0.0.0` and save. The running server ignores it (it does not read `HOST`), so
    the redeploy this starts changes nothing.
@@ -154,7 +158,8 @@ To turn it on for yourself:
 1. Log in to the site with your own account.
 2. Open `https://<site>/api/session` in the same browser. Copy `identity.id` (it starts with `user_`).
 3. In Render → Environment, set `ADMIN_ACCOUNT_IDS` to that id (several ids: comma separated) and save. Render
-   redeploys.
+   redeploys. This one stays in the dashboard after the Blueprint is linked: `render.yaml` lists it as
+   `sync: false`, so Render never changes its value.
 4. Reload the site: a **Console** link appears in the header for you only.
 
 Removing an id and redeploying takes access away at once (it is checked on every request). Reports are cached for 5
@@ -257,7 +262,10 @@ the real number without logging any address:
    (browser dev tools, Network tab).
 2. Find that request id in the Render logs. The `request completed` line has `forwardedEntries`, the number of entries
    in `X-Forwarded-For` (only the count, never the addresses). A browser sends none, so this is the number of proxies.
-3. Set `TRUST_PROXY_HOPS` to that number in Render (dashboard → Environment) and redeploy. At startup the server logs
+3. Change `TRUST_PROXY_HOPS` to that number by pull request, never in the dashboard: the value in `render.yaml` and
+   the one in `PLAIN` in `scripts/renderBlueprint.test.mjs`. Never set it above the measured count. Once the
+   Blueprint is linked, a dashboard edit is quietly put back to the file's value on the next sync. Until it is linked,
+   set the same number in Render → Environment as well, after the pull request merges. At startup the server logs
    `client addresses read through trusted proxies` with the `trustProxyHops` in effect.
 
 The app-wide `/api` budget (CC-110) is 300 requests a minute, counted per session when the player has one (guest or
@@ -307,7 +315,11 @@ the **Deployment impact** section of the PR template. If anything below changes,
    Verify from a fresh clone: `NODE_ENV=production npm ci --include=dev && npm run build:web && npm start` (with the
    variables above, including `HOST=0.0.0.0`) logs "server listening" with that `host` and `/health` reports the
    database up.
-2. **Environment variables** — new/renamed/removed variables must be set in Render _before_ merging.
+2. **Environment variables** — every variable the config reads is listed in `render.yaml` (its test fails
+   otherwise). A plain value is changed in `render.yaml` and in `PLAIN` in `scripts/renderBlueprint.test.mjs`, never
+   in the dashboard: once the Blueprint is linked, the next sync puts a dashboard edit back. A new secret is added
+   to `render.yaml` as `sync: false` and its value set by hand in Render → Environment _before_ merging (Render reads
+   new `sync: false` keys only when a Blueprint is first created).
 3. **Data** — schema or collection changes, migrations, anything that touches existing documents.
 4. **Sessions/cookies** — changes can log users out.
 
