@@ -14,6 +14,7 @@ describe("loadConfig", () => {
       env: "development",
       isProduction: false,
       port: 4000,
+      host: "127.0.0.1",
       logLevel: "info",
       mongoUri: REQUIRED.MONGO_URI,
       sessionSecret: REQUIRED.SESSION_SECRET,
@@ -50,6 +51,7 @@ describe("loadConfig", () => {
       ...REQUIRED,
       NODE_ENV: "production",
       PORT: "8000",
+      HOST: "0.0.0.0",
       LOG_LEVEL: "warn",
       MONGO_URI: "mongodb+srv://cluster.example.net/classicade",
       ALLOWED_ORIGINS: "https://classicade.app, https://www.classicade.app",
@@ -62,6 +64,7 @@ describe("loadConfig", () => {
         env: "production",
         isProduction: true,
         port: 8000,
+        host: "0.0.0.0",
         logLevel: "warn",
         mongoUri: "mongodb+srv://cluster.example.net/classicade",
         allowedOrigins: ["https://classicade.app", "https://www.classicade.app"],
@@ -76,6 +79,25 @@ describe("loadConfig", () => {
 
     expect(webDistDir).toBe(path.join(process.cwd(), "apps", "web", "dist"));
     expect(loadConfig({ ...REQUIRED, WEB_DIST_DIR: "/srv/web" }).webDistDir).toBe("/srv/web");
+  });
+
+  it("listens on this machine only unless HOST says otherwise, in every environment (CC-287)", () => {
+    const production = { NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app", WEB_DIST_DIR: "/srv" };
+
+    expect(loadConfig(REQUIRED).host).toBe("127.0.0.1");
+    expect(loadConfig({ ...REQUIRED, NODE_ENV: "test" }).host).toBe("127.0.0.1");
+    expect(loadConfig({ ...REQUIRED, ...production }).host).toBe("127.0.0.1");
+  });
+
+  it.each(["0.0.0.0", "::", "::1", "127.0.0.1", "192.168.1.20", "fe80::1", "localhost", "app.internal", "my-host"])(
+    "accepts HOST=%s as given",
+    (host) => {
+      expect(loadConfig({ ...REQUIRED, HOST: host }).host).toBe(host);
+    },
+  );
+
+  it("trims spaces around HOST", () => {
+    expect(loadConfig({ ...REQUIRED, HOST: " 0.0.0.0 " }).host).toBe("0.0.0.0");
   });
 
   it("silences logs by default in tests, but honours an explicit LOG_LEVEL", () => {
@@ -120,6 +142,18 @@ describe("loadConfig", () => {
       },
       /TRUST_PROXY_HOPS must be a whole number from 1 to 5 in production/,
     ],
+    [{ HOST: "" }, /HOST must be an IP address or a hostname \(got ""\)/],
+    [{ HOST: "  " }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "http://0.0.0.0" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "0.0.0.0:4000" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "999.1.1.1" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "127.0.0" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "[::1]" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "*" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "-bad.example" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "bad_host" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: "two words" }, /HOST must be an IP address or a hostname/],
+    [{ HOST: `${"a".repeat(64)}.example` }, /HOST must be an IP address or a hostname/],
     [{ WEB_DIST_DIR: "  " }, /WEB_DIST_DIR, when set, must be a directory path/],
     [
       { NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app" },
