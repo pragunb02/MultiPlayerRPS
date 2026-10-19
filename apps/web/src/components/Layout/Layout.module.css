@@ -1,7 +1,12 @@
+/*
+ * One column that may be narrower than its content. Without the zero minimum, anything too wide in the page widened
+ * the header with it, and the Menu button went off a phone's screen (CC-256).
+ */
 .shell {
   min-height: 100vh;
   display: grid;
   grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
 }
 .skip {
   position: absolute;
@@ -81,7 +86,10 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+/* A name is one word of up to 20 letters. It breaks where it must, so it never pushes Log out away (CC-256). */
 .name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 700;
   color: var(--color-text);
 }
@@ -208,7 +216,13 @@
     flex-wrap: wrap;
   }
 }
+/*
+ * Player names have no space to break at, and they appear all over the page: the profile heading, the greeting, the
+ * score line, the turn lines. Any word too long for its line may break anywhere, so the page is never wider than a
+ * phone. A word that fits is never broken, so ordinary text looks the same (CC-256).
+ */
 .main {
+  overflow-wrap: anywhere;
   width: 100%;
   max-width: var(--content-width);
   margin: 0 auto;
