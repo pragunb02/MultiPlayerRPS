@@ -137,6 +137,13 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
      * @returns {Promise<{ items: object[], next?: string }>}
      */
     getFeedbackInbox: (query = {}) => request("GET", `/admin/feedback${toQuery(query)}`),
+    /** One item of the inbox with everything, the reply email included, for its own view (CC-290). */
+    getFeedbackItem: async (feedbackId) =>
+      (await request("GET", `/admin/feedback/${encodeURIComponent(feedbackId)}`)).item,
+    /** Deletes one item of the inbox for good (CC-290). */
+    deleteFeedback: async (feedbackId) => {
+      await request("DELETE", `/admin/feedback/${encodeURIComponent(feedbackId)}`);
+    },
     /** Moves one item of the inbox to another status, and answers it as it is now (CC-290). */
     setFeedbackStatus: async (feedbackId, status) =>
       (await request("PATCH", `/admin/feedback/${encodeURIComponent(feedbackId)}`, { status })).item,

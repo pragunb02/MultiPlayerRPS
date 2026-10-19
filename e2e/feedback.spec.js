@@ -49,7 +49,9 @@ test.describe("feedback", () => {
     const message = dialog.getByRole("textbox", { name: "Message" });
     await message.fill("The invite link did not copy on my phone");
     await expect(dialog.getByText("40 / 1000")).toBeVisible();
-    const sent = page.waitForRequest((request) => request.url().endsWith("/api/feedback") && request.method() === "POST");
+    const sent = page.waitForRequest(
+      (request) => request.url().endsWith("/api/feedback") && request.method() === "POST",
+    );
     await dialog.getByRole("button", { name: "Send" }).click();
     const request = await sent;
 
@@ -87,7 +89,7 @@ test.describe("feedback", () => {
     const markup = `<img src=x onerror="document.title='owned'"> ${account.username.slice(-6)}`;
     const dialog = await openFeedback(adult.page, testInfo);
     await dialog.getByRole("radio", { name: "Idea" }).check();
-    await dialog.getByRole("textbox", { name: "Message" }).fill(markup);
+    await dialog.getByRole("textbox", { name: "Message" }).fill(`${markup} call +91 98765 43210`);
     await dialog.getByRole("textbox", { name: "Email me back (optional)" }).fill("reply.test@example.com");
     await dialog.getByRole("button", { name: "Send" }).click();
     await expect(adult.page.getByRole("dialog", { name: /Thank you!/ })).toBeVisible();
@@ -97,7 +99,11 @@ test.describe("feedback", () => {
     await owner.page.goto("/admin/feedback?type=idea");
     await expect(owner.page).toHaveTitle("Feedback · Owner console · ClassiCade");
     const entry = owner.page.getByRole("article").filter({ hasText: account.username.slice(-6) });
-    await expect(entry.getByText(markup, { exact: true })).toBeVisible();
+    await expect(entry.getByText(`${markup} call [phone removed]`, { exact: true })).toBeVisible();
+    // The list says only that there is a reply email. The address shows in the item's own view.
+    await expect(entry).toContainText("Has a reply email");
+    await expect(entry).not.toContainText("reply.test@example.com");
+    await entry.getByRole("button", { name: "Details" }).click();
     await expect(entry).toContainText("Reply to reply.test@example.com");
     await expect(entry).toContainText("account");
     expect(await entry.locator("img").count()).toBe(0);
@@ -107,12 +113,30 @@ test.describe("feedback", () => {
     await expect(entry.getByText("Done", { exact: true })).toBeVisible();
     await owner.page.getByRole("combobox", { name: "Status" }).selectOption("done");
     await expect(owner.page).toHaveURL("/admin/feedback?type=idea&status=done");
-    await expect(owner.page.getByRole("article").filter({ hasText: account.username.slice(-6) })).toBeVisible();
+    await expect(
+      owner.page.getByRole("article").filter({ hasText: account.username.slice(-6) }),
+    ).toBeVisible();
     await owner.page.goBack();
     await expect(owner.page).toHaveURL("/admin/feedback?type=idea");
+
+    // The owner deletes it for good, after saying yes.
+    const again = owner.page.getByRole("article").filter({ hasText: account.username.slice(-6) });
+    await again.getByRole("button", { name: "Delete" }).click();
+    await owner.page
+      .getByRole("dialog", { name: "Delete this feedback?" })
+      .getByRole("button", { name: "Delete for good" })
+      .click();
+    await expect(again).toHaveCount(0);
+    await owner.page.reload();
+    await expect(owner.page.getByRole("heading", { name: "Feedback" })).toBeVisible();
+    await expect(owner.page.getByRole("article").filter({ hasText: account.username.slice(-6) })).toHaveCount(
+      0,
+    );
   });
 
-  test("the inbox is the ordinary not found page and a 404 for a player who is not an admin", async ({ players }) => {
+  test("the inbox is the ordinary not found page and a 404 for a player who is not an admin", async ({
+    players,
+  }) => {
     const riya = await players.open("riya");
     const { page } = riya;
     await page.goto("/");

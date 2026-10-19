@@ -120,6 +120,8 @@ export function fakeApi(overrides = {}) {
     getFeedbackForm: vi.fn().mockResolvedValue({ replyEmail: false }),
     getFeedbackInbox: vi.fn(() => new Promise(() => {})),
     setFeedbackStatus: vi.fn(),
+    getFeedbackItem: vi.fn(),
+    deleteFeedback: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

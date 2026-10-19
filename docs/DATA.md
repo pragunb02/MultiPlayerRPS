@@ -270,7 +270,8 @@ ADR-053)
 
 1. **Holds:** one document per item sent with the Feedback button: `feedbackId` (random), `type` (bug, idea or
    other), `message` (plain text, at most 1000 characters, control characters other than new lines and tabs
-   removed), `replyEmail` (only when an adult account gave one), `page` (the route pattern such as
+   removed, and every email address and phone number in it replaced by `[email removed]` or `[phone removed]`
+   before it is stored, `domain/feedback/maskContacts.js`), `replyEmail` (only when an adult account gave one), `page` (the route pattern such as
    `/games/chess/rooms/:code`, never a room code, a name, a query or a hash), `build` (the web build, such as
    `0.1.0+3f9c2ab`), `device` (phone, tablet or desktop), `kind` (visitor, guest or account, from the session),
    `status` (new, read or done), `createdAt` and `updatedAt`. Indexes: unique on `feedbackId`, TTL on `createdAt`,
@@ -280,13 +281,17 @@ ADR-053)
 3. **Personal data:** whatever the player types in the message (the dialog asks them to leave out names, phone
    numbers and passwords), and the reply email when given. A reply email is taken only from an account whose birth
    year makes it an adult (ADR-028.1, ADR-048.8): the server refuses it from anyone else.
-4. **Who can read it:** no client except an admin, through the owner console's inbox (`GET /api/admin/feedback`,
-   `ADMIN_ACCOUNT_IDS`, ADR-036). The owner.
+4. **Who can read it:** no client except an admin, through the owner console's inbox (`ADMIN_ACCOUNT_IDS`,
+   ADR-036). The list (`GET /api/admin/feedback`) never carries a reply email, only whether there is one. The
+   reply email is sent only for one item at a time, when the owner opens its details
+   (`GET /api/admin/feedback/:feedbackId`). This is the console's first view of content about one person (ADR-059
+   amends ADR-036.3). The owner, in the database.
 5. **Kept for:** 180 days after it was sent (`FEEDBACK_KEEP_DAYS`), then MongoDB's TTL index removes it (within about
    a minute). Marking an item read or done does not change when it goes.
-6. **Deleted by:** MongoDB's TTL index on `createdAt`. Because no player id is stored, account deletion and the data
+6. **Deleted by:** MongoDB's TTL index on `createdAt`, and the owner's Delete in the inbox
+   (`DELETE /api/admin/feedback/:feedbackId`), for anything that holds personal details. Because no player id is stored, account deletion and the data
    export cannot find a player's feedback and do not take part (ADR-048.2 covers stores kept by player id). A
-   request to delete one sooner goes through the privacy contact, and the owner deletes it in the database.
+   request to delete one sooner goes through the privacy contact, and the owner deletes it in the inbox.
 
 ### `accounts.birthYear`
 

@@ -88,32 +88,102 @@ describe("the feedback inbox (CC-290)", () => {
     expect(api.getFeedbackInbox).toHaveBeenCalledWith({});
   });
 
-  it("shows markup in a message as the characters typed, never as HTML", async () => {
+  it("shows markup in a message and in a reply email as the characters typed, never as HTML", async () => {
     const message = '<img src=x onerror="alert(1)"><b>bold</b>';
+    const listed = item({ message, hasReplyEmail: true });
     const api = ownerApi({
-      getFeedbackInbox: vi
-        .fn()
-        .mockResolvedValue({ items: [item({ message, replyEmail: "<i>x</i>@example.com" })] }),
+      getFeedbackInbox: vi.fn().mockResolvedValue({ items: [listed] }),
+      getFeedbackItem: vi.fn().mockResolvedValue({ ...listed, replyEmail: "<i>x</i>@example.com" }),
     });
-    await openInbox({ api });
-
+    const { user } = await openInbox({ api });
     const [entry] = await screen.findAllByRole("article");
+
+    await user.click(within(entry).getByRole("button", { name: "Details" }));
+
     expect(within(entry).getByText(message)).toBeInTheDocument();
-    expect(within(entry).getByText("Reply to <i>x</i>@example.com")).toBeInTheDocument();
+    expect(await within(entry).findByText("Reply to <i>x</i>@example.com")).toBeInTheDocument();
     expect(entry.querySelector("img, b, i, script")).toBeNull();
   });
 
-  it("shows the reply email only on an item that has one", async () => {
+  it("shows a reply email only in the item's own view, never in the list", async () => {
+    const withEmail = item({ hasReplyEmail: true });
     const api = ownerApi({
-      getFeedbackInbox: vi
-        .fn()
-        .mockResolvedValue({ items: [item({ replyEmail: "riya@example.com" }), item({ kind: "visitor" })] }),
+      getFeedbackInbox: vi.fn().mockResolvedValue({ items: [withEmail, item({ kind: "visitor" })] }),
+      getFeedbackItem: vi.fn().mockResolvedValue({ ...withEmail, replyEmail: "riya@example.com" }),
     });
-    await openInbox({ api });
+    const { user } = await openInbox({ api });
+    const [first, second] = await screen.findAllByRole("article");
+    expect(first).toHaveTextContent("Has a reply email");
+    expect(first).not.toHaveTextContent("riya@example.com");
+    expect(second).not.toHaveTextContent("reply email");
 
-    const [withEmail, without] = await screen.findAllByRole("article");
-    expect(withEmail).toHaveTextContent("Reply to riya@example.com");
-    expect(without).not.toHaveTextContent("Reply to");
+    const details = within(first).getByRole("button", { name: "Details" });
+    await user.click(details);
+
+    expect(await within(first).findByText("Reply to riya@example.com")).toBeInTheDocument();
+    expect(details).toHaveAttribute("aria-expanded", "true");
+    expect(api.getFeedbackItem).toHaveBeenCalledWith(withEmail.feedbackId);
+    await user.click(details);
+    expect(first).not.toHaveTextContent("riya@example.com");
+  });
+
+  it("says so in the item's view when it has no reply email", async () => {
+    const plain = item();
+    const api = ownerApi({
+      getFeedbackInbox: vi.fn().mockResolvedValue({ items: [plain] }),
+      getFeedbackItem: vi.fn().mockResolvedValue(plain),
+    });
+    const { user } = await openInbox({ api });
+    const [entry] = await screen.findAllByRole("article");
+
+    await user.click(within(entry).getByRole("button", { name: "Details" }));
+
+    expect(await within(entry).findByText("No reply email.")).toBeInTheDocument();
+  });
+
+  it("says why the item's view could not be opened", async () => {
+    const api = ownerApi({
+      getFeedbackInbox: vi.fn().mockResolvedValue({ items: [item()] }),
+      getFeedbackItem: vi
+        .fn()
+        .mockRejectedValue(
+          new AppRequestError({ code: "NOT_FOUND", message: "No such feedback", status: 404 }),
+        ),
+    });
+    const { user } = await openInbox({ api });
+    const [entry] = await screen.findAllByRole("article");
+
+    await user.click(within(entry).getByRole("button", { name: "Details" }));
+
+    expect(await within(entry).findByRole("alert")).toHaveTextContent("No such feedback");
+  });
+
+  it("deletes an item after a confirmation, and Cancel keeps it", async () => {
+    const gone = item({ message: "My phone is in here somewhere" });
+    const api = ownerApi({
+      getFeedbackInbox: vi.fn().mockResolvedValue({ items: [gone, item({ message: "Kept" })] }),
+    });
+    const { user } = await openInbox({ api });
+    const [entry] = await screen.findAllByRole("article");
+
+    await user.click(within(entry).getByRole("button", { name: "Delete" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Delete this feedback?" })).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
+    expect(api.deleteFeedback).not.toHaveBeenCalled();
+    await user.click(within(entry).getByRole("button", { name: "Delete" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Delete this feedback?" })).getByRole("button", {
+        name: "Delete for good",
+      }),
+    );
+
+    await vi.waitFor(() => expect(entries()).toHaveLength(1));
+    expect(api.deleteFeedback).toHaveBeenCalledWith(gone.feedbackId);
+    expect(screen.queryByText("My phone is in here somewhere")).toBeNull();
+    expect(screen.getByText("Kept")).toBeInTheDocument();
   });
 
   it("filters by type and status from the address, and a new filter is a new address", async () => {

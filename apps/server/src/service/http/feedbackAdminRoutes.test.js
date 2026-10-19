@@ -171,7 +171,9 @@ describe("GET /api/admin/feedback/:feedbackId (CC-290)", () => {
   it("answers 404 for an item that is not there and 400 for an id that is not one", async () => {
     const { app } = await inbox();
 
-    expect((await get(app, "/api/admin/feedback/00000000-0000-4000-a000-0000000000ff", ADMIN)).status).toBe(404);
+    expect((await get(app, "/api/admin/feedback/00000000-0000-4000-a000-0000000000ff", ADMIN)).status).toBe(
+      404,
+    );
     expect((await get(app, "/api/admin/feedback/not-an-id", ADMIN)).status).toBe(400);
   });
 
@@ -200,9 +202,9 @@ describe("DELETE /api/admin/feedback/:feedbackId (CC-290)", () => {
     const res = await remove(app, `/api/admin/feedback/${feedbackId}`, ADMIN);
 
     expect(res.status).toBe(204);
-    expect((await feedbackComponent.list({ where: {}, limit: 10 })).items.map((each) => each.message)).toEqual([
-      "kept",
-    ]);
+    expect(
+      (await feedbackComponent.list({ where: {}, limit: 10 })).items.map((each) => each.message),
+    ).toEqual(["kept"]);
     expect((await remove(app, `/api/admin/feedback/${feedbackId}`, ADMIN)).status).toBe(404);
   });
 

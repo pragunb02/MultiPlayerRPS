@@ -295,6 +295,23 @@ describe("api client, the account's data and age (CC-035, CC-152)", () => {
     expect(form.mock.calls[0][0]).toBe("/api/feedback/form");
   });
 
+  it("reads one feedback item and deletes one (CC-290)", async () => {
+    const read = respond(200, { item: { feedbackId: "a/b", replyEmail: "riya@example.com" } });
+    const deleted = respond(204, undefined);
+
+    expect(await createApiClient({ fetchImpl: read }).getFeedbackItem("a/b")).toEqual({
+      feedbackId: "a/b",
+      replyEmail: "riya@example.com",
+    });
+    expect(await createApiClient({ fetchImpl: deleted }).deleteFeedback("a/b")).toBeUndefined();
+
+    expect(read.mock.calls[0][0]).toBe("/api/admin/feedback/a%2Fb");
+    expect(deleted.mock.calls[0]).toEqual([
+      "/api/admin/feedback/a%2Fb",
+      expect.objectContaining({ method: "DELETE" }),
+    ]);
+  });
+
   it("reads the feedback inbox with its filters and changes an item's status (CC-290)", async () => {
     const listed = respond(200, { items: [], next: "1_x" });
     const changed = respond(200, { item: { feedbackId: "a/b", status: "done" } });

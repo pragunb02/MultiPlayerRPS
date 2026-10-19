@@ -22,6 +22,7 @@ const LOADING = Object.freeze({
  *   retry: () => void,
  *   loadOlder: () => Promise<void>,
  *   setStatus: (feedbackId: string, status: string) => Promise<void>,
+ *   remove: (feedbackId: string) => Promise<void>,
  * }}
  */
 export function useFeedbackInbox({ type, status }) {
@@ -60,7 +61,18 @@ export function useFeedbackInbox({ type, status }) {
     [api],
   );
 
+  const remove = useCallback(
+    async (feedbackId) => {
+      await api.deleteFeedback(feedbackId);
+      setResult((shown) => ({
+        ...shown,
+        items: shown.items.filter((each) => each.feedbackId !== feedbackId),
+      }));
+    },
+    [api],
+  );
+
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const { items, next, error } = current;
-  return { status: current.status, items, next, error, retry, loadOlder, setStatus };
+  return { status: current.status, items, next, error, retry, loadOlder, setStatus, remove };
 }

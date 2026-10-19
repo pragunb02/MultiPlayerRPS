@@ -216,9 +216,15 @@ describe("feedbackComponent (CC-290)", () => {
 
   it("reads one item with everything, and answers NotFoundError for one that is not there", async () => {
     const { component } = setUp();
-    const { feedbackId } = await component.submit({ sender: { kind: "visitor" }, feedback: feedback(), now: T0 });
+    const { feedbackId } = await component.submit({
+      sender: { kind: "visitor" },
+      feedback: feedback(),
+      now: T0,
+    });
 
-    expect(await component.get({ feedbackId })).toEqual(expect.objectContaining({ feedbackId, ...feedback() }));
+    expect(await component.get({ feedbackId })).toEqual(
+      expect.objectContaining({ feedbackId, ...feedback() }),
+    );
     await expect(component.get({ feedbackId: "00000000-0000-4000-a000-0000000000ff" })).rejects.toThrow(
       NotFoundError,
     );
@@ -226,7 +232,11 @@ describe("feedbackComponent (CC-290)", () => {
 
   it("deletes an item for good, and answers NotFoundError when it is not there", async () => {
     const { component } = setUp();
-    const { feedbackId } = await component.submit({ sender: { kind: "visitor" }, feedback: feedback(), now: T0 });
+    const { feedbackId } = await component.submit({
+      sender: { kind: "visitor" },
+      feedback: feedback(),
+      now: T0,
+    });
 
     await component.remove({ feedbackId });
 

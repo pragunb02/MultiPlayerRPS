@@ -22,7 +22,8 @@ export const REPLY_EMAIL_ONLY_FOR_ADULTS = true;
  * An item as the inbox lists it: everything but the reply email, which only the item's own view shows
  * (ADR-059). `hasReplyEmail` says whether there is one.
  */
-const listed = ({ replyEmail, ...item }) => Object.freeze({ ...item, hasReplyEmail: replyEmail !== undefined });
+const listed = ({ replyEmail, ...item }) =>
+  Object.freeze({ ...item, hasReplyEmail: replyEmail !== undefined });
 
 /**
  * In-app feedback (CC-290, ADR-059). Anyone can send it, visitors included. Nothing stored names the player: only

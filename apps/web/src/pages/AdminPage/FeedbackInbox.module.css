@@ -77,6 +77,11 @@
   font-weight: 700;
   overflow-wrap: anywhere;
 }
+.hasReply {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
 .actions {
   display: flex;
   flex-wrap: wrap;

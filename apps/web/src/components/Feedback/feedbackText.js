@@ -27,8 +27,8 @@ export const FEEDBACK_TEXT = Object.freeze({
   typeLegend: both("Kis baare mein hai?", "What is it about?"),
   messageLabel: "Message",
   messageHint: both(
-    "Kya hua, ya kya chahiye? Apna naam, phone number ya password mat likhna.",
-    "What happened, or what would you like? Please leave out your name, phone number and passwords.",
+    "Kya hua, ya kya chahiye? Apna naam ya password mat likhna. Email aur phone number save hone se pehle hata diye jaate hain.",
+    "What happened, or what would you like? Please leave out your name and passwords. Emails and phone numbers are removed before we save it.",
   ),
   messageMissing: both("Pehle kuch likho.", "Write a message first."),
   replyLabel: "Email me back (optional)",
