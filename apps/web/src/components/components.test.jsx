@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Modal } from "./Modal/Modal.jsx";
@@ -174,7 +174,8 @@ describe("ShareRoom", () => {
     await user.click(screen.getByRole("button", { name: "Copy link" }));
 
     expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3");
-    expect(await screen.findByRole("status")).toHaveTextContent("Link copied");
+    // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Link copied"));
   });
 
   it("names the actual game in the share text (regression: BUG-12)", async () => {

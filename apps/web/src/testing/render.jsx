@@ -1,4 +1,5 @@
-import { act, render } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { expect } from "vitest";
 import { MemoryRouter } from "react-router";
 import { App } from "../app/App.jsx";
 import { fakeApi, fakeDownload, fakeSessionBroadcast, fakeSocket, fakeSound } from "./fakes.js";
@@ -52,4 +53,17 @@ export function renderApp({
     back: () => act(() => navigate(-1)),
     forward: () => act(() => navigate(1)),
   };
+}
+
+/**
+ * Finds a button by its name once it can act. Some buttons are on the page before they can act, such as Play as a
+ * guest while the session is still being checked, and a press then only says why. The check finishes in an effect,
+ * which can run a moment after the button shows, later still on a busy machine (CC-288).
+ *
+ * @param {string | RegExp} name
+ */
+export async function findUsableButton(name) {
+  const button = await screen.findByRole("button", { name });
+  await waitFor(() => expect(button).not.toHaveAttribute("aria-disabled"));
+  return button;
 }

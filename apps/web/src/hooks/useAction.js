@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isRetryable } from "../lib/errors.js";
 
 /**
@@ -83,7 +83,10 @@ export function useAction(fn, { id }) {
   const lastArgs = useRef([]);
   const mounted = useRef(true);
 
-  useEffect(() => {
+  // A layout effect runs in the same step that updates the page. A plain effect can run a moment later, and a press
+  // in that moment would run the work from the render before, for example loading the first page of matches again
+  // instead of the next one (CC-288).
+  useLayoutEffect(() => {
     latest.current = fn;
   }, [fn]);
 
