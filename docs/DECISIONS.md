@@ -8,6 +8,31 @@ the owner may change it.
 
 ## Open decisions
 
+### ADR-051 — The Social and sharing domain: scope, safety inside it, and its open questions
+
+- **Status:** Open · 2026-10-19 (proposed in [domains/SOCIAL_AND_SHARING.md](domains/SOCIAL_AND_SHARING.md), owner
+  to decide)
+- **Context.** The owner asked for the domains to be defined, Social and sharing first among two. Its tickets were
+  spread over the board, some twice (CC-043 beside CC-217 and CC-169, CC-068 beside CC-214), and three questions
+  from #86 are still open.
+- **Proposed.**
+  1. Scope and boundaries as in the domain file §1 and §2: the line with Match experience is the room, Growth
+     measures what Social builds, Accounts owns the age signal that Social reads.
+  2. Safety and moderation (block, mute, report, the reports queue, the grievance contact) live inside this domain,
+     not as their own, until there is free text, a second moderator or about 20 reports a week.
+  3. Close CC-043 and CC-068 as replaced, cut CC-149 (referral rewards), move CC-056 (spectating) to Match
+     experience.
+  4. Minors may have friends, mutual only, with people met through a link or pass and play, never from quick match,
+     and never findable by name. A minor can challenge again (CC-277) only people met through a link.
+  5. A quick match stranger sees the chosen, filtered username, with opaque seat ids (CC-253).
+- **For the owner.** (1) The Grievance Officer: the owner at first, with `grievance@<domain>` after CC-123, 24 hours
+  to acknowledge and 15 days to close. (2) "Find a person" at every hour (recommended) or only 19:00 to 23:00 IST.
+  (3) One chess quick pool (3+2) while the crowd is tiny (recommended) or 3+2 and 10+0. (4) The Hinglish share
+  lines. (5) Free text in reports for adults: not now (recommended). (6) Later: an adult's own name on a share card,
+  off by default.
+- **Consequences.** When accepted, the domain file's ticket list and order become the plan for these tickets, and
+  this record becomes Accepted with the owner's answers.
+
 ### ADR-046 — Our own screen in front of Render's cold start page
 
 - **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)

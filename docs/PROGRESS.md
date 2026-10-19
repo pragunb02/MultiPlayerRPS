@@ -54,6 +54,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-19 — ADR-051, CC-277, CC-278, CC-279 — Social and sharing domain defined (docs only, #97): scope and boundaries, safety and moderation kept inside it, research (Lichess kid mode and preferences, Roblox Trusted Connections, Duolingo Friend Streak, Wordle, Ludo King), its 23 tickets in build order with parallel groups, three new tickets (recent opponents, privacy and safety settings, a share channel marker for k), proposed moves (close CC-043 and CC-068, cut CC-149, CC-056 to Match experience) and the owner's decisions, including the Grievance Officer and quick match hours from #86.
 - 2026-10-18 — CC-276 — The required backup round trip failed at random with exit 141: `mongodump --version | head -n 1` under pipefail. sed reads to the end instead, so mongodump never gets SIGPIPE.
 - 2026-10-18 — ADR-039 — Owner: fast mode ended. Every check is required again (lint/unit/coverage, Docker, Chromium and Firefox browser suites), branches must be up to date, full reviews on every PR. CLAUDE.md rules 6, 7 and 8 restored.
 - 2026-10-18 — CC-272 — SECURITY.md (#95, started by the owner): private reporting through GitHub, acknowledgement in 3 days, update in 7, serious fixes or a decision in 30, rules for good-faith testing (own accounts only, players may be children, no denial of service), scope.
