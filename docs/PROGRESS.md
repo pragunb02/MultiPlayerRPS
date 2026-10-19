@@ -47,13 +47,14 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 | Category         | Open | In progress | Fixed |
 | ---------------- | ---- | ----------- | ----- |
 | Security (SEC)   | 2    | 1           | 18    |
-| Bugs (BUG)       | 5    | 1           | 36    |
+| Bugs (BUG)       | 4    | 1           | 37    |
 | Tech debt (DEBT) | 7    | 1           | 12    |
 
 ## Changelog
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-20 — CC-270, CC-256, BUG-40 — Phones never get a page wider than the screen. CC-270 was already fixed by CC-275's seat row (measured: 452 px before #96, 412 px after, through the confetti and the level-up), so no effect changed. CC-256: a 20 character name breaks where it must (`overflow-wrap: anywhere` on `main` and the header's name, the shell's column `minmax(0, 1fr)`), so the profile (612 px), home and the opponent's score line no longer widen the page; Firefox's lobby field may shrink. New guard `e2e/layout-width.spec.js` at 360, 390 and 412 px on every main screen, sampled on every frame.
 - 2026-10-20 — CC-287 — The server listens on `HOST`, default `127.0.0.1`, so a local `npm start` or `npm run dev:server` is no longer offered to the whole network (it listened on `*:4000`). Validated at boot (an IP address or a hostname), shown in the `server listening` log, `HOST=0.0.0.0` in the Docker image behind compose's `127.0.0.1` publish, documented in `.env.example` and DEPLOYMENT.md. **The owner sets `HOST=0.0.0.0` in Render before it merges.**
 - 2026-10-19 — CC-280 to CC-284, ADR-052 — Look and feel domain defined (docs only, no code): [domains/LOOK_AND_FEEL.md](domains/LOOK_AND_FEEL.md) with scope and boundaries, principles (low-end Android budgets, CSP, reduced motion, licences, no dark patterns, minors), research with sources, every ticket in the domain in build order, five new tickets (appearance settings, motion tokens, loading states, icon set, haptics) and moves, accepted by the owner in ADR-052 (amends ADR-018 point 4 for `cc.look` and ADR-050 point 4 for page transitions).
 - 2026-10-19 — ADR-051, CC-043, CC-068, CC-149, CC-056 — Owner accepted the Social and sharing domain (ADR-051 Accepted): safety inside it, the owner named as Grievance Officer (`grievance@<domain>` after CC-123, GitHub private reporting until then), "Find a person" at every hour, one chess 3+2 pool, minors' friends only mutual and only with people met through a link or pass and play, no free text in reports. CC-043 and CC-068 closed as replaced, CC-149 cut, CC-056 moved to Match experience. Still open: the Hinglish lines and an adult's name on share cards. SECURITY.md gets a Grievances section (24 h and 15 days, the interim channel), CC-044 moves to phase 1 and CC-253 comes first in the domain order.
