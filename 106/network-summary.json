@@ -1,0 +1,118 @@
+[
+  {
+    "game": "rps",
+    "size": "390x844",
+    "serverRequestsBeforeStart": [
+      "GET /api/session"
+    ],
+    "requestsAfterStart": [
+      "GET /assets/RpsBoard-C1Ni1UwL.js",
+      "GET /assets/useMove-CDK1oVHQ.js",
+      "GET /assets/useMove-762l_umo.css",
+      "GET /assets/RpsBoard-x2tAYN4U.css"
+    ],
+    "serverRequestsAfterStart": [],
+    "socketFramesSentAfterStart": []
+  },
+  {
+    "game": "tictactoe",
+    "size": "390x844",
+    "serverRequestsBeforeStart": [
+      "GET /api/session"
+    ],
+    "requestsAfterStart": [
+      "GET /assets/TicTacToeBoard-Bo2uFpwY.js",
+      "GET /assets/useMove-CDK1oVHQ.js",
+      "GET /assets/useMove-762l_umo.css",
+      "GET /assets/TicTacToeBoard-BGe9GJsm.css"
+    ],
+    "serverRequestsAfterStart": [],
+    "socketFramesSentAfterStart": []
+  },
+  {
+    "game": "chess",
+    "size": "390x844",
+    "serverRequestsBeforeStart": [
+      "GET /api/session"
+    ],
+    "requestsAfterStart": [
+      "GET /assets/ChessBoard-RXd-OIer.js",
+      "GET /assets/useMove-CDK1oVHQ.js",
+      "GET /assets/useMove-762l_umo.css",
+      "GET /assets/ChessBoard-CruENZnT.css",
+      "GET /pieces/bR.png",
+      "GET /pieces/bN.png",
+      "GET /pieces/bB.png",
+      "GET /pieces/bQ.png",
+      "GET /pieces/bK.png",
+      "GET /pieces/bP.png",
+      "GET /pieces/wP.png",
+      "GET /pieces/wR.png",
+      "GET /pieces/wN.png",
+      "GET /pieces/wB.png",
+      "GET /pieces/wQ.png",
+      "GET /pieces/wK.png",
+      "GET /assets/motionFeatures-CkfD__dr.js"
+    ],
+    "serverRequestsAfterStart": [],
+    "socketFramesSentAfterStart": []
+  },
+  {
+    "game": "rps",
+    "size": "1280x720",
+    "serverRequestsBeforeStart": [
+      "GET /api/session"
+    ],
+    "requestsAfterStart": [
+      "GET /assets/RpsBoard-C1Ni1UwL.js",
+      "GET /assets/useMove-CDK1oVHQ.js",
+      "GET /assets/useMove-762l_umo.css",
+      "GET /assets/RpsBoard-x2tAYN4U.css"
+    ],
+    "serverRequestsAfterStart": [],
+    "socketFramesSentAfterStart": []
+  },
+  {
+    "game": "tictactoe",
+    "size": "1280x720",
+    "serverRequestsBeforeStart": [
+      "GET /api/session"
+    ],
+    "requestsAfterStart": [
+      "GET /assets/TicTacToeBoard-Bo2uFpwY.js",
+      "GET /assets/useMove-CDK1oVHQ.js",
+      "GET /assets/useMove-762l_umo.css",
+      "GET /assets/TicTacToeBoard-BGe9GJsm.css"
+    ],
+    "serverRequestsAfterStart": [],
+    "socketFramesSentAfterStart": []
+  },
+  {
+    "game": "chess",
+    "size": "1280x720",
+    "serverRequestsBeforeStart": [
+      "GET /api/session"
+    ],
+    "requestsAfterStart": [
+      "GET /assets/ChessBoard-RXd-OIer.js",
+      "GET /assets/useMove-CDK1oVHQ.js",
+      "GET /assets/useMove-762l_umo.css",
+      "GET /assets/ChessBoard-CruENZnT.css",
+      "GET /pieces/bR.png",
+      "GET /pieces/bN.png",
+      "GET /pieces/bB.png",
+      "GET /pieces/bQ.png",
+      "GET /pieces/bK.png",
+      "GET /pieces/bP.png",
+      "GET /pieces/wP.png",
+      "GET /pieces/wR.png",
+      "GET /pieces/wN.png",
+      "GET /pieces/wB.png",
+      "GET /pieces/wQ.png",
+      "GET /pieces/wK.png",
+      "GET /assets/motionFeatures-CkfD__dr.js"
+    ],
+    "serverRequestsAfterStart": [],
+    "socketFramesSentAfterStart": []
+  }
+]
