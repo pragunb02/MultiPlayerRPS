@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ROOM_STATUS, SOCKET_EVENTS } from "@classicade/shared";
 import { returnsToRoom } from "../app/paths.js";
 import { useServices } from "../app/servicesContext.js";
@@ -48,14 +48,16 @@ export function useRoom(code, { enabled, currentPath = addressBar }) {
     closedReason: "",
   });
   // The viewer's seat as the page last heard: none, one in a room that waits for players, or one in a room whose
-  // game has started. A ref, because the cleanup must see the latest room, not the one from when it started.
+  // game has started. A ref, because the cleanup must see the latest room, not the one from when it started. It is
+  // set in a layout effect, in the same step that draws the room. A plain effect can run a moment later, after a
+  // press on Leave already gave the seat up, and would hand the page its old seat back (CC-288).
   const seat = useRef(NO_SEAT);
   const room = state.room;
-  useEffect(() => {
+  useLayoutEffect(() => {
     seat.current = seatIn(room);
   }, [room]);
   const pathNow = useRef(currentPath);
-  useEffect(() => {
+  useLayoutEffect(() => {
     pathNow.current = currentPath;
   }, [currentPath]);
 

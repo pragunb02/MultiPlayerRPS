@@ -511,8 +511,14 @@ describe("an opponent who lost their connection during the game (CC-036)", () =>
     vi.useFakeTimers({ now: 0, shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const gone = { ...BOB, connected: false, presence: "offline", graceUntil: T + 2_000 };
-    const won = { ...finished(), gameId: "chess" };
-    const { socket } = openRoom(chess({ seats: [ME, gone] }), { "room:claim-win": () => won });
+    // The claimed win is a finished chess game, with the chess board's own view (CC-288).
+    const playingRoom = chess({ seats: [ME, gone] });
+    const won = {
+      ...playingRoom,
+      status: "finished",
+      game: { ...playingRoom.game, activePlayers: [], outcome: WIN },
+    };
+    const { socket } = openRoom(playingRoom, { "room:claim-win": () => won });
     await board();
     expect(screen.queryByRole("button", { name: "Claim the win" })).not.toBeInTheDocument();
 

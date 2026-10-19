@@ -100,7 +100,8 @@ export function fakeApi(overrides = {}) {
     exportData: vi.fn(),
     deleteAccount: vi.fn().mockResolvedValue(undefined),
     getProgress: vi.fn().mockResolvedValue(PROGRESS),
-    getMatches: vi.fn(),
+    // An empty history, so a page that lists matches draws instead of failing on a missing answer (CC-288).
+    getMatches: vi.fn().mockResolvedValue({ matches: [] }),
     getMatch: vi.fn(),
     getAchievements: vi.fn().mockResolvedValue([]),
     getStreaks: vi.fn().mockResolvedValue(NO_STREAKS),

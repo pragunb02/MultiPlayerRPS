@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
@@ -454,6 +454,9 @@ describe("RoomPage: every other state and path", () => {
     });
     await vi.waitFor(() => expect(socket.connect).toHaveBeenCalled());
     await screen.findByText(/Joining room AB2CD3/);
+    // The room starts listening in an effect, which can run a moment after the text shows. It listens for its
+    // updates and for the connection at the same time, so once one is heard the other is too (CC-288).
+    await vi.waitFor(() => expect(socket.on).toHaveBeenCalledWith("room:updated", expect.any(Function)));
     expect(socket.request).not.toHaveBeenCalledWith("room:join", expect.anything());
 
     act(() => socket.push("connect"));
@@ -613,7 +616,8 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
 
     const heading = await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" });
 
-    expect(heading).toHaveFocus();
+    // The chooser moves focus in an effect, which can run a moment after the heading shows (CC-288).
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText("AB2CD3")).toBeInTheDocument();
     // Arcade art (CC-087): the invite envelope above the heading, the game's glyph by the code — decoration.
     expect(heading.previousElementSibling.tagName).toBe("svg");
@@ -701,7 +705,7 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     const user = userEvent.setup();
     const { url, back } = openInvite({ history: ["/"] });
 
-    await user.click(within(await screen.findByRole("main")).getByRole("link", { name: "Log in" }));
+    await user.click(await within(screen.getByRole("main")).findByRole("link", { name: "Log in" }));
     expect(url()).toBe(`/login?next=${encodeURIComponent(INVITE)}`);
     back();
 

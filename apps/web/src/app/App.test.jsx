@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi, GUEST } from "../testing/fakes.js";
-import { renderApp } from "../testing/render.jsx";
+import { findUsableButton, renderApp } from "../testing/render.jsx";
 
 describe("App", () => {
   it("shows the pitch and the game catalog", async () => {
@@ -55,7 +55,7 @@ describe("App", () => {
     const user = userEvent.setup();
     const { api } = renderApp();
 
-    await user.click(await screen.findByRole("button", { name: /play as a guest/i }));
+    await user.click(await findUsableButton(/play as a guest/i));
 
     expect(api.startGuest).toHaveBeenCalledOnce();
     expect(await screen.findByText(`You're playing as ${GUEST.displayName}.`)).toBeInTheDocument();
@@ -70,7 +70,7 @@ describe("App", () => {
       }),
     });
 
-    await user.click(await screen.findByRole("button", { name: /play as a guest/i }));
+    await user.click(await findUsableButton(/play as a guest/i));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests, try again later");
   });

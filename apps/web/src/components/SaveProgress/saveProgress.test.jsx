@@ -488,6 +488,9 @@ describe("the header's sign-up link", () => {
       api: { getProgress: vi.fn().mockResolvedValue(PROGRESS) },
     });
     expect(await banner().findByRole("link", { name: "Sign up" })).toBeInTheDocument();
+    // The link shows as soon as the guest is known, but the listener for pushes starts in an effect that can run a
+    // moment later. The level chip loads in the same step, so once it shows, a push is heard (CC-288).
+    await banner().findByRole("progressbar", { name: "Level 1: 0 of 50 XP to the next level" });
 
     pushProgress(socket, { progress: FIRST_WIN });
 
