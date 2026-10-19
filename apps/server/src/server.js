@@ -8,6 +8,7 @@ import { getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "./data/blockAccessor.js";
+import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
 import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
 import { createGamificationAccessor } from "./data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "./data/leaderboardAccessor.js";
@@ -23,6 +24,7 @@ import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/anal
 import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botComponent.js";
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
 import { createBlockComponent } from "./domain/blocks/blockComponent.js";
+import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
 import { createBotTurns } from "./domain/bots/botTurns.js";
 import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
 import { createThinkingQueue } from "./domain/bots/thinkingQueue.js";
@@ -47,6 +49,7 @@ import { createAchievementDao } from "./persistence/achievementDao.js";
 import { createAnalyticsDao } from "./persistence/analyticsDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createBlockDao } from "./persistence/blockDao.js";
+import { createFeedbackDao } from "./persistence/feedbackDao.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
@@ -507,7 +510,7 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object },
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, feedback?: object },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
@@ -560,6 +563,7 @@ export async function startServer({
   const pendingMatchDao = createPendingMatchDao({ connection: database.connection });
   const accountDeletionDao = createAccountDeletionDao({ connection: database.connection });
   const blockDao = createBlockDao({ connection: database.connection });
+  const feedbackDao = createFeedbackDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -575,6 +579,7 @@ export async function startServer({
       pendingMatchDao,
       accountDeletionDao,
       blockDao,
+      feedbackDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -593,6 +598,7 @@ export async function startServer({
   const accountDeletionAccessor = createAccountDeletionAccessor({ accountDeletionDao });
   const sessionAccessor = createSessionAccessor({ sessionDao });
   const blockAccessor = createBlockAccessor({ blockDao });
+  const feedbackAccessor = createFeedbackAccessor({ feedbackDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -606,6 +612,7 @@ export async function startServer({
     accountDeletionAccessor,
   });
   const matchComponent = createMatchComponent({ matchAccessor });
+  const feedbackComponent = createFeedbackComponent({ feedbackAccessor, ages: accountComponent });
   const blockComponent = createBlockComponent({
     blockAccessor,
     rooms: roomAccessor,
@@ -777,6 +784,8 @@ export async function startServer({
     apiLimit: limits.api,
     blockLimits: limits.blocks,
     blockComponent,
+    feedbackLimits: limits.feedback,
+    feedbackComponent,
     leaderboardComponent,
     analyticsComponent,
     sessionMiddleware,

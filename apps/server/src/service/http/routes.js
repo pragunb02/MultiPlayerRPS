@@ -4,6 +4,7 @@ import { createAccountRoutes } from "./accountRoutes.js";
 import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
+import { createFeedbackRoutes } from "./feedbackRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
 import { createMatchRoutes } from "./matchRoutes.js";
@@ -16,7 +17,8 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { leaderboardComponent: Parameters<typeof createLeaderboardRoutes>[0]["leaderboardComponent"], leaderboardLimit?: { windowMs: number, limit: number } }
  *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
- *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }} deps
+ *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
+ *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }} deps
  */
 export function apiRouter({
   matchComponent,
@@ -37,6 +39,8 @@ export function apiRouter({
   accountLimits,
   blockComponent,
   blockLimits,
+  feedbackComponent,
+  feedbackLimits,
   ...sessionDeps
 }) {
   const router = Router();
@@ -80,6 +84,15 @@ export function apiRouter({
       leaderboardComponent,
       now,
       ...(leaderboardLimit && { limit: leaderboardLimit }),
+    }),
+  );
+
+  router.use(
+    createFeedbackRoutes({
+      feedbackComponent,
+      requireAdmin: adminAccess.requireAdmin,
+      now,
+      ...(feedbackLimits && { limits: feedbackLimits }),
     }),
   );
 

@@ -6,6 +6,7 @@ import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "../data/blockAccessor.js";
+import { createFeedbackAccessor } from "../data/feedbackAccessor.js";
 import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
@@ -19,6 +20,7 @@ import { createAccountComponent } from "../domain/accounts/accountComponent.js";
 import { createPlayerDataComponent } from "../domain/accounts/playerDataComponent.js";
 import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
 import { createBlockComponent } from "../domain/blocks/blockComponent.js";
+import { createFeedbackComponent } from "../domain/feedback/feedbackComponent.js";
 import { createBotComponent } from "../domain/bots/botComponent.js";
 import { createBotDriver } from "../domain/bots/botDriver.js";
 import { createBotTurns } from "../domain/bots/botTurns.js";
@@ -54,6 +56,7 @@ import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.js";
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
+import { createInMemoryFeedbackDao } from "./inMemoryFeedbackDao.js";
 import { createMemoryStoreSessionDao } from "./memoryStoreSessionDao.js";
 import {
   createInMemoryAchievementDao,
@@ -94,6 +97,7 @@ import { testConfig } from "./testConfig.js";
  *   dataParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who takes
  *     part in deleting an account (e.g. one that fails, CC-035)
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
+ *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
  * }} [options]
  */
 export function createTestApp({
@@ -114,6 +118,7 @@ export function createTestApp({
   accountLimits,
   dataParticipants = (participants) => participants,
   blockLimits,
+  feedbackLimits,
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -160,6 +165,10 @@ export function createTestApp({
     progressAccessor,
     matchAccessor,
     events: domainEvents,
+  });
+  const feedbackComponent = createFeedbackComponent({
+    feedbackAccessor: createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() }),
+    ages: accountComponent,
   });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
@@ -308,6 +317,8 @@ export function createTestApp({
     apiLimit,
     blockComponent,
     blockLimits,
+    feedbackComponent,
+    feedbackLimits,
     analyticsComponent: createAnalyticsComponent({
       analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
       cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }),
@@ -343,6 +354,7 @@ export function createTestApp({
     gamificationComponent,
     leaderboardComponent,
     blockComponent,
+    feedbackComponent,
     matchPipeline,
     playerDataComponent,
     tasks,
