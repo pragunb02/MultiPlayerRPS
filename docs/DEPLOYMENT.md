@@ -180,6 +180,31 @@ browser tests, Docker); force pushes and deletion are blocked (admins can overri
 with push protection blocks pushes that contain credentials. Dependabot alerts and security updates, and CodeQL code
 scanning, are on.
 
+## The MongoDB image for Docker and CI (CC-288)
+
+Production uses Atlas and is not affected. `docker-compose.yml` (local development and the required CI check
+"Docker image builds and serves") runs MongoDB from an exact image: `mongo:8.2.12` with its multi-platform digest
+`sha256:e0ce8c35124d4a9f9785532d1f268f39e9728ffa1cb38f46fa482436424c4bd3`. Never a floating tag such as `mongo:8`.
+
+Why: on 2026-10-19 GitHub rolled out runner image `ubuntu-24.04` 20261018.339.1 with kernel `7.0.0-1017-azure`
+(upstream 7.0.14). `mongo:8` is 8.3.13, and it and 8.0.34 stop at once on that kernel with
+`"s":"F" ... "MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility with this version
+of MongoDB. See https://jira.mongodb.org/browse/SERVER-121912"`. Kernels 6.19 to 7.0.13 broke the rseq behaviour that
+MongoDB 8's memory allocator needs, 7.0.14 restored it (SERVER-125742), but the check reads `uname -r`, which Ubuntu
+keeps at `7.0.0`, so the fixed kernel is still refused (SERVER-136848, open). 8.2 has no such check: 8.2.12 started,
+took 100,000 writes and stayed up for over a minute on the new kernel and on the old 6.17 one. The runner rollout was
+gradual, so the job failed now and then at first and then most of the time. The image itself never changed.
+
+To upgrade: try the new exact version on CI (the Docker job prints `docker compose logs mongo` when it fails), then
+pin its digest from `docker buildx imagetools inspect mongo:<version>` (the `Digest:` line of the index, so it works
+on Intel and Arm). Dependabot ignores `mongo` 8.3 and later until SERVER-136848 is fixed (`.github/dependabot.yml`).
+
+**Existing local databases, once:** a Docker volume that `mongo:8` (8.3) created has feature compatibility version
+8.3, and 8.2 cannot open it: mongod exits with `"Wrong mongod version" ... UPGRADE PROBLEM: Found an invalid
+featureCompatibilityVersion document ... version: "8.3"` (checked locally). Run `docker compose down -v` once to delete
+the old volume, and take a `mongodump` first with the old image if you need its data. CI starts from a fresh volume
+every time. Production on Atlas is not affected. The same applies to any later move to an older version.
+
 ## Before merging any PR
 
 CI (lint, format, audit, unit + integration tests with coverage gates, browser tests) must be green. Every PR fills in

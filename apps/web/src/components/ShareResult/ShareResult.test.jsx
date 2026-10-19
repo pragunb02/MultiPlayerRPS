@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../Toast/ToastProvider.jsx";
@@ -90,7 +90,8 @@ describe("ShareResult", () => {
     await user.click(screen.getByRole("button", { name: "Share result" }));
 
     expect(writeText).toHaveBeenCalledWith(MESSAGE);
-    expect(await screen.findByRole("status")).toHaveTextContent("Result copied");
+    // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Result copied"));
   });
 
   it("copies the whole message where the device has no share sheet", async () => {
@@ -102,7 +103,8 @@ describe("ShareResult", () => {
     await user.click(screen.getByRole("button", { name: "Share result" }));
 
     expect(writeText).toHaveBeenCalledWith(MESSAGE);
-    expect(await screen.findByRole("status")).toHaveTextContent("Result copied");
+    // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Result copied"));
   });
 
   it("says so when copying fails", async () => {

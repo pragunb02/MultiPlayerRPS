@@ -26,6 +26,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   playerDataComponent: ReturnType<typeof import("../../domain/accounts/playerDataComponent.js").createPlayerDataComponent>,
  *   onAccountDeleted: (playerId: string) => void,  told once an account is deleted, so its sockets are cut (CC-035)
  *   accountLimits?: Parameters<typeof import("./accountRoutes.js").createAccountRoutes>[0]["limits"],
+ *   blockComponent: ReturnType<typeof import("../../domain/blocks/blockComponent.js").createBlockComponent>,
+ *   blockLimits?: Parameters<typeof import("./blockRoutes.js").createBlockRoutes>[0]["limits"],
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
  *   onOtherSessionsEnded: (which: { playerId: string, fromSessionId: string, toSessionId: string }) => void,  told
@@ -53,6 +55,8 @@ export function createHttpApp({
   playerDataComponent,
   onAccountDeleted,
   accountLimits,
+  blockComponent,
+  blockLimits,
   authLimits,
   onSessionEnded,
   onOtherSessionsEnded,
@@ -125,6 +129,8 @@ export function createHttpApp({
       playerDataComponent,
       onAccountDeleted,
       accountLimits,
+      blockComponent,
+      blockLimits,
     }),
   );
 

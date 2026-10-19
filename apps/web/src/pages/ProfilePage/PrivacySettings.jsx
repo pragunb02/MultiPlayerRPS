@@ -123,8 +123,8 @@ function DataExport() {
     <form className={styles.part} onSubmit={submit} noValidate aria-labelledby="export-data">
       <h3 id="export-data">Download your data</h3>
       <p className={styles.muted}>
-        A file with your account, games, progress, achievements, quests and leaderboard places. Other players
-        appear by their display name only.
+        A file with your account, games, progress, achievements, quests, leaderboard places and the players
+        you blocked. Other players appear by their display name only.
       </p>
       <Field
         label="Password for the download"

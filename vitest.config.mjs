@@ -34,7 +34,8 @@ export default defineConfig({
           name: "web",
           environment: "jsdom",
           include: ["apps/web/**/*.test.{js,jsx}"],
-          setupFiles: ["apps/web/src/testing/setup.js"],
+          // slowEffects.js first: it must load before React (CC-288).
+          setupFiles: ["apps/web/src/testing/slowEffects.js", "apps/web/src/testing/setup.js"],
           css: { modules: { classNameStrategy: "non-scoped" } },
         },
       },

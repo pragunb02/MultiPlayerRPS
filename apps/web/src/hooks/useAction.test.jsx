@@ -1,4 +1,5 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook } from "@testing-library/react";
+import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../lib/errors.js";
 import { ACTION_PHASES, ACTION_TIMING, useAction } from "./useAction.js";
@@ -256,5 +257,25 @@ describe("useAction (CC-164)", () => {
     act(() => vi.advanceTimersByTime(ACTION_TIMING.DONE_FOR_MS));
 
     expect(result.current.phase).toBe(ACTION_PHASES.SENDING);
+  });
+
+  it("runs the newest work for a press in the same step that drew it (CC-288)", () => {
+    // The press comes before any plain effect of that step has run, like a press on a busy phone. With the work kept
+    // in a plain effect it ran the work from the render before, such as loading the first page of matches again.
+    function PressOnDraw({ work, press }) {
+      const action = useAction(work, { id: "profile.more" });
+      useLayoutEffect(() => {
+        if (press) action.run();
+      }, [press, action]);
+      return null;
+    }
+    const first = vi.fn(async () => "page 1");
+    const newest = vi.fn(async () => "page 2");
+    const view = render(<PressOnDraw work={first} press={false} />);
+
+    view.rerender(<PressOnDraw work={newest} press />);
+
+    expect(newest).toHaveBeenCalledOnce();
+    expect(first).not.toHaveBeenCalled();
   });
 });

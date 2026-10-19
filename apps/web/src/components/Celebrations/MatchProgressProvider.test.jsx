@@ -1,9 +1,11 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
 import { SessionProvider } from "../../hooks/SessionProvider.jsx";
 import { useSession } from "../../hooks/useSession.js";
 import { fakeApi, fakeSessionBroadcast, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
+import { SessionStatus } from "../../testing/SessionStatus.jsx";
+import { sessionReady } from "../../testing/sessionReady.js";
 import { KEPT_MATCHES, keepMatchUpdate, useMatchProgress } from "./matchProgressContext.js";
 import { MatchProgressProvider } from "./MatchProgressProvider.jsx";
 import { ResultCelebration } from "./ResultCelebration.jsx";
@@ -52,12 +54,15 @@ async function renderKept(children) {
   const providers = (inside) => (
     <ServicesProvider services={services}>
       <SessionProvider>
-        <MatchProgressProvider>{inside}</MatchProgressProvider>
+        <MatchProgressProvider>
+          {inside}
+          <SessionStatus />
+        </MatchProgressProvider>
       </SessionProvider>
     </ServicesProvider>
   );
   const view = render(providers(children));
-  await waitFor(() => expect(socket.connect).toHaveBeenCalled());
+  await sessionReady();
   return { ...view, socket, show: (next) => view.rerender(providers(next)) };
 }
 

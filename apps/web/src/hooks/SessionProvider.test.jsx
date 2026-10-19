@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
 import { AppRequestError } from "../lib/errors.js";
@@ -7,11 +7,13 @@ import { fakeApi, fakeSessionBroadcast, fakeSocket, GUEST } from "../testing/fak
 import { SessionProvider } from "./SessionProvider.jsx";
 import { useSession } from "./useSession.js";
 
-// The latest session value, captured after each render (effects may write outside React; render may not).
+// The latest session value, captured after each render (effects may write outside React; render may not). A layout
+// effect runs in the same step that changes the page, so once the page shows a status this value has it too. A
+// plain effect can run later on a busy machine, and a test would then act on the value from before (CC-288).
 const latest = { current: undefined };
 function Probe() {
   const value = useSession();
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = value;
   });
   return <p>{value.status}</p>;

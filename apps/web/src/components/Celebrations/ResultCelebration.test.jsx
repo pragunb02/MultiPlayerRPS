@@ -1,9 +1,11 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
 import { SessionProvider } from "../../hooks/SessionProvider.jsx";
 import { fakeApi, fakeSessionBroadcast, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
 import { installMatchMedia } from "../../testing/matchMedia.js";
+import { SessionStatus } from "../../testing/SessionStatus.jsx";
+import { sessionReady } from "../../testing/sessionReady.js";
 import { MatchProgressProvider } from "./MatchProgressProvider.jsx";
 import { outcomeFor } from "./outcome.js";
 import { ResultCelebration } from "./ResultCelebration.jsx";
@@ -44,11 +46,12 @@ async function celebrate(room, socket = fakeSocket()) {
       <SessionProvider>
         <MatchProgressProvider>
           <ResultCelebration room={room} />
+          <SessionStatus />
         </MatchProgressProvider>
       </SessionProvider>
     </ServicesProvider>,
   );
-  await waitFor(() => expect(socket.connect).toHaveBeenCalled());
+  await sessionReady();
   return { ...view, socket };
 }
 

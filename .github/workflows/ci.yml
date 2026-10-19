@@ -334,5 +334,9 @@ jobs:
       - name: Server log on failure
         if: failure()
         run: docker compose logs app
+      # When MongoDB itself fails to start, the reason is only in its own log (CC-288).
+      - name: MongoDB log on failure
+        if: failure()
+        run: docker compose logs mongo
       - run: docker compose down --volumes
         if: always()
