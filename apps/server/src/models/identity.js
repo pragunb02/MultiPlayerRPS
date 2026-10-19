@@ -7,6 +7,12 @@ const ID_PATTERNS = Object.freeze({
 });
 const DISPLAY_NAME_PATTERN = /^[A-Za-z0-9_-]{3,24}$/;
 
+/** The letters a guest's name is drawn from. No 0/O or 1/I, so names are easy to read out loud to a friend. */
+export const GUEST_NAME_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/** How many letters follow `Guest-` in a guest's name. */
+export const GUEST_NAME_SUFFIX_LENGTH = 4;
+const SERVER_GIVEN_GUEST_NAME = new RegExp(`^Guest-[${GUEST_NAME_ALPHABET}]{${GUEST_NAME_SUFFIX_LENGTH}}$`);
+
 /**
  * Who is playing. The only source of truth is the server-side session — never client input.
  *
@@ -43,3 +49,19 @@ export function createIdentity({ kind, id, displayName }) {
  * @param {string} id
  */
 export const isAccountId = (id) => ID_PATTERNS[IDENTITY_KINDS.USER].test(id);
+
+/**
+ * Whether a player id belongs to a guest.
+ *
+ * @param {string} id
+ */
+export const isGuestId = (id) => ID_PATTERNS[IDENTITY_KINDS.GUEST].test(id);
+
+/**
+ * Whether a name has exactly the shape the server gives guests (`Guest-` and four letters of the alphabet). Such a
+ * name was not chosen by the player and says nothing about them, so the boards may show it at any age. Any other
+ * name is treated as chosen, and the age rule applies to it (ADR-060).
+ *
+ * @param {string} name
+ */
+export const isServerGivenGuestName = (name) => SERVER_GIVEN_GUEST_NAME.test(name);

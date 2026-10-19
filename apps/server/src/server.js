@@ -627,6 +627,7 @@ export async function startServer({
     leaderboardAccessor,
     matchAccessor,
     progressAccessor,
+    transfers: playerTransferAccessor,
     ages: accountComponent,
   });
   // Everything stored by player id moves with a guest who signs in (ADR-014), in this order. Leaderboards go

@@ -23,6 +23,24 @@ export function createInMemoryLeaderboardDao() {
       ...(expiresAt && { expiresAt }),
     });
 
+  /** Adds `inc` once per `key`, and remembers `keys` with it (the keys a merged guest row already had). */
+  function addWithKeys({ board, period, playerId, displayName, level, key, keys, inc, at, expiresAt }) {
+    const ref = { board, period, playerId };
+    const current = entries.get(keyOf(ref));
+    if (current?.recentKeys.includes(key)) {
+      return Promise.resolve({ applied: false });
+    }
+    write(ref, {
+      displayName,
+      level,
+      score: (current?.score ?? 0) + inc,
+      recentKeys: [...(current?.recentKeys ?? []), ...keys, key].slice(-200),
+      updatedAt: at,
+      expiresAt,
+    });
+    return Promise.resolve({ applied: true });
+  }
+
   return Object.freeze({
     ensureIndexes: async () => {},
 
@@ -34,21 +52,28 @@ export function createInMemoryLeaderboardDao() {
       return { raised };
     },
 
-    async addOnce({ board, period, playerId, displayName, level, key, inc, at, expiresAt }) {
-      const ref = { board, period, playerId };
-      const current = entries.get(keyOf(ref));
-      if (current?.recentKeys.includes(key)) {
-        return { applied: false };
-      }
-      write(ref, {
-        displayName,
-        level,
-        score: (current?.score ?? 0) + inc,
-        recentKeys: [...(current?.recentKeys ?? []), key].slice(-200),
-        updatedAt: at,
-        expiresAt,
-      });
-      return { applied: true };
+    addOnce: (write) => addWithKeys({ ...write, keys: [] }),
+
+    mergeOnce: (write) => addWithKeys(write),
+
+    async listWithKeys({ board, playerId }) {
+      return [...entries.values()]
+        .filter((entry) => entry.board === board && entry.playerId === playerId)
+        .map(({ period, score, updatedAt, recentKeys, expiresAt }) => ({
+          period,
+          score,
+          updatedAt: new Date(updatedAt),
+          recentKeys: [...recentKeys],
+          ...(expiresAt && { expiresAt: new Date(expiresAt) }),
+        }));
+    },
+
+    async extendLifetime({ playerId, period, expiresAt }) {
+      const rows = [...entries.values()].filter(
+        (entry) => entry.playerId === playerId && entry.period === period && entry.expiresAt < expiresAt,
+      );
+      rows.forEach((entry) => write(entry, { expiresAt }));
+      return rows.length;
     },
 
     async top({ board, period, limit }) {

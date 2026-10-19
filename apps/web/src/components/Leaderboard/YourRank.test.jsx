@@ -58,16 +58,34 @@ describe("Your rank on the profile", () => {
     expect(await within(rank).findAllByText("—")).toHaveLength(2);
   });
 
-  it("asks a guest to sign up instead, without loading any board", async () => {
-    const api = openProfile({ identity: GUEST });
+  it("shows a guest its place too, and asks it to sign up to keep it (ADR-060)", async () => {
+    const getLeaderboard = vi.fn(async (id) => ({
+      board: { id },
+      entries: [],
+      you: id === "weekly" ? { listed: true, rank: 7, score: 40 } : { listed: false, reason: "unranked" },
+    }));
+    openProfile({ identity: GUEST, getLeaderboard });
 
     const rank = await card();
 
-    expect(within(rank).getByText(/Guests aren't ranked/)).toBeInTheDocument();
+    expect(await within(rank).findByText("#7")).toBeInTheDocument();
+    expect(await within(rank).findByText("Unranked")).toBeInTheDocument();
+    expect(within(rank).getByText(/to keep your place/)).toHaveTextContent(
+      "Sign up to keep your place on the boards.",
+    );
     expect(within(rank).getByRole("link", { name: "Sign up" })).toHaveAttribute(
       "href",
       "/signup?next=%2Fprofile",
     );
-    expect(api.getLeaderboard).not.toHaveBeenCalled();
+  });
+
+  it("never asks an account to sign up", async () => {
+    const getLeaderboard = vi.fn(async (id) => ({ board: { id }, entries: [], you: { listed: false, reason: "unranked" } }));
+    openProfile({ identity: USER, getLeaderboard });
+
+    const rank = await card();
+
+    expect(await within(rank).findAllByText("Unranked")).toHaveLength(2);
+    expect(within(rank).queryByText(/keep your place/)).not.toBeInTheDocument();
   });
 });

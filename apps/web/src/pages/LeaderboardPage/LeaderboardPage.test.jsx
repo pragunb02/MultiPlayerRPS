@@ -172,19 +172,51 @@ describe("LeaderboardPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("asks a guest to sign up, returning to this board", async () => {
+    it("marks a guest's own row, under its Guest name, and invites it to keep its place (ADR-060)", async () => {
       const overall = {
         board: boardInfo("overall"),
-        entries: ENTRIES,
-        you: { listed: false, reason: "guest" },
+        entries: [entry(1, "ada", 900, 6), entry(2, "Guest-T7K2", 500)],
+        you: { listed: true, rank: 2, score: 500 },
       };
       renderApp({ path: "/leaderboards/overall", api: api({ identity: GUEST, boards: { overall } }) });
 
-      const nudge = await screen.findByText(/Guests aren't ranked/);
+      await screen.findByRole("list", { name: "Overall XP rankings" });
+
+      expect(rows()[1]).toHaveAttribute("aria-current", "true");
+      expect(rows()[1]).toHaveTextContent("2Guest-T7K2youLv 3500 XP");
+      const nudge = screen.getByText(/to keep your place on the boards/);
+      expect(nudge).toHaveTextContent("Sign up to keep your place on the boards.");
       expect(within(nudge).getByRole("link", { name: "Sign up" })).toHaveAttribute(
         "href",
         "/signup?next=%2Fleaderboards%2Foverall",
       );
+    });
+
+    it("pins a guest's row below the list as You when it is outside it (ADR-060)", async () => {
+      const overall = { board: boardInfo("overall"), entries: ENTRIES, you: { listed: true, rank: 51, score: 30 } };
+      renderApp({ path: "/leaderboards/overall", api: api({ identity: GUEST, boards: { overall } }) });
+
+      expect(await screen.findByText("#51")).toBeInTheDocument();
+      expect(screen.getByText("Your rank:").parentElement).toHaveTextContent("Your rank: #51You30 XP");
+    });
+
+    it("tells a guest without a score how to get ranked, and how to keep it (ADR-060)", async () => {
+      const chess = { board: boardInfo("chess"), entries: ENTRIES, you: { listed: false, reason: "unranked" } };
+      renderApp({ path: "/leaderboards/chess", api: api({ identity: GUEST, boards: { chess } }) });
+
+      expect(
+        await screen.findByText("You're not on this board yet. Win a match to get ranked."),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/to keep your place on the boards/)).toBeInTheDocument();
+    });
+
+    it("never asks an account to sign up", async () => {
+      const overall = { board: boardInfo("overall"), entries: ENTRIES, you: { listed: true, rank: 2, score: 500 } };
+      renderApp({ path: "/leaderboards/overall", api: api({ identity: USER, boards: { overall } }) });
+
+      await screen.findByRole("list", { name: "Overall XP rankings" });
+
+      expect(screen.queryByText(/keep your place/)).not.toBeInTheDocument();
     });
 
     it("shows a visitor without a session no row of their own", async () => {
@@ -195,7 +227,7 @@ describe("LeaderboardPage", () => {
 
       await screen.findByRole("list", { name: "Overall XP rankings" });
 
-      expect(screen.queryByText(/Your rank|Guests aren't ranked|not on this board/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Your rank|keep your place|not on this board/)).not.toBeInTheDocument();
     });
   });
 
@@ -301,7 +333,7 @@ describe("LeaderboardPage", () => {
           .getAllByRole("listitem")
           .map((step) => step.textContent),
       ).toEqual([
-        "Play with an account. Only accounts are ranked.",
+        "Play as a guest or with an account. Guests are ranked under their Guest name.",
         "Earn XP from games and daily quests.",
         "Games against the computer never count here.",
       ]);

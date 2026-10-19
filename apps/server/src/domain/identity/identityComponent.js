@@ -1,19 +1,16 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { IDENTITY_KINDS } from "@classicade/shared";
-import { createIdentity } from "../../models/identity.js";
+import { createIdentity, GUEST_NAME_ALPHABET, GUEST_NAME_SUFFIX_LENGTH } from "../../models/identity.js";
 import { isOffensiveName, isReservedName } from "../../models/publicName.js";
 import { assertFunction } from "../../utils/assert.js";
 
-// No 0/O or 1/I, so names are easy to read out loud to a friend.
-const GUEST_SUFFIX_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const GUEST_SUFFIX_LENGTH = 4;
 // Random letters can spell a rude word or a bot name. A clean draw is almost certain within a few tries.
 const GUEST_SUFFIX_ATTEMPTS = 20;
 
 const randomGuestSuffix = () =>
   Array.from(
-    { length: GUEST_SUFFIX_LENGTH },
-    () => GUEST_SUFFIX_ALPHABET[randomInt(GUEST_SUFFIX_ALPHABET.length)],
+    { length: GUEST_NAME_SUFFIX_LENGTH },
+    () => GUEST_NAME_ALPHABET[randomInt(GUEST_NAME_ALPHABET.length)],
   ).join("");
 
 /**

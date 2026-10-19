@@ -47,6 +47,27 @@ export function createLeaderboardDao({ connection }) {
   const Entry = connection.model("LeaderboardEntry", entrySchema);
   const names = ({ displayName, level }) => ({ displayName, level });
 
+  /** Adds `inc` once per `key`, and remembers `keys` with it. */
+  async function addWithKeys({ board, period, playerId, key, keys, inc, at, expiresAt, ...player }) {
+    const filter = { board, period, playerId, recentKeys: { $ne: key } };
+    const update = {
+      $inc: { score: inc },
+      $push: { recentKeys: { $each: [...keys, key], $slice: -RECENT_KEYS } },
+      $set: { updatedAt: at, ...names(player), ...(expiresAt && { expiresAt }) },
+    };
+    try {
+      await Entry.updateOne(filter, update, { upsert: true });
+      return { applied: true };
+    } catch (err) {
+      if (!isDuplicate(err)) {
+        throw err;
+      }
+    }
+    // Either the key was applied already, or another write created the entry just now.
+    const { modifiedCount } = await Entry.updateOne(filter, update);
+    return { applied: modifiedCount > 0 };
+  }
+
   return Object.freeze({
     ensureIndexes: () => Entry.syncIndexes(),
 
@@ -82,24 +103,38 @@ export function createLeaderboardDao({ connection }) {
      * @param {EntryWrite & { key: string, inc: number }} write
      * @returns {Promise<{ applied: boolean }>}
      */
-    async addOnce({ board, period, playerId, key, inc, at, expiresAt, ...player }) {
-      const filter = { board, period, playerId, recentKeys: { $ne: key } };
-      const update = {
-        $inc: { score: inc },
-        $push: { recentKeys: { $each: [key], $slice: -RECENT_KEYS } },
-        $set: { updatedAt: at, ...names(player), ...(expiresAt && { expiresAt }) },
-      };
-      try {
-        await Entry.updateOne(filter, update, { upsert: true });
-        return { applied: true };
-      } catch (err) {
-        if (!isDuplicate(err)) {
-          throw err;
-        }
-      }
-      // Either the key was applied already, or another write created the entry just now.
-      const { modifiedCount } = await Entry.updateOne(filter, update);
-      return { applied: modifiedCount > 0 };
+    addOnce: (write) => addWithKeys({ ...write, keys: [] }),
+
+    /**
+     * Like `addOnce`, and also remembers `keys`: the match and quest keys a guest's row already counted, so none of
+     * them is added to this entry again (CC-291).
+     *
+     * @param {EntryWrite & { key: string, keys: string[], inc: number }} write
+     * @returns {Promise<{ applied: boolean }>}
+     */
+    mergeOnce: (write) => addWithKeys(write),
+
+    /**
+     * One player's rows of one board, every period, with the keys they counted and when they end (CC-291).
+     *
+     * @param {{ board: string, playerId: string }} query
+     * @returns {Promise<Array<{ period: string, score: number, updatedAt: Date, recentKeys: string[], expiresAt?: Date }>>}
+     */
+    listWithKeys: ({ board, playerId }) =>
+      Entry.find({ board, playerId }, "-_id period score updatedAt recentKeys expiresAt").lean(),
+
+    /**
+     * Moves the end of one player's rows of a period to `expiresAt`, only where that is later (CC-291).
+     *
+     * @param {{ playerId: string, period: string, expiresAt: Date }} change
+     * @returns {Promise<number>} rows changed
+     */
+    async extendLifetime({ playerId, period, expiresAt }) {
+      const { modifiedCount } = await Entry.updateMany(
+        { playerId, period, expiresAt: { $lt: expiresAt } },
+        { $set: { expiresAt } },
+      );
+      return modifiedCount;
     },
 
     /**

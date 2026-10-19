@@ -57,6 +57,8 @@ export function createLeaderboardRoutes({ leaderboardComponent, limit = DEFAULT_
       return;
     }
     const viewer = requireIdentity(req.session);
+    // `you` belongs to one person, so no shared cache may keep this answer and hand it to someone else.
+    res.set("Cache-Control", "private, no-store");
     res.json({ board, entries, you: await leaderboardComponent.standingFor({ boardId, viewer, now: at }) });
   });
 

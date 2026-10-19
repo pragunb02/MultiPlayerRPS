@@ -4,8 +4,15 @@ import {
   GAMES,
   getLeaderboard,
   LEADERBOARD_MAX_ENTRIES,
+  LEADERBOARD_UNLISTED,
   LEADERBOARDS,
 } from "./index.js";
+
+describe("why a viewer has no rank", () => {
+  it("is only ever that they have no score yet: guests are ranked too (ADR-060)", () => {
+    expect(LEADERBOARD_UNLISTED).toEqual({ UNRANKED: "unranked" });
+  });
+});
 
 describe("leaderboard catalog", () => {
   it("has overall XP, this week, and one wins board per game", () => {

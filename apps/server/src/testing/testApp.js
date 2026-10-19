@@ -10,6 +10,7 @@ import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
+import { GUEST_NAME_ALPHABET } from "../models/identity.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
 import { createPendingMatchAccessor } from "../data/pendingMatchAccessor.js";
 import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js";
@@ -126,7 +127,9 @@ export function createTestApp({
   let guestNumber = 0;
   const identityComponent = createIdentityComponent({
     generateId: () => `00000000-0000-4000-8000-${String(++guestNumber).padStart(12, "0")}`,
-    generateGuestSuffix: () => `T${String(guestNumber).padStart(3, "0")}`,
+    // Counted in the guest name alphabet, so the boards show test guests as server-given names (ADR-060).
+    generateGuestSuffix: () =>
+      `T${[2, 1, 0].map((place) => GUEST_NAME_ALPHABET[Math.floor(guestNumber / 32 ** place) % 32]).join("")}`,
   });
   const accountAccessor = createAccountAccessor({ accountDao });
   const legacyUserAccessor = createLegacyUserAccessor({
@@ -165,6 +168,7 @@ export function createTestApp({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
     matchAccessor,
     progressAccessor,
+    transfers: playerTransferAccessor,
     ages: accountComponent,
   });
   const gamificationComponent = createGamificationComponent({

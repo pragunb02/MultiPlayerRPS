@@ -16,6 +16,7 @@ import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { useLeaderboard } from "../../hooks/useLeaderboard.js";
 import { formatTimeLeft, useNow } from "../../hooks/useNow.js";
+import { useSession } from "../../hooks/useSession.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import styles from "./LeaderboardPage.module.css";
 
@@ -73,9 +74,8 @@ function ResetsIn({ resetsAt }) {
   return <p className={styles.resets}>Resets in {formatTimeLeft(resetsAt - now)}</p>;
 }
 
-/** Your own row under the list: where you stand, or why you are not on the board. */
+/** Your own row under the list: where you stand, or that you are not on the board yet. */
 function YouRow({ you, metric, listedRanks }) {
-  const location = useLocation();
   if (you === undefined || (you.listed && listedRanks.includes(you.rank))) {
     return null;
   }
@@ -89,19 +89,18 @@ function YouRow({ you, metric, listedRanks }) {
       </p>
     );
   }
+  return <p className={styles.unlisted}>You're not on this board yet. Win a match to get ranked.</p>;
+}
+
+/** A guest is ranked under its Guest name, and its rows move to the account it signs up for (ADR-060). */
+function KeepYourPlace() {
+  const location = useLocation();
   return (
     <p className={styles.unlisted}>
-      {you.reason === "guest" ? (
-        <>
-          Guests aren't ranked.{" "}
-          <Link to={paths.signup(returnPathFor(location))} data-cc-control="leaderboard.signup">
-            Sign up
-          </Link>{" "}
-          to get on the leaderboard.
-        </>
-      ) : (
-        "You're not on this board yet. Win a match to get ranked."
-      )}
+      <Link to={paths.signup(returnPathFor(location))} data-cc-control="leaderboard.signup">
+        Sign up
+      </Link>{" "}
+      to keep your place on the boards.
     </p>
   );
 }
@@ -123,7 +122,7 @@ function HowToGetOn({ info }) {
     <aside className={styles.howTo} aria-labelledby="how-to-get-on">
       <h2 id="how-to-get-on">How to get on the board</h2>
       <ol className={styles.steps}>
-        <li>Play with an account. Only accounts are ranked.</li>
+        <li>Play as a guest or with an account. Guests are ranked under their Guest name.</li>
         <li>{whatCounts(info)}</li>
         <li>Games against the computer never count here.</li>
       </ol>
@@ -151,6 +150,7 @@ function BoardCard({ info, children }) {
 
 function Board({ info }) {
   const board = useLeaderboard(info.id);
+  const { identity } = useSession();
   if (board.status === "loading") {
     return (
       <BoardCard info={info}>
@@ -207,6 +207,7 @@ function Board({ info }) {
           </p>
         )}
         <YouRow you={you} metric={info.metric} listedRanks={entries.map((entry) => entry.rank)} />
+        {you !== undefined && identity?.kind === "guest" && <KeepYourPlace />}
       </BoardCard>
       {few && <HowToGetOn info={info} />}
     </div>
@@ -214,8 +215,9 @@ function Board({ info }) {
 }
 
 /**
- * Leaderboards (CC-053): one URL per board — overall XP, this week, and wins per game — with tabs as plain links,
- * so Back and Forward move between boards. Accounts only; guests are invited to sign up.
+ * Leaderboards (CC-053): one URL per board (overall XP, this week, and wins per game) with tabs as plain links,
+ * so Back and Forward move between boards. Guests are ranked under their Guest name and are invited to sign up to
+ * keep their place (ADR-060).
  */
 export function LeaderboardPage() {
   const { board: boardId } = useParams();

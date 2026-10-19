@@ -14,6 +14,17 @@ import { NotFoundError } from "../utils/errors.js";
  */
 
 const toEntry = ({ updatedAt, ...doc }) => Object.freeze({ ...doc, updatedAt: updatedAt.getTime() });
+/**
+ * @typedef {{ period: string, score: number, updatedAt: number, recentKeys: ReadonlyArray<string>, expiresAt?: number }} KeyedRow
+ *   one row of a player with the match and quest keys it counted, and when it ends if it does (times in ms)
+ */
+const toKeyedRow = ({ updatedAt, recentKeys, expiresAt, ...row }) =>
+  Object.freeze({
+    ...row,
+    updatedAt: updatedAt.getTime(),
+    recentKeys: Object.freeze([...recentKeys]),
+    ...(expiresAt !== undefined && { expiresAt: expiresAt.getTime() }),
+  });
 const toWrite = ({ at, expiresAt, ...write }) => ({
   ...write,
   at: new Date(at),
@@ -44,6 +55,34 @@ export function createLeaderboardAccessor({ leaderboardDao }) {
      * @returns {Promise<{ applied: boolean }>}
      */
     addOnce: (write) => leaderboardDao.addOnce(toWrite(write)),
+
+    /**
+     * Adds to an entry's score once per key, and remembers `keys` too: the keys a guest's row counted, so none of
+     * them is added to the account again (CC-291).
+     *
+     * @param {EntryWrite & { key: string, keys: ReadonlyArray<string>, inc: number }} write
+     * @returns {Promise<{ applied: boolean }>}
+     */
+    mergeOnce: ({ keys, ...write }) => leaderboardDao.mergeOnce({ ...toWrite(write), keys: [...keys] }),
+
+    /**
+     * One player's rows of one board, every period, with the keys they counted and when they end (CC-291).
+     *
+     * @param {{ board: string, playerId: string }} query
+     * @returns {Promise<ReadonlyArray<Readonly<KeyedRow>>>}
+     */
+    async listWithKeys(query) {
+      return Object.freeze((await leaderboardDao.listWithKeys(query)).map(toKeyedRow));
+    },
+
+    /**
+     * Moves the end of one player's rows of a period later, never earlier (CC-291).
+     *
+     * @param {{ playerId: string, period: string, expiresAt: number }} change
+     * @returns {Promise<number>} rows changed
+     */
+    extendLifetime: ({ expiresAt, ...change }) =>
+      leaderboardDao.extendLifetime({ ...change, expiresAt: new Date(expiresAt) }),
 
     /**
      * @param {BoardRef & { limit: number }} query
