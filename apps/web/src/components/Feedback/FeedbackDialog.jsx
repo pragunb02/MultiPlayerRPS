@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { useLocation } from "react-router";
 import { FEEDBACK_MESSAGE_MAX, FEEDBACK_TYPES } from "@classicade/shared";
-import { APP_BUILD } from "../../app/buildStamp.js";
+import { APP_BUILD } from "../../app/build.js";
 import { useServices } from "../../app/servicesContext.js";
 import { useAction } from "../../hooks/useAction.js";
 import { Button } from "../Button/Button.jsx";

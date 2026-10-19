@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { APP_BUILD, buildStamp } from "./buildStamp.js";
+import { APP_BUILD } from "./build.js";
+import { buildStamp } from "./buildStamp.js";
 
 describe("buildStamp: the web build's version and commit (CC-290)", () => {
   it("is the version and the short commit", () => {
@@ -12,7 +13,7 @@ describe("buildStamp: the web build's version and commit (CC-290)", () => {
     expect(buildStamp({ version: "0.1.0", commit })).toBe("0.1.0+local");
   });
 
-  it("names this build dev when no build stamped it, as in tests and the dev server", () => {
+  it("names this build dev when no build stamped it, as in tests", () => {
     expect(APP_BUILD).toBe("dev");
   });
 });
