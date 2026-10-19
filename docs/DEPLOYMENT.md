@@ -12,29 +12,43 @@
 
 ### Render settings (dashboard → Settings)
 
-| Setting           | Value                                                                                                                                                                   |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Build Command     | `npm ci --include=dev && npm run build:web` — exact lockfile install, then the web build (Vite is a dev dependency, so `--include=dev` even with `NODE_ENV=production`) |
-| Start Command     | `npm start` — runs `apps/server/src/index.js`                                                                                                                           |
-| Health Check Path | `/health` — 200 only when the database is connected; a failing new deploy is never promoted                                                                             |
-| Node version      | from `.nvmrc`                                                                                                                                                           |
+| Setting           | Value                                                                                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build Command     | `npm ci --include=dev && npm run build:web` — exact lockfile install, then the web build (Vite is a dev dependency, so `--include=dev` even with `NODE_ENV=production`)                                                                                     |
+| Start Command     | `npm start` — runs `apps/server/src/index.js`                                                                                                                                                                                                               |
+| Health Check Path | `/health` — 200 only when the database is connected; a failing new deploy is never promoted                                                                                                                                                                 |
+| Node version      | from `.nvmrc`                                                                                                                                                                                                                                               |
+| Listen address    | Environment → `HOST=0.0.0.0`. Render requires every web service to listen on 0.0.0.0 and the port in `PORT`; the server's own default is 127.0.0.1 (CC-287), which Render's proxy cannot reach, so without this setting every deploy fails its health check |
 
 ### Environment variables (dashboard → Environment)
 
-| Variable           | Required      | Notes                                                                                                                                                                                                                                                     |
-| ------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MONGO_URI`        | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                                           |
-| `SESSION_SECRET`   | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                                            |
-| `NODE_ENV`         | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                                                 |
-| `ALLOWED_ORIGINS`  | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047)                   |
-| `PORT`             | set by Render |                                                                                                                                                                                                                                                           |
-| `WEB_DIST_DIR`     | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                                                 |
-| `LOG_LEVEL`        | no            | default `info`                                                                                                                                                                                                                                            |
-| `TRUST_PROXY_HOPS` | no            | default `1` in production, `0` elsewhere. How many proxies in front of the server add to `X-Forwarded-For`; rate limits key on the address that many entries in from the right. See [Client addresses and rate limits](#client-addresses-and-rate-limits) |
-
-| `ADMIN_ACCOUNT_IDS` | no | default empty: nobody can open the owner console. Comma separated account ids such as `user_65f0c2a1b2c3d4e5f6a7b8c9`. A guest id or a typo stops the boot. See [Owner console](#owner-console-cc-233) |
+| Variable            | Required      | Notes                                                                                                                                                                                                                                                                       |
+| ------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MONGO_URI`         | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                                                             |
+| `SESSION_SECRET`    | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                                                              |
+| `NODE_ENV`          | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                                                                   |
+| `ALLOWED_ORIGINS`   | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047)                                     |
+| `PORT`              | set by Render |                                                                                                                                                                                                                                                                             |
+| `HOST`              | yes           | `0.0.0.0` on Render (see Render settings). Default `127.0.0.1`: this machine only, so local runs are never offered to the network. An IP address or a hostname; anything else stops the boot. The startup log `server listening` shows the bound `host` and `port` (CC-287) |
+| `WEB_DIST_DIR`      | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                                                                   |
+| `LOG_LEVEL`         | no            | default `info`                                                                                                                                                                                                                                                              |
+| `TRUST_PROXY_HOPS`  | no            | default `1` in production, `0` elsewhere. How many proxies in front of the server add to `X-Forwarded-For`; rate limits key on the address that many entries in from the right. See [Client addresses and rate limits](#client-addresses-and-rate-limits)                   |
+| `ADMIN_ACCOUNT_IDS` | no            | default empty: nobody can open the owner console. Comma separated account ids such as `user_65f0c2a1b2c3d4e5f6a7b8c9`. A guest id or a typo stops the boot. See [Owner console](#owner-console-cc-233)                                                                      |
 
 Secrets live only in Render and local `.env` files — never in the repo (it is public), chat, or PR text.
+
+### Listen address (CC-287)
+
+The server listens on `HOST`, default `127.0.0.1`, so `npm start` or `npm run dev:server` on a laptop is reachable
+from that laptop only. Render needs `HOST=0.0.0.0` ("Every Render web service must bind to a port on host 0.0.0.0",
+render.com/docs/web-services). The Docker image sets `HOST=0.0.0.0` inside the container, and `docker-compose.yml`
+publishes its port on `127.0.0.1` only. Rollout order for the change that added it:
+
+1. Render → Environment: add `HOST` = `0.0.0.0` and save. The running server ignores it (it does not read `HOST`), so
+   the redeploy this starts changes nothing.
+2. Merge the PR. The new server reads `HOST` and logs `server listening` with `"host":"0.0.0.0"`.
+3. Check `/health`. If the deploy fails its health check, `HOST` is missing or wrong: Render keeps the last good
+   deploy live; fix `HOST` and redeploy.
 
 ### Owner console (CC-233)
 
@@ -166,6 +180,31 @@ browser tests, Docker); force pushes and deletion are blocked (admins can overri
 with push protection blocks pushes that contain credentials. Dependabot alerts and security updates, and CodeQL code
 scanning, are on.
 
+## The MongoDB image for Docker and CI (CC-288)
+
+Production uses Atlas and is not affected. `docker-compose.yml` (local development and the required CI check
+"Docker image builds and serves") runs MongoDB from an exact image: `mongo:8.2.12` with its multi-platform digest
+`sha256:e0ce8c35124d4a9f9785532d1f268f39e9728ffa1cb38f46fa482436424c4bd3`. Never a floating tag such as `mongo:8`.
+
+Why: on 2026-10-19 GitHub rolled out runner image `ubuntu-24.04` 20261018.339.1 with kernel `7.0.0-1017-azure`
+(upstream 7.0.14). `mongo:8` is 8.3.13, and it and 8.0.34 stop at once on that kernel with
+`"s":"F" ... "MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility with this version
+of MongoDB. See https://jira.mongodb.org/browse/SERVER-121912"`. Kernels 6.19 to 7.0.13 broke the rseq behaviour that
+MongoDB 8's memory allocator needs, 7.0.14 restored it (SERVER-125742), but the check reads `uname -r`, which Ubuntu
+keeps at `7.0.0`, so the fixed kernel is still refused (SERVER-136848, open). 8.2 has no such check: 8.2.12 started,
+took 100,000 writes and stayed up for over a minute on the new kernel and on the old 6.17 one. The runner rollout was
+gradual, so the job failed now and then at first and then most of the time. The image itself never changed.
+
+To upgrade: try the new exact version on CI (the Docker job prints `docker compose logs mongo` when it fails), then
+pin its digest from `docker buildx imagetools inspect mongo:<version>` (the `Digest:` line of the index, so it works
+on Intel and Arm). Dependabot ignores `mongo` 8.3 and later until SERVER-136848 is fixed (`.github/dependabot.yml`).
+
+**Existing local databases, once:** a Docker volume that `mongo:8` (8.3) created has feature compatibility version
+8.3, and 8.2 cannot open it: mongod exits with `"Wrong mongod version" ... UPGRADE PROBLEM: Found an invalid
+featureCompatibilityVersion document ... version: "8.3"` (checked locally). Run `docker compose down -v` once to delete
+the old volume, and take a `mongodump` first with the old image if you need its data. CI starts from a fresh volume
+every time. Production on Atlas is not affected. The same applies to any later move to an older version.
+
 ## Before merging any PR
 
 CI (lint, format, audit, unit + integration tests with coverage gates, browser tests) must be green. Every PR fills in
@@ -173,7 +212,8 @@ the **Deployment impact** section of the PR template. If anything below changes,
 
 1. **Start/build behaviour** — `package.json` scripts, dependencies, Node version, entry file.
    Verify from a fresh clone: `NODE_ENV=production npm ci --include=dev && npm run build:web && npm start` (with the
-   variables above) logs "server listening" and `/health` reports the database up.
+   variables above, including `HOST=0.0.0.0`) logs "server listening" with that `host` and `/health` reports the
+   database up.
 2. **Environment variables** — new/renamed/removed variables must be set in Render _before_ merging.
 3. **Data** — schema or collection changes, migrations, anything that touches existing documents.
 4. **Sessions/cookies** — changes can log users out.

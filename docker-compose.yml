@@ -4,9 +4,17 @@
 #   docker compose up mongo       only MongoDB on localhost:27017, for `npm run dev:server` + `npm run dev:web`
 #                                 (set MONGO_URI=mongodb://localhost:27017/classicade-dev in apps/server/.env)
 #   docker compose down           stop (add -v to delete the database)
+#
+# Once after CC-288: a database that `mongo:8` (8.3) created has feature version 8.3, and 8.2 exits on it with
+# "UPGRADE PROBLEM: Found an invalid featureCompatibilityVersion document". Run `docker compose down -v` once to start
+# a fresh one (take a mongodump first if you need the data). Production runs on Atlas and is not affected.
 services:
   mongo:
-    image: mongo:8
+    # An exact version and digest, never a floating tag (CC-288). `mongo:8` (8.3.13) and 8.0.34 refuse to start on
+    # Ubuntu's 7.0 kernels, which GitHub's runners use since image 20261018: their kernel check reads "7.0.0" and
+    # misses that it is the fixed 7.0.14 (SERVER-136848). 8.2 has no such check and runs there. Why and how to
+    # upgrade: docs/DEPLOYMENT.md.
+    image: mongo:8.2.12@sha256:e0ce8c35124d4a9f9785532d1f268f39e9728ffa1cb38f46fa482436424c4bd3
     ports:
       - "127.0.0.1:27017:27017" # this machine only
     volumes:
@@ -23,6 +31,8 @@ services:
       mongo:
         condition: service_healthy
     ports:
+      # This machine only. The image listens on 0.0.0.0 inside the container (HOST in the Dockerfile), so this
+      # line is what keeps the app off the network (CC-287).
       - "127.0.0.1:4000:4000"
     environment:
       # Development mode: plain-HTTP cookies on localhost (production cookies need HTTPS, as on Render).

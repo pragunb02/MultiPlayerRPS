@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useLayoutEffect } from "react";
 
 /** Short, non-blocking notifications ("+30 XP", "Link copied"). Provided by <ToastProvider>. */
 export const ToastContext = createContext(null);
@@ -24,12 +24,14 @@ export function useToast() {
 
 /**
  * While `active`, toasts of categories below `category` wait (CC-208). The request banner holds the request
- * category, so rewards wait until the question is answered.
+ * category, so rewards wait until the question is answered. The hold starts in a layout effect, in the same step that
+ * draws the question. A plain effect can run a moment later, and a reward arriving in that moment would cover the
+ * question (CC-288).
  *
  * @param {string} category  a CATEGORIES value
  * @param {boolean} active
  */
 export function useHold(category, active) {
   const { hold } = useToast();
-  useEffect(() => (active ? hold(category) : undefined), [hold, category, active]);
+  useLayoutEffect(() => (active ? hold(category) : undefined), [hold, category, active]);
 }
