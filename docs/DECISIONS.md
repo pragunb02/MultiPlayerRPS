@@ -2,7 +2,7 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-054**. A later change to a decision is a dated
+reused; the next free ID is **ADR-057**. A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -35,7 +35,7 @@ the owner may change it.
 
 ## Accepted decisions
 
-### ADR-053 — Screenshot baselines in one pinned container, reviewed in the pull request
+### ADR-056 — Screenshot baselines in one pinned container, reviewed in the pull request
 
 - **Status:** Taken · 2026-10-20 (CC-155, builder). Whether the check becomes required is the owner's decision after
   a week of advisory runs.

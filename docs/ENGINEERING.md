@@ -199,7 +199,7 @@ Rules:
     sees the production headers and the `Secure` cookie unchanged. Branch on `formFactor(testInfo)`, never on the
     project name. Engine wording the `players` fixture lets pass lives in `e2e/browserNoise.js`, each rule as
     narrow as the words allow and unit tested.
-15. **Screenshot baselines** (CC-155, ADR-053). `e2e/baselines.visual.js` compares the main screens at 1280×720 and
+15. **Screenshot baselines** (CC-155, ADR-056). `e2e/baselines.visual.js` compares the main screens at 1280×720 and
     390×844, light and dark, with the PNGs in `e2e/visual-baselines/`. They are made and compared only in the pinned
     Playwright image, never on a laptop's own browser: `npm run test:visual` (Docker) compares, and after a change to
     the look made on purpose `npm run test:visual:update` or the `Visual baselines (update)` workflow (Actions tab,
