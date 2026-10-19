@@ -17,8 +17,12 @@ RUN npm run build:web && npm prune --omit=dev --no-audit --no-fund
 
 # ---- runtime: only what the server needs, as an unprivileged user -------------------------------------------------
 FROM node:24-alpine AS runtime
+# HOST=0.0.0.0 inside the container only: the server's own default is 127.0.0.1, which a published port cannot reach.
+# What is reachable from outside is decided where the port is published, and docker-compose.yml publishes it on
+# 127.0.0.1 only (CC-287).
 ENV NODE_ENV=production \
     PORT=4000 \
+    HOST=0.0.0.0 \
     WEB_DIST_DIR=/app/apps/web/dist
 WORKDIR /app
 COPY --from=build --chown=node:node /app/package.json ./

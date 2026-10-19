@@ -82,19 +82,30 @@ describe("loadConfig", () => {
   });
 
   it("listens on this machine only unless HOST says otherwise, in every environment (CC-287)", () => {
-    const production = { NODE_ENV: "production", ALLOWED_ORIGINS: "https://classicade.app", WEB_DIST_DIR: "/srv" };
+    const production = {
+      NODE_ENV: "production",
+      ALLOWED_ORIGINS: "https://classicade.app",
+      WEB_DIST_DIR: "/srv",
+    };
 
     expect(loadConfig(REQUIRED).host).toBe("127.0.0.1");
     expect(loadConfig({ ...REQUIRED, NODE_ENV: "test" }).host).toBe("127.0.0.1");
     expect(loadConfig({ ...REQUIRED, ...production }).host).toBe("127.0.0.1");
   });
 
-  it.each(["0.0.0.0", "::", "::1", "127.0.0.1", "192.168.1.20", "fe80::1", "localhost", "app.internal", "my-host"])(
-    "accepts HOST=%s as given",
-    (host) => {
-      expect(loadConfig({ ...REQUIRED, HOST: host }).host).toBe(host);
-    },
-  );
+  it.each([
+    "0.0.0.0",
+    "::",
+    "::1",
+    "127.0.0.1",
+    "192.168.1.20",
+    "fe80::1",
+    "localhost",
+    "app.internal",
+    "my-host",
+  ])("accepts HOST=%s as given", (host) => {
+    expect(loadConfig({ ...REQUIRED, HOST: host }).host).toBe(host);
+  });
 
   it("trims spaces around HOST", () => {
     expect(loadConfig({ ...REQUIRED, HOST: " 0.0.0.0 " }).host).toBe("0.0.0.0");
@@ -142,7 +153,7 @@ describe("loadConfig", () => {
       },
       /TRUST_PROXY_HOPS must be a whole number from 1 to 5 in production/,
     ],
-    [{ HOST: "" }, /HOST must be an IP address or a hostname \(got ""\)/],
+    [{ HOST: "" }, /HOST must be an IP address or a hostname, for example 127.0.0.1 or 0.0.0.0 \(got ""\)/],
     [{ HOST: "  " }, /HOST must be an IP address or a hostname/],
     [{ HOST: "http://0.0.0.0" }, /HOST must be an IP address or a hostname/],
     [{ HOST: "0.0.0.0:4000" }, /HOST must be an IP address or a hostname/],

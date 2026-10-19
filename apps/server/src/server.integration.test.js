@@ -96,7 +96,9 @@ describe("startServer (integration)", () => {
 
     try {
       expect(app.server.address()).toEqual(expect.objectContaining({ address: "::1", family: "IPv6" }));
-      expect(app.find("server listening")).toEqual([expect.objectContaining({ host: "::1", port: app.port })]);
+      expect(app.find("server listening")).toEqual([
+        expect.objectContaining({ host: "::1", port: app.port }),
+      ]);
       const res = await fetch(`http://[::1]:${app.port}/health`);
       expect(res.status).toBe(200);
     } finally {
