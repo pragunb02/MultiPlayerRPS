@@ -51,7 +51,9 @@ function setup({ adults, transfers } = {}) {
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const leaderboardAccessor = createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() });
-  const transferAccessor = createPlayerTransferAccessor({ playerTransferDao: createInMemoryPlayerTransferDao() });
+  const transferAccessor = createPlayerTransferAccessor({
+    playerTransferDao: createInMemoryPlayerTransferDao(),
+  });
   const asked = [];
   const boards = createLeaderboardComponent({
     leaderboardAccessor,
@@ -575,7 +577,10 @@ describe("leaderboardComponent", () => {
 
       expect(await entries("overall")).toEqual([{ rank: 1, displayName: "Guest-7K2Q", level: 1, score: 30 }]);
       expect(await entries("weekly")).toEqual([{ rank: 1, displayName: "Guest-7K2Q", level: 1, score: 30 }]);
-      expect(await endsOf(GUEST.id)).toEqual({ "xp all": NOW + 30 * DAY_MS, "xp 2026-W42": NOW + 30 * DAY_MS });
+      expect(await endsOf(GUEST.id)).toEqual({
+        "xp all": NOW + 30 * DAY_MS,
+        "xp 2026-W42": NOW + 30 * DAY_MS,
+      });
     });
 
     it("leaves no row for a guest who has moved to an account (ADR-060)", async () => {
@@ -681,7 +686,10 @@ describe("leaderboardComponent", () => {
       await ctx.progressTo(GUEST, 50);
       await ctx.questBonus(GUEST, 20, 50);
       // The matches participant renames the guest's match. The tests then bring the account's progress along.
-      await createMatchComponent({ matchAccessor: ctx.matchAccessor }).transferPlayer({ from: GUEST.id, to: ALICE });
+      await createMatchComponent({ matchAccessor: ctx.matchAccessor }).transferPlayer({
+        from: GUEST.id,
+        to: ALICE,
+      });
       const moved = await ctx.matchAccessor.getById(won.matchId);
       return { ...ctx, won, moved };
     }
@@ -713,8 +721,12 @@ describe("leaderboardComponent", () => {
 
       await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 1 });
 
-      expect((await entries("weekly"))[0]).toEqual(expect.objectContaining({ displayName: "alice", score: 90 }));
-      expect((await entries("overall"))[0]).toEqual(expect.objectContaining({ displayName: "alice", score: 90 }));
+      expect((await entries("weekly"))[0]).toEqual(
+        expect.objectContaining({ displayName: "alice", score: 90 }),
+      );
+      expect((await entries("overall"))[0]).toEqual(
+        expect.objectContaining({ displayName: "alice", score: 90 }),
+      );
     });
 
     it("never counts the guest's match again when the boards step runs again for the account", async () => {
@@ -725,7 +737,9 @@ describe("leaderboardComponent", () => {
       await boards.applyMatch({ match: moved });
       await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 2 });
 
-      expect((await entries("weekly"))[0]).toEqual(expect.objectContaining({ displayName: "alice", score: 50 }));
+      expect((await entries("weekly"))[0]).toEqual(
+        expect.objectContaining({ displayName: "alice", score: 50 }),
+      );
       expect((await entries("rock-paper-scissors"))[0].score).toBe(1);
     });
 
@@ -754,8 +768,43 @@ describe("leaderboardComponent", () => {
       await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW });
 
       expect(await leaderboardAccessor.listWithKeys({ board: "xp", playerId: ALICE.id })).toEqual([
-        expect.objectContaining({ period: "2026-W41", score: 20, expiresAt: Date.parse("2026-11-09T00:00:00Z") }),
+        expect.objectContaining({
+          period: "2026-W41",
+          score: 20,
+          expiresAt: Date.parse("2026-11-09T00:00:00Z"),
+        }),
       ]);
+    });
+
+    it("runs again after a crash that left the guest's rows behind, and adds nothing twice", async () => {
+      const { boards, entries, leaderboardAccessor, progressTo } = await guestWhoSignsUp();
+      await progressTo(ALICE, 50);
+      const rows = await leaderboardAccessor.listWithKeys({ board: "xp", playerId: GUEST.id });
+      await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 1 });
+      // The crash came after the weeks were added and before the guest's rows were deleted.
+      for (const { period, score, recentKeys } of rows.filter((row) => row.period !== "all")) {
+        await leaderboardAccessor.mergeOnce({
+          board: "xp",
+          period,
+          playerId: GUEST.id,
+          displayName: GUEST.displayName,
+          level: 1,
+          key: "restored",
+          keys: recentKeys,
+          inc: score,
+          at: NOW,
+          expiresAt: NOW + DAY_MS,
+        });
+      }
+
+      const again = await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 2 });
+
+      expect(again).toEqual({ moved: { leaderboardEntries: 0 } });
+      expect((await entries("weekly")).map((e) => [e.displayName, e.score])).toEqual([
+        ["alice", 50],
+        ["bob", 10],
+      ]);
+      expect(await leaderboardAccessor.listForPlayer(GUEST.id)).toEqual([]);
     });
 
     it("moves the guest's rows once, however often it runs", async () => {

@@ -193,7 +193,11 @@ describe("LeaderboardPage", () => {
     });
 
     it("pins a guest's row below the list as You when it is outside it (ADR-060)", async () => {
-      const overall = { board: boardInfo("overall"), entries: ENTRIES, you: { listed: true, rank: 51, score: 30 } };
+      const overall = {
+        board: boardInfo("overall"),
+        entries: ENTRIES,
+        you: { listed: true, rank: 51, score: 30 },
+      };
       renderApp({ path: "/leaderboards/overall", api: api({ identity: GUEST, boards: { overall } }) });
 
       expect(await screen.findByText("#51")).toBeInTheDocument();
@@ -201,7 +205,11 @@ describe("LeaderboardPage", () => {
     });
 
     it("tells a guest without a score how to get ranked, and how to keep it (ADR-060)", async () => {
-      const chess = { board: boardInfo("chess"), entries: ENTRIES, you: { listed: false, reason: "unranked" } };
+      const chess = {
+        board: boardInfo("chess"),
+        entries: ENTRIES,
+        you: { listed: false, reason: "unranked" },
+      };
       renderApp({ path: "/leaderboards/chess", api: api({ identity: GUEST, boards: { chess } }) });
 
       expect(
@@ -211,7 +219,11 @@ describe("LeaderboardPage", () => {
     });
 
     it("never asks an account to sign up", async () => {
-      const overall = { board: boardInfo("overall"), entries: ENTRIES, you: { listed: true, rank: 2, score: 500 } };
+      const overall = {
+        board: boardInfo("overall"),
+        entries: ENTRIES,
+        you: { listed: true, rank: 2, score: 500 },
+      };
       renderApp({ path: "/leaderboards/overall", api: api({ identity: USER, boards: { overall } }) });
 
       await screen.findByRole("list", { name: "Overall XP rankings" });

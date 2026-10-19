@@ -558,16 +558,14 @@ describe("a guest's progress moving to their account through the real compositio
       await play(alice, bob);
       await progressOf(app.url, alice.cookie, 1);
       const bonus = await questBonusOf(app.url, alice.cookie);
-      // Before signing up, the guest is on the boards under its server-given name (ADR-060).
+      // Before signing up, the guest is on the boards under its server-given name (ADR-060). The list and `you`
+      // are two reads, so the probe waits until both show the whole score.
       const asGuest = await eventually(async () => {
         const weekly = await api(app.url, "/leaderboards/weekly", alice.cookie);
-        return weekly.you.listed && weekly.you.score === 30 + bonus ? weekly : undefined;
+        const row = weekly.entries.find((entry) => entry.displayName === alice.identity.displayName);
+        return row?.score === 30 + bonus ? weekly : undefined;
       });
-      expect(asGuest.entries).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ displayName: alice.identity.displayName, score: 30 + bonus }),
-        ]),
-      );
+      expect(asGuest.you).toEqual(expect.objectContaining({ listed: true, score: 30 + bonus }));
 
       const signup = await fetch(`${app.url}/api/auth/signup`, {
         method: "POST",
@@ -593,7 +591,9 @@ describe("a guest's progress moving to their account through the real compositio
 
       const boards = await eventually(async () => {
         const [overallBoard, weeklyBoard, winsBoard] = await Promise.all(
-          ["overall", "weekly", "rock-paper-scissors"].map((id) => api(app.url, `/leaderboards/${id}`, cookie)),
+          ["overall", "weekly", "rock-paper-scissors"].map((id) =>
+            api(app.url, `/leaderboards/${id}`, cookie),
+          ),
         );
         return overallBoard.you.listed && winsBoard.you.listed
           ? { overallBoard, weeklyBoard, winsBoard }

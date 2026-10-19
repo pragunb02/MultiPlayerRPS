@@ -141,7 +141,14 @@ export function runLeaderboardDaoContract(createDao) {
   it("lists one player's rows of one board with their keys and end, for a guest transfer (CC-291)", async () => {
     const dao = await createDao();
     await dao.addOnce({ ...WEEK, ...player("guest_a"), key: "m1", inc: 30, at: at(), expiresAt: at(9) });
-    await dao.addOnce({ ...WEEK, ...player("guest_a"), key: "quest:q", inc: 20, at: at(1), expiresAt: at(10) });
+    await dao.addOnce({
+      ...WEEK,
+      ...player("guest_a"),
+      key: "quest:q",
+      inc: 20,
+      at: at(1),
+      expiresAt: at(10),
+    });
     await dao.raiseScore({ ...XP, ...player("guest_a"), score: 50, at: at(1) });
     await dao.raiseScore({ board: "wins:rps", period: "all", ...player("guest_a"), score: 1, at: at(1) });
     await dao.addOnce({ ...WEEK, ...player("user_b"), key: "m2", inc: 10, at: at() });
@@ -158,7 +165,13 @@ export function runLeaderboardDaoContract(createDao) {
   it("adds a merged score once per key and remembers the keys it came with (CC-291)", async () => {
     const dao = await createDao();
     await dao.addOnce({ ...WEEK, ...player("user_a"), key: "m-own", inc: 30, at: at() });
-    const merge = { ...WEEK, ...player("user_a", "alice", 2), key: "guest:g", keys: ["m1", "quest:q"], inc: 50 };
+    const merge = {
+      ...WEEK,
+      ...player("user_a", "alice", 2),
+      key: "guest:g",
+      keys: ["m1", "quest:q"],
+      inc: 50,
+    };
 
     const first = await dao.mergeOnce({ ...merge, at: at(5), expiresAt: at(100) });
     const again = await dao.mergeOnce({ ...merge, at: at(6), expiresAt: at(100) });
@@ -174,7 +187,10 @@ export function runLeaderboardDaoContract(createDao) {
         expiresAt: at(100),
       },
     ]);
-    expect(await dao.getEntry({ ...WEEK, playerId: "user_a" })).toMatchObject({ displayName: "alice", level: 2 });
+    expect(await dao.getEntry({ ...WEEK, playerId: "user_a" })).toMatchObject({
+      displayName: "alice",
+      level: 2,
+    });
   });
 
   it("creates the row when a merge comes first (CC-291)", async () => {
@@ -206,7 +222,9 @@ export function runLeaderboardDaoContract(createDao) {
 
     expect(moved).toBe(1);
     const endOf = async (board, playerId) =>
-      (await dao.listWithKeys({ board, playerId })).map(({ period, expiresAt }) => [period, expiresAt]).sort();
+      (await dao.listWithKeys({ board, playerId }))
+        .map(({ period, expiresAt }) => [period, expiresAt])
+        .sort();
     expect(await endOf("xp", "guest_a")).toEqual([
       ["2026-W42", at(10)],
       ["all", at(20)],

@@ -80,7 +80,11 @@ describe("Your rank on the profile", () => {
   });
 
   it("never asks an account to sign up", async () => {
-    const getLeaderboard = vi.fn(async (id) => ({ board: { id }, entries: [], you: { listed: false, reason: "unranked" } }));
+    const getLeaderboard = vi.fn(async (id) => ({
+      board: { id },
+      entries: [],
+      you: { listed: false, reason: "unranked" },
+    }));
     openProfile({ identity: USER, getLeaderboard });
 
     const rank = await card();

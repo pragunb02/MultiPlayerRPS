@@ -54,7 +54,10 @@ describe("when rows end (ADR-060)", () => {
 
   it("keeps a guest's rows 30 days after what put them there", () => {
     expect(GUEST_ROW_LIFETIME_MS).toBe(30 * DAY_MS);
-    expect(rowEnds({ isGuest: true, at: NOW })).toEqual({ allTime: NOW + 30 * DAY_MS, week: NOW + 30 * DAY_MS });
+    expect(rowEnds({ isGuest: true, at: NOW })).toEqual({
+      allTime: NOW + 30 * DAY_MS,
+      week: NOW + 30 * DAY_MS,
+    });
   });
 
   it("never keeps a guest's weekly row past the week's own retention", () => {
