@@ -83,6 +83,11 @@ the owner may change it.
   7. Order: CC-259 and CC-163 first, CC-099 after #67 (inside today's result section if CC-157 is not ready),
      CC-153 in eight PRs.
 
+**Amended · 2026-10-19** (owner, ADR-052 point 7). Point 4: page transitions go through React's
+`<ViewTransition>` around the route outlet if it is in the stable `react` we ship, because React Router deprecated
+its `viewTransition` prop for React 19.3 and later. The router prop is used only if `<ViewTransition>` is not in
+stable React. Still the browser's View Transitions, still no added bundle.
+
 ### ADR-049 — The game shell, the series scoreboard and the match layout
 
 - **Status:** Accepted · 2026-10-18 (owner accepted every recommendation in [CC-157](tickets/CC-157.md),

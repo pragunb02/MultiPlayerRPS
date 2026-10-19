@@ -197,13 +197,12 @@ characters (ADR-016 amendment point 2). No change to ADR-016.
 
 ### 3.9 Icons
 
-- Our allowlist accepts MIT and the CC licences, so Heroicons (MIT), Phosphor (MIT) or Tabler (MIT) could be copied
-  in as SVG paths; Lucide is ISC, which is not on the allowlist (CC-230) and would need an ADR first (general
-  knowledge of those licences, high confidence).
+- Open icon sets under MIT (Heroicons, Phosphor, Tabler) would fit our licence allowlist, and Lucide is ISC, which is
+  not on it (general knowledge of those licences, high confidence). The owner chose to draw our own instead
+  (ADR-052 point 9), so none is copied.
 - Emoji and text symbols are drawn by the phone's own font, so `🔒` and `⚠` look different on Samsung, Xiaomi and
   Pixel phones and can be missing on old ones (general knowledge, high confidence).
-- **Our take:** CC-283: one `art/icons/` registry of about 16 icons drawn by us in the arcade stroke (or copied from
-  an MIT set and credited), replacing the per-component icons and the emoji, all `aria-hidden` next to text.
+- **Our take:** CC-283: one `art/icons/` registry of about 16 icons drawn by us in the arcade stroke (ADR-052 point 9), replacing the per-component icons and the emoji, all `aria-hidden` next to text.
 
 ### 3.10 Sound
 
@@ -221,7 +220,7 @@ CC-282, CC-280, CC-283). Haptics and the phase 3 skins come last.
 
 ## 4. Tickets in the domain
 
-Order is the build order of section 6. Status from the board on 2026-10-19.
+The Step column is the step of the build order in section 6; tickets in the same step can run in parallel. Status from the board on 2026-10-19.
 
 ### Done (the base this domain builds on)
 
@@ -238,28 +237,31 @@ Order is the build order of section 6. Status from the board on 2026-10-19.
 
 ### Open
 
-| Order | Ticket        | What                                                                                 | In or out                                                      | Pri | Phase | Status                 |
-| ----- | ------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- | --- | ----- | ---------------------- |
-| 1     | CC-270        | Effects past the phone's edge after a win                                            | In                                                             | P1  | 1     | ⬜ Todo                |
-| 1     | CC-256        | 20 character name breaks the phone header and profile                                | In                                                             | P1  | 1     | ⬜ Todo                |
-| 1     | CC-155        | Visual regression baselines, light and dark, desktop and phone                       | In (test)                                                      | P1  | 2     | ⬜ Todo                |
-| 2     | CC-163        | Outcome moments: tone, words, sound, effect per reason                               | In (writes into the shell's result slot)                       | P1  | 1     | ⬜ Todo, research done |
-| 3     | CC-099        | Rewards one beat at a time in the result card                                        | In (writes into the shell's result slot)                       | P1  | 1     | ⬜ Todo, research done |
-| 3     | CC-154        | Nothing clipped or overlapping on any screen, contrast, stress data                  | In (Accessibility reuses its check)                            | P1  | 1     | ⬜ Todo                |
-| 4     | CC-281 (new)  | Motion tokens and recipes standard, exit animations in CSS                           | In                                                             | P2  | 1     | ⬜ Todo                |
-| 5     | CC-153 a to e | Bit in result, empty states and 404; animated home; page transitions; trophy cabinet | In (part a done in CC-230)                                     | P1  | 2     | ⬜ Todo, research done |
-| 6     | CC-282 (new)  | Loading states standard: delay, reserved-space skeletons                             | In                                                             | P2  | 1     | ⬜ Todo                |
-| 7     | CC-280 (new)  | Appearance settings: theme and motion choice, no flash, `theme-color`, skin hook     | In                                                             | P2  | 2     | ⬜ Todo                |
-| 8     | CC-283 (new)  | One icon set in `art/icons/`, no emoji as icons                                      | In                                                             | P3  | 2     | ⬜ Todo                |
-| 9     | CC-092        | Motion for interaction animation (chess done)                                        | In, narrowed: its open parts move (section 5), then it closes  | P1  | 2     | 🟦 In progress         |
-| 10    | CC-267        | Lawyer-drafted assignment deed for commissioned art                                  | In (moved in, section 5)                                       | P2  | 2     | ⬜ Todo                |
-| 11    | CC-194        | Character art: the artist's Bit and 18 characters, five poses                        | In (art production; Story places it)                           | P1  | 2     | ⬜ Todo                |
-| 12    | CC-153 f      | Preset avatars and frames (the drawings and picker)                                  | In, after CC-034 (Social)                                      | P1  | 2     | ⬜ Todo                |
-| 13    | CC-284 (new)  | Haptic taps on Android through the Vibration API                                     | In                                                             | P3  | 2     | ⬜ Todo                |
-| 14    | CC-266        | In-app credits page from CREDITS.md                                                  | In (moved in)                                                  | P3  | 2     | ⬜ Todo                |
-| 15    | CC-265        | Our own neon chess piece set                                                         | In (moved in)                                                  | P3  | 3     | ⬜ Todo                |
-| 16    | CC-156        | "Coming soon" tiles, next-unlock teaser, unlock animation and sound                  | In, narrowed: unlock rules move to CC-143                      | P1  | 3     | ⬜ Todo                |
-| 17    | CC-205        | Seasonal skins: colours, board art, event banner                                     | In, narrowed: event quests and badges move to seasons (CC-055) | P2  | 3     | ⬜ Todo                |
+| Step | Ticket       | What                                                                                    | In or out                                                      | Pri | Phase | Status                 |
+| ---- | ------------ | --------------------------------------------------------------------------------------- | -------------------------------------------------------------- | --- | ----- | ---------------------- |
+| 1    | CC-270       | Effects past the phone's edge after a win                                               | In                                                             | P1  | 1     | ⬜ Todo                |
+| 1    | CC-256       | 20 character name breaks the phone header and profile                                   | In                                                             | P1  | 1     | ⬜ Todo                |
+| 1    | CC-155       | Visual regression baselines, light and dark, desktop and phone                          | In (test)                                                      | P1  | 2     | ⬜ Todo                |
+| 1    | CC-267       | Lawyer-drafted assignment deed for commissioned art                                     | In (moved in, section 5)                                       | P2  | 2     | ⬜ Todo                |
+| 2    | CC-163       | Outcome moments: tone, words, sound, effect per reason                                  | In (writes into the shell's result slot)                       | P1  | 1     | ⬜ Todo, research done |
+| 2    | CC-153 c     | Animated home: hover tilt, stagger in, hero intro once                                  | In                                                             | P1  | 2     | ⬜ Todo, research done |
+| 2    | CC-153 e     | Trophy cabinet: shelves by tier, locked silhouettes                                     | In                                                             | P1  | 2     | ⬜ Todo, research done |
+| 3    | CC-099       | Rewards one beat at a time in the result card                                           | In (writes into the shell's result slot)                       | P1  | 1     | ⬜ Todo, research done |
+| 3    | CC-154       | Nothing clipped or overlapping on any screen, contrast, stress data                     | In (Accessibility reuses its check)                            | P1  | 1     | ⬜ Todo                |
+| 3    | CC-153 d     | Page transitions through React's `<ViewTransition>` (ADR-052 point 7)                   | In                                                             | P1  | 2     | ⬜ Todo, research done |
+| 4    | CC-153 b     | Bit in the result, empty states and 404 (part a, the Bit component, was done in CC-230) | In                                                             | P1  | 2     | ⬜ Todo, research done |
+| 4    | CC-282 (new) | Loading states standard: delay, reserved-space skeletons                                | In                                                             | P2  | 1     | ⬜ Todo                |
+| 5    | CC-281 (new) | Motion tokens and recipes standard, exit animations in CSS                              | In                                                             | P2  | 1     | ⬜ Todo                |
+| 6    | CC-280 (new) | Appearance settings: theme and motion choice, no flash, `theme-color`, skin hook        | In                                                             | P2  | 2     | ⬜ Todo                |
+| 6    | CC-283 (new) | One icon set in `art/icons/`, no emoji as icons                                         | In                                                             | P3  | 2     | ⬜ Todo                |
+| 7    | CC-092       | Motion for interaction animation (chess done)                                           | In, narrowed: its open parts move (section 5), then it closes  | P1  | 2     | 🟦 In progress         |
+| 7    | CC-194       | Character art: the artist's Bit and 18 characters, five poses                           | In (art production; Story places it)                           | P1  | 2     | ⬜ Todo                |
+| 7    | CC-153 f     | Preset avatars and frames (the drawings and picker)                                     | In, after CC-034 (Social)                                      | P1  | 2     | ⬜ Todo                |
+| 7    | CC-284 (new) | Haptic taps on Android through the Vibration API                                        | In                                                             | P3  | 2     | ⬜ Todo                |
+| 7    | CC-266       | In-app credits page from CREDITS.md                                                     | In (moved in)                                                  | P3  | 2     | ⬜ Todo                |
+| 8    | CC-265       | Our own neon chess piece set                                                            | In (moved in)                                                  | P3  | 3     | ⬜ Todo                |
+| 8    | CC-156       | "Coming soon" tiles, next-unlock teaser, unlock animation and sound                     | In, narrowed: unlock rules move to CC-143                      | P1  | 3     | ⬜ Todo                |
+| 8    | CC-205       | Seasonal skins: colours, board art, event banner                                        | In, narrowed: event quests and badges move to seasons (CC-055) | P2  | 3     | ⬜ Todo                |
 
 ### Listed by the neighbours, not here
 
