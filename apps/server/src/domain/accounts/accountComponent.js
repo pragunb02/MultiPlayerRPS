@@ -14,7 +14,7 @@ import {
   parseUsername,
   previousEmailSpelling,
 } from "../../models/credentials.js";
-import { createIdentity, isAccountId } from "../../models/identity.js";
+import { ACCOUNT_ID_PREFIX, createIdentity, isAccountId } from "../../models/identity.js";
 import { normaliseLegacyUsername, usernameCandidates } from "../../models/legacyUsername.js";
 import { assertDefined } from "../../utils/assert.js";
 import {
@@ -29,7 +29,6 @@ import { yearOf } from "../../utils/indiaTime.js";
 const INVALID_LOGIN = "Invalid email or password";
 const { EMAIL_UNAVAILABLE } = ACCOUNT_MESSAGES;
 const USERNAME_ATTEMPTS = 20;
-const ACCOUNT_ID_PREFIX = "user_";
 
 /** The account behind a player id. Guests have none, so they have no password to change. */
 function accountIdOf(playerId) {

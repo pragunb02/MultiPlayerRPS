@@ -60,8 +60,7 @@ the owner may change it.
 
 ### ADR-057 — Room views name players by opaque per-room seat ids
 
-- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-253](tickets/CC-253.md), CC-241 F11,
-  ADR-051.9)
+- **Status:** Accepted · 2026-10-20 by the owner ([CC-253](tickets/CC-253.md), CC-241 F11, ADR-051.9)
 - **Context.** Every room view and request push sent every seat's player id to everyone in the room, spectators
   included. An account's player id is a MongoDB ObjectId, whose first 4 bytes are its creation time, and the same id
   in every room lets anyone follow a player from room to room. Quick match (CC-051) will seat strangers.
@@ -71,19 +70,23 @@ the owner may change it.
      "classicade room seat ids", the first 16 bytes in base64url (22 characters). It is the same through rematches
      and restarts, different in every other room, and cannot be worked out or turned back without the key.
   2. Nothing is stored: the seat id is worked out for each view, so rooms already in MongoDB need no migration and a
-     rollback leaves nothing behind. A room records the players its game started with (`game.players`), so a player
-     who left a finished game is still renamed.
+     rollback leaves nothing behind.
   3. The view keeps its field names. `you` is the viewer's own seat id ("" without a seat). Every player id in the
      view, the engine's own view included, is replaced as a value and as a key.
-  4. `POST /api/blocks` keeps `{ roomCode, seat, seatId }`. The server works out the seat id of the person in that
+  4. The engine is the source of truth for who plays: the engine contract gains `playersOf(state)`, every player of
+     the game in seat order, and the contract kit checks for every engine that no view, outcome or active list names
+     anyone else, in every state. A player who left a finished game is still renamed, in any stored room.
+  5. Fail closed: after that, any string in the view shaped like a player id (`guest_`, `user_`, `bot_`, `deleted_`,
+     `models/playerIdShape.js`) is replaced by its seat id, so a field nobody listed cannot leak.
+  6. `POST /api/blocks` keeps `{ roomCode, seat, seatId }`. The server works out the seat id of the person in that
      seat and blocks only when it matches. A `seatId` that is not 22 base64url characters is refused with 400.
-  5. A deleted player's stand-in is labelled `deleted: true` on its seat.
-  6. Later features that show one player another (public profiles CC-034, chat and emotes CC-169, spectating CC-056,
+  7. A deleted player's stand-in is labelled `deleted: true` on its seat.
+  8. Later features that show one player another (public profiles CC-034, chat and emotes CC-169, spectating CC-056,
      quick match CC-051, challenges CC-277) name the other player by a seat id or an id made for that purpose, never
      by a player id.
 - **Consequences.** A guest who signs in during a game, or a deleted player's stand-in, is a new player id and so
   gets a new seat id, as they get a new name. Rotating `SESSION_SECRET` gives open rooms new seat ids. Match history
-  still sends past opponents' player ids to the participants: it needs its own ticket.
+  still sends past opponents' player ids to the participants: CC-297.
 
 ### ADR-056 — Screenshot baselines in one pinned container, reviewed in the pull request
 

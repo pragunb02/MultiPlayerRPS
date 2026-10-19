@@ -130,7 +130,6 @@ describe("roomComponent rematch (CC-037, CC-159)", () => {
       matchId: "m2",
       number: 2,
       seed: 42,
-      players: [BOB.id, ALICE.id],
       startedAt: T0 + 5,
       state: expect.any(Object),
       log: [],

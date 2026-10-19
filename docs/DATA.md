@@ -117,8 +117,8 @@ of every nightly backup.
 `apps/server/src/persistence/roomDao.js`, lifetimes in `apps/server/src/domain/rooms/roomLifetimes.js` (CC-101)
 
 1. **Holds:** the room `code`, `gameId`, `options`, `status`, `hostId`, the seats (`playerId`, `displayName`,
-   `connected`), the running game (match id, seed, the player ids it started with (`players`, CC-253), the engine's
-   full state including hidden choices, and a `log` of every move and forfeit with the player id and the time), `result`, `rematch` (who asked, who declined, the name of
+   `connected`), the running game (match id, seed, the engine's full state including hidden choices, and a `log` of
+   every move and forfeit with the player id and the time), `result`, `rematch` (who asked, who declined, the name of
    a player who left), `series` (wins per player id), `createdAt`, `lastActivityAt`, `dueAt`, `expiresAt`, and
    `network`.
 2. **`network`** is a keyed hash of the host's network address: HMAC-SHA-256, cut to 16 hex characters

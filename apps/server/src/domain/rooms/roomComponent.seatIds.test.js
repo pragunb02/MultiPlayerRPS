@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createEngineRegistry, ENGINES } from "@classicade/games";
+import { createEngineRegistry, defineEngine, ENGINES } from "@classicade/games";
+import { raceEngine } from "@classicade/games/testing";
 import { DELETED_PLAYER_NAME } from "@classicade/shared";
 import { createRoomAccessor } from "../../data/roomAccessor.js";
 import { botIdentity } from "../../models/botIdentity.js";
@@ -28,12 +29,12 @@ const SECRET = "seat-secret-for-tests-only-0123456789abcdef";
 const T0 = 1_000_000;
 
 /** Rooms with the real engines and the real seat ids. Codes ROOM22, ROOM23, … */
-function setup() {
+function setup({ engines = ENGINES } = {}) {
   let codes = 22;
   const seatIds = createSeatIds({ secret: SECRET });
   const rooms = createRoomComponent({
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
-    engines: createEngineRegistry(ENGINES),
+    engines: createEngineRegistry(engines),
     events: { emit: () => {} },
     seatIds,
     generateCode: () => `ROOM${codes++}`,
@@ -158,7 +159,7 @@ describe("room views name players by seat id (CC-253)", () => {
     expect(second.seats[1].playerId).not.toBe(first.seats[1].playerId);
   });
 
-  it("still hides a player who left a finished game, even when only the game's state names them", async () => {
+  it("hides a player who left an aborted game, whom only the game's state still names", async () => {
     const { rooms } = setup();
     const code = await rpsGame(rooms);
     // Nobody moves, so the game is aborted (CC-036): no move, result or series names either player.
@@ -233,37 +234,64 @@ describe("room views name players by seat id (CC-253)", () => {
     expect(wire([forAlice, forBob])).not.toContain(BOB.id);
   });
 
-  it("hides every player of a room stored before CC-253, whose game does not list its players", async () => {
-    const { rooms, seatIds } = setup();
-    const code = await finishedRps(rooms);
-    const { players, ...game } = (await rooms.getRoom(code)).game;
-    const stored = { ...(await rooms.getRoom(code)), game };
+  it("hides a chess player who lost on time and left, whom only the game's state still names", async () => {
+    const { rooms } = setup();
+    const { code } = await rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "chess",
+      options: { timeControl: "bullet-1+0" },
+      now: T0,
+    });
+    const started = await rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
+    const { w: white, b: black } = started.game.state.byColor;
+    const pawn = { type: "move", from: "e2", to: "e4" };
+    await rooms.makeMove({ code, playerId: white, move: pawn, now: T0 + 2 });
+    // Black never moves and their minute runs out: the log says only that a clock ran out, the winner is White.
+    await rooms.expireDue({ now: T0 + 2 + 60_000 });
+    const left = await rooms.leaveRoom({ code, playerId: black, now: T0 + 2 + 60_001 });
 
-    const view = rooms.viewFor(stored, BOB.id);
+    const view = rooms.viewFor(left.room, white);
 
-    expect(players).toEqual([ALICE.id, BOB.id]);
-    expect(view.you).toBe(seatIds.seatIdOf(stored, BOB.id));
-    expect(wire(view)).not.toContain(ALICE.id);
-    expect(wire(view)).not.toContain(BOB.id);
+    expect(view.game.outcome).toEqual(expect.objectContaining({ reason: "timeout" }));
+    expect(view.seats).toHaveLength(1);
+    expect(Object.keys(view.game.view.colors)).toHaveLength(2);
+    expect(wire(view)).not.toContain(black);
+    expect(wire(view)).not.toContain(white);
   });
 
-  it("records who a game started with, so the players stay known after seats change", async () => {
+  it("stores nothing for seat ids: a game keeps only what it kept before", async () => {
     const { rooms } = setup();
     const code = await rpsGame(rooms);
 
     const room = await rooms.getRoom(code);
 
-    expect(room.game.players).toEqual([ALICE.id, BOB.id]);
+    expect(Object.keys(room.game).sort()).toEqual(["log", "matchId", "number", "seed", "startedAt", "state"]);
   });
 
-  it("moves the players a game started with to the account of a guest who signs in", async () => {
-    const { rooms } = setup();
-    const code = await rpsGame(rooms);
-    const account = { kind: "user", id: "user_65f1a2b3c4d5e6f708192a3c", displayName: "Bobby" };
+  it("names by seat id anything shaped like a player id that a game's view names, even someone it does not list", async () => {
+    const STRANGER = "user_65f1a2b3c4d5e6f7081900ff";
+    const leaky = defineEngine({
+      ...raceEngine,
+      id: "leaky",
+      viewFor: (state) => ({ ...raceEngine.viewFor(state), [STRANGER]: [STRANGER, "guest_x", "not-an-id"] }),
+    });
+    const { rooms, seatIds } = setup({ engines: [leaky] });
+    const room = await rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "leaky",
+      options: { target: 3 },
+      now: T0,
+    });
+    const started = await rooms.joinRoom({ code: room.code, player: BOB, now: T0 + 1 });
 
-    await rooms.transferPlayer({ from: BOB.id, to: account, now: T0 + 2 });
+    const view = rooms.viewFor(started, ALICE.id);
 
-    expect((await rooms.getRoom(code)).game.players).toEqual([ALICE.id, account.id]);
+    const stranger = seatIds.seatIdOf(started, STRANGER);
+    expect(view.game.view[stranger]).toEqual([stranger, seatIds.seatIdOf(started, "guest_x"), "not-an-id"]);
+    expect(wire(view)).not.toContain(STRANGER);
+    expect(wire(view)).not.toContain("guest_x");
   });
 
   it("refuses to be built without seat ids, so a room view can never fall back to player ids", () => {

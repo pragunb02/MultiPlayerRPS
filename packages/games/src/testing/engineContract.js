@@ -268,6 +268,59 @@ const CHECKS = Object.freeze([
     },
   },
   {
+    name: "lists the game's players in seat order with playersOf, from start to end and after a rename",
+    run(engine, scenario) {
+      const same = (state, expected, when) =>
+        assert(
+          JSON.stringify(engine.playersOf(state)) === JSON.stringify(expected),
+          `${when}: playersOf gave ${JSON.stringify(engine.playersOf(state))}, expected ${JSON.stringify(expected)}`,
+        );
+      const final = play(engine, scenario, (state, index) => same(state, scenario.players, `step ${index}`));
+      same(final, scenario.players, "the end");
+      const [from] = scenario.players;
+      same(
+        renamePlayer(final, from, "renamed-player"),
+        scenario.players.map((p) => (p === from ? "renamed-player" : p)),
+        "after a rename",
+      );
+    },
+  },
+  {
+    // The server renames exactly the players playersOf lists before anything leaves it (CC-253). A view, an
+    // outcome or an active list that named anyone else would send that id to the browser as it is.
+    name: "names nobody but playersOf in any view, outcome or active list, in every state",
+    run(engine, scenario) {
+      const viewers = [...scenario.players, "spectator"];
+      const check = (state, when) => {
+        const shown = viewers.map((viewer) => ({
+          view: engine.viewFor(state, viewer),
+          outcome: engine.getOutcome(state),
+          active: engine.activePlayers(state),
+        }));
+        const hidden = JSON.stringify(
+          engine.playersOf(state).reduce((value, id, index) => renamePlayer(value, id, `seat-${index}`), shown),
+        );
+        for (const player of scenario.players) {
+          assert(!hidden.includes(JSON.stringify(player)), `${when}: ${player} is named outside playersOf`);
+        }
+      };
+      const each = (state, when) => {
+        check(state, when);
+        if (engine.deadline !== undefined && engine.deadline(state) > 0) {
+          check(engine.expire(state, { now: engine.deadline(state) }), `${when}, expired`);
+        }
+        const [to, from] = scenario.players;
+        for (const type of Object.keys(engine.requestTypes ?? {})) {
+          check(engine.acceptRequest(state, { type, from, to }, CTX), `${when}, ${type} accepted`);
+        }
+      };
+      each(
+        play(engine, scenario, (state, index) => each(state, `step ${index}`)),
+        "the end",
+      );
+    },
+  },
+  {
     name: "keeps time hooks pure: integer deadlines, no mutation, none after the end",
     run(engine, scenario) {
       if (engine.deadline === undefined) {
