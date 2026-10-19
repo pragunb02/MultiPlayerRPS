@@ -53,7 +53,7 @@ describe("RoomPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveValue(
-      `${window.location.origin}/games/tic-tac-toe/rooms/AB2CD3`,
+      `${window.location.origin}/games/tic-tac-toe/rooms/AB2CD3?via=copy`,
     );
     expect(screen.getByRole("list", { name: "Players" })).toHaveTextContent("Waiting for a player…");
   });
