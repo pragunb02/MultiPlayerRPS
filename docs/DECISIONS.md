@@ -58,6 +58,42 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-061 — Daily puzzles: a curated CC0 set in the repo, checked on the server, their own streak, no XP yet
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 (CC-144 part 1, research in
+  [tickets/CC-144.md](tickets/CC-144.md))
+- **Context.** CC-144 is a daily set where each puzzle has its own streak and a spoiler-free share grid. Part 1 is
+  the chess puzzle from the Lichess puzzle database (CC0, 6 million puzzles, about 270 MB compressed). Later parts
+  add Ultimate Tic Tac Toe and RPS puzzles.
+- **Decision.**
+  1. **A puzzle kind is a strategy.** Each kind (today only `chess`) gives the server a pure referee (start, judge a
+     move, hint, solution), its limits and its catalogue, and gives the web app a board in a registry. Attempts,
+     streaks, routes, sign-up moves, export and deletion are shared by every kind.
+  2. **The set lives in the repo**, server side only (`apps/server/src/persistence/puzzles/`), curated once by
+     `scripts/curate-chess-puzzles.mjs` from a downloaded part of the CC0 file and never fetched at run time. The
+     licence is kept beside it and in `docs/CREDITS.md`. Adding puzzles appends to the end of each band, so the
+     puzzle of a day already played never changes until the set wraps.
+  3. **The day's puzzle** is the same for everyone on an India day (ADR-034): day number since Monday 2026-10-19,
+     modulo the set, with the set ordered so the rating rises from Monday to Sunday. The day comes from one injected
+     function, so CC-146 can give each player their own day.
+  4. **Server checked, solution sealed.** chess.js judges every move on the server (ADR-041). Answers never carry
+     the moves still to find. The solution is shown only once the attempt has ended, solved or failed. Any
+     checkmate is accepted, as on Lichess.
+  5. **Three mistakes, two optional hints.** A wrong move costs a mistake and never moves the board. An illegal move
+     is refused and costs nothing.
+  6. **Its own streak**, per kind, on the same days as the puzzle: a solved day after a solved yesterday adds one, a
+     solved day after a gap starts at 1, a failed day sets it to 0, and a streak last extended yesterday is at
+     risk. It is stored on each day's attempt and rebuilt from them after a guest signs in. A puzzle is not a match:
+     it never feeds the daily play streak, quests, achievements or leaderboards (ADR-013).
+  7. **No XP in part 1.** A guest who solves and then signs in to an account that solved the same day would bring a
+     second award for that day (ADR-014.5 adds totals), and the leaderboards take bonus XP only from quests.
+  8. **Guests play, and their days follow them** (ADR-014): an account keeps its own day where both played,
+     otherwise the guest's day moves, then the streak is rebuilt. Export and deletion include the days (ADR-048).
+  9. **The share grid names nobody** (ADR-028.7): the kind, the number, one square per move to find, hints, the
+     streak, and CC-217's Hinglish and English lines.
+- **Consequences.** A new collection, `daily_puzzle_attempts`, with one unique index, kept until the account is
+  deleted. About 60 KB of JSON in the server. A new kind is a referee, a catalogue, a board and two registry lines.
+
 ### ADR-056 — Screenshot baselines in one pinned container, reviewed in the pull request
 
 - **Status:** Taken · 2026-10-20 (CC-155, builder). Whether the check becomes required is the owner's decision after
