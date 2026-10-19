@@ -4,12 +4,27 @@ import { describe, expect, it, vi } from "vitest";
 import { fakeApi, GUEST } from "../testing/fakes.js";
 import { findUsableButton, renderApp } from "../testing/render.jsx";
 
+/** The list of game cards, inside the Games section, once the catalogue has loaded. */
+const gameList = () => within(screen.getByRole("region", { name: "Games" })).findByRole("list");
+
 describe("App", () => {
+  it("links to the daily chess puzzle from the home page (CC-144)", async () => {
+    renderApp();
+
+    const daily = screen.getByRole("region", { name: "Daily puzzle" });
+
+    expect(within(daily).getByRole("link", { name: "Daily chess puzzle" })).toHaveAttribute(
+      "href",
+      "/daily/chess",
+    );
+    expect(within(daily).getByRole("listitem")).toHaveClass("chess");
+  });
+
   it("shows the pitch and the game catalog", async () => {
     renderApp();
 
     expect(screen.getByRole("heading", { level: 1, name: /play the classics/i })).toBeInTheDocument();
-    const games = await screen.findByRole("list");
+    const games = await gameList();
     expect(
       within(games)
         .getAllByRole("listitem")
@@ -20,7 +35,7 @@ describe("App", () => {
   it("illustrates each game card with its art and accent, keeping the game's name as the link", async () => {
     renderApp();
 
-    const games = await screen.findByRole("list");
+    const games = await gameList();
     const [rps, chess] = within(games).getAllByRole("listitem");
     expect(rps).toHaveClass("rps");
     expect(chess).toHaveClass("chess");
@@ -35,7 +50,7 @@ describe("App", () => {
       }),
     });
 
-    expect((await screen.findByRole("listitem")).className).toContain("primary");
+    expect((await within(await gameList()).findByRole("listitem")).className).toContain("primary");
   });
 
   it("shows the arcade scene in the hero once it has loaded", async () => {

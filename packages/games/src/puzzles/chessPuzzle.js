@@ -90,6 +90,7 @@ function tryMove(chess, move) {
 function replay(puzzle, found) {
   const chess = new Chess(puzzle.fen);
   let last = chess.move(toBoardMove(puzzle.moves[0]));
+  const player = chess.turn();
   const line = [];
   found.forEach((uci, index) => {
     last = chess.move(toBoardMove(uci));
@@ -100,7 +101,7 @@ function replay(puzzle, found) {
       line.push(last.san);
     }
   });
-  return { chess, last, line };
+  return { chess, last, line, player };
 }
 
 /**
@@ -116,14 +117,15 @@ export const chessPuzzleSteps = (puzzle) => puzzle.moves.length / 2;
  *
  * @param {{ puzzle: Readonly<ChessPuzzle>, found: ReadonlyArray<string> }} input  found: the player's accepted
  *   moves in UCI, oldest first
- * @returns {{ fen: string, toMove: "w" | "b", lastMove: { from: string, to: string, san: string }, line: string[] }}
- *   line: every move after the opponent's first one, in SAN
+ * @returns {{ fen: string, toMove: "w" | "b", player: "w" | "b", lastMove: { from: string, to: string, san: string }, line: string[] }}
+ *   player: the colour the player plays. line: every move after the opponent's first one, in SAN
  */
 export function chessPuzzlePosition({ puzzle, found }) {
-  const { chess, last, line } = replay(puzzle, found);
+  const { chess, last, line, player } = replay(puzzle, found);
   return {
     fen: chess.fen(),
     toMove: /** @type {"w" | "b"} */ (chess.turn()),
+    player: /** @type {"w" | "b"} */ (player),
     lastMove: { from: last.from, to: last.to, san: last.san },
     line,
   };

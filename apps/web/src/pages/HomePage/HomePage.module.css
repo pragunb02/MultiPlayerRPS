@@ -149,3 +149,11 @@
 .card:focus-within .play {
   transform: scale(1.08);
 }
+
+/* The daily puzzle card (CC-144) has words instead of art, so it keeps room under them for its Solve badge. */
+.daily {
+  margin-top: var(--space-8);
+}
+.daily .card {
+  padding-bottom: var(--space-12);
+}

@@ -1,4 +1,11 @@
-import { getGame, SITE_NAME } from "@classicade/shared";
+import {
+  DAILY_PUZZLE_KINDS,
+  DAILY_PUZZLE_MARKS,
+  DAILY_PUZZLE_STATUS,
+  getDailyPuzzle,
+  getGame,
+  SITE_NAME,
+} from "@classicade/shared";
 
 /**
  * The words a player shares: an invite to a room, or a game's result (CC-217). Every line is here, in one place,
@@ -103,6 +110,58 @@ export function resultText({ gameId, outcome, character, score, forfeit }) {
     return NEUTRAL_UNKNOWN_GAME;
   }
   return RESULT_LINES[outcome]({ game, character, score, forfeit });
+}
+
+/** The share grid's square for each mark: found first time, found after a mistake, where it ended, not reached. */
+const GRID_SQUARES = Object.freeze({
+  [DAILY_PUZZLE_MARKS.FIRST_TRY]: "🟩",
+  [DAILY_PUZZLE_MARKS.AFTER_MISTAKES]: "🟨",
+  [DAILY_PUZZLE_MARKS.FAILED]: "🟥",
+  [DAILY_PUZZLE_MARKS.NOT_REACHED]: "⬛",
+});
+
+/**
+ * The lines under a daily puzzle's grid, per kind, solved and failed (CC-144). None of them is in the owner's
+ * drafts: they are listed in docs/tickets/CC-144.md for the owner.
+ */
+const DAILY_LINES = Object.freeze({
+  [DAILY_PUZZLE_KINDS.CHESS]: Object.freeze({
+    [DAILY_PUZZLE_STATUS.SOLVED]: [
+      "Aaj ka chess puzzle solve kar liya! Tum karke dikhao:",
+      `I solved today's chess puzzle on ${SITE_NAME}. Can you?`,
+    ],
+    [DAILY_PUZZLE_STATUS.FAILED]: [
+      "Aaj ka chess puzzle mushkil tha. Tum solve karke dikhao:",
+      `Today's chess puzzle on ${SITE_NAME} beat me. Can you solve it?`,
+    ],
+  }),
+});
+
+/**
+ * The squares of a daily puzzle's grid, one per move to find.
+ *
+ * @param {ReadonlyArray<string>} grid  DAILY_PUZZLE_MARKS values
+ */
+export const gridSquares = (grid) => grid.map((mark) => GRID_SQUARES[mark]).join("");
+
+/**
+ * The text of a daily puzzle share, the way Wordle shares (CC-144): the puzzle and its number, a grid of squares
+ * that tells how it went and never which moves, the hints and the streak, then a Hinglish and an English line. It
+ * takes no name, so no guest's or minor's name can be in it (ADR-028.7).
+ *
+ * @param {{ kind: string, number: number, status: string, grid: ReadonlyArray<string>, hintsTaken: number, streak: number }} puzzle
+ *   status: solved or failed. streak: the puzzle's streak now
+ * @returns {string}
+ * @throws {Error} for a kind or a status that has no words
+ */
+export function dailyPuzzleText({ kind, number, status, grid, hintsTaken, streak }) {
+  const words = DAILY_LINES[kind]?.[status];
+  if (words === undefined) {
+    throw new Error(`No share text for a ${kind} puzzle that is ${status}`);
+  }
+  const extras = [hintsTaken > 0 ? `💡${hintsTaken}` : "", streak > 0 ? `🔥${streak}` : ""].filter(Boolean);
+  const gridLine = [gridSquares(grid), ...extras].join(" ");
+  return `🧩 ${SITE_NAME} ${getDailyPuzzle(kind).name} #${number}\n${gridLine}\n${words.join("\n")}`;
 }
 
 /**

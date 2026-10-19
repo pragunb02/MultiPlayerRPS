@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  DAILY_PUZZLES,
   describePage,
   gameForSlug,
+  getGame,
   gamePreviewImage,
   GAMES,
   LEADERBOARDS,
@@ -117,6 +119,22 @@ describe("describePage", () => {
     expect(describePage("/leaderboards").path).toBe(`/leaderboards/${LEADERBOARDS[0].id}`);
     expect(describePage("/leaderboards/nope").found).toBe(false);
     expect(describePage("/leaderboards/overall/extra").found).toBe(false);
+  });
+
+  it("describes each daily puzzle with its game's preview image, listed, and nothing for an unknown kind (CC-144)", () => {
+    for (const puzzle of DAILY_PUZZLES) {
+      expect(describePage(`/daily/${puzzle.id}`)).toMatchObject({
+        found: true,
+        indexable: true,
+        path: `/daily/${puzzle.id}`,
+        title: `${puzzle.name} · ClassiCade`,
+        image: gamePreviewImage(getGame(puzzle.gameId)),
+      });
+    }
+    expect(describePage("/Daily/chess/").path).toBe("/daily/chess");
+    expect(describePage("/daily/sudoku").found).toBe(false);
+    expect(describePage("/daily").found).toBe(false);
+    expect(PUBLIC_PAGE_PATHS).toContain("/daily/chess");
   });
 
   it("lists the legal pages, whatever the letter case and trailing slash", () => {

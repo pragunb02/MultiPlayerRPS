@@ -10,6 +10,7 @@ import { DEFAULT_LEADERBOARD_ID, gameForSlug, getGame } from "@classicade/shared
  *   /games/:slug/pass-and-play         two people on one phone, nothing sent or kept (CC-223)
  *   /login?next=…  /signup?next=…      account pages; `next` = where to return afterwards
  *   /profile                           your progress and match history (guests and accounts)
+ *   /daily/:kind                       today's daily puzzle of a kind, such as /daily/chess (CC-144)
  *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
  *   /privacy  /terms                   the privacy policy and the terms of use
  *   /admin  /admin/:section?from=…&to=…&bucket=…   the owner console (CC-233), not found for anyone but an admin
@@ -24,6 +25,7 @@ export const ROUTES = Object.freeze({
   LOGIN: "login",
   SIGNUP: "signup",
   PROFILE: "profile",
+  DAILY: "daily/:kind",
   LEADERBOARDS: "leaderboards",
   LEADERBOARD: "leaderboards/:board",
   PRIVACY: "privacy",
@@ -133,6 +135,8 @@ export const paths = Object.freeze({
   /** @param {string} [next] */
   signup: (next) => withNext("/signup", next),
   profile: () => "/profile",
+  /** @param {string} kind  a DAILY_PUZZLE_KINDS value */
+  daily: (kind) => `/daily/${encodeURIComponent(kind)}`,
   /** @param {string} [boardId]  a leaderboard id (default: overall XP) */
   leaderboards: (boardId = DEFAULT_LEADERBOARD_ID) => `/leaderboards/${encodeURIComponent(boardId)}`,
   privacy: () => "/privacy",

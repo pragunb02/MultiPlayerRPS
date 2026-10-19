@@ -1,0 +1,7 @@
+/* The puzzle board takes the column's width, as the room's board does, and never grows past it. */
+.board {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 36rem;
+}

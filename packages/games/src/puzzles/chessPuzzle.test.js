@@ -47,6 +47,7 @@ describe("the chess puzzle referee", () => {
     expect(position).toEqual({
       fen: "5rk1/1p3ppp/pq1Q1b2/8/8/1P3N2/P4PPP/3R2K1 b - - 3 27",
       toMove: "b",
+      player: "b",
       lastMove: { from: "d3", to: "d6", san: "Qd6" },
       line: [],
     });
