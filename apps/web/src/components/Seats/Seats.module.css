@@ -88,6 +88,11 @@
 .gone {
   color: var(--color-warning);
 }
+/* Block (CC-044) is a quiet action at the end of the row, smaller than the game's own buttons. */
+.block {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
 .timer {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

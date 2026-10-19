@@ -18,6 +18,7 @@ import { useMatchHistory } from "../../hooks/useMatchHistory.js";
 import { useProgress } from "../../hooks/useProgress.js";
 import { useSession } from "../../hooks/useSession.js";
 import { AccountSettings } from "./AccountSettings.jsx";
+import { BlockedPlayers } from "./BlockedPlayers.jsx";
 import { PrivacySettings } from "./PrivacySettings.jsx";
 import styles from "./ProfilePage.module.css";
 import { VisitorProfile } from "./VisitorProfile.jsx";
@@ -149,7 +150,10 @@ function PlayerConsole({ guest }) {
   );
 }
 
-/** Your level, stats and match history, for guests and account holders alike. Account holders also get their account settings. */
+/**
+ * Your level, stats, match history and blocked players, for guests and account holders alike. Account holders also
+ * get their account settings.
+ */
 export function ProfilePage() {
   const session = useSession();
   // Set by the deletion on this page, so the visitor it leaves behind is told it worked (CC-035).
@@ -192,6 +196,7 @@ export function ProfilePage() {
       <PlayerConsole guest={session.identity.kind === "guest"} />
       <h2>Recent matches</h2>
       <MatchHistory you={session.identity.id} />
+      <BlockedPlayers />
       {session.identity.kind === "user" && <AccountSettings />}
       {session.identity.kind === "user" && <PrivacySettings />}
     </section>

@@ -1,7 +1,10 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
-import { fakeSound } from "../../testing/fakes.js";
+import { AppRequestError } from "../../lib/errors.js";
+import { fakeApi, fakeSound } from "../../testing/fakes.js";
+import { ToastContext } from "../Toast/toastContext.js";
 import { Seats } from "./Seats.jsx";
 
 const T = 9_000_000;
@@ -28,17 +31,21 @@ const room = (overrides = {}) => ({
   ...overrides,
 });
 
-function mount(view, sound = fakeSound()) {
+function mount(view, sound = fakeSound(), api = fakeApi()) {
+  const toast = { show: vi.fn(), dismiss: vi.fn(), hold: vi.fn(() => () => undefined) };
   const ui = (next) => (
-    <ServicesProvider services={{ sound }}>
-      <Seats room={next} />
+    <ServicesProvider services={{ sound, api }}>
+      <ToastContext.Provider value={toast}>
+        <Seats room={next} />
+      </ToastContext.Provider>
     </ServicesProvider>
   );
   const result = render(ui(view));
-  return { ...result, sound, update: (next) => result.rerender(ui(next)) };
+  return { ...result, sound, api, toast, update: (next) => result.rerender(ui(next)) };
 }
 
-const chips = () => screen.getAllByRole("listitem").map((item) => item.textContent);
+// The Block button at the end of another player's row has tests of its own (CC-044).
+const chips = () => screen.getAllByRole("listitem").map((item) => item.textContent.replace(/Block$/, ""));
 
 describe("Seats (CC-158)", () => {
   afterEach(() => vi.useRealTimers());
@@ -130,5 +137,78 @@ describe("Seats (CC-158)", () => {
     act(() => vi.advanceTimersByTime(1_000));
 
     expect(screen.getByRole("status").textContent).toBe("");
+  });
+});
+
+describe("Seats: blocking from a seat (CC-044)", () => {
+  const blockable = (overrides = {}) => room({ code: "ROOM22", ...overrides });
+  const blockButton = () => screen.queryByRole("button", { name: "Block Alice" });
+
+  it("offers Block only for other people, and only to a seated viewer", () => {
+    const rocky = seat({
+      playerId: "bot_rocky_hard",
+      displayName: "Rocky",
+      bot: { character: "rocky", level: "hard" },
+    });
+    const standIn = seat({ playerId: "deleted_6c1d", displayName: "Deleted player" });
+    const { update } = mount(blockable({ players: { min: 2, max: 4 }, seats: [ALICE, BOB, rocky, standIn] }));
+
+    expect(
+      screen.getAllByRole("button", { name: /^Block / }).map((button) => button.getAttribute("aria-label")),
+    ).toEqual(["Block Alice"]);
+    expect(blockButton()).toHaveAttribute("data-cc-control", "room.seat.block");
+
+    update(blockable({ you: "" }));
+    expect(blockButton()).toBeNull();
+  });
+
+  it("asks first, and Cancel blocks nobody", async () => {
+    const { api } = mount(blockable());
+
+    await userEvent.click(blockButton());
+    const dialog = screen.getByRole("dialog", { name: "Block Alice?" });
+    expect(dialog).toHaveTextContent(
+      "You won't be put in a room with Alice again, and there are no rematches between you. Alice is not told. You can unblock them on your profile.",
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(blockButton());
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(api.blockPlayer).not.toHaveBeenCalled();
+  });
+
+  it("blocks the seat by its place in the room, says so to the viewer only, and marks the seat", async () => {
+    const api = fakeApi({
+      blockPlayer: vi.fn().mockResolvedValue({ blockId: "b1", displayName: "Alice", blockedAt: 1 }),
+    });
+    const { toast } = mount(blockable(), fakeSound(), api);
+
+    await userEvent.click(blockButton());
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Block" }));
+
+    expect(api.blockPlayer).toHaveBeenCalledWith({ roomCode: "ROOM22", seat: 0 });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(toast.show).toHaveBeenCalledWith("You blocked Alice.", { tone: "info" });
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("Alicehostconnectedblocked");
+    expect(blockButton()).toBeNull();
+  });
+
+  it("shows the server's refusal under the button and keeps the question open", async () => {
+    const refusal = new AppRequestError({
+      code: "NOT_FOUND",
+      message: "You can only block someone you played with",
+      status: 404,
+    });
+    const api = fakeApi({ blockPlayer: vi.fn().mockRejectedValue(refusal) });
+    const { toast } = mount(blockable(), fakeSound(), api);
+
+    await userEvent.click(blockButton());
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Block" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("You can only block someone you played with");
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(toast.show).not.toHaveBeenCalled();
   });
 });

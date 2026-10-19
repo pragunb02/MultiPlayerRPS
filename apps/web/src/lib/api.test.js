@@ -183,6 +183,32 @@ describe("api client", () => {
     expect(fetchImpl.mock.calls[0][0]).toBe(path);
   });
 
+  it("lists, adds and removes blocks, never with a player id (CC-044)", async () => {
+    const listed = respond(200, { blocks: [{ blockId: "b1", displayName: "Bob", blockedAt: 1 }] });
+    const added = respond(200, { block: { blockId: "b2", displayName: "Bob", blockedAt: 2 } });
+    const removed = vi.fn().mockResolvedValue({ status: 204, ok: true });
+
+    expect(await createApiClient({ fetchImpl: listed }).getBlocks()).toEqual([
+      { blockId: "b1", displayName: "Bob", blockedAt: 1 },
+    ]);
+    expect(await createApiClient({ fetchImpl: added }).blockPlayer({ roomCode: "ABC234", seat: 1 })).toEqual({
+      blockId: "b2",
+      displayName: "Bob",
+      blockedAt: 2,
+    });
+    expect(await createApiClient({ fetchImpl: removed }).unblockPlayer("a/b")).toBeUndefined();
+
+    expect(listed.mock.calls[0][0]).toBe("/api/blocks");
+    expect(added.mock.calls[0]).toEqual([
+      "/api/blocks",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ roomCode: "ABC234", seat: 1 }) }),
+    ]);
+    expect(removed.mock.calls[0]).toEqual([
+      "/api/blocks/a%2Fb",
+      expect.objectContaining({ method: "DELETE" }),
+    ]);
+  });
+
   it("reads the leaderboard catalog and one board, with its limit", async () => {
     const boards = respond(200, { boards: [{ id: "overall" }] });
     const board = respond(200, { board: { id: "chess" }, entries: [] });
