@@ -86,3 +86,22 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
 }
+/* Pass and play (CC-223) is a link to its own page, drawn like the lobby's other buttons. */
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.link {
+  justify-self: start;
+  padding: var(--space-3) var(--space-6);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-decoration: none;
+}
+.link:hover {
+  border-color: var(--color-primary);
+}

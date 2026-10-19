@@ -1,0 +1,72 @@
+/* Pass and play on one phone (CC-223). The frame and its cards come from MatchShell.module.css. */
+
+/* The pass the phone screen takes the board's place, so it is as tall as a board and centred like one. */
+.handOver {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-4);
+  min-height: 20rem;
+  text-align: center;
+}
+.handOver h2,
+.handOver p {
+  margin: 0;
+}
+.note {
+  font-weight: 700;
+  color: var(--color-text);
+}
+.notCounted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.players {
+  display: grid;
+  gap: var(--space-3);
+}
+.players h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.players ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.players li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+}
+.tag {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.privacy {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+/* The board's place takes the focus when it comes back, but draws no ring of its own: the board inside shows it. */
+.turn {
+  display: grid;
+  gap: var(--space-4);
+  outline: none;
+}
+.handOver h2:focus {
+  outline: none;
+}
+.choices {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-6);
+}

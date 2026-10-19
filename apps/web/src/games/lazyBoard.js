@@ -17,3 +17,15 @@ const RELOADING = new Promise(() => {});
 export function lazyBoard(load, name) {
   return lazy(() => load().then((module) => (module === undefined ? RELOADING : { default: module[name] })));
 }
+
+/**
+ * A game's pure engine, downloaded the first time two people start it on one phone (CC-223). It fails the same way
+ * a board does: while the page reloads for a newer version it keeps waiting, and any other failure is passed on, so
+ * the page can say the game did not load and offer to try again.
+ *
+ * @param {() => Promise<Record<string, unknown> | undefined>} load  the dynamic import
+ * @param {string} name  the export that is the engine
+ * @returns {() => Promise<any>}
+ */
+export const lazyEngine = (load, name) => () =>
+  load().then((module) => (module === undefined ? RELOADING : module[name]));

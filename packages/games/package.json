@@ -6,6 +6,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.js",
+    "./rps": "./src/rps/rpsEngine.js",
+    "./tictactoe": "./src/tictactoe/tictactoeEngine.js",
+    "./chess": "./src/chess/chessEngine.js",
     "./testing": "./src/testing/index.js"
   },
   "dependencies": {
