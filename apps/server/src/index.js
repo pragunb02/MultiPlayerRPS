@@ -19,6 +19,5 @@ try {
 const logger = createLogger({ level: config.logLevel });
 handleFatalErrors({ logger });
 
-const { port, close } = await startServer({ config, logger });
-logger.info({ port, env: config.env }, "server listening");
+const { close } = await startServer({ config, logger });
 handleShutdownSignals({ close, logger });
