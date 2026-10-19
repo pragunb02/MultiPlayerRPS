@@ -250,6 +250,7 @@ describe("visual baselines (CC-155)", () => {
     expect(render).toContain("persist-credentials: false");
     expect(render).toContain("grep -Eq '^cc-[0-9]{3}-[a-z0-9-]+$'");
     expect(render).toContain("--update-snapshots=changed");
+    expect(render).not.toMatch(/cache: |actions\/cache/);
     expect(commit).toContain("    permissions:\n      contents: write\n");
     expect(commit).not.toMatch(/npm|npx|node /);
     expect(commit).toContain('git commit --quiet --message "$TICKET: ');

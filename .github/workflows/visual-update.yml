@@ -47,15 +47,11 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
           persist-credentials: false
+      # No caches here. This run belongs to the default branch, so a cache it saved would be read by main's own
+      # CI, and it runs a branch's code that nobody has reviewed yet.
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - name: Cache MongoDB binary
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-visual-${{ hashFiles('package-lock.json') }}
       - run: npm ci
       # Writes the images that differ and the missing ones. The others stay as they were.
       - name: Make the baselines
