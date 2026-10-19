@@ -1,12 +1,13 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useLayoutEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Modal } from "./Modal/Modal.jsx";
 import { RequestCountdown } from "./RequestBanner/RequestBanner.jsx";
 import { ShareRoom } from "./ShareRoom/ShareRoom.jsx";
 import { ToastProvider } from "./Toast/ToastProvider.jsx";
 import { TurnBanner } from "./TurnBanner/TurnBanner.jsx";
-import { useToast } from "./Toast/toastContext.js";
+import { useHold, useToast } from "./Toast/toastContext.js";
 
 const withToasts = (ui) => render(<ToastProvider>{ui}</ToastProvider>);
 
@@ -119,6 +120,33 @@ describe("ToastProvider", () => {
       act(() => release());
 
       expect(shown()).toBe("");
+    });
+
+    it("holds rewards from the very step that draws the question (CC-288)", () => {
+      // A reward that comes in the same step as the question, before any plain effect has run. A hold started in
+      // a plain effect let it through and covered the question.
+      function Question({ open }) {
+        const toast = useToast();
+        useHold("request", open);
+        useLayoutEffect(() => {
+          if (open) toast.show("+30 XP", { category: "reward" });
+        }, [open, toast]);
+        return open ? <p>Rematch?</p> : null;
+      }
+      const view = render(
+        <ToastProvider displayMs={1_000}>
+          <Question open={false} />
+        </ToastProvider>,
+      );
+
+      view.rerender(
+        <ToastProvider displayMs={1_000}>
+          <Question open />
+        </ToastProvider>,
+      );
+
+      expect(screen.getByText("Rematch?")).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("");
     });
 
     it("refuses a category that does not exist", () => {

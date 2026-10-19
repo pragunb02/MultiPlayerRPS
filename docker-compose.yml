@@ -4,6 +4,10 @@
 #   docker compose up mongo       only MongoDB on localhost:27017, for `npm run dev:server` + `npm run dev:web`
 #                                 (set MONGO_URI=mongodb://localhost:27017/classicade-dev in apps/server/.env)
 #   docker compose down           stop (add -v to delete the database)
+#
+# Once after CC-288: a database that `mongo:8` (8.3) created has feature version 8.3, and 8.2 exits on it with
+# "UPGRADE PROBLEM: Found an invalid featureCompatibilityVersion document". Run `docker compose down -v` once to start
+# a fresh one (take a mongodump first if you need the data). Production runs on Atlas and is not affected.
 services:
   mongo:
     # An exact version and digest, never a floating tag (CC-288). `mongo:8` (8.3.13) and 8.0.34 refuse to start on

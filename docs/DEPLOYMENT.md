@@ -199,6 +199,12 @@ To upgrade: try the new exact version on CI (the Docker job prints `docker compo
 pin its digest from `docker buildx imagetools inspect mongo:<version>` (the `Digest:` line of the index, so it works
 on Intel and Arm). Dependabot ignores `mongo` 8.3 and later until SERVER-136848 is fixed (`.github/dependabot.yml`).
 
+**Existing local databases, once:** a Docker volume that `mongo:8` (8.3) created has feature compatibility version
+8.3, and 8.2 cannot open it: mongod exits with `"Wrong mongod version" ... UPGRADE PROBLEM: Found an invalid
+featureCompatibilityVersion document ... version: "8.3"` (checked locally). Run `docker compose down -v` once to delete
+the old volume, and take a `mongodump` first with the old image if you need its data. CI starts from a fresh volume
+every time. Production on Atlas is not affected. The same applies to any later move to an older version.
+
 ## Before merging any PR
 
 CI (lint, format, audit, unit + integration tests with coverage gates, browser tests) must be green. Every PR fills in
