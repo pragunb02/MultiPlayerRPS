@@ -323,6 +323,8 @@ record, because today one process keeps the games it is running in memory.
 
 - **Amended 2026-10-18 (owner): fast mode ended.** Branch protection requires eight checks with branches up to date: lint/unit/coverage, Docker, the merged browser jobs (Chromium desktop + mobile, Firefox), the backup round trip, actionlint, and CodeQL for JavaScript and for Actions; every PR gets both reviewers and the skeptic again; builders run lint, format, coverage and their own browser tests locally. WebKit stays advisory until its open flakes (CC-273) are fixed.
 
+- **Amended 2026-10-19 (owner): PR evidence.** Every pull request shows its change working in the template's Evidence section: UI screenshots (desktop 1280×720 and phone 390×844, before and after) on the `pr-evidence` branch, request and response for API or socket changes, and the tests added. Test accounts only, because the repository is public.
+
 ### ADR-038 — Button feedback: every press answers, waiting says so
 
 - **Status:** Accepted · 2026-10-17 (CC-164, PR #53, merged behaviour. Design in

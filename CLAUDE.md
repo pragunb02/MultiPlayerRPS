@@ -63,11 +63,11 @@ These rules come first. Where they differ from anything below, they win.
 2. **No untracked work**: anything new (including bugs found along the way) gets a ticket with the next free ID first.
 3. Starting a ticket: set 🟦 on the board and create `docs/tickets/CC-###.md` from the template. Every ticket gets a
    file; a small one (under about an hour) gets Root cause and a short Research note (working agreement rule 4).
-4. Every PR fills the template's **Evidence** section: screenshots for UI changes (desktop and phone, before and
-   after), request and response for API or socket changes, and the tests added. Screenshots go on the `pr-evidence`
-   branch, never on `main`, and show test accounts only.
-   Branch `cc-###-short-name`. Every commit message starts with the ticket ID: `CC-007: fix RPS Scissors mismatch (BUG-01)`.
+4. Branch `cc-###-short-name`. Every commit message starts with the ticket ID: `CC-007: fix RPS Scissors mismatch (BUG-01)`.
    Multi-ticket commits list all IDs: `CC-003, CC-004: …`.
+   Every PR fills the template's **Evidence** section: screenshots for UI changes (desktop and phone, before and
+   after), request and response for API or socket changes, and the tests added (owner, 2026-10-19; ADR-039).
+   Screenshots go on the `pr-evidence` branch, never on `main`, and show test accounts only.
 5. Finishing: ✅ on the board, update linked findings in `KNOWN_ISSUES.md`, add a dated changelog line in `PROGRESS.md`
    using ticket IDs, update the stage counters.
 6. Non-trivial decisions (library, pattern, data model) get an ADR in `DECISIONS.md` first.

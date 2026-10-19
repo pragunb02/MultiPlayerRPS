@@ -54,6 +54,7 @@ Counts are derived from [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (`scripts/issue-count
 
 Newest first. Format: `YYYY-MM-DD — <ticket IDs> — what changed`.
 
+- 2026-10-19 — ADR-039 — Owner: every PR attaches evidence (screenshots for UI, request and response for APIs, tests added). PR template Evidence section, CLAUDE.md, docs/pr-evidence/README.md, and the orphan `pr-evidence` branch for images.
 - 2026-10-19 — CC-285 — Main was red from 00:00 UTC: the leaderboard routes were wired without the injected clock, so a test that fixes the date got the real ISO week. routes.js now passes `now`, as every other route does.
 - 2026-10-18 — CC-276 — The required backup round trip failed at random with exit 141: `mongodump --version | head -n 1` under pipefail. sed reads to the end instead, so mongodump never gets SIGPIPE.
 - 2026-10-18 — ADR-039 — Owner: fast mode ended. Every check is required again (lint/unit/coverage, Docker, Chromium and Firefox browser suites), branches must be up to date, full reviews on every PR. CLAUDE.md rules 6, 7 and 8 restored.
