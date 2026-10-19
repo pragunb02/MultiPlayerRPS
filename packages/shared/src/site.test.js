@@ -62,7 +62,7 @@ describe("describePage", () => {
       indexable: false,
       title: "Rock Paper Scissors on one phone · ClassiCade",
       path: "/games/rock-paper-scissors/pass-and-play",
-      image: "/og/rock-paper-scissors.png",
+      image: expect.stringMatching(/^\/og\/rock-paper-scissors\.[0-9a-f]{8}\.jpg$/),
     });
     expect(describePage("/games/ludo/pass-and-play")).toMatchObject({ found: false });
     expect(describePage("/play/chess/pass-and-play")).toMatchObject({ found: false });
