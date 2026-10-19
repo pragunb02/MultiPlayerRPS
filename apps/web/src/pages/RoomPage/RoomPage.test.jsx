@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
@@ -179,18 +179,22 @@ describe("RoomPage", () => {
   });
 
   it.each([
-    [{ result: "win", winners: [GUEST.id], reason: "three-in-a-row" }, "Victory!", true],
-    [{ result: "win", winners: ["guest_b"], reason: "three-in-a-row" }, "Defeat", false],
-  ])("celebrates the result: banner, and confetti for a win (%o)", async (outcome, banner, confetti) => {
-    openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
+    [{ result: "win", winners: [GUEST.id], reason: "three-in-a-row" }, "Victory!", true, "win"],
+    [{ result: "win", winners: ["guest_b"], reason: "three-in-a-row" }, "", false, "gentle-loss"],
+  ])(
+    "celebrates the result in its tone: a stamp and confetti for a win, no stamp after a loss (%o)",
+    async (outcome, stamp, confetti, tone) => {
+      openRoom({ joined: playing({ status: "finished", game: { view: {}, activePlayers: [], outcome } }) });
 
-    expect(await screen.findByText(banner)).toBeInTheDocument();
-    expect(Boolean(document.querySelector("[data-effect='confetti']"))).toBe(confetti);
-    // The status region still says the result in words; the banner is decoration.
-    const result = screen.getByRole("heading", { name: confetti ? "You won!" : "You lost" });
-    // The result panel takes the outcome's colour.
-    expect(result.closest("section")).toHaveClass(confetti ? "win" : "loss");
-  });
+      // The result heading says it in words. The stamp over it is decoration.
+      const result = await screen.findByRole("heading", { name: confetti ? "You won!" : "You lost" });
+      expect(Boolean(document.querySelector("[data-effect='confetti']"))).toBe(confetti);
+      expect(screen.queryByText("Defeat")).not.toBeInTheDocument();
+      if (stamp !== "") expect(screen.getByText(stamp)).toBeInTheDocument();
+      // The result panel takes the outcome's tone.
+      expect(result.closest("section")).toHaveAttribute("data-cc-tone", tone);
+    },
+  );
 
   it("shows the game's icon in the room title and invite art while waiting", async () => {
     openRoom();
@@ -494,6 +498,9 @@ describe("RoomPage: every other state and path", () => {
 // The server records the match in the background, so its progress update can come before the page has drawn the
 // result. The result must still show it (CC-235).
 describe("the result's own XP and reason", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   const forfeitWin = { result: "win", winners: [GUEST.id], reason: "forfeit" };
   const game = ({ matchId = "match-1", outcome = { status: "ongoing" } } = {}) => ({
     matchId,
@@ -555,6 +562,28 @@ describe("the result's own XP and reason", () => {
     await screen.findByRole("heading", { name: "You won by forfeit" });
     expect(within(resultOf()).queryByText(/didn't count/)).toBeNull();
     expect(xpPop()).toBeNull();
+  });
+
+  it("plays the result first, then the level-up with its burst, fanfare and toast together (CC-163)", async () => {
+    const { socket, sound } = await playingRoom();
+    vi.useFakeTimers();
+    const toasts = () => document.querySelector("[role='status'][aria-live='polite']");
+    const burst = () => document.querySelector("[data-effect='level-up']");
+
+    act(() => socket.push("room:updated", finishedRoom("match-1")));
+    act(() =>
+      socket.push("progress:updated", { ...counted("match-1"), leveledUp: true, progress: { level: 2 } }),
+    );
+
+    expect(sound.played).toEqual(["win-quiet"]);
+    expect(toasts()).not.toHaveTextContent("Level up!");
+    expect(burst()).toBeNull();
+
+    act(() => vi.advanceTimersByTime(1_200));
+
+    expect(toasts()).toHaveTextContent("Level up! You reached level 2");
+    expect(burst()).toHaveTextContent("2");
+    expect(sound.played).toEqual(["win-quiet", "level-up"]);
   });
 });
 

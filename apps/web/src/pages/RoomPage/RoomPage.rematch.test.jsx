@@ -207,9 +207,8 @@ describe("RoomPage rematch (CC-037, CC-159)", () => {
     const aborted = { status: "finished", result: "aborted", winners: [], reason: "aborted" };
     openRoom(finished({ game: { view: {}, activePlayers: [], outcome: aborted, number: 1, turnEndsAt: 0 } }));
 
-    expect(
-      await screen.findByRole("heading", { name: "Game aborted: the first move did not come in time" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Game aborted" })).toBeInTheDocument();
+    expect(screen.getByText("No first move in time. Nothing counted.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
   });
 

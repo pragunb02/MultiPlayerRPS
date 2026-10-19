@@ -7,12 +7,13 @@ export const ToastContext = createContext(null);
  * @typedef {{ label: string, to: string, dismissLabel: string, onDismiss: () => void }} ToastAction
  *   a link shown in the toast, and a close button named `dismissLabel` that calls `onDismiss`
  * @returns {{
- *   show: (message: string, options?: { tone?: "info" | "success" | "danger", art?: import("react").ReactNode, action?: ToastAction, category?: string }) => number,
+ *   show: (message: string, options?: { tone?: "info" | "success" | "danger", art?: import("react").ReactNode, action?: ToastAction, category?: string, onShow?: () => void }) => number,
  *   dismiss: (id: number) => void,
  *   hold: (category: string) => () => void,
  * }} `show` returns the toast's id, and `dismiss` takes a toast away before its time is up. `category` is a
- *   notification category (CATEGORIES, CC-208), "system" when not given. `hold` keeps toasts of lower
- *   categories waiting until the function it returns is called
+ *   notification category (CATEGORIES, CC-208), "system" when not given. `onShow` runs when the toast really
+ *   shows, which is later when it had to wait (CC-163). `hold` keeps toasts of lower categories waiting until the
+ *   function it returns is called
  */
 export function useToast() {
   const toast = useContext(ToastContext);

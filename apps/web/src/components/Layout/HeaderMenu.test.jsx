@@ -68,6 +68,16 @@ describe("the header menu (CC-259)", () => {
     expect(menuButton()).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("stays open when a click beside the sound settings dialog closes only the dialog", async () => {
+    const { user } = await openMenu();
+    await user.click(within(panel()).getByRole("button", { name: "Sound settings" }));
+
+    await user.click(screen.getByRole("dialog").parentElement);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(menuButton()).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("ignores other keys", async () => {
     const { user } = await openMenu();
 

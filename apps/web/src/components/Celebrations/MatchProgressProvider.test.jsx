@@ -1,11 +1,13 @@
 import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
+import { outcomeMoment } from "../../games/outcomeMoment.js";
 import { SessionProvider } from "../../hooks/SessionProvider.jsx";
 import { useSession } from "../../hooks/useSession.js";
 import { fakeApi, fakeSessionBroadcast, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
 import { SessionStatus } from "../../testing/SessionStatus.jsx";
 import { sessionReady } from "../../testing/sessionReady.js";
+import { ToastProvider } from "../Toast/ToastProvider.jsx";
 import { KEPT_MATCHES, keepMatchUpdate, useMatchProgress } from "./matchProgressContext.js";
 import { MatchProgressProvider } from "./MatchProgressProvider.jsx";
 import { ResultCelebration } from "./ResultCelebration.jsx";
@@ -25,7 +27,9 @@ const update = (matchId, overrides = {}) =>
   });
 const won = (matchId) => ({
   you: GUEST.id,
-  game: { matchId, outcome: { result: "win", winners: [GUEST.id] } },
+  gameId: "chess",
+  seats: [{ playerId: GUEST.id, displayName: GUEST.displayName, connected: true }],
+  game: { matchId, outcome: { result: "win", winners: [GUEST.id], reason: "checkmate" } },
 });
 
 /** Shows the XP the kept update of `matchId` gave, and lets the test sign in as someone else. */
@@ -54,10 +58,12 @@ async function renderKept(children) {
   const providers = (inside) => (
     <ServicesProvider services={services}>
       <SessionProvider>
-        <MatchProgressProvider>
-          {inside}
-          <SessionStatus />
-        </MatchProgressProvider>
+        <ToastProvider>
+          <MatchProgressProvider>
+            {inside}
+            <SessionStatus />
+          </MatchProgressProvider>
+        </ToastProvider>
       </SessionProvider>
     </ServicesProvider>
   );
@@ -76,7 +82,7 @@ describe("MatchProgressProvider", () => {
         update("match-1", { xpGained: 0, counted: false, notCountedReason: "ended-too-soon" }),
       ),
     );
-    show(<ResultCelebration room={won("match-1")} />);
+    show(<ResultCelebration room={won("match-1")} moment={outcomeMoment(won("match-1"))} live={false} />);
 
     expect(screen.getByText("This game didn't count: it ended too soon")).toBeInTheDocument();
   });
