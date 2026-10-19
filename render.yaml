@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+#
+# Production's settings on Render, reviewed like code (ADR-063, CC-294). Render applies this file to the service
+# named below once the owner links it as a Blueprint, and on every later change to it on main. How to link it
+# safely, and what happens to each setting: docs/DEPLOYMENT.md, "Render Blueprint".
+#
+# Never write a secret here. This repository is public. A secret is `sync: false` with no value, and its value is
+# set in Render's dashboard only. Render keeps those values and never reads them from this file.
+services:
+  - type: web
+    # Render finds the live service by this name. A different name would create a second service.
+    name: NoCapGaming
+    runtime: node
+    plan: free
+    # Render cannot move a service to another region, so this must stay the region the service is in.
+    region: oregon
+    branch: main
+    # Vite is a dev dependency, so the web build needs dev dependencies even with NODE_ENV=production.
+    buildCommand: npm ci --include=dev && npm run build:web
+    startCommand: npm start
+    # 200 only when the database is connected. A new deploy that fails it never gets traffic.
+    healthCheckPath: /health
+    # Deploy a commit on main only after every GitHub check on it has passed.
+    autoDeployTrigger: checksPass
+    # PORT is not here: Render sets it, and the server listens on it.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render's proxy must reach the server, so it listens on every interface here (CC-287).
+      - key: HOST
+        value: 0.0.0.0
+      - key: LOG_LEVEL
+        value: info
+      # The first origin is also the site's public address in link previews and the sitemap.
+      - key: ALLOWED_ORIGINS
+        value: https://nocapgaming.onrender.com
+      - key: WEB_DIST_DIR
+        value: apps/web/dist
+      # Never more than the real number of proxies, or a script can bypass every rate limit (DEPLOYMENT.md).
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: MONGO_URI
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: ADMIN_ACCOUNT_IDS
+        sync: false
