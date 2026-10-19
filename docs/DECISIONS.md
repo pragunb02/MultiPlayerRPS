@@ -8,10 +8,38 @@ the owner may change it.
 
 ## Open decisions
 
+### ADR-046 — Our own screen in front of Render's cold start page
+
+- **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)
+- **Context.** On a true cold start the browser first gets Render's own loading page, before our process can send
+  any HTML, and Render offers no way to brand it. The "Waking up the arcade" screen (CC-232) shows only once our
+  server answers.
+- **Options.** (1) Leave it as it is. (2) Serve the web app from static hosting or a CDN (with CC-028 or CC-123), so
+  our screen loads at once and waits for the API. (3) A service worker that shows the screen on repeat visits.
+- **Recommendation.** Decide with CC-123 (brand domain and CDN). Until then option 1.
+
+### ADR-045 — Keep the previous build's files online after a deploy
+
+- **Status:** Open · 2026-10-17 (from [CC-181](tickets/CC-181.md), owner to decide)
+- **Context.** Render builds every deploy from scratch, so a tab opened before a deploy asks for script files that
+  no longer exist. Since CC-181 such a tab reloads once instead of showing an error, so nobody is stuck.
+- **Options.** (1) Leave it: the reload is enough. (2) Keep the old files for a while (storage for old files, for
+  example a bucket or a CDN, and a rule for when to drop them).
+- **Recommendation.** Option 1 until a CDN exists (CC-123), then revisit.
+
+### ADR-003 — Database: stay on MongoDB vs move to PostgreSQL
+
+- **Status:** Open
+- **Context:** Ratings, leaderboards, friends, payments are relational; matches/moves fit documents.
+- **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
+
+## Accepted decisions
+
 ### ADR-055 — Operations telemetry: our own metrics and named log lines to Grafana Cloud, no personal data
 
-- **Status:** Proposed — owner to decide · 2026-10-20 (research in [CC-286](tickets/CC-286.md#research-written-before-any-code)).
-  Nothing is sent until the owner accepts this and sets the env vars.
+- **Status:** Accepted · 2026-10-20 (owner, every recommendation below; research in
+  [CC-286](tickets/CC-286.md#research-written-before-any-code)). Nothing is sent until the code pull request merges
+  and the owner sets the env vars in Render (CC-286, Owner checklist).
 - **Context.** Logs live only in Render for 7 to 14 days, nothing measures latency per socket event or route, and
   the two alert lines (`room gauge`, ADR-035; `match pipeline failed`, ADR-047) raise nothing. The free Render
   instance has 0.1 CPU and 512 MB and cannot host a Collector. ADR-034 keeps product analytics first party; this
@@ -43,7 +71,8 @@ the owner may change it.
      read, there is no tracer provider). Budget: about 3 000 active series (10 000 free) and well under 1 GB of
      logs a month (50 GB free).
   3. **Where it goes and how long it is kept.** A Grafana Cloud free stack in the India region (AWS `ap-south-1`),
-     over OTLP/HTTP straight from the server, every 60 seconds. Grafana keeps it 14 days. The full log lines stay in
+     or Singapore (AWS `ap-southeast-1`) if a free stack cannot be made in India, over OTLP/HTTP straight from the
+     server, every 60 seconds. Grafana keeps it 14 days. The full log lines stay in
      Render as today, and Render stays the record for the log retention decision (CC-252).
   4. **Env vars, off when unset.** `OTEL_EXPORTER_OTLP_ENDPOINT` (the stack's `https://otlp-gateway-…/otlp`; unset
      means no SDK is started and the API stays a no-op) and `OTEL_EXPORTER_OTLP_HEADERS`
@@ -89,40 +118,12 @@ the owner may change it.
   it. Because nothing personal is sent, Grafana Labs is not a processor of personal data under the DPDP Act, and
   deletion (CC-035) does not reach it. The same timers give CC-240 its server-side numbers. Traces, if ever wanted,
   need a new decision (sampling, a Collector, and their own allowlist).
-- **Owner decisions, with the recommendation for each.**
-  1. Allow a third party for operations telemetry with no personal data? **Yes**, under points 1, 2 and 7.
-  2. Which service? **Grafana Cloud free**; Axiom if Grafana's sign-up or region does not suit.
-  3. Region? **India (AWS `ap-south-1`)**; Singapore if India is not offered to a free stack.
-  4. Signals? **Metrics and named warning and error lines now; no traces** until paid hosting or a Collector.
-  5. Alerts? **The three in point 6, by email** to the owner's address.
-  6. Who can open the stack? **The owner only** (1 of the 3 free users), with two-factor sign-in.
-
-### ADR-046 — Our own screen in front of Render's cold start page
-
-- **Status:** Open · 2026-10-18 (from [CC-232](tickets/CC-232.md), owner to decide)
-- **Context.** On a true cold start the browser first gets Render's own loading page, before our process can send
-  any HTML, and Render offers no way to brand it. The "Waking up the arcade" screen (CC-232) shows only once our
-  server answers.
-- **Options.** (1) Leave it as it is. (2) Serve the web app from static hosting or a CDN (with CC-028 or CC-123), so
-  our screen loads at once and waits for the API. (3) A service worker that shows the screen on repeat visits.
-- **Recommendation.** Decide with CC-123 (brand domain and CDN). Until then option 1.
-
-### ADR-045 — Keep the previous build's files online after a deploy
-
-- **Status:** Open · 2026-10-17 (from [CC-181](tickets/CC-181.md), owner to decide)
-- **Context.** Render builds every deploy from scratch, so a tab opened before a deploy asks for script files that
-  no longer exist. Since CC-181 such a tab reloads once instead of showing an error, so nobody is stuck.
-- **Options.** (1) Leave it: the reload is enough. (2) Keep the old files for a while (storage for old files, for
-  example a bucket or a CDN, and a rule for when to drop them).
-- **Recommendation.** Option 1 until a CDN exists (CC-123), then revisit.
-
-### ADR-003 — Database: stay on MongoDB vs move to PostgreSQL
-
-- **Status:** Open
-- **Context:** Ratings, leaderboards, friends, payments are relational; matches/moves fit documents.
-- **Recommendation:** Stay on MongoDB through Stage 1 (lower migration risk); revisit before Stage 3 payments.
-
-## Accepted decisions
+- **Owner decisions (2026-10-20, each as recommended).**
+  1. Operations telemetry may go to a third party when it carries no personal data (points 1, 2 and 7).
+  2. Grafana Cloud free, India region (AWS `ap-south-1`), Singapore as the fallback. Axiom stays the runner-up.
+  3. Metrics and named warning and error lines only. No traces, until a new decision.
+  4. The three alerts in point 6, by email to the owner.
+  5. The stack is opened by the owner only, with two-factor sign-in.
 
 ### ADR-052 — The look and feel domain: scope, moves, new tickets and five choices
 
