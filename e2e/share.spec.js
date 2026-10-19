@@ -84,10 +84,10 @@ test.describe("sharing on WhatsApp", () => {
     const won = await whatsappMessage(adult.page);
     const lost = await whatsappMessage(guest.page);
     expect(won).toBe(
-      `🏆 I won a game of Rock Paper Scissors on ClassiCade. Your turn!\nFree, no login needed.\n${gamePage}`,
+      `🏆 Maine Rock Paper Scissors jeeta! Ab tumhari baari:\nI won a game of Rock Paper Scissors on ClassiCade. Your turn!\nFree hai, login nahi chahiye.\nFree, no login needed.\n${gamePage}`,
     );
     expect(lost).toBe(
-      `🎯 I played Rock Paper Scissors on ClassiCade and lost. Can you do better?\nFree, no login needed.\n${gamePage}`,
+      `🎯 Aaj Rock Paper Scissors mein haar mili. Badla loge?\nI played Rock Paper Scissors on ClassiCade and lost. Can you do better?\nFree hai, login nahi chahiye.\nFree, no login needed.\n${gamePage}`,
     );
     const personal = [
       code,
@@ -114,7 +114,7 @@ test.describe("sharing on WhatsApp", () => {
       .poll(() => adult.page.evaluate(() => window.__shared))
       .toEqual({
         title: "ClassiCade",
-        text: "🏆 I won a game of Rock Paper Scissors on ClassiCade. Your turn!\nFree, no login needed.",
+        text: "🏆 Maine Rock Paper Scissors jeeta! Ab tumhari baari:\nI won a game of Rock Paper Scissors on ClassiCade. Your turn!\nFree hai, login nahi chahiye.\nFree, no login needed.",
         url: gamePage,
       });
   });
@@ -158,7 +158,7 @@ test.describe("sharing on WhatsApp", () => {
 
     expect(room.invite.startsWith(`${baseURL}/games/chess/rooms/`)).toBe(true);
     expect(await whatsappMessage(host.page)).toBe(
-      `Play Chess with me on ClassiCade — room ${room.code}\nFree, no login needed.\n${room.invite}`,
+      `Ek game ho jaaye? ClassiCade pe Chess khelo, link kholo aur seedha khelo:\nPlay Chess with me on ClassiCade — room ${room.code}\nFree hai, login nahi chahiye.\nFree, no login needed.\n${room.invite}`,
     );
   });
 

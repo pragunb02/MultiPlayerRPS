@@ -1,6 +1,7 @@
 import { siteOrigin } from "../../app/siteOrigin.js";
 import { resultShare } from "../../games/resultShare.js";
 import { useAction } from "../../hooks/useAction.js";
+import { shareWasCancelled } from "../../lib/shareText.js";
 import { Button } from "../Button/Button.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import { WhatsAppLink } from "../WhatsAppLink/WhatsAppLink.jsx";
@@ -23,10 +24,12 @@ export function ShareResult({ room, origin = siteOrigin() }) {
       if (typeof navigator.share === "function") {
         try {
           await navigator.share({ title: "ClassiCade", text: share.text, url: share.url });
-        } catch {
-          // The player closed the share sheet, so there is nothing to do.
+          return;
+        } catch (error) {
+          // The player closed the share sheet, so there is nothing to do. Any other refusal, such as a browser that
+          // does not allow sharing here, falls through to a copy, so the press still does something.
+          if (shareWasCancelled(error)) return;
         }
-        return;
       }
       try {
         await navigator.clipboard.writeText(share.message);

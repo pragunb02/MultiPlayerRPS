@@ -22,9 +22,11 @@ const room = (overrides = {}) => ({
   game: { outcome: { status: "finished", result: "win", winners: [ME.playerId], reason: "" }, number: 3 },
   ...overrides,
 });
-const TEXT = "🏆 I beat Rocky 2-1 at Rock Paper Scissors on ClassiCade. Can you beat Rocky?";
+const TEXT =
+  "🏆 Maine Rocky ko 2-1 se haraya! Tum try karo:\nI beat Rocky 2-1 at Rock Paper Scissors on ClassiCade. Can you beat Rocky?";
+const FREE = "Free hai, login nahi chahiye.\nFree, no login needed.";
 const URL_ = `${ORIGIN}/games/rock-paper-scissors`;
-const MESSAGE = `${TEXT}\nFree, no login needed.\n${URL_}`;
+const MESSAGE = `${TEXT}\n${FREE}\n${URL_}`;
 
 const show = (props = {}) =>
   render(
@@ -57,7 +59,7 @@ describe("ShareResult", () => {
 
     expect(share).toHaveBeenCalledWith({
       title: "ClassiCade",
-      text: `${TEXT}\nFree, no login needed.`,
+      text: `${TEXT}\n${FREE}`,
       url: URL_,
     });
   });
@@ -73,6 +75,22 @@ describe("ShareResult", () => {
     await user.click(screen.getByRole("button", { name: "Share result" }));
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("copies the whole message when the browser refuses the share sheet for another reason", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue();
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      share: vi.fn().mockRejectedValue(new DOMException("not allowed", "NotAllowedError")),
+      clipboard: { writeText },
+    });
+    show();
+
+    await user.click(screen.getByRole("button", { name: "Share result" }));
+
+    expect(writeText).toHaveBeenCalledWith(MESSAGE);
+    expect(await screen.findByRole("status")).toHaveTextContent("Result copied");
   });
 
   it("copies the whole message where the device has no share sheet", async () => {
@@ -106,7 +124,9 @@ describe("ShareResult", () => {
   it("shows the message it will send, without any name or the room code", () => {
     show();
 
-    const preview = screen.getByText(TEXT);
+    const preview = screen.getByText(
+      (content, element) => element?.textContent === TEXT && element.tagName === "P",
+    );
     expect(preview).toBeVisible();
     expect(document.body.textContent).not.toContain("Guest-ME12");
     expect(document.body.textContent).not.toContain("AB2CD3");

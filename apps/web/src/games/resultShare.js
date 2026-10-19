@@ -4,22 +4,33 @@ import { outcomeFor } from "../components/Celebrations/outcome.js";
 import { resultText, shareMessage, whatsappUrl, withFreeLine } from "../lib/shareText.js";
 import { isAborted } from "./outcomeText.js";
 
-/** Two counts as a score such as "2-1", the viewer's first. */
-const scoreOf = (counts, you, opponentId) => `${counts[you] ?? 0}-${counts[opponentId] ?? 0}`;
+/**
+ * Two counts as a score such as "2-1", the viewer's first, but only when the viewer leads. A score next to "I won"
+ * must back the claim: a player who won the last game but is level or behind ("1-1", "1-3") gets no score.
+ */
+function leadingScore(counts, you, opponentId) {
+  const mine = counts[you] ?? 0;
+  const theirs = counts[opponentId] ?? 0;
+  return mine > theirs ? `${mine}-${theirs}` : "";
+}
 
 /**
  * The score to tell, as numbers only: the room's series once more than one game was played, otherwise the rounds
  * inside the game when it has several (a best of 3 of Rock Paper Scissors keeps `view.score` per player). Empty
- * when there is none, or nothing to tell.
+ * when there is none, when the viewer does not lead, or when the opponent's seat is gone, because then the score
+ * may count games against someone else.
  */
-function scoreFor(room, opponentId) {
+function scoreFor(room, opponent) {
+  if (opponent === undefined) {
+    return "";
+  }
   const { series } = room;
   if (series !== undefined && series.games >= 2) {
-    return scoreOf(series.wins, room.you, opponentId);
+    return leadingScore(series.wins, room.you, opponent.playerId);
   }
   const rounds = room.game.view?.score;
   const played = Object.values(rounds ?? {}).reduce((sum, count) => sum + count, 0);
-  return played > 1 ? scoreOf(rounds, room.you, opponentId) : "";
+  return played > 1 ? leadingScore(rounds, room.you, opponent.playerId) : "";
 }
 
 /**
@@ -35,7 +46,7 @@ export function resultShareOf(room) {
   const outcome = isAborted(room) || seen === "watched" ? "neutral" : seen;
   const opponent = room.seats.find((seat) => seat.playerId !== room.you);
   const character = BOT_CHARACTERS.find((entry) => entry.id === opponent?.bot?.character)?.name ?? "";
-  const score = outcome === "neutral" ? "" : scoreFor(room, opponent?.playerId);
+  const score = outcome === "win" ? scoreFor(room, opponent) : "";
   const forfeit = room.game.outcome.reason === ROOM_END_REASONS.FORFEIT;
   return { gameId: room.gameId, outcome, character, score, forfeit };
 }

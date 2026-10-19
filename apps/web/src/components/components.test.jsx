@@ -183,7 +183,7 @@ describe("ShareRoom", () => {
     const link = screen.getByRole("link", { name: /WhatsApp/ });
 
     const message =
-      "Play Chess with me on ClassiCade — room AB2CD3\nFree, no login needed.\nhttps://classicade.app/games/chess/rooms/AB2CD3";
+      "Ek game ho jaaye? ClassiCade pe Chess khelo, link kholo aur seedha khelo:\nPlay Chess with me on ClassiCade — room AB2CD3\nFree hai, login nahi chahiye.\nFree, no login needed.\nhttps://classicade.app/games/chess/rooms/AB2CD3";
     expect(link).toHaveAttribute("href", `https://wa.me/?text=${encodeURIComponent(message)}`);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -225,7 +225,9 @@ describe("ShareRoom", () => {
     await user.click(screen.getByRole("button", { name: "Share…" }));
 
     expect(share).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "Play a game with me on ClassiCade — room AB2CD3" }),
+      expect.objectContaining({
+        text: "Ek game ho jaaye? ClassiCade pe khelo, link kholo aur seedha khelo:\nPlay a game with me on ClassiCade — room AB2CD3",
+      }),
     );
   });
 
@@ -251,6 +253,22 @@ describe("ShareRoom", () => {
     await user.click(field);
 
     expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
+  });
+
+  it("copies the link when the browser refuses the share sheet for another reason", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue();
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      share: vi.fn().mockRejectedValue(new DOMException("not allowed", "NotAllowedError")),
+      clipboard: { writeText },
+    });
+    withToasts(<ShareRoom code="AB2CD3" gameId="chess" origin="https://classicade.app" />);
+
+    await user.click(screen.getByRole("button", { name: "Share…" }));
+
+    expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3");
+    expect(await screen.findByRole("status")).toHaveTextContent("Link copied");
   });
 
   it("closing the share sheet without sharing is not an error", async () => {

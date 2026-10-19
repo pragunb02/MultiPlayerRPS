@@ -1,7 +1,7 @@
 import { paths } from "../../app/paths.js";
 import { siteOrigin } from "../../app/siteOrigin.js";
 import { useAction } from "../../hooks/useAction.js";
-import { inviteText, shareMessage } from "../../lib/shareText.js";
+import { inviteText, shareMessage, shareWasCancelled } from "../../lib/shareText.js";
 import { Button } from "../Button/Button.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import { WhatsAppLink } from "../WhatsAppLink/WhatsAppLink.jsx";
@@ -20,25 +20,26 @@ export function ShareRoom({ code, gameId, origin = siteOrigin() }) {
   const text = inviteText({ gameId, code });
   const canShare = typeof navigator.share === "function";
 
-  const copy = useAction(
-    async () => {
-      try {
-        await navigator.clipboard.writeText(url);
-      } catch (cause) {
-        // Shown under the button. The browser's own reason means nothing to a player.
-        throw new Error("Couldn't copy. Select the link and copy it", { cause });
-      }
-      toast.show("Link copied", { tone: "success" });
-    },
-    { id: "invite.copy" },
-  );
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (cause) {
+      // Shown under the button. The browser's own reason means nothing to a player.
+      throw new Error("Couldn't copy. Select the link and copy it", { cause });
+    }
+    toast.show("Link copied", { tone: "success" });
+  };
+
+  const copy = useAction(copyLink, { id: "invite.copy" });
 
   const share = useAction(
     async () => {
       try {
         await navigator.share({ title: "ClassiCade", text, url });
-      } catch {
-        // The player closed the share sheet, so there is nothing to do.
+      } catch (error) {
+        // The player closed the share sheet, so there is nothing to do. Any other refusal copies the link instead,
+        // so the press still does something.
+        if (!shareWasCancelled(error)) await copyLink();
       }
     },
     { id: "invite.share" },

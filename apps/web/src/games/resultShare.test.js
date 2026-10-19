@@ -164,8 +164,49 @@ describe("resultShareOf", () => {
     expect(resultShareOf(withRounds({ [viewer.playerId]: 2 })).score).toBe("2-0");
     expect(resultShareOf(withRounds({ [viewer.playerId]: 1 })).score).toBe("");
     expect(resultText(resultShareOf(withRounds({ [viewer.playerId]: 2, [rocky]: 1 })))).toBe(
-      "🏆 I beat Rocky 2-1 at Rock Paper Scissors on ClassiCade. Can you beat Rocky?",
+      "🏆 Maine Rocky ko 2-1 se haraya! Tum try karo:\nI beat Rocky 2-1 at Rock Paper Scissors on ClassiCade. Can you beat Rocky?",
     );
+  });
+
+  // A score next to "I won" must back the claim (review of #103).
+  it("gives no series score to a winner who is level, such as 1-1 after losing the first game", () => {
+    const series = { games: 2, wins: { [viewer.playerId]: 1, [OPPONENT.playerId]: 1 } };
+    const room = finishedRoom({ gameId: "chess", viewer, against: "person", outcome: "win", series });
+
+    expect(resultShareOf(room).score).toBe("");
+    expect(resultShare(room, { origin: ORIGIN }).line).toBe(
+      "🏆 Maine Chess jeeta! Ab tumhari baari:\nI won a game of Chess on ClassiCade. Your turn!",
+    );
+  });
+
+  it("gives no series score to a winner who is behind, such as 1-3 against Rocky", () => {
+    const room = finishedRoom({ gameId: "rps", viewer, against: "character", outcome: "win" });
+    const series = { games: 4, wins: { [viewer.playerId]: 1, [room.seats[1].playerId]: 3 } };
+
+    expect(resultShareOf({ ...room, series }).score).toBe("");
+    expect(resultShare({ ...room, series }, { origin: ORIGIN }).message).not.toMatch(/\d-\d/);
+  });
+
+  it("gives no rounds score to a winner by forfeit who was behind on rounds", () => {
+    const room = finishedRoom({ gameId: "rps", viewer, against: "person", outcome: "forfeit" });
+    const behind = {
+      ...room,
+      game: { ...room.game, view: { bestOf: 5, score: { [viewer.playerId]: 1, [OPPONENT.playerId]: 2 } } },
+    };
+
+    expect(resultShareOf(behind)).toMatchObject({ outcome: "win", forfeit: true, score: "" });
+    expect(resultShare(behind, { origin: ORIGIN }).line).toContain(
+      "I won a game of Rock Paper Scissors on ClassiCade (my opponent left)",
+    );
+  });
+
+  it("gives no score with a loss or a draw", () => {
+    const series = { games: 3, wins: { [viewer.playerId]: 2, [OPPONENT.playerId]: 0 } };
+    const of = (outcome) =>
+      resultShareOf(finishedRoom({ gameId: "chess", viewer, against: "person", outcome, series }));
+
+    expect(of("loss").score).toBe("");
+    expect(of("draw").score).toBe("");
   });
 
   it("tells a forfeit, a draw and an aborted game apart", () => {
@@ -183,7 +224,7 @@ describe("resultShareOf", () => {
     expect(resultShareOf({ ...room, you: "" }).outcome).toBe("neutral");
   });
 
-  it("still tells the result when the opponent's seat is gone after they left", () => {
+  it("still tells the result, without a score, when the opponent's seat is gone after they left", () => {
     const series = { games: 2, wins: { [viewer.playerId]: 2 } };
     const room = finishedRoom({ gameId: "chess", viewer, against: "person", outcome: "forfeit", series });
 
@@ -191,7 +232,7 @@ describe("resultShareOf", () => {
       gameId: "chess",
       outcome: "win",
       character: "",
-      score: "2-0",
+      score: "",
       forfeit: true,
     });
   });

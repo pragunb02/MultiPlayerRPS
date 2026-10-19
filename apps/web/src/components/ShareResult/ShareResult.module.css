@@ -9,6 +9,8 @@
   max-width: 32rem;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  /* The Hinglish line and the English line under it. */
+  white-space: pre-line;
 }
 .buttons {
   display: flex;
