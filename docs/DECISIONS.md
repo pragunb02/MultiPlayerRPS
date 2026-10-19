@@ -87,7 +87,8 @@ the owner may change it.
 ### ADR-051 — The Social and sharing domain: scope, safety inside it, and the answers to #86
 
 - **Status:** Accepted · 2026-10-19 (owner). Proposed in [domains/SOCIAL_AND_SHARING.md](domains/SOCIAL_AND_SHARING.md),
-  PR #97. Two points stay open: the Hinglish share lines and an adult's own name on a share card.
+  PR #97. One point stays open: an adult's own name on a share card. The Hinglish share lines were answered on
+  2026-10-20 (below).
 - **Context.** The owner asked for the domains to be defined, Social and sharing first among two. Its tickets were
   spread over the board, some twice (CC-043 beside CC-217 and CC-169, CC-068 beside CC-214), and three questions
   from #86 were still open.
@@ -109,8 +110,13 @@ the owner may change it.
      met in a room joined by a link, never a quick match stranger.
   9. **What a quick match stranger sees:** the chosen, filtered username, with opaque per-room seat ids (CC-253).
   10. **No free text in reports** for now. Revisit with point 2.
-- **Still open.** The Hinglish share lines (CC-217, the owner writes them). An adult's own name on their share card
-  after CC-152 (recommended: off by default, a choice per share, never the opponent's name).
+- **Still open.** An adult's own name on their share card after CC-152 (recommended: off by default, a choice per
+  share, never the opponent's name).
+- **Answered 2026-10-20 (owner): the Hinglish share lines (CC-217).** Hinglish and English: every share message has
+  the Hinglish line first and the short English line under it. The five drafts in CC-217 §3.6 are used as written.
+  A score is shown only when the player leads. Lines for cases the drafts did not cover (a draw, a loss against a
+  person, an aborted game, a win with no score) were drafted by the builder and are listed in CC-217 for the owner
+  to change.
 - **Consequences.** The domain file's ticket list and build order are the plan for these tickets. CC-044 publishes
   the owner's name as Grievance Officer. CC-051 builds one chess pool and no hour limit. CC-052 and CC-278 enforce the
   minors' friend rule.
@@ -309,6 +315,12 @@ record, because today one process keeps the games it is running in memory.
   on the server (they would drift apart).
 - **Consequences.** `site.js` must agree with the URL shapes in `paths.js` (ADR-011), and a test checks that they
   do. The PNGs are about 300 KB each, which some apps find large; compressing them is a follow-up.
+- **Amended 2026-10-20 ([CC-217](tickets/CC-217.md)).** Point 4: the cards are now JPEGs under 150 KB (a test fails
+  at 300 KB), drawn by the same script, and each file name carries the start of the image's hash
+  (`/og/chess.b756bac7.jpg`, listed in `packages/shared/src/previewImages.js`), because chat apps keep an image by
+  its address. The first release's PNGs stay online for messages sent before. `og:image:type` follows the file.
+  Point 3: the server also writes the site's public address into every page (`classicade:site-origin`), so the web
+  app builds the links players share on it and never on the address the page was opened at or on request headers.
 
 ### ADR-041 — Our own small chess engine for the bots; chess.js stays the referee
 

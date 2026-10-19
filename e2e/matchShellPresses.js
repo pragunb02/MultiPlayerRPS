@@ -42,6 +42,18 @@ const LEAVES_STATE = new Set([
 /** Controls not pressed here, with the reason. */
 export const NOT_PRESSED = new Map([
   ["invite.share", "opens the system share sheet, which a test browser cannot close"],
+  [
+    "invite.whatsapp",
+    "opens WhatsApp's site in a new tab, outside ClassiCade. share.spec.js checks its link",
+  ],
+  [
+    "result.whatsapp",
+    "opens WhatsApp's site in a new tab, outside ClassiCade. share.spec.js checks its link",
+  ],
+  [
+    "result.share",
+    "opens the system share sheet where the browser has one. share.spec.js presses it with and without one",
+  ],
   ["header.skip", "shows only while it has the keyboard focus, and is checked by the keyboard tests"],
 ]);
 
