@@ -17,6 +17,18 @@ Include what you found, where (page, API route or socket event), steps to reprod
 - For a serious issue, a fix or a decision within 30 days. We tell you when it is live.
 - Credit in the fix's notes if you want it. There is no paid bounty.
 
+## Grievances (player reports)
+
+The times above are for security vulnerabilities. A complaint about another player, a name or anything else on the
+site is a grievance, and it has shorter times (IT Rules 2021, ADR-051):
+
+- The Grievance Officer is the owner, named on the terms and privacy pages.
+- An acknowledgement within 24 hours, and a resolution within 15 days.
+- Until the site has its own domain (CC-123), send a grievance through the same private GitHub report as above, or
+  report the player in the game once in-game reports exist (CC-044). After that, write to `grievance@` the site's
+  domain.
+- If a child is in danger, contact Childline on 1098, or cybercrime.gov.in and 1930, at once.
+
 ## Rules for testing
 
 Good-faith research within these rules is welcome, and we will not take action against it.
