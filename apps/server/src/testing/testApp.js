@@ -5,6 +5,7 @@ import { BOTS, createBotRegistry, createEngineRegistry } from "@classicade/games
 import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
+import { createBlockAccessor } from "../data/blockAccessor.js";
 import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
@@ -17,6 +18,7 @@ import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createAccountComponent } from "../domain/accounts/accountComponent.js";
 import { createPlayerDataComponent } from "../domain/accounts/playerDataComponent.js";
 import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
+import { createBlockComponent } from "../domain/blocks/blockComponent.js";
 import { createBotComponent } from "../domain/bots/botComponent.js";
 import { createBotDriver } from "../domain/bots/botDriver.js";
 import { createBotTurns } from "../domain/bots/botTurns.js";
@@ -51,6 +53,7 @@ import { createEmptyAnalyticsDao } from "./emptyAnalyticsDao.js";
 import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.js";
+import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
 import { createMemoryStoreSessionDao } from "./memoryStoreSessionDao.js";
 import {
   createInMemoryAchievementDao,
@@ -90,6 +93,7 @@ import { testConfig } from "./testConfig.js";
  *   accountLimits?: object,   the export and password limits of the account routes (CC-035)
  *   dataParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who takes
  *     part in deleting an account (e.g. one that fails, CC-035)
+ *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
  * }} [options]
  */
 export function createTestApp({
@@ -109,6 +113,7 @@ export function createTestApp({
   pendingMatchDao = createInMemoryPendingMatchDao(),
   accountLimits,
   dataParticipants = (participants) => participants,
+  blockLimits,
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -141,6 +146,16 @@ export function createTestApp({
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const matchComponent = createMatchComponent({ matchAccessor });
+  const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
+  const playerTransferAccessor = createPlayerTransferAccessor({
+    playerTransferDao: createInMemoryPlayerTransferDao(),
+  });
+  const blockComponent = createBlockComponent({
+    blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
+    rooms: roomAccessor,
+    matches: matchComponent,
+    transfers: playerTransferAccessor,
+  });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
     matchAccessor,
@@ -163,13 +178,12 @@ export function createTestApp({
     events: domainEvents,
   });
   const playerTransferComponent = createPlayerTransferComponent({
-    playerTransferAccessor: createPlayerTransferAccessor({
-      playerTransferDao: createInMemoryPlayerTransferDao(),
-    }),
+    playerTransferAccessor,
     participants: transferParticipants([
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
+      { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ]),
     matches: matchComponent,
@@ -188,7 +202,6 @@ export function createTestApp({
     }),
   });
   const engineRegistry = createEngineRegistry(engines);
-  const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const botTurns = createBotTurns({
     bots: createBotRegistry(BOTS.filter((bot) => engineRegistry.has(bot.gameId))),
     engines: engineRegistry,
@@ -202,6 +215,7 @@ export function createTestApp({
     ...(roomLimits && { limits: roomLimits }),
     botTurns,
     keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
+    blocks: blockComponent,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
@@ -263,6 +277,7 @@ export function createTestApp({
         erasePlayer: playerTransferComponent.erasePlayer,
         exportPlayer: playerTransferComponent.exportPlayer,
       },
+      { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
     ]),
   });
   const endedSessions = [];
@@ -291,6 +306,8 @@ export function createTestApp({
     leaderboardComponent,
     leaderboardLimit,
     apiLimit,
+    blockComponent,
+    blockLimits,
     analyticsComponent: createAnalyticsComponent({
       analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
       cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }),
@@ -325,6 +342,7 @@ export function createTestApp({
     playerTransferComponent,
     gamificationComponent,
     leaderboardComponent,
+    blockComponent,
     matchPipeline,
     playerDataComponent,
     tasks,

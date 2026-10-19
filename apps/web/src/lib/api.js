@@ -84,6 +84,18 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     deleteAccount: async (password) => {
       await request("POST", "/account/delete", { password });
     },
+    /** The players this player blocked, newest first: `{ blockId, displayName, blockedAt }` each (CC-044). */
+    getBlocks: async () => (await request("GET", "/blocks")).blocks,
+    /**
+     * Blocks the player in a seat of a room both sit in (CC-044). The server never takes a player id.
+     *
+     * @param {{ roomCode: string, seat: number, seatId: string }} target
+     */
+    blockPlayer: async (target) => (await request("POST", "/blocks", target)).block,
+    /** Removes one of this player's blocks (CC-044). */
+    unblockPlayer: async (blockId) => {
+      await request("DELETE", `/blocks/${encodeURIComponent(blockId)}`);
+    },
     getProgress: async () => (await request("GET", "/progress")).progress,
     getMatches: (query = {}) => request("GET", `/matches${toQuery(query)}`),
     getMatch: async (matchId) => (await request("GET", `/matches/${encodeURIComponent(matchId)}`)).match,

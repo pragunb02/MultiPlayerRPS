@@ -149,6 +149,43 @@ the owner may change it.
   4. The three alerts in point 6, by email to the owner.
   5. The stack is opened by the owner only, with two-factor sign-in.
 
+### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
+
+- **Status:** Accepted by default (owner may change) · 2026-10-19 ([CC-044](tickets/CC-044.md) research §3.1 and
+  the addendum §4, following the plan accepted in ADR-051). Reports are CC-044's second pull request.
+- **Context.** Block must exist before any feature that lets a player meet a stranger (ADR-028.8): quick match
+  (CC-051) first. Players cannot talk, so blocking is about never being put together again. Every player counts as a
+  minor until CC-152, and the repository is public, so nothing may tell a player who blocked them.
+- **Decision.**
+  1. **A block is silent and works both ways**, for guests and accounts alike. The blocked player is never told.
+  2. **Effects.** A blocked pair is never seated together: joining a room where the other sits is refused with
+     exactly the full room answer ("This room is full"). A rematch between them never starts, and the blocked
+     player sees only what any opponent could do: their requests open as anyone's, the blocker's yes is a decline,
+     and the blocked player's yes to an earlier request of the blocker finds it withdrawn. Nothing is refused with
+     words of its own (amended after the review of #107). A game in progress is not stopped. Quick match (CC-051) never pairs them,
+     and every later feature that brings two players together (challenges, friends, presence, invitations, circles)
+     checks the same rule through `blockComponent.blockedWith` or `eitherBlocked` before it acts.
+  3. **Only people you played with.** The client names the other player by a room code or a match id and a seat,
+     never by a player id alone. A room seat also carries the id the room view showed for it, and the server blocks
+     only while that seat still holds that person, because seats move (someone leaves or joins, a rematch swaps
+     them). The server checks that both sat in that open room or played that stored match. Any reference it cannot
+     confirm, including yourself, a computer character or a deleted player, gets the same 404. A block that names a
+     guest who has signed in since applies to their account.
+  4. **Unblock by the record's own random id**, only by the player who made it, from the profile. The list shows the
+     name at the time of the block and the date, never an id.
+  5. **At most 500 blocks per player**, the oldest dropped. Blocking and unblocking: 20 per 10 minutes per player and
+     100 per 10 minutes per network address. The address counts only what the player's own limit let through, so one
+     player cannot use up a school's or a carrier's address.
+  6. **Data.** `player_blocks` (`blockId`, `blockerId`, `blockedId`, `blockedName`, `createdAt`), kept until
+     unblocked or the account is deleted. Both sides move with a guest who signs in (ADR-014), keeping the name the
+     blocker saw. Deletion erases both sides. The export lists only the blocks the player made (ADR-048.2).
+  7. **Mute is not stored.** It ships with emotes (CC-169) as "Mute <name>" for that room, in the browser only.
+- **Consequences.** CC-051 must call `blockedWith` when it pairs. Until the blocker leaves the room, the blocked
+  player can still ask them for a rematch there, and the blocker can decline or ignore it: that is the price of a
+  refusal nobody can tell from an ordinary one. A blocked player who sees a free seat in a room
+  can still guess why they were refused, as on Lichess. That is accepted. A blocked guest who clears their cookies is
+  a new guest, which no block can follow.
+
 ### ADR-052 — The look and feel domain: scope, moves, new tickets and five choices
 
 - **Status:** Accepted · 2026-10-19 (owner, every recommendation in [domains/LOOK_AND_FEEL.md](domains/LOOK_AND_FEEL.md), PR #98)
