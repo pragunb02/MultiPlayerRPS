@@ -1,0 +1,91 @@
+{
+  "safetyUnknownAge": {
+    "safety": {
+      "canFollow": false,
+      "friendsMode": "mutual-known",
+      "emotes": "off",
+      "quietHours": {
+        "timeZone": "Asia/Kolkata",
+        "from": "22:00",
+        "to": "07:00"
+      },
+      "shareCardName": false,
+      "maxOwnedCircleSize": 10,
+      "publicProfile": false,
+      "boardName": "hidden"
+    }
+  },
+  "safetyAdult": {
+    "safety": {
+      "canFollow": true,
+      "friendsMode": "mutual",
+      "emotes": "on",
+      "quietHours": null,
+      "shareCardName": true,
+      "maxOwnedCircleSize": 50,
+      "publicProfile": true,
+      "boardName": "own"
+    }
+  },
+  "correctionByPlayer": {
+    "status": 404
+  },
+  "correctionByOwner": {
+    "status": 200,
+    "body": {
+      "account": {
+        "username": "riya_4875786509",
+        "birthYear": 2010,
+        "ageGroup": "minor"
+      }
+    }
+  },
+  "safetyAfterCorrection": {
+    "safety": {
+      "canFollow": false,
+      "friendsMode": "mutual-known",
+      "emotes": "off",
+      "quietHours": {
+        "timeZone": "Asia/Kolkata",
+        "from": "22:00",
+        "to": "07:00"
+      },
+      "shareCardName": false,
+      "maxOwnedCircleSize": 10,
+      "publicProfile": false,
+      "boardName": "hidden"
+    }
+  },
+  "safetyGuest": {
+    "safety": {
+      "canFollow": false,
+      "friendsMode": "none",
+      "emotes": "off",
+      "quietHours": {
+        "timeZone": "Asia/Kolkata",
+        "from": "22:00",
+        "to": "07:00"
+      },
+      "shareCardName": false,
+      "maxOwnedCircleSize": 10,
+      "publicProfile": false,
+      "boardName": "server-given"
+    }
+  },
+  "safetyVisitor": {
+    "safety": {
+      "canFollow": false,
+      "friendsMode": "mutual-known",
+      "emotes": "off",
+      "quietHours": {
+        "timeZone": "Asia/Kolkata",
+        "from": "22:00",
+        "to": "07:00"
+      },
+      "shareCardName": false,
+      "maxOwnedCircleSize": 10,
+      "publicProfile": false,
+      "boardName": "hidden"
+    }
+  }
+}
