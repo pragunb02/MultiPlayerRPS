@@ -59,6 +59,36 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-074 — A merge queue on main: CI on `merge_group`, merges through the queue
+
+- **Status:** Accepted · 2026-10-20 (owner approved from research. [CC-298](tickets/CC-298.md), research there.
+  Amends ADR-039's up-to-date rule. The owner turns it on with the steps in
+  [DEPLOYMENT.md](DEPLOYMENT.md#merge-queue-cc-298-adr-074))
+- **Context.** Two pull requests that are each green can break `main` together (CC-247, CC-257). Requiring
+  branches to be up to date fixes that, but makes every open PR rebase and rerun after each merge, which with up to
+  five builders is most of the day's CI. Branch protection requires no checks during the feature phase.
+- **Decision.**
+  1. **GitHub's merge queue** on `main`, in a branch ruleset with the required status checks. The queue tests each
+     PR on the newest `main` plus the PRs ahead of it and merges only what passed there. Up to date is no longer
+     required.
+  2. **ci.yml starts on `merge_group`.** Every required job runs there. The jobs that answer a pull request
+     question are skipped there by their `if`, which GitHub reports as success: `render-blueprint` (render.com must
+     never hold back a merge), `visual-scope` and `visual` (advisory). `changes` runs there, because its first
+     parent is the queue's base, so it checks exactly the PR's change. No other workflow starts on `merge_group`:
+     WebKit stays advisory, and `visual-refresh.yml` still runs on the push to `main` after the merge. The table is
+     in ci.yml's header and pinned in `scripts/workflows.test.mjs`.
+  3. **Settings:** merge method Merge (the collector reads `Merge pull request #N`), build concurrency 2, group
+     size 1 to 5, 5 minute wait, 30 minute status check timeout, only non-failing PRs merge.
+  4. **Required checks:** the seven ci.yml checks listed in DEPLOYMENT.md, `Changelog fragments` newly among them.
+     CodeQL runs from default setup, outside our workflows, so it is required by the ruleset's code scanning rule,
+     not as a status check that might never report on the queue's branch.
+  5. **The coordinator merges with `gh pr merge <n> --merge --auto`.** Nobody merges or updates a branch by hand.
+- **Why.** The queue gives the safety of up-to-date branches with one CI run per merge instead of one per open PR
+  per merge. Not chosen: keeping "up to date" (the rebase churn), and no required checks (red `main` again).
+- **Consequences.** Each merge waits for a second CI run, about 10 minutes, the owner's chosen trade-off. The push
+  to `main` runs CI a third time on the same commit, which Render waits for. A queue run that hangs leaves the queue
+  at the 30 minute timeout. An emergency merge disables the ruleset for the moment.
+
 ### ADR-068 — Changelog fragments, folded by the coordinator, and numbers assigned at dispatch
 
 - **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-299](tickets/CC-299.md), research there)
@@ -999,6 +1029,10 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
 - **Amended 2026-10-18 (owner): fast mode ended.** Branch protection requires eight checks with branches up to date: lint/unit/coverage, Docker, the merged browser jobs (Chromium desktop + mobile, Firefox), the backup round trip, actionlint, and CodeQL for JavaScript and for Actions; every PR gets both reviewers and the skeptic again; builders run lint, format, coverage and their own browser tests locally. WebKit stays advisory until its open flakes (CC-273) are fixed.
 
 - **Amended 2026-10-19 (owner): PR evidence.** Every pull request shows its change working in the template's Evidence section: UI screenshots (desktop 1280×720 and phone 390×844, before and after) on the `pr-evidence` branch, request and response for API or socket changes, and the tests added. Test accounts only, because the repository is public.
+
+- **Amended 2026-10-20 (owner, CC-298): merge queue.** The up-to-date rule is replaced by GitHub's merge queue
+  (ADR-074): required checks run again on the newest `main` plus the PRs ahead, and the coordinator merges with
+  `gh pr merge --merge --auto`.
 
 ### ADR-038 — Button feedback: every press answers, waiting says so
 

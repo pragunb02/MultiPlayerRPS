@@ -458,13 +458,118 @@ describe("render.yaml schema check", () => {
   });
 });
 
+// The merge queue (CC-298, ADR-074). A required check must report on the queue's `merge_group` run, or the queue
+// waits for it until its timeout. These pin which events start each workflow and which jobs run on each event, and
+// keep the check names the owner requires in docs/DEPLOYMENT.md in step with the jobs that report them.
+describe("merge queue (CC-298)", () => {
+  const EVENTS = ["pull_request", "merge_group", "push"];
+
+  /** The events a job runs on, from its `if`. Any condition not written in these two forms fails the test. */
+  const eventsOf = (/** @type {string | undefined} */ condition) => {
+    if (condition === undefined || condition === "${{ !cancelled() }}") return EVENTS;
+    const parts = condition
+      .split(" || ")
+      .map((part) => /^github\.event_name == '([a-z_]+)'$/.exec(part)?.[1]);
+    if (parts.some((part) => part === undefined))
+      throw new Error(`a condition this test cannot read: ${condition}`);
+    return parts;
+  };
+
+  /** The jobs of ci.yml with their check names and the events each runs on. */
+  const ciJobs = async () => {
+    const { jobs } = parse(await read(".github/workflows/ci.yml"));
+    return Object.entries(jobs).map(([id, each]) => ({ id, name: each.name, events: eventsOf(each.if) }));
+  };
+
+  /** The checks the owner requires in the main ruleset, as docs/DEPLOYMENT.md lists them. */
+  const REQUIRED = [
+    "Lint, format, audit, unit + integration (coverage gates)",
+    "Docker image builds and serves (docker compose)",
+    "Browser persona tests (desktop + mobile)",
+    "Browser persona tests (firefox desktop)",
+    "Backup round trip (mongodump, age, mongorestore)",
+    "Workflow files (actionlint)",
+    "Changelog fragments",
+  ];
+
+  it("starts CI on pull requests, the merge queue and pushes to main", async () => {
+    const { on } = parse(await read(".github/workflows/ci.yml"));
+
+    expect(on).toEqual({
+      pull_request: null,
+      merge_group: { types: ["checks_requested"] },
+      push: { branches: ["main"] },
+    });
+  });
+
+  it("runs each job on the events written in ci.yml's table, and no other", async () => {
+    const events = Object.fromEntries((await ciJobs()).map(({ id, events: each }) => [id, each]));
+
+    expect(events).toEqual({
+      checks: EVENTS,
+      "backup-round-trip": EVENTS,
+      workflows: EVENTS,
+      changes: ["pull_request", "merge_group"],
+      "render-blueprint": ["pull_request"],
+      "e2e-parts": EVENTS,
+      "e2e-restarts": EVENTS,
+      e2e: EVENTS,
+      "e2e-firefox-parts": EVENTS,
+      "e2e-firefox-restarts": EVENTS,
+      "e2e-firefox": EVENTS,
+      "visual-scope": ["pull_request"],
+      visual: ["pull_request"],
+      docker: EVENTS,
+    });
+  });
+
+  it("runs every required check in the merge queue", async () => {
+    const jobs = await ciJobs();
+
+    for (const name of REQUIRED) {
+      expect(jobs.find((each) => each.name === name)?.events, name).toContain("merge_group");
+    }
+  });
+
+  it("lists exactly those check names in the owner's steps", async () => {
+    const deployment = await read("docs/DEPLOYMENT.md");
+
+    for (const name of REQUIRED) {
+      expect(deployment).toContain(`{ "context": "${name}", "integration_id": 15368 }`);
+    }
+    expect(deployment.match(/"integration_id": 15368/g)).toHaveLength(REQUIRED.length);
+  });
+
+  it("gives each queue run a group of its own that no other run cancels", async () => {
+    const { concurrency } = parse(await read(".github/workflows/ci.yml"));
+
+    // merge_group is not pull_request, so its group is its own commit and cancel-in-progress is false.
+    expect(concurrency.group).toBe(
+      "ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}",
+    );
+    expect(concurrency["cancel-in-progress"]).toBe("${{ github.event_name == 'pull_request' }}");
+  });
+
+  it("starts no other workflow from the merge queue: WebKit is advisory, and the refresh runs after a merge", async () => {
+    const folder = new URL("../.github/workflows/", import.meta.url);
+    const others = (await readdir(folder)).filter((name) => name !== "ci.yml");
+
+    expect(others).toEqual(expect.arrayContaining(["visual-refresh.yml", "webkit.yml"]));
+    for (const name of others) {
+      const { on } = parse(await read(`.github/workflows/${name}`));
+      expect(Object.keys(on), name).not.toContain("merge_group");
+      expect(JSON.stringify(on), name).not.toContain("gh-readonly-queue");
+    }
+  });
+});
+
 describe("changelog fragments check (CC-299)", () => {
   it("runs on pull requests, on the merge commit with main as its first parent, with a read-only token", async () => {
     const workflow = await read(".github/workflows/ci.yml");
     const { jobs, permissions } = parse(workflow);
     const changes = jobs.changes;
 
-    expect(changes.if).toBe("github.event_name == 'pull_request'");
+    expect(changes.if).toBe("github.event_name == 'pull_request' || github.event_name == 'merge_group'");
     expect(changes.permissions ?? permissions).toEqual({ contents: "read" });
     expect(changes.steps[0].with).toEqual({ "fetch-depth": 2, "persist-credentials": false });
     expect(changes.steps.at(-1).run).toBe("node scripts/bin/collect-changes.mjs --check --base HEAD^1");

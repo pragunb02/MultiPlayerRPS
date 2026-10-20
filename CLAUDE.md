@@ -102,6 +102,10 @@ These rules come first. Where they differ from anything below, they win.
    **Temporary (owner, 2026-10-20):** during the feature phase merges do not wait for CI and branch protection
    requires no checks. CI still runs on every PR and push, and Render deploys only commits whose checks pass. The
    owner restores the required checks after the feature phase.
+   **Merge queue (CC-298, ADR-074):** once the owner turns on the ruleset (DEPLOYMENT.md, Merge queue), the
+   coordinator merges only with `gh pr merge <n> --merge --auto`, which enqueues the PR. The queue runs CI again on
+   the newest `main` plus the PRs ahead (about 10 minutes, the owner's chosen trade-off), so nobody updates a branch
+   by hand to make it mergeable.
 8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
 9. **Parallel agents (owner, 2026-10-20, from research):** at most 5 builders at once on one machine. Each starts
    from fresh `main` (never another open PR) with the files and APIs it owns listed in its brief. Locally a builder
