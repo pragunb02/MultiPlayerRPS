@@ -28,16 +28,22 @@ async function makeChallenge(alice) {
 /** Bob opens the link without an account, plays as a guest and takes the challenge. */
 async function takeAsVisitor(bob, path) {
   await bob.page.goto(path);
-  await expect(bob.page.getByRole("heading", { name: "You've been challenged to Rock Paper Scissors" })).toBeVisible();
+  await expect(
+    bob.page.getByRole("heading", { name: "You've been challenged to Rock Paper Scissors" }),
+  ).toBeVisible();
   // Alice is a guest, so the link never shows her name (ADR-028.7).
-  await expect(bob.page.getByText("A ClassiCade player challenges you to Rock Paper Scissors.")).toBeVisible();
+  await expect(
+    bob.page.getByText("A ClassiCade player challenges you to Rock Paper Scissors."),
+  ).toBeVisible();
   await bob.page.getByRole("button", { name: "Play as guest" }).click();
   await bob.page.getByRole("button", { name: "Accept and play" }).click();
   await expect(bob.page).toHaveURL(/\/games\/rock-paper-scissors\/rooms\/[A-Z0-9]{6}$/);
 }
 
 test.describe("challenge links (CC-139)", () => {
-  test("Alice sends a link, Bob takes it, Alice hears it on another page and both play", async ({ players }) => {
+  test("Alice sends a link, Bob takes it, Alice hears it on another page and both play", async ({
+    players,
+  }) => {
     const alice = await players.open("alice");
     const path = await makeChallenge(alice);
     const aliceName = await nameOf(alice);
@@ -70,7 +76,10 @@ test.describe("challenge links (CC-139)", () => {
     await takenPopup(alice).getByRole("button", { name: "Not now" }).click();
     await expect(takenPopup(alice)).toHaveCount(0);
     await alice.page.getByRole("button", { name: "Inbox, 1 waiting" }).click();
-    await alice.page.getByRole("region", { name: "Inbox" }).getByRole("link", { name: "Go and play" }).click();
+    await alice.page
+      .getByRole("region", { name: "Inbox" })
+      .getByRole("link", { name: "Go and play" })
+      .click();
 
     await expect(choices(alice)).toBeVisible();
     await expect(choices(bob)).toBeVisible();
