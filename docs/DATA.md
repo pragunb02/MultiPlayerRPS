@@ -47,6 +47,7 @@ does not.
 | [`leaderboard_entries`](#leaderboard_entries)         | yes for accounts: username, level, score (public). Guests: pseudonymous, the server-given name                    | accounts: all time for ever, weekly 28 days after the week. Guests: 30 days after the last counted game | MongoDB TTL index, the guest transfer, account deletion |
 | [`player_transfers`](#player_transfers)               | pseudonymous: guest id, account id and username                                                                   | for ever                                                                                                | nothing                                                 |
 | [`player_blocks`](#player_blocks)                     | pseudonymous: both player ids, the blocked player's name then                                                     | until unblocked, or either account is deleted                                                           | unblocking, account deletion                            |
+| [`daily_puzzle_attempts`](#daily_puzzle_attempts)     | pseudonymous: player id, how each day's puzzle went                                                               | until the account is deleted                                                                            | account deletion, the guest transfer                    |
 | [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)                                                       | until the player deletes the account                                                                    | account deletion (CC-035)                               |
 | [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                                                                         | 30 days                                                                                                 | MongoDB TTL index                                       |
 | [`legacy_closures`](#legacy_closures)                 | pseudonymous: the id of a legacy row whose player deleted the account                                             | for ever                                                                                                | nothing                                                 |
@@ -331,6 +332,24 @@ ADR-053)
    blocker saw (ADR-014). A guest who never signs in keeps their blocks as long as other guest data (CC-098).
 5. **Deleted by:** unblocking (`DELETE /api/blocks/:blockId`), and account deletion, on either side.
 
+### `daily_puzzle_attempts`
+
+`apps/server/src/persistence/dailyPuzzleAttemptDao.js`, rules in
+`apps/server/src/domain/dailyPuzzles/dailyPuzzleComponent.js` (CC-144, ADR-061)
+
+1. **Holds:** one document per player, puzzle kind and day, made by the player's first legal move or hint that day:
+   `playerId`, `kind`, `day`, `puzzleId`, `status`, the moves found, mistakes and hints at each move, the streak and
+   best streak once the day ended, a `version`, and when it started, changed and ended. Guests and accounts alike.
+   Index: unique on `playerId`, `kind` and `day`. A visitor who only looks stores nothing.
+2. **Personal data:** pseudonymous. It says on which days a player did the puzzle and how it went.
+3. **Who can read it:** the player, as today's attempt and their puzzle streak (`GET /api/daily/:kind`, the data
+   export, which leaves out the puzzle of a day still being played). Nobody else: the share card the player may send names nobody and shows no move. The owner.
+4. **Kept for:** until the account is deleted. A guest's days move to the account they sign in to. Where both have
+   a day, the one that went further stays (failed, then solved, then still being played) and the other is deleted
+   (ADR-014, ADR-061.8). A guest who never signs in keeps them as long as other
+   guest data (CC-098).
+5. **Deleted by:** account deletion, and the guest transfer for the copy of a day that does not stay.
+
 ### `accounts.birthYear`
 
 `apps/server/src/persistence/accountDao.js`, the rule in `packages/shared/src/ages.js` (CC-152)
@@ -393,6 +412,7 @@ describe the stores as they were before CC-035 and are brought in line by CC-248
 | `leaderboard_entries`                       | deleted                                                   | yes, without the player id             |
 | `player_transfers`                          | deleted                                                   | yes                                    |
 | `player_blocks`                             | deleted on either side                                    | the blocks the player made, by name    |
+| `daily_puzzle_attempts`                     | deleted                                                   | every day, without the moves           |
 | server memory (login throttle, rate limits) | not reached, forgotten at the next deploy or restart      | no                                     |
 | server logs (Render)                        | not reached, ids only, 7 or 14 days                       | no                                     |
 | backups                                     | not reached, age out within 30 days                       | no                                     |

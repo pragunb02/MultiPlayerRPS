@@ -281,3 +281,64 @@ test("Chess after 1. e4, on Black's turn", async ({ players }) => {
   await phaseIs(guest, "my-turn");
   await matchesBaselines(guest.page, "playing-chess");
 });
+
+/** Lichess puzzle 0000D (CC0) as the server shows it on Tuesday 2026-10-20, before the first move. */
+const DAILY_CHESS = Object.freeze({
+  kind: "chess",
+  day: "2026-10-20",
+  number: 2,
+  nextAt: Date.parse("2026-10-20T18:30:00.000Z"),
+  rating: 1529,
+  steps: 2,
+  maxMistakes: 3,
+  maxHints: 2,
+  position: {
+    fen: "5rk1/1p3ppp/pq1Q1b2/8/8/1P3N2/P4PPP/3R2K1 b - - 3 27",
+    toMove: "b",
+    player: "b",
+    lastMove: { from: "d3", to: "d6", san: "Qd6" },
+    line: [],
+  },
+  status: "new",
+  mistakes: 0,
+  hints: [],
+  hintsTaken: 0,
+  hintsLeft: 2,
+  grid: ["notReached", "notReached"],
+  streak: { current: 0, best: 0, playedToday: false, atRisk: false },
+});
+/** The same puzzle solved, with one mistake and one hint, on a three day streak. */
+const DAILY_CHESS_SOLVED = Object.freeze({
+  ...DAILY_CHESS,
+  position: {
+    fen: "3b2k1/1p3ppp/pq6/8/8/1P3N2/P4PPP/3R2K1 w - - 0 29",
+    toMove: "w",
+    player: "b",
+    lastMove: { from: "f6", to: "d8", san: "Bxd8" },
+    line: ["Rd8", "Qxd8+", "Bxd8"],
+  },
+  status: "solved",
+  mistakes: 1,
+  hintsTaken: 1,
+  hintsLeft: 1,
+  grid: ["afterMistakes", "firstTry"],
+  solution: ["Rd8", "Qxd8+", "Bxd8"],
+  sourceUrl: "https://lichess.org/training/0000D",
+  streak: { current: 3, best: 4, playedToday: true, atRisk: false },
+});
+
+test("the daily chess puzzle before the first move, and solved", async ({ players }) => {
+  const { page } = await players.open("visitor");
+  // Each day has its own puzzle, so the page is given one fixed puzzle and its picture is the same every run.
+  let shown = DAILY_CHESS;
+  await page.route("**/api/daily/chess", (route) => route.fulfill({ json: { puzzle: shown } }));
+
+  await page.goto("/daily/chess");
+  await expect(page.getByRole("grid", { name: "Chess board" })).toBeVisible();
+  await matchesBaselines(page, "daily-chess");
+
+  shown = DAILY_CHESS_SOLVED;
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Solved!" })).toBeVisible();
+  await matchesBaselines(page, "daily-chess-solved");
+});

@@ -1,4 +1,5 @@
-import { GAMES, getGameBySlug } from "./games.js";
+import { DAILY_PUZZLES, getDailyPuzzle } from "./dailyPuzzles.js";
+import { GAMES, getGame, getGameBySlug } from "./games.js";
 import { getLeaderboard, LEADERBOARDS } from "./leaderboards.js";
 import { PREVIEW_IMAGE_FILES } from "./previewImages.js";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "./rooms.js";
@@ -147,6 +148,16 @@ const room = (game, code) =>
         ...withGameImage(game),
       });
 
+/** A daily puzzle (CC-144): the same for everyone on a day, so it is worth listing. */
+const daily = (puzzle) =>
+  page({
+    title: `${puzzle.name} · ${SITE_NAME}`,
+    description: `A new puzzle every day, the same for everyone. Solve it, keep your streak and share your grid. Free, no account needed.`,
+    path: `/daily/${puzzle.id}`,
+    indexable: true,
+    ...withGameImage(getGame(puzzle.gameId)),
+  });
+
 const leaderboard = (board) =>
   page({
     title: `${board.name} leaderboard · ${SITE_NAME}`,
@@ -241,6 +252,10 @@ function match(segments) {
     const board = getLeaderboard(rest[0] ?? LEADERBOARDS[0].id);
     return board === undefined ? NOT_FOUND : leaderboard(board);
   }
+  if (head === "daily" && rest.length === 1) {
+    const puzzle = getDailyPuzzle(rest[0].toLowerCase());
+    return puzzle === undefined ? NOT_FOUND : daily(puzzle);
+  }
   if (head === "u" && rest.length === 2 && rest[1].toLowerCase() === "userprofile") return FIXED.profile;
   return NOT_FOUND;
 }
@@ -256,10 +271,14 @@ export function describePage(pathname) {
   return segments === undefined ? NOT_FOUND : match(segments);
 }
 
-/** Every page search engines should list: home, the game lobbies, the leaderboards and the legal pages. */
+/**
+ * Every page search engines should list: home, the game lobbies, the daily puzzles, the leaderboards and the legal
+ * pages.
+ */
 export const PUBLIC_PAGE_PATHS = Object.freeze([
   "/",
   ...GAMES.map((game) => `/games/${game.slug}`),
+  ...DAILY_PUZZLES.map((puzzle) => `/daily/${puzzle.id}`),
   ...LEADERBOARDS.map((board) => `/leaderboards/${board.id}`),
   "/privacy",
   "/terms",

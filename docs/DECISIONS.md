@@ -97,6 +97,48 @@ the owner may change it.
   graph (ADR-027 point 4) can read the stored changes. A second instance (CC-061) works unchanged, because every
   write is guarded by its revision.
 
+### ADR-061 — Daily puzzles: a curated CC0 set in the repo, checked on the server, their own streak, no XP yet
+
+- **Status:** Accepted · 2026-10-20 by the owner (CC-144 part 1, research in [tickets/CC-144.md](tickets/CC-144.md)).
+  The owner confirmed three points on 2026-10-20: no XP in part 1 (point 7), puzzle #1 stays Monday 2026-10-19
+  (point 3), and the solution shows after a failed attempt as well as after a solved one (point 4).
+- **Context.** CC-144 is a daily set where each puzzle has its own streak and a spoiler-free share grid. Part 1 is
+  the chess puzzle from the Lichess puzzle database (CC0, 6 million puzzles, about 270 MB compressed). Later parts
+  add Ultimate Tic Tac Toe and RPS puzzles.
+- **Decision.**
+  1. **A puzzle kind is a strategy.** Each kind (today only `chess`) gives the server a pure referee (start, judge a
+     move, hint, solution), its limits and its catalogue, and gives the web app a board in a registry. Attempts,
+     streaks, routes, sign-up moves, export and deletion are shared by every kind.
+  2. **The set lives in the repo**, server side only (`apps/server/src/persistence/puzzles/`), curated once by
+     `scripts/bin/curate-chess-puzzles.mjs` from a downloaded part of the CC0 file and never fetched at run time. The
+     licence is kept beside it and in `docs/CREDITS.md`. Adding puzzles appends to the end of each band, so the
+     puzzle of a day already played never changes until the set wraps.
+  3. **The day's puzzle** is the same for everyone on an India day (ADR-034): day number since Monday 2026-10-19,
+     modulo the set, with the set ordered so the rating rises from Monday to Sunday. The day comes from one injected
+     function, so CC-146 can give each player their own day.
+  4. **Server checked, solution sealed.** chess.js judges every move on the server (ADR-041). Answers never carry
+     the moves still to find. The solution is shown only once the attempt has ended, solved or failed. Any
+     checkmate is accepted, as on Lichess.
+  5. **Three mistakes, two optional hints.** A wrong move costs a mistake and never moves the board. An illegal move
+     is refused and costs nothing.
+  6. **Its own streak**, per kind, on the same days as the puzzle: a solved day after a solved yesterday adds one, a
+     solved day after a gap starts at 1, a failed day sets it to 0, and a streak last extended yesterday is at
+     risk. It is stored on each day's attempt and rebuilt from them after a guest signs in. A puzzle is not a match:
+     it never feeds the daily play streak, quests, achievements or leaderboards (ADR-013).
+  7. **No XP in part 1.** A guest who solves and then signs in to an account that solved the same day would bring a
+     second award for that day (ADR-014.5 adds totals), and the leaderboards take bonus XP only from quests.
+  8. **Guests play, and their days follow them** (ADR-014): a guest's day moves to the account, then the streak is
+     rebuilt. Where both have the day, the one that went further stays: failed over solved over still being played,
+     the account's own on a tie. So failing as a guest to see the solution and then solving on the account leaves the
+     account's day failed. A day is stored only once a legal move or a hint is accepted. Export and deletion include
+     the days (ADR-048), and the export leaves out the puzzle of a day still being played, whose id leads to its
+     solution.
+  9. **The share grid names nobody** (ADR-028.7): the kind, the number, one square per move to find, hints, the
+     streak, and CC-217's Hinglish and English lines. The Hinglish speaks to the friend with "tum", never "aap",
+     as all the app's copy does (owner, 2026-10-20), and a test checks it.
+- **Consequences.** A new collection, `daily_puzzle_attempts`, with one unique index, kept until the account is
+  deleted. About 108 KB of JSON in the server. A new kind is a referee, a catalogue, a board and two registry lines.
+
 ### ADR-060 — Guests on the leaderboards under their server-given name
 
 - **Status:** Accepted · 2026-10-20 by the owner (points 1 to 3). Points 4 to 8 are how
