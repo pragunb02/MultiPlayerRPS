@@ -35,6 +35,14 @@ const DECISION_COLUMNS = Object.freeze([
 // A cell left as the template wrote it counts as empty.
 const PLACEHOLDER = /^(|…|\.\.\.|-|—|tbd|todo|\?|<[^>]*>)$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * From this day on, a full `feature` ticket at Ready or later names at least one Friction guardrail row in its Success
+ * metric table (CC-313 section 6, owner 2026-10-20). Tickets started before it are not checked, as CC-311 did.
+ */
+export const FRICTION_GUARDRAIL_FROM = "2026-10-21";
+/** The Kind of the row a feature ticket must have. */
+export const FRICTION_GUARDRAIL = "Friction guardrail";
 const AC_ID = /\bAC-(\d+)\b/g;
 
 /** The cells of a Markdown table row. A pipe written as `\|` stays inside its cell. */
@@ -131,6 +139,21 @@ export function checkTicket({ name, text, today }) {
   }
   const repeated = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
   if (repeated.length > 0) problems.push(`acceptance criterion ids used twice: ${repeated.join(", ")}`);
+
+  const started = headCell(lines, "Started");
+  const isNewFeature =
+    template === "full" &&
+    headCell(lines, "Type") === "feature" &&
+    isDay(started) &&
+    started >= FRICTION_GUARDRAIL_FROM;
+  const kinds = section(lines, "Success metric")
+    .lines.filter((line) => line.trim().startsWith("|"))
+    .map((line) => cellsOf(line)[0].replace(/\*/g, ""));
+  if (isNewFeature && !kinds.includes(FRICTION_GUARDRAIL)) {
+    problems.push(
+      `a feature ticket started on or after ${FRICTION_GUARDRAIL_FROM} needs a ${FRICTION_GUARDRAIL} row in its Success metric table (CC-313)`,
+    );
+  }
 
   return problems.map((problem) => `docs/tickets/${name} (${status}): ${problem}`);
 }

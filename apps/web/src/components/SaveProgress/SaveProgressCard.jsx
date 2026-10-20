@@ -8,6 +8,7 @@ import { DismissButton } from "../DismissButton/DismissButton.jsx";
 import { PROMPTS, useSaveProgress } from "./saveProgressContext.js";
 import { winWorthSaving } from "./savedMessage.js";
 import styles from "./SaveProgressCard.module.css";
+import { useInterruption } from "../../hooks/useInterruption.js";
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
@@ -34,6 +35,7 @@ export function SaveProgressCard({ room, game }) {
     !save.isDismissed(PROMPTS.ROOM_CARD) &&
     save.mayOfferInRoom(here);
   const { offeredInRoom } = save;
+  const interruption = useInterruption("card.save_progress", { open: shown });
 
   useEffect(() => {
     if (shown) offeredInRoom({ code: room.code, game });
@@ -44,7 +46,7 @@ export function SaveProgressCard({ room, game }) {
   }
   const next = returnPathFor(location);
   return (
-    <section className={styles.card} aria-labelledby={headingId}>
+    <section className={styles.card} aria-labelledby={headingId} data-cc-surface="card.save_progress">
       <div className={styles.top}>
         <h2 id={headingId} className={styles.heading}>
           Save your progress
@@ -52,7 +54,10 @@ export function SaveProgressCard({ room, game }) {
         <DismissButton
           control="save.dismiss"
           label="Close: save your progress"
-          onClick={() => save.dismiss(PROMPTS.ROOM_CARD)}
+          onClick={() => {
+            interruption.dismissed();
+            save.dismiss(PROMPTS.ROOM_CARD);
+          }}
         />
       </div>
       <p className={styles.lead}>You're playing as a guest. Sign up and keep everything you've earned:</p>
@@ -73,10 +78,20 @@ export function SaveProgressCard({ room, game }) {
         )}
       </ul>
       <div className={styles.actions}>
-        <Link to={paths.signup(next)} className={styles.primary} data-cc-control="save.signup">
+        <Link
+          to={paths.signup(next)}
+          className={styles.primary}
+          data-cc-control="save.signup"
+          onClick={interruption.acted}
+        >
           Sign up — keep it
         </Link>
-        <Link to={paths.login(next)} className={styles.secondary} data-cc-control="save.login">
+        <Link
+          to={paths.login(next)}
+          className={styles.secondary}
+          data-cc-control="save.login"
+          onClick={interruption.acted}
+        >
           Log in
         </Link>
       </div>

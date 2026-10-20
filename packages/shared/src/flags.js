@@ -79,6 +79,18 @@ export const FLAGS = Object.freeze([
     client: true,
     success: "A batch the server accepted (204).",
   }),
+  Object.freeze({
+    name: "interruption_counts",
+    description:
+      "Counts each toast, banner, dialog, card, request and screen the site shows and how it ended, interruptions per visit and per game, the words on each screen as buckets, and the steps of the registered funnels, with no id. Needs telemetry_client on too.",
+    ticket: "CC-313",
+    default: false,
+    removeBy: "2027-02-28",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: true,
+    success: "An interruption_ended event the server accepted.",
+  }),
 ]);
 
 const NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;

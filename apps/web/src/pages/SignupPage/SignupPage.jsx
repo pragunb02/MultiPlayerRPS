@@ -12,6 +12,7 @@ import { useSession } from "../../hooks/useSession.js";
 import { useServices } from "../../app/servicesContext.js";
 import { NO_TELEMETRY } from "../../lib/telemetry/facade.js";
 import { nextKindOf, ruleOf } from "../../lib/telemetry/authForms.js";
+import { NO_INTERRUPTIONS } from "../../lib/telemetry/interruptions.js";
 import styles from "../authForms.module.css";
 
 // Mirrors the server's rules (models/credentials.js) for instant feedback; the server still decides.
@@ -51,7 +52,7 @@ export function SignupPage() {
   const saveProgress = useSaveProgress();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
-  const telemetry = useServices().telemetry ?? NO_TELEMETRY;
+  const { telemetry = NO_TELEMETRY, interruptions = NO_INTERRUPTIONS } = useServices();
   const [form, setForm] = useState({ username: "", email: "", password: "", birthYear: "" });
   // Set when the server refused the year (under 13). The choice then stays as it is for this visit (CC-152).
   const [tooYoung, setTooYoung] = useState(false);
@@ -66,6 +67,7 @@ export function SignupPage() {
       setFieldErrors({});
       try {
         const { carriedOver } = await session.signup(credentialsOf(form));
+        interruptions.reach("sign_up", "account_created");
         // One confirmation, with the account's numbers, when guest games came along (CC-097).
         saveProgress.confirmSaved(carriedOver);
         // Signed in: the redirect below takes over on the next render.
@@ -107,6 +109,7 @@ export function SignupPage() {
     );
     if (broken.length === 0) {
       telemetry.track("auth_form_submitted", { form: "signup" });
+      interruptions.reach("sign_up", "form_submitted");
       signup.run();
     }
   }

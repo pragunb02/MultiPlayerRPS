@@ -138,6 +138,8 @@ export {
   CLIENT_COMMON_FIELDS,
   CONTROL_PATTERN,
   DEVICE_WIDTHS,
+  INTERRUPTION_OUTCOMES,
+  INTERRUPTION_PHASES,
   isTelemetryBuild,
   isTelemetryEventName,
   SERVER_COMMON_FIELDS,
@@ -166,3 +168,13 @@ export {
   ROUTE_TEMPLATES,
   TELEMETRY_ROUTES,
 } from "./telemetry/routes.js";
+export {
+  isSurfaceId,
+  SURFACE_CLASSES,
+  SURFACE_IDS,
+  SURFACE_KINDS,
+  SURFACE_OPENERS,
+  SURFACES,
+  surfaceNamed,
+} from "./telemetry/surfaces.js";
+export { FUNNEL_IDS, FUNNEL_STEP_IDS, FUNNELS, isFunnelStep } from "./telemetry/funnels.js";

@@ -17,6 +17,7 @@ import { useAction } from "../../hooks/useAction.js";
 import { useChallenge } from "../../hooks/useChallenge.js";
 import { useSession } from "../../hooks/useSession.js";
 import { challengeText, shareMessage } from "../../lib/shareText.js";
+import { NO_INTERRUPTIONS } from "../../lib/telemetry/interruptions.js";
 import styles from "./ChallengePage.module.css";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -71,7 +72,7 @@ function Yours({ challenge, onChange }) {
       } catch (cause) {
         throw new Error("Couldn't copy. Select the link and copy it", { cause });
       }
-      toast.show("Link copied", { tone: "success" });
+      toast.show("Link copied", { surface: "toast.copied", tone: "success" });
     },
     { id: "challenge.copy" },
   );
@@ -120,7 +121,7 @@ function Yours({ challenge, onChange }) {
  * until they choose.
  */
 function Theirs({ challenge }) {
-  const { api } = useServices();
+  const { api, interruptions = NO_INTERRUPTIONS } = useServices();
   const session = useSession();
   const navigate = useNavigate();
   const location = useLocation();
@@ -133,6 +134,7 @@ function Theirs({ challenge }) {
   const accept = useAction(
     async () => {
       const taken = await api.acceptChallenge(challenge.id);
+      interruptions.reach("challenge", "challenge_accepted");
       remember(taken.challenge);
       navigate(paths.room(taken.room.gameId, taken.room.code), { replace: true });
     },

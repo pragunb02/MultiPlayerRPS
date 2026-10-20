@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useConnection } from "../../hooks/useConnection.js";
+import { useInterruption } from "../../hooks/useInterruption.js";
 import { useSound } from "../../hooks/useSound.js";
 import { SOUNDS } from "../../lib/sound/sounds.js";
 import styles from "./ConnectionBanner.module.css";
@@ -26,6 +27,8 @@ export function ConnectionBanner() {
   }, [lost, drops]);
 
   const shown = restarting || (lost && lateDrop === drops);
+  // Counted while it shows, and gone by itself when the connection is back (CC-313).
+  useInterruption("banner.connection", { open: shown });
   useEffect(() => {
     if (shown) sound.play(SOUNDS.CONNECTION);
   }, [shown, sound]);
@@ -34,7 +37,7 @@ export function ConnectionBanner() {
     return null;
   }
   return (
-    <div className={styles.banner} role="alert">
+    <div className={styles.banner} role="alert" data-cc-surface="banner.connection">
       <span className={styles.spinner} aria-hidden="true" />
       {restarting ? "Server restarting, your game is safe" : "Reconnecting…"}
     </div>

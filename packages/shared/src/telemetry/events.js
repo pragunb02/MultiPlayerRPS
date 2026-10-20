@@ -2,7 +2,9 @@ import { ERROR_CODES } from "../errors.js";
 import { GAME_IDS } from "../games.js";
 import { SHARE_CHANNELS } from "../shareChannels.js";
 import { fits, flag, list, ms, optional, pattern, ratio } from "./fields.js";
+import { FUNNEL_IDS, FUNNEL_STEP_IDS } from "./funnels.js";
 import { API_ENDPOINTS, OTHER_ENDPOINT, TELEMETRY_ROUTES } from "./routes.js";
+import { SURFACE_CLASSES, SURFACE_IDS, SURFACE_KINDS, SURFACE_OPENERS } from "./surfaces.js";
 
 /**
  * The telemetry catalogue in code (CC-174, CC-175): every event of docs/analytics/EVENTS.md that is built, with each
@@ -49,6 +51,30 @@ export const TELEMETRY_BUCKETS = Object.freeze({
   AFTER_S: Object.freeze(["0-10", "10-60", "60-600", "600+"]),
   GUEST_MATCHES: Object.freeze(["0", "1", "2-5", "6-20", "21+"]),
   GUEST_AGE_DAYS: Object.freeze(["0", "1", "2-7", "8+"]),
+  // CC-313
+  SHOWN_MS: Object.freeze(["0-1s", "1-3s", "3-10s", "10s+"]),
+  STACK: Object.freeze(["0", "1", "2+"]),
+  INTERRUPTIONS: Object.freeze(["0", "1", "2", "3-5", "6+"]),
+  BLOCKING_INTERRUPTIONS: Object.freeze(["0", "1", "2+"]),
+  INTERRUPTIONS_BEFORE: Object.freeze(["0", "1", "2", "3+"]),
+  WORDS: Object.freeze(["0-50", "51-100", "101-200", "201-400", "400+"]),
+});
+
+/** How an interruption ended (CC-313). */
+export const INTERRUPTION_OUTCOMES = Object.freeze({
+  ACTED: "acted",
+  DISMISSED: "dismissed",
+  TIMED_OUT: "timed_out",
+  COVERED: "covered",
+  PAGE_LEFT: "page_left",
+});
+
+/** Where in a visit an interruption showed (CC-313). */
+export const INTERRUPTION_PHASES = Object.freeze({
+  BEFORE_PLAY: "before_play",
+  PLAYING: "playing",
+  RESULT: "result",
+  ELSEWHERE: "elsewhere",
 });
 
 /** The constructor names `client_errored` may carry. Any other is `other`. */
@@ -133,6 +159,8 @@ export const TELEMETRY_MAX_WAIT_MS = 2 * 60 * 1000;
 export const TELEMETRY_MAX_SINCE_LOAD_MS = HOUR_MS;
 
 const control = pattern(CONTROL_PATTERN, CONTROL_MAX);
+const surfaceId = list(SURFACE_IDS);
+const interruptions = list(TELEMETRY_BUCKETS.INTERRUPTIONS);
 const element = list(ELEMENTS);
 const entries = list(Object.values(TELEMETRY_ENTRIES));
 const wait = ms(TELEMETRY_MAX_WAIT_MS);
@@ -184,10 +212,18 @@ export const TELEMETRY_EVENTS = Object.freeze({
     presses: list(TELEMETRY_BUCKETS.VISIT_PRESSES),
   }),
   // 3.2 Presses
-  control_pressed: client({ control, has_reason: flag() }),
-  dead_clicked: client({ control: optional(control), element: optional(element) }, { oneOf: pressedOn }),
+  control_pressed: client({ control, has_reason: flag(), surface: optional(surfaceId) }),
+  dead_clicked: client(
+    { control: optional(control), element: optional(element), surface: optional(surfaceId) },
+    { oneOf: pressedOn },
+  ),
   rage_clicked: client(
-    { control: optional(control), element: optional(element), presses: list(TELEMETRY_BUCKETS.RAGE_PRESSES) },
+    {
+      control: optional(control),
+      element: optional(element),
+      presses: list(TELEMETRY_BUCKETS.RAGE_PRESSES),
+      surface: optional(surfaceId),
+    },
     { oneOf: pressedOn },
   ),
   action_waited: client({
@@ -210,7 +246,32 @@ export const TELEMETRY_EVENTS = Object.freeze({
     game_id: gameIds,
     entry: entries,
     since_load_ms: ms(TELEMETRY_MAX_SINCE_LOAD_MS),
+    interruptions_before: optional(list(TELEMETRY_BUCKETS.INTERRUPTIONS_BEFORE)),
   }),
+  // Interruptions, text and steps (CC-313)
+  interruption_ended: client({
+    surface: surfaceId,
+    kind: list(SURFACE_KINDS),
+    class: list(Object.values(SURFACE_CLASSES)),
+    blocking: flag(),
+    outcome: list(Object.values(INTERRUPTION_OUTCOMES)),
+    shown_ms: list(TELEMETRY_BUCKETS.SHOWN_MS),
+    phase: list(Object.values(INTERRUPTION_PHASES)),
+    trigger: list(Object.values(SURFACE_OPENERS)),
+    stack: list(TELEMETRY_BUCKETS.STACK),
+  }),
+  interruption_counted: client({
+    scope: list(["visit", "game"]),
+    game_id: optional(gameIds),
+    optional: interruptions,
+    blocking_optional: list(TELEMETRY_BUCKETS.BLOCKING_INTERRUPTIONS),
+    essential: interruptions,
+  }),
+  screen_text_measured: client({
+    words: list(TELEMETRY_BUCKETS.WORDS),
+    fold_words: list(TELEMETRY_BUCKETS.WORDS),
+  }),
+  funnel_step_reached: client({ funnel: list(FUNNEL_IDS), step: list(FUNNEL_STEP_IDS) }),
   // 3.5 Errors and connection
   client_errored: client({
     kind: list(["render", "unhandled", "chunk_load", "stale_build_reload"]),

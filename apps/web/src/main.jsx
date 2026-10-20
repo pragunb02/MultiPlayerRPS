@@ -15,6 +15,7 @@ import { createSoundPreferences } from "./lib/sound/soundPreferences.js";
 import { entryOf } from "./lib/telemetry/entry.js";
 import { codeOf, socketCodeOf } from "./lib/telemetry/errorFields.js";
 import { createTelemetryFacade } from "./lib/telemetry/facade.js";
+import { createInterruptionTracker } from "./lib/telemetry/interruptions.js";
 import { isTelemetryOff } from "./lib/telemetry/optOut.js";
 import { routeOf } from "./lib/telemetry/routeOf.js";
 import { endpointOf, roundMs, TELEMETRY_MAX_SINCE_LOAD_MS } from "@classicade/shared";
@@ -42,6 +43,12 @@ telemetry.setLanding(
     origin: window.location.origin,
   }),
 );
+// Interruptions and steps (CC-313), counted through the same facade and only while its own flag is on.
+const interruptions = createInterruptionTracker({
+  telemetry,
+  now: () => window.performance.now(),
+  strict: !import.meta.env.PROD,
+});
 const sound = createSoundPlayer({
   // Older Safari only has the prefixed name. Without either, creating the context throws and the app stays silent.
   createContext: () => new (window.AudioContext ?? window.webkitAudioContext)(),
@@ -52,6 +59,7 @@ const sound = createSoundPlayer({
 sound.listen(window);
 const services = {
   telemetry,
+  interruptions,
   api: createApiClient({
     onRequest: () => telemetry.noteRequest("http"),
     onFailure: ({ path, status, error }) =>
@@ -65,12 +73,15 @@ const services = {
         code: socketCodeOf(reason),
         ...(afterS !== undefined && { after_s: afterS }),
       }),
-    onFirstMove: (gameId) =>
+    onFirstMove: (gameId) => {
       telemetry.track("gameplay_started", {
         game_id: gameId,
         entry: telemetry.landing.entry,
         since_load_ms: roundMs(window.performance.now(), TELEMETRY_MAX_SINCE_LOAD_MS),
-      }),
+        ...(interruptions.isEnabled() && { interruptions_before: interruptions.interruptionsBefore() }),
+      });
+      interruptions.reach("visit_to_play", "first_move");
+    },
   }),
   sound,
   // Tabs of this browser tell each other the session changed (ADR-033). Older browsers without it get none.

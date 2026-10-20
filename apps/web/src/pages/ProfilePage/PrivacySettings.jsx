@@ -217,6 +217,7 @@ function DeleteAccount() {
         Delete my account
       </Button>
       <Modal
+        surface="dialog.delete_account"
         open={confirming}
         title="Delete your account?"
         onClose={() => setConfirming(false)}

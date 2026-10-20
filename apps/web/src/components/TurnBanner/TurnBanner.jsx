@@ -1,4 +1,5 @@
 import styles from "./TurnBanner.module.css";
+import { useInterruption } from "../../hooks/useInterruption.js";
 
 /**
  * On one phone both players read the same screen, so "Your turn" could be either of them. The banner names the
@@ -13,7 +14,10 @@ const sharedScreenText = (room) =>
  * @param {{ room: { you: string, status: string, seats: Array<{ playerId: string, displayName: string }>, game?: { activePlayers: string[] } } }} props
  */
 export function TurnBanner({ room }) {
-  if (room.status !== "playing" || room.game === undefined) {
+  const playing = room.status === "playing" && room.game !== undefined;
+  // One showing for the whole game, counted as essential (CC-313).
+  useInterruption("banner.turn", { open: playing });
+  if (!playing) {
     return null;
   }
   const active = room.game.activePlayers;
@@ -27,7 +31,11 @@ export function TurnBanner({ room }) {
       ? "Your turn"
       : `Waiting for ${waitingFor.map((seat) => seat.displayName).join(" and ") || "the other player"}`;
   return (
-    <p className={`${styles.banner} ${yourTurn ? styles.yours : ""}`} aria-live="polite">
+    <p
+      className={`${styles.banner} ${yourTurn ? styles.yours : ""}`}
+      aria-live="polite"
+      data-cc-surface="banner.turn"
+    >
       {text}
     </p>
   );

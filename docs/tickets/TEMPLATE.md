@@ -72,10 +72,18 @@ Each criterion has an id and names the test that proves it.
 
 ## Success metric
 
-| Kind      | Metric | Target | Window |
-| --------- | ------ | ------ | ------ |
-| Primary   | …      | …      | …      |
-| Guardrail | …      | …      | …      |
+| Kind               | Metric | Target | Window |
+| ------------------ | ------ | ------ | ------ |
+| Primary            | …      | …      | …      |
+| Guardrail          | …      | …      | …      |
+| Friction guardrail | …      | …      | …      |
+
+A `feature` ticket names at least one **Friction guardrail** row (CC-313 section 6, checked from Ready by the decision
+gate for tickets started on or after 2026-10-21). Pick one: optional interruptions per visit, its own surface's
+dismissed share, time to first move p75, the drop-off at its own step, rage and dead clicks on its route, or the text
+budget of the screen it changes, with a threshold and its CC-312 flag compared on against off. A feature that adds a
+toast, banner, dialog, card, request or step registers it in `packages/shared/src/telemetry/surfaces.js` or
+`funnels.js` in the same pull request.
 
 ## Instrumentation
 

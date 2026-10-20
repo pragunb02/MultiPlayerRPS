@@ -9,6 +9,7 @@ import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { countRenderErrors } from "../lib/telemetry/errorFields.js";
 import { NO_TELEMETRY } from "../lib/telemetry/facade.js";
+import { InterruptionHost } from "../lib/telemetry/InterruptionHost.jsx";
 import { TelemetryHost } from "../lib/telemetry/TelemetryHost.jsx";
 import { AdminRoute } from "../pages/AdminPage/AdminRoute.jsx";
 import { CONSOLE_ROUTES } from "../pages/AdminPage/consolePages.js";
@@ -44,6 +45,7 @@ export function App({ services }) {
       <ServicesProvider services={services}>
         <SessionProvider>
           <TelemetryHost />
+          <InterruptionHost />
           <ToastProvider>
             <SaveProgressProvider>
               <MatchProgressProvider>

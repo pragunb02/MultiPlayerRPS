@@ -45,7 +45,7 @@ export function DailyShare({ puzzle, origin = siteOrigin() }) {
       } catch (cause) {
         throw new Error("Couldn't copy. Use the WhatsApp button instead", { cause });
       }
-      toast.show("Result copied", { tone: "success" });
+      toast.show("Result copied", { surface: "toast.copied", tone: "success" });
     },
     { id: "daily.share" },
   );

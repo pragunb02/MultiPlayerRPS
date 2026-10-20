@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
+import { surfaceNamed } from "@classicade/shared";
+import { ServicesContext } from "../../app/servicesContext.js";
+import { NO_INTERRUPTIONS } from "../../lib/telemetry/interruptions.js";
 import { CATEGORIES, categoryOf } from "../../lib/notify/categories.js";
 import { DismissButton } from "../DismissButton/DismissButton.jsx";
 import { ToastContext } from "./toastContext.js";
@@ -20,9 +23,15 @@ const ACTION_FACTOR = 2;
  * category, see `hold`), toasts of lower categories wait and show once it is gone, so a question is never buried
  * under rewards. A toast's `onShow` runs when it really shows, so an effect or a sound that belongs to it (the
  * level-up burst) waits with it (CC-163).
+ *
+ * Every toast names its registered `surface` (CC-313), and is counted from when it really shows until it goes: by
+ * its time (`timed_out`), its close button (`dismissed`) or its link (`acted`). A toast that waited and never showed
+ * is not counted.
  */
 export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
+  const interruptions = useContext(ServicesContext)?.interruptions ?? NO_INTERRUPTIONS;
   const [toasts, setToasts] = useState([]);
+  const shown = useRef(new Map());
   const nextId = useRef(0);
   const timers = useRef(new Set());
   const waiting = useRef([]);
@@ -34,8 +43,11 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
     return () => pending.forEach(clearTimeout);
   }, []);
 
-  const remove = useCallback((id) => {
+  /** Takes a toast away. How it ended was marked on its handle before, or it was dismissed. */
+  const remove = useCallback((id, outcome = "dismissed") => {
     waiting.current = waiting.current.filter((toast) => toast.id !== id);
+    shown.current.get(id)?.end(outcome);
+    shown.current.delete(id);
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
 
@@ -48,21 +60,23 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
   const display = useCallback(
     (toast) => {
       setToasts((current) => [...current, toast]);
+      shown.current.set(toast.id, interruptions.open(toast.surface));
       toast.onShow?.();
       const timer = setTimeout(
         () => {
           timers.current.delete(timer);
-          remove(toast.id);
+          remove(toast.id, "timed_out");
         },
         toast.action ? displayMs * ACTION_FACTOR : displayMs,
       );
       timers.current.add(timer);
     },
-    [displayMs, remove],
+    [displayMs, remove, interruptions],
   );
 
   const show = useCallback(
-    (message, { tone = "info", art, action, category = CATEGORIES.SYSTEM, onShow } = {}) => {
+    (message, { surface, tone = "info", art, action, category = CATEGORIES.SYSTEM, onShow } = {}) => {
+      surfaceNamed(surface);
       const { priority, minGapMs } = categoryOf(category);
       const key = `${category}:${message}`;
       const last = recent.current.get(key);
@@ -71,7 +85,7 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
       }
       const id = ++nextId.current;
       recent.current.set(key, { id, at: Date.now() });
-      const toast = { id, message, tone, art, action, priority, onShow };
+      const toast = { id, surface, message, tone, art, action, priority, onShow };
       if (priority < heldPriority()) {
         waiting.current = [...waiting.current, toast];
       } else {
@@ -120,6 +134,7 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
           <div
             key={toast.id}
             className={`${styles.toast} ${styles[toast.tone]} ${toast.art ? styles.withArt : ""}`}
+            data-cc-surface={toast.surface}
           >
             {toast.art && (
               <span className={styles.art} aria-hidden="true">
@@ -129,7 +144,12 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
             {toast.message}
             {toast.action && (
               <>
-                <Link to={toast.action.to} className={styles.action} data-cc-control="toast.action">
+                <Link
+                  to={toast.action.to}
+                  className={styles.action}
+                  data-cc-control="toast.action"
+                  onClick={() => remove(toast.id, "acted")}
+                >
                   {toast.action.label}
                 </Link>
                 <DismissButton

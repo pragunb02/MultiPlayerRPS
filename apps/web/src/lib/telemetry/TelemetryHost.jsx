@@ -85,6 +85,7 @@ export function TelemetryHost({ load = loadClient }) {
           strict: !import.meta.env.PROD,
           wasWaking: document.documentElement.classList.contains(WAITED_CLASS),
           onAccepted: () => services.api.sendFlagSuccess("telemetry_client").catch(() => undefined),
+          ...(services.interruptions && { surfaceOf: services.interruptions.surfaceOf }),
         });
       });
     if (window.requestIdleCallback === undefined) window.setTimeout(begin, 0);

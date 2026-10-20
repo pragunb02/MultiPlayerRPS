@@ -26,6 +26,7 @@ import { RequestCountdown } from "../RequestBanner/RequestBanner.jsx";
 import { useHold, useToast } from "../Toast/toastContext.js";
 import { useInGame } from "./inGameContext.js";
 import styles from "./SiteRequests.module.css";
+import { useInterruption } from "../../hooks/useInterruption.js";
 
 const keyOf = (code, request) => `${code}:${request.type}:${request.from}:${request.createdAt}`;
 const gameName = (gameId) => getGame(gameId)?.name ?? "a game";
@@ -100,11 +101,26 @@ function useAnswerToasts({ rooms, pathname }) {
           onDismiss: () => undefined,
         };
         if (request.state === REQUEST_STATES.ACCEPTED) {
-          toast.show(texts.accepted(name), { tone: "success", category: CATEGORIES.REQUEST, action: back });
+          toast.show(texts.accepted(name), {
+            surface: "toast.request_answer",
+            tone: "success",
+            category: CATEGORIES.REQUEST,
+            action: back,
+          });
         } else if (request.state === REQUEST_STATES.DECLINED) {
-          toast.show(texts.declined(name), { tone: "info", category: CATEGORIES.REQUEST, action: back });
+          toast.show(texts.declined(name), {
+            surface: "toast.request_answer",
+            tone: "info",
+            category: CATEGORIES.REQUEST,
+            action: back,
+          });
         } else if (request.state === REQUEST_STATES.EXPIRED) {
-          toast.show(`No answer from ${name}`, { tone: "info", category: CATEGORIES.REQUEST, action: back });
+          toast.show(`No answer from ${name}`, {
+            surface: "toast.request_answer",
+            tone: "info",
+            category: CATEGORIES.REQUEST,
+            action: back,
+          });
         }
       }
     }
@@ -136,6 +152,7 @@ function useDeclineToasts() {
         previous.get(challenge.id) === CHALLENGE_STATES.OPEN
       ) {
         toast.show(both(CHALLENGE_COPY.declinedYours(challenge.toName)), {
+          surface: "toast.challenge_answer",
           tone: "info",
           category: CATEGORIES.REQUEST,
         });
@@ -191,21 +208,35 @@ function SitePopup({ room, request, reason }) {
   const questionId = useId();
   const texts = textsFor(room.gameId, request.type);
   const from = room.names[request.from] ?? "Someone";
+  // A request from another room is optional: Accept and go answers it, Not now puts it away (CC-313).
+  const interruption = useInterruption("request.site");
   const answer = (reply) =>
     socket.request(SOCKET_EVENTS.ROOM_ANSWER, { code: room.code, type: request.type, answer: reply });
   const accept = useAction(
     async () => {
+      interruption.acted();
       await answer(REQUEST_ANSWERS.ACCEPT);
       navigate(paths.room(room.gameId, room.code));
     },
     { id: "site_request.accept" },
   );
   // Rematch and draw requests end within a minute, so Not now answers them: the asker is not left waiting.
-  const decline = useAction(() => answer(REQUEST_ANSWERS.DECLINE), { id: "site_request.decline" });
+  const decline = useAction(
+    () => {
+      interruption.dismissed();
+      return answer(REQUEST_ANSWERS.DECLINE);
+    },
+    { id: "site_request.decline" },
+  );
   const answering = accept.busy || decline.busy ? "Sending your answer" : "";
 
   return (
-    <section className={styles.popup} aria-labelledby={titleId} aria-describedby={questionId}>
+    <section
+      className={styles.popup}
+      aria-labelledby={titleId}
+      aria-describedby={questionId}
+      data-cc-surface="request.site"
+    >
       <h2 id={titleId} className={styles.title}>
         {texts.title}
       </h2>
@@ -246,11 +277,13 @@ function ChallengePopup({ challenge, reason }) {
   const questionId = useId();
   const game = gameName(challenge.gameId);
   const taken = challenge.own;
+  const interruption = useInterruption("request.challenge");
   const copy = taken
     ? CHALLENGE_COPY.tookYours(challenge.acceptedName, game)
     : CHALLENGE_COPY.challengesYou(challenge.fromName, game);
   const go = useAction(
     async () => {
+      interruption.acted();
       if (taken) {
         later(challenge.id);
         navigate(paths.room(challenge.room.gameId, challenge.room.code));
@@ -264,7 +297,12 @@ function ChallengePopup({ challenge, reason }) {
   );
 
   return (
-    <section className={styles.popup} aria-labelledby={titleId} aria-describedby={questionId}>
+    <section
+      className={styles.popup}
+      aria-labelledby={titleId}
+      aria-describedby={questionId}
+      data-cc-surface="request.challenge"
+    >
       <h2 id={titleId} className={styles.title}>
         {taken ? "Challenge taken" : "Challenge"}
       </h2>
@@ -278,7 +316,10 @@ function ChallengePopup({ challenge, reason }) {
         <Button
           control="site_challenge.later"
           variant="secondary"
-          onClick={() => later(challenge.id)}
+          onClick={() => {
+            interruption.dismissed();
+            later(challenge.id);
+          }}
           reason={go.busy ? "Sending your answer" : ""}
         >
           Not now
