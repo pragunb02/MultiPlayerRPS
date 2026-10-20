@@ -4,3 +4,5 @@ coverage
 dist
 # Local tool settings (not project code)
 .claude/
+# Written by the last step of npm run build:web (CC-303), not in git
+apps/server/build-info.json
