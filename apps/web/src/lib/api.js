@@ -138,6 +138,31 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
      * @param {{ from?: string, to?: string, bucket?: string }} [range]
      */
     getAnalytics: async (range = {}) => (await request("GET", `/admin/analytics${toQuery(range)}`)).report,
+    /**
+     * Sends one item of feedback (CC-290). The server works out who sent it from the session.
+     *
+     * @param {{ type: string, message: string, page: string, build: string, device: string, replyEmail?: string }} feedback
+     */
+    sendFeedback: async (feedback) => (await request("POST", "/feedback", feedback)).feedback,
+    /** @returns {Promise<{ replyEmail: boolean }>} whether the feedback form may offer an email reply */
+    getFeedbackForm: async () => (await request("GET", "/feedback/form")).form,
+    /**
+     * The owner console's feedback inbox, newest first, 50 at a time (CC-290).
+     *
+     * @param {{ type?: string, status?: string, before?: string }} [query]  `before` is the `next` of the page before
+     * @returns {Promise<{ items: object[], next?: string }>}
+     */
+    getFeedbackInbox: (query = {}) => request("GET", `/admin/feedback${toQuery(query)}`),
+    /** One item of the inbox with everything, the reply email included, for its own view (CC-290). */
+    getFeedbackItem: async (feedbackId) =>
+      (await request("GET", `/admin/feedback/${encodeURIComponent(feedbackId)}`)).item,
+    /** Deletes one item of the inbox for good (CC-290). */
+    deleteFeedback: async (feedbackId) => {
+      await request("DELETE", `/admin/feedback/${encodeURIComponent(feedbackId)}`);
+    },
+    /** Moves one item of the inbox to another status, and answers it as it is now (CC-290). */
+    setFeedbackStatus: async (feedbackId, status) =>
+      (await request("PATCH", `/admin/feedback/${encodeURIComponent(feedbackId)}`, { status })).item,
   });
 }
 

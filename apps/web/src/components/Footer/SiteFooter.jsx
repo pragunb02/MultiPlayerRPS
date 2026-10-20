@@ -4,13 +4,15 @@ import { LogoMark } from "../../art/Logo.jsx";
 import styles from "./SiteFooter.module.css";
 
 /**
- * The foot of every page: the legal pages and the cookie notice (CC-046).
+ * The foot of every page: the legal pages, the cookie notice (CC-046) and the Feedback button (CC-290).
  *
  * The notice is a line of text, not a banner. ClassiCade sets one cookie, only once you choose to play, and only
  * to remember who you are, so there is nothing to agree to. A banner that can be closed would need its own cookie
  * or browser storage just to remember that it was closed, which is exactly what this notice promises we do not do.
+ *
+ * @param {{ onFeedback: () => void }} props  opens the Feedback dialog
  */
-export function SiteFooter() {
+export function SiteFooter({ onFeedback }) {
   return (
     <footer className={styles.footer}>
       <p className={styles.tagline}>
@@ -31,6 +33,14 @@ export function SiteFooter() {
           Terms
         </Link>
       </nav>
+      <button
+        type="button"
+        className={styles.feedback}
+        data-cc-control="footer.feedback"
+        onClick={onFeedback}
+      >
+        Feedback
+      </button>
     </footer>
   );
 }

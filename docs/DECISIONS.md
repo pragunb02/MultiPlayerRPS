@@ -223,6 +223,57 @@ the owner may change it.
   methods no route sends. The account export keeps its `you` and `player-2` labels (ADR-048.6). Every identifier a
   client can receive is listed in DATA.md, Identifiers, which every new feature checks.
 
+### ADR-059 — In-app feedback: unlinked, masked, 180 days, reply email for adults only, and the console's first per-person view
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-290](tickets/CC-290.md)), the number reserved
+  for it on the board.
+- **Context.** The owner is sharing the site with friends and wants their feedback from inside the app. Free text from
+  players is new: until now display names were the only text a player chose (DATA.md). Many players may be children
+  (ADR-028.1: unknown age is a minor), the database is a free tier, and the owner console has so far shown only
+  totals (ADR-036).
+- **Decision.**
+  1. **A store of its own, joined to nobody.** A `feedback` collection holds the type, the message, the route pattern
+     of the page (never a room code, a name, a query or a hash), the web build, a device class (phone, tablet,
+     desktop), the kind of sender (visitor, guest, account, from the session) and a status (new, read, done). No
+     player id, session id, IP address or hash of one, and no user agent. The lists are in
+     `packages/shared/src/feedback.js`, so a new type or status is one line.
+  2. **Contacts masked before saving.** Digits of any script (Devanagari, Bengali, full width) are stored as plain
+     digits. Then every email address, and every phone shape (an optional +91, 91 or 0, then 10 digits in groups of 3
+     to 5 with at most one space, hyphen, dot, comma, slash or underscore between groups, never across a line)
+     becomes `[email removed]` or `[phone removed]` before it is stored (`domain/feedback/maskContacts.js`). Scores,
+     dates and times have groups too short to match. A number written in another shape, such as a landline in
+     brackets, is not caught: the dialog asks players to leave contact details out, and the owner can delete an item.
+  3. **A reply email only from adults.** "Email me back" shows only to an account whose birth year makes it surely
+     an adult (ADR-048.8), and the server refuses a reply email from anyone else, because a minor's email needs a
+     parent's consent under the DPDP Act. It is stored as given, as the player chose to give it.
+  4. **180 days.** A TTL index on `createdAt` removes each item 180 days after it was sent: two release cycles to see
+     a theme and to reply, and nobody's words kept for ever. The owner can delete any item sooner from the inbox.
+  5. **Not part of deletion or export.** ADR-048.2 covers the stores kept by player id. This store has none, so it
+     cannot find a player's feedback, by design. A request goes through the privacy contact and the owner's Delete.
+  6. **Limits in the style of ADR-035.** 5 an hour per session, 20 an hour per address (visitors included), 25 a
+     day per network (an IPv6 /48 counted as one), and a daily cap for the whole site worked out from storage: a
+     budget of 200 MB over 180 days at 4 KB at most per item, which is 284 a day (only stored items count). One
+     network can take at most a tenth of a day, so it alone can never close feedback for everyone. In memory, as the
+     other limits.
+  7. **The owner reads it in the console** at `/admin/feedback`, behind the same allowlist and the same 404 for
+     everyone else (ADR-036.1). Every value is shown as text, never as HTML. The list carries no reply email, only
+     whether there is one. The address is sent for one item at a time, when the owner opens its details.
+- **Amends ADR-036.3.** ADR-036 accepted that totals could in theory be differenced because "no id, name, email or
+  room code leaves the database". The inbox is the first view of content about one person: a message can hold a name
+  or a detail the masking did not catch, and an adult's reply email is an email. That is accepted for this one view
+  because (1) the owner is the only reader, behind the allowlist and `no-store`, (2) the content is what the player
+  chose to send to the owner, for the owner to read, (3) the reply email is shown one item at a time and only on
+  request, so the list's answer never carries one, (4) everything can be deleted by the owner and expires in 180 days,
+  and (5) no id, room code or address is stored at all. Every other console view keeps ADR-036.3 unchanged, and a
+  later view of per-person content needs its own decision.
+- **Consequences.** DATA.md and the privacy page list the store. The owner decides three defaults in the ticket: the
+  adults-only reply email (one line, `REPLY_EMAIL_ONLY_FOR_ADULTS`), the 180 days (`FEEDBACK_KEEP_DAYS`) and the
+  limits (`FEEDBACK_LIMITS`). The lawyer's review (ADR-048 consequences) should include free text from minors.
+  **Accepted residual risk:** many networks together (more than eleven /48s in a day, or a botnet) can still use up
+  the site's daily cap. Feedback then refuses everyone with "try again tomorrow" until the window ends. Games, rooms
+  and accounts are not affected, and nothing is stored beyond the budget. A restart forgets the counts, as for every
+  other limit.
+
 ### ADR-056 — Screenshot baselines in one pinned container, reviewed in the pull request
 
 - **Status:** Taken · 2026-10-20 (CC-155, builder). Whether the check becomes required is the owner's decision after
@@ -246,6 +297,22 @@ the owner may change it.
      checks for its first week.
 - **Not chosen.** Chromatic, Percy or Argos (an account and a secret in a public repository, per-snapshot pricing
   over a free tier), baselines per platform (three sets to keep in step), a trace of every passing test.
+- **Amended · 2026-10-20** (CC-300, builder; accepted by default). Pull requests that merged in a row each made their
+  images against an older `main`, so `main`'s baselines went stale and every open pull request's check failed
+  (after #121, #123 and #124). Now:
+  1. `visual-refresh.yml` runs on each push to `main` that changes `apps/**`, `packages/**`, `e2e/**`,
+     `package.json` or `package-lock.json`. Job `render` makes the images in the pinned image from `main`'s own
+     commit with a read-only token. Job `propose` (contents and pull requests write, runs no project code) commits
+     only changed PNGs to `visual-baselines/refresh`, force pushed to that branch only, and opens or updates one
+     pull request with a comment listing them. A person reviews and merges it. Nothing pushes to `main`. One run at a
+     time (`concurrency: visual-refresh`, never cancelled halfway).
+  2. The pull request check compares with `main`'s baselines as before. When it fails on a pull request whose diff
+     changes none of those paths, it passes with "baselines on main are stale; a refresh PR is pending". A pull
+     request that changes them still fails on a difference, which may be its own.
+  3. Item 4 changes: a pull request need not make its images. It may, with the update workflow or
+     `npm run test:visual:update`.
+  4. The owner allows Actions to create pull requests (repository setting). CI does not start on the bot pull
+     request by itself (`GITHUB_TOKEN` rule): close and reopen it to run CI.
 
 ### ADR-063 — Render's settings live in `render.yaml`, secrets stay in Render
 
@@ -881,6 +948,9 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
 - **Consequences.** Adding an admin is a Render setting change. Telemetry (CC-173 to CC-178) follows ADR-034 and
   rule 2 when its numbers join the console. The per-player read scans every match by design and should move to the
   nightly rollup (CC-176) at about 500,000 matches.
+- **Amended · 2026-10-20** (CC-290, ADR-059). Point 3 no longer holds for the feedback inbox at `/admin/feedback`,
+  the console's first view of content about one person: messages players sent to the owner, and an adult's reply
+  email shown one item at a time on request. The reasons and limits are in ADR-059. Every other view keeps point 3.
 
 ### ADR-035 — Abuse limits: rooms, connections, sign-ups and failed logins
 

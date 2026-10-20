@@ -4,6 +4,7 @@ import { createAccountRoutes } from "./accountRoutes.js";
 import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
+import { createFeedbackRoutes } from "./feedbackRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
@@ -18,6 +19,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
+ *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
  */
@@ -40,6 +42,8 @@ export function apiRouter({
   accountLimits,
   blockComponent,
   blockLimits,
+  feedbackComponent,
+  feedbackLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   build,
@@ -93,6 +97,15 @@ export function apiRouter({
       leaderboardComponent,
       now,
       ...(leaderboardLimit && { limit: leaderboardLimit }),
+    }),
+  );
+
+  router.use(
+    createFeedbackRoutes({
+      feedbackComponent,
+      requireAdmin: adminAccess.requireAdmin,
+      now,
+      ...(feedbackLimits && { limits: feedbackLimits }),
     }),
   );
 

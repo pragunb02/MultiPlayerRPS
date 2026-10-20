@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { paths, returnPathFor } from "../../app/paths.js";
 import { Logo, LogoMark } from "../../art/Logo.jsx";
@@ -8,6 +9,8 @@ import { useDisclosureMenu } from "../../hooks/useDisclosureMenu.js";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
 import { ConnectionBanner } from "../ConnectionBanner/ConnectionBanner.jsx";
+import { FeedbackDialog } from "../Feedback/FeedbackDialog.jsx";
+import { FEEDBACK_TEXT } from "../Feedback/feedbackText.js";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { PageAnnouncer } from "../PageAnnouncer/PageAnnouncer.jsx";
@@ -53,7 +56,18 @@ export function Layout() {
   // A guest with XP has something to lose: the same sign-up link, worded as what it does for them (CC-097).
   const save = useSaveProgress();
   const hasProgress = save.guest && (save.progress?.xp ?? 0) > 0;
-  const { open: menuOpen, toggle: toggleMenu, buttonRef, panelRef } = useDisclosureMenu();
+  const { open: menuOpen, toggle: toggleMenu, close: closeMenu, buttonRef, panelRef } = useDisclosureMenu();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const openFeedback = () => setFeedbackOpen(true);
+  // From the phone's menu: the menu closes first and its button takes the focus, so the dialog gives the focus
+  // back to a button that is still on screen when it closes (CC-290).
+  const openFeedbackFromMenu = () => {
+    if (menuOpen) {
+      closeMenu();
+      buttonRef.current.focus();
+    }
+    openFeedback();
+  };
 
   const logout = useAction(
     async () => {
@@ -143,6 +157,9 @@ export function Layout() {
               </Button>
             )}
           </div>
+          <Button control="header.feedback" variant="ghost" onClick={openFeedbackFromMenu}>
+            {FEEDBACK_TEXT.open}
+          </Button>
         </div>
       </header>
       {/* Outside the menu, which a phone hides while it is closed: a hidden region is never read out (CC-259). */}
@@ -156,7 +173,14 @@ export function Layout() {
         <Outlet />
       </main>
       <PageAnnouncer />
-      <SiteFooter />
+      <SiteFooter onFeedback={openFeedback} />
+      {/* Outside the menu, which a phone hides while it is closed, so the footer can open it too. */}
+      {/* A new dialog for each player: a draft and its email never pass to whoever uses the phone next. */}
+      <FeedbackDialog
+        key={identity?.id ?? "visitor"}
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
     </div>
   );
 }
