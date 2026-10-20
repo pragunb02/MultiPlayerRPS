@@ -3,7 +3,7 @@ import { REPORT_ACTION, REPORT_CONTEXT, REPORT_REASONS, REPORT_STATUS } from "@c
 import { deletedPlayer } from "../../models/deletedPlayer.js";
 import { isAccountId } from "../../models/identity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { ConflictError, NotFoundError } from "../../utils/errors.js";
+import { ConflictError, GoneError, NotFoundError } from "../../utils/errors.js";
 import { dayOf } from "../../utils/indiaTime.js";
 import { maskContacts } from "../feedback/maskContacts.js";
 import { renameIdShapes } from "../identity/idShapes.js";
@@ -40,8 +40,9 @@ const notFound = (cause) =>
 const ROLE = Object.freeze({ REPORTED: "reported", REPORTER: "reporter", OTHER: "other" });
 
 /**
- * @typedef {import("../players/playerReferences.js").PlayedWith | { handle: string }} ReportTarget   who to report:
- *   a seat of an open room or a stored match (playerReferences.js), or a public profile's handle (ADR-065)
+ * @typedef {import("../players/coPlayers.js").PlayedWith | { handle: string }} ReportTarget   who to report: a seat
+ *   of an open room or a stored match (coPlayers.js), or a public profile's handle (ADR-065)
+ * @typedef {Readonly<{ playerId: string, displayName: string }>} Person   who a report names, as they are now
  */
 
 /**
@@ -51,29 +52,36 @@ const ROLE = Object.freeze({ REPORTED: "reported", REPORTER: "reporter", OTHER: 
  *
  * @param {{
  *   reportAccessor: ReturnType<typeof import("../../data/reportAccessor.js").createReportAccessor>,
- *   references: ReturnType<typeof import("../players/playerReferences.js").createPlayerReferences>,
+ *   coPlayers: Pick<ReturnType<typeof import("../players/coPlayers.js").createCoPlayers>, "personAt">,
+ *   rooms: { getByCode: (code: string) => Promise<Readonly<import("../../data/roomAccessor.js").Room>> },
  *   matches: { getById: (matchId: string) => Promise<Readonly<{ gameId: string, log: ReadonlyArray<Readonly<{ kind: string, playerId?: string, move?: unknown, at: number }>> }>> },
- *   profiles: { personByHandle: (query: { handle: string, viewerId: string, now: number }) => Promise<import("../players/playerReferences.js").Person> },
+ *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom">,
+ *   profiles: { personByHandle: (query: { handle: string, viewerId: string, now: number }) => Promise<Person> },
  *   names: { resetName: (query: { playerId: string, now: number }) => Promise<string> },
  *   newReportId?: () => string,
  *   newUuid?: () => string,
- * }} deps  `matches` is the match component's server-only full record, read for the last moves of a match.
+ * }} deps  `coPlayers` checks that the two played together (ADR-053.3), the same check blocks and friends use.
+ *   `rooms` is the room accessor and `matches` the match component's server-only full record, read for the last
+ *   moves and requests. `transfers` are the guests who signed in, so a report follows them to their account.
  *   `profiles` finds the adult account behind a handle, and nobody else. `names` gives an account a safe default name
  *   and makes it show everywhere (composed in server.js). `newUuid` makes deleted reporters' stand-ins
  */
 export function createReportComponent({
   reportAccessor,
-  references,
+  coPlayers,
+  rooms,
   matches,
+  transfers,
   profiles,
   names,
   newReportId = randomUUID,
   newUuid = randomUUID,
 }) {
   assertDefined(reportAccessor, "reportAccessor");
-  assertFunction(references?.playedWith, "references.playedWith");
-  assertFunction(references?.accountsOf, "references.accountsOf");
+  assertFunction(coPlayers?.personAt, "coPlayers.personAt");
+  assertFunction(rooms?.getByCode, "rooms.getByCode");
   assertFunction(matches?.getById, "matches.getById");
+  assertFunction(transfers?.listFrom, "transfers.listFrom");
   assertFunction(profiles?.personByHandle, "profiles.personByHandle");
   assertFunction(names?.resetName, "names.resetName");
   assertFunction(newReportId, "newReportId");
@@ -108,6 +116,14 @@ export function createReportComponent({
     return [...moves, ...asked].sort((a, b) => a.at - b.at);
   }
 
+  /** Each id as it is now: a guest who signed in is their account. Other ids stay as they are. */
+  async function accountsOf(playerIds) {
+    const moved = new Map(
+      (await transfers.listFrom([...new Set(playerIds)])).map((transfer) => [transfer.from, transfer.to.id]),
+    );
+    return (id) => moved.get(id) ?? id;
+  }
+
   /** The person a target names and what is kept of where they met. */
   async function resolve({ reporter, target, now }) {
     try {
@@ -116,14 +132,14 @@ export function createReportComponent({
         if (person.playerId === reporter.id) throw notFound();
         return { person, context: { kind: REPORT_CONTEXT.PROFILE } };
       }
-      const { person, place } = await references.playedWith({ target, callerId: reporter.id });
+      const person = await coPlayers.personAt({ target, askerId: reporter.id, refusal: notFound });
       const ids = { reporterId: reporter.id, reportedId: person.playerId };
       // The room or match may still name the guest the reported player was when they sat down.
       const seatedId = (playerId, current) =>
         current(playerId) === person.playerId ? person.playerId : playerId;
-      if (place.kind === "room") {
-        const { room } = place;
-        const current = await references.accountsOf(room.seats.map((seat) => seat.playerId));
+      if ("roomCode" in target) {
+        const room = await rooms.getByCode(target.roomCode);
+        const current = await accountsOf(room.seats.map((seat) => seat.playerId));
         const log = (room.game?.log ?? []).map((entry) => ({
           ...entry,
           playerId: seatedId(entry.playerId, current),
@@ -144,20 +160,21 @@ export function createReportComponent({
           },
         };
       }
-      const match = await matches.getById(place.matchId);
-      const current = await references.accountsOf(match.log.map((entry) => entry.playerId ?? ""));
+      const match = await matches.getById(target.matchId);
+      const current = await accountsOf(match.log.map((entry) => entry.playerId ?? ""));
       const log = match.log.map((entry) => ({ ...entry, playerId: seatedId(entry.playerId, current) }));
       return {
         person,
         context: {
           kind: REPORT_CONTEXT.MATCH,
           gameId: match.gameId,
-          matchId: place.matchId,
+          matchId: target.matchId,
           recent: recentOf({ log, ...ids }),
         },
       };
     } catch (err) {
-      throw err instanceof NotFoundError ? notFound(err) : err;
+      // A room that closed between the check and the read is a stranger's room too.
+      throw err instanceof NotFoundError || err instanceof GoneError ? notFound(err) : err;
     }
   }
 
@@ -244,13 +261,13 @@ export function createReportComponent({
      * tap (ADR-071.4). Server only: never sent to a client.
      *
      * @param {{ reportId: string, reporterId: string }} query
-     * @returns {Promise<import("../players/playerReferences.js").Person>}
+     * @returns {Promise<Person>}
      * @throws {NotFoundError} for anyone else's report and an unknown one, alike
      */
     async reportedBy({ reportId, reporterId }) {
       const report = await reportAccessor.get(reportId);
       if (report.reporterId !== reporterId) throw new NotFoundError("No such report");
-      const playerId = (await references.accountsOf([report.reportedId]))(report.reportedId);
+      const playerId = (await accountsOf([report.reportedId]))(report.reportedId);
       return Object.freeze({ playerId, displayName: report.reportedName });
     },
 

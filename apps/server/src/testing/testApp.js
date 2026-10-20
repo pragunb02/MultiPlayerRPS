@@ -6,6 +6,8 @@ import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "../data/blockAccessor.js";
+import { createFriendAccessor } from "../data/friendAccessor.js";
+import { createPrivacyAccessor } from "../data/privacyAccessor.js";
 import { createFeedbackAccessor } from "../data/feedbackAccessor.js";
 import { createDailyPuzzleAccessor } from "../data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "../data/chessRatingAccessor.js";
@@ -28,7 +30,6 @@ import { createProfileCards } from "../domain/profiles/profileCards.js";
 import { createProfileComponent } from "../domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "../domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "../domain/feedback/feedbackComponent.js";
-import { createPlayerReferences } from "../domain/players/playerReferences.js";
 import { createReportComponent, REPORT_EVENTS } from "../domain/reports/reportComponent.js";
 import { createReportAccessor } from "../data/reportAccessor.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
@@ -43,6 +44,7 @@ import { inProcessThinking } from "./inProcessThinking.js";
 import { createGamificationComponent } from "../domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
+import { createCoPlayers } from "../domain/players/coPlayers.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createMatchPlayerIds, matchPlayerSecretFrom } from "../domain/matches/matchPlayerIds.js";
@@ -60,6 +62,7 @@ import {
   matchPipelineSteps,
   reportedNames,
   roomErasure,
+  wireFriends,
 } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionCheck, createSessionMiddleware } from "../service/http/session.js";
@@ -74,6 +77,12 @@ import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.js";
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
+import {
+  createInMemoryFriendLinkDao,
+  createInMemoryFriendRequestDao,
+  createInMemoryFriendshipDao,
+  createInMemoryPrivacyDao,
+} from "./inMemoryFriendDaos.js";
 import { createInMemoryProfileDao } from "./inMemoryProfileDao.js";
 import { createInMemoryFeedbackDao } from "./inMemoryFeedbackDao.js";
 import { createInMemoryReportDao } from "./inMemoryReportDao.js";
@@ -122,6 +131,8 @@ import { testConfig } from "./testConfig.js";
  *     part in deleting an account (e.g. one that fails, CC-035)
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
  *   profileLimits?: object,   the limits on profile lookups and changes (CC-034)
+ *   friendLimits?: object,   the limits on friend requests, changes and link lookups (CC-052)
+ *   friendRules?: object,   the friends rules (FRIEND_LIMITS), such as how many requests may wait (CC-052)
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
  *   reportLimits?: object,   the limits on reporting a player (CC-044)
  *   reportDao?: ReturnType<typeof createInMemoryReportDao>,   the reports store, which a test can read (CC-044)
@@ -152,6 +163,8 @@ export function createTestApp({
   dataParticipants = (participants) => participants,
   blockLimits,
   profileLimits,
+  friendLimits,
+  friendRules,
   feedbackLimits,
   reportLimits,
   reportDao = createInMemoryReportDao(),
@@ -254,13 +267,15 @@ export function createTestApp({
   const roomsToRename = /** @type {Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">} */ ({});
   const reportComponent = createReportComponent({
     reportAccessor: createReportAccessor({ reportDao }),
-    references: createPlayerReferences({
+    coPlayers: createCoPlayers({
       rooms: roomAccessor,
       matches: matchComponent,
       transfers: playerTransferAccessor,
       seatIds,
     }),
+    rooms: roomAccessor,
     matches: matchComponent,
+    transfers: playerTransferAccessor,
     profiles: profileComponent,
     names: reportedNames({
       accountComponent,
@@ -276,6 +291,8 @@ export function createTestApp({
     transfers: playerTransferAccessor,
     seatIds,
     reports: reportComponent,
+    // As in the composition root: friends are made after the rooms they read (CC-052).
+    followers: [{ name: "friends", playersBlocked: (pair) => friends.friendComponent.playersBlocked(pair) }],
   });
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,
@@ -327,6 +344,25 @@ export function createTestApp({
   });
   roomsToRename.renamePlayer = roomComponent.renamePlayer;
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  const friends = wireFriends({
+    friendAccessor: createFriendAccessor({
+      friendshipDao: createInMemoryFriendshipDao(),
+      friendRequestDao: createInMemoryFriendRequestDao(),
+      friendLinkDao: createInMemoryFriendLinkDao(),
+    }),
+    privacyAccessor: createPrivacyAccessor({ privacyDao: createInMemoryPrivacyDao() }),
+    profileAccessor,
+    roomAccessor,
+    roomComponent,
+    matchComponent,
+    transfers: playerTransferAccessor,
+    seatIds,
+    blocks: blockComponent,
+    accountComponent,
+    safety: safetyComponent,
+    domainEvents,
+    limits: friendRules,
+  });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
   const botDriver = createBotDriver({
     roomComponent,
@@ -402,6 +438,11 @@ export function createTestApp({
         exportPlayer: reportComponent.exportPlayer,
       },
       {
+        name: "friends",
+        erasePlayer: friends.friendComponent.erasePlayer,
+        exportPlayer: friends.friendComponent.exportPlayer,
+      },
+      {
         name: "dailyPuzzles",
         erasePlayer: dailyPuzzleComponent.erasePlayer,
         exportPlayer: dailyPuzzleComponent.exportPlayer,
@@ -443,6 +484,8 @@ export function createTestApp({
     blockLimits,
     profileComponent,
     profileLimits,
+    friendComponent: friends.friendComponent,
+    friendLimits,
     feedbackComponent,
     feedbackLimits,
     reportComponent,
@@ -488,6 +531,7 @@ export function createTestApp({
     chessRatingComponent,
     blockComponent,
     profileComponent,
+    friends,
     feedbackComponent,
     reportComponent,
     dailyPuzzleComponent,
@@ -542,6 +586,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     botComponent: testApp.botComponent,
     chessRatingComponent: testApp.chessRatingComponent,
     ...(options.metrics?.recordSocketEvent && { recordSocketEvent: options.metrics.recordSocketEvent }),
+    friends: testApp.friends,
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));

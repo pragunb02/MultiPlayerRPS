@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
-import { createPlayerReferences } from "../players/playerReferences.js";
+import { createCoPlayers } from "../players/coPlayers.js";
 
 /** How many blocks one player keeps. Blocking one more drops the oldest (ADR-053, as Lichess does). */
 export const MAX_BLOCKS_PER_PLAYER = 500;
@@ -18,9 +18,9 @@ const viewOf = (block) =>
   Object.freeze({ blockId: block.blockId, displayName: block.blockedName, blockedAt: block.createdAt });
 
 /**
- * @typedef {import("../players/playerReferences.js").PlayedWith | { reportId: string }} BlockTarget   who to block,
- *   by a seat in an open room or among the players of a stored match (see playerReferences.js), or by a report the
- *   blocker made, so the thank-you after a report can block in one tap (ADR-071.4)
+ * @typedef {import("../players/coPlayers.js").PlayedWith | { reportId: string }} BlockTarget   who to block: someone the
+ *   blocker played with, or the player of a report the blocker made, so the thank-you after a report can block in
+ *   one tap (ADR-071.4)
  */
 
 /**
@@ -31,19 +31,22 @@ const viewOf = (block) =>
  *
  * @param {{
  *   blockAccessor: ReturnType<typeof import("../../data/blockAccessor.js").createBlockAccessor>,
- *   rooms: Parameters<typeof createPlayerReferences>[0]["rooms"],
- *   matches: Parameters<typeof createPlayerReferences>[0]["matches"],
+ *   rooms: { getByCode: (code: string) => Promise<Readonly<{ code: string, createdAt: number, seats: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
+ *   matches: Parameters<typeof createCoPlayers>[0]["matches"],
  *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom" | "listTo">,
- *   seatIds: Parameters<typeof createPlayerReferences>[0]["seatIds"],
- *   reports?: { reportedBy: (query: { reportId: string, reporterId: string }) => Promise<import("../players/playerReferences.js").Person> },
+ *   seatIds: Pick<ReturnType<typeof import("../rooms/seatIds.js").createSeatIds>, "seatIdOf">,
  *   newBlockId?: () => string,
  *   limit?: number,
+ *   followers?: ReadonlyArray<{ name: string, playersBlocked: (pair: { blockerId: string, blockedId: string, now: number }) => Promise<unknown> }>,
+ *   reports?: { reportedBy: (query: { reportId: string, reporterId: string }) => Promise<Readonly<{ playerId: string, displayName: string }>> },
  * }} deps  `rooms` is the room accessor: the room component reads blocks itself, so it cannot be read here. A
  *   room that has closed is gone from it. `matches` is the match component, read for the real players of a match
  *   (CC-297). `transfers` are the guests who signed
  *   in: a block that names a guest after that guest became an account still applies to the account (ADR-014).
- *   `seatIds` are the seat ids the room views show (CC-253), the same ones the room component uses. `reports` finds
- *   who a player reported, by their own report's id. Without it a report id names nobody. `limit` is for tests only
+ *   `seatIds` are the seat ids the room views show (CC-253), the same ones the room component uses. `limit` is for
+ *   tests only. `followers` are told of every block, a repeated one too, before the block answers: friends end the
+ *   friendship there (CC-052), so a block never leaves the pair friends, even for a moment. `reports` finds who a
+ *   player reported, by their own report's id (ADR-071.4). Without it a report id names nobody
  */
 export function createBlockComponent({
   blockAccessor,
@@ -51,29 +54,46 @@ export function createBlockComponent({
   matches,
   transfers,
   seatIds,
-  reports,
   newBlockId = randomUUID,
   limit = MAX_BLOCKS_PER_PLAYER,
+  followers = [],
+  reports,
 }) {
   assertDefined(blockAccessor, "blockAccessor");
+  assertFunction(rooms?.getByCode, "rooms.getByCode");
+  assertFunction(matches?.meetingFor, "matches.meetingFor");
+  assertFunction(transfers?.listFrom, "transfers.listFrom");
   assertFunction(transfers?.listTo, "transfers.listTo");
+  assertFunction(seatIds?.seatIdOf, "seatIds.seatIdOf");
   assertFunction(newBlockId, "newBlockId");
+  followers.forEach((follower) => assertFunction(follower.playersBlocked, `${follower.name}.playersBlocked`));
   if (reports !== undefined) assertFunction(reports.reportedBy, "reports.reportedBy");
-  const references = createPlayerReferences({ rooms, matches, transfers, seatIds });
-  const { accountsOf } = references;
+  const coPlayers = createCoPlayers({ rooms, matches, transfers, seatIds });
 
-  /** The person at `target`, once the server has checked that the blocker played with them there or reported them. */
+  /**
+   * The person at `target`, once the server has checked that the blocker played with them there or reported them. A
+   * guest who signed in since is their account, so the block goes straight to it (ADR-014).
+   */
   async function personAt(target, blockerId) {
-    try {
-      if ("reportId" in target) {
-        if (reports === undefined) throw notPlayedWith();
-        return await reports.reportedBy({ reportId: target.reportId, reporterId: blockerId });
-      }
-      return (await references.playedWith({ target, callerId: blockerId })).person;
-    } catch (err) {
-      if (err instanceof NotFoundError) throw notPlayedWith(err);
-      throw err;
+    if (!("reportId" in target)) {
+      return coPlayers.personAt({ target, askerId: blockerId, refusal: notPlayedWith });
     }
+    if (reports === undefined) throw notPlayedWith();
+    const person = await reports
+      .reportedBy({ reportId: target.reportId, reporterId: blockerId })
+      .catch((err) => {
+        throw err instanceof NotFoundError ? notPlayedWith(err) : err;
+      });
+    if (person.playerId === blockerId) throw notPlayedWith();
+    return person;
+  }
+
+  /** Each id as it is now: a guest who signed in is their account. Other ids stay as they are. */
+  async function accountsOf(playerIds) {
+    const moved = new Map(
+      (await transfers.listFrom([...new Set(playerIds)])).map((transfer) => [transfer.from, transfer.to.id]),
+    );
+    return (id) => moved.get(id) ?? id;
   }
 
   /**
@@ -114,10 +134,7 @@ export function createBlockComponent({
      */
     async block({ blocker, target, now }) {
       const person = await personAt(target, blocker.id);
-      // The guest at the seat may have signed in since the seat was read, and their blocks have moved already. So
-      // this one goes straight to the account (ADR-014).
-      const blockedId = (await accountsOf([person.playerId]))(person.playerId);
-      if (blockedId === blocker.id) throw notPlayedWith();
+      const blockedId = person.playerId;
       const { created, block } = await blockAccessor.add({
         blockId: newBlockId(),
         blockerId: blocker.id,
@@ -127,6 +144,9 @@ export function createBlockComponent({
       });
       if (created) {
         await blockAccessor.keepNewest({ blockerId: blocker.id, keep: limit });
+      }
+      for (const follower of followers) {
+        await follower.playersBlocked({ blockerId: blocker.id, blockedId, now });
       }
       return viewOf(block);
     },

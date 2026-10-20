@@ -97,6 +97,21 @@ const FACTS = [
     page: /We never store your player id, your IP address or your browser details with it\..*Feedback is deleted 180 days after it was sent/,
   },
   {
+    fact: "friendships are kept until either removes, blocks or deletes the account (CC-052)",
+    data: "| [`friendships`](#friendships) | pseudonymous: both player ids, since when | until either removes the other, blocks the other or deletes the account |",
+    page: /We store who is friends with whom and when, until either of you removes the other, blocks the other or deletes the account/,
+  },
+  {
+    fact: "a friend request lasts 30 days and a friend link works once for 7 days, stored as a hash (CC-052)",
+    data: "| [`friend_links`](#friend_links) | pseudonymous: who made it, a SHA-256 of its token | 7 days, or until it is used |",
+    page: /A friend request is kept for 30 days, and a friend link works once, for 7 days: we store only a scrambled copy of the link/,
+  },
+  {
+    fact: "presence is never stored and Appear offline is kept until changed (CC-052)",
+    data: "| [`player_privacy`](#player_privacy) | pseudonymous: player id, the Appear offline choice | until the player changes it or deletes the account |",
+    page: /We work it out while you are connected and never store it\. You can turn on Appear offline/,
+  },
+  {
     fact: "blocks are kept until unblocked or an account is deleted",
     data: "Kept until the blocker unblocks, or either account is deleted",
     page: /we store that you blocked them, the name they had and when, until you unblock them or either account is deleted/,
@@ -109,7 +124,7 @@ const FACTS = [
   {
     fact: "your own reports are in your export, without the other player's id (CC-044)",
     data: "the reports the player made: reason, note, where, the name, when",
-    page: /the players you blocked and the reports you made\. Other players appear in it by their display name only/,
+    page: /and the reports you made\. Other players appear in it by their display name only/,
   },
   {
     fact: "operations telemetry goes to Grafana Labs with no personal data (ADR-055)",

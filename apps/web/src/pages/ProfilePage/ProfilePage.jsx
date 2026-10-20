@@ -9,6 +9,7 @@ import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { EmptyMatches } from "../../art/illustrations/EmptyMatches.jsx";
 import { AchievementGrid } from "../../components/Achievements/AchievementGrid.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { AddFriendButton } from "../../components/Friends/AddFriendButton.jsx";
 import { YourRank } from "../../components/Leaderboard/YourRank.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
@@ -79,9 +80,11 @@ function ProgressCard() {
 
 /**
  * A past opponent in history: their avatar and name, and a link to their profile when the server gave one, which it
- * does only for an adult account (CC-034). A computer character is labelled as one (ADR-025).
+ * does only for an adult account (CC-034). A computer character is labelled as one (ADR-025). An account can add a
+ * person as a friend, named by the match and their place in it, never by id (CC-052). A guest is not offered it
+ * here: the Friends page and the room tell them how to save their progress.
  */
-function Opponent({ player, last }) {
+function Opponent({ player, last, target, canAddFriends }) {
   const name = player.computer ? `${player.displayName} (computer)` : player.displayName;
   return (
     <span className={styles.opponent}>
@@ -93,6 +96,9 @@ function Opponent({ player, last }) {
           {name}
         </Link>
       )}
+      {canAddFriends && !player.computer && player.displayName !== DELETED_PLAYER_NAME && (
+        <AddFriendButton target={target} name={player.displayName} control="profile.matches.friend" />
+      )}
       {!last && ", "}
     </span>
   );
@@ -101,7 +107,7 @@ function Opponent({ player, last }) {
 /** Whether a past opponent is a person who can be reported: not a computer, not a deleted player's stand-in. */
 const isReportable = (player) => !player.computer && player.displayName !== DELETED_PLAYER_NAME;
 
-function MatchHistory() {
+function MatchHistory({ canAddFriends }) {
   const history = useMatchHistory();
   // The opponent the player pressed Report on, by the match and their place in it (CC-044, ADR-071).
   const [reporting, setReporting] = useState(undefined);
@@ -144,6 +150,8 @@ function MatchHistory() {
                           key={player.playerId}
                           player={player}
                           last={index === opponents.length - 1}
+                          target={{ matchId: match.matchId, seat: match.players.indexOf(player) }}
+                          canAddFriends={canAddFriends}
                         />
                       ))}
                 </span>
@@ -261,11 +269,17 @@ export function ProfilePage() {
           to keep your name.
         </p>
       )}
+      <p className={styles.muted}>
+        <Link to={paths.friends()} data-cc-control="profile.friends">
+          Your friends
+        </Link>
+        : who is online, your friend requests and your friend link.
+      </p>
       <ProgressCard />
       <YourRank identity={session.identity} />
       <PlayerConsole guest={session.identity.kind === "guest"} />
       <h2>Recent matches</h2>
-      <MatchHistory />
+      <MatchHistory canAddFriends={session.identity.kind === "user"} />
       <PublicProfileSettings own={own} guest={session.identity.kind === "guest"} />
       <BlockedPlayers />
       {session.identity.kind === "user" && <AccountSettings />}

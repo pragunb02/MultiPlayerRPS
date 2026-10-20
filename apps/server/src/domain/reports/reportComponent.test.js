@@ -3,7 +3,7 @@ import { createReportAccessor } from "../../data/reportAccessor.js";
 import { hasPlayerIdShape } from "../../models/playerIdShape.js";
 import { createInMemoryReportDao } from "../../testing/inMemoryReportDao.js";
 import { ConflictError, GoneError, NotFoundError } from "../../utils/errors.js";
-import { createPlayerReferences } from "../players/playerReferences.js";
+import { createCoPlayers } from "../players/coPlayers.js";
 import { createSeatIds } from "../rooms/seatIds.js";
 import { createReportComponent, REPORTER_TRUST } from "./reportComponent.js";
 
@@ -54,12 +54,12 @@ function fakeRooms(rooms) {
 
 function fakeMatches(matches) {
   return {
-    async playersFor({ matchId, playerId }) {
+    async meetingFor({ matchId, playerId }) {
       const match = matches[matchId];
       if (match === undefined || !match.players.some((p) => p.playerId === playerId)) {
         throw new NotFoundError("Match not found");
       }
-      return match.players;
+      return { players: match.players };
     },
     async getById(matchId) {
       return matches[matchId];
@@ -86,13 +86,15 @@ function setup({ rooms = { ROOM22: room() }, matches = {}, profiles = fakeProfil
   const renamed = [];
   const reports = createReportComponent({
     reportAccessor: createReportAccessor({ reportDao: dao }),
-    references: createPlayerReferences({
+    coPlayers: createCoPlayers({
       rooms: fakeRooms(rooms),
       matches: fakeMatches(matches),
       transfers: fakeTransfers(moves),
       seatIds: SEAT_IDS,
     }),
+    rooms: fakeRooms(rooms),
     matches: fakeMatches(matches),
+    transfers: fakeTransfers(moves),
     profiles,
     names: {
       async resetName({ playerId }) {
