@@ -25,6 +25,8 @@
     "dev:web": "npm run dev -w @classicade/web",
     "build:web": "npm run build -w @classicade/web",
     "test:e2e": "npm test -w @classicade/e2e",
+    "test:visual": "node scripts/bin/visual.mjs",
+    "test:visual:update": "node scripts/bin/visual.mjs --update",
     "load:test": "node scripts/bin/load-test.mjs",
     "load:charts": "node scripts/bin/load-charts.mjs"
   },
@@ -32,12 +34,14 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@vitest/coverage-v8": "^5.0.5",
-    "eslint": "^10.12.0",
+    "ajv": "^8.20.0",
+    "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
     "espree": "^11.2.0",
     "globals": "^17.13.0",
     "mongodb": "^7.7.0",
     "prettier": "^3.9.10",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "yaml": "^2.9.1"
   }
 }

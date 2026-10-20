@@ -76,6 +76,11 @@ const FACTS = [
     data: "There is no telemetry yet",
     page: /We do not count how you use the site\. If we ever do, it will be anonymous counts on our own server/,
   },
+  {
+    fact: "blocks are kept until unblocked or an account is deleted",
+    data: "Kept until the blocker unblocks, or either account is deleted",
+    page: /we store that you blocked them, the name they had and when, until you unblock them or either account is deleted/,
+  },
 ];
 
 /** Sentences the page used to say that DATA.md shows are wrong (CC-241 F1 to F4, F8, F9). */

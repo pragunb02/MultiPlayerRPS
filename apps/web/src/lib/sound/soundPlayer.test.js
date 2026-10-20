@@ -316,6 +316,18 @@ describe("soundPlayer (CC-103)", () => {
       expect(audio.oscillators).toHaveLength(RECIPES.move.length);
     });
 
+    it("follows the result switch and volume for the quiet win and the void note too (CC-163)", () => {
+      const { player, audio } = categorised();
+      player.setCategory("result", { volume: 0.5 });
+
+      expect(player.play("win-quiet")).toBe(true);
+      expect(peakOf(audio.gains[1])).toBeCloseTo(RECIPES["win-quiet"][0].gain * 0.5);
+
+      player.setCategory("result", { on: false });
+      expect(player.play("win-quiet")).toBe(false);
+      expect(player.play("game-void")).toBe(false);
+    });
+
     it("plays a kind's sound at most once within its rate limit", () => {
       const { player, clock } = categorised();
 

@@ -30,6 +30,7 @@ export const SHARDS = Object.freeze([
     "share.spec.js", // new (CC-217), about 10 s locally
     "names.spec.js", // 4
     "privacy.spec.js", // new (CC-035, CC-152), about 25 s locally
+    "blocks.spec.js", // new (CC-044), not measured yet
   ]),
   // 1078 s
   Object.freeze([
@@ -37,6 +38,7 @@ export const SHARDS = Object.freeze([
     "accessibility.spec.js", // 203, desktop only
     "dead-space.spec.js", // new (CC-259), not measured yet
     "layout-width.spec.js", // new (CC-256, CC-270), about 15 s a phone size locally
+    "pass-and-play.spec.js", // new (CC-223), about 30 s locally
   ]),
   // 1106 s
   Object.freeze([

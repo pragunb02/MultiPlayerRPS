@@ -79,6 +79,11 @@ export function PrivacyPage() {
             birth, the board shows &quot;Hidden player&quot; instead. Guests never appear on a leaderboard.
           </li>
           <li>
+            <strong>Players you block.</strong> When you block a player, we store that you blocked them, the
+            name they had and when, until you unblock them or either account is deleted. The blocked player is
+            never told, and only you can see your list.
+          </li>
+          <li>
             <strong>Moving from guest to account.</strong> If you play as a guest and then sign up or log in,
             your guest progress and match history move to your account. We keep a note that the move happened
             so it is never done twice.
@@ -205,16 +210,16 @@ export function PrivacyPage() {
         <ul>
           <li>
             <strong>Download my data</strong> gives you a file (JSON) with your account, your games, progress,
-            achievements, quests and leaderboard places. Other players appear in it by their display name
-            only.
+            achievements, quests, leaderboard places and the players you blocked. Other players appear in it
+            by their display name only.
           </li>
           <li>
             <strong>Delete my account</strong> deletes it at once, with your progress, achievements, quests,
-            leaderboard places and sessions, and signs you out everywhere. Games you played against other
-            people stay in their history with your name replaced by &quot;Deleted player&quot;. A game you are
-            in at that moment ends, and your opponent wins. Games against the computer only are deleted. If
-            your account came from the earlier version of the site, that old record is closed so it can never
-            sign in again.
+            leaderboard places, blocks and sessions, and signs you out everywhere. Games you played against
+            other people stay in their history with your name replaced by &quot;Deleted player&quot;. A game
+            you are in at that moment ends, and your opponent wins. Games against the computer only are
+            deleted. If your account came from the earlier version of the site, that old record is closed so
+            it can never sign in again.
           </li>
         </ul>
         <p>

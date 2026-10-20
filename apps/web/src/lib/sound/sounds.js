@@ -18,6 +18,8 @@ export const SOUNDS = Object.freeze({
   WIN: "win",
   LOSS: "loss",
   DRAW: "draw",
+  WIN_QUIET: "win-quiet",
+  GAME_VOID: "game-void",
   LOW_TIME: "low-time",
   NOTIFY: "notify",
   ACHIEVEMENT: "achievement",
@@ -111,6 +113,11 @@ export const RECIPES = Object.freeze({
     note(0.3, C4, 0.4, "sine", 0.3),
   ]),
   [SOUNDS.DRAW]: Object.freeze([note(0, A4, 0.16, "sine", 0.3), note(0.16, A4, 0.26, "sine", 0.26)]),
+  // A win the player did not earn on the board (the opponent left or ran out the move timer): two soft rising
+  // notes, no fanfare (CC-163).
+  [SOUNDS.WIN_QUIET]: Object.freeze([note(0, C5, 0.14, "sine", 0.3), note(0.12, G5, 0.24, "sine", 0.3)]),
+  // An aborted game counted for nothing: one short, neutral note (CC-163).
+  [SOUNDS.GAME_VOID]: Object.freeze([note(0, A4, 0.15, "sine", 0.2)]),
   // The clock is running out: a tiny, high tick once a second.
   [SOUNDS.LOW_TIME]: Object.freeze([note(0, 1500, 0.035, "sine", 0.2)]),
   // Someone wants an answer (draw offer, rematch): a two-note chime.

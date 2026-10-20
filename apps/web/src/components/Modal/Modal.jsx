@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import styles from "./Modal.module.css";
 
 /**
@@ -30,8 +31,11 @@ export function Modal({ open, title, onClose, children, actions }) {
   if (!open) {
     return null;
   }
-  return (
-    <div className={styles.backdrop} onClick={onClose}>
+  // Drawn on the page's body, not where it was opened. A style on an ancestor (such as the softened board after a
+  // loss, a filter) would otherwise become the frame of the fixed backdrop: the dialog would be greyed with it and
+  // cover only that part, leaving the buttons around it pressable (review of #113, CC-163).
+  return createPortal(
+    <div className={styles.backdrop} onClick={onClose} data-cc-modal-backdrop="">
       <div
         ref={dialog}
         className={styles.dialog}
@@ -44,6 +48,7 @@ export function Modal({ open, title, onClose, children, actions }) {
         <div>{children}</div>
         <div className={styles.actions}>{actions}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

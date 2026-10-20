@@ -81,6 +81,24 @@ jobs:
           docker run --rm --volume "$PWD:/repo" --workdir /repo --entrypoint shellcheck rhysd/actionlint:1.7.12
           scripts/backup/dump-and-encrypt.sh
 
+  # render.yaml against the schema Render publishes (CC-294, ADR-063). It downloads the schema from render.com, so it
+  # runs on pull requests only. Render deploys a main commit only when every check on it passed, and a check that
+  # fails because render.com is slow must never hold back a deploy. On main this job is skipped, which Render
+  # counts as passed. Our own rules for the file are unit tests in the checks job (scripts/renderBlueprint.test.mjs).
+  render-blueprint:
+    name: render.yaml matches Render's schema
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: node scripts/bin/check-render-blueprint.mjs
+
   # The browser suite runs in parts on separate machines, so it takes minutes instead of 20 (CC-236). Each part is
   # a list of whole spec files balanced by time (e2e/shards.js). The restart tests stop the server, so they have
   # their own job, one test at a time. The last job merges the parts' reports into one, checks that every test
@@ -316,6 +334,53 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 14
 
+  # Screenshot baselines of the main screens, light and dark, laptop and phone (CC-155). They run inside the pinned
+  # Playwright image (VISUAL_IMAGE in scripts/visual/docker.mjs), so the fonts and the browser are the ones the baselines
+  # were made with. Advisory for its first week: not a required check until the owner decides. To accept a change
+  # on purpose, run the "Visual baselines (update)" workflow on the branch, or `npm run test:visual:update`.
+  visual:
+    name: Visual baselines (advisory)
+    # Pull requests only. On a push to main a visual diff would turn main's CI red, and a red main stops every
+    # merge, which an advisory check must not do. A PR is compared before it merges, so main loses nothing.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host --init
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-visual-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - name: Compare every screen with its baseline
+        working-directory: e2e
+        run: npx playwright test -c playwright.visual.config.js --workers=2
+        env:
+          CI: "true"
+      - name: Visual report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-report
+          path: e2e/visual-report/
+          retention-days: 14
+      # The expected, actual and diff image of each screen that changed, with a video and a trace of its test.
+      - name: Differences, videos and traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-results
+          path: e2e/visual-results/
+          retention-days: 14
+
   docker:
     name: Docker image builds and serves (docker compose)
     runs-on: ubuntu-latest
@@ -334,5 +399,9 @@ jobs:
       - name: Server log on failure
         if: failure()
         run: docker compose logs app
+      # When MongoDB itself fails to start, the reason is only in its own log (CC-288).
+      - name: MongoDB log on failure
+        if: failure()
+        run: docker compose logs mongo
       - run: docker compose down --volumes
         if: always()

@@ -37,6 +37,24 @@ describe("checkGameViewContract", () => {
     ]);
   });
 
+  it("passes a pass and play part with an engine loader and a hand-over choice (CC-223)", () => {
+    expect(check({ passAndPlay: Object.freeze({ loadEngine: async () => ({}), handOver: false }) })).toEqual(
+      [],
+    );
+  });
+
+  it("finds a pass and play part of the wrong shape", () => {
+    expect(
+      check({ passAndPlay: { loadEngine: "rps", handOver: "yes", handOverNote: "", turnLabel: 1 } }),
+    ).toEqual([
+      "passAndPlay must be frozen",
+      "passAndPlay.loadEngine must be a function",
+      "passAndPlay.handOver must be true or false",
+      "passAndPlay.handOverNote must be a function",
+      "passAndPlay.turnLabel must be a function",
+    ]);
+  });
+
   it("finds actions that the shell cannot draw", () => {
     const problems = check({
       actions: () => [

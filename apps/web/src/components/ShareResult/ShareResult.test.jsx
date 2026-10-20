@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../Toast/ToastProvider.jsx";
@@ -26,7 +26,7 @@ const TEXT =
   "🏆 Maine Rocky ko 2-1 se haraya! Tum try karo:\nI beat Rocky 2-1 at Rock Paper Scissors on ClassiCade. Can you beat Rocky?";
 const FREE = "Free hai, login nahi chahiye.\nFree, no login needed.";
 const URL_ = `${ORIGIN}/games/rock-paper-scissors`;
-const MESSAGE = `${TEXT}\n${FREE}\n${URL_}`;
+const messageVia = (via) => `${TEXT}\n${FREE}\n${URL_}?via=${via}`;
 
 const show = (props = {}) =>
   render(
@@ -43,7 +43,7 @@ describe("ShareResult", () => {
 
     const link = screen.getByRole("link", { name: /WhatsApp/ });
 
-    expect(link).toHaveAttribute("href", `https://wa.me/?text=${encodeURIComponent(MESSAGE)}`);
+    expect(link).toHaveAttribute("href", `https://wa.me/?text=${encodeURIComponent(messageVia("wa"))}`);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link).toHaveAttribute("data-cc-control", "result.whatsapp");
@@ -60,7 +60,7 @@ describe("ShareResult", () => {
     expect(share).toHaveBeenCalledWith({
       title: "ClassiCade",
       text: `${TEXT}\n${FREE}`,
-      url: URL_,
+      url: `${URL_}?via=share`,
     });
   });
 
@@ -89,8 +89,9 @@ describe("ShareResult", () => {
 
     await user.click(screen.getByRole("button", { name: "Share result" }));
 
-    expect(writeText).toHaveBeenCalledWith(MESSAGE);
-    expect(await screen.findByRole("status")).toHaveTextContent("Result copied");
+    expect(writeText).toHaveBeenCalledWith(messageVia("copy"));
+    // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Result copied"));
   });
 
   it("copies the whole message where the device has no share sheet", async () => {
@@ -101,8 +102,9 @@ describe("ShareResult", () => {
 
     await user.click(screen.getByRole("button", { name: "Share result" }));
 
-    expect(writeText).toHaveBeenCalledWith(MESSAGE);
-    expect(await screen.findByRole("status")).toHaveTextContent("Result copied");
+    expect(writeText).toHaveBeenCalledWith(messageVia("copy"));
+    // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Result copied"));
   });
 
   it("says so when copying fails", async () => {
@@ -151,6 +153,6 @@ describe("ShareResult", () => {
     meta.remove();
 
     const text = new URL(screen.getByRole("link", { name: /WhatsApp/ }).href).searchParams.get("text");
-    expect(text.endsWith("\nhttps://canonical.example/games/rock-paper-scissors")).toBe(true);
+    expect(text.endsWith("\nhttps://canonical.example/games/rock-paper-scissors?via=wa")).toBe(true);
   });
 });

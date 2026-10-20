@@ -1,4 +1,5 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { useLayoutEffect, useRef } from "react";
 import { describe, expect, it } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
@@ -103,6 +104,41 @@ const departures = (socket) =>
   socket.request.mock.calls.filter(
     ([event]) => event === SOCKET_EVENTS.ROOM_LEAVE || event === SOCKET_EVENTS.ROOM_AWAY,
   );
+
+describe("useRoom: Leave pressed in the step that draws the room (CC-288)", () => {
+  // The press comes before any plain effect of that step has run. A seat copied in a plain effect came back after
+  // Leave gave it up, and leaving the page then told the server the player was away.
+  function LeaveOnDraw() {
+    const room = useRoom(CODE, { enabled: true, currentPath: () => "/games/tic-tac-toe" });
+    const pressed = useRef(false);
+    useLayoutEffect(() => {
+      if (room.status === "ready" && !pressed.current) {
+        pressed.current = true;
+        room.leave();
+      }
+    });
+    return <p>{room.status}</p>;
+  }
+
+  it("stays left: leaving the page afterwards sends nothing more", async () => {
+    const socket = fakeSocket();
+    socket.connect();
+    socket.request.mockImplementation(async (event) =>
+      event === SOCKET_EVENTS.ROOM_JOIN ? view({ status: "playing" }) : {},
+    );
+    const { unmount } = render(
+      <ServicesProvider services={{ socket }}>
+        <LeaveOnDraw />
+      </ServicesProvider>,
+    );
+    await screen.findByText("ready");
+
+    unmount();
+
+    expect(socket.request).not.toHaveBeenCalledWith(SOCKET_EVENTS.ROOM_AWAY, expect.anything());
+    expect(leaves(socket)).toEqual([[SOCKET_EVENTS.ROOM_LEAVE, { code: CODE }]]);
+  });
+});
 
 describe("useRoom: leaving the page leaves a waiting room, and is away from any other (CC-112, CC-207)", () => {
   it("only leaves a waiting room, without saying away as well", async () => {

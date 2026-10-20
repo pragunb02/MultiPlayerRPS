@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { fakeApi, GUEST } from "../../testing/fakes.js";
-import { renderApp } from "../../testing/render.jsx";
+import { findUsableButton, renderApp } from "../../testing/render.jsx";
 
 // The header's menu on a phone (CC-259). jsdom applies no CSS, so these tests check what the menu says and does:
 // its state, where the focus goes and when it closes. The browser tests check that a phone shows one row.
@@ -68,6 +68,16 @@ describe("the header menu (CC-259)", () => {
     expect(menuButton()).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("stays open when a click beside the sound settings dialog closes only the dialog", async () => {
+    const { user } = await openMenu();
+    await user.click(within(panel()).getByRole("button", { name: "Sound settings" }));
+
+    await user.click(screen.getByRole("dialog").parentElement);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(menuButton()).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("ignores other keys", async () => {
     const { user } = await openMenu();
 
@@ -115,7 +125,7 @@ describe("the header menu (CC-259)", () => {
   it("announces who you are from outside the menu, which a phone hides while it is closed", async () => {
     const user = userEvent.setup();
     renderApp();
-    await user.click(await screen.findByRole("button", { name: "Play as a guest" }));
+    await user.click(await findUsableButton("Play as a guest"));
 
     const announcement = await screen.findByText(`Playing as ${GUEST.displayName}, a guest.`);
     expect(announcement).toHaveAttribute("aria-live", "polite");

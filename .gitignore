@@ -17,3 +17,5 @@ all-blob-reports/
 e2e/listed.json
 e2e/merged.json
 .claude/worktrees/
+e2e/visual-results/
+e2e/visual-report/

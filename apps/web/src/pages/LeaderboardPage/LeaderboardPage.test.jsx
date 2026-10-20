@@ -124,6 +124,9 @@ describe("LeaderboardPage", () => {
 
     expect(await screen.findByText("Resets in 2d 4h")).toBeInTheDocument();
     expect(screen.getByText(/Everyone starts again on Monday/)).toBeInTheDocument();
+    // The countdown's clock starts in an effect, which can run a moment after the text shows. It is the page's only
+    // timer. Vitest's own wait runs on real time, so the fake clock does not stop it (CC-288).
+    await vi.waitFor(() => expect(vi.getTimerCount()).toBe(1));
     act(() => vi.advanceTimersByTime(4 * 60 * 60 * 1000 + 60_000));
     expect(screen.getByText("Resets in 2d 0h")).toBeInTheDocument();
   });

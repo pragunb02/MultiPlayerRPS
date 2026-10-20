@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { Component, Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { lazyBoard } from "./lazyBoard.js";
+import { lazyBoard, lazyEngine } from "./lazyBoard.js";
 
 class Boundary extends Component {
   state = { failed: false };
@@ -55,5 +55,29 @@ describe("lazyBoard", () => {
 
     expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
     report.mockRestore();
+  });
+});
+
+describe("lazyEngine (CC-223)", () => {
+  it("gives the named export of the module once it has downloaded", async () => {
+    const engine = { id: "fake" };
+    const load = lazyEngine(async () => ({ fakeEngine: engine }), "fakeEngine");
+
+    await expect(load()).resolves.toBe(engine);
+  });
+
+  it("keeps waiting instead of failing while the page reloads for a newer version", async () => {
+    const load = lazyEngine(async () => undefined, "fakeEngine");
+    const tooLate = new Promise((resolve) => setTimeout(() => resolve("still waiting"), 20));
+
+    await expect(Promise.race([load(), tooLate])).resolves.toBe("still waiting");
+  });
+
+  it("passes any other failure on, for the page to show", async () => {
+    const load = lazyEngine(async () => {
+      throw new TypeError("Failed to fetch dynamically imported module");
+    }, "fakeEngine");
+
+    await expect(load()).rejects.toThrow(TypeError);
   });
 });

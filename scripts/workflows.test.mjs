@@ -222,3 +222,60 @@ describe("browser test parts", () => {
     }
   });
 });
+
+describe("visual baselines (CC-155)", () => {
+  it("compare on every pull request in an advisory job that keeps the differences, videos and traces", async () => {
+    const visual = job(await read(".github/workflows/ci.yml"), "visual");
+
+    expect(visual).toContain("    name: Visual baselines (advisory)\n");
+    // Advisory on main too: a push to main never runs it, so a visual diff can never turn main red.
+    expect(visual).toContain("    if: github.event_name == 'pull_request'\n");
+    expect(visual).toContain("        run: npx playwright test -c playwright.visual.config.js --workers=2\n");
+    expect(visual).toContain("        if: failure()\n        uses: actions/upload-artifact@v7");
+    expect(visual).toContain("          path: e2e/visual-results/\n          retention-days: 14\n");
+  });
+
+  it("record a video and a trace of a failing test", async () => {
+    const { default: config } = await import("../e2e/playwright.visual.config.js");
+
+    expect(config.use).toMatchObject({ video: "retain-on-failure", trace: "retain-on-failure" });
+    expect(config.retries).toBe(0);
+  });
+
+  it("are updated only on a ticket branch, and the branch's code never runs with a token that can push", async () => {
+    const workflow = await read(".github/workflows/visual-update.yml");
+    const render = job(workflow, "render");
+    const commit = job(workflow, "commit");
+
+    expect(workflow).toMatch(/\npermissions:\n {2}contents: read\n/);
+    expect(render).not.toContain("permissions:");
+    expect(render).toContain("persist-credentials: false");
+    // The whole value is matched, not one line of it, so a ticket with a second line cannot reach the commit
+    // message. Both jobs check, and each check runs in bash, where `=~` is defined.
+    for (const each of [render, commit]) {
+      expect(each).toContain('[[ "$TICKET" =~ ^CC-[0-9]{3}$ ]]');
+      expect(each).toContain("        shell: bash\n");
+      expect(each).toContain("          TICKET: ${{ inputs.ticket }}\n");
+    }
+    expect(render).toContain('[[ "$GITHUB_REF" =~ ^refs/heads/cc-[0-9]{3}-[a-z0-9-]+$ ]]');
+    expect(workflow).not.toContain("grep -Eq");
+    // Run on the branch itself: checking out another ref would run its code with main's caches (CodeQL).
+    expect(workflow).not.toMatch(/inputs\.branch|ref: \$\{\{/);
+    expect(render).toContain("--update-snapshots=changed");
+    expect(commit).toContain("    permissions:\n      contents: write\n");
+    expect(commit).not.toMatch(/npm|npx|node /);
+    expect(commit).toContain('git commit --quiet --message "$TICKET: ');
+    // Inputs reach shell scripts only through the environment, never pasted into the script.
+    expect(workflow).not.toMatch(/run: .*\$\{\{ inputs\./);
+  });
+});
+
+describe("render.yaml schema check", () => {
+  it("runs on pull requests only, so a slow render.com never holds back a deploy of main", async () => {
+    const check = job(await read(".github/workflows/ci.yml"), "render-blueprint");
+
+    expect(check).toContain("    if: github.event_name == 'pull_request'\n");
+    expect(check).toContain("      - run: node scripts/bin/check-render-blueprint.mjs\n");
+    expect(check).not.toMatch(/secrets\./);
+  });
+});

@@ -60,3 +60,8 @@ updates:
       timezone: Asia/Kolkata
     commit-message:
       prefix: "docker"
+    ignore:
+      # MongoDB 8.3 and later exit at start on GitHub's Ubuntu 7.0 kernels (CC-288, SERVER-136848). The Docker job
+      # would fail on every such update. Move past 8.2 by a deliberate PR once MongoDB fixes its kernel check.
+      - dependency-name: mongo
+        versions: [">= 8.3"]

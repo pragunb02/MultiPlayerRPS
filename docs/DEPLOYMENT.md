@@ -6,35 +6,146 @@
 | -------- | ------------------------------------------------------------------------------------------ |
 | Host     | Render web service **NoCapGaming** (free plan, Oregon) — https://nocapgaming.onrender.com  |
 | Source   | `pragunb02/MultiPlayerRPS`, branch **`main`**                                              |
-| Trigger  | **Auto-deploy on every commit to `main`** — merging a PR _is_ a production deploy          |
+| Trigger  | **Auto-deploy of `main` after CI checks pass**: merging a PR _is_ a production deploy      |
 | Database | MongoDB Atlas free cluster (`cluster0`)                                                    |
 | Runs     | The new server (`apps/server`), serving the built web app (`apps/web/dist`) — since CC-029 |
 
 ### Render settings (dashboard → Settings)
 
-| Setting           | Value                                                                                                                                                                   |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Build Command     | `npm ci --include=dev && npm run build:web` — exact lockfile install, then the web build (Vite is a dev dependency, so `--include=dev` even with `NODE_ENV=production`) |
-| Start Command     | `npm start` — runs `apps/server/src/index.js`                                                                                                                           |
-| Health Check Path | `/health` — 200 only when the database is connected; a failing new deploy is never promoted                                                                             |
-| Node version      | from `.nvmrc`                                                                                                                                                           |
+These settings, and every env var that is not a secret, are also written in [`render.yaml`](../render.yaml). Once the
+owner links it as a Blueprint, the file is what Render applies. Until then the dashboard is. See
+[Render Blueprint](#render-blueprint-cc-294).
+
+| Setting           | Value                                                                                                                                                                                                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build Command     | `npm ci --include=dev && npm run build:web` — exact lockfile install, then the web build (Vite is a dev dependency, so `--include=dev` even with `NODE_ENV=production`)                                                                                          |
+| Start Command     | `npm start` — runs `apps/server/src/index.js`                                                                                                                                                                                                                    |
+| Health Check Path | `/health` — 200 only when the database is connected; a failing new deploy is never promoted                                                                                                                                                                      |
+| Auto-Deploy       | **After CI Checks Pass**: Render deploys a commit on `main` only when every GitHub check on it passed (success, neutral or skipped). A failed check on a merge commit means that commit is not deployed: fix `main`, and the next green commit deploys           |
+| Node version      | from `.nvmrc`                                                                                                                                                                                                                                                    |
+| Listen address    | `HOST=0.0.0.0` (in `render.yaml`). Render requires every web service to listen on 0.0.0.0 and the port in `PORT`; the server's own default is 127.0.0.1 (CC-287), which Render's proxy cannot reach, so without this setting every deploy fails its health check |
 
 ### Environment variables (dashboard → Environment)
 
-| Variable           | Required      | Notes                                                                                                                                                                                                                                                     |
-| ------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MONGO_URI`        | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                                           |
-| `SESSION_SECRET`   | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                                            |
-| `NODE_ENV`         | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                                                 |
-| `ALLOWED_ORIGINS`  | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047)                   |
-| `PORT`             | set by Render |                                                                                                                                                                                                                                                           |
-| `WEB_DIST_DIR`     | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                                                 |
-| `LOG_LEVEL`        | no            | default `info`                                                                                                                                                                                                                                            |
-| `TRUST_PROXY_HOPS` | no            | default `1` in production, `0` elsewhere. How many proxies in front of the server add to `X-Forwarded-For`; rate limits key on the address that many entries in from the right. See [Client addresses and rate limits](#client-addresses-and-rate-limits) |
+Once the Blueprint is linked, only the secrets (`MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`) are set in the
+dashboard. Every other value below lives in `render.yaml` and changes by pull request.
 
-| `ADMIN_ACCOUNT_IDS` | no | default empty: nobody can open the owner console. Comma separated account ids such as `user_65f0c2a1b2c3d4e5f6a7b8c9`. A guest id or a typo stops the boot. See [Owner console](#owner-console-cc-233) |
+| Variable            | Required      | Notes                                                                                                                                                                                                                                                                       |
+| ------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MONGO_URI`         | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                                                             |
+| `SESSION_SECRET`    | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                                                              |
+| `NODE_ENV`          | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                                                                   |
+| `ALLOWED_ORIGINS`   | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047)                                     |
+| `PORT`              | set by Render |                                                                                                                                                                                                                                                                             |
+| `HOST`              | yes           | `0.0.0.0` on Render (see Render settings). Default `127.0.0.1`: this machine only, so local runs are never offered to the network. An IP address or a hostname; anything else stops the boot. The startup log `server listening` shows the bound `host` and `port` (CC-287) |
+| `WEB_DIST_DIR`      | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                                                                   |
+| `LOG_LEVEL`         | no            | default `info`                                                                                                                                                                                                                                                              |
+| `TRUST_PROXY_HOPS`  | no            | default `1` in production, `0` elsewhere. How many proxies in front of the server add to `X-Forwarded-For`; rate limits key on the address that many entries in from the right. See [Client addresses and rate limits](#client-addresses-and-rate-limits)                   |
+| `ADMIN_ACCOUNT_IDS` | no            | default empty: nobody can open the owner console. Comma separated account ids such as `user_65f0c2a1b2c3d4e5f6a7b8c9`. A guest id or a typo stops the boot. See [Owner console](#owner-console-cc-233)                                                                      |
 
 Secrets live only in Render and local `.env` files — never in the repo (it is public), chat, or PR text.
+
+### Render Blueprint (CC-294)
+
+[`render.yaml`](../render.yaml) holds the service settings above and every env var the server reads (ADR-063).
+Plain settings have their value in the file: `NODE_ENV`, `HOST`, `LOG_LEVEL`, `ALLOWED_ORIGINS`, `WEB_DIST_DIR`,
+`TRUST_PROXY_HOPS`. Secrets are `sync: false` with no value: `MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`.
+`PORT` is not in the file because Render sets it. `scripts/renderBlueprint.test.mjs` fails if a variable the config
+reads is missing from the file, or if a secret has a value. A CI job on pull requests checks the file against
+Render's published schema (`https://render.com/schema/render.yaml.json`).
+
+**The file does nothing by itself.** Render reads it only for a Blueprint, which the owner creates in the dashboard
+(New → Blueprint). Merging it changes nothing on Render.
+
+#### What linking does to the live service (Render's docs, read 2026-10-20)
+
+| Thing                                 | What happens                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Which service                         | Render matches an existing service **by name**: "If you add the name of an existing service to your Blueprint file, Render attempts to apply the Blueprint's configuration to that existing service" (render.com/docs/blueprint-spec). `type` and `region` can never change after creation                                     |
+| Duplicate service                     | If Render does not match it, it plans a **new** service, and when names clash it "appends a suffix to the name of each new resource" (render.com/docs/infrastructure-as-code, Replicating a Blueprint). The review screen shows this before anything happens                                                                   |
+| Plain values in the file              | Written to the service. A different dashboard value is overwritten                                                                                                                                                                                                                                                             |
+| `sync: false` secrets                 | Kept. "When you update an existing Blueprint, Render ignores any environment variables with `sync: false`", and "The resource retains any existing environment variable values that aren't overwritten by the Blueprint" (render.com/docs/blueprint-spec, render.com/docs/infrastructure-as-code)                              |
+| Env vars not in the file              | Kept: "Render preserves existing environment variables, even if you omit them from the Blueprint file" (render.com/docs/blueprint-spec). For example a `NODE_VERSION` set in the dashboard stays                                                                                                                               |
+| Fields reset when the file omits them | Build filters ("Render replaces those settings with empty lists"), pull request previews (off), root directory (repo root), shutdown delay (30 s). Plan, instance count, auto-deploy, IP allow list and the onrender.com subdomain are kept when omitted                                                                       |
+| Deleting                              | Never. "Changes to a Blueprint never cause a resource to be deleted" (render.com/docs/infrastructure-as-code). But a Blueprint-managed service deleted by hand is recreated on the next sync                                                                                                                                   |
+| After linking                         | Every push to `main` that changes `render.yaml` syncs it (Auto Sync, the default). A dashboard edit to a field in the file is overwritten on the next sync, so change those fields by pull request. A **new** secret is added in the dashboard by hand: Render reads `sync: false` keys only when a Blueprint is first created |
+
+One thing Render's docs do not spell out: what the first creation screen does when a `sync: false` key already has
+a value on the service it adopts. The docs say that screen prompts "for each environment variable with
+`sync: false`", and that a file made by Render's own Generate Blueprint (all `sync: false`) needs values only for
+**new** services. So expect no prompt, and if one appears, follow step 7 below.
+
+#### Owner steps
+
+Do these on a laptop, in the dashboard only. Nothing is applied before step 8.
+
+**Before linking (changes nothing):**
+
+1. Wait until the CC-294 pull request is merged, so `render.yaml` is on `main`.
+2. Open NoCapGaming → **Settings** and check each against `render.yaml`. The name is exactly `NoCapGaming`, the
+   region Oregon, the instance type Free, the branch `main`, the build and start commands as above, the health check
+   path `/health`, and Auto-Deploy "After CI Checks Pass". These must be empty or off, because linking resets them:
+   **Root Directory**, **Build Filters** (included and ignored paths), **Pull Request Previews**, and a custom
+   shutdown delay. If one is set and should stay, stop and ask for it to be added to `render.yaml` first.
+3. Open **Environment**. Every secret must already be there: `MONGO_URI`, `SESSION_SECRET`, and `ADMIN_ACCOUNT_IDS`
+   if the owner console is on. Compare the six plain values with the file: `NODE_ENV=production`, `HOST=0.0.0.0`,
+   `LOG_LEVEL` (missing means `info`), `ALLOWED_ORIGINS=https://nocapgaming.onrender.com`,
+   `WEB_DIST_DIR=apps/web/dist`, `TRUST_PROXY_HOPS` (missing means `1`). If the dashboard has a different value
+   that is right (for example a measured `TRUST_PROXY_HOPS`), stop and change `render.yaml` by pull request first.
+4. Optional second check: on the dashboard's service list, select NoCapGaming and click **Generate Blueprint**. It
+   only shows a file (with no env var values) and changes nothing. Compare it with `render.yaml`. Differences should
+   be the env var values only.
+5. Open **Blueprints** and make sure no Blueprint already manages NoCapGaming (Render: "Do not add a resource to
+   more than one Blueprint").
+
+**Linking (the preview is the dry run):**
+
+6. **New → Blueprint**, connect `pragunb02/MultiPlayerRPS`, name it (for example `ClassiCade production`), branch
+   `main`, Blueprint Path `render.yaml`. Render then shows "the list of the changes that Render will apply". This
+   screen is the dry run: nothing has changed yet. Go on only if it shows **NoCapGaming as an existing service** and
+   nothing else. **Leave the page without applying** if it shows a new web service, a name with a suffix such as
+   `NoCapGaming-xxxx`, a notice that the Blueprint "matches existing resources", a region or plan change, or any
+   change step 2 or 3 did not predict.
+7. If the screen asks for a value for `MONGO_URI`, `SESSION_SECRET` or `ADMIN_ACCOUNT_IDS`: **leave the page without
+   applying**. Nothing has changed. Do not paste a secret there: a mistyped `SESSION_SECRET` logs every player out.
+   Ask for a follow-up pull request that leaves the secrets out of the file (Render keeps env vars a Blueprint does
+   not name) and start again at step 6. One exception: if `ADMIN_ACCOUNT_IDS` is not set on the service yet, it is
+   fine to type your own account id or leave it empty (empty means nobody opens the console).
+8. Click **Deploy Blueprint**. Render applies the file and redeploys NoCapGaming.
+
+**After linking:**
+
+9. Watch NoCapGaming → **Events** until the deploy is **Live**, then
+   `curl https://nocapgaming.onrender.com/health` must answer `{"status":"ok","database":"up"}`.
+10. Check **Environment** again: the same keys as in step 3, and `MONGO_URI` and `SESSION_SECRET` still have their
+    (hidden) values. Check **Settings**: Auto-Deploy still "After CI Checks Pass". The service list must show one
+    NoCapGaming, now with the Blueprint icon, and no new service.
+11. Leave the Blueprint's Auto Sync on "Yes": every change to `render.yaml` reaches `main` only through a reviewed
+    pull request.
+
+**If something went wrong:**
+
+1. A deploy fails: Render keeps the last good deploy live (health check). Find the setting that changed in the
+   Blueprint's sync history, fix `render.yaml` by pull request, or Rollback (below).
+2. A secret was blanked or changed: set it again in **Environment** with its old value (`SESSION_SECRET` must be the
+   old one, or every player is logged out) and redeploy.
+3. A second service was created: **Suspend** it at once, before it gets secrets, so two servers never run on the
+   production database. Then disconnect the Blueprint (Render keeps every resource), and only then delete the
+   suspended copy. Deleting it while the Blueprint is linked makes Render recreate it on the next sync.
+
+### Listen address (CC-287)
+
+The server listens on `HOST`, default `127.0.0.1`, so `npm start` or `npm run dev:server` on a laptop is reachable
+from that laptop only. Render needs `HOST=0.0.0.0` ("Every Render web service must bind to a port on host 0.0.0.0",
+render.com/docs/web-services). The Docker image sets `HOST=0.0.0.0` inside the container, and `docker-compose.yml`
+publishes its port on `127.0.0.1` only. Rollout order for the change that added it (done 2026-10-20, before the
+Blueprint: `HOST` is now in `render.yaml`, so once the Blueprint is linked it changes by pull request only):
+
+1. Render → Environment: add `HOST` = `0.0.0.0` and save. The running server ignores it (it does not read `HOST`), so
+   the redeploy this starts changes nothing.
+2. Merge the PR. The new server reads `HOST` and logs `server listening` with `"host":"0.0.0.0"`.
+3. Check `/health`. If the deploy fails its health check, `HOST` is missing or wrong: Render keeps the last good
+   deploy live; fix `HOST` and redeploy.
 
 ### Owner console (CC-233)
 
@@ -47,7 +158,8 @@ To turn it on for yourself:
 1. Log in to the site with your own account.
 2. Open `https://<site>/api/session` in the same browser. Copy `identity.id` (it starts with `user_`).
 3. In Render → Environment, set `ADMIN_ACCOUNT_IDS` to that id (several ids: comma separated) and save. Render
-   redeploys.
+   redeploys. This one stays in the dashboard after the Blueprint is linked: `render.yaml` lists it as
+   `sync: false`, so Render never changes its value.
 4. Reload the site: a **Console** link appears in the header for you only.
 
 Removing an id and redeploying takes access away at once (it is checked on every request). Reports are cached for 5
@@ -150,7 +262,10 @@ the real number without logging any address:
    (browser dev tools, Network tab).
 2. Find that request id in the Render logs. The `request completed` line has `forwardedEntries`, the number of entries
    in `X-Forwarded-For` (only the count, never the addresses). A browser sends none, so this is the number of proxies.
-3. Set `TRUST_PROXY_HOPS` to that number in Render (dashboard → Environment) and redeploy. At startup the server logs
+3. Change `TRUST_PROXY_HOPS` to that number by pull request, never in the dashboard: the value in `render.yaml` and
+   the one in `PLAIN` in `scripts/renderBlueprint.test.mjs`. Never set it above the measured count. Once the
+   Blueprint is linked, a dashboard edit is quietly put back to the file's value on the next sync. Until it is linked,
+   set the same number in Render → Environment as well, after the pull request merges. At startup the server logs
    `client addresses read through trusted proxies` with the `trustProxyHops` in effect.
 
 The app-wide `/api` budget (CC-110) is 300 requests a minute, counted per session when the player has one (guest or
@@ -166,6 +281,31 @@ browser tests, Docker); force pushes and deletion are blocked (admins can overri
 with push protection blocks pushes that contain credentials. Dependabot alerts and security updates, and CodeQL code
 scanning, are on.
 
+## The MongoDB image for Docker and CI (CC-288)
+
+Production uses Atlas and is not affected. `docker-compose.yml` (local development and the required CI check
+"Docker image builds and serves") runs MongoDB from an exact image: `mongo:8.2.12` with its multi-platform digest
+`sha256:e0ce8c35124d4a9f9785532d1f268f39e9728ffa1cb38f46fa482436424c4bd3`. Never a floating tag such as `mongo:8`.
+
+Why: on 2026-10-19 GitHub rolled out runner image `ubuntu-24.04` 20261018.339.1 with kernel `7.0.0-1017-azure`
+(upstream 7.0.14). `mongo:8` is 8.3.13, and it and 8.0.34 stop at once on that kernel with
+`"s":"F" ... "MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility with this version
+of MongoDB. See https://jira.mongodb.org/browse/SERVER-121912"`. Kernels 6.19 to 7.0.13 broke the rseq behaviour that
+MongoDB 8's memory allocator needs, 7.0.14 restored it (SERVER-125742), but the check reads `uname -r`, which Ubuntu
+keeps at `7.0.0`, so the fixed kernel is still refused (SERVER-136848, open). 8.2 has no such check: 8.2.12 started,
+took 100,000 writes and stayed up for over a minute on the new kernel and on the old 6.17 one. The runner rollout was
+gradual, so the job failed now and then at first and then most of the time. The image itself never changed.
+
+To upgrade: try the new exact version on CI (the Docker job prints `docker compose logs mongo` when it fails), then
+pin its digest from `docker buildx imagetools inspect mongo:<version>` (the `Digest:` line of the index, so it works
+on Intel and Arm). Dependabot ignores `mongo` 8.3 and later until SERVER-136848 is fixed (`.github/dependabot.yml`).
+
+**Existing local databases, once:** a Docker volume that `mongo:8` (8.3) created has feature compatibility version
+8.3, and 8.2 cannot open it: mongod exits with `"Wrong mongod version" ... UPGRADE PROBLEM: Found an invalid
+featureCompatibilityVersion document ... version: "8.3"` (checked locally). Run `docker compose down -v` once to delete
+the old volume, and take a `mongodump` first with the old image if you need its data. CI starts from a fresh volume
+every time. Production on Atlas is not affected. The same applies to any later move to an older version.
+
 ## Before merging any PR
 
 CI (lint, format, audit, unit + integration tests with coverage gates, browser tests) must be green. Every PR fills in
@@ -173,8 +313,13 @@ the **Deployment impact** section of the PR template. If anything below changes,
 
 1. **Start/build behaviour** — `package.json` scripts, dependencies, Node version, entry file.
    Verify from a fresh clone: `NODE_ENV=production npm ci --include=dev && npm run build:web && npm start` (with the
-   variables above) logs "server listening" and `/health` reports the database up.
-2. **Environment variables** — new/renamed/removed variables must be set in Render _before_ merging.
+   variables above, including `HOST=0.0.0.0`) logs "server listening" with that `host` and `/health` reports the
+   database up.
+2. **Environment variables** — every variable the config reads is listed in `render.yaml` (its test fails
+   otherwise). A plain value is changed in `render.yaml` and in `PLAIN` in `scripts/renderBlueprint.test.mjs`, never
+   in the dashboard: once the Blueprint is linked, the next sync puts a dashboard edit back. A new secret is added
+   to `render.yaml` as `sync: false` and its value set by hand in Render → Environment _before_ merging (Render reads
+   new `sync: false` keys only when a Blueprint is first created).
 3. **Data** — schema or collection changes, migrations, anything that touches existing documents.
 4. **Sessions/cookies** — changes can log users out.
 
