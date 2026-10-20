@@ -76,6 +76,7 @@ describe("the daily chess puzzle page (CC-144)", () => {
     expect(screen.getByText("3 tries left")).toBeVisible();
     expect(square("d6")).toHaveAccessibleName("d6, white queen");
     expect(screen.queryByText(/Solution/)).toBeNull();
+    expect(screen.getByText("Solve a puzzle each day to build a streak.")).toBeVisible();
     expect(screen.getByRole("link", { name: "Lichess puzzle database" })).toHaveAttribute(
       "href",
       "https://database.lichess.org/#puzzles",

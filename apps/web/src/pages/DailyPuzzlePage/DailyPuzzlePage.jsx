@@ -84,6 +84,13 @@ function Result({ puzzle }) {
 
 /** The puzzle's own streak, apart from the daily play streak (ADR-061). */
 function Streak({ streak }) {
+  if (streak.best === 0) {
+    return (
+      <section className={styles.streak} aria-label="Puzzle streak">
+        <p className={styles.atRisk}>Solve a puzzle each day to build a streak.</p>
+      </section>
+    );
+  }
   return (
     <section className={styles.streak} aria-label="Puzzle streak">
       <p className={styles.streakLine}>
