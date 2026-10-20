@@ -36,6 +36,39 @@ describe("leaderboardAccessor", () => {
     });
   });
 
+  it("merges a guest's weekly row into an account's once, remembering the guest's keys (CC-291)", async () => {
+    const boards = setup();
+    const week = { ...write("user_a", 0), period: "2026-W42", expiresAt: T0 + 1e9 };
+
+    await boards.mergeOnce({ ...week, from: "guest_g", keys: ["m1"], inc: 40 });
+    await boards.mergeOnce({ ...week, from: "guest_g", keys: ["m1"], inc: 40 });
+    await boards.addOnce({ ...week, key: "m1", inc: 30 });
+    await boards.addOnce({ ...week, key: "m2", inc: 5 });
+
+    const rows = await boards.listWithKeys({ board: "xp", playerId: "user_a" });
+    expect(rows).toEqual([
+      { period: "2026-W42", score: 45, updatedAt: T0, recentKeys: ["m2"], expiresAt: T0 + 1e9 },
+    ]);
+    expect(Object.isFrozen(rows)).toBe(true);
+    expect(Object.isFrozen(rows[0])).toBe(true);
+    expect(Object.isFrozen(rows[0].recentKeys)).toBe(true);
+  });
+
+  it("lists rows without an end as such, and moves a player's ends later (CC-291)", async () => {
+    const boards = setup();
+    await boards.raiseScore({ ...write("guest_a", 30), expiresAt: T0 + 10 });
+    await boards.raiseScore(write("user_a", 30));
+
+    expect(await boards.extendLifetime({ playerId: "guest_a", period: "all", expiresAt: T0 + 20 })).toBe(1);
+
+    expect(await boards.listWithKeys({ board: "xp", playerId: "guest_a" })).toEqual([
+      { period: "all", score: 30, updatedAt: T0, recentKeys: [], expiresAt: T0 + 20 },
+    ]);
+    expect(await boards.listWithKeys({ board: "xp", playerId: "user_a" })).toEqual([
+      { period: "all", score: 30, updatedAt: T0, recentKeys: [] },
+    ]);
+  });
+
   it("reports a player's rank, counting everyone ahead", async () => {
     const boards = setup();
     await boards.raiseScore(write("user_a", 40));

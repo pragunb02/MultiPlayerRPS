@@ -8,7 +8,7 @@ import { SESSION_COOKIE_NAME } from "./session.js";
 const FIRST_GUEST = {
   kind: "guest",
   id: "guest_00000000-0000-4000-8000-000000000001",
-  displayName: "Guest-T001",
+  displayName: "Guest-TAAB",
 };
 
 const sessionCookie = (res) =>
