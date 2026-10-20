@@ -199,4 +199,14 @@ describe("the shared page list", () => {
       expect(describePage(path)).toMatchObject({ found: true, path });
     }
   });
+
+  it("gives the friends pages the URLs the server describes, a friend link by its token only (CC-052)", () => {
+    const token = "AbCdEfGhIjKlMnOpQrSt_-";
+
+    expect(paths.friends()).toBe("/friends");
+    expect(paths.friendLink(token)).toBe(`/friends/add/${token}`);
+    for (const path of [paths.friends(), paths.friendLink(token)]) {
+      expect(describePage(path)).toMatchObject({ found: true, indexable: false, path });
+    }
+  });
 });

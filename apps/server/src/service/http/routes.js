@@ -6,6 +6,7 @@ import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
 import { createFeedbackRoutes } from "./feedbackRoutes.js";
+import { createFriendRoutes } from "./friendRoutes.js";
 import { createFlagRoutes } from "./flagRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
@@ -24,6 +25,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
+ *   & { friendComponent: Parameters<typeof createFriendRoutes>[0]["friendComponent"], friendLimits?: Parameters<typeof createFriendRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
  *   & { flagComponent: Parameters<typeof createFlagRoutes>[0]["flagComponent"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
@@ -51,6 +53,8 @@ export function apiRouter({
   blockLimits,
   profileComponent,
   profileLimits,
+  friendComponent,
+  friendLimits,
   feedbackComponent,
   feedbackLimits,
   dailyPuzzleComponent,
@@ -95,6 +99,7 @@ export function apiRouter({
   router.use(createMatchRoutes({ matchComponent, now }));
   router.use(createBlockRoutes({ blockComponent, now, ...(blockLimits && { limits: blockLimits }) }));
   router.use(createProfileRoutes({ profileComponent, now, ...(profileLimits && { limits: profileLimits }) }));
+  router.use(createFriendRoutes({ friendComponent, now, ...(friendLimits && { limits: friendLimits }) }));
   router.use(createSafetyRoutes({ safetyComponent, now }));
   router.use(createProgressRoutes({ progressionComponent }));
   router.use(createGamificationRoutes({ gamificationComponent, now }));

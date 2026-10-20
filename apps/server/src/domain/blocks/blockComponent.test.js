@@ -38,16 +38,16 @@ function fakeRooms(rooms = {}, closed = []) {
 
 /**
  * Stored matches by id. Only their players may read them, and by their real player ids, as
- * `matchComponent.playersFor` answers them (CC-297).
+ * `matchComponent.meetingFor` answers them (CC-297, CC-052).
  */
 function fakeMatches(matches = {}) {
   return {
-    async playersFor({ matchId, playerId }) {
+    async meetingFor({ matchId, playerId }) {
       const match = matches[matchId];
       if (match === undefined || !match.players.some((p) => p.playerId === playerId)) {
         throw new NotFoundError("Match not found");
       }
-      return match.players;
+      return { players: match.players };
     },
   };
 }
@@ -66,7 +66,14 @@ function fakeTransfers(moves = {}) {
 }
 
 let ids = 0;
-function setup({ rooms = {}, closed = [], matches = {}, limit, transfers = fakeTransfers() } = {}) {
+function setup({
+  rooms = {},
+  closed = [],
+  matches = {},
+  limit,
+  transfers = fakeTransfers(),
+  followers,
+} = {}) {
   const dao = createInMemoryBlockDao();
   const blocks = createBlockComponent({
     blockAccessor: createBlockAccessor({ blockDao: dao }),
@@ -76,6 +83,7 @@ function setup({ rooms = {}, closed = [], matches = {}, limit, transfers = fakeT
     seatIds: SEAT_IDS,
     newBlockId: () => `00000000-0000-4000-9000-${String(++ids).padStart(12, "0")}`,
     ...(limit !== undefined && { limit }),
+    ...(followers !== undefined && { followers }),
   });
   /** A seat of a room as the page names it: its place and the seat id the room view showed for it (CC-253). */
   const at = (roomCode, seatIndex) => {
@@ -90,6 +98,28 @@ function setup({ rooms = {}, closed = [], matches = {}, limit, transfers = fakeT
 }
 
 const sharedRoom = { ROOM22: { code: "ROOM22", seats: [seat(RIYA), seat(GUEST)] } };
+
+describe("blockComponent: followers (CC-052)", () => {
+  it("tells every follower of each block, a repeated one too, before it answers", async () => {
+    const told = [];
+    const { blocks, at } = setup({
+      rooms: sharedRoom,
+      followers: [{ name: "friends", playersBlocked: async (pair) => told.push(pair) }],
+    });
+
+    await blocks.block({ blocker: RIYA, target: at("ROOM22", 1), now: T0 });
+    await blocks.block({ blocker: RIYA, target: at("ROOM22", 1), now: T0 + 1 });
+
+    expect(told).toEqual([
+      { blockerId: RIYA.id, blockedId: GUEST.id, now: T0 },
+      { blockerId: RIYA.id, blockedId: GUEST.id, now: T0 + 1 },
+    ]);
+  });
+
+  it("refuses a follower without a way to be told, at construction", () => {
+    expect(() => setup({ followers: [{ name: "friends" }] })).toThrow(/friends.playersBlocked/);
+  });
+});
 
 describe("blockComponent: who can be blocked (CC-044, ADR-053)", () => {
   it("blocks the other player of an open room both sit in, by seat", async () => {
