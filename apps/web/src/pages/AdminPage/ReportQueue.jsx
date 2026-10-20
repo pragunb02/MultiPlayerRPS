@@ -61,7 +61,7 @@ function Recent({ recent }) {
 }
 
 /**
- * One report of a group. Every value is React text, so a note holding markup shows as the characters typed and is
+ * One report of a group. Every value is React text, so a name holding markup shows as the characters typed and is
  * never read as HTML.
  */
 function Item({ item }) {
@@ -84,7 +84,6 @@ function Item({ item }) {
           <dd>{item.nameThen}</dd>
         </div>
       </dl>
-      {item.note !== undefined && <p className={styles.message}>{item.note}</p>}
       <Recent recent={item.context.recent} />
     </li>
   );

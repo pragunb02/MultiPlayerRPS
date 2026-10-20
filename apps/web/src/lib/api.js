@@ -110,10 +110,10 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
       await request("DELETE", `/blocks/${encodeURIComponent(blockId)}`);
     },
     /**
-     * Reports a player by where the two met, with a closed reason and an optional note (CC-044, ADR-071). The answer
+     * Reports a player by where the two met, with a closed reason and nothing else (CC-044, ADR-071). The answer
      * is the same every time: the report's id, for the one-tap block, and its time.
      *
-     * @param {({ roomCode: string, seat: number, seatId: string } | { matchId: string, seat: number } | { handle: string }) & { reason: string, note?: string }} report
+     * @param {({ roomCode: string, seat: number, seatId: string } | { matchId: string, seat: number } | { handle: string }) & { reason: string }} report
      * @returns {Promise<{ reportId: string, createdAt: number }>}
      */
     reportPlayer: async (report) => (await request("POST", "/reports", report)).report,

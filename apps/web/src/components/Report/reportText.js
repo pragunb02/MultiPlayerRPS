@@ -29,11 +29,6 @@ export const reportText = (name) =>
   Object.freeze({
     title: both(`${name} ko report karo`, `Report ${name}`),
     reasonLegend: both("Kya hua?", "What happened?"),
-    noteLabel: "Anything else? (optional)",
-    noteHint: both(
-      "Apna naam, phone ya address mat likhna. Email aur phone number save hone se pehle hata diye jaate hain.",
-      "Leave out your name, phone and address. Emails and phone numbers are removed before we save it.",
-    ),
     reasonMissing: both("Pehle ek wajah chuno.", "Pick a reason first."),
     send: "Send report",
     sending: "Sending…",

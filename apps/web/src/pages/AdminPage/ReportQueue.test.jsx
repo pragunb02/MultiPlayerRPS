@@ -97,8 +97,8 @@ describe("the report queue (CC-044)", () => {
     expect(entry).toHaveTextContent("Room ABC234 · rps");
     expect(entry).toHaveTextContent("Match 11111111-2222-4333-8444-555555555555 · chess");
     expect(entry).toHaveTextContent('reported moved "e4"');
-    // The note is the characters typed, never markup.
-    expect(within(entry).getByText("<img src=x onerror=alert(1)>")).toBeVisible();
+    // Reports carry no free text (owner, 2026-10-21): even a note in an answer is never shown, as text or markup.
+    expect(within(entry).queryByText("<img src=x onerror=alert(1)>")).toBeNull();
     expect(entry.querySelector("img")).toBeNull();
     expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("aria-current", "page");
   });

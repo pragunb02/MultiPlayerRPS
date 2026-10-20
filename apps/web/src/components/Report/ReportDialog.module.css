@@ -42,43 +42,9 @@
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
-.note {
-  display: grid;
-  gap: var(--space-1);
-}
-.note label {
-  font-weight: 700;
-}
-.note textarea {
-  font: inherit;
-  resize: vertical;
-  min-height: 4.5rem;
-  padding: var(--space-2) var(--space-3);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-}
-.note textarea:focus-visible {
-  border-color: var(--color-primary);
-}
-.under {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-.hint,
 .help {
   margin: 0;
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-.count {
-  flex: none;
-  margin: 0;
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
 }
 .error {

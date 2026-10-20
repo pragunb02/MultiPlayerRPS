@@ -3,10 +3,10 @@ import { OWNER } from "./ownerConsole.js";
 import { newAccount } from "./personas.js";
 
 // Reports (CC-044, ADR-071). Riya, a guest, plays Rock Paper Scissors with Bob, an account whose name she finds
-// offensive. She reports him from his seat, with a note, and blocks him in one tap from the thank-you. The request
-// names Bob only by the seat and the id the page saw there, never by a player id, and Bob's browser hears nothing.
-// She reports again from her match history. The owner reads the report as plain text in the console and renames
-// Bob to a safe default, which signs him out; he logs in again under the new name.
+// offensive. She reports him from his seat with a reason (there is no box to type in) and blocks him in one tap from
+// the thank-you. The request names Bob only by the seat and the id the page saw there, never by a player id, and
+// Bob's browser hears nothing. She reports again from her match history. The owner reads the report in the console
+// and renames Bob to a safe default, which signs him out; he logs in again under the new name.
 
 const choices = (player) => player.page.getByRole("group", { name: "Your choice" });
 
@@ -54,8 +54,7 @@ test.describe("reports", () => {
     await dialog.getByRole("button", { name: "Send report" }).click();
     await expect(dialog.getByText("Pick a reason first.")).toBeVisible();
     await dialog.getByRole("radio", { name: /Offensive name/ }).check();
-    const note = "<b>rude</b> name, he said call 98765 43210";
-    await dialog.getByRole("textbox", { name: "Anything else? (optional)" }).fill(note);
+    await expect(dialog.getByRole("textbox")).toHaveCount(0);
     const sent = riya.page.waitForRequest((r) => r.url().endsWith("/api/reports") && r.method() === "POST");
     await dialog.getByRole("button", { name: "Send report" }).click();
     const request = await sent;
@@ -65,7 +64,6 @@ test.describe("reports", () => {
       seat: expect.any(Number),
       seatId: expect.stringMatching(/^[A-Za-z0-9_-]{22}$/),
       reason: "name",
-      note,
     });
     expect(request.postData()).not.toMatch(/guest_|user_/);
     const thanks = riya.page.getByRole("dialog", { name: /Thanks, we got it/ });
@@ -97,8 +95,7 @@ test.describe("reports", () => {
     await expect(owner.page).toHaveTitle("Reports · Owner console · ClassiCade");
     const group = owner.page.getByRole("article").filter({ hasText: account.username });
     await expect(group).toContainText("1 report from 1 person");
-    await expect(group.getByText("<b>rude</b> name, he said call [phone removed]")).toBeVisible();
-    await expect(group.locator("b")).toHaveCount(0);
+    await expect(group.getByText("Offensive name").first()).toBeVisible();
     await group.getByRole("button", { name: "Rename" }).click();
     const confirm = owner.page.getByRole("dialog", { name: `Rename ${account.username}?` });
     await confirm.getByRole("button", { name: "Rename to a safe name" }).click();

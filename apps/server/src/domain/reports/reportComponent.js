@@ -5,7 +5,6 @@ import { isAccountId } from "../../models/identity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { ConflictError, GoneError, NotFoundError } from "../../utils/errors.js";
 import { dayOf } from "../../utils/indiaTime.js";
-import { maskContacts } from "../feedback/maskContacts.js";
 import { renameIdShapes } from "../identity/idShapes.js";
 
 /**
@@ -191,7 +190,6 @@ export function createReportComponent({
     Object.freeze({
       reportId: report.reportId,
       reason: report.reason,
-      ...(report.note !== undefined && { note: report.note }),
       nameThen: report.reportedName,
       context: report.context,
       setAside: report.setAside,
@@ -233,21 +231,19 @@ export function createReportComponent({
      * answer says nothing about who that is or what will happen. A second report by the same reporter on the same
      * player the same India day answers the first one.
      *
-     * @param {{ reporter: Readonly<import("../../models/identity.js").Identity>, target: ReportTarget, reason: string, note?: string, now: number }} input
-     *   `reason` and `note` are already checked by the service layer
+     * @param {{ reporter: Readonly<import("../../models/identity.js").Identity>, target: ReportTarget, reason: string, now: number }} input
+     *   `reason` is already checked by the service layer
      * @returns {Promise<Readonly<{ reportId: string, createdAt: number }>>}
      * @throws {NotFoundError} for every reference the server cannot confirm, all with the same message
      */
-    async report({ reporter, target, reason, note, now }) {
+    async report({ reporter, target, reason, now }) {
       const { person, context } = await resolve({ reporter, target, now });
-      const masked = note === undefined ? "" : maskContacts(note);
       const { report } = await reportAccessor.add({
         reportId: newReportId(),
         reporterId: reporter.id,
         reportedId: person.playerId,
         reportedName: person.displayName,
         reason,
-        ...(masked !== "" && { note: masked }),
         context,
         day: dayOf(now),
         setAside: await isSetAside(reporter.id),
@@ -370,15 +366,14 @@ export function createReportComponent({
     exportPlayer: async ({ playerId }) =>
       (await reportAccessor.listByReporter(playerId)).map((report) => ({
         reason: report.reason,
-        ...(report.note !== undefined && { note: report.note }),
         where: report.context.kind,
         displayName: report.reportedName,
         reportedAt: new Date(report.createdAt).toISOString(),
       })),
 
     /**
-     * Deletes every report about the player, and gives each report they made a stand-in of its own without its
-     * note, so a report on someone who harmed them outlives their account but no longer leads to them (CC-035).
+     * Deletes every report about the player, and gives each report they made a stand-in of its own, so a report on
+     * someone who harmed them outlives their account but no longer leads to them (CC-035).
      * Running it twice changes nothing.
      *
      * @param {{ playerId: string }} input

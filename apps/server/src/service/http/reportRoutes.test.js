@@ -98,7 +98,7 @@ describe("POST /api/reports (CC-044)", () => {
     const { bobSeat } = await finishedRace(alice, bob);
     const bobFramesBefore = bob.received.length;
 
-    const res = await report(alice, { ...bobSeat, reason: "name", note: "Mail me at a@b.co" });
+    const res = await report(alice, { ...bobSeat, reason: "name" });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ report: { reportId: expect.any(String), createdAt: expect.any(Number) } });
@@ -108,8 +108,9 @@ describe("POST /api/reports (CC-044)", () => {
       reporterId: alice.identity.id,
       reportedId: bob.identity.id,
       reportedName: bob.identity.displayName,
-      note: "Mail me at [email removed]",
+      reason: "name",
     });
+    expect(stored).not.toHaveProperty("note");
     // Bob is never told: nothing his socket received after the game names a report (the game's own pushes may land).
     const later = JSON.stringify(bob.received.slice(bobFramesBefore));
     expect(later).not.toMatch(/report/i);
@@ -170,13 +171,28 @@ describe("POST /api/reports (CC-044)", () => {
       await report(alice, { ...bobSeat, seatId: bob.identity.id, reason: "name" }),
       await report(alice, { ...bobSeat, reason: "spam" }),
       await report(alice, { ...bobSeat }),
-      await report(alice, { ...bobSeat, reason: "name", note: "x".repeat(501) }),
-      await report(alice, { ...bobSeat, reason: "name", note: 5 }),
       await report(alice, { handle: "short", reason: "name" }),
       await report(alice, [bobSeat]),
     ];
 
     expect(answers.map((res) => res.status)).toEqual(answers.map(() => 400));
+  });
+
+  it("refuses a note with 400 and stores nothing: reports are reasons only (owner, 2026-10-21)", async () => {
+    const reportDao = createInMemoryReportDao();
+    server = await startTestServer({ reportDao });
+    const [alice, bob] = [await clients.player(), await clients.player()];
+    const { bobSeat } = await finishedRace(alice, bob);
+
+    const answers = [
+      await report(alice, { ...bobSeat, reason: "name", note: "Rude name" }),
+      await report(alice, { ...bobSeat, reason: "name", note: "" }),
+      await report(alice, { handle: "zzzzzzzzzzzzzzzz", reason: "name", note: "x" }),
+    ];
+
+    expect(answers.map((res) => res.status)).toEqual([400, 400, 400]);
+    expect(answers[0].body.error.details).toEqual({ fields: ["note"] });
+    expect(await reportDao.listByReporter(alice.identity.id)).toEqual([]);
   });
 
   it("answers 401 to a visitor without a session", async () => {
@@ -228,7 +244,7 @@ describe("the owner's report queue, /api/admin/reports (CC-044, ADR-071.6)", () 
     server = await startTestServer(await withOwner());
     const [alice, bob] = [await clients.player(), await clients.player()];
     const { bobSeat } = await finishedRace(alice, bob);
-    await report(alice, { ...bobSeat, reason: "name", note: "<script>alert(1)</script>" });
+    await report(alice, { ...bobSeat, reason: "name" });
     const owner = await logIn("owner@example.com");
 
     const asGuest = await call("GET", "/admin/reports", { cookie: alice.cookie });
@@ -251,8 +267,7 @@ describe("the owner's report queue, /api/admin/reports (CC-044, ADR-071.6)", () 
       reports: 1,
       reporters: 1,
     });
-    // The note is sent as the text it is, for the page to show as text.
-    expect(group.items[0].note).toBe("<script>alert(1)</script>");
+    expect(group.items[0]).not.toHaveProperty("note");
     expect(stringsIn(asOwner.body).filter(hasPlayerIdShape)).toEqual([]);
     expect(asOwner.text).not.toContain(alice.identity.id);
     expect(asOwner.text).not.toContain(bob.identity.id);
@@ -341,7 +356,7 @@ describe("reports in the account export and deletion (CC-044, ADR-071.7)", () =>
     const view = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
     const seat = view.data.seats.findIndex((s) => s.playerId === view.data.you);
     const { reportId } = (
-      await report(riya, { roomCode: code, seat, seatId: view.data.you, reason: "harassment", note: "kept" })
+      await report(riya, { roomCode: code, seat, seatId: view.data.you, reason: "harassment" })
     ).body.report;
 
     const exported = await call("POST", "/account/export", {
@@ -353,7 +368,6 @@ describe("reports in the account export and deletion (CC-044, ADR-071.7)", () =>
     expect(exported.body.reports).toEqual([
       {
         reason: "harassment",
-        note: "kept",
         where: "room",
         displayName: bob.identity.displayName,
         reportedAt: expect.any(String),

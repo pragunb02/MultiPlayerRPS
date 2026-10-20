@@ -292,23 +292,7 @@ describe("reportComponent.report: who can be reported (CC-044, ADR-071.1)", () =
   });
 });
 
-describe("reportComponent.report: the note and the limits (CC-044, ADR-071.2, ADR-071.5)", () => {
-  it("masks emails and phone numbers in the note before it is stored", async () => {
-    const { reports, dao, inRoom } = setup();
-
-    const { reportId } = await reports.report({
-      reporter: RIYA,
-      target: inRoom(1),
-      reason: "harassment",
-      note: "He asked for my number, mine is 98765 43210 and riya@example.com",
-      now: T0,
-    });
-
-    expect((await dao.getById(reportId)).note).toBe(
-      "He asked for my number, mine is [phone removed] and [email removed]",
-    );
-  });
-
+describe("reportComponent.report: the limits (CC-044, ADR-071.5)", () => {
   it("answers the same report for a second one on the same player the same India day, and a new one the next day", async () => {
     const { reports, dao, inRoom } = setup();
     const first = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 });
@@ -412,7 +396,7 @@ describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
       },
     });
     const { reports, inRoom } = fixture;
-    await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", note: "bad", now: T0 });
+    await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 });
     await reports.report({ reporter: MEERA, target: inRoom(1, "ROOM33"), reason: "cheating", now: T0 + 10 });
     await reports.report({ reporter: RIYA, target: inRoom(1, "ROOM44"), reason: "other", now: T0 + 20 });
     return fixture;
@@ -440,7 +424,6 @@ describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
     expect(arjun.items[1]).toEqual({
       reportId: expect.any(String),
       reason: "name",
-      note: "bad",
       nameThen: "Arjun",
       context: expect.objectContaining({ kind: "room", roomCode: "ROOM22" }),
       setAside: false,
@@ -525,7 +508,6 @@ describe("reportComponent: guests who sign in, export and deletion (ADR-071.7)",
       reporter: RIYA,
       target: inRoom(1),
       reason: "name",
-      note: "n",
       now: T0,
     });
     await reports.act({ reportId, action: "rename", now: T0 + 1 });
@@ -535,7 +517,6 @@ describe("reportComponent: guests who sign in, export and deletion (ADR-071.7)",
     expect(exported).toEqual([
       {
         reason: "name",
-        note: "n",
         where: "room",
         displayName: "Arjun",
         reportedAt: new Date(T0).toISOString(),
@@ -545,14 +526,13 @@ describe("reportComponent: guests who sign in, export and deletion (ADR-071.7)",
     expect(stringsIn(exported).filter(hasPlayerIdShape)).toEqual([]);
   });
 
-  it("erases reports about the player, and keeps the reports they made under a stand-in without the note", async () => {
+  it("erases reports about the player, and keeps the reports they made under a stand-in", async () => {
     const rooms = { ROOM22: room(), ROOM33: room({ code: "ROOM33", seats: [seat(ARJUN), seat(RIYA)] }) };
     const { reports, dao, inRoom } = setup({ rooms });
     const made = await reports.report({
       reporter: RIYA,
       target: inRoom(1),
       reason: "name",
-      note: "n",
       now: T0,
     });
     const about = await reports.report({
@@ -567,7 +547,6 @@ describe("reportComponent: guests who sign in, export and deletion (ADR-071.7)",
     expect(erased).toEqual({ erased: { reports: 2 } });
     const kept = await dao.getById(made.reportId);
     expect(kept.reporterId).toMatch(/^deleted_/);
-    expect(kept).not.toHaveProperty("note");
     await expect(dao.getById(about.reportId)).rejects.toBeInstanceOf(RangeError);
   });
 });

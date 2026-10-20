@@ -64,7 +64,7 @@ describe("MongoDB report DAO honours the report DAO contract (integration)", () 
 
   it("stores no Mongo version field beside the record", async () => {
     const dao = await createDao();
-    const report = reportRecord({ note: "A note" });
+    const report = reportRecord();
 
     await dao.insert(report);
 

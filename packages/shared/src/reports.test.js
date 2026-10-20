@@ -5,7 +5,6 @@ import {
   REPORT_ACTIONS,
   REPORT_CONTEXT,
   REPORT_KEEP_DAYS,
-  REPORT_NOTE_MAX,
   REPORT_REASON,
   REPORT_REASONS,
   REPORT_STATUS,
@@ -31,8 +30,8 @@ describe("report names shared by the page and the server (CC-044, ADR-071)", () 
     expect(REPORT_ACTIONS).toEqual(Object.values(REPORT_ACTION));
   });
 
-  it("keeps a note to 500 characters and a report for 180 days, as long as feedback", () => {
-    expect(REPORT_NOTE_MAX).toBe(500);
+  it("keeps a report for 180 days, as long as feedback, and has no note: reasons only (owner, 2026-10-21)", async () => {
+    expect(Object.keys(await import("./reports.js"))).not.toContain("REPORT_NOTE_MAX");
     expect(REPORT_KEEP_DAYS).toBe(180);
     expect(REPORT_KEEP_DAYS).toBe(FEEDBACK_KEEP_DAYS);
   });

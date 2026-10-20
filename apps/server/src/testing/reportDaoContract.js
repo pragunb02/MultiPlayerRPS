@@ -17,7 +17,6 @@ export const reportRecord = ({
   day = "2026-10-20",
   seconds = 0,
   status = "open",
-  note,
   setAside = false,
 } = {}) => ({
   reportId: reportId ?? `00000000-0000-4000-b000-${String(++counter).padStart(12, "0")}`,
@@ -25,7 +24,6 @@ export const reportRecord = ({
   reportedId,
   reportedName: "Arjun",
   reason: "name",
-  ...(note !== undefined && { note }),
   context: {
     kind: "match",
     gameId: "rps",
@@ -48,7 +46,7 @@ const idsOf = (docs) => docs.map((doc) => doc.reportId);
 export function runReportDaoContract(createDao) {
   it("stores a report and answers it as stored, by id", async () => {
     const dao = await createDao();
-    const report = reportRecord({ note: "Rude name" });
+    const report = reportRecord();
 
     expect(await dao.insert(report)).toEqual(report);
     expect(await dao.getById(report.reportId)).toEqual(report);
@@ -207,9 +205,9 @@ export function runReportDaoContract(createDao) {
     expect(await dao.getById(kept.reportId)).toEqual(kept);
   });
 
-  it("gives each report a player made its own stand-in and drops its note, and deletes the reports about them", async () => {
+  it("gives each report a player made its own stand-in, and deletes the reports about them", async () => {
     const dao = await createDao();
-    const made = [reportRecord({ note: "Their words" }), reportRecord({ reportedId: GUEST, note: "More" })];
+    const made = [reportRecord(), reportRecord({ reportedId: GUEST })];
     const about = reportRecord({ reporterId: ARJUN, reportedId: RIYA });
     const unrelated = reportRecord({ reporterId: GUEST, reportedId: ARJUN });
     for (const report of [...made, about, unrelated]) await dao.insert(report);
@@ -227,7 +225,6 @@ export function runReportDaoContract(createDao) {
       "deleted_00000000-0000-4000-8000-000000000001",
       "deleted_00000000-0000-4000-8000-000000000002",
     ]);
-    after.forEach((report) => expect(report).not.toHaveProperty("note"));
     await expect(dao.getById(about.reportId)).rejects.toBeInstanceOf(RangeError);
     expect(await dao.getById(unrelated.reportId)).toEqual(unrelated);
     expect(await dao.listByReporter(RIYA)).toEqual([]);

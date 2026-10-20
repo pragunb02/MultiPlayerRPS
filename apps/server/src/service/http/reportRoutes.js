@@ -1,11 +1,5 @@
 import { Router } from "express";
-import {
-  REPORT_ACTIONS,
-  REPORT_NOTE_MAX,
-  REPORT_REASONS,
-  REPORT_STATUS,
-  REPORT_STATUSES,
-} from "@classicade/shared";
+import { REPORT_ACTIONS, REPORT_REASONS, REPORT_STATUS, REPORT_STATUSES } from "@classicade/shared";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
 import { isPlainObject, parseReference, REFERENCE_KIND, UUID_PATTERN } from "./playerReferenceInput.js";
@@ -31,19 +25,6 @@ export const REPORT_LIMITS = Object.freeze({
 
 const invalid = (field, message) => new ValidationError(message, { details: { field } });
 
-// Control characters other than a new line or a tab. Nobody means to type them (as feedback, ADR-059).
-const CONTROL = /[^\P{Cc}\n\t]/gu;
-
-/** The optional note as plain text: one kind of new line, no control characters, the ends trimmed. */
-function parseNote(value) {
-  if (value === undefined) return undefined;
-  if (typeof value !== "string" || value.length > REPORT_NOTE_MAX) {
-    throw invalid("note", `Write a note of at most ${REPORT_NOTE_MAX} characters, or none`);
-  }
-  const note = value.replace(/\r\n?/g, "\n").replace(CONTROL, "").trim();
-  return note === "" ? undefined : note;
-}
-
 function parseReason(value) {
   if (!REPORT_REASONS.includes(value)) {
     throw invalid("reason", `reason must be one of ${REPORT_REASONS.join(", ")}`);
@@ -52,24 +33,21 @@ function parseReason(value) {
 }
 
 /**
- * A report: who, by where the two met (never a player id), a closed reason and an optional note. Nothing else.
+ * A report: who, by where the two met (never a player id), and a closed reason. Nothing else: there is no free text,
+ * so a `note` is refused like any unknown field (owner, 2026-10-21, ADR-051 answer 11).
  *
- * @returns {{ target: import("../../domain/reports/reportComponent.js").ReportTarget, reason: string, note?: string }}
+ * @returns {{ target: import("../../domain/reports/reportComponent.js").ReportTarget, reason: string }}
  */
 function parseReport(body) {
   const target = parseReference(body, {
     kinds: [REFERENCE_KIND.ROOM, REFERENCE_KIND.MATCH, REFERENCE_KIND.HANDLE],
-    extra: ["reason", "note"],
-    message: "Send who you report (a room seat, a match seat or a profile), a reason and a note",
+    extra: ["reason"],
+    message: "Send who you report (a room seat, a match seat or a profile) and a reason",
   });
-  const fields = Object.fromEntries(
-    Object.entries(target).filter(([key]) => key !== "reason" && key !== "note"),
-  );
-  const note = parseNote(body.note);
+  const fields = Object.fromEntries(Object.entries(target).filter(([key]) => key !== "reason"));
   return {
     target: /** @type {import("../../domain/reports/reportComponent.js").ReportTarget} */ (fields),
     reason: parseReason(body.reason),
-    ...(note !== undefined && { note }),
   };
 }
 
@@ -104,9 +82,9 @@ function parseAction(params, body) {
 /**
  * Reports (CC-044, ADR-071).
  *
- * 1. `POST /reports` with `{ roomCode, seat, seatId }`, `{ matchId, seat }` or `{ handle }`, a `reason` and an
- *    optional `note`, from a guest or an account, answers `{ report: { reportId, createdAt } }`, the same for a repeat
- *    the same day. 404 for anyone the server cannot confirm, 400 for anything else in the body, 429 over a limit,
+ * 1. `POST /reports` with `{ roomCode, seat, seatId }`, `{ matchId, seat }` or `{ handle }` and a `reason`, nothing
+ *    else (a `note` is a 400), from a guest or an account, answers `{ report: { reportId, createdAt } }`, the same for
+ *    a repeat the same day. 404 for anyone the server cannot confirm, 400 for anything else in the body, 429 over a limit,
  *    401 for a visitor. Nothing is sent to the reported player.
  * 2. `GET /admin/reports?status=open|dismissed|actioned&page=0` answers an admin `{ groups, total, page, more }`:
  *    one page of the reports grouped by reported player, without any player id, how many groups there are, and
@@ -146,16 +124,15 @@ export function createReportRoutes({ reportComponent, requireAdmin, now = Date.n
 
   // The player's own limit first, so the network's budget counts only what it let through.
   router.post("/reports", signedIn, perPlayer, perAddress, async (req, res) => {
-    const { target, reason, note } = parseReport(req.body);
+    const { target, reason } = parseReport(req.body);
     const reporter = requireIdentity(req.session);
     const report = await reportComponent.report({
       reporter,
       target,
       reason,
-      ...(note !== undefined && { note }),
       now: now(),
     });
-    // Nobody is named in the log, neither who reported nor who was reported, and never the note.
+    // Nobody is named in the log, neither who reported nor who was reported.
     req.log.info({ reportReason: reason }, "player reported");
     res.set("Cache-Control", "no-store");
     res.json({ report });

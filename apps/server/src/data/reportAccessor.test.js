@@ -30,7 +30,7 @@ const input = ({ at = T0, ...rest } = {}) => ({
 describe("reportAccessor (CC-044, ADR-071)", () => {
   it("stores a new report as open, and answers a frozen model with times in milliseconds", async () => {
     const reports = createReportAccessor({ reportDao: createInMemoryReportDao() });
-    const report = input({ note: "Too fast" });
+    const report = input();
 
     const { created, report: stored } = await reports.add(report);
 

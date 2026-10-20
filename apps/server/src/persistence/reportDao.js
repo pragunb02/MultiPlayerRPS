@@ -25,7 +25,6 @@ const DUPLICATE_KEY_CODE = 11000;
  * @property {string} reportedId     who was reported. Never sent to any client
  * @property {string} reportedName   the reported player's display name when the report was made
  * @property {string} reason         one of REPORT_REASONS
- * @property {string} [note]         plain text, contacts masked, only when the reporter wrote one
  * @property {ReportContext} context
  * @property {string} day            the India day of the report: one report per reporter and player a day
  * @property {boolean} setAside      made by a reporter whose reports were dismissed before (ADR-071.5)
@@ -71,7 +70,6 @@ const reportSchema = new mongoose.Schema(
     reportedId: { type: String, required: true },
     reportedName: { type: String, required: true },
     reason: { type: String, required: true },
-    note: { type: String },
     context: { type: contextSchema, required: true },
     day: { type: String, required: true },
     setAside: { type: Boolean, required: true },
@@ -94,7 +92,7 @@ reportSchema.index({ status: 1, createdAt: -1 });
 reportSchema.index({ createdAt: 1 }, { expireAfterSeconds: REPORT_KEEP_DAYS * DAY_SECONDS });
 
 const FIELDS =
-  "-_id reportId reporterId reportedId reportedName reason note context day setAside status action createdAt closedAt";
+  "-_id reportId reporterId reportedId reportedName reason context day setAside status action createdAt closedAt";
 const NEWEST_FIRST = Object.freeze({ createdAt: -1, reportId: -1 });
 const isDuplicate = (err) => err.code === DUPLICATE_KEY_CODE;
 
@@ -263,7 +261,7 @@ export function createReportDao({ connection }) {
     moveReported: (transfer) => move("reportedId", "reporterId", transfer),
 
     /**
-     * Gives each report the player made a stand-in of its own and drops its note, which holds their words.
+     * Gives each report the player made a stand-in of its own, so it no longer leads to them.
      *
      * @param {{ reporterId: string, standIn: () => string }} input
      * @returns {Promise<number>} reports changed
@@ -271,7 +269,7 @@ export function createReportDao({ connection }) {
     async anonymiseReporter({ reporterId, standIn }) {
       const docs = await Report.find({ reporterId }, "-_id reportId").lean();
       for (const { reportId } of docs) {
-        await Report.updateOne({ reportId }, { $set: { reporterId: standIn() }, $unset: { note: "" } });
+        await Report.updateOne({ reportId }, { $set: { reporterId: standIn() } });
       }
       return docs.length;
     },

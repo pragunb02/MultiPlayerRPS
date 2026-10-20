@@ -168,9 +168,9 @@ the owner may change it.
 - **Consequences.** A ticket takes longer to start and shorter to finish. The coordinator keeps one more file. The
   check is text only: it can see that a row is answered, not that the answer is good, which is spec review's job.
 
-### ADR-071 — Reports: by reference, closed reasons, a masked note, grouped for one moderator, 180 days
+### ADR-071 — Reports: by reference, closed reasons only, grouped for one moderator, 180 days
 
-- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-044](tickets/CC-044.md) research §6, the
+- **Status:** Accepted · 2026-10-21 by the owner, with the note removed (below) ([CC-044](tickets/CC-044.md) research §6, the
   second pull request of CC-044). Amends ADR-053.3 and ADR-059's last sentence (below).
 - **Context.** Players can meet people they do not know (links today, quick match next), the name filter lets some
   names through "and reports cover it" (ADR-022.2), and the IT Rules expect a way to complain. Every player counts as
@@ -224,6 +224,12 @@ the owner may change it.
   queue groups in the store before it pages (a MongoDB aggregation by reported player: counts, distinct reporters
   without set aside reports, the newest report), 25 groups a page with the total and whether more follow, and the 20
   newest reports of each group, so a flood about one player cannot push another out of the queue.
+- **Amended 2026-10-21 (owner): reasons only, no note.** The owner keeps ADR-051 answer 11. A report is a closed
+  reason and nothing else: the dialog has no box to type in, `POST /api/reports` refuses a `note` with 400 like any
+  unknown field, `player_reports` has no note field, and the console, the export and deletion carry none. Points 2,
+  6 and 7 read without the note from now on, and the report component no longer uses the feedback masker. A note may
+  come later behind a CC-312 flag, masked as feedback is (ADR-059.2), by a decision of its own. The other defaults
+  (180 days, the limits, the safe-name rename with sign-out, the Hinglish drafts, no flag) are accepted.
 
 ### ADR-068 — Changelog fragments, folded by the coordinator, and numbers assigned at dispatch
 

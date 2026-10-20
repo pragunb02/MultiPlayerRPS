@@ -12,7 +12,6 @@ import { NotFoundError } from "../utils/errors.js";
  * @property {string} reportedId     never sent to a client
  * @property {string} reportedName
  * @property {string} reason
- * @property {string} [note]
  * @property {ReportContext} context
  * @property {string} day
  * @property {boolean} setAside

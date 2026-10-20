@@ -101,8 +101,7 @@ export function createInMemoryReportDao() {
     async anonymiseReporter({ reporterId, standIn }) {
       const made = find((d) => d.reporterId === reporterId);
       for (const doc of made) {
-        const { note, ...rest } = doc;
-        reports.set(doc.reportId, { ...rest, reporterId: standIn() });
+        reports.set(doc.reportId, { ...doc, reporterId: standIn() });
       }
       return made.length;
     },

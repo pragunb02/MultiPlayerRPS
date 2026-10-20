@@ -24,8 +24,5 @@ export const REPORT_STATUSES = Object.freeze(Object.values(REPORT_STATUS));
 export const REPORT_ACTION = Object.freeze({ DISMISS: "dismiss", RENAME: "rename" });
 export const REPORT_ACTIONS = Object.freeze(Object.values(REPORT_ACTION));
 
-/** The longest note, in UTF-16 units, which is what a text box's `maxLength` counts. */
-export const REPORT_NOTE_MAX = 500;
-
 /** How long a report is kept after it was made. MongoDB removes it after that (ADR-071.7). */
 export const REPORT_KEEP_DAYS = 180;

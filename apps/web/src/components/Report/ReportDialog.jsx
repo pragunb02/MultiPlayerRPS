@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { REPORT_NOTE_MAX, REPORT_REASONS } from "@classicade/shared";
+import { REPORT_REASONS } from "@classicade/shared";
 import { useServices } from "../../app/servicesContext.js";
 import { useAction } from "../../hooks/useAction.js";
 import { Button } from "../Button/Button.jsx";
@@ -75,8 +75,8 @@ function Thanks({ name, reportId, canBlock, onBlocked, onClose }) {
 }
 
 /**
- * Reporting one player (CC-044, ADR-071): one of four closed reasons and an optional note of at most 500 characters,
- * then a neutral thank-you that says nothing about what happens to the other player, who is never told. The page
+ * Reporting one player (CC-044, ADR-071): one of four closed reasons, and no free text (owner, 2026-10-21), then a
+ * neutral thank-you that says nothing about what happens to the other player, who is never told. The page
  * names the player only by where the two met: a room seat, a match seat or a profile handle.
  *
  * @param {{
@@ -92,18 +92,14 @@ export function ReportDialog({ name, target, canBlock, onBlocked, onClose }) {
   const { api } = useServices();
   const text = reportText(name);
   const [reason, setReason] = useState(undefined);
-  const [note, setNote] = useState("");
   const [missing, setMissing] = useState(false);
   const [sent, setSent] = useState(undefined);
   const formId = useId();
-  const hintId = useId();
-  const countId = useId();
   const errorId = useId();
 
   const send = useAction(
     async () => {
-      const trimmed = note.trim();
-      setSent(await api.reportPlayer({ ...target, reason, ...(trimmed !== "" && { note: trimmed }) }));
+      setSent(await api.reportPlayer({ ...target, reason }));
     },
     { id: "report.send" },
   );
@@ -174,26 +170,6 @@ export function ReportDialog({ name, target, canBlock, onBlocked, onClose }) {
             </p>
           )}
         </fieldset>
-        <div className={styles.note}>
-          <label htmlFor={`${formId}-note`}>{text.noteLabel}</label>
-          <textarea
-            id={`${formId}-note`}
-            rows={3}
-            maxLength={REPORT_NOTE_MAX}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            aria-describedby={`${hintId} ${countId}`}
-            data-cc-control="report.note"
-          />
-          <div className={styles.under}>
-            <p id={hintId} className={styles.hint}>
-              <Lines text={text.noteHint} />
-            </p>
-            <p id={countId} className={styles.count}>
-              {`${note.length} / ${REPORT_NOTE_MAX}`}
-            </p>
-          </div>
-        </div>
       </form>
     </Modal>
   );

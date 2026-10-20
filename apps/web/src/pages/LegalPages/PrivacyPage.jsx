@@ -103,13 +103,13 @@ export function PrivacyPage() {
           </li>
           <li>
             <strong>Players you report.</strong> When you report a player, we store who you reported (by their
-            player id, which only our server sees), the name they had, the reason you picked, your note if you
-            wrote one, where it happened (a room, a past game or a profile) and the last few moves and
-            requests between you, with nobody named. Before your note is saved, any email address or phone
-            number in it is replaced with a marker. We keep it so the site&apos;s owner can look at it and, if
-            a name breaks the rules, give that account a safe name. The reported player is never told, and
-            never learns who reported them. Reports are deleted 180 days after they were made. If you delete
-            your account, your reports stay without your name or your note, and reports about you are deleted.
+            player id, which only our server sees), the name they had, the reason you picked, where it
+            happened (a room, a past game or a profile) and the last few moves and requests between you, with
+            nobody named. There is no box to type in, so a report holds nothing you wrote. We keep it so the
+            site&apos;s owner can look at it and, if a name breaks the rules, give that account a safe name.
+            The reported player is never told, and never learns who reported them. Reports are deleted 180
+            days after they were made. If you delete your account, your reports stay without your name, and
+            reports about you are deleted.
           </li>
           <li>
             <strong>Friends.</strong> With an account you can ask someone you played with to be friends, or

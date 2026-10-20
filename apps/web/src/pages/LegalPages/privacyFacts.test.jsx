@@ -118,12 +118,12 @@ const FACTS = [
   },
   {
     fact: "reports are kept 180 days, and the reported player is never told (CC-044, ADR-071)",
-    data: "| [`player_reports`](#player_reports) | pseudonymous: both player ids, the reported name then, the reason, the note as typed with contacts masked, the last moves |",
+    data: "| [`player_reports`](#player_reports) | pseudonymous: both player ids, the reported name then, the reason, where, the last moves, no free text |",
     page: /we store who you reported.*The reported player is never told.*Reports are deleted 180 days after they were made/,
   },
   {
     fact: "your own reports are in your export, without the other player's id (CC-044)",
-    data: "the reports the player made: reason, note, where, the name, when",
+    data: "the reports the player made: reason, where, the name, when",
     page: /and the reports you made\. Other players appear in it by their display name only/,
   },
   {
