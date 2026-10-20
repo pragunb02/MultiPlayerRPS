@@ -1,0 +1,251 @@
+== AXE ==
+heading-order [moderate] nodes=12 pages=12 :: Heading levels should only increase by one :: e.g. ['#_r_l_'] :: ['admin-conversion@1280-light', 'admin-conversion@390-light', 'admin-engagement@1280-light', 'admin-engagement@390-light', 'admin-games@1280-light', 'admin-games@390-light']
+     Fix any of the following:   Heading order invalid
+label-content-name-mismatch [serious] nodes=6 pages=6 :: Elements must have their visible text as part of their accessible name :: e.g. ['._button_w2u11_7'] :: ['challenge-taken-back@1280-light', 'challenge-taken-back@390-light', 'inbox-open@1280-light', 'inbox-open@390-light', 'popup-challenge-taken@1280-light', 'popup-challenge-taken@390-light']
+     Fix any of the following:   Text inside the element is not included in the accessible name
+
+== OVERFLOW ==
+admin-ages 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-conversion 390 {'docScroll': False, 'offenders': ['table._table_1fbff_145 right=637', 'thead. right=637', 'tr. right=637', 'th. right=481', 'th. right=637']}
+admin-conversion 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-engagement 390 {'docScroll': False, 'offenders': ['table._table_1fbff_145 right=422', 'thead. right=422', 'tr. right=422', 'th. right=422', 'tbody. right=422']}
+admin-engagement 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-feedback 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-flags 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-games 390 {'docScroll': False, 'offenders': ['table._table_1fbff_145 right=528', 'thead. right=528', 'tr. right=528', 'th. right=469', 'th. right=528']}
+admin-games 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-overview 390 {'docScroll': False, 'offenders': ['table._table_1fbff_145 right=569', 'thead. right=569', 'tr. right=569', 'th. right=400', 'th. right=481']}
+admin-overview 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-players 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-retention 390 {'docScroll': False, 'offenders': ['table._table_1fbff_145 right=1216', 'thead. right=1216', 'tr. right=1216', 'th. right=456', 'th. right=571']}
+admin-retention 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+admin-statuses 390 {'docScroll': False, 'offenders': ['table._table_1fbff_145 right=1049', 'thead. right=1049', 'tr. right=1049', 'th. right=414', 'th. right=463']}
+admin-statuses 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1203', 'div._control_bo2no_2 right=774', 'button._settings_bo2no_8 right=774', 'span._chip_17kao_1 right=935', 'svg.[object SVGAnimatedString] right=819']}
+challenge-missing 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+challenge-own 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1166', 'div._control_bo2no_2 right=770', 'button._settings_bo2no_8 right=770', 'span._chip_17kao_1 right=931', 'svg.[object SVGAnimatedString] right=815']}
+challenge-received-guest 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+challenge-received-visitor 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+challenge-taken-back 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1198', 'div._control_bo2no_2 right=802', 'button._settings_bo2no_8 right=802', 'svg.[object SVGAnimatedString] right=793', 'circle.[object SVGAnimatedString] right=787']}
+daily-chess-account 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+daily-chess-guest 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+daily-chess-visitor 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+dialog-resign 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+feedback-dialog 390 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=505', 'path.[object SVGAnimatedString] right=397', 'path.[object SVGAnimatedString] right=505']}
+feedback-dialog 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+feedback-dialog 1280 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=1352', 'path.[object SVGAnimatedString] right=1352']}
+friend-link-invalid 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+friend-request-toast 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+friends-empty 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+friends-list 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+friends-request 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+friends-visitor 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+home-account 390 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=505', 'path.[object SVGAnimatedString] right=397', 'path.[object SVGAnimatedString] right=505']}
+home-account 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+home-account 1280 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=1352', 'path.[object SVGAnimatedString] right=1352']}
+home-guest 390 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=505', 'path.[object SVGAnimatedString] right=397', 'path.[object SVGAnimatedString] right=505']}
+home-guest 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+home-guest 1280 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=1352', 'path.[object SVGAnimatedString] right=1352']}
+home-visitor 390 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=505', 'path.[object SVGAnimatedString] right=397', 'path.[object SVGAnimatedString] right=505']}
+home-visitor 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813', 'g.[object SVGAnimatedString] right=800', 'path.[object SVGAnimatedString] right=800']}
+home-visitor 1280 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=1352', 'path.[object SVGAnimatedString] right=1352']}
+inbox-open 390 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=505', 'path.[object SVGAnimatedString] right=397', 'path.[object SVGAnimatedString] right=505']}
+inbox-open 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1198', 'div._control_bo2no_2 right=802', 'button._settings_bo2no_8 right=802', 'svg.[object SVGAnimatedString] right=793', 'circle.[object SVGAnimatedString] right=787']}
+inbox-open 1280 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=1352', 'path.[object SVGAnimatedString] right=1352']}
+invite-chooser 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+leaderboard-account 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+leaderboard-chess 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+leaderboard-loading 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+leaderboard-overall 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+leaderboard-rps-account 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+leaderboard-weekly 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+lobby-chess-guest 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+lobby-chess-visitor 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+lobby-rock-paper-scissors-guest 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+lobby-rock-paper-scissors-visitor 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+lobby-tic-tac-toe-guest 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+lobby-tic-tac-toe-visitor 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+login 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+login-error 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+not-found 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+pass-and-play-handover 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+pass-and-play-result 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+pass-and-play-setup 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+pass-and-play-start 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+playing-chess 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+playing-chess-selected 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+playing-rps 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+playing-rps-locked 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+playing-tictactoe 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+playing-tictactoe-mid 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+popup-challenge-taken 390 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=505', 'path.[object SVGAnimatedString] right=397', 'path.[object SVGAnimatedString] right=505']}
+popup-challenge-taken 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1198', 'div._control_bo2no_2 right=802', 'button._settings_bo2no_8 right=802', 'svg.[object SVGAnimatedString] right=793', 'circle.[object SVGAnimatedString] right=787']}
+popup-challenge-taken 1280 {'docScroll': False, 'offenders': ['g.[object SVGAnimatedString] right=1352', 'path.[object SVGAnimatedString] right=1352']}
+privacy 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+profile-account 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+profile-guest 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+profile-visitor 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+public-profile 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+public-profile-missing 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+result-chess 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18 _gained_17kao_41 right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+result-chess-other 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1108', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18 _gained_17kao_41 right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+result-rps-account 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1111', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18 _gained_17kao_41 right=832', 'div._identity_pdxbe_86 right=999', 'span._name_pdxbe_94 right=867']}
+result-rps-loss 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1108', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18 _gained_17kao_41 right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+result-rps-win 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18 _gained_17kao_41 right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+result-tictactoe 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18 _gained_17kao_41 right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+room-offline-banner 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1107', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18 _gained_17kao_41 right=832', 'div._identity_pdxbe_86 right=996', 'span._name_pdxbe_94 right=868']}
+room-waiting 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=1079', 'span._chip_17kao_1 right=845', 'progress._bar_17kao_18  right=832', 'div._identity_pdxbe_86 right=968', 'span._name_pdxbe_94 right=868']}
+signup 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+signup-error 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+terms 768 {'docScroll': True, 'offenders': ['div._player_pdxbe_80  right=813', 'span._control_jz5a2_6 right=813', 'button._button_jz5a2_13 _ghost_jz5a2_86 _md_jz5 right=813']}
+
+== SMALL TARGETS @390 ==
+admin-ages 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 20
+admin-conversion 8 ['7 days 42x17', '30 days 51x17', '90 days 51x17', '365 days 60x17', 'How we use your data 151x17', 'Privacy 51x21'] | <44: 22
+admin-engagement 8 ['7 days 42x17', '30 days 51x17', '90 days 51x17', '365 days 60x17', 'How we use your data 151x17', 'Privacy 51x21'] | <44: 27
+admin-feedback 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 19
+admin-flags 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 19
+admin-games 8 ['7 days 42x17', '30 days 51x17', '90 days 51x17', '365 days 60x17', 'How we use your data 151x17', 'Privacy 51x21'] | <44: 26
+admin-overview 8 ['7 days 42x17', '30 days 51x17', '90 days 51x17', '365 days 60x17', 'How we use your data 151x17', 'Privacy 51x21'] | <44: 22
+admin-players 8 ['7 days 42x17', '30 days 51x17', '90 days 51x17', '365 days 60x17', 'How we use your data 151x17', 'Privacy 51x21'] | <44: 23
+admin-retention 8 ['7 days 42x17', '30 days 51x17', '90 days 51x17', '365 days 60x17', 'How we use your data 151x17', 'Privacy 51x21'] | <44: 22
+admin-statuses 8 ['7 days 42x17', '30 days 51x17', '90 days 51x17', '365 days 60x17', 'How we use your data 151x17', 'Privacy 51x21'] | <44: 23
+challenge-missing 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 7
+challenge-own 5 ['INPUT 306x21', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 10
+challenge-received-guest 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 7
+challenge-received-visitor 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 7
+challenge-taken-back 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 9
+daily-chess-account 5 ['Lichess puzzle database 139x15', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 71
+daily-chess-guest 5 ['Lichess puzzle database 139x15', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 71
+daily-chess-visitor 5 ['Lichess puzzle database 139x15', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 70
+dialog-resign 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 82
+feedback-dialog 11 ['Rock Paper Scissors 178x23', 'Tic Tac Toe 100x23', 'Chess 52x23', "Today's puzzle 132x23", 'How we use your data 151x17', 'Privacy 51x21'] | <44: 9
+friend-link-invalid 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+friend-request-toast 10 ['riya_2628224672 141x18', 'riya_5000871335 139x18', 'riya_9702514265 138x18', 'riya_5000871336 140x18', 'riya_9702514266 138x18', 'riya_2628224673 141x18'] | <44: 7
+friends-empty 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 8
+friends-list 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 10
+friends-request 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 10
+friends-visitor 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 5
+home-account 8 ['Rock Paper Scissors 178x23', 'Tic Tac Toe 100x23', 'Chess 52x23', "Today's puzzle 132x23", 'How we use your data 151x17', 'Privacy 51x21'] | <44: 7
+home-guest 8 ['Rock Paper Scissors 178x23', 'Tic Tac Toe 100x23', 'Chess 52x23', "Today's puzzle 132x23", 'How we use your data 151x17', 'Privacy 51x21'] | <44: 7
+home-visitor 8 ['Rock Paper Scissors 178x23', 'Tic Tac Toe 100x23', 'Chess 52x23', "Today's puzzle 132x23", 'How we use your data 151x17', 'Privacy 51x21'] | <44: 5
+inbox-open 8 ['Rock Paper Scissors 178x23', 'Tic Tac Toe 100x23', 'Chess 52x23', "Today's puzzle 132x23", 'How we use your data 151x17', 'Privacy 51x21'] | <44: 9
+invite-chooser 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 5
+leaderboard-account 10 ['riya_2628224672 141x18', 'riya_5000871335 139x18', 'riya_9702514265 138x18', 'riya_5000871336 140x18', 'riya_9702514266 138x18', 'riya_2628224673 141x18'] | <44: 7
+leaderboard-chess 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+leaderboard-loading 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 5
+leaderboard-overall 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+leaderboard-rps-account 7 ['riya_5000871335 139x18', 'riya_9702514265 138x18', 'riya_2628224672 141x18', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21'] | <44: 7
+leaderboard-weekly 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+lobby-chess-guest 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 11
+lobby-chess-visitor 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 10
+lobby-rock-paper-scissors-guest 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 10
+lobby-rock-paper-scissors-visitor 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 9
+lobby-tic-tac-toe-guest 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 10
+lobby-tic-tac-toe-visitor 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 9
+login 5 ['Create an account 126x17', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 5
+login-error 5 ['Create an account 126x17', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 5
+not-found 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+pass-and-play-handover 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 7
+pass-and-play-result 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 7
+pass-and-play-setup 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+pass-and-play-start 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 7
+playing-chess 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 79
+playing-chess-selected 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 79
+playing-rps 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 8
+playing-rps-locked 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 8
+playing-tictactoe 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 8
+playing-tictactoe-mid 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 8
+popup-challenge-taken 8 ['Rock Paper Scissors 178x23', 'Tic Tac Toe 100x23', 'Chess 52x23', "Today's puzzle 132x23", 'How we use your data 151x17', 'Privacy 51x21'] | <44: 10
+privacy 7 ['github.com/pragunb02/MultiPlay 331x18', 'profile 46x18', 'terms of use 91x18', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21'] | <44: 5
+profile-account 7 ['Your friends 78x17', '/players/rm9xqffegfq1rc6w 173x17', 'privacy policy 89x17', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21'] | <44: 13
+profile-guest 10 ['Create an account 118x17', 'Your friends 78x17', 'Sign up 55x18', 'Sign up to keep your streak an 297x17', 'Play one 61x18', '/players/m21hghvbapd2fqxv 182x17'] | <44: 8
+profile-visitor 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+public-profile 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+public-profile-missing 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+result-chess 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 82
+result-chess-other 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 83
+result-rps-account 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 12
+result-rps-loss 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 11
+result-rps-win 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 12
+result-tictactoe 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 11
+room-offline-banner 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 12
+room-waiting 4 ['How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 10
+signup 5 ['Log in 41x17', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+signup-error 5 ['Log in 41x17', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 6
+terms 5 ['privacy policy 98x18', 'How we use your data 151x17', 'Privacy 51x21', 'Terms 43x21', 'Feedback 67x21'] | <44: 5
+
+== <44 counts ==
+{'home-visitor': 5, 'login': 5, 'login-error': 5, 'signup': 6, 'signup-error': 6, 'privacy': 5, 'terms': 5, 'not-found': 6, 'lobby-rock-paper-scissors-visitor': 9, 'lobby-tic-tac-toe-visitor': 9, 'lobby-chess-visitor': 10, 'leaderboard-overall': 6, 'leaderboard-weekly': 6, 'leaderboard-chess': 6, 'profile-visitor': 6, 'friends-visitor': 5, 'invite-chooser': 5, 'daily-chess-visitor': 70, 'challenge-missing': 7, 'public-profile-missing': 6, 'friend-link-invalid': 6, 'leaderboard-loading': 5, 'home-guest': 7, 'feedback-dialog': 9, 'lobby-rock-paper-scissors-guest': 10, 'lobby-tic-tac-toe-guest': 10, 'lobby-chess-guest': 11, 'room-waiting': 10, 'playing-chess': 79, 'playing-chess-selected': 79, 'dialog-resign': 82, 'pass-and-play-setup': 6, 'pass-and-play-start': 7, 'pass-and-play-handover': 7, 'pass-and-play-result': 7, 'profile-guest': 8, 'daily-chess-guest': 71, 'challenge-own': 10, 'challenge-received-visitor': 7, 'challenge-received-guest': 7, 'popup-challenge-taken': 10, 'inbox-open': 9, 'challenge-taken-back': 9, 'home-account': 7, 'friends-empty': 8, 'result-rps-account': 12, 'friend-request-toast': 7, 'friends-request': 10, 'friends-list': 10, 'profile-account': 13, 'public-profile': 6, 'leaderboard-account': 7, 'leaderboard-rps-account': 7, 'daily-chess-account': 71, 'admin-overview': 22, 'admin-statuses': 23, 'admin-players': 23, 'admin-games': 26, 'admin-retention': 22, 'admin-conversion': 22, 'admin-engagement': 27, 'admin-feedback': 19, 'admin-ages': 20, 'admin-flags': 19, 'playing-rps': 8, 'playing-rps-locked': 8, 'result-rps-win': 12, 'result-rps-loss': 11, 'room-offline-banner': 12, 'playing-tictactoe': 8, 'playing-tictactoe-mid': 8, 'result-tictactoe': 11, 'result-chess': 82, 'result-chess-other': 83}
+
+== REDUCED MOTION leftovers ==
+
+== HOVER ==
+admin-overview 18/23 change on hover; unchanged: ['Console', 'Overview', '7 days', '30 days', '90 days']
+home-account 7/13 change on hover; unchanged: ['Games', 'Open your player console', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', "Today's puzzle"]
+home-guest 7/14 change on hover; unchanged: ['Games', 'Log in', 'Open your player console', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', "Today's puzzle"]
+home-visitor 7/13 change on hover; unchanged: ['Games', 'Log in', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', "Today's puzzle"]
+lobby-chess-visitor 13/16 change on hover; unchanged: ['Games', 'Log in', 'Join room']
+playing-rps 12/14 change on hover; unchanged: ['Games', 'Log in']
+profile-account 12/19 change on hover; unchanged: ['Profile', 'Your friends', 'See the leaderboards', 'riya_2628224673', '/players/rm9xqffegfq1rc6w', 'privacy policy', 'Delete my account']
+room-waiting 10/12 change on hover; unchanged: ['Games', 'Log in']
+
+== KEYS ==
+admin-flags 27 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Console', 'Sound on', 'Volume', 'Sound settings', 'Log outSending…', 'Feedback', 'Overview', 'Statuses', 'Players', 'Games', 'Retention', 'Conversion', 'Engagement', 'Feedback', 'Ages', 'Flags', 'OffOnA share of the audience', 'SaveSending…✓Saved']
+admin-overview 30 stops; noRing: ['INPUT', 'INPUT']
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Console', 'Sound on', 'Volume', 'Sound settings', 'Log outSending…', 'Feedback', 'Overview', 'Statuses', 'Players', 'Games', 'Retention', 'Conversion', 'Engagement', 'Feedback', 'Ages', 'Flags', 'INPUT', 'INPUT']
+challenge-own 20 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Inbox', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'INPUT', 'Send on WhatsApp', 'Copy linkSending…✓Copied', 'Take backSending…', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+challenge-received-visitor 17 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'Play as guestSending…', 'Log in', 'Sign up', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+daily-chess-visitor 17 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'h8', 'Get a hint (2 left)Sending…', 'Lichess puzzle database', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+dialog-resign 28 stops; noRing: []
+   order: ['Resign', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound off', 'Sound settings', 'Log in', 'Save progress — sign up', 'Feedback', 'e4, white pawn', 'Flip board', 'e4', 'First position', 'Previous move', 'Next move', 'Latest move', 'Offer drawSending…', 'ResignSending…', 'Leave roomSending…', 'Block Guest-22QG']
+feedback-dialog 28 stops; noRing: []
+   order: ['TEXTAREA', 'Cancel', 'SendSending…', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'Open your player console', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', "Today's puzzle", 'How we use your data', 'Privacy', 'Terms']
+friends-empty 16 stops; noRing: []
+   order: ['Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound on', 'Volume', 'Sound settings', 'Log outSending…', 'Feedback', 'Make a friend linkMaking…', 'Appear offline: offSaving…', 'How we use your data', 'Privacy', 'Terms', 'Feedback']
+home-account 19 stops; noRing: []
+   order: ['Open your player console', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', "Today's puzzle", 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound on', 'Volume', 'Sound settings', 'Log outSending…', 'Feedback']
+home-guest 20 stops; noRing: []
+   order: ['Open your player console', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', "Today's puzzle", 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback']
+home-visitor 19 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'Play as a guestSending…', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', "Today's puzzle", 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+leaderboard-overall 20 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'Overall XP', 'This week', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', 'Play a game', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+lobby-chess-visitor 24 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'Beginner', 'Club player', 'Strong', 'Play Queen VeeStarting…', 'Bullet 1 minBlitz 3 min + 2 ', 'Create roomCreating…', 'Make a challenge linkMaking ', 'INPUT', 'Join room', 'Play on this phone', 'How we use your data', 'Privacy', 'Terms']
+login 18 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'INPUT', 'INPUT', 'Log inSending…', 'Create an account', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+not-found 15 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'Back to the games', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+pass-and-play-setup 17 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound off', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'INPUT', 'INPUT', 'Start game', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+playing-chess 24 stops; noRing: []
+   order: ['a1, white rook', 'Flip board', 'First position', 'Previous move', 'Next move', 'Latest move', 'Offer drawSending…', 'ResignSending…', 'Leave roomSending…', 'Block Guest-22QG', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound off', 'Sound settings', 'Log in']
+playing-rps 19 stops; noRing: []
+   order: ['Rock', 'Paper', 'Scissors', 'Leave roomSending…', 'Block Guest-22QG', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound off', 'Sound settings', 'Log in', 'Sign up', 'Feedback']
+playing-tictactoe 25 stops; noRing: []
+   order: ['top left: empty', 'top centre: empty', 'top right: empty', 'middle left: empty', 'middle centre: empty', 'middle right: empty', 'bottom left: empty', 'bottom centre: empty', 'bottom right: empty', 'Leave roomSending…', 'Block Guest-22QG', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound off', 'Sound settings']
+popup-challenge-taken 23 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Inbox, 1 waiting', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'Go and playSending…', 'Not now', 'Open your player console', 'Rock Paper Scissors', 'Tic Tac Toe', 'Chess', "Today's puzzle", 'How we use your data', 'Privacy', 'Terms', 'Feedback']
+profile-account 30 stops; noRing: []
+   order: ['Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound on', 'Volume', 'Sound settings', 'Log outSending…', 'Feedback', 'Your friends', 'See the leaderboards', 'riya_2628224673', 'Add friend riya_2628224673', 'INPUT', 'Make my profile publicSaving', '/players/rm9xqffegfq1rc6w', 'INPUT', 'INPUT', 'Change passwordSending…', 'Sign out other devicesSendin', 'privacy policy']
+profile-guest 23 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound off', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'Create an account', 'Your friends', 'Sign up', 'See the leaderboards', 'Sign up to keep your streak ', 'Play one', 'INPUT', 'Make my profile publicSaving', '/players/m21hghvbapd2fqxv', 'How we use your data', 'Privacy', 'Terms', 'Feedback']
+public-profile 14 stops; noRing: []
+   order: ['Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound on', 'Volume', 'Sound settings', 'Log outSending…', 'Feedback', 'How we use your data', 'Privacy', 'Terms', 'Feedback']
+result-rps-win 23 stops; noRing: []
+   order: ['Close: save your progress', 'Sign up — keep it', 'Log in', 'Block Guest-22QG', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound off', 'Sound settings', 'Log in', 'Save progress — sign up', 'Feedback', 'RematchSending…', 'New opponentSending…', 'Leave roomSending…', 'Send on WhatsApp']
+room-waiting 18 stops; noRing: []
+   order: ['INPUT', 'Copy linkSending…✓Copied', 'Send on WhatsApp', 'Leave roomSending…', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content', 'ClassiCade home', 'Games', 'Leaderboards', 'Profile', 'Sound off', 'Sound settings', 'Log in', 'Sign up', 'Feedback']
+signup 20 stops; noRing: []
+   order: ['ClassiCade home', 'Games', 'Leaderboards', 'Sound on', 'Volume', 'Sound settings', 'Log in', 'Sign up', 'Feedback', 'INPUT', 'INPUT', 'INPUT', "I'd rather not say2026202520", 'Create accountSending…', 'Log in', 'How we use your data', 'Privacy', 'Terms', 'Feedback', 'Skip to content']
+
+== TYPE ==
+[('11px', 38), ('12px', 317), ('13.3333px', 4), ('14px', 2719), ('16px', 1449), ('18.72px', 2), ('20px', 224), ('24px', 99), ('28px', 63), ('32px', 1), ('40px', 45), ('52px', 10)]
+[('system-ui', 3482), ('ui-rounded', 1441), ('ui-monospace', 46), ('monospace', 2)]
+[('400', 2124), ('800', 1537), ('700', 1307), ('600', 2), ('900', 1)]
+
+errors []

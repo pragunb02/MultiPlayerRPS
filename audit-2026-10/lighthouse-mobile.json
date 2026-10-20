@@ -1,0 +1,89 @@
+{
+ "/": {
+  "scores": {
+   "performance": 67,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100
+  },
+  "FCP": "5.2 s",
+  "LCP": "5.4 s",
+  "TBT": "10 ms",
+  "CLS": "0",
+  "SI": "5.2 s",
+  "TTI": "5.4 s",
+  "unusedJs": "Est savings of 355 KiB",
+  "totalBytes": "Total size was 738 KiB",
+  "failing": [
+   "first-contentful-paint: 5.2 s",
+   "largest-contentful-paint: 5.4 s",
+   "speed-index: 5.2 s",
+   "interactive: 5.4 s",
+   "unused-css-rules: Est savings of 81 KiB",
+   "unused-javascript: Est savings of 355 KiB",
+   "document-latency-insight: Est savings of 3 KiB",
+   "network-dependency-tree-insight: 0",
+   "render-blocking-insight: Est savings of 600 ms"
+  ]
+ },
+ "/games/chess": {
+  "scores": {
+   "performance": 49,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100
+  },
+  "FCP": "5.1 s",
+  "LCP": "5.3 s",
+  "TBT": "0 ms",
+  "CLS": "0.373",
+  "SI": "5.1 s",
+  "TTI": "5.3 s",
+  "unusedJs": "Est savings of 372 KiB",
+  "totalBytes": "Total size was 731 KiB",
+  "failing": [
+   "first-contentful-paint: 5.1 s",
+   "largest-contentful-paint: 5.3 s",
+   "speed-index: 5.1 s",
+   "cumulative-layout-shift: 0.373",
+   "interactive: 5.3 s",
+   "layout-shifts: 1 layout shift found",
+   "unused-css-rules: Est savings of 79 KiB",
+   "unused-javascript: Est savings of 372 KiB",
+   "cls-culprits-insight: 0",
+   "document-latency-insight: Est savings of 3 KiB",
+   "network-dependency-tree-insight: 0",
+   "render-blocking-insight: Est savings of 600 ms"
+  ]
+ },
+ "/daily/chess": {
+  "scores": {
+   "performance": 57,
+   "accessibility": 100,
+   "best-practices": 100,
+   "seo": 100
+  },
+  "FCP": "5.1 s",
+  "LCP": "5.9 s",
+  "TBT": "0 ms",
+  "CLS": "0.183",
+  "SI": "5.1 s",
+  "TTI": "5.9 s",
+  "unusedJs": "Est savings of 375 KiB",
+  "totalBytes": "Total size was 866 KiB",
+  "failing": [
+   "first-contentful-paint: 5.1 s",
+   "largest-contentful-paint: 5.9 s",
+   "speed-index: 5.1 s",
+   "cumulative-layout-shift: 0.183",
+   "interactive: 5.9 s",
+   "layout-shifts: 1 layout shift found",
+   "unused-css-rules: Est savings of 82 KiB",
+   "unused-javascript: Est savings of 375 KiB",
+   "cls-culprits-insight: 0",
+   "document-latency-insight: Est savings of 3 KiB",
+   "network-dependency-tree-insight: 0",
+   "render-blocking-insight: Est savings of 600 ms"
+  ]
+ }
+}
