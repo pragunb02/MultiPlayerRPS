@@ -233,4 +233,16 @@ describe("room limits (CC-107)", () => {
 
     expect(await rooms.countRooms()).toEqual({ waiting: 1, playing: 1, finished: 0 });
   });
+
+  it("counts open rooms per catalogue game and status for the operations gauge", async () => {
+    const rooms = setup();
+    const started = await create(rooms);
+    await rooms.joinRoom({ code: started.code, player: BOB, now: T0 + 1 });
+
+    const counts = await rooms.countRoomsByGame();
+
+    // The race engine of these tests is not a catalogue game, so only the catalogue's games appear, at zero.
+    expect(counts).toContainEqual({ gameId: "rps", status: "playing", rooms: 0 });
+    expect(counts.some((row) => row.gameId === started.gameId)).toBe(false);
+  });
 });

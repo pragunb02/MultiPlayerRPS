@@ -41,6 +41,7 @@ export const SHARDS = Object.freeze([
     "pass-and-play.spec.js", // new (CC-223), about 30 s locally
     "daily-puzzle.spec.js", // new (CC-144), not measured yet
     "seat-ids.spec.js", // new (CC-253), about 10 s locally
+    "match-history-ids.spec.js", // new (CC-297), about 10 s locally
   ]),
   // 1106 s
   Object.freeze([

@@ -50,10 +50,10 @@ export const delayAfter = (attempt, policy) =>
  *   or a restart
  *
  * @typedef {{ matchId: string, status: "done", ran: string[] }
- *   | { matchId: string, status: "retrying", step: string, error: unknown, attempts: number, nextAttemptAt: number }
- *   | { matchId: string, status: "failed", step: string, error: unknown, attempts: number }
+ *   | { matchId: string, status: "retrying", step: string, error: unknown, attempts: number, nextAttemptAt: number, ran: string[] }
+ *   | { matchId: string, status: "failed", step: string, error: unknown, attempts: number, ran: string[] }
  *   | { matchId: string, status: "failed" | "busy" }} RunOutcome
- *   what one run of a game did. `failed` without a step is a game that failed for good before this run, and
+ *   what one run of a game did. `ran` lists the steps that went through in this run. `failed` without a step is a game that failed for good before this run, and
  *   `busy` one that this process is running already, or that another run moved to a later attempt meanwhile
  */
 
@@ -130,8 +130,8 @@ export function createMatchOutboxComponent({
     const lastError = { step: failure.step, message: String(failure.error?.message ?? failure.error) };
     await pendingMatchAccessor.attemptFailed({ matchId, failed, attempts, nextAttemptAt, lastError });
     return failed
-      ? { matchId, status: "failed", ...failure, attempts }
-      : { matchId, status: "retrying", ...failure, attempts, nextAttemptAt };
+      ? { matchId, status: "failed", ...failure, attempts, ran }
+      : { matchId, status: "retrying", ...failure, attempts, nextAttemptAt, ran };
   }
 
   /**

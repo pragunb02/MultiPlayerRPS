@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMatchAccessor } from "../../data/matchAccessor.js";
 import { createInMemoryMatchDao } from "../../testing/inMemoryMatchDao.js";
+import { TEST_MATCH_PLAYER_IDS } from "../../testing/matchPlayerIds.js";
 import { NotFoundError } from "../../utils/errors.js";
 import { NOT_COUNTED_REASONS } from "@classicade/shared";
 import { FAIR_PLAY_LIMITS } from "./fairPlay.js";
@@ -37,7 +38,10 @@ const finishedRoom = ({ lastActivityAt, finishedAt = lastActivityAt, ...override
 const WIN_A = { status: "finished", result: "win", winners: ["guest_a"], reason: "best-of-1" };
 const DRAW = { status: "finished", result: "draw", winners: [], reason: "agreement" };
 const setup = () =>
-  createMatchComponent({ matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }) });
+  createMatchComponent({
+    matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }),
+    matchPlayerIds: TEST_MATCH_PLAYER_IDS,
+  });
 
 describe("matchComponent", () => {
   it("ends the match when the game finished, even when the room changed after that (CC-111)", () => {
@@ -132,9 +136,11 @@ describe("matchComponent: computer characters in history (ADR-025)", () => {
     const [listed] = await matches.listForPlayer({ playerId: "guest_a", limit: 10 });
     const details = await matches.getForPlayer({ matchId: listed.matchId, playerId: "guest_a" });
 
+    // Every player is named by their id for this match (CC-297).
+    const idOf = (playerId) => TEST_MATCH_PLAYER_IDS.playerIdIn(listed, playerId);
     const expected = [
-      { playerId: "guest_a", displayName: "Alice" },
-      { playerId: "bot_rocky_easy", displayName: "Rocky", computer: true },
+      { playerId: idOf("guest_a"), displayName: "Alice" },
+      { playerId: idOf("bot_rocky_easy"), displayName: "Rocky", computer: true },
     ];
     expect(listed.players).toEqual(expected);
     expect(details.players).toEqual(expected);
@@ -272,16 +278,16 @@ describe("matchComponent: a guest's history moving to their account (CC-032)", (
     await matches.recordFinished({ room: withMatch("m1", [ALICE, BOB]), outcome: WIN_A });
 
     const result = await matches.transferPlayer({ from: "guest_a", to: ACCOUNT, now: T0 });
-    const moved = await matches.getForPlayer({ matchId: "m1", playerId: ACCOUNT.id });
+    const moved = await matches.getById("m1");
 
     expect(result).toEqual({ moved: { matches: 1 } });
+    expect((await matches.getForPlayer({ matchId: "m1", playerId: ACCOUNT.id })).outcomeForYou).toBe("win");
     expect(moved.players).toEqual([
       { playerId: ACCOUNT.id, displayName: "Riya" },
       { playerId: "guest_b", displayName: "Bob" },
     ]);
     expect(moved.log[0].playerId).toBe(ACCOUNT.id);
     expect(moved.result.winners).toEqual([ACCOUNT.id]);
-    expect(moved.outcomeForYou).toBe("win");
     expect(await matches.listForPlayer({ playerId: "guest_a", limit: 10 })).toEqual([]);
   });
 
@@ -412,7 +418,10 @@ describe("matchComponent: a guest's history moving to their account (CC-032)", (
         // Another run renames the match between the listing and the write.
         listExcluding: async (...args) => {
           const listed = await accessor.listExcluding(...args);
-          await createMatchComponent({ matchAccessor: accessor }).transferPlayer({
+          await createMatchComponent({
+            matchAccessor: accessor,
+            matchPlayerIds: TEST_MATCH_PLAYER_IDS,
+          }).transferPlayer({
             from: "guest_a",
             to: ACCOUNT,
             now: T0,
@@ -420,6 +429,7 @@ describe("matchComponent: a guest's history moving to their account (CC-032)", (
           return listed;
         },
       },
+      matchPlayerIds: TEST_MATCH_PLAYER_IDS,
     });
     await racing.recordFinished({ room: withMatch("m1", [ALICE, BOB]), outcome: WIN_A });
 
@@ -435,6 +445,7 @@ describe("matchComponent and deleted players (CC-035)", () => {
     const queue = [...ids];
     return createMatchComponent({
       matchAccessor: createMatchAccessor({ matchDao: createInMemoryMatchDao() }),
+      matchPlayerIds: TEST_MATCH_PLAYER_IDS,
       newUuid: () => queue.shift(),
     });
   };
@@ -556,6 +567,7 @@ describe("matchComponent export and erasure details (CC-035)", () => {
     const accessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
     const matches = createMatchComponent({
       matchAccessor: accessor,
+      matchPlayerIds: TEST_MATCH_PLAYER_IDS,
       newUuid: () => "00000000-0000-4000-8000-0000000000b1",
     });
     await matches.recordFinished({ room: room(), outcome: WIN_A });
@@ -616,6 +628,7 @@ describe("matchComponent anonymising beside a fair play verdict written meanwhil
     };
     const matches = createMatchComponent({
       matchAccessor: racing,
+      matchPlayerIds: TEST_MATCH_PLAYER_IDS,
       newUuid: () => "00000000-0000-4000-8000-0000000000d1",
     });
     await matches.recordFinished({ room: room(), outcome: WIN_A });

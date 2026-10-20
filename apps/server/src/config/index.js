@@ -1,6 +1,7 @@
 import { isIP } from "node:net";
 import path from "node:path";
 import { LOG_LEVELS } from "../utils/logger.js";
+import { parseTelemetry } from "./telemetry.js";
 
 const NODE_ENVS = ["development", "test", "production"];
 const MIN_SESSION_SECRET_LENGTH = 32;
@@ -26,6 +27,7 @@ const MAX_HOSTNAME_LENGTH = 253;
  * @property {string} webDistDir      absolute path of the built web app to serve ("" = API only, e.g. in development with Vite)
  * @property {number} trustProxyHops  how many proxies in front of the server add to X-Forwarded-For (0 = none, trust no header)
  * @property {ReadonlyArray<string>} adminAccountIds  the player ids (`user_` and 24 hex digits) that may open the owner console. Empty means nobody can (CC-233)
+ * @property {Readonly<import("./telemetry.js").TelemetrySettings>} telemetry  operations telemetry to Grafana Cloud, off unless OTEL_EXPORTER_OTLP_ENDPOINT is set (ADR-055)
  */
 
 /**
@@ -36,7 +38,8 @@ const MAX_HOSTNAME_LENGTH = 253;
  * Documented defaults: NODE_ENV=development, PORT=4000, HOST=127.0.0.1 in every environment, LOG_LEVEL=info (silent when NODE_ENV=test),
  * ALLOWED_ORIGINS=http://localhost:4000,http://localhost:5173 outside production,
  * TRUST_PROXY_HOPS=1 in production and 0 elsewhere. Optional: WEB_DIST_DIR (serve the built web app),
- * ADMIN_ACCOUNT_IDS (who may open the owner console, empty by default).
+ * ADMIN_ACCOUNT_IDS (who may open the owner console, empty by default), the OTEL_* variables of operations
+ * telemetry (off by default, see telemetry.js).
  *
  * @param {Record<string, string | undefined>} env
  * @returns {Readonly<Config>}
@@ -84,6 +87,7 @@ export function loadConfig(env) {
 
   const trustProxyHops = parseTrustProxyHops(env.TRUST_PROXY_HOPS, { isProduction, errors });
   const adminAccountIds = parseAdminAccountIds(env.ADMIN_ACCOUNT_IDS, { errors });
+  const telemetry = parseTelemetry(env, { isProduction, nodeEnv, errors });
 
   if (errors.length > 0) {
     throw new Error(`Invalid configuration:\n  - ${errors.join("\n  - ")}`);
@@ -102,6 +106,7 @@ export function loadConfig(env) {
     webDistDir: webDistDir === "" ? "" : path.resolve(webDistDir),
     trustProxyHops,
     adminAccountIds,
+    telemetry,
   });
 }
 

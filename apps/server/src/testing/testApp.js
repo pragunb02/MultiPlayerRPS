@@ -34,6 +34,7 @@ import { createIdentityComponent } from "../domain/identity/identityComponent.js
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
+import { createMatchPlayerIds, matchPlayerSecretFrom } from "../domain/matches/matchPlayerIds.js";
 import { createMatchOutboxComponent } from "../domain/matches/matchOutboxComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
@@ -105,6 +106,8 @@ import { testConfig } from "./testConfig.js";
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   daily puzzle moves and hints per player (CC-144)
  *   chessPuzzles?: ReadonlyArray<object>,   the daily chess puzzles, two known ones unless a test gives its own
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
+ *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
+ *     to see what the service layer records (ADR-055)
  * }} [options]
  */
 export function createTestApp({
@@ -128,6 +131,7 @@ export function createTestApp({
   dailyPuzzleLimit,
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
+  metrics = {},
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -161,7 +165,10 @@ export function createTestApp({
   const domainEvents = new EventEmitter();
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
-  const matchComponent = createMatchComponent({ matchAccessor });
+  const matchComponent = createMatchComponent({
+    matchAccessor,
+    matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
+  });
   const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const playerTransferAccessor = createPlayerTransferAccessor({
     playerTransferDao: createInMemoryPlayerTransferDao(),
@@ -355,6 +362,7 @@ export function createTestApp({
       otherEndedListeners.forEach((listener) => listener(which));
     },
     checkSession,
+    ...(metrics.recordHttpRequest && { recordRequest: metrics.recordHttpRequest }),
   });
 
   return {
@@ -426,6 +434,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     now,
     ...(options.roomLimits && { limits: options.roomLimits }),
     botComponent: testApp.botComponent,
+    ...(options.metrics?.recordSocketEvent && { recordSocketEvent: options.metrics.recordSocketEvent }),
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));

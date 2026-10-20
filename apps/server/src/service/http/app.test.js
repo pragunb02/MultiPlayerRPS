@@ -32,6 +32,21 @@ describe("HTTP app", () => {
     expect(res.headers["set-cookie"]).toBeUndefined();
   });
 
+  it("times every request for operations telemetry by its full route template, never its path", async () => {
+    const recorded = [];
+    const { app } = createTestApp({ metrics: { recordHttpRequest: (r) => recorded.push(r) } });
+
+    await request(app).get("/api/games");
+    await request(app).get("/api/matches/3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+    await request(app).get("/room/AB2CDE");
+
+    expect(recorded.map(({ route, method, status }) => [route, method, status])).toEqual([
+      ["/api/games", "GET", 200],
+      ["/api/matches/:matchId", "GET", 401],
+      ["unmatched", "GET", 404],
+    ]);
+  });
+
   it("GET /api/games returns the shared catalog", async () => {
     const { app } = setup();
 

@@ -68,4 +68,50 @@ describe("createLogger", () => {
       expect(createLogger({ level, destination: { write() {} } }).level).toBe(level);
     }
   });
+
+  it("also writes info and above to a second stream when one is given, redacted the same way", () => {
+    const stdout = [];
+    const forwarded = [];
+    const logger = createLogger({
+      level: "info",
+      destination: { write: (line) => stdout.push(JSON.parse(line)) },
+      forward: { write: (line) => forwarded.push(JSON.parse(line)) },
+    });
+
+    logger.debug("debug is off anyway");
+    logger.info({ password: "hunter2" }, "on both");
+    logger.error("on both too");
+
+    expect(stdout.map((entry) => entry.msg)).toEqual(["on both", "on both too"]);
+    expect(forwarded.map((entry) => entry.msg)).toEqual(["on both", "on both too"]);
+    expect(forwarded[0].password).toBe("[REDACTED]");
+  });
+
+  it("never sends debug lines to the second stream, even when the logger writes them", () => {
+    const forwarded = [];
+    const logger = createLogger({
+      level: "debug",
+      destination: { write: () => undefined },
+      forward: { write: (line) => forwarded.push(JSON.parse(line)) },
+    });
+
+    logger.debug("dropped");
+    logger.info("kept");
+
+    expect(forwarded.map((entry) => entry.msg)).toEqual(["kept"]);
+  });
+
+  it("sends nothing to the second stream below the logger's own level", () => {
+    const forwarded = [];
+    const logger = createLogger({
+      level: "error",
+      destination: { write: () => undefined },
+      forward: { write: (line) => forwarded.push(JSON.parse(line)) },
+    });
+
+    logger.warn("dropped");
+    logger.error("kept");
+
+    expect(forwarded.map((entry) => entry.msg)).toEqual(["kept"]);
+  });
 });

@@ -172,6 +172,17 @@ the owner may change it.
 - **Consequences.** A guest who signs in during a game, or a deleted player's stand-in, is a new player id and so
   gets a new seat id, as they get a new name. Rotating `SESSION_SECRET` gives open rooms new seat ids. Match history
   still sends past opponents' player ids to the participants: CC-297.
+- **Amended 2026-10-20 ([CC-297](tickets/CC-297.md)): match history too.** The same rule covers a second context.
+  `GET /api/matches` and `GET /api/matches/:matchId` name every player of a match, the viewer included, by a match
+  player id: HMAC-SHA-256 of `[matchId, playerId]` under a key derived from `SESSION_SECRET` with the label
+  "classicade match player ids", 22 base64url characters, as a value and as a key in the players, the winners and
+  every log entry, then the last pass of point 5 with match player ids. Each answer has `you`, the viewer's own match player id. Both participants see the same ids for a
+  match, and unrelated ids in every other match and in the room the match was played in. The field names stay.
+  Nothing is stored or migrated. Room seat ids and match player ids now share one helper, `utils/keyedIds.js`, with
+  one label per purpose, so every later keyed id is one more label there; the seat ids it gives are unchanged. The
+  server's own readers (the block route's `{ matchId, seat }`, the match pipeline) read the real record through
+  methods no route sends. The account export keeps its `you` and `player-2` labels (ADR-048.6). Every identifier a
+  client can receive is listed in DATA.md, Identifiers, which every new feature checks.
 
 ### ADR-056 — Screenshot baselines in one pinned container, reviewed in the pull request
 
@@ -314,6 +325,34 @@ the owner may change it.
   3. Metrics and named warning and error lines only. No traces, until a new decision.
   4. The three alerts in point 6, by email to the owner.
   5. The stack is opened by the owner only, with two-factor sign-in.
+- **Amended 2026-10-20 (owner, with the code pull request of CC-286).** The owner looked at self-hosting the same
+  day and chose Grafana Cloud free after all, as decided above, with these additions so the free tier lasts and
+  growth stays easy:
+  1. **Vendor neutral.** The server speaks plain OTLP over HTTP (protobuf) to whatever `OTEL_EXPORTER_OTLP_ENDPOINT`
+     names, with `OTEL_EXPORTER_OTLP_HEADERS`. Nothing in the code assumes Grafana Cloud. The code lives in
+     `apps/server/src/dependency/telemetry/` (it calls another company's service), and only the composition root
+     imports it. The service layer receives two plain functions.
+  2. **Cardinality budget.** The metric names and attribute keys of point 1 are fixed in `telemetrySchema.js`, and
+     every value comes from a closed set. A test fails when an attribute key is not on the list. Expected active
+     series: about 1 250 per instance, at most about 5 100 per instance in the worst case (CC-286, "Cardinality
+     budget"). Durations use eleven bucket boundaries (5 ms to 10 s).
+  3. **Logs.** Never below info level: the named lines now include four info lines that mark a start or a stop
+     (`server listening`, `telemetry on`, `shutting down`, `shutdown complete`). The same line is sent at most 30
+     times a minute, the rest are counted in a new counter, `telemetry.logs.suppressed`. A body is always one of
+     the named lines, so its size is bounded, and each field value is limited to 128 characters.
+  4. **Instances.** The resource gets a fourth key, `service.instance.id`: a random UUID made when the process
+     starts, with nothing about the machine or anyone in it. Two servers (CC-061) then never mix their series.
+  5. **Traces** stay out (point 2). If a later decision adds them: head sampling read from `OTEL_TRACES_SAMPLER_ARG`
+     with about 10 % as the default, errors always kept, and their own allowlist.
+  6. **Usage alerts.** Two more alerts and a dashboard row from the stack's `grafanacloud-usage` data source: active
+     series above 8 000 (80 % of 10 000) and logs on course for more than 40 GB a month (80 % of 50 GB). Free tier
+     limits as read on https://grafana.com/pricing/ on 2026-10-20: 10k active series, 50 GB of logs, 14 days
+     retention, 3 users.
+  7. **Growth path.** When a usage alert fires: first tune or sample (find the label or line that grew, turn logs
+     off with `OTEL_LOGS_EXPORTER=none`), then move to Grafana Cloud pay as you go, or self-host a Collector with
+     Prometheus, Loki and Grafana on a VM. In each case only the two env vars change. The application code does not.
+  8. **Self-hosting now** was set aside: we would run, update and secure it ourselves, a single VM can fail with
+     nobody to notice, and free VMs have their own limits (CC-286 section 5).
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 

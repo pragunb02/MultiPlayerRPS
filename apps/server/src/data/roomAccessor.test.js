@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { GAMES, ROOM_STATUS } from "@classicade/shared";
 import { createInMemoryRoomDao } from "../testing/inMemoryRoomDao.js";
 import { ConcurrentChangeError, ConflictError, NotFoundError } from "../utils/errors.js";
 import { createRoomAccessor } from "./roomAccessor.js";
@@ -110,6 +111,22 @@ describe("roomAccessor", () => {
     expect(await rooms.countByNetworks(["net-a"])).toBe(0);
     expect(perStatus).toEqual({ waiting: 1, playing: 1, finished: 0 });
     expect(Object.isFrozen(perStatus)).toBe(true);
+  });
+
+  it("counts open rooms for every game of the catalogue and every status, zero included", async () => {
+    const rooms = setup();
+    await rooms.create(room());
+    await rooms.create(room({ code: "ROOM33", status: "playing" }));
+
+    const counts = await rooms.countByGameAndStatus();
+
+    expect(counts).toHaveLength(GAMES.length * Object.values(ROOM_STATUS).length);
+    expect(counts.filter(({ rooms: n }) => n > 0)).toEqual([
+      { gameId: room().gameId, status: "waiting", rooms: 1 },
+      { gameId: room().gameId, status: "playing", rooms: 1 },
+    ]);
+    expect(counts).toContainEqual({ gameId: "chess", status: "finished", rooms: 0 });
+    expect(Object.isFrozen(counts)).toBe(true);
   });
 
   it("passes unexpected storage failures through unchanged", async () => {

@@ -170,6 +170,7 @@ describe("the match pipeline (CC-111)", () => {
     });
     let now = T;
     const domainEvents = new EventEmitter();
+    const recorded = [];
     const pipeline = connectMatchPipeline({
       domainEvents,
       matchComponent,
@@ -178,6 +179,7 @@ describe("the match pipeline (CC-111)", () => {
       tasks,
       logger: capture.logger,
       now: () => now,
+      recordPipelineStep: (attempt) => recorded.push(attempt),
     });
     const finish = async () => {
       domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
@@ -189,7 +191,18 @@ describe("the match pipeline (CC-111)", () => {
       await tasks.drain();
     };
     const names = () => calls.map(([name]) => name);
-    return { steps, calls, names, finish, later, pipeline, pendingMatchAccessor, tasks, ...capture };
+    return {
+      steps,
+      calls,
+      names,
+      finish,
+      later,
+      pipeline,
+      pendingMatchAccessor,
+      tasks,
+      recorded,
+      ...capture,
+    };
   }
 
   it("has five named steps in order, the boards needing progression but not gamification", () => {
@@ -325,6 +338,29 @@ describe("the match pipeline (CC-111)", () => {
     ]);
     expect((await pendingMatchAccessor.get("m1")).status).toBe("done");
     expect(names()[0]).toBe("record");
+  });
+
+  it("counts each step attempt for operations telemetry, and the step that failed for good (ADR-055)", async () => {
+    const { finish, later, recorded } = setup({ fail: { progression: 2 } });
+
+    await finish();
+    await later(1_000);
+
+    expect(recorded).toEqual([
+      { step: MATCH_STEPS.RECORD, failedForGood: false },
+      { step: MATCH_STEPS.JUDGE, failedForGood: false },
+      { step: MATCH_STEPS.PROGRESSION, failedForGood: false },
+      { step: MATCH_STEPS.PROGRESSION, failedForGood: true },
+    ]);
+  });
+
+  it("counts every step of a game that went through at once", async () => {
+    const { finish, recorded } = setup();
+
+    await finish();
+
+    expect(recorded.map(({ step }) => step)).toEqual(Object.values(MATCH_STEPS));
+    expect(recorded.every(({ failedForGood }) => !failedForGood)).toBe(true);
   });
 
   it("says nothing about runs that changed nothing", () => {

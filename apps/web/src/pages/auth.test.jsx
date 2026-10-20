@@ -409,17 +409,20 @@ describe("ProfilePage", () => {
     losses: 1,
     draws: 0,
   };
+  // History names every player, you too, by an id made for that match, never by a player id (CC-297).
+  const ME_IN_MATCH = "RiyaInMatch00000000000";
   const match = (n, outcomeForYou) => ({
     matchId: `00000000-0000-4000-8000-00000000000${n}`,
     gameId: "rps",
     players: [
-      { playerId: USER.id, displayName: "Riya" },
-      { playerId: "guest_b", displayName: "Bob" },
+      { playerId: ME_IN_MATCH, displayName: "Riya" },
+      { playerId: "BobInMatch000000000000", displayName: "Bob" },
     ],
     result: {},
     startedAt: 0,
     endedAt: Date.UTC(2026, 9, 16, 12, n),
     outcomeForYou,
+    you: ME_IN_MATCH,
   });
 
   it("shows level, progress bar and stats", async () => {
@@ -473,15 +476,15 @@ describe("ProfilePage", () => {
     const vsRocky = {
       ...match(4, "win"),
       players: [
-        { playerId: USER.id, displayName: "Riya" },
-        { playerId: "bot_rocky_easy", displayName: "Rocky", computer: true },
+        { playerId: ME_IN_MATCH, displayName: "Riya" },
+        { playerId: "RockyInMatch0000000000", displayName: "Rocky", computer: true },
       ],
     };
     const vsPerson = {
       ...match(3, "loss"),
       players: [
-        { playerId: USER.id, displayName: "Riya" },
-        { playerId: "user_rocky", displayName: "Rocky" },
+        { playerId: ME_IN_MATCH, displayName: "Riya" },
+        { playerId: "RockyPersonInMatch0000", displayName: "Rocky" },
       ],
     };
     renderApp({
@@ -498,6 +501,22 @@ describe("ProfilePage", () => {
     expect(first).toHaveTextContent("Rock Paper Scissors vs Rocky (computer)");
     expect(second).toHaveTextContent("Rock Paper Scissors vs Rocky");
     expect(second).not.toHaveTextContent("computer");
+  });
+
+  it("knows which player is you from the match's own `you`, as history never sends your player id (CC-297)", async () => {
+    renderApp({
+      path: "/profile",
+      api: fakeApi({
+        getSession: async () => USER,
+        getProgress: async () => progress,
+        getMatches: async () => ({ matches: [match(1, "win")] }),
+      }),
+    });
+
+    const list = await screen.findByRole("list", { name: "Match history" });
+
+    expect(within(list).getByRole("listitem")).toHaveTextContent("Rock Paper Scissors vs Bob");
+    expect(within(list).getByRole("listitem")).not.toHaveTextContent("Riya");
   });
 
   it("says so when the next page of matches can't be loaded, keeping the list and the button", async () => {
@@ -561,7 +580,7 @@ describe("ProfilePage", () => {
     const solo = {
       ...match(1, "win"),
       gameId: "ludo",
-      players: [{ playerId: USER.id, displayName: "Riya" }],
+      players: [{ playerId: ME_IN_MATCH, displayName: "Riya" }],
     };
     renderApp({
       path: "/profile",

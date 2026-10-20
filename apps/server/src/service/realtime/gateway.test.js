@@ -41,6 +41,23 @@ const connected = (socket) =>
 const emitWithAck = (socket, event, ...args) => socket.timeout(2_000).emitWithAck(event, ...args);
 
 describe("realtime gateway", () => {
+  it("times each acknowledged event for operations telemetry by name and outcome only (ADR-055)", async () => {
+    const recorded = [];
+    server = await startTestServer({ metrics: { recordSocketEvent: (event) => recorded.push(event) } });
+    const { cookie } = await createGuest();
+    const socket = openSocket({ cookie, origin: ALLOWED_ORIGIN });
+    await connected(socket);
+
+    await emitWithAck(socket, SOCKET_EVENTS.IDENTITY_GET);
+    await emitWithAck(socket, SOCKET_EVENTS.ROOM_JOIN, { code: "AB2CDE" });
+
+    expect(recorded.map(({ event, outcome }) => [event, outcome])).toEqual([
+      [SOCKET_EVENTS.IDENTITY_GET, "ok"],
+      [SOCKET_EVENTS.ROOM_JOIN, "refused"],
+    ]);
+    expect(Object.keys(recorded[0]).sort()).toEqual(["durationMs", "event", "outcome"]);
+  });
+
   it("refuses connections without a session", async () => {
     server = await startTestServer();
 

@@ -35,6 +35,7 @@ import { createIdentityComponent } from "./domain/identity/identityComponent.js"
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "./domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
+import { createMatchPlayerIds, matchPlayerSecretFrom } from "./domain/matches/matchPlayerIds.js";
 import { createMatchOutboxComponent, matchRetryPolicy } from "./domain/matches/matchOutboxComponent.js";
 import {
   createProgressionComponent,
@@ -72,6 +73,7 @@ import { createBackgroundTasks } from "./utils/backgroundTasks.js";
 import { createLegacyPasswordChecker } from "./utils/legacyPassword.js";
 import { createNetworkKey, dropOldNetworkKeysEveryMidnight } from "./utils/networkKey.js";
 import { createPasswordHasher } from "./utils/passwordHasher.js";
+import { NO_OPERATIONS_METRICS } from "./utils/operationsMetrics.js";
 import { createTtlCache } from "./utils/ttlCache.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -226,6 +228,21 @@ export function logPipelineOutcome(logger, outcome) {
 }
 
 /**
+ * Tells operations telemetry what one run of a game through the match pipeline tried (ADR-055): one attempt for
+ * each step that went through, one for the step that failed, and that step marked as failed for good when no
+ * attempt is left. A run that changed nothing counts nothing.
+ *
+ * @param {import("./utils/operationsMetrics.js").OperationsMetrics["recordPipelineStep"]} recordPipelineStep
+ * @param {import("./domain/matches/matchOutboxComponent.js").RunOutcome} outcome
+ */
+export function countPipelineOutcome(recordPipelineStep, outcome) {
+  (outcome.ran ?? []).forEach((step) => recordPipelineStep({ step, failedForGood: false }));
+  if (Object.hasOwn(outcome, "step")) {
+    recordPipelineStep({ step: outcome.step, failedForGood: outcome.status === "failed" });
+  }
+}
+
+/**
  * Stores a finished game in the match pipeline's outbox, unless the outbox has it already (CC-111). The room
  * component calls it before any change to a finished room, so a rematch or a closing room never takes a game with
  * it that the outbox does not have yet.
@@ -261,7 +278,8 @@ export const keepFinishedGameIn =
  *   tasks: ReturnType<typeof createBackgroundTasks>,
  *   logger: Logger,
  *   now?: () => number,
- * }} deps
+ *   recordPipelineStep?: import("./utils/operationsMetrics.js").OperationsMetrics["recordPipelineStep"],
+ * }} deps  `recordPipelineStep` counts attempts for operations telemetry, and does nothing unless it is on
  * @returns {{ addFinishedRooms: () => Promise<number>, runDue: () => void }}
  */
 export function connectMatchPipeline({
@@ -272,14 +290,19 @@ export function connectMatchPipeline({
   tasks,
   logger,
   now = Date.now,
+  recordPipelineStep = NO_OPERATIONS_METRICS.recordPipelineStep,
 }) {
+  const report = (outcome) => {
+    logPipelineOutcome(logger, outcome);
+    countPipelineOutcome(recordPipelineStep, outcome);
+  };
   domainEvents.on(ROOM_EVENTS.GAME_FINISHED, (event) => {
     const match = matchComponent.finishedMatch(event);
     tasks.run(
       "match pipeline",
       async () => {
         await outbox.add({ match, now: now() });
-        logPipelineOutcome(logger, await outbox.run({ matchId: match.matchId, now: now() }));
+        report(await outbox.run({ matchId: match.matchId, now: now() }));
       },
       { matchId: match.matchId, roomCode: event.room.code },
     );
@@ -298,7 +321,7 @@ export function connectMatchPipeline({
     },
     runDue() {
       tasks.run("match pipeline", async () => {
-        (await outbox.runDue({ now: now() })).forEach((outcome) => logPipelineOutcome(logger, outcome));
+        (await outbox.runDue({ now: now() })).forEach(report);
       });
     },
   });
@@ -529,6 +552,8 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  *     policy?: Partial<typeof import("./domain/matches/matchOutboxComponent.js").MATCH_RETRY_POLICY>,
  *     intervalMs?: number,
  *   },
+ *   metrics?: import("./utils/operationsMetrics.js").OperationsMetrics,  operations telemetry (ADR-055), from
+ *     `startTelemetry`. Without it nothing is measured
  * }} deps  `now`, `rooms`, `bots` and `pipeline` are for tests only. Production runs on the real clock, the
  *   standard room lifetimes and limits, a human-like pause before each computer move and the standard match
  *   pipeline. Integration tests move the clock, let computer players act at once and make a pipeline step fail or
@@ -544,6 +569,7 @@ export async function startServer({
   rooms = {},
   bots = {},
   pipeline = {},
+  metrics = NO_OPERATIONS_METRICS,
 }) {
   if (config.webDistDir !== "" && !existsSync(path.join(config.webDistDir, "index.html"))) {
     throw new Error(`WEB_DIST_DIR has no index.html: ${config.webDistDir} (run npm run build:web)`);
@@ -619,7 +645,10 @@ export async function startServer({
     legacyPasswords: createLegacyPasswordChecker(),
     accountDeletionAccessor,
   });
-  const matchComponent = createMatchComponent({ matchAccessor });
+  const matchComponent = createMatchComponent({
+    matchAccessor,
+    matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
+  });
   // One set of seat ids for rooms and blocks, so a seat id the room view shows is the one a block is checked against.
   const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
   const blockComponent = createBlockComponent({
@@ -726,6 +755,7 @@ export async function startServer({
     tasks,
     logger,
     now,
+    recordPipelineStep: metrics.recordPipelineStep,
   });
   connectLeaderboardBonuses({ domainEvents, leaderboardComponent, tasks, now });
   // Deleting an account reaches every store of DATA.md, in this order (CC-035). Rooms go first, so a game the
@@ -824,6 +854,7 @@ export async function startServer({
     onOtherSessionsEnded: (which) => sessionEvents.emit(OTHER_SESSIONS_ENDED, which),
     checkSession,
     onIdentityChanged: identityFollowers({ roomComponent, playerTransferComponent, domainEvents, now }),
+    recordRequest: metrics.recordHttpRequest,
   });
   const server = http.createServer(app);
   const networkKey = createNetworkKey({ now });
@@ -840,7 +871,10 @@ export async function startServer({
     limits: limitsOfRooms,
     now,
     botComponent,
+    recordSocketEvent: metrics.recordSocketEvent,
   });
+  // Read only when telemetry takes a reading, once a minute in production.
+  metrics.watch({ rooms: roomComponent.countRoomsByGame, connections: () => gateway.counts().connections });
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
   sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
   sessionEvents.on(ACCOUNT_DELETED, (playerId) => gateway.disconnectPlayer(playerId));
