@@ -7,6 +7,7 @@ import {
   XP_AWARDS,
 } from "@classicade/shared";
 import { isAccountId, isGuestId, isServerGivenGuestName } from "../../models/identity.js";
+import { BOARD_NAMES } from "../safety/agePolicy.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
 import { creditFor, hasComputerPlayer } from "../matches/fairPlay.js";
@@ -43,18 +44,18 @@ const rankedEntry = ({ xp, level }, stored) => Object.freeze({ xp: xp - stored.u
 const hasRows = (playerId) => isAccountId(playerId) || isGuestId(playerId);
 
 /**
- * The name a row shows. An adult account shows its username. A guest shows the name the server gave it, which it
- * did not choose and which says nothing about it (ADR-060). Everyone else is hidden (ADR-048.10). A guest row with
- * any other name is hidden too, so a name a guest could one day choose falls under the age rule.
+ * The name a row shows, as the player's age policy says (CC-152): an adult account's username, a guest's name only
+ * when the server gave it (ADR-060), and "Hidden player" for everyone else (ADR-048.10). A guest row with any other
+ * name is hidden too, so a name a guest could one day choose falls under the age rule.
  *
- * @param {{ playerId: string, displayName: string }} entry
- * @param {ReadonlySet<string>} adults
+ * @param {{ displayName: string }} entry
+ * @param {{ boardName: string }} policy
  */
-function shownName({ playerId, displayName }, adults) {
-  const serverGiven = isGuestId(playerId) && isServerGivenGuestName(displayName);
-  return adults.has(playerId) || serverGiven
-    ? { displayName }
-    : { displayName: HIDDEN_PLAYER_NAME, hidden: true };
+function shownName({ displayName }, policy) {
+  const shown =
+    policy.boardName === BOARD_NAMES.OWN ||
+    (policy.boardName === BOARD_NAMES.SERVER_GIVEN && isServerGivenGuestName(displayName));
+  return shown ? { displayName } : { displayName: HIDDEN_PLAYER_NAME, hidden: true };
 }
 
 /**
@@ -71,8 +72,8 @@ function shownName({ playerId, displayName }, adults) {
  *     listPendingTo: (playerIds: ReadonlyArray<string>) => Promise<ReadonlyArray<{ to: { id: string } }>>,
  *   },  the guests who have started moving to an account, and the accounts being moved into (ADR-014). Their rows
  *     move and are recomputed by the move, so the board step leaves them alone
- *   ages: { adultsAmong: (query: { playerIds: string[], now: number }) => Promise<ReadonlySet<string>> },  which
- *     players are adults. Every other account's name is hidden on the boards (CC-152)
+ *   safety: Pick<ReturnType<typeof import("../safety/safetyComponent.js").createSafetyComponent>, "policiesFor">,  each
+ *     row's age policy, whose `boardName` says which name it shows (CC-152)
  *   cards?: Pick<ReturnType<typeof import("../profiles/profileCards.js").createProfileCards>, "cardsFor">,  the
  *     avatar and profile link beside each name a board shows (CC-034). Without it rows have neither
  * }} deps
@@ -82,10 +83,10 @@ export function createLeaderboardComponent({
   matchAccessor,
   progressAccessor,
   transfers,
-  ages,
+  safety,
   cards = NO_CARDS,
 }) {
-  assertFunction(ages?.adultsAmong, "ages.adultsAmong");
+  assertFunction(safety?.policiesFor, "safety.policiesFor");
   assertFunction(cards?.cardsFor, "cards.cardsFor");
   assertDefined(leaderboardAccessor, "leaderboardAccessor");
   assertDefined(matchAccessor, "matchAccessor");
@@ -331,9 +332,11 @@ export function createLeaderboardComponent({
         { doneOnly: true },
       );
       const top = stored.filter((e) => !gone.has(e.playerId));
-      const accounts = top.map((e) => e.playerId).filter(isAccountId);
-      const adults = accounts.length === 0 ? new Set() : await ages.adultsAmong({ playerIds: accounts, now });
-      const shown = top.map((entry) => ({ entry, name: shownName(entry, adults) }));
+      const policies =
+        top.length === 0
+          ? new Map()
+          : await safety.policiesFor({ playerIds: top.map((e) => e.playerId), now });
+      const shown = top.map((entry) => ({ entry, name: shownName(entry, policies.get(entry.playerId)) }));
       // Every row shows the avatar its player picked, a hidden row too: avatars come from our own set and say
       // nothing about who someone is (owner, ADR-065). A hidden row never gets a profile link (CC-034).
       const cardOf =
