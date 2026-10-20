@@ -9,16 +9,18 @@ export const LOW_TIME_MS = 20_000;
  * One player's strip beside the board: name, the pieces they have taken with their material lead, and their
  * clock. The clock glows while it runs and turns red under 20 seconds.
  *
- * @param {{ name: string, colour: "w" | "b", ms: number, running: boolean, live: boolean, captured: string[], advantage: number }} props
- *   `live`: the game is on, so a low clock matters
+ * @param {{ name: string, colour: "w" | "b", ms: number, running: boolean, live: boolean, captured: string[], advantage: number, badge?: import("react").ReactNode }} props
+ *   `live`: the game is on, so a low clock matters. `badge` is shown right after the name: the player's chess
+ *   rating today (CC-042)
  */
-export function PlayerBar({ name, colour, ms, running, live, captured, advantage }) {
+export function PlayerBar({ name, colour, ms, running, live, captured, advantage, badge }) {
   const low = live && ms < LOW_TIME_MS;
   const classes = [styles.clock, running && styles.running, low && styles.low].filter(Boolean);
   return (
     <div className={classes.join(" ")}>
       <div className={styles.who}>
         <span className={styles.name}>{name}</span>
+        {badge}
         {captured.length > 0 && (
           <span className={styles.captured} role="img" aria-label={`Captured ${describePieces(captured)}`}>
             {captured.map((type, i) => (

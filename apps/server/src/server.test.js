@@ -131,9 +131,9 @@ describe("the match pipeline (CC-111)", () => {
 
   /**
    * The real outbox over the in-memory store, with fake components. Each component call is recorded in `calls`,
-   * in order. `fail` names steps that throw, and how often.
+   * in order. `fail` names steps that throw, and how often. `ratings` is what the chess rating step answers.
    */
-  function setup({ fail = {}, finishedGames = [] } = {}) {
+  function setup({ fail = {}, finishedGames = [], ratings = [] } = {}) {
     const calls = [];
     const left = { ...fail };
     const call = (name, args, result) => {
@@ -158,6 +158,7 @@ describe("the match pipeline (CC-111)", () => {
       progressionComponent: { applyMatch: (match) => call("progression", match, [{}, {}]) },
       gamificationComponent: { applyMatch: (input) => call("gamification", input) },
       leaderboardComponent: { applyMatch: (input) => call("leaderboards", input) },
+      chessRatingComponent: { applyMatch: (input) => call("chessRatings", input, ratings) },
       logger: capture.logger,
     });
     const pendingMatchAccessor = createPendingMatchAccessor({
@@ -205,7 +206,7 @@ describe("the match pipeline (CC-111)", () => {
     };
   }
 
-  it("has five named steps in order, the boards needing progression but not gamification", () => {
+  it("has six named steps in order, the boards needing progression and the ratings only the verdict", () => {
     const { steps } = setup();
 
     expect(steps.map(({ name, needs = [] }) => [name, needs])).toEqual([
@@ -214,6 +215,7 @@ describe("the match pipeline (CC-111)", () => {
       [MATCH_STEPS.PROGRESSION, [MATCH_STEPS.JUDGE]],
       [MATCH_STEPS.GAMIFICATION, [MATCH_STEPS.PROGRESSION]],
       [MATCH_STEPS.LEADERBOARDS, [MATCH_STEPS.PROGRESSION]],
+      [MATCH_STEPS.CHESS_RATINGS, [MATCH_STEPS.JUDGE]],
     ]);
   });
 
@@ -222,12 +224,21 @@ describe("the match pipeline (CC-111)", () => {
 
     await finish();
 
-    expect(names()).toEqual(["record", "follow", "judge", "progression", "gamification", "leaderboards"]);
+    expect(names()).toEqual([
+      "record",
+      "follow",
+      "judge",
+      "progression",
+      "gamification",
+      "leaderboards",
+      "chessRatings",
+    ]);
     expect(calls[0][1]).toEqual({ ...finished, roomCode: "ROOM22" });
     expect(calls[1][1]).toEqual({ match: judged, now: T });
     expect(calls[3][1]).toBe(judged);
     expect(calls[4][1]).toEqual({ match: judged, now: T });
     expect(calls[5][1]).toEqual({ match: judged });
+    expect(calls[6][1]).toEqual({ match: judged });
     expect(find("match recorded")[0]).toEqual(
       expect.objectContaining({ matchId: "m1", reason: "best-of-1" }),
     );
@@ -236,7 +247,8 @@ describe("the match pipeline (CC-111)", () => {
     );
     expect(find("gamification applied")[0].matchId).toBe("m1");
     expect(find("leaderboards applied")[0].matchId).toBe("m1");
-    expect(find("match pipeline done")[0].steps).toHaveLength(5);
+    expect(find("chess ratings applied")).toEqual([]);
+    expect(find("match pipeline done")[0].steps).toHaveLength(6);
     expect((await pendingMatchAccessor.get("m1")).status).toBe("done");
   });
 
@@ -263,6 +275,7 @@ describe("the match pipeline (CC-111)", () => {
       "progression",
       "gamification",
       "leaderboards",
+      "chessRatings",
     ]);
   });
 
@@ -279,8 +292,25 @@ describe("the match pipeline (CC-111)", () => {
       "progression",
       "gamification",
       "leaderboards",
+      "chessRatings",
       "gamification",
     ]);
+  });
+
+  it("logs the chess ratings a game changed", async () => {
+    const { finish, find } = setup({ ratings: [{}, {}] });
+
+    await finish();
+
+    expect(find("chess ratings applied")).toEqual([expect.objectContaining({ matchId: "m1", players: 2 })]);
+  });
+
+  it("still rates a chess game when progression fails", async () => {
+    const { names, finish } = setup({ fail: { progression: 1 } });
+
+    await finish();
+
+    expect(names()).toEqual(["record", "follow", "judge", "progression", "chessRatings"]);
   });
 
   it("logs a game that failed for good at error level, as the alert", async () => {
@@ -349,6 +379,8 @@ describe("the match pipeline (CC-111)", () => {
     expect(recorded).toEqual([
       { step: MATCH_STEPS.RECORD, failedForGood: false },
       { step: MATCH_STEPS.JUDGE, failedForGood: false },
+      // The ratings step needs only judge, so it runs in the same attempt and is counted before the failure is.
+      { step: MATCH_STEPS.CHESS_RATINGS, failedForGood: false },
       { step: MATCH_STEPS.PROGRESSION, failedForGood: false },
       { step: MATCH_STEPS.PROGRESSION, failedForGood: true },
     ]);

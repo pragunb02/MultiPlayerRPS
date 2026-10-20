@@ -3,16 +3,22 @@ import { Chess } from "chess.js";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
-import { fakeSound } from "../../testing/fakes.js";
+import { SOCKET_EVENTS } from "@classicade/shared";
+import { fakeSocket, fakeSound } from "../../testing/fakes.js";
 import { installMatchMedia } from "../../testing/matchMedia.js";
 import { ChessBoard } from "./ChessBoard.jsx";
 import { formatClock, useChessClocks } from "./useChessClocks.js";
 
-// The board plays sounds (the low time tick, CC-103), so it gets a fake sound player.
+// The board plays sounds (the low time tick, CC-103), so it gets a fake sound player. It asks for the room's chess
+// ratings (CC-042), so it gets a fake socket too. `socket` is the one the last render used.
+let socket;
 const Services = ({ children }) => (
-  <ServicesProvider services={{ sound: fakeSound() }}>{children}</ServicesProvider>
+  <ServicesProvider services={{ sound: fakeSound(), socket }}>{children}</ServicesProvider>
 );
-const render = (ui, options) => renderPlain(ui, { wrapper: Services, ...options });
+const render = (ui, { socket: given = fakeSocket(), ...options } = {}) => {
+  socket = given;
+  return renderPlain(ui, { wrapper: Services, ...options });
+};
 
 const ME = "guest_me";
 const THEM = "guest_them";
@@ -28,7 +34,7 @@ const room = (view, overrides = {}) => ({
   seats,
   players: { min: 2, max: 2 },
   serverTime: 1_000_000,
-  game: { view, activePlayers: [ME], outcome: { status: "ongoing" } },
+  game: { matchId: "m1", view, activePlayers: [ME], outcome: { status: "ongoing" } },
   ...overrides,
 });
 
@@ -1202,5 +1208,74 @@ describe("ChessBoard says why a press did nothing (CC-164)", () => {
     await user.click(nav.getByRole("button", { name: "First position" }));
     await user.click(nav.getByRole("button", { name: "Previous move" }));
     expect(reason()).toContain("This is the first position");
+  });
+
+  describe("chess ratings (CC-042)", () => {
+    // The server names a rating by its seat, never by player id (CC-253).
+    const rated = (playerId, overrides = {}) => ({
+      seat: seats.findIndex((seat) => seat.playerId === playerId),
+      rating: 1500,
+      deviation: 350,
+      games: 0,
+      provisional: true,
+      ...overrides,
+    });
+    const answering = (ratings) => {
+      const fake = fakeSocket();
+      fake.request.mockResolvedValue({ ratings });
+      return fake;
+    };
+    const finished = () =>
+      room(chessView(), {
+        status: "finished",
+        game: {
+          matchId: "m1",
+          view: chessView(),
+          activePlayers: [],
+          outcome: { status: "finished", result: "win", winners: [THEM], reason: "checkmate" },
+        },
+      });
+
+    it("shows each player's rating in their bar, with a question mark while it is provisional", async () => {
+      render(<ChessBoard room={room(chessView())} onMove={vi.fn()} />, {
+        socket: answering([rated(ME), rated(THEM, { rating: 1612, games: 14, provisional: false })]),
+      });
+
+      expect(await screen.findByRole("img", { name: "Rating 1500, provisional" })).toHaveTextContent("1500?");
+      expect(screen.getByRole("img", { name: "Rating 1612" })).toHaveTextContent("1612");
+      expect(socket.request).toHaveBeenCalledWith(SOCKET_EVENTS.RATING_ROOM, { code: "AB2CD3" });
+    });
+
+    it("shows what the game did to both ratings in the result once it was rated", () => {
+      render(<ChessBoard room={finished()} onMove={vi.fn()} />);
+
+      act(() =>
+        socket.push(SOCKET_EVENTS.RATING_UPDATED, {
+          matchId: "m1",
+          ratings: [
+            rated(ME, { rating: 1338, games: 1, change: -162 }),
+            rated(THEM, { rating: 1662, games: 1, change: 162 }),
+          ],
+        }),
+      );
+
+      const list = within(screen.getByRole("list", { name: "Rating changes" }));
+      const [white, black] = list.getAllByRole("listitem");
+      expect(white).toHaveTextContent("You1338−162Provisional");
+      expect(black).toHaveTextContent("Riya1662+162Provisional");
+    });
+
+    it("shows no rating at all while none has arrived", () => {
+      render(<ChessBoard room={finished()} onMove={vi.fn()} />);
+
+      expect(screen.queryByRole("img", { name: /^Rating/ })).toBeNull();
+      expect(screen.queryByRole("list", { name: "Rating changes" })).toBeNull();
+    });
+
+    it("asks for no rating on a shared screen (ADR-054)", () => {
+      render(<ChessBoard room={room(chessView(), { sharedScreen: true })} onMove={vi.fn()} />);
+
+      expect(socket.request).not.toHaveBeenCalled();
+    });
   });
 });

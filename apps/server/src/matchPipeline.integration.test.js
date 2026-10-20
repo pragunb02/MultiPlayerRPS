@@ -164,7 +164,12 @@ describe("the match pipeline outbox (integration, CC-111)", { timeout: 20_000 },
       const found = second.find("match pipeline done");
       return found.length === 1 ? found : undefined;
     });
-    expect(done.steps).toEqual([MATCH_STEPS.PROGRESSION, MATCH_STEPS.GAMIFICATION, MATCH_STEPS.LEADERBOARDS]);
+    expect(done.steps).toEqual([
+      MATCH_STEPS.PROGRESSION,
+      MATCH_STEPS.GAMIFICATION,
+      MATCH_STEPS.LEADERBOARDS,
+      MATCH_STEPS.CHESS_RATINGS,
+    ]);
     expect(second.find("match recorded")).toEqual([]);
     const settled = await progressOf(second, alice);
 
@@ -174,7 +179,7 @@ describe("the match pipeline outbox (integration, CC-111)", { timeout: 20_000 },
     expect(await progressOf(second, alice)).toEqual(settled);
     const [entry] = await readCollection(uri, "pending_matches");
     expect(entry).toEqual(expect.objectContaining({ status: "done", attempts: 0 }));
-    expect(entry.done).toHaveLength(5);
+    expect(entry.done).toHaveLength(6);
     expect(await readCollection(uri, "matches")).toHaveLength(1);
   });
 
