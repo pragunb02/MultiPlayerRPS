@@ -74,6 +74,11 @@ export function PrivacyPage() {
             from the games you play.
           </li>
           <li>
+            <strong>Chess rating.</strong> Your chess rating and its last 200 changes, worked out from the
+            counted chess games you play against people. Your opponent and anyone watching the room see your
+            rating next to your name.
+          </li>
+          <li>
             <strong>Leaderboards.</strong> Accounts and guests appear on the public leaderboards with their
             level and score. The username shows only for adults: for anyone under 18, or who has not given a
             year of birth, the board shows &quot;Hidden player&quot; instead. A guest shows the name we gave
@@ -227,16 +232,16 @@ export function PrivacyPage() {
         <ul>
           <li>
             <strong>Download my data</strong> gives you a file (JSON) with your account, your games, progress,
-            achievements, quests, daily puzzle days, leaderboard places and the players you blocked. Other
-            players appear in it by their display name only.
+            chess rating, achievements, quests, daily puzzle days, leaderboard places and the players you
+            blocked. Other players appear in it by their display name only.
           </li>
           <li>
-            <strong>Delete my account</strong> deletes it at once, with your progress, achievements, quests,
-            daily puzzle days, leaderboard places, blocks and sessions, and signs you out everywhere. Games
-            you played against other people stay in their history with your name replaced by &quot;Deleted
-            player&quot;. A game you are in at that moment ends, and your opponent wins. Games against the
-            computer only are deleted. If your account came from the earlier version of the site, that old
-            record is closed so it can never sign in again.
+            <strong>Delete my account</strong> deletes it at once, with your progress, chess rating,
+            achievements, quests, daily puzzle days, leaderboard places, blocks and sessions, and signs you
+            out everywhere. Games you played against other people stay in their history with your name
+            replaced by &quot;Deleted player&quot;. A game you are in at that moment ends, and your opponent
+            wins. Games against the computer only are deleted. If your account came from the earlier version
+            of the site, that old record is closed so it can never sign in again.
           </li>
         </ul>
         <p>

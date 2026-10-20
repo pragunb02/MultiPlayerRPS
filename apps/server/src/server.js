@@ -9,6 +9,7 @@ import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "./data/blockAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
+import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
 import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
 import { createGamificationAccessor } from "./data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "./data/leaderboardAccessor.js";
@@ -34,6 +35,7 @@ import { createGamificationComponent } from "./domain/gamification/gamificationC
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "./domain/leaderboards/leaderboardComponent.js";
+import { createChessRatingComponent } from "./domain/ratings/chessRatingComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
 import { createMatchPlayerIds, matchPlayerSecretFrom } from "./domain/matches/matchPlayerIds.js";
 import { createMatchOutboxComponent, matchRetryPolicy } from "./domain/matches/matchOutboxComponent.js";
@@ -56,6 +58,7 @@ import { createBlockDao } from "./persistence/blockDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
+import { createChessRatingDao } from "./persistence/chessRatingDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
 import { createPendingMatchDao } from "./persistence/pendingMatchDao.js";
@@ -117,6 +120,7 @@ export const MATCH_STEPS = Object.freeze({
   PROGRESSION: "apply progression",
   GAMIFICATION: "apply gamification",
   LEADERBOARDS: "apply leaderboards",
+  CHESS_RATINGS: "apply chess ratings",
 });
 
 /**
@@ -128,6 +132,8 @@ export const MATCH_STEPS = Object.freeze({
  * 4. Apply gamification: achievements, streaks and quests (CC-054, CC-089).
  * 5. Apply leaderboards (CC-053). It needs progression but not gamification, so a failing gamification step does
  *    not keep the boards back.
+ * 6. Apply chess ratings (CC-042, ADR-062). It needs only the verdict, so a failing XP or board step never holds a
+ *    rating back.
  * Each step reads the match from storage and changes nothing when it runs again, so a game the outbox runs a
  * second time, after a failure or a restart, still counts once.
  *
@@ -137,6 +143,7 @@ export const MATCH_STEPS = Object.freeze({
  *   progressionComponent: { applyMatch: Function },
  *   gamificationComponent: { applyMatch: Function },
  *   leaderboardComponent: { applyMatch: Function },
+ *   chessRatingComponent: { applyMatch: Function },
  *   logger: Logger,
  * }} deps
  * @returns {ReadonlyArray<import("./domain/matches/matchOutboxComponent.js").MatchStep>}
@@ -147,6 +154,7 @@ export function matchPipelineSteps({
   progressionComponent,
   gamificationComponent,
   leaderboardComponent,
+  chessRatingComponent,
   logger,
 }) {
   const stored = (matchId) => matchComponent.getById(matchId);
@@ -198,6 +206,14 @@ export function matchPipelineSteps({
       async run({ matchId }) {
         await leaderboardComponent.applyMatch({ match: await stored(matchId) });
         logger.info({ matchId }, "leaderboards applied");
+      },
+    },
+    {
+      name: MATCH_STEPS.CHESS_RATINGS,
+      needs: [MATCH_STEPS.JUDGE],
+      async run({ matchId }) {
+        const ratings = await chessRatingComponent.applyMatch({ match: await stored(matchId) });
+        if (ratings.length > 0) logger.info({ matchId, players: ratings.length }, "chess ratings applied");
       },
     },
   ]);
@@ -594,6 +610,7 @@ export async function startServer({
   const accountDeletionDao = createAccountDeletionDao({ connection: database.connection });
   const blockDao = createBlockDao({ connection: database.connection });
   const dailyPuzzleAttemptDao = createDailyPuzzleAttemptDao({ connection: database.connection });
+  const chessRatingDao = createChessRatingDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -610,6 +627,7 @@ export async function startServer({
       accountDeletionDao,
       blockDao,
       dailyPuzzleAttemptDao,
+      chessRatingDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -633,6 +651,7 @@ export async function startServer({
     attemptDao: dailyPuzzleAttemptDao,
     catalogues: { [DAILY_PUZZLE_KINDS.CHESS]: chessPuzzles },
   });
+  const chessRatingAccessor = createChessRatingAccessor({ chessRatingDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -682,6 +701,7 @@ export async function startServer({
     transfers: playerTransferAccessor,
     ages: accountComponent,
   });
+  const chessRatingComponent = createChessRatingComponent({ chessRatingAccessor, events: domainEvents });
   // Everything stored by player id moves with a guest who signs in (ADR-014), in this order. Leaderboards go
   // last: they are recomputed from the progress and matches that have moved by then.
   const playerTransferComponent = createPlayerTransferComponent({
@@ -689,6 +709,7 @@ export async function startServer({
     participants: [
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
+      { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
@@ -707,6 +728,7 @@ export async function startServer({
     progressionComponent,
     gamificationComponent,
     leaderboardComponent,
+    chessRatingComponent,
     logger,
   });
   const outbox = createMatchOutboxComponent({
@@ -778,6 +800,11 @@ export async function startServer({
         name: "progress",
         erasePlayer: progressionComponent.erasePlayer,
         exportPlayer: progressionComponent.exportPlayer,
+      },
+      {
+        name: "chessRatings",
+        erasePlayer: chessRatingComponent.erasePlayer,
+        exportPlayer: chessRatingComponent.exportPlayer,
       },
       {
         name: "gamification",
@@ -871,6 +898,7 @@ export async function startServer({
     limits: limitsOfRooms,
     now,
     botComponent,
+    chessRatingComponent,
     recordSocketEvent: metrics.recordSocketEvent,
   });
   // Read only when telemetry takes a reading, once a minute in production.

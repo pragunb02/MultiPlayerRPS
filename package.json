@@ -26,7 +26,9 @@
     "build:web": "npm run build -w @classicade/web",
     "test:e2e": "npm test -w @classicade/e2e",
     "test:visual": "node scripts/bin/visual.mjs",
-    "test:visual:update": "node scripts/bin/visual.mjs --update"
+    "test:visual:update": "node scripts/bin/visual.mjs --update",
+    "load:test": "node scripts/bin/load-test.mjs",
+    "load:charts": "node scripts/bin/load-charts.mjs"
   },
   "license": "ISC",
   "devDependencies": {

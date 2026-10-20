@@ -8,10 +8,11 @@ const SCORE_TEXT = Object.freeze({ "1-0": "1–0", "0-1": "0–1", "1/2-1/2": "�
  * How the game ended (checkmate, resignation, time out and so on), the score, and the game as a PGN file. The
  * file is built here from the move list, so downloading it needs no request to the server.
  *
- * @param {{ room: any, names: Record<"w" | "b", string>, yourColour: "w" | "b" | "", site: string }} props
- *   `names`: the players' display names by colour, `yourColour`: "" for a spectator
+ * @param {{ room: any, names: Record<"w" | "b", string>, yourColour: "w" | "b" | "", site: string, children?: import("react").ReactNode }} props
+ *   `names`: the players' display names by colour, `yourColour`: "" for a spectator. `children` go under the
+ *   score: the rating changes today (CC-042), kept as a slot so the outcome screen (CC-163) can take them over
  */
-export function GameOver({ room, names, yourColour, site }) {
+export function GameOver({ room, names, yourColour, site, children }) {
   const titleId = useId();
   const { view, outcome } = room.game;
   const result = resultToken(outcome, view.colors);
@@ -39,6 +40,7 @@ export function GameOver({ room, names, yourColour, site }) {
         <span>{summary}</span>
         <span className={styles.score}>{SCORE_TEXT[result]}</span>
       </p>
+      {children}
       <a
         className={styles.download}
         data-cc-control="chess.pgn"

@@ -218,6 +218,39 @@ test.describe("chess", () => {
     expect(pgn).toContain("1. f3 e5 2. g4 Qh4# 0-1");
   });
 
+  test("both bars show a provisional rating, and a counted game shows each change in the result (CC-042)", async ({
+    players,
+  }, testInfo) => {
+    const { white, black } = await startChess(players);
+    for (const player of [white, black]) {
+      await expect(player.page.getByRole("img", { name: "Rating 1500, provisional" })).toHaveCount(2);
+      await expect(player.page.getByRole("img", { name: "Rating 1500, provisional" }).first()).toHaveText(
+        "1500?",
+      );
+    }
+
+    await play(white, "f2", "f3", testInfo);
+    await seen([white, black], "f3");
+    await play(black, "e7", "e5", testInfo);
+    await seen([white, black], "e5");
+    await play(white, "g2", "g4", testInfo);
+    await seen([white, black], "g4");
+    await play(black, "d8", "h4", testInfo);
+    await seen([white, black], "Qh4#");
+
+    // Glicko-2 from 1500 and RD 350 on both sides: the winner gains 162 and the loser drops as much.
+    for (const player of [white, black]) {
+      const changes = player.page.getByRole("list", { name: "Rating changes" });
+      await expect(changes.getByRole("listitem")).toHaveCount(2);
+      await expect(changes).toContainText("1662+162Provisional");
+      await expect(changes).toContainText("1338−162Provisional");
+      await expect(player.page.getByRole("img", { name: "Rating 1662, provisional" })).toHaveText("1662?");
+      await expect(player.page.getByRole("img", { name: "Rating 1338, provisional" })).toHaveText("1338?");
+    }
+    await expect(black.page.getByRole("list", { name: "Rating changes" })).toContainText("You1662+162");
+    await expect(white.page.getByRole("list", { name: "Rating changes" })).toContainText("You1338−162");
+  });
+
   test("a piece dropped on a square it cannot reach goes back, and stays picked up", async ({
     players,
   }, testInfo) => {

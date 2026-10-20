@@ -74,3 +74,4 @@ export {
   getDailyPuzzle,
   isDailyPuzzleEnded,
 } from "./dailyPuzzles.js";
+export { CHESS_RATING_START } from "./ratings.js";

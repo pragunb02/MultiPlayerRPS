@@ -218,3 +218,43 @@
 .download:hover {
   filter: brightness(1.08);
 }
+
+/* The chess rating beside a name and the changes in the result (CC-042). A loss is muted, never red (CC-163). */
+.rating {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.ratingChanges {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+.ratingChanges li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.ratingName {
+  font-weight: 700;
+}
+.ratingNew {
+  font-family: var(--font-mono);
+}
+.ratingUp {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--color-success);
+}
+.ratingDown {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+.ratingProvisional {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}

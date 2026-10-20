@@ -7,6 +7,7 @@ import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "../data/blockAccessor.js";
 import { createDailyPuzzleAccessor } from "../data/dailyPuzzleAccessor.js";
+import { createChessRatingAccessor } from "../data/chessRatingAccessor.js";
 import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
@@ -37,6 +38,7 @@ import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createMatchPlayerIds, matchPlayerSecretFrom } from "../domain/matches/matchPlayerIds.js";
 import { createMatchOutboxComponent } from "../domain/matches/matchOutboxComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
+import { createChessRatingComponent } from "../domain/ratings/chessRatingComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
 import { createSeatIds, seatSecretFrom } from "../domain/rooms/seatIds.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
@@ -63,6 +65,7 @@ import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.j
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
 import { TEST_CHESS_PUZZLES } from "./dailyPuzzleSet.js";
 import { createInMemoryDailyPuzzleAttemptDao } from "./inMemoryDailyPuzzleAttemptDao.js";
+import { createInMemoryChessRatingDao } from "./inMemoryChessRatingDao.js";
 import { createMemoryStoreSessionDao } from "./memoryStoreSessionDao.js";
 import {
   createInMemoryAchievementDao,
@@ -208,11 +211,16 @@ export function createTestApp({
     progressionComponent,
     events: domainEvents,
   });
+  const chessRatingComponent = createChessRatingComponent({
+    chessRatingAccessor: createChessRatingAccessor({ chessRatingDao: createInMemoryChessRatingDao() }),
+    events: domainEvents,
+  });
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,
     participants: transferParticipants([
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
+      { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
@@ -230,6 +238,7 @@ export function createTestApp({
       progressionComponent,
       gamificationComponent,
       leaderboardComponent,
+      chessRatingComponent,
       logger: capture.logger,
     }),
   });
@@ -294,6 +303,11 @@ export function createTestApp({
         name: "progress",
         erasePlayer: progressionComponent.erasePlayer,
         exportPlayer: progressionComponent.exportPlayer,
+      },
+      {
+        name: "chessRatings",
+        erasePlayer: chessRatingComponent.erasePlayer,
+        exportPlayer: chessRatingComponent.exportPlayer,
       },
       {
         name: "gamification",
@@ -383,6 +397,7 @@ export function createTestApp({
     playerTransferComponent,
     gamificationComponent,
     leaderboardComponent,
+    chessRatingComponent,
     blockComponent,
     dailyPuzzleComponent,
     matchPipeline,
@@ -434,6 +449,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     now,
     ...(options.roomLimits && { limits: options.roomLimits }),
     botComponent: testApp.botComponent,
+    chessRatingComponent: testApp.chessRatingComponent,
     ...(options.metrics?.recordSocketEvent && { recordSocketEvent: options.metrics.recordSocketEvent }),
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
