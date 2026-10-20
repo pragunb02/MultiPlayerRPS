@@ -59,6 +59,74 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-074 — A merge queue on main: CI on `merge_group`, merges through the queue
+
+- **Status:** Accepted · 2026-10-20 (owner approved from research. [CC-298](tickets/CC-298.md), research there.
+  Amends ADR-039's up-to-date rule. The owner turns it on with the steps in
+  [DEPLOYMENT.md](DEPLOYMENT.md#merge-queue-cc-298-adr-074))
+- **Context.** Two pull requests that are each green can break `main` together (CC-247, CC-257). Requiring
+  branches to be up to date fixes that, but makes every open PR rebase and rerun after each merge, which with up to
+  five builders is most of the day's CI. Branch protection requires no checks during the feature phase.
+- **Decision.**
+  1. **GitHub's merge queue** on `main`, in a branch ruleset with the required status checks. The queue tests each
+     PR on the newest `main` plus the PRs ahead of it and merges only what passed there. Up to date is no longer
+     required.
+  2. **ci.yml starts on `merge_group`.** Every required job runs there. The jobs that answer a pull request
+     question are skipped there by their `if`, which GitHub reports as success: `render-blueprint` (render.com must
+     never hold back a merge), `visual-scope` and `visual` (advisory). `changes` runs there, because its first
+     parent is the queue's base, so it checks exactly the PR's change. No other workflow starts on `merge_group`:
+     WebKit stays advisory, and `visual-refresh.yml` still runs on the push to `main` after the merge. The table is
+     in ci.yml's header and pinned in `scripts/workflows.test.mjs`.
+  3. **Settings:** merge method Merge (the collector reads `Merge pull request #N`), build concurrency 2, group
+     size 1 to 5, 5 minute wait, 30 minute status check timeout, only non-failing PRs merge.
+  4. **Required checks:** the seven ci.yml checks listed in DEPLOYMENT.md, `Changelog fragments` newly among them.
+     CodeQL runs from default setup, outside our workflows, so it is required by the ruleset's code scanning rule,
+     not as a status check that might never report on the queue's branch.
+  5. **The coordinator merges with `gh pr merge <n> --merge --auto`.** Nobody merges or updates a branch by hand.
+- **Why.** The queue gives the safety of up-to-date branches with one CI run per merge instead of one per open PR
+  per merge. Not chosen: keeping "up to date" (the rebase churn), and no required checks (red `main` again).
+- **Consequences.** Each merge waits for a second CI run, about 10 minutes, the owner's chosen trade-off. The push
+  to `main` runs CI a third time on the same commit, which Render waits for. A queue run that hangs leaves the queue
+  at the 30 minute timeout. An emergency merge disables the ruleset for the moment.
+
+### ADR-072 — Decision-first tickets: open decisions answered before build, two templates, a CI gate
+
+- **Status:** Accepted · 2026-10-20 (owner approved the process upgrade from research.
+  [CC-311](tickets/CC-311.md), research there. Detail in [PROCESS.md](PROCESS.md))
+- **Context.** Builders started tickets with questions still open (copy, defaults, privacy), guessed, and the owner
+  changed the answer in review, so the work was built twice. Questions reached the owner one at a time from many
+  tickets. Tickets had no appetite, no measurable acceptance criteria and no rollout or review after launch.
+- **Decision.**
+  1. **Two templates.** The full one (`docs/tickets/TEMPLATE.md`) in Shape Up order with product and safety
+     sections: problem, job to be done, appetite and cut line, sketch, non-goals, rabbit holes, an Open decisions
+     table (question, options, recommended default, owner answer, the day the default applies), Given/When/Then
+     acceptance criteria with ids that name tests, definition of done, one primary and one guardrail metric,
+     ADR-034 instrumentation, a four-question threat model, a privacy checklist with minors (ADR-028),
+     alternatives, interfaces with contract tests, files touched, test plan, rollout with flag and removal date,
+     pre-mortem, research, tasks and a post-launch review. The lite one (`TEMPLATE-lite.md`) for one-sentence work:
+     problem, fix, acceptance criteria, test, files.
+  2. **Statuses in words** in the ticket file: Shaping, Spec review, Ready, Building, Rolling out, Done, Reviewed.
+     The board keeps its own four (todo, in progress, blocked, done), set by fragments.
+  3. **The decision gate.** No builder starts until every open decision is answered or its default day has passed.
+     CI checks it on every pull request (`node scripts/bin/check-tickets.mjs` in the `Changelog fragments` job): a
+     ticket at Ready or later fails on an incomplete Open decisions row, an unanswered row before its default day,
+     no acceptance criterion with an id, or an id used twice.
+  4. **One owner decision list**, `docs/DECISIONS-PENDING.md`, kept by the coordinator, answered once. Answers go
+     into the ticket and the ADR. Before writing a spec the coordinator asks the owner all of the ticket's questions
+     in one message (the shaping interview).
+  5. **Spec review.** The review lenses (code, security, design, then the skeptic) read the filled ticket before
+     build and the code after it, against the acceptance criteria, which the PR template now lists with their
+     evidence. They block only on correctness, security or a missing requirement.
+  6. **Appetite is a budget.** Over it, scope is cut at the cut line.
+  7. **Files touched** are listed so the coordinator never runs two builders on overlapping areas.
+  8. **Flags.** New player-facing features ship behind a flag with a removal date (CC-312).
+- **Why.** An answer asked for before build costs one message; after build it costs a second build. A default with
+  a date keeps work moving when the owner is busy, and the owner may still change it. Not chosen: a check that
+  the default was picked by the owner (the default day is the owner's chosen trade-off), and checking older
+  tickets, which use emoji statuses and were written to the old template.
+- **Consequences.** A ticket takes longer to start and shorter to finish. The coordinator keeps one more file. The
+  check is text only: it can see that a row is answered, not that the answer is good, which is spec review's job.
+
 ### ADR-071 — Reports: by reference, closed reasons, a masked note, grouped for one moderator, 180 days
 
 - **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-044](tickets/CC-044.md) research §6, the
@@ -1047,6 +1115,10 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
 - **Amended 2026-10-18 (owner): fast mode ended.** Branch protection requires eight checks with branches up to date: lint/unit/coverage, Docker, the merged browser jobs (Chromium desktop + mobile, Firefox), the backup round trip, actionlint, and CodeQL for JavaScript and for Actions; every PR gets both reviewers and the skeptic again; builders run lint, format, coverage and their own browser tests locally. WebKit stays advisory until its open flakes (CC-273) are fixed.
 
 - **Amended 2026-10-19 (owner): PR evidence.** Every pull request shows its change working in the template's Evidence section: UI screenshots (desktop 1280×720 and phone 390×844, before and after) on the `pr-evidence` branch, request and response for API or socket changes, and the tests added. Test accounts only, because the repository is public.
+
+- **Amended 2026-10-20 (owner, CC-298): merge queue.** The up-to-date rule is replaced by GitHub's merge queue
+  (ADR-074): required checks run again on the newest `main` plus the PRs ahead, and the coordinator merges with
+  `gh pr merge --merge --auto`.
 
 ### ADR-038 — Button feedback: every press answers, waiting says so
 

@@ -1,8 +1,24 @@
 # Every pull request and every push to main must pass these before it can reach production (Render deploys main).
 name: CI
 
+# Three events (CC-298, ADR-074). A pull request runs everything. The merge queue (`merge_group`) tests the pull
+# request on top of main and of the pull requests ahead of it in the queue, on a temporary branch named
+# gh-readonly-queue/main/..., and merges only when every required check passed there. A push to main runs it all
+# again on the commit Render deploys. What each job does on each event:
+#
+#   job                                    pull_request  merge_group  push to main
+#   checks, backup, actionlint, docker     runs          runs         runs
+#   browser suites (Chromium, Firefox)     runs          runs         runs
+#   changes (fragments, decision gate)     runs          runs         skipped, nothing to compare with
+#   render-blueprint                       runs          skipped      skipped, render.com must never hold back a merge
+#   visual-scope and visual (advisory)     runs          skipped      skipped, a pull request question only
+#
+# A job skipped by its `if` reports success, so a required check that is skipped never blocks the queue. A required
+# check must run, or be skipped, on `merge_group` too, or the queue waits for it until its timeout.
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
 
@@ -11,7 +27,9 @@ permissions:
 
 # A new push to a pull request cancels its older run. Each commit on main gets a group of its own, so no run on main
 # is cancelled or replaced by the next merge's, every merge's browser tests finish, and the every-10th-merge stop
-# (ADR-039) can see them (CC-236). One group per branch would keep only the newest waiting run on main.
+# (ADR-039) can see them (CC-236). One group per branch would keep only the newest waiting run on main. Each merge
+# queue group is a commit of its own too, so it is never cancelled by another: the queue itself drops a group whose
+# pull requests changed.
 concurrency:
   group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -86,10 +104,12 @@ jobs:
   # and on a changelog entry added, changed or removed by hand. The coordinator's collector pull request passes
   # because every line it adds is made from a fragment it deletes, which the script checks from the files, so no
   # branch name or label can claim the exception. A pull request's run checks out GitHub's merge of it into main,
-  # and the merge's first parent is main as it is now. Pull requests only: on main there is nothing to compare.
+  # and the merge's first parent is main as it is now. In the merge queue the commit's first parent is main, or the
+  # pull request ahead in the queue, so the check compares exactly this pull request's change there too (CC-298).
+  # Not on a push to main: there is nothing to compare.
   changes:
     name: Changelog fragments
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -103,11 +123,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/bin/collect-changes.mjs --check --base HEAD^1
+      # The decision gate (CC-311, ADR-072). A ticket at Ready or later has every open decision answered by the owner
+      # or past its default day, and at least one acceptance criterion with an id. Older tickets are not checked.
+      - name: Tickets at Ready or later pass the decision gate
+        run: node scripts/bin/check-tickets.mjs
 
   # render.yaml against the schema Render publishes (CC-294, ADR-063). It downloads the schema from render.com, so it
   # runs on pull requests only. Render deploys a main commit only when every check on it passed, and a check that
   # fails because render.com is slow must never hold back a deploy. On main this job is skipped, which Render
   # counts as passed. Our own rules for the file are unit tests in the checks job (scripts/renderBlueprint.test.mjs).
+  # Skipped in the merge queue for the same reason: the pull request's own run already checked the file (CC-298).
   render-blueprint:
     name: render.yaml matches Render's schema
     if: github.event_name == 'pull_request'
@@ -361,6 +386,8 @@ jobs:
   # that start visual-refresh.yml on main. A pull request that changes none of them cannot change a screen, so a
   # visual difference on it can only mean main's baselines are stale, and the merge that made them stale has already
   # started the refresh. A job of its own, on a plain runner, because the Playwright image has no GitHub CLI.
+  # Pull requests only. It only feeds the advisory visual check, which is not required and so has no place in the
+  # merge queue, where it would hold runners for a verdict nobody waits on (CC-298).
   visual-scope:
     name: Visual baselines, does this PR change the screens
     if: github.event_name == 'pull_request'
