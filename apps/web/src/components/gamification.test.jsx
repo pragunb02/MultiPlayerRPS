@@ -24,6 +24,7 @@ import { DailyQuests } from "./Quests/DailyQuests.jsx";
 import { resetsIn } from "./Quests/resetsIn.js";
 import { StreakCard } from "./Streaks/StreakCard.jsx";
 import { ToastProvider } from "./Toast/ToastProvider.jsx";
+import { useToast } from "./Toast/toastContext.js";
 
 const down = () => new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" });
 
@@ -539,6 +540,72 @@ describe("arcade art (CC-087)", () => {
 
     act(() => vi.advanceTimersByTime(CELEBRATION_MS));
     expect(effect("confetti")).toBeNull();
+  });
+
+  it("waits with its toasts while the result holds the screen: confetti and one chime come after (CC-163)", () => {
+    vi.useFakeTimers();
+    const holds = {};
+    function Holder() {
+      Object.assign(holds, useToast());
+      return null;
+    }
+    const { socket, sound } = renderWith(
+      <>
+        <Holder />
+        <GamificationToasts />
+      </>,
+    );
+    let release;
+    act(() => {
+      release = holds.hold("result");
+    });
+
+    act(() =>
+      socket.push(SOCKET_EVENTS.ACHIEVEMENTS_UNLOCKED, {
+        achievements: [achievement({ name: "First Move" }), achievement({ name: "First Win" })],
+      }),
+    );
+    expect(effect("confetti")).toBeNull();
+    expect(sound.played).toEqual([]);
+
+    act(() => release());
+    expect(effect("confetti")).not.toBeNull();
+    expect(sound.played).toEqual(["achievement"]);
+  });
+
+  it("raises a quest's XP and chimes only once its toast shows (CC-163)", () => {
+    vi.useFakeTimers();
+    const holds = {};
+    function Holder() {
+      Object.assign(holds, useToast());
+      return null;
+    }
+    const { socket, sound } = renderWith(
+      <>
+        <Holder />
+        <GamificationToasts />
+      </>,
+    );
+    let release;
+    act(() => {
+      release = holds.hold("result");
+    });
+
+    act(() =>
+      socket.push(SOCKET_EVENTS.PROGRESS_UPDATED, {
+        source: "quest",
+        key: "quest:2026-10-16:win-1",
+        xpGained: 20,
+        leveledUp: false,
+        progress: {},
+      }),
+    );
+    expect(effect("xp-pop")).toBeNull();
+    expect(sound.played).toEqual([]);
+
+    act(() => release());
+    expect(effect("xp-pop")).toHaveTextContent("+20 XP");
+    expect(sound.played).toEqual(["achievement"]);
   });
 
   it("draws an unlocked achievement of an unknown tier in bronze in its toast, and ignores an empty unlock", () => {

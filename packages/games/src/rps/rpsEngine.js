@@ -123,6 +123,8 @@ export const rpsEngine = defineEngine({
     };
   },
 
+  playersOf: (state) => [...state.players],
+
   activePlayers(state) {
     return state.winner === "" ? state.players.filter((p) => state.pending[p] === "") : [];
   },

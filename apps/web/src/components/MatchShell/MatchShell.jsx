@@ -1,9 +1,9 @@
-import { getGame } from "@classicade/shared";
-import { resultHeadline } from "../../games/outcomeText.js";
+import { useState } from "react";
+import { getGame, ROOM_STATUS } from "@classicade/shared";
+import { outcomeMoment } from "../../games/outcomeMoment.js";
 import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
 import { gameNumber, matchPhase, PLAY_REASONS } from "../../games/roomView.js";
 import { useAction } from "../../hooks/useAction.js";
-import { outcomeFor } from "../Celebrations/outcome.js";
 import { ResultCelebration } from "../Celebrations/ResultCelebration.jsx";
 import { ClaimWin } from "../ClaimWin/ClaimWin.jsx";
 import { ComputerNote } from "../ComputerNote/ComputerNote.jsx";
@@ -15,6 +15,19 @@ import { ActionBar } from "./ActionBar.jsx";
 import { MatchFrame, MatchStage } from "./MatchFrame.jsx";
 import { sendIntent, shellLayout } from "./matchShell.js";
 import styles from "./MatchShell.module.css";
+
+/**
+ * Whether the viewer saw the room's current game end on this page. A game that was already over when the page
+ * opened (a reload, or a link to a finished room) is no new moment. A rematch that ends later is.
+ */
+function useSawItEnd(room) {
+  const [opened] = useState(() => ({
+    code: room.code,
+    game: gameNumber(room),
+    finished: room.status === ROOM_STATUS.FINISHED,
+  }));
+  return !(opened.finished && opened.code === room.code && opened.game === gameNumber(room));
+}
 
 /** Which requests stand for the viewer: one they were asked, one they asked, or none (CC-170). */
 function requestState(room) {
@@ -31,9 +44,11 @@ function requestState(room) {
  * 2. Match bar: the game's name and, when the game has one, the score inside the game (`inGameScore`).
  * 3. Stage: the game's `Board`, or the invite while the room waits for players.
  * 4. Action bar: the game's `actions` and Leave, under the board. At the end it moves into the result.
- * 5. Result: the headline and its celebration at the end, with the action bar under it.
+ * 5. Result: the outcome moment at the end (CC-163): its stamp, the headline and the line under it, in the tone of
+ *    how the game ended, with the action bar under it. After a loss the board's colours soften.
  * 6. Presence and panel, in the side column: who is in the room and the game's own `Panel`.
- * 7. Announcer: one polite and one urgent screen reader region. The result is read out urgently.
+ * 7. Announcer: one polite and one urgent screen reader region. The result's headline and line are read out
+ *    urgently.
  *
  * Every slot gets the room as the server sent it, and buttons only send intents. Nothing here decides a result.
  *
@@ -71,6 +86,9 @@ export function MatchShell({
   const offline = reconnecting ? PLAY_REASONS.RECONNECTING : "";
   const score = layout.stage === "waiting" ? undefined : game.inGameScore?.(room);
   const { Panel } = game;
+  const moment = layout.result ? outcomeMoment(room) : undefined;
+  const dimmed = moment?.effect === "dim";
+  const sawItEnd = useSawItEnd(room);
 
   /** What a request button does (RoomAction): a game move, asking for something, or answering a request. */
   function act(action) {
@@ -109,21 +127,27 @@ export function MatchShell({
       }
       score={score?.text}
       result={
-        layout.result
-          ? {
-              tone: outcomeFor(room),
-              headline: resultHeadline(room),
-              celebration: <ResultCelebration room={room} />,
+        moment === undefined
+          ? undefined
+          : {
+              moment,
+              celebration: (
+                <ResultCelebration key={room.game.matchId} room={room} moment={moment} live={sawItEnd} />
+              ),
               footer: <ShareResult room={room} />,
             }
-          : undefined
       }
       stage={
         <>
           {layout.stage === "waiting" ? (
             waiting
           ) : (
-            <MatchStage room={room} game={game} onMove={onMove} onAsk={onAsk} reconnecting={reconnecting} />
+            <div
+              className={dimmed ? `${styles.board} ${styles.dimmed}` : styles.board}
+              data-cc-effect={dimmed ? "dim" : undefined}
+            >
+              <MatchStage room={room} game={game} onMove={onMove} onAsk={onAsk} reconnecting={reconnecting} />
+            </div>
           )}
           {layout.result && <SaveProgressCard room={room} game={gameNumber(room)} />}
         </>

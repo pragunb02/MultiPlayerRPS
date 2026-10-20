@@ -217,7 +217,8 @@ export function createLocalMatch({ engine, clock, rng }) {
         status: over ? ROOM_STATUS.FINISHED : ROOM_STATUS.PLAYING,
         hostId: "",
         players: { min: engine.players.min, max: engine.players.max },
-        seats: LOCAL_PLAYERS.map((playerId, index) => ({
+        // The engine says who plays, in seat order (CC-253). The game starts with LOCAL_PLAYERS, so the names match.
+        seats: engine.playersOf(session.state).map((playerId, index) => ({
           playerId,
           displayName: session.names[index],
           connected: true,

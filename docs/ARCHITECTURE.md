@@ -138,6 +138,7 @@ true cold start Render's own loading page comes first; replacing that is open de
  * @property {(state) => Outcome} getOutcome                                  never null
  * @property {(state, viewer | "spectator") => View} viewFor                 hides secret info (e.g. RPS choice)
  * @property {(state) => PlayerId[]} activePlayers                           who may act now (empty when finished)
+ * @property {(state) => PlayerId[]} playersOf      every player, in seat order. Views name nobody else (CC-253)
  * @property {(state) => number} [deadline]       optional: when a time-based event happens if nobody acts (0 = none)
  * @property {(state, { now }) => State} [expire]  optional, with deadline: applies it (e.g. chess flag falls)
  * @property {number} [turnLimitMs]                optional idle limit per move once a player has moved (CC-036)

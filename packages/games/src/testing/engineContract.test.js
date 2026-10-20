@@ -127,6 +127,23 @@ describe("checkEngineContract catches broken engines", () => {
     );
   });
 
+  it("catches playersOf out of seat order (CC-253)", () => {
+    const reversed = broken({ playersOf: (state) => [...state.players].reverse() });
+
+    expect(violatedChecks(reversed)).toEqual([
+      "lists the game's players in seat order with playersOf, from start to end and after a rename",
+    ]);
+  });
+
+  it("catches a view that names a player playersOf leaves out, so the server would send their id (CC-253)", () => {
+    const forgetful = broken({ playersOf: (state) => [state.players[0]] });
+
+    expect(violatedChecks(forgetful)).toEqual([
+      "lists the game's players in seat order with playersOf, from start to end and after a rename",
+      "names nobody but playersOf in any view, outcome or active list, in every state",
+    ]);
+  });
+
   it("catches views that are not JSON-safe", () => {
     const leaky = broken({ viewFor: (state) => ({ ...state, toString: () => "x" }) });
 
@@ -209,6 +226,6 @@ describe("checkEngineContract catches broken engines", () => {
   });
 
   it("exposes the list of checks", () => {
-    expect(CONTRACT_CHECK_NAMES).toHaveLength(13);
+    expect(CONTRACT_CHECK_NAMES).toHaveLength(15);
   });
 });

@@ -2,8 +2,8 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-061**. Reserved for open work (2026-10-20): ADR-056
-(CC-155, #104), ADR-057 (CC-253), ADR-058 (CC-163), ADR-059 (CC-290) and ADR-060 (CC-291). A later change to a decision is a dated
+reused; the next free ID is **ADR-065**. Reserved for open work (2026-10-20): ADR-057
+(CC-253), ADR-058 (CC-163), ADR-059 (CC-290), ADR-060 (CC-291), ADR-061 (CC-144), ADR-062 (CC-042) and ADR-064 (CC-297). A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -60,8 +60,7 @@ the owner may change it.
 
 ### ADR-057 — Room views name players by opaque per-room seat ids
 
-- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-253](tickets/CC-253.md), CC-241 F11,
-  ADR-051.9)
+- **Status:** Accepted · 2026-10-20 by the owner ([CC-253](tickets/CC-253.md), CC-241 F11, ADR-051.9)
 - **Context.** Every room view and request push sent every seat's player id to everyone in the room, spectators
   included. An account's player id is a MongoDB ObjectId, whose first 4 bytes are its creation time, and the same id
   in every room lets anyone follow a player from room to room. Quick match (CC-051) will seat strangers.
@@ -71,19 +70,23 @@ the owner may change it.
      "classicade room seat ids", the first 16 bytes in base64url (22 characters). It is the same through rematches
      and restarts, different in every other room, and cannot be worked out or turned back without the key.
   2. Nothing is stored: the seat id is worked out for each view, so rooms already in MongoDB need no migration and a
-     rollback leaves nothing behind. A room records the players its game started with (`game.players`), so a player
-     who left a finished game is still renamed.
+     rollback leaves nothing behind.
   3. The view keeps its field names. `you` is the viewer's own seat id ("" without a seat). Every player id in the
      view, the engine's own view included, is replaced as a value and as a key.
-  4. `POST /api/blocks` keeps `{ roomCode, seat, seatId }`. The server works out the seat id of the person in that
+  4. The engine is the source of truth for who plays: the engine contract gains `playersOf(state)`, every player of
+     the game in seat order, and the contract kit checks for every engine that no view, outcome or active list names
+     anyone else, in every state. A player who left a finished game is still renamed, in any stored room.
+  5. Fail closed: after that, any string in the view shaped like a player id (`guest_`, `user_`, `bot_`, `deleted_`,
+     `models/playerIdShape.js`) is replaced by its seat id, so a field nobody listed cannot leak.
+  6. `POST /api/blocks` keeps `{ roomCode, seat, seatId }`. The server works out the seat id of the person in that
      seat and blocks only when it matches. A `seatId` that is not 22 base64url characters is refused with 400.
-  5. A deleted player's stand-in is labelled `deleted: true` on its seat.
-  6. Later features that show one player another (public profiles CC-034, chat and emotes CC-169, spectating CC-056,
+  7. A deleted player's stand-in is labelled `deleted: true` on its seat.
+  8. Later features that show one player another (public profiles CC-034, chat and emotes CC-169, spectating CC-056,
      quick match CC-051, challenges CC-277) name the other player by a seat id or an id made for that purpose, never
      by a player id.
 - **Consequences.** A guest who signs in during a game, or a deleted player's stand-in, is a new player id and so
   gets a new seat id, as they get a new name. Rotating `SESSION_SECRET` gives open rooms new seat ids. Match history
-  still sends past opponents' player ids to the participants: it needs its own ticket.
+  still sends past opponents' player ids to the participants: CC-297.
 - **Amended 2026-10-20 ([CC-297](tickets/CC-297.md)): match history too.** The same rule covers a second context.
   `GET /api/matches` and `GET /api/matches/:matchId` name every player of a match, the viewer included, by a match
   player id: HMAC-SHA-256 of `[matchId, playerId]` under a key derived from `SESSION_SECRET` with the label
@@ -119,6 +122,34 @@ the owner may change it.
      checks for its first week.
 - **Not chosen.** Chromatic, Percy or Argos (an account and a secret in a public repository, per-snapshot pricing
   over a free tier), baselines per platform (three sets to keep in step), a trace of every passing test.
+
+### ADR-063 — Render's settings live in `render.yaml`, secrets stay in Render
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 (from [CC-294](tickets/CC-294.md), research in
+  its Research section). Nothing changes in production until the owner links the Blueprint (DEPLOYMENT.md,
+  "Render Blueprint").
+- **Context.** Every Render setting lived only in the dashboard, unreviewed. Auto-deploy had stayed on "On Commit"
+  without anyone noticing. Render Blueprints read a `render.yaml` and adopt an existing service by its name. Render
+  keeps env vars the file leaves out and ignores `sync: false` keys on every later sync, but resets a few omitted
+  fields (build filters, PR previews, root directory) and overwrites dashboard values that differ from the file.
+- **Decision.**
+  1. `render.yaml` at the repo root declares the one web service `NoCapGaming` with every setting the dashboard has:
+     `runtime: node`, `plan: free`, `region: oregon`, `branch: main`, the build and start commands,
+     `healthCheckPath: /health`, `autoDeployTrigger: checksPass`.
+  2. Settings that are not secret are plain values in the file and change only by pull request: `NODE_ENV`, `HOST`,
+     `LOG_LEVEL`, `ALLOWED_ORIGINS`, `WEB_DIST_DIR`, `TRUST_PROXY_HOPS`. Secrets are `sync: false` with no value:
+     `MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`. `PORT` belongs to Render and is not declared.
+  3. A unit test keeps the file honest: the service settings, every env var name `loadConfig` reads declared (and
+     nothing else), every secret `sync: false`, and the plain values passing `loadConfig` in production.
+  4. Render's published JSON Schema checks the file with Ajv in a CI job that runs on pull requests only. It needs
+     render.com, and with "After CI Checks Pass" a failed check on a `main` commit would stop that deploy.
+  5. The owner links it from the dashboard after comparing the review screen with the dashboard (DEPLOYMENT.md).
+     Builders never call Render's API.
+- **Consequences.** A change to production's build, start, health check, auto-deploy or plain env vars is now a
+  reviewed diff. A new env var in config cannot merge without a line in `render.yaml`. After linking, a dashboard
+  edit to a field in the file is overwritten on the next sync. Secrets are still set by hand in the dashboard, and
+  a new secret must be added there by hand too (Render ignores new `sync: false` keys after the first sync). Two new
+  dev dependencies, `yaml` and `ajv`.
 
 ### ADR-055 — Operations telemetry: our own metrics and named log lines to Grafana Cloud, no personal data
 

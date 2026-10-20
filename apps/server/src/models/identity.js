@@ -1,9 +1,13 @@
 import { IDENTITY_KINDS } from "@classicade/shared";
 import { ValidationError } from "../utils/errors.js";
 
+/** How a guest's player id starts. */
+export const GUEST_ID_PREFIX = "guest_";
+/** How an account's player id starts. */
+export const ACCOUNT_ID_PREFIX = "user_";
 const ID_PATTERNS = Object.freeze({
-  [IDENTITY_KINDS.GUEST]: /^guest_[0-9a-f-]{36}$/,
-  [IDENTITY_KINDS.USER]: /^user_[0-9a-f]{24}$/,
+  [IDENTITY_KINDS.GUEST]: new RegExp(`^${GUEST_ID_PREFIX}[0-9a-f-]{36}$`),
+  [IDENTITY_KINDS.USER]: new RegExp(`^${ACCOUNT_ID_PREFIX}[0-9a-f]{24}$`),
 });
 const DISPLAY_NAME_PATTERN = /^[A-Za-z0-9_-]{3,24}$/;
 

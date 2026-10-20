@@ -24,6 +24,7 @@ import {
   ValidationError,
 } from "../../utils/errors.js";
 import { isDeletedPlayerId } from "../../models/deletedPlayer.js";
+import { hasPlayerIdShape } from "../../models/playerIdShape.js";
 import { NO_BOT_TURNS } from "../bots/botTurns.js";
 import { lifetimeOf, roomLifetimes } from "./roomLifetimes.js";
 import { roomLimits } from "./roomLimits.js";
@@ -210,15 +211,15 @@ export function createRoomComponent({
   };
 
   /**
-   * Every player a room names anywhere: the seats and the host, the players its game started with, and anyone the
-   * result, the series, the requests or the game's log names. Games started before CC-253 do not list their
-   * players, so the other places are read too.
+   * Every player a room names anywhere: the seats and the host, the players of its game as its engine lists them
+   * (the engine is the one that knows, a player who left is still in the game), and anyone the result, the series,
+   * the requests or the game's log names.
    */
   const playersNamedIn = (room) =>
     new Set([
       room.hostId,
       ...room.seats.map((seat) => seat.playerId),
-      ...(room.game?.players ?? []),
+      ...(room.game === undefined ? [] : engineFor(room).playersOf(room.game.state)),
       ...(room.game?.log ?? []).flatMap((entry) =>
         [entry.playerId, entry.from, ...(entry.playerIds ?? [])].filter((id) => id !== undefined),
       ),
@@ -228,13 +229,29 @@ export function createRoomComponent({
     ]);
   /**
    * `value` with every player of the room named by their seat id instead of their player id, wherever it names
-   * them, as a value or as a key (CC-253). Player ids are unique strings, so nothing else is changed.
+   * them, as a value or as a key (CC-253). Player ids are unique strings, so nothing else is changed. Last, anything
+   * still shaped like a player id is named by its seat id too, so an id that nobody listed is never sent as it is.
    */
   const withSeatIds = (room, value) =>
-    [...playersNamedIn(room)].reduce(
-      (renamed, playerId) => renamePlayer(renamed, playerId, seatIds.seatIdOf(room, playerId)),
-      value,
+    hideIdShapes(
+      room,
+      [...playersNamedIn(room)].reduce(
+        (renamed, playerId) => renamePlayer(renamed, playerId, seatIds.seatIdOf(room, playerId)),
+        value,
+      ),
     );
+  /** `value` with every string shaped like a player id, as a value or a key, replaced by its seat id. */
+  const hideIdShapes = (room, value) => {
+    const hidden = (text) => (hasPlayerIdShape(text) ? seatIds.seatIdOf(room, text) : text);
+    if (typeof value === "string") return hidden(value);
+    if (Array.isArray(value)) return value.map((item) => hideIdShapes(room, item));
+    if (value !== null && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [hidden(key), hideIdShapes(room, item)]),
+      );
+    }
+    return value;
+  };
   /** The viewer's own seat id, or "" for a viewer without a seat. */
   const yourSeatId = (room, viewerId) =>
     seatOf(room, viewerId) === undefined ? "" : seatIds.seatIdOf(room, viewerId);
@@ -432,16 +449,7 @@ export function createRoomComponent({
     return {
       ...room,
       status: ROOM_STATUS.PLAYING,
-      // Who the game started with, so a player who later leaves is still known to the views (CC-253).
-      game: {
-        matchId: generateMatchId(),
-        number,
-        seed,
-        players: room.seats.map((seat) => seat.playerId),
-        startedAt: now,
-        state,
-        log: [],
-      },
+      game: { matchId: generateMatchId(), number, seed, startedAt: now, state, log: [] },
       lastActivityAt: now,
     };
   }
@@ -580,7 +588,6 @@ export function createRoomComponent({
           ...room.game,
           state: renamePlayer(room.game.state, from, to.id),
           log: renamePlayer(room.game.log, from, to.id),
-          ...(room.game.players && { players: renamePlayer(room.game.players, from, to.id) }),
         },
       }),
     };

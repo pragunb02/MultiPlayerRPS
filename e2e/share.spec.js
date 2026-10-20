@@ -6,6 +6,9 @@ import { newAccount } from "./personas.js";
 // sheet, with a copy of the message where there is no sheet. The text tells the result the way Wordle does and
 // names nobody: not the player, not the opponent, whether a guest, a minor or an adult. The link is the game's
 // page on the site's own address, because a finished room closes soon.
+//
+// Every link carries its channel and nothing else (CC-279): `?via=wa`, `share` or `copy`. A visit by such a link is
+// a `shared_link` landing of that channel, and the marker leaves the address at once.
 
 const RPS_PAGE = "/games/rock-paper-scissors";
 // The first release's preview images. Messages sent before still point at them, so they must keep answering.
@@ -80,7 +83,7 @@ test.describe("sharing on WhatsApp", () => {
 
     const { code } = await hostBeatsGuest(adult, guest);
 
-    const gamePage = `${baseURL}${RPS_PAGE}`;
+    const gamePage = `${baseURL}${RPS_PAGE}?via=wa`;
     const won = await whatsappMessage(adult.page);
     const lost = await whatsappMessage(guest.page);
     expect(won).toBe(
@@ -115,7 +118,7 @@ test.describe("sharing on WhatsApp", () => {
       .toEqual({
         title: "ClassiCade",
         text: "🏆 Maine Rock Paper Scissors jeeta! Ab tumhari baari:\nI won a game of Rock Paper Scissors on ClassiCade. Your turn!\nFree hai, login nahi chahiye.\nFree, no login needed.",
-        url: gamePage,
+        url: `${baseURL}${RPS_PAGE}?via=share`,
       });
   });
 
@@ -145,7 +148,9 @@ test.describe("sharing on WhatsApp", () => {
 
     await expect(host.page.getByRole("status").filter({ hasText: "Result copied" })).toBeVisible();
     expect((await answerTo(host.page, armed)).ms).toBeLessThanOrEqual(100);
-    expect(await host.page.evaluate(() => window.__copied)).toBe(await whatsappMessage(host.page));
+    const copied = await host.page.evaluate(() => window.__copied);
+    expect(copied.endsWith(`${RPS_PAGE}?via=copy`)).toBe(true);
+    expect(copied.replace(/via=copy$/, "via=wa")).toBe(await whatsappMessage(host.page));
   });
 
   test("the waiting room offers WhatsApp with the room's invite on the site's own address", async ({
@@ -156,10 +161,66 @@ test.describe("sharing on WhatsApp", () => {
 
     const room = await createRoom(host, "chess");
 
-    expect(room.invite.startsWith(`${baseURL}/games/chess/rooms/`)).toBe(true);
+    expect(room.invite).toBe(`${baseURL}/games/chess/rooms/${room.code}?via=copy`);
     expect(await whatsappMessage(host.page)).toBe(
-      `Ek game ho jaaye? ClassiCade pe Chess khelo, link kholo aur seedha khelo:\nPlay Chess with me on ClassiCade — room ${room.code}\nFree hai, login nahi chahiye.\nFree, no login needed.\n${room.invite}`,
+      `Ek game ho jaaye? ClassiCade pe Chess khelo, link kholo aur seedha khelo:\nPlay Chess with me on ClassiCade — room ${room.code}\nFree hai, login nahi chahiye.\nFree, no login needed.\n${baseURL}${room.path}?via=wa`,
     );
+  });
+
+  test("a visit by a WhatsApp link lands as a shared link, and the marker leaves the address", async ({
+    players,
+  }) => {
+    const friend = await players.open("friend");
+    await friend.page.goto("/games/chess");
+    const before = await friend.page.evaluate(() => history.length);
+
+    await friend.page.goto("/games/chess?via=wa#play");
+
+    await expect(friend.page).toHaveURL("/games/chess#play");
+    await expect(friend.page.locator("html")).toHaveAttribute("data-cc-entry", "shared_link");
+    await expect(friend.page.locator("html")).toHaveAttribute("data-cc-via", "wa");
+    await expect(friend.page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      new URL("/games/chess", friend.page.url()).href,
+    );
+    // The marked address was replaced, not added: one entry for the visit, and Back goes to the page before it.
+    expect(await friend.page.evaluate(() => history.length)).toBe(before + 1);
+    await friend.page.goBack();
+    await expect(friend.page).toHaveURL("/games/chess");
+    await friend.page.goForward();
+    await expect(friend.page).toHaveURL("/games/chess#play");
+    // A reload is not a second share, and nothing about the landing is kept in the browser.
+    await friend.page.reload();
+    await expect(friend.page).toHaveURL("/games/chess#play");
+    await expect(friend.page.locator("html")).not.toHaveAttribute("data-cc-entry");
+  });
+
+  test("a friend who opens a copied room link lands as a shared link at the room's own address", async ({
+    players,
+  }) => {
+    const host = await players.open("host");
+    const friend = await players.open("friend");
+    const room = await createRoom(host, "tic-tac-toe");
+
+    await friend.page.goto(room.invite);
+
+    await expect(friend.page).toHaveURL(room.path);
+    await expect(friend.page.locator("html")).toHaveAttribute("data-cc-via", "copy");
+    await friend.page.getByRole("button", { name: "Play as guest" }).click();
+    await expect(friend.page.getByRole("button", { name: "Play as guest" })).toHaveCount(0);
+    await expect(friend.page).toHaveURL(room.path);
+  });
+
+  test("a marker that is not one of ours is not counted and still leaves the address", async ({
+    players,
+  }) => {
+    const visitor = await players.open("visitor");
+
+    await visitor.page.goto("/games/rock-paper-scissors?via=u_5f2a9c&via=wa");
+
+    await expect(visitor.page).toHaveURL(RPS_PAGE);
+    await expect(visitor.page.locator("html")).not.toHaveAttribute("data-cc-entry");
+    await expect(visitor.page.locator("html")).not.toHaveAttribute("data-cc-via");
   });
 
   test("the new preview images serve as small JPEGs, and the old PNG addresses still answer", async ({

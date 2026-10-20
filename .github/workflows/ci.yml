@@ -81,6 +81,24 @@ jobs:
           docker run --rm --volume "$PWD:/repo" --workdir /repo --entrypoint shellcheck rhysd/actionlint:1.7.12
           scripts/backup/dump-and-encrypt.sh
 
+  # render.yaml against the schema Render publishes (CC-294, ADR-063). It downloads the schema from render.com, so it
+  # runs on pull requests only. Render deploys a main commit only when every check on it passed, and a check that
+  # fails because render.com is slow must never hold back a deploy. On main this job is skipped, which Render
+  # counts as passed. Our own rules for the file are unit tests in the checks job (scripts/renderBlueprint.test.mjs).
+  render-blueprint:
+    name: render.yaml matches Render's schema
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: node scripts/bin/check-render-blueprint.mjs
+
   # The browser suite runs in parts on separate machines, so it takes minutes instead of 20 (CC-236). Each part is
   # a list of whole spec files balanced by time (e2e/shards.js). The restart tests stop the server, so they have
   # their own job, one test at a time. The last job merges the parts' reports into one, checks that every test

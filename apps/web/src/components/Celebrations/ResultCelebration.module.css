@@ -3,26 +3,38 @@
   justify-items: center;
   gap: var(--space-1);
 }
-/* The result word, stamped in with a bounce (once). */
-.banner {
+/* The stamp: the result word, stamped in with a bounce, once. Its resting style is the final one, so with reduced
+   motion it is simply there. A loss has no stamp (CC-163). */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   font-family: var(--font-display);
   font-weight: 800;
   font-size: var(--text-3xl);
   line-height: 1;
   letter-spacing: -0.02em;
   text-transform: uppercase;
+  color: var(--color-primary);
   animation: stamp var(--duration-slow) var(--ease-spring) both;
 }
-.win .banner {
+/* Gold for both wins. Only the win earned on the board glows. */
+[data-cc-tone="win"] .stamp,
+[data-cc-tone="quiet-win"] .stamp {
   color: var(--color-gold);
+}
+[data-cc-tone="win"] .stamp {
   text-shadow: var(--glow-gold);
 }
-.loss .banner {
-  color: var(--color-text-muted);
+/* The quiet win's small trophy, drawn from the achievement art. */
+.icon {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
 }
-.draw .banner,
-.watched .banner {
-  color: var(--color-primary);
+.icon > svg {
+  width: 100%;
+  height: 100%;
 }
 /* Why the game gave nothing (CC-095): quiet, readable, never a scolding. */
 .notCounted {
@@ -33,8 +45,12 @@
   color: var(--color-text-muted);
 }
 @media (max-width: 30rem) {
-  .banner {
+  .stamp {
     font-size: var(--text-2xl);
+  }
+  .icon {
+    width: 1.75rem;
+    height: 1.75rem;
   }
 }
 @keyframes stamp {

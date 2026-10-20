@@ -1,4 +1,10 @@
-import { DEFAULT_LEADERBOARD_ID, gameForSlug, getGame } from "@classicade/shared";
+import {
+  DEFAULT_LEADERBOARD_ID,
+  gameForSlug,
+  getGame,
+  isShareChannel,
+  SHARE_CHANNEL_PARAM,
+} from "@classicade/shared";
 
 /**
  * Every URL of the app, in one place (ADR-011). Pages and components build links with `paths.*` and never write
@@ -16,6 +22,9 @@ import { DEFAULT_LEADERBOARD_ID, gameForSlug, getGame } from "@classicade/shared
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
+ *
+ * A link our share buttons hand out ends in `?via=wa`, `share` or `copy` (CC-279, `withShareChannel` below). The
+ * page that opens it removes the marker before the router reads the address (`landing.js`).
  */
 export const ROUTES = Object.freeze({
   GAME: "games/:slug",
@@ -152,4 +161,20 @@ function rangeQuery(range) {
   );
   const text = params.toString();
   return text === "" ? "" : `?${text}`;
+}
+
+/**
+ * A link our share buttons hand out, marked with the channel it leaves by (CC-279): `?via=wa`, `share` or `copy`.
+ * The marker names the channel only, never the sharer, so a player who opens the link cannot be tied to the one who
+ * sent it (ADR-034.1). A channel that is not on the list throws, so a typo fails a test instead of shipping.
+ *
+ * @param {string} url  an absolute link with no query, built from `paths`
+ * @param {string} channel  a `SHARE_CHANNELS` value
+ * @returns {string}
+ */
+export function withShareChannel(url, channel) {
+  if (!isShareChannel(channel)) {
+    throw new RangeError(`Not a share channel: ${JSON.stringify(channel)}`);
+  }
+  return `${url}?${new URLSearchParams([[SHARE_CHANNEL_PARAM, channel]])}`;
 }

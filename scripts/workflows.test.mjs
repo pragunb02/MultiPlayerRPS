@@ -269,3 +269,13 @@ describe("visual baselines (CC-155)", () => {
     expect(workflow).not.toMatch(/run: .*\$\{\{ inputs\./);
   });
 });
+
+describe("render.yaml schema check", () => {
+  it("runs on pull requests only, so a slow render.com never holds back a deploy of main", async () => {
+    const check = job(await read(".github/workflows/ci.yml"), "render-blueprint");
+
+    expect(check).toContain("    if: github.event_name == 'pull_request'\n");
+    expect(check).toContain("      - run: node scripts/bin/check-render-blueprint.mjs\n");
+    expect(check).not.toMatch(/secrets\./);
+  });
+});
