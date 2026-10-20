@@ -171,6 +171,25 @@ describe("describePage", () => {
     }
   });
 
+  it("describes a challenge without naming anyone or its game, never listed, nothing for a malformed id (CC-139)", () => {
+    const head = describePage("/challenge/0123456789abcdefghjk");
+    expect(head).toMatchObject({
+      found: true,
+      indexable: false,
+      title: "You've been challenged on ClassiCade",
+      path: "/challenge/0123456789abcdefghjk",
+    });
+    expect(head.description.length).toBeLessThanOrEqual(160);
+    for (const path of [
+      "/challenge",
+      "/challenge/0123456789abcdef",
+      "/challenge/0123456789ABCDEFGHJK",
+      "/challenge/0123456789abcdefghjk/x",
+    ]) {
+      expect(describePage(path).found, path).toBe(false);
+    }
+  });
+
   it("lists the legal pages, whatever the letter case and trailing slash", () => {
     expect(describePage("/privacy")).toMatchObject({ found: true, indexable: true, path: "/privacy" });
     expect(describePage("/Terms/")).toMatchObject({ found: true, indexable: true, path: "/terms" });

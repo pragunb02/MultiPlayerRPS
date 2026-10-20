@@ -1,3 +1,4 @@
+import { isChallengeId } from "./challenges.js";
 import { DAILY_PUZZLES, getDailyPuzzle } from "./dailyPuzzles.js";
 import { GAMES, getGame, getGameBySlug } from "./games.js";
 import { getLeaderboard, LEADERBOARDS } from "./leaderboards.js";
@@ -190,6 +191,18 @@ const friendLink = (token) =>
     path: `/friends/add/${token}`,
   });
 
+/**
+ * A challenge's own page (CC-139), the link sent on WhatsApp. Like a profile's, the head is written without asking
+ * whose challenge it is or which game, so a link preview never names a player (ADR-028.7) and says nothing about
+ * whether the challenge is still open. The page is never listed.
+ */
+const challenge = (id) =>
+  page({
+    title: `You've been challenged on ${SITE_NAME}`,
+    description: `Someone challenged you to a game on ${SITE_NAME}. Open the link to play, no account needed. A challenge lasts a day.`,
+    path: `/challenge/${id}`,
+  });
+
 /** Pages at one fixed URL, by their lower case path segment. */
 const FIXED = Object.freeze({
   privacy: page({
@@ -290,6 +303,9 @@ function match(segments) {
   }
   if (head === "friends" && rest.length === 2 && rest[0].toLowerCase() === "add") {
     return isFriendLinkToken(rest[1]) ? friendLink(rest[1]) : NOT_FOUND;
+  }
+  if (head === "challenge" && rest.length === 1) {
+    return isChallengeId(rest[0]) ? challenge(rest[0]) : NOT_FOUND;
   }
   if (head === "u" && rest.length === 2 && rest[1].toLowerCase() === "userprofile") return FIXED.profile;
   return NOT_FOUND;

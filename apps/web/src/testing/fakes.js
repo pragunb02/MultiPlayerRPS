@@ -143,6 +143,13 @@ export function fakeApi(overrides = {}) {
     exportData: vi.fn(),
     deleteAccount: vi.fn().mockResolvedValue(undefined),
     getBlocks: vi.fn().mockResolvedValue([]),
+    getChallenges: vi.fn().mockResolvedValue([]),
+    getChallenge: vi.fn(),
+    createChallenge: vi.fn(),
+    acceptChallenge: vi.fn(),
+    declineChallenge: vi.fn(),
+    withdrawChallenge: vi.fn(),
+    challengeLater: vi.fn().mockResolvedValue({}),
     blockPlayer: vi.fn(),
     unblockPlayer: vi.fn().mockResolvedValue(undefined),
     // An empty friends view, so a page that shows friends draws instead of failing on a missing answer (CC-052).

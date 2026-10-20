@@ -156,6 +156,28 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     expect(accepted.data.series).toEqual({ games: 1, wins: { [room.you]: 1 } });
   });
 
+  it("keeps a challenge and its link across a restart, and it can be taken after (CC-139)", async () => {
+    const server = serverProcess();
+    await server.start();
+    const alice = await guest(server);
+    const api = (path, cookie, body) =>
+      fetch(`${server.url()}/api${path}`, {
+        method: body === undefined && !path.endsWith("/accept") ? "GET" : "POST",
+        headers: { cookie, ...(body !== undefined && { "Content-Type": "application/json" }) },
+        ...(body !== undefined && { body: JSON.stringify(body) }),
+      }).then(async (res) => ({ status: res.status, body: await res.json() }));
+    const made = await api("/challenges", alice.cookie, { gameId: "chess", options: {} });
+
+    await server.restart();
+    const bob = await guest(server);
+    const seen = await api(`/challenges/${made.body.challenge.id}`, bob.cookie);
+    const taken = await api(`/challenges/${made.body.challenge.id}/accept`, bob.cookie);
+
+    expect(seen.body.challenge).toMatchObject({ state: "open", gameId: "chess" });
+    expect(taken.status).toBe(200);
+    expect(taken.body.room.gameId).toBe("chess");
+  });
+
   it("shows who is really connected after a restart: nobody, until they come back", async () => {
     const server = serverProcess();
     await server.start();

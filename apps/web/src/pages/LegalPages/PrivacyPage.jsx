@@ -117,6 +117,12 @@ export function PrivacyPage() {
             account.
           </li>
           <li>
+            <strong>Challenges.</strong> When you make a challenge link, we store the game and its options,
+            your name, who took it and the room made for you both. Anyone with the link sees the game, and
+            your name only if you are an adult account. A challenge is open for 24 hours, and we delete it a
+            day after that.
+          </li>
+          <li>
             <strong>Feedback.</strong> When you send feedback with the Feedback button, we store its type,
             your message, the page you were on (never a room code or a name), the app version, the kind of
             device (phone, tablet or computer) and whether you were a visitor, a guest or signed in. We keep
@@ -272,16 +278,17 @@ export function PrivacyPage() {
             <strong>Download my data</strong> gives you a file (JSON) with your account, your games, progress,
             chess rating, achievements, quests, daily puzzle days, leaderboard places, your profile and
             avatar, the players you blocked, your friends, the friend requests you sent, your open friend
-            links and your Appear offline choice. Other players appear in it by their display name only.
+            links, your Appear offline choice and your challenges. Other players appear in it by their display
+            name only.
           </li>
           <li>
             <strong>Delete my account</strong> deletes it at once, with your progress, chess rating,
             achievements, quests, daily puzzle days, leaderboard places, profile, blocks, friends, friend
-            requests, friend links and sessions, and signs you out everywhere. Games you played against other
-            people stay in their history with your name replaced by &quot;Deleted player&quot;. A game you are
-            in at that moment ends, and your opponent wins. Games against the computer only are deleted. If
-            your account came from the earlier version of the site, that old record is closed so it can never
-            sign in again.
+            requests, friend links, challenges and sessions, and signs you out everywhere. Games you played
+            against other people stay in their history with your name replaced by &quot;Deleted player&quot;.
+            A game you are in at that moment ends, and your opponent wins. Games against the computer only are
+            deleted. If your account came from the earlier version of the site, that old record is closed so
+            it can never sign in again.
           </li>
         </ul>
         <p>
