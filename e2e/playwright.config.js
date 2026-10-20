@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL } from "./personas.js";
 import { RESTARTS, specFilesFor } from "./shards.js";
+import { CHROMIUM_ACCEPTS_TEST_CERTIFICATE } from "./tlsFront.js";
 
 // Browser tests of whole journeys, one file per kind of person (ENGINEERING.md §4). Run: npm run test:e2e
 // CI runs the suite in parts on separate machines, one part each (E2E_SHARD, shards.js, CC-236). Without
@@ -62,6 +63,8 @@ export default defineConfig({
     baseURL: BASE_URL,
     // The e2e server's certificate is made for each run (tlsFront.js), so no browser trusts it by itself.
     ignoreHTTPSErrors: true,
+    // Chromium accepts it during the handshake instead of restarting each request after the error (CC-319).
+    ...(engine === "chromium" ? { launchOptions: { args: [...CHROMIUM_ACCEPTS_TEST_CERTIFICATE] } } : {}),
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
