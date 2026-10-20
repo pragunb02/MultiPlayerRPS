@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { birthYearChoices } from "@classicade/shared";
+import { AGE_COPY } from "./ageCopy.js";
 import styles from "./YearSelect.module.css";
 
 /** The value of the "I'd rather not say" choice, which is also where the picker starts. */
@@ -44,11 +45,24 @@ export function YearSelect({ currentYear, value, onChange, error = "", locked = 
         ))}
       </select>
       <p id={hintId} className={styles.hint}>
-        Optional. Only the year is kept.
+        <span lang="hi-Latn" className={styles.line}>
+          {AGE_COPY.hint.hi}
+        </span>
+        <span lang="en" className={styles.line}>
+          {AGE_COPY.hint.en}
+        </span>
       </p>
       {error && (
         <p id={errorId} className={styles.error}>
-          {error}
+          {/* After an under 13 refusal, the only time the choice is locked, the refusal in Hinglish too. */}
+          {locked && (
+            <span lang="hi-Latn" className={styles.line}>
+              {AGE_COPY.tooYoung.hi}
+            </span>
+          )}
+          <span lang="en" className={styles.line}>
+            {error}
+          </span>
         </p>
       )}
     </div>

@@ -32,26 +32,28 @@ const listed = ({ replyEmail, ...item }) =>
  *
  * @param {{
  *   feedbackAccessor: ReturnType<typeof import("../../data/feedbackAccessor.js").createFeedbackAccessor>,
- *   ages: Pick<ReturnType<typeof import("../accounts/accountComponent.js").createAccountComponent>, "adultsAmong">,
+ *   safety: Pick<ReturnType<typeof import("../safety/safetyComponent.js").createSafetyComponent>, "policiesFor">,  the
+ *     age policy, whose `replyEmail` says who may leave an email (CC-152)
  *   newFeedbackId?: () => string,
  *   replyEmailOnlyForAdults?: boolean,
  * }} deps  `replyEmailOnlyForAdults` is REPLY_EMAIL_ONLY_FOR_ADULTS unless a test says otherwise
  */
 export function createFeedbackComponent({
   feedbackAccessor,
-  ages,
+  safety,
   newFeedbackId = randomUUID,
   replyEmailOnlyForAdults = REPLY_EMAIL_ONLY_FOR_ADULTS,
 }) {
   assertDefined(feedbackAccessor, "feedbackAccessor");
-  assertFunction(ages?.adultsAmong, "ages.adultsAmong");
+  assertFunction(safety?.policiesFor, "safety.policiesFor");
   assertFunction(newFeedbackId, "newFeedbackId");
 
   /** @param {{ sender: FeedbackSender, now: number }} query */
   async function canAskForReply({ sender, now }) {
     if (!replyEmailOnlyForAdults) return true;
     if (sender.kind !== FEEDBACK_KIND.ACCOUNT) return false;
-    return (await ages.adultsAmong({ playerIds: [sender.playerId], now })).has(sender.playerId);
+    const policies = await safety.policiesFor({ playerIds: [sender.playerId], now });
+    return policies.get(sender.playerId).replyEmail;
   }
 
   return Object.freeze({

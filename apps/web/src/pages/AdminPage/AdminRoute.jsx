@@ -8,10 +8,12 @@ import { CONSOLE_VIEWS } from "./consolePages.js";
 const AdminPage = lazyBoard(() => import("./AdminPage.jsx"), "AdminPage");
 const FeedbackInbox = lazyBoard(() => import("./FeedbackInbox.jsx"), "FeedbackInbox");
 const ReportQueue = lazyBoard(() => import("./ReportQueue.jsx"), "ReportQueue");
+const AgeCorrections = lazyBoard(() => import("./AgeCorrections.jsx"), "AgeCorrections");
 const PAGES = Object.freeze({
   [CONSOLE_VIEWS.TOTALS]: AdminPage,
   [CONSOLE_VIEWS.FEEDBACK]: FeedbackInbox,
   [CONSOLE_VIEWS.REPORTS]: ReportQueue,
+  [CONSOLE_VIEWS.AGES]: AgeCorrections,
 });
 
 const Waiting = () => (
@@ -25,7 +27,7 @@ const Waiting = () => (
  * as the server's 404, so the console's existence is not revealed. The server checks again on every request.
  *
  * @param {{ view: string }} props  a CONSOLE_VIEWS value: the totals and their sections, the feedback inbox (CC-290)
- *   or the report queue (CC-044)
+ *   the report queue (CC-044) or the year of birth corrections (CC-152)
  */
 export function AdminRoute({ view }) {
   const Page = PAGES[view];

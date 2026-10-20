@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { safetyFromAdults } from "../../testing/fakeSafety.js";
 import { createProfileAccessor } from "../../data/profileAccessor.js";
 import { hasPlayerIdShape } from "../../models/playerIdShape.js";
 import { createInMemoryProfileDao } from "../../testing/inMemoryProfileDao.js";
@@ -36,7 +37,7 @@ function setup({ deleted = [] } = {}) {
   });
   const component = createProfileComponent({
     profileAccessor,
-    ages: { adultsAmong: async ({ playerIds }) => new Set(playerIds.filter((id) => ADULTS.has(id))) },
+    safety: safetyFromAdults(async ({ playerIds }) => new Set(playerIds.filter((id) => ADULTS.has(id)))),
     accounts: {
       profileOf: async ({ playerId }) => {
         if (deleted.includes(playerId)) throw new NotFoundError("Account not found");
@@ -255,7 +256,7 @@ describe("profileComponent: what a viewer sees at a handle (CC-034)", () => {
     const handle = await handleOf(RIYA);
     const broken = createProfileComponent({
       profileAccessor,
-      ages: { adultsAmong: async () => new Set([RIYA.id]) },
+      safety: safetyFromAdults(async () => new Set([RIYA.id])),
       accounts: { profileOf: async () => Promise.reject(new Error("database down")) },
       progress: { getProgress: async () => ({}) },
       ratings: { ratingsOf: async () => [] },
@@ -267,7 +268,7 @@ describe("profileComponent: what a viewer sees at a handle (CC-034)", () => {
   it("passes a failure to read the handle through", async () => {
     const broken = createProfileComponent({
       profileAccessor: { getByHandle: async () => Promise.reject(new Error("database down")) },
-      ages: { adultsAmong: async () => new Set() },
+      safety: safetyFromAdults(async () => new Set()),
       accounts: { profileOf: async () => ({}) },
       progress: { getProgress: async () => ({}) },
       ratings: { ratingsOf: async () => [] },
@@ -387,7 +388,7 @@ describe("profileComponent: a guest signs in (ADR-014)", () => {
           return profileAccessor.rename(transfer);
         },
       },
-      ages: { adultsAmong: async () => new Set() },
+      safety: safetyFromAdults(async () => new Set()),
       accounts: { profileOf: async () => ({}) },
       progress: { getProgress: async () => ({}) },
       ratings: { ratingsOf: async () => [] },
@@ -404,7 +405,7 @@ describe("profileComponent: a guest signs in (ADR-014)", () => {
     await handleOf(GUEST);
     const broken = createProfileComponent({
       profileAccessor: { ...profileAccessor, rename: async () => Promise.reject(new Error("database down")) },
-      ages: { adultsAmong: async () => new Set() },
+      safety: safetyFromAdults(async () => new Set()),
       accounts: { profileOf: async () => ({}) },
       progress: { getProgress: async () => ({}) },
       ratings: { ratingsOf: async () => [] },

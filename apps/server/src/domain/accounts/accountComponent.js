@@ -1,7 +1,6 @@
 import {
   ACCOUNT_MESSAGES,
   ageGroupFor,
-  AGE_GROUPS,
   IDENTITY_KINDS,
   isTooYoungForAccount,
   TOO_YOUNG_MESSAGE,
@@ -450,24 +449,64 @@ export function createAccountComponent({
     },
 
     /**
-     * Which of these players are adults: accounts whose birth year makes them surely 18. Guests, computer
-     * characters and accounts without a year are not (ADR-028).
+     * The age group of each account among these players, from its birth year, in one read. An account without a
+     * year, or one that is gone, is `unknown`. Guests, computer characters and anyone else get no entry. Only the
+     * safety component asks: features read the age policy (domain/safety), never the group.
      *
      * @param {{ playerIds: ReadonlyArray<string>, now: number }} query
-     * @returns {Promise<ReadonlySet<string>>}
+     * @returns {Promise<ReadonlyMap<string, string>>} player id to an age group of `@classicade/shared`
      */
-    async adultsAmong({ playerIds, now }) {
-      const accountIds = playerIds.filter(isAccountId).map((id) => id.slice(ACCOUNT_ID_PREFIX.length));
-      if (accountIds.length === 0) {
-        return new Set();
+    async ageGroupsOf({ playerIds, now }) {
+      const accounts = [...new Set(playerIds.filter(isAccountId))];
+      if (accounts.length === 0) {
+        return new Map();
       }
       const currentYear = yearOf(now);
-      const years = await accountAccessor.listBirthYears(accountIds);
-      return new Set(
-        years
-          .filter(({ birthYear }) => ageGroupFor({ birthYear, currentYear }) === AGE_GROUPS.ADULT)
-          .map(({ accountId }) => `${ACCOUNT_ID_PREFIX}${accountId}`),
+      const years = new Map(
+        (await accountAccessor.listBirthYears(accounts.map((id) => id.slice(ACCOUNT_ID_PREFIX.length)))).map(
+          ({ accountId, birthYear }) => [`${ACCOUNT_ID_PREFIX}${accountId}`, birthYear],
+        ),
       );
+      return new Map(
+        accounts.map((playerId) => [playerId, ageGroupFor({ birthYear: years.get(playerId), currentYear })]),
+      );
+    },
+
+    /**
+     * The owner's correction of a birth year, on a request the owner checked first, such as a message from the
+     * account's own email (CC-152, ADR-048.9). Sets the year whatever was there, or clears it with `null`, which
+     * makes the account of unknown age again and lets its player set the year once more. The under 13 refusal
+     * still holds: such an account is deleted instead. Only the owner console calls this.
+     *
+     * @param {{ email: unknown, birthYear: unknown, now: number }} input  `birthYear` a year from the picker, or null
+     * @returns {Promise<Readonly<{ playerId: string, username: string, birthYear?: number, ageGroup: string }>>}
+     * @throws {ValidationError} with `details.field` "email" or "birthYear"
+     * @throws {NotFoundError} when no account has that email
+     * @throws {ConflictError} when more than one account has it under older spellings, so the owner picks by hand
+     */
+    async correctBirthYear({ email, birthYear, now }) {
+      const address = parseLoginEmail(email);
+      const year = birthYear === null ? undefined : statedBirthYear(birthYear, now);
+      const found = await accountAccessor.findByEmail(address);
+      if (found.length === 0) {
+        throw new NotFoundError("No account has that email");
+      }
+      if (found.length > 1) {
+        throw new ConflictError("More than one account has that email", { details: { field: "email" } });
+      }
+      const [{ accountId }] = found;
+      await accountAccessor.correctBirthYear({ accountId, birthYear: year, at: now });
+      const {
+        username,
+        birthYear: stored,
+        ageGroup,
+      } = profile(await accountAccessor.getById(accountId), now);
+      return Object.freeze({
+        playerId: `${ACCOUNT_ID_PREFIX}${accountId}`,
+        username,
+        ...(stored !== undefined && { birthYear: stored }),
+        ageGroup,
+      });
     },
 
     /**
@@ -475,7 +514,7 @@ export function createAccountComponent({
      * email (CC-035). Answers what the account itself holds.
      *
      * @param {{ playerId: string, password: unknown }} input
-     * @returns {Promise<Readonly<{ username: string, email: string, createdAt: number, birthYear?: number }>>}
+     * @returns {Promise<Readonly<{ username: string, email: string, createdAt: number, birthYear?: number, birthYearCorrectedAt?: Date }>>}
      * @throws {ValidationError} with `details.field` "password"
      * @throws {ForbiddenError} for a guest
      * @throws {NotFoundError} when the account is not there any more
@@ -491,6 +530,9 @@ export function createAccountComponent({
         email: account.email,
         createdAt: account.createdAt,
         ...(account.birthYear !== undefined && { birthYear: account.birthYear }),
+        ...(account.birthYearCorrectedAt !== undefined && {
+          birthYearCorrectedAt: account.birthYearCorrectedAt,
+        }),
       });
     },
 

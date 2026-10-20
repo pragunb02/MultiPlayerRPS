@@ -45,7 +45,9 @@ export function PrivacyPage() {
             give the year you were born. We keep the year only, never a date, and you can say nothing. We use
             it for one thing: whether you are an adult. If you are under 18, or have not said, we treat you as
             under 18 and show &quot;Hidden player&quot; instead of your username on the public leaderboards.
-            We do not accept an account from someone who tells us they are under 13.
+            We do not accept an account from someone who tells us they are under 13. You set the year once. If
+            it is wrong, ask the owner at the contact address above: the owner checks the request, corrects or
+            clears the year, and we keep the time of the correction with it.
           </li>
           <li>
             <strong>Games you play.</strong> For each finished match we keep the game, the players&apos; ids

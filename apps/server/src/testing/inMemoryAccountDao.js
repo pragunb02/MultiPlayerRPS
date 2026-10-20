@@ -114,6 +114,19 @@ export function createInMemoryAccountDao() {
       return { set: true };
     },
 
+    async correctBirthYear({ accountId, birthYear, at }) {
+      const doc = accounts.get(accountId);
+      if (doc === undefined) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      const { birthYear: _old, ...rest } = doc;
+      accounts.set(accountId, {
+        ...rest,
+        ...(birthYear !== undefined && { birthYear }),
+        birthYearCorrectedAt: new Date(at),
+      });
+    },
+
     async listBirthYears(accountIds) {
       return accountIds
         .map((accountId) => accounts.get(accountId))

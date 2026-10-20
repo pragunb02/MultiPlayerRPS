@@ -5,7 +5,6 @@ import {
   isAvatarId,
   PROFILE_VISIBILITY,
 } from "@classicade/shared";
-import { isAccountId } from "../../models/identity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../utils/errors.js";
 import { canPickAvatar } from "./avatarRules.js";
@@ -32,23 +31,23 @@ const visibilityOf = (profile) => profile.visibility ?? DEFAULT_PROFILE_VISIBILI
  *
  * @param {{
  *   profileAccessor: ReturnType<typeof import("../../data/profileAccessor.js").createProfileAccessor>,
- *   ages: { adultsAmong: (query: { playerIds: string[], now: number }) => Promise<ReadonlySet<string>> },
+ *   safety: Pick<ReturnType<typeof import("../safety/safetyComponent.js").createSafetyComponent>, "policyFor">,  the
+ *     age policy: `publicProfile` says who may go public, `profileLink` whose profile shows a name (CC-152)
  *   accounts: { profileOf: (query: { playerId: string, now: number }) => Promise<Readonly<{ username: string }>> },
  *   progress: { getProgress: (playerId: string) => Promise<Readonly<{ level: number, matchesPlayed: number, wins: number }>> },
  *   ratings: { ratingsOf: (query: { gameId: string, playerIds: ReadonlyArray<string>, matchId: string }) => Promise<ReadonlyArray<Readonly<{ rating: number, games: number, provisional: boolean }>>> },
  * }} deps  `accounts` gives an adult's username, `progress` their level and games, `ratings` their chess rating
  *   (CC-042)
  */
-export function createProfileComponent({ profileAccessor, ages, accounts, progress, ratings }) {
+export function createProfileComponent({ profileAccessor, safety, accounts, progress, ratings }) {
   assertDefined(profileAccessor, "profileAccessor");
-  assertFunction(ages?.adultsAmong, "ages.adultsAmong");
+  assertFunction(safety?.policyFor, "safety.policyFor");
   assertFunction(accounts?.profileOf, "accounts.profileOf");
   assertFunction(progress?.getProgress, "progress.getProgress");
   assertFunction(ratings?.ratingsOf, "ratings.ratingsOf");
 
-  /** Whether the player is an account surely 18 or older. Guests never are (ADR-028.1). */
-  const isAdult = async (playerId, now) =>
-    isAccountId(playerId) && (await ages.adultsAmong({ playerIds: [playerId], now })).has(playerId);
+  /** The player's age policy (CC-152). Guests and anyone not surely an adult get the minor's (ADR-028.1). */
+  const policyOf = (playerId, now) => safety.policyFor({ playerId, now });
 
   /** The player's own view of their profile. */
   async function ownView(profile, now) {
@@ -56,7 +55,7 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
       handle: profile.handle,
       ...avatarField(profile),
       visibility: visibilityOf(profile),
-      canBePublic: await isAdult(profile.playerId, now),
+      canBePublic: (await policyOf(profile.playerId, now)).publicProfile,
     });
   }
 
@@ -123,7 +122,7 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
       if (typeof visibility !== "string" || !VISIBILITIES.has(visibility)) {
         throw new ValidationError("Choose public or private", { details: { field: "visibility" } });
       }
-      if (visibility === PROFILE_VISIBILITY.PUBLIC && !(await isAdult(player.id, now))) {
+      if (visibility === PROFILE_VISIBILITY.PUBLIC && !(await policyOf(player.id, now)).publicProfile) {
         throw new ForbiddenError("Only players aged 18 or over can make their profile public");
       }
       return ownView(
@@ -145,7 +144,7 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
       const profile = await profileAccessor.getByHandle(handle).catch((err) => {
         throw err instanceof NotFoundError ? notFound(err) : err;
       });
-      if (!(await isAdult(profile.playerId, now))) throw notFound();
+      if (!(await policyOf(profile.playerId, now)).profileLink) throw notFound();
       return Object.freeze({
         playerId: profile.playerId,
         displayName: await usernameOf(profile.playerId, now),
@@ -177,7 +176,7 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
       const { playerId } = profile;
       const own = viewerId !== "" && viewerId === playerId;
       const base = { handle, ...(own && { own: true }) };
-      if (!(await isAdult(playerId, now))) {
+      if (!(await policyOf(playerId, now)).profileLink) {
         return Object.freeze({
           ...base,
           hidden: true,

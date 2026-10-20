@@ -14,6 +14,7 @@ const NON_ASCII = "[^\\x00-\\x7F]";
  * @property {Date} createdAt
  * @property {number} sessionVersion  counted up to sign out every session made before (CC-116)
  * @property {number} [birthYear]    only when the player stated one, a four digit year and never a date (CC-152)
+ * @property {Date} [birthYearCorrectedAt]  when the owner last corrected the year on request (CC-152)
  */
 
 const accountSchema = new mongoose.Schema(
@@ -26,6 +27,8 @@ const accountSchema = new mongoose.Schema(
     sessionVersion: { type: Number, required: true, default: 0 },
     // Left out when the player did not say. An unknown age counts as a minor (ADR-028).
     birthYear: { type: Number },
+    // Only when the owner corrected the year on request (CC-152, ADR-048.9).
+    birthYearCorrectedAt: { type: Date },
   },
   { collection: "accounts", versionKey: false },
 );
@@ -41,6 +44,7 @@ const toDoc = (doc) => ({
   // Accounts made before CC-116 have no version stored. Their sessions were all made at version 0.
   sessionVersion: doc.sessionVersion ?? 0,
   ...(typeof doc.birthYear === "number" && { birthYear: doc.birthYear }),
+  ...(doc.birthYearCorrectedAt instanceof Date && { birthYearCorrectedAt: doc.birthYearCorrectedAt }),
 });
 
 const isId = (accountId) => mongoose.isValidObjectId(accountId);
@@ -225,6 +229,27 @@ export function createAccountDao({ connection }) {
         throw new RangeError(`No account ${accountId}`);
       }
       return { set: false };
+    },
+
+    /**
+     * The owner's correction of a birth year (CC-152, ADR-048.9): sets it, or clears it when `birthYear` is left out,
+     * whatever was there, and records when. Only the owner console calls this.
+     *
+     * @param {{ accountId: string, birthYear?: number, at: Date }} change
+     * @throws {RangeError} when absent
+     */
+    async correctBirthYear({ accountId, birthYear, at }) {
+      if (!isId(accountId)) {
+        throw new RangeError(`No account ${accountId}`);
+      }
+      const update =
+        birthYear === undefined
+          ? { $unset: { birthYear: "" }, $set: { birthYearCorrectedAt: at } }
+          : { $set: { birthYear, birthYearCorrectedAt: at } };
+      const updated = await Account.updateOne({ _id: accountId }, update);
+      if (updated.matchedCount === 0) {
+        throw new RangeError(`No account ${accountId}`);
+      }
     },
 
     /**

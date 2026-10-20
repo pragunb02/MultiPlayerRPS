@@ -1,6 +1,7 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
+import { safetyFromAdults } from "../../testing/fakeSafety.js";
 import { ERROR_CODES } from "@classicade/shared";
 import { createFeedbackAccessor } from "../../data/feedbackAccessor.js";
 import { createFeedbackComponent } from "../../domain/feedback/feedbackComponent.js";
@@ -23,7 +24,7 @@ async function inbox(items = []) {
   let counter = 0;
   const feedbackComponent = createFeedbackComponent({
     feedbackAccessor: createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() }),
-    ages: { adultsAmong: async () => new Set() },
+    safety: safetyFromAdults(async () => new Set()),
     // The items here are sent by visitors, and some carry a reply email.
     replyEmailOnlyForAdults: false,
     newFeedbackId: () => `00000000-0000-4000-a000-${String(++counter).padStart(12, "0")}`,

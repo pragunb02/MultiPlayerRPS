@@ -47,6 +47,7 @@ export const ROUTES = Object.freeze({
   ADMIN_SECTION: "admin/:section",
   ADMIN_FEEDBACK: "admin/feedback",
   ADMIN_REPORTS: "admin/reports",
+  ADMIN_AGES: "admin/ages",
 });
 
 /** The owner console's pages after its overview, in tab order (CC-233). Each is the URL segment after /admin. */
@@ -181,6 +182,8 @@ export const paths = Object.freeze({
    * @param {{ status?: string, page?: string }} [filters]  open and the first page when left out
    */
   adminReports: (filters = {}) => `/admin/reports${queryOf(filters, ["status", "page"])}`,
+  /** The console's year of birth corrections (CC-152). */
+  adminAges: () => "/admin/ages",
 });
 
 /**
