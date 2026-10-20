@@ -21,6 +21,7 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 | [docs/PROGRESS.md](docs/PROGRESS.md)             | Current phase, in-flight work, dated changelog                                                   | **Every working session**       |
 | [docs/changes/](docs/changes/README.md)          | Changelog fragments: one `CC-###.md` per PR, folded into PROGRESS.md and the board (CC-299)      | Every PR that changes a ticket  |
 | [docs/DECISIONS.md](docs/DECISIONS.md)           | Architecture/product decision records (ADRs)                                                     | A decision is made or reversed  |
+| [docs/PROCESS.md](docs/PROCESS.md)               | Ticket process, shaping to review (CC-311). Open decisions for the owner: `DECISIONS-PENDING.md` | The process changes             |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)         | **Production**: Render settings, env vars, pre/post-merge checks, rollback, incidents            | Deploy setup changes            |
 | [docs/ENGINEERING.md](docs/ENGINEERING.md)       | **How to write code**: layers, principles, patterns, coding/testing standards, dependency policy | Standards change                |
 | [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)     | Audit findings (`BUG-*`, `SEC-*`, `DEBT-*`)                                                      | Issue found or fixed            |
@@ -64,11 +65,29 @@ These rules come first. Where they differ from anything below, they win.
    (phone and desktop layouts, plain words, accessibility, the look and feel domain). Each finding is checked by a second
    agent that tries to refute it. Confirmed findings are fixed, or written down with a reason, before the merge.
 
+### Decision-first tickets (owner, 2026-10-20, CC-311, ADR-072)
+
+Detail in [docs/PROCESS.md](docs/PROCESS.md).
+
+1. **Decision gate.** No builder starts until every open decision in the ticket is answered by the owner or its
+   default date has passed. CI checks tickets at Ready or later.
+2. **Owner decision list.** The coordinator batches open decisions from all tickets into `docs/DECISIONS-PENDING.md`,
+   each with options and a recommended default. The owner answers once; answers go into the ticket and the ADR.
+3. **Shaping interview.** The coordinator asks the owner all of a ticket's questions together (copy, defaults,
+   privacy) before writing the spec.
+4. **Spec review.** The review lenses (code, security, design, then a skeptic) review the filled ticket before
+   build, and the code after it against the ticket's acceptance criteria. Block only on correctness, security or a
+   missing requirement.
+5. **Appetite.** Going over the appetite means cutting scope, not extending the build.
+6. **Files touched.** The coordinator never runs two builders on overlapping areas.
+7. **Flags.** New player-facing features ship behind a flag (CC-312, coming), each with a removal date.
+
 ### Workflow rules
 
 1. Before starting work, read `docs/PROGRESS.md` and the ticket on `docs/BACKLOG.md`.
 2. **No untracked work**: anything new (including bugs found along the way) gets a ticket with the next free ID first.
-3. Starting a ticket: create `docs/tickets/CC-###.md` from the template. Every ticket gets a file; a small one
+3. Starting a ticket: create `docs/tickets/CC-###.md` from `TEMPLATE.md`, or `TEMPLATE-lite.md` for work you can
+   describe in one sentence (CC-311). Every ticket gets a file; a small one
    (under about an hour) gets Root cause and a short Research note (working agreement rule 4). The board's 🟦
    comes from the PR's fragment (rule 5), or from the coordinator at dispatch.
 4. Branch `cc-###-short-name`. Every commit message starts with the ticket ID: `CC-007: fix RPS Scissors mismatch (BUG-01)`.

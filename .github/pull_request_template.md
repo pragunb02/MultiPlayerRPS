@@ -6,13 +6,23 @@ CC-### — <title> · `docs/tickets/CC-###.md`
 
 -
 
+## Acceptance criteria and evidence
+
+<!-- One row per AC in the ticket (docs/tickets/CC-###.md). Reviewers check the code against these rows (CC-311).
+An AC that is not met is cut (say why, and where it went) or blocks the merge. Lite tickets have one or two rows. -->
+
+| AC   | Criterion (Given / When / Then, short) | Test that proves it | Evidence (link, screenshot, request and response, test run) |
+| ---- | -------------------------------------- | ------------------- | ----------------------------------------------------------- |
+| AC-1 |                                        |                     |                                                             |
+
 ## Verification
 
 - [ ] CI green (all required checks, branch up to date with `main`)
+- [ ] Every AC above has a test and evidence, and the ticket's Status says Building or later
 - [ ] Ran it for real (what was checked):
 - [ ] Changelog fragment `docs/changes/CC-###.md` added; PROGRESS.md, board rows and next free lines untouched (CC-299)
 
-## Evidence (required: show it working, not just that tests pass)
+## Evidence (required: show it working, not just that tests pass; link each item from its AC row above)
 
 <!-- Images live on the `pr-evidence` branch (docs/pr-evidence/README.md), never on main. No real player's name,
 email, id or session in any image or response: use test accounts only. -->

@@ -89,6 +89,44 @@ the owner may change it.
   to `main` runs CI a third time on the same commit, which Render waits for. A queue run that hangs leaves the queue
   at the 30 minute timeout. An emergency merge disables the ruleset for the moment.
 
+### ADR-072 — Decision-first tickets: open decisions answered before build, two templates, a CI gate
+
+- **Status:** Accepted · 2026-10-20 (owner approved the process upgrade from research.
+  [CC-311](tickets/CC-311.md), research there. Detail in [PROCESS.md](PROCESS.md))
+- **Context.** Builders started tickets with questions still open (copy, defaults, privacy), guessed, and the owner
+  changed the answer in review, so the work was built twice. Questions reached the owner one at a time from many
+  tickets. Tickets had no appetite, no measurable acceptance criteria and no rollout or review after launch.
+- **Decision.**
+  1. **Two templates.** The full one (`docs/tickets/TEMPLATE.md`) in Shape Up order with product and safety
+     sections: problem, job to be done, appetite and cut line, sketch, non-goals, rabbit holes, an Open decisions
+     table (question, options, recommended default, owner answer, the day the default applies), Given/When/Then
+     acceptance criteria with ids that name tests, definition of done, one primary and one guardrail metric,
+     ADR-034 instrumentation, a four-question threat model, a privacy checklist with minors (ADR-028),
+     alternatives, interfaces with contract tests, files touched, test plan, rollout with flag and removal date,
+     pre-mortem, research, tasks and a post-launch review. The lite one (`TEMPLATE-lite.md`) for one-sentence work:
+     problem, fix, acceptance criteria, test, files.
+  2. **Statuses in words** in the ticket file: Shaping, Spec review, Ready, Building, Rolling out, Done, Reviewed.
+     The board keeps its own four (todo, in progress, blocked, done), set by fragments.
+  3. **The decision gate.** No builder starts until every open decision is answered or its default day has passed.
+     CI checks it on every pull request (`node scripts/bin/check-tickets.mjs` in the `Changelog fragments` job): a
+     ticket at Ready or later fails on an incomplete Open decisions row, an unanswered row before its default day,
+     no acceptance criterion with an id, or an id used twice.
+  4. **One owner decision list**, `docs/DECISIONS-PENDING.md`, kept by the coordinator, answered once. Answers go
+     into the ticket and the ADR. Before writing a spec the coordinator asks the owner all of the ticket's questions
+     in one message (the shaping interview).
+  5. **Spec review.** The review lenses (code, security, design, then the skeptic) read the filled ticket before
+     build and the code after it, against the acceptance criteria, which the PR template now lists with their
+     evidence. They block only on correctness, security or a missing requirement.
+  6. **Appetite is a budget.** Over it, scope is cut at the cut line.
+  7. **Files touched** are listed so the coordinator never runs two builders on overlapping areas.
+  8. **Flags.** New player-facing features ship behind a flag with a removal date (CC-312).
+- **Why.** An answer asked for before build costs one message; after build it costs a second build. A default with
+  a date keeps work moving when the owner is busy, and the owner may still change it. Not chosen: a check that
+  the default was picked by the owner (the default day is the owner's chosen trade-off), and checking older
+  tickets, which use emoji statuses and were written to the old template.
+- **Consequences.** A ticket takes longer to start and shorter to finish. The coordinator keeps one more file. The
+  check is text only: it can see that a row is answered, not that the answer is good, which is spec review's job.
+
 ### ADR-068 — Changelog fragments, folded by the coordinator, and numbers assigned at dispatch
 
 - **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-299](tickets/CC-299.md), research there)
