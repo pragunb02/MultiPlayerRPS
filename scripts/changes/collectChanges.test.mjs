@@ -9,6 +9,7 @@ import {
   isFragmentName,
   parseFragment,
   renderLine,
+  parseOptions,
   withMergedPr,
 } from "./collectChanges.mjs";
 
@@ -73,6 +74,25 @@ const collect = (/** @type {Partial<Parameters<typeof collectChanges>[0]>} */ ov
     ticketFiles: [],
     ...overrides,
   });
+
+describe("parseOptions", () => {
+  it("folds by default, checks with --check, and compares with a ref given to --base", () => {
+    expect(parseOptions([])).toEqual({ check: false, base: "" });
+    expect(parseOptions(["--check"])).toEqual({ check: true, base: "" });
+    expect(parseOptions(["--base", "HEAD^1", "--check"])).toEqual({ check: true, base: "HEAD^1" });
+  });
+
+  it.each([
+    [["--bogus"]],
+    [["--check", "--check"]],
+    [["--base", "HEAD^1"]],
+    [["--check", "--base"]],
+    [["--check", "--base", "--upload-pack=x"]],
+    [["--check", "--base", "main; rm"]],
+  ])("rejects %j", (argv) => {
+    expect(() => parseOptions(argv)).toThrow(OpsError);
+  });
+});
 
 describe("isFragmentName", () => {
   it("accepts a ticket ID file and nothing else", () => {
@@ -335,6 +355,28 @@ describe("collectChanges, the board", () => {
     });
 
     expect(rowOf(collect({ fragments: [done] }).backlog, "CC-311")?.[7]).toBe("ADR-068, done in #4");
+  });
+
+  it("replaces a links cell that holds only a dash", () => {
+    const board = backlog().replace("| ⬜ Todo | CC-289 |", "| ⬜ Todo | — |");
+    const done = fragment({
+      front: ["ticket: CC-310", "date: 2026-10-21", "type: bug", "status: done", "adrs: []", "pr: 5"],
+    });
+
+    expect(rowOf(collect({ backlog: board, fragments: [done] }).backlog, "CC-310")?.[7]).toBe("done in #5");
+  });
+
+  it("adds a new row under the header of a table that has no rows yet, and fails with no table at all", () => {
+    const front = ["ticket: CC-320", "date: 2026-10-21", "type: test", "status: todo", "adrs: []"];
+    const added = fragment({ ticket: "CC-320", front, body: "Started.\n| CC-320 | x | |" });
+    const empty = "# Backlog\n\n| ID | Status | Links |\n| -- | ------ | ----- |\n";
+
+    expect(collect({ backlog: empty, fragments: [added] }).backlog.split("\n")[4]).toBe(
+      "| CC-320 | ⬜ Todo |  |",
+    );
+    expect(() => collect({ backlog: "# Backlog\n", fragments: [added] })).toThrow(
+      /CC-320 is not on the board/,
+    );
   });
 
   it("replaces a row with the fragment's own row, then applies the status", () => {
