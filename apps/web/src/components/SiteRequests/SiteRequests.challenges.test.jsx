@@ -90,7 +90,8 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     });
     push(sentToYou());
 
-    await user.click(within(popup()).getByRole("button", { name: "Accept and go" }));
+    const question = await screen.findByRole("region", { name: "Challenge" }, { timeout: 3_000 });
+    await user.click(within(question).getByRole("button", { name: "Accept and go" }));
 
     expect(api.acceptChallenge).toHaveBeenCalledWith("c0000000000000000001");
     await waitFor(() => expect(url()).toBe("/games/chess/rooms/ZZ2CD3"), { timeout: 3_000 });
