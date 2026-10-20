@@ -6,6 +6,8 @@ import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "../data/blockAccessor.js";
+import { createFriendAccessor } from "../data/friendAccessor.js";
+import { createPrivacyAccessor } from "../data/privacyAccessor.js";
 import { createFeedbackAccessor } from "../data/feedbackAccessor.js";
 import { createDailyPuzzleAccessor } from "../data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "../data/chessRatingAccessor.js";
@@ -56,6 +58,7 @@ import {
   keepFinishedGameIn,
   matchPipelineSteps,
   roomErasure,
+  wireFriends,
 } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionCheck, createSessionMiddleware } from "../service/http/session.js";
@@ -70,6 +73,12 @@ import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.js";
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
+import {
+  createInMemoryFriendLinkDao,
+  createInMemoryFriendRequestDao,
+  createInMemoryFriendshipDao,
+  createInMemoryPrivacyDao,
+} from "./inMemoryFriendDaos.js";
 import { createInMemoryProfileDao } from "./inMemoryProfileDao.js";
 import { createInMemoryFeedbackDao } from "./inMemoryFeedbackDao.js";
 import { TEST_CHESS_PUZZLES } from "./dailyPuzzleSet.js";
@@ -117,6 +126,8 @@ import { testConfig } from "./testConfig.js";
  *     part in deleting an account (e.g. one that fails, CC-035)
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
  *   profileLimits?: object,   the limits on profile lookups and changes (CC-034)
+ *   friendLimits?: object,   the limits on friend requests, changes and link lookups (CC-052)
+ *   friendRules?: object,   the friends rules (FRIEND_LIMITS), such as how many requests may wait (CC-052)
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   daily puzzle moves and hints per player (CC-144)
  *   chessPuzzles?: ReadonlyArray<object>,   the daily chess puzzles, two known ones unless a test gives its own
@@ -145,6 +156,8 @@ export function createTestApp({
   dataParticipants = (participants) => participants,
   blockLimits,
   profileLimits,
+  friendLimits,
+  friendRules,
   feedbackLimits,
   dailyPuzzleLimit,
   chessPuzzles = TEST_CHESS_PUZZLES,
@@ -202,6 +215,8 @@ export function createTestApp({
     matches: matchComponent,
     transfers: playerTransferAccessor,
     seatIds,
+    // As in the composition root: friends are made after the rooms they read (CC-052).
+    followers: [{ name: "friends", playersBlocked: (pair) => friends.friendComponent.playersBlocked(pair) }],
   });
   const dailyPuzzleComponent = createDailyPuzzleComponent({
     dailyPuzzleAccessor: createDailyPuzzleAccessor({ attemptDao: dailyPuzzleAttemptDao, catalogues: {} }),
@@ -294,6 +309,25 @@ export function createTestApp({
     avatars: profileCards,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  const friends = wireFriends({
+    friendAccessor: createFriendAccessor({
+      friendshipDao: createInMemoryFriendshipDao(),
+      friendRequestDao: createInMemoryFriendRequestDao(),
+      friendLinkDao: createInMemoryFriendLinkDao(),
+    }),
+    privacyAccessor: createPrivacyAccessor({ privacyDao: createInMemoryPrivacyDao() }),
+    profileAccessor,
+    roomAccessor,
+    roomComponent,
+    matchComponent,
+    transfers: playerTransferAccessor,
+    seatIds,
+    blocks: blockComponent,
+    accountComponent,
+    safety: safetyComponent,
+    domainEvents,
+    limits: friendRules,
+  });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
   const botDriver = createBotDriver({
     roomComponent,
@@ -364,6 +398,11 @@ export function createTestApp({
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
       {
+        name: "friends",
+        erasePlayer: friends.friendComponent.erasePlayer,
+        exportPlayer: friends.friendComponent.exportPlayer,
+      },
+      {
         name: "dailyPuzzles",
         erasePlayer: dailyPuzzleComponent.erasePlayer,
         exportPlayer: dailyPuzzleComponent.exportPlayer,
@@ -405,6 +444,8 @@ export function createTestApp({
     blockLimits,
     profileComponent,
     profileLimits,
+    friendComponent: friends.friendComponent,
+    friendLimits,
     feedbackComponent,
     feedbackLimits,
     dailyPuzzleComponent,
@@ -448,6 +489,7 @@ export function createTestApp({
     chessRatingComponent,
     blockComponent,
     profileComponent,
+    friends,
     feedbackComponent,
     dailyPuzzleComponent,
     matchPipeline,
@@ -501,6 +543,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     botComponent: testApp.botComponent,
     chessRatingComponent: testApp.chessRatingComponent,
     ...(options.metrics?.recordSocketEvent && { recordSocketEvent: options.metrics.recordSocketEvent }),
+    friends: testApp.friends,
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));
