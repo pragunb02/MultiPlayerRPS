@@ -92,15 +92,42 @@
   justify-items: center;
   gap: var(--space-2);
 }
-/* The card takes the result's colour: gold for a win, neutral for a loss (the words say which). */
-.win {
+/* The card takes the outcome's tone (CC-163): gold for both wins, with the glow only for a win earned on the
+   board, and neutral for a loss, never red (the words say which). A draw keeps the primary look. */
+.outcome[data-cc-tone="win"] {
   border-color: var(--color-tier-gold);
   box-shadow: var(--glow-gold);
 }
-.loss {
+.outcome[data-cc-tone="quiet-win"] {
+  border-color: var(--color-tier-gold);
+  box-shadow: var(--shadow-sm);
+}
+.outcome[data-cc-tone="gentle-loss"] {
   background: var(--color-surface-raised);
   border-color: var(--color-border);
   box-shadow: var(--shadow-sm);
+}
+/* The line under the headline: the Hinglish line, and the English one under it. */
+.line {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  max-width: 32rem;
+}
+.line span:last-child {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+/* The board, on the stage. */
+.board {
+  display: grid;
+  min-width: 0;
+}
+/* After a loss the board's colours soften once and stay so (CC-163). It is one still change, never a flash, so it is
+   the same with reduced motion. It takes colour away but keeps how light each part is, so every text on the board
+   keeps its AA contrast. A fade of the whole board to 85 % opacity, as first planned, failed that. */
+.dimmed {
+  filter: saturate(0.35);
 }
 .again {
   display: inline-block;

@@ -49,13 +49,17 @@ export function ProgressToasts() {
     if (isUncountedMatch(update)) {
       toast.show(notCountedMessage(update.notCountedReason), { tone: "info", category: CATEGORIES.REWARD });
     } else if (leveledUp) {
+      // The burst and the fanfare come with the toast. When the toast waits (a result or a question holds the
+      // screen), they wait too, so one beat plays at a time (CC-163).
       toast.show(`Level up! You reached level ${progress.level}`, {
         tone: "success",
         category: CATEGORIES.REWARD,
         ...saveOffer(),
+        onShow: () => {
+          setBurst({ id: ++nextBurst.current, level: progress.level });
+          sound.play(SOUNDS.LEVEL_UP);
+        },
       });
-      setBurst({ id: ++nextBurst.current, level: progress.level });
-      sound.play(SOUNDS.LEVEL_UP);
     } else if (isComputerGame(update)) {
       toast.show(computerXpMessage(update), { tone: "info", category: CATEGORIES.REWARD });
     } else if (xpGained > 0 && source !== "quest") {

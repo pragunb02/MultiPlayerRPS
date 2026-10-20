@@ -34,6 +34,11 @@ describe("notification categories (CC-208)", () => {
     }
   });
 
+  it("files the quiet win and the void note under results, so the result setting governs them (CC-163)", () => {
+    expect(SOUND_CATEGORIES[SOUNDS.WIN_QUIET]).toBe(CATEGORIES.RESULT);
+    expect(SOUND_CATEGORIES[SOUNDS.GAME_VOID]).toBe(CATEGORIES.RESULT);
+  });
+
   it("refuses a category that does not exist, because that is a mistake in the code", () => {
     expect(() => categoryOf("ads")).toThrow("Unknown notification category: ads");
   });

@@ -114,6 +114,8 @@ export const tictactoeEngine = defineEngine({
     return { board: state.board, marks: state.marks, turn: state.turn, winningLine: state.winningLine };
   },
 
+  playersOf: (state) => [...state.players],
+
   activePlayers(state) {
     return state.turn === "" ? [] : [state.turn];
   },

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getGame } from "@classicade/shared";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
+import { momentAnnouncement } from "../../games/outcomeMoment.js";
 import { gameNumber, playReason } from "../../games/roomView.js";
 import { PageTitle } from "../PageTitle.jsx";
 import { MatchAnnouncer } from "./MatchAnnouncer.jsx";
@@ -45,11 +46,12 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  *
  * 1. Banner: whatever must sit above the match bar, such as the request banner.
  * 2. Match bar: the game's icon and name, and a short score line when there is one.
- * 3. Result: at the end, the headline, its celebration and a note, with the action bar inside the card.
+ * 3. Result: at the end, the outcome moment (CC-163): its celebration, the headline and the line under it, and a
+ *    note, in the tone of how the game ended, with the action bar inside the card.
  * 4. Stage: the board, or whatever covers it.
  * 5. Action bar: under the stage while the game is on.
  * 6. Side column: the players, and the game's own panel.
- * 7. Announcer: the result is read out urgently.
+ * 7. Announcer: the result's headline and line are read out urgently.
  *
  * @param {{
  *   pageTitle: string,
@@ -59,13 +61,18 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  *   request?: string,
  *   banner?: import("react").ReactNode,
  *   score?: string,
- *   result?: { tone: string, headline: string, celebration?: import("react").ReactNode, note?: import("react").ReactNode, footer?: import("react").ReactNode },
+ *   result?: {
+ *     moment: Readonly<import("../../games/outcomeMoment.js").OutcomeMoment>,
+ *     celebration?: import("react").ReactNode,
+ *     note?: import("react").ReactNode,
+ *     footer?: import("react").ReactNode,
+ *   },
  *   stage: import("react").ReactNode,
  *   actionBar: import("react").ReactNode,
  *   side: import("react").ReactNode,
  * }} props  `phase` and `request` are written on the frame for tests and telemetry. `result` is given once the
- *   game is over, and its `tone` is one of the card's colours: win, loss, draw or watched. Its `footer` goes under the
- *   action bar inside the card, such as the share buttons
+ *   game is over, with the game's outcome moment (outcomeMoment), whose tone colours the card. Its `footer` goes
+ *   under the action bar inside the card, such as the share buttons
  */
 export function MatchFrame({
   pageTitle,
@@ -81,7 +88,7 @@ export function MatchFrame({
   side,
 }) {
   return (
-    <MatchAnnouncer urgent={result ? result.headline : ""}>
+    <MatchAnnouncer urgent={result ? momentAnnouncement(result.moment) : ""}>
       <section className={styles.shell} data-cc-phase={phase} data-cc-request={request}>
         <PageTitle>{pageTitle}</PageTitle>
         {banner}
@@ -97,13 +104,19 @@ export function MatchFrame({
           <div className={styles.main}>
             {result && (
               <section
-                className={`${styles.outcome} ${styles[result.tone]}`}
+                className={styles.outcome}
                 aria-labelledby="result-heading"
                 data-cc-slot="result"
+                data-cc-tone={result.moment.tone}
               >
                 <div className={styles.headline}>
                   {result.celebration}
-                  <h2 id="result-heading">{result.headline}</h2>
+                  <h2 id="result-heading">{result.moment.headline}</h2>
+                  {/* Hinglish first and English under it, like every line of feeling (ADR-051). */}
+                  <p className={styles.line} data-cc-outcome-line="">
+                    <span>{result.moment.line.hinglish}</span>
+                    <span>{result.moment.line.english}</span>
+                  </p>
                   {result.note}
                 </div>
                 {actionBar}

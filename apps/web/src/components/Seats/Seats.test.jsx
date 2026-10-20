@@ -150,7 +150,12 @@ describe("Seats: blocking from a seat (CC-044)", () => {
       displayName: "Rocky",
       bot: { character: "rocky", level: "hard" },
     });
-    const standIn = seat({ playerId: "deleted_6c1d", displayName: "Deleted player" });
+    // Seats are named by opaque seat ids (CC-253), so the stand-in is known by its label, not its id.
+    const standIn = seat({
+      playerId: "seatOfTheStandIn000000",
+      displayName: "Deleted player",
+      deleted: true,
+    });
     const { update } = mount(blockable({ players: { min: 2, max: 4 }, seats: [ALICE, BOB, rocky, standIn] }));
 
     expect(
