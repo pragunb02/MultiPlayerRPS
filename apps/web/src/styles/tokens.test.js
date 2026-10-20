@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { contrastRatio, parseColour } from "./contrast.js";
@@ -12,24 +12,45 @@ import {
   TYPE_ROLES,
 } from "./tokenRoles.js";
 
-// tokens.css is the only source of the values (CC-314). These tests read it as text, the way a browser would, with
-// the dark theme's values laid over the light ones.
-const SOURCE = readFileSync(path.join(import.meta.dirname, "tokens.css"), "utf8").replace(
-  /\/\*[\s\S]*?\*\//g,
-  "",
+// The token files are the only source of the values (CC-314): tokens.css imports one file per role from tokens/.
+// These tests read them as text, the way a browser would, with the dark theme's values laid over the light ones.
+const FOLDER = path.join(import.meta.dirname, "tokens");
+const uncommented = (css) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+const ROLE_FILES = Object.fromEntries(
+  readdirSync(FOLDER)
+    .filter((file) => file.endsWith(".css"))
+    .map((file) => [file, uncommented(readFileSync(path.join(FOLDER, file), "utf8"))]),
 );
+const ENTRY = uncommented(readFileSync(path.join(import.meta.dirname, "tokens.css"), "utf8"));
 
 const declarations = (block) =>
   Object.fromEntries(
     [...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]),
   );
+const lightOf = (css) =>
+  declarations([...css.matchAll(/^:root\s*\{([\s\S]*?)^\}/gm)].map(([, body]) => body).join(""));
+const darkOf = (css) =>
+  declarations(
+    [...css.matchAll(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([\s\S]*?)\}\s*\}/g)]
+      .map(([, body]) => body)
+      .join(""),
+  );
 
-const LIGHT = declarations(/^:root\s*\{([\s\S]*?)^\}/m.exec(SOURCE)[1]);
-const DARK = {
-  ...LIGHT,
-  ...declarations(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([\s\S]*?)\}\s*\}/.exec(SOURCE)[1]),
-};
+const SOURCE = Object.values(ROLE_FILES).join("\n");
+const LIGHT = lightOf(SOURCE);
+const DARK = { ...LIGHT, ...darkOf(SOURCE) };
 const THEMES = Object.freeze({ light: LIGHT, dark: DARK });
+
+// Which file holds which tokens, so retuning a role (a palette refresh, a type scale, deeper glows) changes values in
+// that one file and nowhere else.
+const OWNERS = Object.freeze([
+  ["palette.css", /^--(color-|gradient-|grid-line)/],
+  ["type.css", /^--(font-|text-|type-|leading-)/],
+  ["space.css", /^--(space-|radius-|content-width)/],
+  ["elevation.css", /^--(shadow-|glow-|elevation-)/],
+  ["layers.css", /^--layer-/],
+  ["motion.css", /^--(duration-|ease-)/],
+]);
 
 /** A token's value with every `var()` alias followed to the end. */
 const valueOf = (theme, name) => {
@@ -63,6 +84,19 @@ describe("tokens.css", () => {
     }
     for (const { token } of [...TYPE_ROLES, ...LEADING_ROLES, ...ELEVATIONS, ...LAYERS]) {
       expect(theme[token], `${token} is missing`).toBeDefined();
+    }
+  });
+
+  it("keeps each role in its own file, which tokens.css imports, so a retune changes one file's values", () => {
+    expect(
+      [...ENTRY.matchAll(/@import "\.\/tokens\/([\w-]+\.css)";/g)].map(([, file]) => file).sort(),
+    ).toEqual(Object.keys(ROLE_FILES).sort());
+    expect(Object.keys(lightOf(ENTRY))).toEqual([]);
+    for (const [file, css] of Object.entries(ROLE_FILES)) {
+      for (const name of Object.keys({ ...lightOf(css), ...darkOf(css) })) {
+        const owner = OWNERS.find(([, pattern]) => pattern.test(name));
+        expect(owner?.[0], `${name} is in ${file}`).toBe(file);
+      }
     }
   });
 

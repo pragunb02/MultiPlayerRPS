@@ -2,7 +2,14 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { checkCss, checkCssFiles, readTokens, RULES, TOKENS_FILE } from "./design/cssTokens.mjs";
+import {
+  checkCss,
+  checkCssFiles,
+  readTokenFiles,
+  readTokens,
+  RULES,
+  TOKENS_FILE,
+} from "./design/cssTokens.mjs";
 import { TOKEN_EXCEPTIONS, TOKEN_EXCEPTIONS_CEILING } from "./design/tokenExceptions.mjs";
 
 const ROOT = path.join(import.meta.dirname, "..");
@@ -117,8 +124,9 @@ describe("the CSS token check", () => {
     expect(problemsIn(css)).toEqual([]);
   });
 
-  it("never checks tokens.css itself", () => {
+  it("never checks the token files themselves", () => {
     expect(problemsIn(".a { color: #fff; z-index: 3; }", TOKENS_FILE)).toEqual([]);
+    expect(problemsIn(":root { --color-bg: #fff; }", "apps/web/src/styles/tokens/palette.css")).toEqual([]);
   });
 
   it("refuses position: fixed outside the contract's pop-up components", () => {
@@ -164,7 +172,7 @@ describe("the exceptions list", () => {
   });
 
   it("holds only entries still needed: each one lets through a raw value that is really there", () => {
-    const tokens = readTokens(readFileSync(path.join(ROOT, TOKENS_FILE), "utf8"));
+    const tokens = readTokens(readTokenFiles(ROOT));
     for (const entry of TOKEN_EXCEPTIONS) {
       const css = readFileSync(path.join(ROOT, entry.file), "utf8");
       const others = TOKEN_EXCEPTIONS.filter((other) => other !== entry);

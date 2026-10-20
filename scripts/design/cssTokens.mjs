@@ -5,7 +5,7 @@ import { CONTRACT_FILE, isPopupComponent } from "../../eslint-rules/popupContrac
 import { TOKEN_EXCEPTIONS } from "./tokenExceptions.mjs";
 
 /**
- * The CSS token check of the design contract (docs/design/CONTRACT.md, CC-314). Outside tokens.css a CSS file may
+ * The CSS token check of the design contract (docs/design/CONTRACT.md, CC-314). Outside the token files a CSS file may
  * not write a raw colour, a raw `z-index`, a raw size in a type, spacing or radius property, a custom property that
  * holds a raw colour or size, or `position: fixed` outside the contract's pop-up components.
  *
@@ -15,8 +15,30 @@ import { TOKEN_EXCEPTIONS } from "./tokenExceptions.mjs";
  * `stylelint.createPlugin`. The rules and their tests stay the same.
  */
 
-/** The one file allowed to hold raw values. */
+/** The tokens' entry file. It imports one file per role from TOKENS_FOLDER. */
 export const TOKENS_FILE = "apps/web/src/styles/tokens.css";
+
+/** The one folder allowed to hold raw values: a file per role, such as the palette or the type scale. */
+export const TOKENS_FOLDER = "apps/web/src/styles/tokens/";
+
+/**
+ * Whether a file is one of the token files, which hold the raw values and are never checked.
+ *
+ * @param {string} file  a path from the repository root
+ * @returns {boolean}
+ */
+export const isTokenFile = (file) => file === TOKENS_FILE || file.startsWith(TOKENS_FOLDER);
+
+/**
+ * The text of every token file, the entry file first, as one stylesheet.
+ *
+ * @param {string} root  the repository root
+ * @returns {string}
+ */
+export function readTokenFiles(root) {
+  const roles = globSync(`${TOKENS_FOLDER}*.css`, { cwd: root }).map((name) => name.replaceAll("\\", "/"));
+  return [TOKENS_FILE, ...roles.sort()].map((file) => readFileSync(join(root, file), "utf8")).join("\n");
+}
 
 /** Every CSS file the check reads. */
 export const CSS_FILES = "apps/web/src/**/*.css";
@@ -96,9 +118,9 @@ const rawColourIn = (property, value) => {
 };
 
 /**
- * Reads the light theme's tokens from tokens.css, so a message can name the token that already holds a raw value.
+ * Reads the light theme's tokens from the token files, so a message can name the token that already holds a raw value.
  *
- * @param {string} css  the text of tokens.css
+ * @param {string} css  the text of the token files, as readTokenFiles gives it
  * @returns {ReadonlyMap<string, ReadonlyArray<string>>} each value and the tokens that hold it
  */
 export function readTokens(css) {
@@ -191,7 +213,7 @@ const excepted = (exceptions, file, property) =>
  */
 
 /**
- * Checks one CSS file against every rule. tokens.css itself is never checked.
+ * Checks one CSS file against every rule. The token files themselves are never checked.
  *
  * @param {{
  *   css: string,
@@ -203,7 +225,7 @@ const excepted = (exceptions, file, property) =>
  * @returns {ReadonlyArray<CssTokenProblem>} Every problem, in order. Empty when the file follows the contract.
  */
 export function checkCss({ css, file, tokens, exceptions = TOKEN_EXCEPTIONS }) {
-  if (file === TOKENS_FILE) return Object.freeze([]);
+  if (isTokenFile(file)) return Object.freeze([]);
   const problems = [];
   postcss.parse(css, { from: file }).walkDecls((decl) => {
     if (excepted(exceptions, file, decl.prop)) return;
@@ -227,7 +249,7 @@ export function checkCss({ css, file, tokens, exceptions = TOKEN_EXCEPTIONS }) {
  * @returns {number} How many problems were found, so the caller can fail the lint run.
  */
 export function checkCssFiles({ root, log }) {
-  const tokens = readTokens(readFileSync(join(root, TOKENS_FILE), "utf8"));
+  const tokens = readTokens(readTokenFiles(root));
   const files = globSync(CSS_FILES, { cwd: root, exclude: (name) => name === "node_modules" });
   let count = 0;
   for (const file of [...files].map((name) => name.replaceAll("\\", "/")).sort()) {

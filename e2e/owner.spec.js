@@ -222,8 +222,11 @@ test.describe("owner console", () => {
     await expect(page.getByText("Your turn", { exact: true })).toBeVisible();
 
     // The real dialog: Tab and Shift+Tab never leave it, the page behind is inert, Escape gives the focus back.
+    // Opened from the keyboard, so the opener has the focus to get back in every engine (Safari does not focus a
+    // button on a click).
     const opener = page.getByRole("button", { name: "Open a dialog" });
-    await opener.click();
+    await opener.focus();
+    await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: "Block Riya?" });
     await expect(dialog).toBeVisible();
     await expect(page.locator("#root")).toHaveAttribute("inert", "");

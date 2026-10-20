@@ -3,7 +3,13 @@
 The rules every screen of ClassiCade follows (CC-314). Builders pick from here, and reviewers quote it. A machine
 checks what it can (`npm run lint`), and the design lens of the review (CC-316) checks the rest.
 
-- **Values** live in one file only: [`apps/web/src/styles/tokens.css`](../../apps/web/src/styles/tokens.css).
+- **Values** live only in the token files, one per role, which
+  [`apps/web/src/styles/tokens.css`](../../apps/web/src/styles/tokens.css) imports from
+  [`styles/tokens/`](../../apps/web/src/styles/tokens/): `palette.css` (every colour, base and role), `type.css`
+  (fonts, sizes, type roles, leading), `space.css` (space and radius), `elevation.css` (shadows, glows, elevation),
+  `layers.css` and `motion.css`. **Retuning a role is a change of values in its one file**: a palette refresh
+  touches `palette.css` only, a deeper glow `elevation.css` only. A test fails when a token sits in another
+  role's file (`tokens.test.js`).
 - **The roles** are named in [`apps/web/src/styles/tokenRoles.js`](../../apps/web/src/styles/tokenRoles.js), which
   the token test and the design page read.
 - **The living page** is `/admin/design` in the owner console, behind the `design_page` flag. It draws every token
@@ -82,20 +88,21 @@ the text grows and shrinks with the picture.
 
 Every `z-index` is one of these. The order is the one the app had before CC-314, written once.
 
-| Token                     | Value | Use                                                 |
-| ------------------------- | ----- | --------------------------------------------------- |
-| `--layer-raised`          | 1     | A badge drawn over its own picture                  |
-| `--layer-banner`          | 10    | A sticky banner, such as a request in a room        |
-| `--layer-tooltip`         | 15    | A button's reason why it cannot act                 |
-| `--layer-toast`           | 20    | The toast column                                    |
-| `--layer-banner-alert`    | 20    | The lost connection strip, over the other banners   |
-| `--layer-dialog`          | 30    | A dialog and its backdrop                           |
-| `--layer-effect`          | 40    | Celebrations that never take a press, the rising XP |
-| `--layer-skip`            | 50    | The skip link, over everything once it has focus    |
-| `--layer-board-piece`     | 1     | Inside the chess board: a piece on its square       |
-| `--layer-board-slide`     | 3     | Inside the chess board: a piece sliding             |
-| `--layer-board-ghost`     | 5     | Inside the chess board: a dragged piece             |
-| `--layer-board-promotion` | 10    | Inside the chess board: the promotion picker        |
+| Token                     | Value | Use                                                   |
+| ------------------------- | ----- | ----------------------------------------------------- |
+| `--layer-raised`          | 1     | A badge drawn over its own picture                    |
+| `--layer-banner`          | 10    | A sticky banner, such as a request in a room          |
+| `--layer-tooltip`         | 15    | A button's reason why it cannot act                   |
+| `--layer-toast`           | 20    | The toast column                                      |
+| `--layer-banner-alert`    | 20    | The lost connection strip, over the other banners     |
+| `--layer-menu`            | 20    | A panel that opens from the header, such as the inbox |
+| `--layer-dialog`          | 30    | A dialog and its backdrop                             |
+| `--layer-effect`          | 40    | Celebrations that never take a press, the rising XP   |
+| `--layer-skip`            | 50    | The skip link, over everything once it has focus      |
+| `--layer-board-piece`     | 1     | Inside the chess board: a piece on its square         |
+| `--layer-board-slide`     | 3     | Inside the chess board: a piece sliding               |
+| `--layer-board-ghost`     | 5     | Inside the chess board: a dragged piece               |
+| `--layer-board-promotion` | 10    | Inside the chess board: the promotion picker          |
 
 ### Motion
 
@@ -188,7 +195,7 @@ The banners that do not need a live region of their own (`RequestBanner`, `SiteR
 
 ## 6. The check
 
-`npm run lint` runs `scripts/check-css-tokens.mjs` over every CSS file of the web app except `tokens.css`. It refuses:
+`npm run lint` runs `scripts/check-css-tokens.mjs` over every CSS file of the web app except the token files. It refuses:
 
 1. **A raw colour**: a hex, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()`, `color()` or a named
    colour. `transparent` and `currentColor` are fine.
@@ -196,7 +203,7 @@ The banners that do not need a live region of their own (`RequestBanner`, `SiteR
 3. **A raw size** in `font-size`, `line-height`, `border-radius`, `gap`, `padding` or `margin` (and their longhands),
    written in `px` or `rem`, also inside `calc()` or a `var()` fallback. Zero, `auto`, percentages, `em`, `ch`,
    viewport units and `calc()` over tokens are fine.
-4. **A custom property** that holds a raw colour or a raw `px` or `rem` size. Values are defined in `tokens.css` only.
+4. **A custom property** that holds a raw colour or a raw `px` or `rem` size. Values are defined in the token files only.
 5. **`position: fixed`** outside the pop-up components above.
 
 Each message names the file, the line and the token to use. When a token already holds the raw value, the message
@@ -233,7 +240,7 @@ a `style` attribute.
 ## 7. Changing the contract
 
 1. Change this file first, in the same pull request as the code: a new role, a new pop-up row, a new exception.
-2. A new token goes in `tokens.css` in both themes, and in `tokenRoles.js` if it is a role, so the token test checks
+2. A new token goes in its role's file under `styles/tokens/`, in both themes, and in `tokenRoles.js` if it is a role, so the token test checks
    its contrast and the design page shows it.
 3. Anything a machine cannot see (is this the right component, is this copy short enough) is the design lens's job in
    review (CC-316), with this file to point at.

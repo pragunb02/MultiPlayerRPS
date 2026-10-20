@@ -79,6 +79,11 @@ export const LAYERS = Object.freeze([
     value: 20,
     use: "The lost connection strip, over other banners.",
   }),
+  Object.freeze({
+    token: "--layer-menu",
+    value: 20,
+    use: "A panel that opens from the header, such as the inbox.",
+  }),
   Object.freeze({ token: "--layer-dialog", value: 30, use: "A dialog and its backdrop." }),
   Object.freeze({ token: "--layer-effect", value: 40, use: "Celebrations that never take a press." }),
   Object.freeze({ token: "--layer-skip", value: 50, use: "The skip link, over everything once focused." }),
