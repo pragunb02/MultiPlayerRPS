@@ -243,6 +243,40 @@ describe("api client", () => {
     expect(player.mock.calls[0][0]).toBe("/api/profiles/a%2Fb");
   });
 
+  it("makes, reads, takes and answers challenges by their id (CC-139)", async () => {
+    const challenge = { id: "a/b", state: "open" };
+    const one = respond(200, { challenge });
+    const made = respond(201, { challenge });
+    const inbox = respond(200, { challenges: [challenge] });
+    const taken = respond(200, { challenge, room: { code: "AB2CD3", gameId: "chess" } });
+
+    expect(
+      await createApiClient({ fetchImpl: made }).createChallenge({ gameId: "chess", options: {} }),
+    ).toEqual(challenge);
+    expect(await createApiClient({ fetchImpl: one }).getChallenge("a/b")).toEqual(challenge);
+    expect(await createApiClient({ fetchImpl: inbox }).getChallenges()).toEqual([challenge]);
+    expect((await createApiClient({ fetchImpl: taken }).acceptChallenge("a/b")).room.code).toBe("AB2CD3");
+    for (const answer of ["declineChallenge", "withdrawChallenge", "challengeLater"]) {
+      expect(await createApiClient({ fetchImpl: one })[answer]("a/b")).toEqual(challenge);
+    }
+
+    expect(made.mock.calls[0]).toEqual([
+      "/api/challenges",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ gameId: "chess", options: {} }) }),
+    ]);
+    expect(inbox.mock.calls[0][0]).toBe("/api/challenges");
+    expect(taken.mock.calls[0]).toEqual([
+      "/api/challenges/a%2Fb/accept",
+      expect.objectContaining({ method: "POST" }),
+    ]);
+    expect(one.mock.calls.map(([url]) => url)).toEqual([
+      "/api/challenges/a%2Fb",
+      "/api/challenges/a%2Fb/decline",
+      "/api/challenges/a%2Fb/withdraw",
+      "/api/challenges/a%2Fb/later",
+    ]);
+  });
+
   it("lists, adds and removes blocks, never with a player id (CC-044)", async () => {
     const listed = respond(200, { blocks: [{ blockId: "b1", displayName: "Bob", blockedAt: 1 }] });
     const added = respond(200, { block: { blockId: "b2", displayName: "Bob", blockedAt: 2 } });

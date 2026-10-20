@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
-import { fakeSocket } from "../../testing/fakes.js";
+import { describe, expect, it, vi } from "vitest";
+import { fakeApi, fakeSocket } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
 
 describe("PlayPage", () => {
@@ -19,6 +19,23 @@ describe("PlayPage", () => {
     expect(api.startGuest).toHaveBeenCalledOnce();
     expect(socket.request).toHaveBeenCalledWith("room:create", { gameId: "rps", options: { bestOf: 5 } });
     expect(await screen.findByText(/Joining room AB2CD3/)).toBeInTheDocument();
+  });
+
+  it("makes a challenge link with the game's options and opens its page (CC-139)", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      createChallenge: vi.fn().mockResolvedValue({ id: "c0000000000000000001" }),
+      getChallenge: vi.fn(() => new Promise(() => {})),
+    });
+    const { url } = renderApp({ path: "/games/rock-paper-scissors", api });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /match length/i }), "5");
+    await user.click(screen.getByRole("button", { name: "Make a challenge link" }));
+
+    expect(api.startGuest).toHaveBeenCalledOnce();
+    expect(api.createChallenge).toHaveBeenCalledWith({ gameId: "rps", options: { bestOf: 5 } });
+    expect(await screen.findByText("Opening the challenge…")).toBeInTheDocument();
+    expect(url()).toBe("/challenge/c0000000000000000001");
   });
 
   it("shows the game's banner with its art and accent", () => {

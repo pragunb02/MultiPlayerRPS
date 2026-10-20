@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GAMES } from "@classicade/shared";
 import {
   friendLinkText,
+  challengeText,
   inviteText,
   RESULT_OUTCOMES,
   resultText,
@@ -111,6 +112,16 @@ describe("friendLinkText (CC-052)", () => {
     expect(hinglish).toBe("ClassiCade pe mere friend bano, phir saath mein khelenge:");
     expect(english).toBe("Be my friend on ClassiCade, then we can play any time:");
     expect(hinglish).not.toMatch(/\baap(ka|ke|ki)?\b/);
+  });
+});
+
+describe("challengeText (CC-139)", () => {
+  it("dares the friend in Hinglish, then in English, and never names the sender", () => {
+    expect(challengeText({ gameId: "chess" })).toBe(
+      "Chess mein mujhse jeet ke dikhao! Link 24 ghante chalega:\nI challenge you to Chess on ClassiCade. The link works for 24 hours",
+    );
+    expect(challengeText({ gameId: "ludo" })).toContain("I challenge you to a game");
+    expect(challengeText({ gameId: "chess" })).not.toMatch(/\baap(ka|ke|ki)?\b/);
   });
 });
 

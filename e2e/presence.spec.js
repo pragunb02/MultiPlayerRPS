@@ -89,12 +89,12 @@ test.describe("the owner's report: a rematch asked of a player who went to anoth
     });
   }
 
-  test("a Decline on another page is shown to Bob at once", async ({ players }) => {
+  test("a Not now on another page is shown to Bob at once", async ({ players }) => {
     const { alice, bob, aliceName } = await finishedRps(players);
     await alice.page.getByRole("link", { name: "ClassiCade home" }).click();
     await bob.page.getByRole("button", { name: "Rematch", exact: true }).click();
 
-    await sitePopup(alice).getByRole("button", { name: "Decline" }).click();
+    await sitePopup(alice).getByRole("button", { name: "Not now" }).click();
 
     await expect(sitePopup(alice)).toHaveCount(0);
     await expect(bob.page.getByText(`${aliceName} declined the rematch`, { exact: true })).toBeVisible();
