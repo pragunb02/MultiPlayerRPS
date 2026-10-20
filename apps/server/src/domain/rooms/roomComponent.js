@@ -587,7 +587,8 @@ export function createRoomComponent({
         game: {
           ...room.game,
           state: renamePlayer(room.game.state, from, to.id),
-          log: renamePlayer(room.game.log, from, to.id),        },
+          log: renamePlayer(room.game.log, from, to.id),
+        },
       }),
     };
   }

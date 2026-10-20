@@ -298,7 +298,9 @@ const CHECKS = Object.freeze([
           active: engine.activePlayers(state),
         }));
         const hidden = JSON.stringify(
-          engine.playersOf(state).reduce((value, id, index) => renamePlayer(value, id, `seat-${index}`), shown),
+          engine
+            .playersOf(state)
+            .reduce((value, id, index) => renamePlayer(value, id, `seat-${index}`), shown),
         );
         for (const player of scenario.players) {
           assert(!hidden.includes(JSON.stringify(player)), `${when}: ${player} is named outside playersOf`);
