@@ -61,7 +61,8 @@ function parseNames(query, isClientFlag) {
  *   POST   /flags/:name/success          204   counts one success on the side the server works out for this player
  *   GET    /admin/flags                  200 { source, days, countsRead, flags }   the console's list
  *   PUT    /admin/flags/:name            200 { flag }   body { rollout: "off" | "on" | 0 to 100 }
- *   DELETE /admin/flags/:name            200 { flag }   back to the rollout in code
+ *   DELETE /admin/flags/:name            200 { flag }   back to the rollout in code. 200 {} for an override left
+ *                                       for a flag removed from the registry, which the list shows in `orphans`
  *
  * The admin routes are behind `requireAdmin`: 404 for anyone else (ADR-036). The bucket a player is in is never
  * part of any answer.

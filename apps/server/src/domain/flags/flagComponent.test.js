@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FLAG_AUDIENCES, FLAG_ROLLOUT } from "@classicade/shared";
 import { createFeatureFlagAccessor } from "../../data/featureFlagAccessor.js";
 import { captureLogger } from "../../testing/captureLogger.js";
@@ -189,6 +189,67 @@ describe("flag component: who gets a flag (CC-312)", () => {
       "removed_flag",
       "server_only",
     ]);
+  });
+
+  it.each([
+    ["set", (flags) => flags.setRollout({ name: "new_lobby", rollout: "off" })],
+    ["cleared", (flags) => flags.clearRollout({ name: "new_lobby" })],
+  ])(
+    "a refresh that was reading while the owner %s a rollout does not undo the change, so the kill switch holds",
+    async (_, change) => {
+      const dao = createInMemoryFeatureFlagDao();
+      await dao.setOverride({ name: "new_lobby", rollout: "on", updatedAt: new Date(T0) });
+      const accessor = createFeatureFlagAccessor({ featureFlagDao: dao });
+      let release;
+      let reads = 0;
+      const flags = createFlagComponent({
+        registry: REGISTRY,
+        flagAccessor: {
+          ...accessor,
+          // The first read is held until the owner's change is done, then answers what it read before it.
+          listOverrides: async () => {
+            reads += 1;
+            if (reads === 1) return accessor.listOverrides();
+            const before = await accessor.listOverrides();
+            await new Promise((resolve) => {
+              release = resolve;
+            });
+            return before;
+          },
+        },
+        keyedIds: createKeyedIds({ secret: "a test key for feature flag buckets, 32+ chars" }),
+        ages: { adultsAmong: async () => new Set() },
+        logger: captureLogger().logger,
+        now: () => T0,
+      });
+      await flags.refresh();
+      expect(await flags.isOn("new_lobby", GUEST)).toBe(true);
+
+      const reading = flags.refresh();
+      await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+      await change(flags);
+      release();
+      await reading;
+
+      expect(await flags.isOn("new_lobby", GUEST)).toBe(false);
+    },
+  );
+
+  it("lists overrides of flags no longer in the registry, warns about each once, and lets the owner clear them", async () => {
+    const { flags, dao, capture } = setup();
+    await dao.setOverride({ name: "removed_flag", rollout: "on", updatedAt: new Date(T0) });
+    await flags.refresh();
+    await flags.refresh();
+
+    expect(capture.find("feature flag override ignored")).toHaveLength(1);
+    expect((await flags.overview()).orphans).toEqual([
+      { name: "removed_flag", rollout: "on", updatedAt: T0 },
+    ]);
+
+    expect(await flags.clearRollout({ name: "removed_flag" })).toBe(true);
+    expect(await dao.listOverrides()).toEqual([]);
+    expect((await flags.overview()).orphans).toEqual([]);
+    await expect(flags.clearRollout({ name: "removed_flag" })).rejects.toThrow(/Unknown feature flag/);
   });
 
   it("falls back to the code's rollout when the database stays down, keeping the last good overrides for a while", async () => {

@@ -30,6 +30,7 @@ const view = (flags = [flag()], fields = {}) => ({
   source: "database",
   days: 30,
   countsRead: true,
+  orphans: [],
   flags,
   ...fields,
 });
@@ -160,6 +161,37 @@ describe("the console's flags (CC-312)", () => {
     );
     expect(percent).toHaveAttribute("aria-invalid", "true");
     expect(api.setFlagRollout).not.toHaveBeenCalled();
+  });
+
+  it("lists overrides left for removed flags, and clears one", async () => {
+    const api = ownerApi({
+      getAdminFlags: vi.fn().mockResolvedValue(
+        view([flag()], {
+          orphans: [
+            { name: "removed_flag", rollout: 40, updatedAt: T0 },
+            { name: "older_flag", rollout: "on", updatedAt: T0 },
+          ],
+        }),
+      ),
+      clearFlagRollout: vi.fn().mockResolvedValue(undefined),
+    });
+    const { user } = await openFlags(api);
+    const left = screen.getByRole("region", { name: "Overrides of removed flags" });
+    expect(within(left).getByText("removed_flag")).toBeVisible();
+    expect(within(left).getByText(/40% of the audience/)).toBeVisible();
+
+    await user.click(within(left).getByRole("button", { name: "Clear removed_flag" }));
+
+    expect(api.clearFlagRollout).toHaveBeenCalledWith("removed_flag");
+    await waitFor(() => expect(within(left).queryByText("removed_flag")).toBeNull());
+    expect(within(left).getByText("older_flag")).toBeVisible();
+    expect(card("new_lobby")).toBeVisible();
+  });
+
+  it("shows no list of removed flags when none are left", async () => {
+    await openFlags();
+
+    expect(screen.queryByRole("region", { name: "Overrides of removed flags" })).toBeNull();
   });
 
   it("says when the database could not be read and every flag uses its rollout in code", async () => {

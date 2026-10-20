@@ -7,7 +7,7 @@ import { useServices } from "../app/servicesContext.js";
  *
  * @returns {{
  *   status: "loading" | "ready" | "error",
- *   view: { source: string, days: number, countsRead: boolean, flags: ReadonlyArray<object> } | undefined,
+ *   view: { source: string, days: number, countsRead: boolean, orphans: ReadonlyArray<object>, flags: ReadonlyArray<object> } | undefined,
  *   error: Error | undefined,
  *   retry: () => void,
  *   setRollout: (name: string, rollout: "off" | "on" | number) => Promise<void>,
@@ -43,7 +43,21 @@ export function useAdminFlags() {
     async (name, rollout) => replace(await api.setFlagRollout(name, rollout)),
     [api],
   );
-  const clearRollout = useCallback(async (name) => replace(await api.clearFlagRollout(name)), [api]);
+  // A flag removed from the registry has no flag to answer with, so its override just leaves the list.
+  const clearRollout = useCallback(
+    async (name) => {
+      const flag = await api.clearFlagRollout(name);
+      if (flag !== undefined) {
+        replace(flag);
+        return;
+      }
+      setShown((current) => ({
+        ...current,
+        view: { ...current.view, orphans: current.view.orphans.filter((each) => each.name !== name) },
+      }));
+    },
+    [api],
+  );
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   const current =

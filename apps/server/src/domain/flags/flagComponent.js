@@ -73,6 +73,20 @@ export function createFlagComponent({
   let lastContact = Number.NEGATIVE_INFINITY;
   /** @type {Map<string, { flag: string, day: string, side: string, exposures: number, successes: number }>} */
   let pending = new Map();
+  /**
+   * Overrides stored for names no longer in the registry, so the console can list them and the owner can clear them.
+   *
+   * @type {Map<string, Readonly<{ rollout: unknown, updatedAt: number }>>}
+   */
+  let orphans = new Map();
+  /** Overrides already warned about, so each is logged once per process and not on every refresh. */
+  const warned = new Set();
+  /**
+   * Counts the owner's changes. A refresh that was reading while one happened may hold what the database had
+   * before it, so it drops its answer rather than undo the change. Each change counts once before its write and
+   * once after, so a read that started during the write is dropped too.
+   */
+  let changes = 0;
 
   /** @param {string} name */
   function flagOf(name) {
@@ -89,6 +103,16 @@ export function createFlagComponent({
       throw new NotFoundError(`Unknown feature flag "${name}"`);
     }
     return byName.get(name);
+  }
+
+  /** Runs an owner's change, so a refresh reading at the same time cannot undo it. */
+  async function ownerChange(change) {
+    changes += 1;
+    try {
+      return await change();
+    } finally {
+      changes += 1;
+    }
   }
 
   const fresh = () => now() - lastContact <= OVERRIDES_STALE_MS;
@@ -143,18 +167,26 @@ export function createFlagComponent({
 
   /** Reads the overrides again. A failure is logged and the ones in memory stay until they are stale. */
   async function refresh() {
+    const changesBefore = changes;
     try {
       const stored = await flagAccessor.listOverrides();
+      lastContact = now();
+      if (changes !== changesBefore) return;
       const next = new Map();
+      const left = new Map();
       stored.forEach(({ name, rollout, updatedAt }) => {
         if (byName.has(name) && isRollout(rollout)) {
           next.set(name, Object.freeze({ rollout, updatedAt }));
-        } else {
+          return;
+        }
+        if (!byName.has(name)) left.set(name, Object.freeze({ rollout, updatedAt }));
+        if (!warned.has(name)) {
+          warned.add(name);
           logger.warn({ flag: name }, "feature flag override ignored");
         }
       });
       overrides = next;
-      lastContact = now();
+      orphans = left;
     } catch (err) {
       logger.warn({ err }, "feature flag overrides not read");
     }
@@ -269,23 +301,26 @@ export function createFlagComponent({
           details: { field: "rollout" },
         });
       }
-      const stored = await flagAccessor.setOverride({ name, rollout, at: now() });
+      const stored = await ownerChange(() => flagAccessor.setOverride({ name, rollout, at: now() }));
       overrides = new Map(overrides).set(name, Object.freeze({ rollout, updatedAt: stored.updatedAt }));
       lastContact = now();
       logger.info({ flag: name, rollout }, "feature flag rollout changed");
     },
 
     /**
-     * Goes back to the rollout in code for a flag.
+     * Goes back to the rollout in code for a flag. It also clears an override left for a flag that has been removed
+     * from the registry, which the console lists in `orphans`.
      *
      * @param {{ name: string }} change
      * @returns {Promise<boolean>} whether there was an override
-     * @throws {NotFoundError} for a name not in the registry
+     * @throws {NotFoundError} for a name neither in the registry nor left over in the database
      */
     async clearRollout({ name }) {
-      knownFlag(name);
-      const cleared = await flagAccessor.clearOverride(name);
+      if (!orphans.has(name)) knownFlag(name);
+      const cleared = await ownerChange(() => flagAccessor.clearOverride(name));
       overrides = new Map([...overrides].filter(([key]) => key !== name));
+      orphans = new Map([...orphans].filter(([key]) => key !== name));
+      warned.delete(name);
       lastContact = now();
       logger.info({ flag: name }, "feature flag rollout back to code");
       return cleared;
@@ -294,7 +329,7 @@ export function createFlagComponent({
     /**
      * Every flag for the owner console: its rules from code, the rollout in use, the override if any, and the last
      * CONSOLE_DAYS of counts per side. `source` says whether overrides are in use ("database") or the database could
-     * not be reached for too long ("code").
+     * not be reached for too long ("code"). `orphans` are overrides left for flags removed from the registry.
      */
     async overview() {
       const today = dayOf(now());
@@ -304,6 +339,9 @@ export function createFlagComponent({
         source: useOverrides ? "database" : "code",
         days: CONSOLE_DAYS,
         countsRead: read,
+        orphans: Object.freeze(
+          [...orphans].map(([name, { rollout, updatedAt }]) => ({ name, rollout, updatedAt })),
+        ),
         flags: Object.freeze(
           registry.map((flag) => {
             const override = useOverrides ? overrides.get(flag.name) : undefined;

@@ -107,8 +107,10 @@ the owner may change it.
   3. **Audiences.** `signed-in` is an account; `adults` uses `accountComponent.adultsAmong` (CC-152's rule, so
      unknown age is not adult); `admins` is the console allowlist (ADR-036.1).
   4. **Overrides** in a new `feature_flags` collection (`name`, `rollout`, `updatedAt`), read into memory every
-     30 seconds. A failed read keeps the last good overrides for 5 minutes, then the code's rollout. Unknown names in
-     the collection are ignored. Changed only by an admin, from the console's Flags tab.
+     30 seconds. A failed read keeps the last good overrides for 5 minutes, then the code's rollout. A read that was
+     on its way while the owner changed a rollout is dropped, so it cannot undo the change. Unknown names in the
+     collection are ignored by the flags, listed in the console and cleared from it. Changed only by an admin, from
+     the console's Flags tab.
   5. **The client gets booleans only**, from `GET /api/flags?names=…` (`no-store`), for flags marked `client`.
   6. **Counts**, ADR-034 style: exposures and successes per flag, India day and side, in a new
      `feature_flag_counts` collection, no id of any kind, kept 90 days. The console shows 30 days with `"<5"` for 1

@@ -112,9 +112,11 @@ rollout in the console's Flags tab, `/admin/flags`, without a deploy.
 7. **Roll back** by setting Off in the console. It applies at once on that server and within 30 seconds anywhere
    else. If the database is unreachable, each server keeps the last overrides for 5 minutes, then uses the code's
    rollout, which is off.
-8. **Remove the flag** by its `removeBy` day, in its own small pull request: delete the old path, the
-   `isOn` or `useFlag` call, the `flagPaths` wrapper and the registry entry, then clear the override in the console.
-   A flag past its day fails CI, so this is never forgotten. Moving the day is a reviewed change with a reason.
+8. **Remove the flag** by its `removeBy` day. First, in the console, press "Use the rollout in code" so no override
+   is left. Then, in its own small pull request, delete the old path, the `isOn` or `useFlag` call, the `flagPaths`
+   wrapper and the registry entry. An override left behind is listed in the Flags tab under "Overrides of removed
+   flags", with a Clear button. A flag past its day fails CI, so this is never forgotten. Moving the day is a
+   reviewed change with a reason.
 
 ## 8. After launch
 

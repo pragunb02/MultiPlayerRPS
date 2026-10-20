@@ -405,8 +405,8 @@ ADR-053)
    `true` or `false` for a flag from `GET /api/flags`, never the rollout, and never their bucket, which is worked out
    from a keyed hash each time and is not stored anywhere.
 5. **Kept for:** until the owner goes back to the rollout in code. A document for a flag no longer in the registry is
-   ignored.
-6. **Deleted by:** the console's "Use the rollout in code" (`DELETE /api/admin/flags/:name`).
+   ignored by the flags, and listed in the Flags tab under "Overrides of removed flags" so the owner can clear it.
+6. **Deleted by:** the console's "Use the rollout in code", or Clear for a removed flag (`DELETE /api/admin/flags/:name`).
 
 ### `feature_flag_counts`
 

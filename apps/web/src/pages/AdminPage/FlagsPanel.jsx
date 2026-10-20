@@ -181,6 +181,47 @@ function Flag({ flag, days, setRollout, clearRollout }) {
   );
 }
 
+/** One override left for a removed flag, with the button that clears it. */
+function Orphan({ orphan, clearRollout }) {
+  const clear = useAction(() => clearRollout(orphan.name), { id: "admin.flags.clear_orphan" });
+  return (
+    <li className={styles.orphan}>
+      <span className={styles.name}>{orphan.name}</span>
+      <span>{`${rolloutText(orphan.rollout)} (set ${setAt(orphan.updatedAt)})`}</span>
+      <Button
+        control="admin.flags.clear_orphan"
+        variant="secondary"
+        action={clear}
+        aria-label={`Clear ${orphan.name}`}
+      >
+        Clear
+      </Button>
+    </li>
+  );
+}
+
+/**
+ * Overrides still stored for flags that were removed from the registry. They do nothing, and clearing them keeps
+ * the database tidy and the logs quiet.
+ */
+function Orphans({ orphans, clearRollout }) {
+  return (
+    <section className={styles.flag} aria-labelledby="orphans-title">
+      <h2 id="orphans-title" className={styles.orphansTitle}>
+        Overrides of removed flags
+      </h2>
+      <p className={styles.description}>
+        These flags are no longer in the code, so their overrides do nothing. Clear each one.
+      </p>
+      <ul className={styles.list}>
+        {orphans.map((orphan) => (
+          <Orphan key={orphan.name} orphan={orphan} clearRollout={clearRollout} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * The flag of this ticket (CC-312), on the page it checks: when it is on for the owner, a line says so, and its
  * button counts the flag's success event.
@@ -263,6 +304,9 @@ export function FlagsPanel() {
               </li>
             ))}
           </ol>
+          {flags.view.orphans.length > 0 && (
+            <Orphans orphans={flags.view.orphans} clearRollout={flags.clearRollout} />
+          )}
         </>
       )}
     </section>

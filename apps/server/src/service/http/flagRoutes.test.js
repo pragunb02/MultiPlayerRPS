@@ -179,6 +179,22 @@ describe("the console's flag routes (CC-312)", () => {
     expect(res.status).toBe(400);
   });
 
+  it("lists an override left for a removed flag, and an admin clears it", async () => {
+    const { app, dao, flagComponent } = setup();
+    await dao.setOverride({ name: "removed_flag", rollout: 40, updatedAt: new Date(Date.UTC(2026, 9, 1)) });
+    await flagComponent.refresh();
+
+    const listed = await get(app, "/api/admin/flags", ADMIN);
+    expect(listed.body.orphans).toEqual([
+      { name: "removed_flag", rollout: 40, updatedAt: Date.UTC(2026, 9, 1) },
+    ]);
+
+    const cleared = await remove(app, "/api/admin/flags/removed_flag", ADMIN);
+    expect(cleared.status).toBe(200);
+    expect(cleared.body).toEqual({});
+    expect(await dao.listOverrides()).toEqual([]);
+  });
+
   it("answers 404 for a flag that is not in the registry", async () => {
     const { app } = setup();
 
