@@ -19,6 +19,7 @@ import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import { ConsoleTabs } from "./ConsoleTabs.jsx";
 import consoleStyles from "./AdminPage.module.css";
 import styles from "./FeedbackInbox.module.css";
+import queueStyles from "./ReportQueue.module.css";
 
 /** The name of each status in the console's filter. */
 const STATUS_LABELS = Object.freeze({
@@ -51,7 +52,7 @@ function where({ kind, gameId, roomCode, matchId }) {
 function Recent({ recent }) {
   if (recent === undefined || recent.length === 0) return null;
   return (
-    <ol className={styles.context} aria-label="Before the report">
+    <ol className={queueStyles.recent} aria-label="Before the report">
       {recent.map((entry, index) => (
         <li key={index}>{`${entry.by} ${entry.kind === "move" ? "moved" : "asked"} ${entry.text}`}</li>
       ))}
