@@ -7,7 +7,7 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  z-index: 40;
+  z-index: var(--layer-effect);
 }
 
 /* Confetti: 24 pieces; each one's spot, drift, spin and colour come from its :nth-child rule below. */

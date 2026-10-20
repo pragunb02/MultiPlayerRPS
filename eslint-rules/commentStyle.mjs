@@ -1,4 +1,5 @@
 import { PROBLEMS, checkComment } from "./commentCheck.mjs";
+import { popupContractRule } from "./popupContract.mjs";
 
 /**
  * The `classicade/comment-style` rule. It reads every comment in a file and reports each place that breaks the
@@ -36,5 +37,5 @@ export const commentStyleRule = Object.freeze({
 /** The local ESLint plugin, registered as `classicade` in eslint.config.js. */
 export const classicadePlugin = Object.freeze({
   meta: { name: "classicade" },
-  rules: { "comment-style": commentStyleRule },
+  rules: { "comment-style": commentStyleRule, "popup-contract": popupContractRule },
 });
