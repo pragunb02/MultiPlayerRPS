@@ -260,7 +260,7 @@ thinking crashed` with `game` only.
       a player's presence changes. A test crawls every friends answer and push for anything shaped like a player id.
 - **Open (owner).** (1) Whether players not surely adults start with Appear offline on (ICO standard 7). Built: off,
   because a friend is someone both chose. (2) The numbers in point 8, the 30 days and the 7 days. (3) The Hinglish
-  lines. (4) "Friends" in the header.
+  lines. (4) Where Friends sits: built in the phone menu and on the profile, because a laptop's header has no room.
 - **Consequences.** Four new collections with their indexes, built at boot (DEPLOYMENT.md). Presence lives in the
   process like socket admission: a restart shows friends offline until their tabs reconnect, and a second server
   (CC-061) needs shared presence. Part 2 adds invites by handle and reads the same presence.
