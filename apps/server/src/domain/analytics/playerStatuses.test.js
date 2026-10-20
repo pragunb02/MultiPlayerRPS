@@ -245,45 +245,57 @@ describe("statusMoves", () => {
 });
 
 describe("cost", () => {
-  // The report runs on the server that also runs live games (CC-255). The longest range, 400 days, with 1,000
-  // players who each play about one day in ten must stay under 50 ms per slice of 250 players, and under 50 ms
-  // for the trend, the moves and the North Star together. Each budget is the best of 3 runs, so a busy machine
-  // does not fail it.
-  const BUDGET_MS = 50;
+  // The report runs on the server that also runs live games (CC-255), so its work must grow with players times
+  // days, once, and never with players times days times weeks (the first version of CC-255 did that and took
+  // 890 ms). The tests count the steps the code takes through a meter instead of timing it, so a busy machine
+  // cannot fail them and a slower algorithm always does (CC-310). The longest range is 400 days, with 1,000
+  // players who each play about one day in ten.
   const SLICE = 250;
   const weeks = bucketsOf({ from: addDays(TODAY, -399), to: TODAY, bucket: "week" });
   const window = statusWindow({ weeks, today: TODAY });
+  const windowDays = daysOf(window).length;
   const players = many(1000, (number) =>
     player(daysOf(window).filter((_, index) => (index * 7 + number) % 10 === 0)),
   );
-  const fastest = (work) =>
-    Math.min(
-      ...many(3, () => {
-        const started = performance.now();
-        work();
-        return performance.now() - started;
-      }),
-    );
+  /** A meter that adds up the steps it is told about. */
+  const meter = () => {
+    let steps = 0;
+    return {
+      add: (count) => {
+        steps += count;
+      },
+      steps: () => steps,
+    };
+  };
+  /** The days of play of some players together. */
+  const daysPlayed = (group) => group.reduce((total, one) => total + one.days.length, 0);
 
-  it("works out a slice of 250 players' statuses over the longest range within the budget", () => {
-    const slowest = Math.max(
-      ...many(players.length / SLICE, (slice) =>
-        fastest(() => statusRows(players.slice(slice * SLICE, (slice + 1) * SLICE), window)),
-      ),
-    );
+  it("works out a slice of 250 players' statuses over the longest range in one walk per player", () => {
+    for (let start = 0; start < players.length; start += SLICE) {
+      const slice = players.slice(start, start + SLICE);
+      const counted = meter();
 
-    expect(slowest).toBeLessThan(BUDGET_MS);
+      statusRows(slice, window, { meter: counted });
+
+      // Each player: one step per day of the window, and at most three per day of play (reading it and moving
+      // each of the two markers past it). A walk per day or per week through the days of play is far more.
+      expect(counted.steps()).toBeGreaterThanOrEqual(slice.length * windowDays);
+      expect(counted.steps()).toBeLessThanOrEqual(slice.length * windowDays + 3 * daysPlayed(slice));
+    }
   });
 
-  it("reads the trend, the moves and the North Star from the book within the budget", () => {
+  it("reads the trend, the moves and the North Star from the book in a few steps per player per week", () => {
     const book = bookOf(players, window);
+    const counted = meter();
 
-    const took = fastest(() => {
-      statusWeeks(book, { weeks, today: TODAY });
-      statusMoves(book, { week: weeks[weeks.length - 2] });
-      northStarOn(book, TODAY);
-    });
+    statusWeeks(book, { weeks, today: TODAY }, { meter: counted });
+    statusMoves(book, { week: weeks[weeks.length - 2] }, { meter: counted });
+    northStarOn(book, TODAY, { meter: counted });
 
-    expect(took).toBeLessThan(BUDGET_MS);
+    // The trend reads the Sunday before each week and its 7 days, the moves 2 days and the North Star 1, for each
+    // player. Reading the book from its start for each week is far more.
+    const rows = book.rows.length;
+    expect(counted.steps()).toBeGreaterThanOrEqual(rows * (weeks.length + 3));
+    expect(counted.steps()).toBeLessThanOrEqual(rows * (8 * weeks.length + 3));
   });
 });
