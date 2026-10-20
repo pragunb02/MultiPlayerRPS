@@ -26,6 +26,7 @@ const request = (senderId, recipientId, at = T0) => ({
   senderId,
   recipientId,
   via: "game",
+  status: "pending",
   createdAt: at,
   notifiedAt: at,
   expiresAt: at + 60_000,
@@ -66,7 +67,7 @@ describe("friend accessor (CC-052)", () => {
     ).rejects.toThrow("down");
   });
 
-  it("stores a request as pending, and answers the same pair's request when asked again", async () => {
+  it("stores a request as given, and answers the same pair's request when asked again", async () => {
     const friends = accessor();
 
     const first = await friends.addRequest(request(RIYA, ARJUN));

@@ -231,6 +231,21 @@ export function createAccountDao({ connection }) {
     },
 
     /**
+     * The usernames of the given accounts that exist (CC-052). Ids that are not accounts are skipped.
+     *
+     * @param {ReadonlyArray<string>} accountIds
+     * @returns {Promise<Array<{ accountId: string, username: string }>>} in no particular order
+     */
+    async listUsernames(accountIds) {
+      const ids = accountIds.filter(isId);
+      if (ids.length === 0) {
+        return [];
+      }
+      const docs = await Account.find({ _id: { $in: ids } }, { username: 1 }).lean();
+      return docs.map((doc) => ({ accountId: doc._id.toHexString(), username: doc.username }));
+    },
+
+    /**
      * Deletes the account (CC-035). Running it again changes nothing.
      *
      * @param {string} accountId

@@ -118,14 +118,12 @@ export function createFriendAccessor({ friendshipDao, friendRequestDao, friendLi
     /**
      * Stores a request, or answers the one the sender already has to that player, whatever its status.
      *
-     * @param {Omit<FriendRequest, "status">} request  stored as pending
+     * @param {FriendRequest} request
      * @returns {Promise<{ created: boolean, request: Readonly<FriendRequest> }>}
      */
     async addRequest(request) {
       try {
-        const doc = await friendRequestDao.insert(
-          toDates({ ...request, status: FRIEND_REQUEST_STATUS.PENDING }),
-        );
+        const doc = await friendRequestDao.insert(toDates(request));
         return { created: true, request: timed(doc) };
       } catch (err) {
         if (!(err instanceof DuplicateKey)) throw err;

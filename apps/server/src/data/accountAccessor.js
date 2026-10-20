@@ -166,6 +166,13 @@ export function createAccountAccessor({ accountDao }) {
       Object.freeze((await accountDao.listBirthYears([...accountIds])).map((entry) => Object.freeze(entry))),
 
     /**
+     * @param {ReadonlyArray<string>} accountIds
+     * @returns {Promise<ReadonlyArray<Readonly<{ accountId: string, username: string }>>>} those that exist (CC-052)
+     */
+    listUsernames: async (accountIds) =>
+      Object.freeze((await accountDao.listUsernames([...accountIds])).map((entry) => Object.freeze(entry))),
+
+    /**
      * Deletes the account (CC-035). Deleting again changes nothing.
      *
      * @param {string} accountId

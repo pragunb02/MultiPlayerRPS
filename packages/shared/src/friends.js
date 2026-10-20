@@ -34,3 +34,10 @@ export const isFriendLinkToken = (value) => typeof value === "string" && FRIEND_
  * 4. `linkDays`: days a friend link works, and it works once.
  */
 export const FRIEND_RULES = Object.freeze({ maxFriends: 200, maxWaiting: 10, requestDays: 30, linkDays: 7 });
+
+/**
+ * How a friend link names its maker when they are not surely an adult, on the link's page and in the request the
+ * opener sent, until the maker accepts. A minor's or an unknown age player's username never goes to whoever holds
+ * a link, which may have been forwarded (ADR-028.7).
+ */
+export const FRIEND_LINK_MAKER_NAME = "A ClassiCade player";

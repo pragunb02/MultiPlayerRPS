@@ -408,6 +408,22 @@ export function createAccountComponent({
     },
 
     /**
+     * The username of each account among these players that still exists (CC-052). Guests, computer characters and
+     * deleted accounts have none, and are left out.
+     *
+     * @param {{ playerIds: ReadonlyArray<string> }} query
+     * @returns {Promise<ReadonlyMap<string, string>>} usernames by player id
+     */
+    async usernamesOf({ playerIds }) {
+      const accountIds = playerIds.filter(isAccountId).map((id) => id.slice(ACCOUNT_ID_PREFIX.length));
+      if (accountIds.length === 0) {
+        return new Map();
+      }
+      const names = await accountAccessor.listUsernames(accountIds);
+      return new Map(names.map(({ accountId, username }) => [`${ACCOUNT_ID_PREFIX}${accountId}`, username]));
+    },
+
+    /**
      * Which of these players are adults: accounts whose birth year makes them surely 18. Guests, computer
      * characters and accounts without a year are not (ADR-028).
      *
