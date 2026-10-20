@@ -117,6 +117,7 @@ describe("the console's flags (CC-312)", () => {
     const api = ownerApi({
       setFlagRollout: vi.fn(async (name, rollout) => flag({ rollout, override: { rollout, updatedAt: T0 } })),
       clearFlagRollout: vi.fn(async () => flag()),
+      getAdminFlags: vi.fn().mockResolvedValue(view([flag(), flag({ name: "other_flag", rollout: "on" })])),
     });
     const { user } = await openFlags(api);
 
@@ -141,6 +142,7 @@ describe("the console's flags (CC-312)", () => {
     );
     expect(within(card("new_lobby")).queryByText(/\(set /)).toBeNull();
     expect(within(card("new_lobby")).getAllByText("Off", { selector: "dd" })).toHaveLength(2);
+    expect(within(card("other_flag")).getByText("On", { selector: "dd" })).toBeVisible();
   });
 
   it.each([["101"], ["2.5"], [""]])("refuses the percentage %j before asking the server", async (typed) => {

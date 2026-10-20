@@ -36,6 +36,16 @@ describe("useFlag (CC-312)", () => {
     expect(api.getFlags).toHaveBeenCalledWith(["console_flag_check"]);
   });
 
+  it("asks for a visitor with no session too, and follows the answer", async () => {
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ console_flag_check: true }) });
+
+    const { result } = renderHook(() => useFlag("console_flag_check"), {
+      wrapper: wrapperFor(api, sessionOf(undefined)),
+    });
+
+    await waitFor(() => expect(result.current).toBe(true));
+  });
+
   it("stays off when the question fails", async () => {
     const api = fakeApi({ getFlags: vi.fn().mockRejectedValue(new Error("offline")) });
 

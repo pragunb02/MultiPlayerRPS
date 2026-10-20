@@ -36,7 +36,8 @@ export const FLAG_SIDES = Object.freeze({ ON: "on", OFF: "off" });
  * @property {string} removeBy      the India day, YYYY-MM-DD, by which the flag and its old path are deleted
  * @property {FlagRollout} rollout  the rollout when the owner has not set one
  * @property {string} audience      one of FLAG_AUDIENCES
- * @property {boolean} client       whether the web app may ask for it. Server-only flags stay unknown to browsers
+ * @property {boolean} client       whether the web app may ask for its answer. This file ships in the web bundle and
+ *   the repository is public, so a name or a description is never a secret
  * @property {string} success       the one event that says the feature worked, in plain words
  */
 
@@ -124,7 +125,7 @@ export function assertFlagRegistry(flags) {
 export const overdueFlags = (flags, today) => flags.filter(({ removeBy }) => removeBy < today);
 
 /**
- * A flag the web app may read. A server-only flag is not, so its name and answer never reach a browser.
+ * A flag the web app may read. A server-only flag is not, so the server never answers a browser about it.
  *
  * @param {Readonly<FeatureFlag>} flag
  * @returns {Readonly<FeatureFlag>} the same flag

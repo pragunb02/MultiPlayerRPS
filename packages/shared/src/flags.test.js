@@ -66,6 +66,12 @@ describe("the flag registry (CC-312)", () => {
     expect(() => assertFlagRegistry([flag(fields)])).toThrow(message);
   });
 
+  it("refuses a flag with no name or ticket at all", () => {
+    expect(() => assertFlagRegistry([flag({ name: undefined, ticket: undefined })])).toThrow(
+      /bad name, ticket/,
+    );
+  });
+
   it("refuses two flags with the same name", () => {
     expect(() => assertFlagRegistry([flag(), flag()])).toThrow(/twice: new_lobby/);
   });

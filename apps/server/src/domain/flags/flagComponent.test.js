@@ -289,6 +289,35 @@ describe("flag component: anonymous counts (CC-312)", () => {
     ]);
   });
 
+  it("adds counts made while a failed write was on its way to the ones it keeps", async () => {
+    let fail;
+    const flags = createFlagComponent({
+      registry: REGISTRY,
+      flagAccessor: {
+        ...createFeatureFlagAccessor({ featureFlagDao: createInMemoryFeatureFlagDao() }),
+        addCounts: () =>
+          new Promise((_, reject) => {
+            fail = reject;
+          }),
+      },
+      keyedIds: createKeyedIds({ secret: "a test key for feature flag buckets, 32+ chars" }),
+      ages: { adultsAmong: async () => new Set() },
+      logger: captureLogger().logger,
+      now: () => T0,
+    });
+    for (const player of players.slice(0, 5)) {
+      await flags.isOn("new_lobby", player);
+    }
+
+    const writing = flags.flush();
+    await flags.isOn("new_lobby", GUEST);
+    fail(new Error("database unreachable"));
+    await writing;
+
+    const { flags: listed } = await flags.overview();
+    expect(listed.find(({ name }) => name === "new_lobby").counts.off.exposures).toBe(6);
+  });
+
   it("leaves counts older than CONSOLE_DAYS out of the console", async () => {
     const { flags, tick } = setup();
     await flags.isOn("new_lobby", GUEST);
