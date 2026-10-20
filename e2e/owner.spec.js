@@ -189,6 +189,69 @@ test.describe("owner console", () => {
     await expect(page.getByText(/console/i)).toHaveCount(0);
   });
 
+  test("the design page shows every contract state to an admin and 404 to others", async ({ players }) => {
+    const owner = await players.open("owner", { secrets: [OWNER.password, OWNER.email] });
+    const { page } = owner;
+    const scripts = [];
+    page.on("request", (request) => {
+      const { pathname } = new URL(request.url());
+      if (pathname.startsWith("/assets/") && pathname.endsWith(".js")) scripts.push(pathname);
+    });
+    await logIn(owner, OWNER);
+    expect(scripts.some((script) => script.includes("DesignPage"))).toBe(false);
+
+    // The flag's rollout is one setting on the shared server. Both devices turn it on and neither turns it off, so
+    // they never race, and no other test reads design_page.
+    const on = await page.request.put("/api/admin/flags/design_page", {
+      data: { rollout: "on" },
+      headers: { Origin: BASE_URL },
+    });
+    expect(on.status()).toBe(200);
+
+    const answer = await page.goto("/admin/design");
+    expect(answer.headers()["cache-control"]).toBe("no-store");
+    expect(answer.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+    await at(page, "/admin/design", "Design");
+    await expect(page.getByRole("heading", { name: "Colour roles" })).toBeVisible();
+    expect(scripts.some((script) => script.includes("DesignPage"))).toBe(true);
+    await expect(page.getByText(/Shown in the light theme/)).toBeVisible();
+    for (const role of ["success", "warning", "danger", "info", "you", "opponent"]) {
+      await expect(page.locator(`[data-cc-role="${role}"]`)).toContainText(/\d+\.\d:1/);
+    }
+    await expect(page.locator("[data-cc-component]")).toHaveCount(7);
+    await expect(page.getByText("Your turn", { exact: true })).toBeVisible();
+
+    // The real dialog: Tab and Shift+Tab never leave it, the page behind is inert, Escape gives the focus back.
+    const opener = page.getByRole("button", { name: "Open a dialog" });
+    await opener.click();
+    const dialog = page.getByRole("dialog", { name: "Block Riya?" });
+    await expect(dialog).toBeVisible();
+    await expect(page.locator("#root")).toHaveAttribute("inert", "");
+    for (const key of ["Tab", "Tab", "Tab", "Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab"]) {
+      await page.keyboard.press(key);
+      expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    }
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator("#root")).not.toHaveAttribute("inert");
+    await expect(opener).toBeFocused();
+
+    await page.getByRole("button", { name: "Show a toast" }).click();
+    await expect(page.getByText("Saved. This is a toast.")).toBeVisible();
+
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.reload();
+    await expect(page.getByText(/Shown in the dark theme/)).toBeVisible();
+    await expect(page.locator('[data-cc-role="you"]')).toContainText(/\d+\.\d:1/);
+
+    const visitor = await players.open("visitor");
+    visitor.expect(404, "/admin/design");
+    await visitor.page.goto("/admin/design");
+    await expect(visitor.page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+    await expect(visitor.page).toHaveTitle("Page not found · ClassiCade");
+    await expect(visitor.page.getByText("Colour roles")).toHaveCount(0);
+  });
+
   test("a guest and a visitor get the ordinary not found page", async ({ players }) => {
     const guest = await players.open("guest");
     await guest.page.goto("/");
