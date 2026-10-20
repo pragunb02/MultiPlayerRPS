@@ -247,7 +247,7 @@ describe("api client", () => {
     const reported = respond(200, { report: { reportId: "r1", createdAt: 1 } });
     const queued = respond(200, { groups: [{ groupId: "r1" }], total: 1, page: 0, more: false });
     const acted = respond(200, { result: { closed: 2 } });
-    const target = { matchId: "m1", seat: 1, reason: "name", note: "rude" };
+    const target = { matchId: "m1", seat: 1, reason: "name" };
 
     expect(await createApiClient({ fetchImpl: reported }).reportPlayer(target)).toEqual({
       reportId: "r1",
@@ -269,6 +269,40 @@ describe("api client", () => {
     expect(acted.mock.calls[0]).toEqual([
       "/api/admin/reports/a%2Fb/actions",
       expect.objectContaining({ method: "POST", body: JSON.stringify({ action: "dismiss" }) }),
+    ]);
+  });
+
+  it("makes, reads, takes and answers challenges by their id (CC-139)", async () => {
+    const challenge = { id: "a/b", state: "open" };
+    const one = respond(200, { challenge });
+    const made = respond(201, { challenge });
+    const inbox = respond(200, { challenges: [challenge] });
+    const taken = respond(200, { challenge, room: { code: "AB2CD3", gameId: "chess" } });
+
+    expect(
+      await createApiClient({ fetchImpl: made }).createChallenge({ gameId: "chess", options: {} }),
+    ).toEqual(challenge);
+    expect(await createApiClient({ fetchImpl: one }).getChallenge("a/b")).toEqual(challenge);
+    expect(await createApiClient({ fetchImpl: inbox }).getChallenges()).toEqual([challenge]);
+    expect((await createApiClient({ fetchImpl: taken }).acceptChallenge("a/b")).room.code).toBe("AB2CD3");
+    for (const answer of ["declineChallenge", "withdrawChallenge", "challengeLater"]) {
+      expect(await createApiClient({ fetchImpl: one })[answer]("a/b")).toEqual(challenge);
+    }
+
+    expect(made.mock.calls[0]).toEqual([
+      "/api/challenges",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ gameId: "chess", options: {} }) }),
+    ]);
+    expect(inbox.mock.calls[0][0]).toBe("/api/challenges");
+    expect(taken.mock.calls[0]).toEqual([
+      "/api/challenges/a%2Fb/accept",
+      expect.objectContaining({ method: "POST" }),
+    ]);
+    expect(one.mock.calls.map(([url]) => url)).toEqual([
+      "/api/challenges/a%2Fb",
+      "/api/challenges/a%2Fb/decline",
+      "/api/challenges/a%2Fb/withdraw",
+      "/api/challenges/a%2Fb/later",
     ]);
   });
 

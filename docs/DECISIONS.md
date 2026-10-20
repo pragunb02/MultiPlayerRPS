@@ -231,6 +231,77 @@ the owner may change it.
   come later behind a CC-312 flag, masked as feedback is (ADR-059.2), by a decision of its own. The other defaults
   (180 days, the limits, the safe-name rename with sign-out, the Hinglish drafts, no flag) are accepted.
 
+### ADR-069 — Challenges: their own random link for a day, silent blocks, and requests that never interrupt a game
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-139](tickets/CC-139.md), research with
+  sources there, and the rest of CC-207). Points 4, 6, 9 and 11 are listed for the owner in the ticket's Open
+  decisions.
+- **Context.** A room link dies 30 minutes after its last activity, so a link sent on WhatsApp is usually dead when
+  the friend opens it. Friends and invites (CC-052) need a challenge that waits, has its own link and reaches a
+  player on any page. No client may get another person's player id (ADR-057, CC-297), a block must look like
+  nothing (ADR-053), and a share never carries a minor's or a guest's name (ADR-028.7).
+- **Decision.**
+  1. **A challenge is its own record**, in a new `challenges` collection: who made it and their name then, the game
+     and the options its engine checked, the one person it is for (empty for a link anyone may take), the state,
+     who took it and the room made. Its id is **20 letters of lower case Crockford base 32, 100 random bits**, made
+     from random bytes only. Never a player id, a room code or a profile handle (handles have 16 letters).
+  2. **States:** open, accepted, declined, expired, withdrawn. **Expired is never stored**: an open challenge whose
+     `expiresAt` has passed is expired on every read, so nothing sweeps. Taking a challenge is one conditional
+     update (`state: open` and not expired), so two people can never both take it. If its room cannot be made or
+     recorded, it is open again, and a hold with no room after 30 seconds (a crash in the middle) counts as open
+     for the next taker and for Take back. **Accepted** means the room was made with both seated: the challenger first and as host,
+     offline until a tab of theirs is known to be on the site (then away), and the taker away until their room page
+     opens. The game starts when both are on the room page, the rule of CC-112.
+  3. **Lifetimes:** open for **24 hours**. The record stays one more day, so the link says "expired" rather than
+     "not found", then MongoDB deletes it by itself (a TTL index on `deleteAt`). A taken challenge stays in its
+     creator's inbox for 30 minutes, as long as a waiting room lasts.
+  4. **Names:** the challenge page and its views name the creator to anyone only for an **adult account**, as the
+     profile links do (ADR-065.2). Anyone else is "A ClassiCade player". The creator and the one person it is for
+     always see each other's names. The page head never names anyone or the game, so a link preview says nothing.
+  5. **Blocks never show.** Anyone in a blocked pair with the creator sees exactly what an expired challenge shows,
+     and taking or declining it answers exactly what an expired one answers (410 with `state: expired`). A
+     challenge to one person in a blocked pair is never delivered to them: the sender sees it wait and then expire,
+     like a challenge nobody answered.
+  6. **Limits:** at most **3 open challenges per sender**, and at most **one every 10 minutes to the same person**,
+     in the domain (409 with `details.reason`). They are checked after the new challenge is stored, over the
+     sender's challenges in one order (oldest first, then by id), and a new one past a limit is deleted again, so
+     challenges made at the same moment can never get past them. Rate limits on the routes: 10 made per player and 50 per address in
+     10 minutes, 60 answers per player in 10 minutes, and 60 reads per player and 300 per address a minute. The
+     address counts only what the player's own limit let through.
+  7. **API.** `POST /api/challenges` `{ gameId, options?, to? }`, `GET /api/challenges` (the inbox),
+     `GET /api/challenges/:id` (visitors too), and `POST /api/challenges/:id/accept | decline | withdraw | later`.
+     `accept` answers `{ challenge, room: { code, gameId } }`. One 404 for an unknown, malformed or forgotten id.
+     The socket push `challenge:updated` `{ challenge }` goes to every tab of the players concerned. No answer or
+     push carries a player id: other players are named by display name only.
+  8. **Ready for CC-052 part 2.** `to` is `{ handle }`, a profile handle (ADR-065). Who may be named is a policy
+     passed to the challenge component (`recipients.resolve`), which names nobody until CC-052 passes in "a friend,
+     by handle". Every refusal is the same 404, so a handle's existence never shows. Delivery, the inbox, decline,
+     the 10 minute rule and the block rule already work for a challenge to one person, tested with a test policy.
+  9. **Requests on any page (CC-207).** The popup says **Accept and go** or **Not now**. For a rematch or a draw,
+     which end on their own within 60 seconds, Not now declines. For a challenge, which waits a day, Not now moves
+     it to the **inbox** without answering, and so does leaving its popup for **about 60 seconds** of being on
+     screen. Moved is stored per player (`laterBy`), so it never pops up again on another tab.
+  10. **A player in a game on the room page is never interrupted.** Popups from elsewhere, their sound and the tab
+      alert wait until the game ends. The sound follows `cc.sound` and its request category (CC-208). Under reduced
+      motion the tab title changes once and does not flash.
+  11. **The inbox** is the minimal CC-147: a button in the header row on every screen size, shown only while it holds
+      something (a full header pushed the game below the fold at 1280 by 720), with the challenges sent
+      to the player, theirs that someone took, and theirs still open. Nothing else yet.
+  12. **Data (ADR-048).** `challenges` is a participant of the guest move (ADR-014), of the export (the challenges a
+      player made and was sent, with others by name only) and of deletion (every challenge they made, were sent or
+      took).
+- **Amended 2026-10-20 (review of #152).** (1) A view tells `createdAt` to the creator only, so a blocked
+  player's "expired" view is the same, byte for byte, as a real expired one: `forYou` and `later` as for anyone,
+  and no time from which its age could be told. (2) A popup's minute counts only while the tab is in front. (3)
+  The claim lease of point 2. (4) The limits are checked after storing, as in point 6. (5) The export shows each
+  challenge's state now, and leaves out challenges sent by someone in a block with the player. (6) The creator's
+  view of a taken challenge carries `until`, and the web app drops open challenges at `expiresAt` and taken ones
+  at `until`.
+- **Consequences.** One new collection with five indexes, nothing existing changed or migrated. A challenger who
+  is offline when someone takes their challenge leaves the taker in a waiting room that closes after 30 minutes;
+  CC-052 scenario 4 adds "keep it for later". A blocked person who compares the page with a friend's can guess,
+  which ADR-053 accepts. Presence for friends ("In a game") is CC-052's.
+
 ### ADR-068 — Changelog fragments, folded by the coordinator, and numbers assigned at dispatch
 
 - **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-299](tickets/CC-299.md), research there)

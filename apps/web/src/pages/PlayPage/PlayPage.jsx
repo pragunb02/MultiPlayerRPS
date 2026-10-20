@@ -16,7 +16,8 @@ import styles from "./PlayPage.module.css";
 
 /**
  * One game's lobby. The main action plays the game's computer character at once, at the level picked with one tap
- * (CC-221). Below it: create a room with the game's options to invite a friend, join a friend's room by code, or
+ * (CC-221). Below it: create a room with the game's options to invite a friend, or a challenge link with the same
+ * options that lasts a day (CC-139), join a friend's room by code, or
  * play with someone beside you on this phone, which is not counted (CC-223).
  * Each button shows a spinner while the server works and explains a failure under it. Join room says what is
  * missing while the code is not complete (CC-164).
@@ -35,6 +36,13 @@ export function PlayPage() {
       navigate(paths.room(game.id, roomCode));
     },
     { id: "lobby.create" },
+  );
+  const challenge = useAction(
+    async () => {
+      const id = await createRoom.challenge({ gameId: game.id, options });
+      navigate(paths.challenge(id));
+    },
+    { id: "lobby.challenge" },
   );
   const playComputer = useAction(
     async (level) => {
@@ -78,6 +86,10 @@ export function PlayPage() {
             pendingLabel="Creating…"
           >
             Create room
+          </Button>
+          <p className={styles.note}>Friend not online now? Send a challenge link. It lasts 24 hours.</p>
+          <Button control="lobby.challenge" variant="secondary" action={challenge} pendingLabel="Making it…">
+            Make a challenge link
           </Button>
         </div>
         <form className={styles.panel} onSubmit={join}>

@@ -6,10 +6,11 @@ import { useSession } from "./useSession.js";
 /**
  * Creates a room, starting a guest session first if needed, and resolves with its code. `create` makes a room to
  * invite a friend to. `playComputer` makes one where the game's computer character already sits, so the game has
- * started when the room opens (CC-221). The button that calls either shows the wait and any failure (see useAction).
+ * started when the room opens (CC-221). `challenge` makes a challenge link that lasts a day instead (CC-139) and
+ * resolves with its id. The button that calls either shows the wait and any failure (see useAction).
  */
 export function useCreateRoom() {
-  const { socket } = useServices();
+  const { api, socket } = useServices();
   const session = useSession();
 
   const create = useCallback(
@@ -30,5 +31,13 @@ export function useCreateRoom() {
     [socket, session],
   );
 
-  return { create, playComputer };
+  const challenge = useCallback(
+    async ({ gameId, options }) => {
+      await session.ensurePlayer();
+      return (await api.createChallenge({ gameId, options })).id;
+    },
+    [api, session],
+  );
+
+  return { create, playComputer, challenge };
 }

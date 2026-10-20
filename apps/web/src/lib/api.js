@@ -165,6 +165,29 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     /** Uses a friend link: its maker gets a request. @returns {Promise<"sent" | "friends">} */
     useFriendLink: async (token) =>
       (await request("POST", `/friends/links/${encodeURIComponent(token)}`)).result,
+    /**
+     * Makes a challenge for a game and its options, open for a day (CC-139). Answers the creator's view of it.
+     * @param {{ gameId: string, options: object }} challenge
+     */
+    createChallenge: async (challenge) => (await request("POST", "/challenges", challenge)).challenge,
+    /** What this viewer may see of a challenge, for its page. Visitors too (CC-139). */
+    getChallenge: async (id) => (await request("GET", `/challenges/${encodeURIComponent(id)}`)).challenge,
+    /** The player's inbox: their open and taken challenges, and the ones sent to them (CC-139, CC-207). */
+    getChallenges: async () => (await request("GET", "/challenges")).challenges,
+    /**
+     * Takes a challenge. Answers `{ challenge, room: { code, gameId } }`, the room made for both players.
+     * @param {string} id
+     */
+    acceptChallenge: (id) => request("POST", `/challenges/${encodeURIComponent(id)}/accept`),
+    /** Says no to a challenge sent to this player. Answers the challenge. */
+    declineChallenge: async (id) =>
+      (await request("POST", `/challenges/${encodeURIComponent(id)}/decline`)).challenge,
+    /** Takes back this player's own open challenge. Answers the challenge. */
+    withdrawChallenge: async (id) =>
+      (await request("POST", `/challenges/${encodeURIComponent(id)}/withdraw`)).challenge,
+    /** Moves a challenge from a popup to this player's inbox, on every tab (CC-207). Answers the challenge. */
+    challengeLater: async (id) =>
+      (await request("POST", `/challenges/${encodeURIComponent(id)}/later`)).challenge,
     /** The player's own profile: handle, avatar, visibility and whether it may be public (CC-034). */
     getOwnProfile: async () => (await request("GET", "/profile")).profile,
     /** @param {string} avatar  an id from `AVATARS` */

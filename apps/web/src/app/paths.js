@@ -17,6 +17,7 @@ import {
  *   /login?next=…  /signup?next=…      account pages; `next` = where to return afterwards
  *   /profile                           your progress and match history (guests and accounts)
  *   /players/:handle                   a player's public profile, by its random handle (CC-034), never by id or name
+ *   /challenge/:id                     a challenge's own link, by its random id (CC-139), lasts a day
  *   /friends                           your friends, their presence and your friend requests (CC-052)
  *   /friends/add/:token                a "be my friend" link, by a random one-use token (CC-052), never by id or name
  *   /daily/:kind                       today's daily puzzle of a kind, such as /daily/chess (CC-144)
@@ -41,6 +42,7 @@ export const ROUTES = Object.freeze({
   SIGNUP: "signup",
   PROFILE: "profile",
   PLAYER: "players/:handle",
+  CHALLENGE: "challenge/:id",
   FRIENDS: "friends",
   FRIEND_LINK: "friends/add/:token",
   DAILY: "daily/:kind",
@@ -163,6 +165,8 @@ export const paths = Object.freeze({
   profile: () => "/profile",
   /** @param {string} handle  a profile handle the server gave (CC-034) */
   player: (handle) => `/players/${encodeURIComponent(handle)}`,
+  /** @param {string} id  a challenge id the server gave (CC-139) */
+  challenge: (id) => `/challenge/${encodeURIComponent(id)}`,
   friends: () => "/friends",
   /** @param {string} token  a friend link token the server gave (CC-052) */
   friendLink: (token) => `/friends/add/${encodeURIComponent(token)}`,
