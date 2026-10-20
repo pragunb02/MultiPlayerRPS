@@ -30,7 +30,7 @@ import { MongoClient } from "mongodb";
 import { createSeededRng } from "../../packages/games/src/rng.js";
 import { DEFAULT_MODEL } from "../load/model.mjs";
 import { parseProbeLines } from "../load/probe.mjs";
-import { opsPerSecond, parseSteps, RENDER_SIZES, serverSummary, verdict } from "../load/ramp.mjs";
+import { opsPerSecond, readSettings, RENDER_SIZES, serverSummary, verdict } from "../load/ramp.mjs";
 import { createRecorder } from "../load/stats.mjs";
 import { createSwarm } from "../load/swarm.mjs";
 
@@ -40,27 +40,12 @@ const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const MONGO_IMAGE = "mongo:8.2.12@sha256:e0ce8c35124d4a9f9785532d1f268f39e9728ffa1cb38f46fa482436424c4bd3";
 const APP_IMAGE = "classicade-load:cc-289";
 
-const sizeName = process.env.LOAD_SIZE ?? "free";
+const settings = readSettings(process.env);
+const { steps, stepSeconds, warmupSeconds, seed, idleSeconds, stop, unplayableMs, port } = settings;
+const sizeName = settings.size;
 const size = RENDER_SIZES[sizeName];
-if (size === undefined) {
-  throw new RangeError(`LOAD_SIZE must be one of ${Object.keys(RENDER_SIZES).join(", ")}`);
-}
-const steps = parseSteps(process.env.LOAD_STEPS);
-const stepSeconds = Number(process.env.LOAD_STEP_S ?? 60);
-const warmupSeconds = Number(process.env.LOAD_WARMUP_S ?? 15);
-const seed = Number(process.env.LOAD_SEED ?? 289);
-const idleSeconds = Number(process.env.LOAD_IDLE_S ?? 30);
-const stop = process.env.LOAD_STOP ?? "nfr3";
-if (!["nfr3", "unplayable"].includes(stop)) {
-  throw new RangeError("LOAD_STOP must be nfr3 or unplayable");
-}
-const unplayableMs = Number(process.env.LOAD_UNPLAYABLE_MS ?? 1000);
 const profileDir = process.env.LOAD_CPU_PROFILE;
-const model = {
-  ...DEFAULT_MODEL,
-  computerShare: Number(process.env.LOAD_COMPUTER_SHARE ?? DEFAULT_MODEL.computerShare),
-};
-const port = Number(process.env.LOAD_PORT ?? 4977);
+const model = { ...DEFAULT_MODEL, computerShare: settings.computerShare };
 const mongoPort = port + 1;
 const out = process.env.LOAD_OUT ?? path.join(ROOT, "scripts/load/results", `${sizeName}.json`);
 const base = `http://127.0.0.1:${port}`;
@@ -153,7 +138,8 @@ async function main() {
     for (const players of steps) {
       await swarm.grow(players, 10_000);
       await sleep(warmupSeconds * 1000);
-      recorder.take();
+      // Failures while the step's players arrive and warm up count too: those players stopped playing.
+      const warmup = recorder.take();
       harnessLoop.reset();
       const from = Date.now();
       const opsBefore = await opcounters();
@@ -172,6 +158,7 @@ async function main() {
       const step = {
         players,
         connected: swarm.players(),
+        playing: swarm.playing(),
         seconds: Math.round(seconds),
         movesPerSecond: Math.round((taken.moves.count / seconds) * 10) / 10,
         gamesPerSecond:
@@ -183,6 +170,7 @@ async function main() {
               100,
           ) / 100,
         ...taken,
+        warmupFailures: warmup.failures,
         server: serverSummary(readings.filter((reading) => reading.at >= from)),
         mongo: { opsPerSecond: opsPerSecond(opsBefore, opsAfter, seconds), connections: connections.current },
         docker: stats,
@@ -195,7 +183,7 @@ async function main() {
       step.playable = verdict(step, { moveP95LimitMs: unplayableMs });
       results.push(step);
       say(
-        `${players} players (${step.connected} connected): move p50 ${step.moves.p50} p95 ${step.moves.p95} ` +
+        `${players} players (${step.playing} playing, ${step.connected} connected): move p50 ${step.moves.p50} p95 ${step.moves.p95} ` +
           `p99 ${step.moves.p99} ms, ${step.movesPerSecond} moves/s, loop p99 ${step.server.loopP99Ms.max} ms, ` +
           `cpu ${step.server.cpu.mean}, rss ${step.server.rssMb} MB, mongo ${step.mongo.opsPerSecond.total} ops/s` +
           (step.verdict.broken ? ` OVER NFR-3: ${step.verdict.reasons.join("; ")}` : ""),
