@@ -48,7 +48,7 @@ function match({ winner = ALICE, loser = BOB, gameId = "rps", endedAt = NOW, rea
  * `adults`: the player ids that are adults. Without it, everyone is, so names show as before CC-152.
  * `transfers`: replaces the guest transfers the boards look at (CC-291).
  */
-function setup({ adults, transfers, failing = () => false, matchReads } = {}) {
+function setup({ adults, transfers, failing = () => false, matchReads, cards } = {}) {
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const stored = createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() });
@@ -76,6 +76,7 @@ function setup({ adults, transfers, failing = () => false, matchReads } = {}) {
         return new Set(adults ?? playerIds);
       },
     },
+    ...(cards !== undefined && { cards }),
   });
   /** Brings a player's stored XP to `xp`, as progression has done by the time the boards step runs. */
   const progressTo = async (player, xp) => {
@@ -1033,6 +1034,100 @@ describe("leaderboardComponent and minors (CC-152)", () => {
 
     expect(await entries("overall")).toEqual([]);
     expect(asked).toEqual([]);
+  });
+});
+
+describe("leaderboardComponent: avatars and profile links (CC-034)", () => {
+  /** Cards as profileCards answers them: an avatar for everyone asked, a handle for the adults. */
+  const fakeCards = (adults) => {
+    const asked = [];
+    return {
+      asked,
+      cardsFor: async ({ playerIds, now }) => {
+        asked.push({ playerIds, now });
+        return new Map(
+          playerIds.map((id) => [
+            id,
+            { avatar: "owl", ...(adults.includes(id) && { profile: `handle-of-${id.slice(-1)}` }) },
+          ]),
+        );
+      },
+    };
+  };
+
+  it("puts the avatar beside every row, a hidden one too, and the profile link only beside a name shown", async () => {
+    // Even if the cards offered a link for the hidden row, the board leaves it out (owner, ADR-065).
+    const cards = fakeCards([ALICE.id, BOB.id]);
+    const { play, entries } = setup({ adults: [ALICE.id], cards });
+    await play({ winner: ALICE, loser: BOB }, [
+      [ALICE, 60],
+      [BOB, 10],
+    ]);
+    await play({ winner: GUEST, loser: ALICE, endedAt: NOW + 1 }, [
+      [GUEST, 30],
+      [ALICE, 70],
+    ]);
+
+    expect(await entries("overall")).toEqual([
+      { rank: 1, displayName: "alice", avatar: "owl", profile: "handle-of-a", level: 2, score: 70 },
+      { rank: 2, displayName: "Guest-7K2Q", avatar: "owl", level: 1, score: 30 },
+      { rank: 3, displayName: "Hidden player", hidden: true, avatar: "owl", level: 1, score: 10 },
+    ]);
+    expect(cards.asked.at(-1)).toEqual({ playerIds: [ALICE.id, GUEST.id, BOB.id], now: NOW });
+  });
+
+  it("shows the avatar of hidden rows with no link, and nothing for a player without a card", async () => {
+    const cards = {
+      cardsFor: async () => new Map([[ALICE.id, { avatar: "fox" }]]),
+    };
+    const { play, entries } = setup({ adults: [], cards });
+    await play({ winner: ALICE, loser: BOB }, [
+      [ALICE, 60],
+      [BOB, 10],
+    ]);
+
+    expect(await entries("overall")).toEqual([
+      { rank: 1, displayName: "Hidden player", hidden: true, avatar: "fox", level: 2, score: 60 },
+      { rank: 2, displayName: "Hidden player", hidden: true, level: 1, score: 10 },
+    ]);
+  });
+
+  it("shows a hidden row without an avatar when its card has none", async () => {
+    const cards = { cardsFor: async () => new Map([[BOB.id, {}]]) };
+    const { play, entries } = setup({ adults: [], cards });
+    await play({ winner: ALICE, loser: BOB }, [
+      [ALICE, 60],
+      [BOB, 10],
+    ]);
+
+    expect((await entries("overall"))[1]).toEqual({
+      rank: 2,
+      displayName: "Hidden player",
+      hidden: true,
+      level: 1,
+      score: 10,
+    });
+  });
+
+  it("asks for no cards for an empty board", async () => {
+    const cards = fakeCards([]);
+    const { entries } = setup({ adults: [], cards });
+
+    expect(await entries("overall")).toEqual([]);
+    expect(cards.asked).toEqual([]);
+  });
+
+  it("fails fast with cards that cannot answer", () => {
+    expect(() =>
+      createLeaderboardComponent({
+        leaderboardAccessor: {},
+        matchAccessor: {},
+        progressAccessor: {},
+        transfers: { listFrom: async () => [], listPendingTo: async () => [] },
+        ages: { adultsAmong: async () => new Set() },
+        cards: {},
+      }),
+    ).toThrow(/cards.cardsFor/);
   });
 });
 

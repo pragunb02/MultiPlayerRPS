@@ -31,16 +31,16 @@ function parsePage(query) {
  *   GET /matches?limit=20&before=<endedAt ms>  → { matches, nextBefore? }   newest first
  *   GET /matches/:matchId                      → full record incl. move log (participants only)
  *
- * @param {{ matchComponent: ReturnType<typeof import("../../domain/matches/matchComponent.js").createMatchComponent> }} deps
+ * @param {{ matchComponent: ReturnType<typeof import("../../domain/matches/matchComponent.js").createMatchComponent>, now?: () => number }} deps
  */
-export function createMatchRoutes({ matchComponent }) {
+export function createMatchRoutes({ matchComponent, now = Date.now }) {
   assertDefined(matchComponent, "matchComponent");
   const router = Router();
 
   router.get("/matches", async (req, res) => {
     const { id: playerId } = requireIdentity(req.session);
     const page = parsePage(req.query);
-    const matches = await matchComponent.listForPlayer({ playerId, ...page });
+    const matches = await matchComponent.listForPlayer({ playerId, ...page, now: now() });
     const full = matches.length === page.limit;
     res.json({ matches, ...(full && { nextBefore: matches.at(-1).endedAt }) });
   });
@@ -50,7 +50,9 @@ export function createMatchRoutes({ matchComponent }) {
     if (!MATCH_ID_PATTERN.test(req.params.matchId)) {
       throw new ValidationError("Invalid match id", { details: { field: "matchId" } });
     }
-    res.json({ match: await matchComponent.getForPlayer({ matchId: req.params.matchId, playerId }) });
+    res.json({
+      match: await matchComponent.getForPlayer({ matchId: req.params.matchId, playerId, now: now() }),
+    });
   });
 
   return router;

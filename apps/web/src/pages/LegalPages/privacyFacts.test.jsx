@@ -87,6 +87,11 @@ const FACTS = [
     page: /We do not count how you use the site\. If we ever do, it will be anonymous counts on our own server/,
   },
   {
+    fact: "profiles start private, only adults can be public, everyone else is Hidden player (CC-034)",
+    data: "once chosen: left out means private",
+    page: /It starts private: others see only your name and avatar\. If you are 18 or over you can make it public.*the profile shows "Hidden player" with the avatar they picked, and nothing else/,
+  },
+  {
     fact: "feedback is kept 180 days, without a player id or an address",
     data: "| [`feedback`](#feedback) | the message as typed, and a reply email from an adult who gave one | 180 days after it was sent |",
     page: /We never store your player id, your IP address or your browser details with it\..*Feedback is deleted 180 days after it was sent/,

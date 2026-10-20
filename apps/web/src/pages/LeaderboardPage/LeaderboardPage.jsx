@@ -8,6 +8,7 @@ import {
 } from "@classicade/shared";
 import { paths, returnPathFor } from "../../app/paths.js";
 import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
+import { Avatar } from "../../art/avatars/Avatar.jsx";
 import { LevelBadge } from "../../art/badges/LevelBadge.jsx";
 import { Medal } from "../../art/badges/Medal.jsx";
 import { rankForLevel } from "../../art/badges/ranks.js";
@@ -52,6 +53,28 @@ function Level({ level }) {
     <span className={styles.level} title={`${rankForLevel(level).name} rank`}>
       <LevelBadge level={level} size="sm" decorative numbered={false} className={styles.shield} />
       Lv {level}
+    </span>
+  );
+}
+
+/**
+ * The name on a row, with the player's avatar. An adult account's name links to their profile (CC-034). A hidden row
+ * shows the avatar but never a link, and neither does a guest's.
+ */
+function RowName({ entry, you }) {
+  return (
+    <span className={[styles.name, entry.hidden && styles.hidden].filter(Boolean).join(" ")}>
+      <Avatar avatar={entry.avatar} size={28} />
+      <span className={styles.nameText}>
+        {entry.profile === undefined ? (
+          entry.displayName
+        ) : (
+          <Link to={paths.player(entry.profile)} data-cc-control="leaderboard.player">
+            {entry.displayName}
+          </Link>
+        )}
+      </span>
+      {you && <span className={styles.tag}>you</span>}
     </span>
   );
 }
@@ -190,10 +213,7 @@ function Board({ info }) {
                 aria-current={entry.rank === yourRank ? "true" : undefined}
               >
                 <Place rank={entry.rank} />
-                <span className={[styles.name, entry.hidden && styles.hidden].filter(Boolean).join(" ")}>
-                  {entry.displayName}
-                  {entry.rank === yourRank && <span className={styles.tag}>you</span>}
-                </span>
+                <RowName entry={entry} you={entry.rank === yourRank} />
                 <Level level={entry.level} />
                 <span className={styles.score}>{formatScore(info.metric, entry.score)}</span>
               </li>

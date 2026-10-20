@@ -404,8 +404,8 @@ describe("LeaderboardPage and hidden names (CC-152)", () => {
     await screen.findByRole("list", { name: "Overall XP rankings" });
 
     expect(rows()[1]).toHaveTextContent("2Hidden playerLv 240 XP");
-    expect(within(rows()[1]).getByText("Hidden player")).toHaveClass("hidden");
-    expect(within(rows()[0]).getByText("ada")).not.toHaveClass("hidden");
+    expect(within(rows()[1]).getByText("Hidden player").closest(".name")).toHaveClass("hidden");
+    expect(within(rows()[0]).getByText("ada").closest(".name")).not.toHaveClass("hidden");
     expect(screen.getByText(/is a player under 18 or one who has not said their age/)).toBeInTheDocument();
   });
 
@@ -418,5 +418,30 @@ describe("LeaderboardPage and hidden names (CC-152)", () => {
     await screen.findByRole("list", { name: "Overall XP rankings" });
 
     expect(screen.queryByText(/has not said their age/)).toBeNull();
+  });
+
+  it("draws each player's avatar and links an adult's name to their profile, never a hidden row (CC-034)", async () => {
+    const user = userEvent.setup();
+    const entries = [
+      { ...entry(1, "ada", 900, 6), avatar: "crown", profile: "k3m9q2x7p4w8z1ab" },
+      { ...entry(2, "Guest-7K2Q", 500), avatar: "owl" },
+      { rank: 3, displayName: "Hidden player", hidden: true, level: 2, score: 40 },
+    ];
+    const view = renderApp({
+      path: "/leaderboards/overall",
+      api: api({ boards: { overall: { board: boardInfo("overall"), entries } } }),
+    });
+    await screen.findByRole("list", { name: "Overall XP rankings" });
+
+    const links = rows().map((row) => within(row).queryByRole("link"));
+    expect(links[0]).toHaveAttribute("href", "/players/k3m9q2x7p4w8z1ab");
+    expect(links.slice(1)).toEqual([null, null]);
+    expect(rows().map((row) => row.querySelectorAll(".name svg").length)).toEqual([1, 1, 1]);
+    expect(rows()[0].querySelector(".name svg").innerHTML).not.toBe(
+      rows()[2].querySelector(".name svg").innerHTML,
+    );
+
+    await user.click(links[0]);
+    expect(view.url()).toBe("/players/k3m9q2x7p4w8z1ab");
   });
 });

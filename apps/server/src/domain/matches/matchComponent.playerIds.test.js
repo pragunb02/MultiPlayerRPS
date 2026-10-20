@@ -216,3 +216,41 @@ describe("match history names players by match player ids (CC-297)", () => {
     expect(() => setup({ matchPlayerIds: undefined })).toThrow(TypeError);
   });
 });
+
+describe("match history shows avatars and profile links beside past opponents (CC-034)", () => {
+  const LATER = T0 + 60_000;
+  const cardsFor = async ({ playerIds, now }) => {
+    expect(now).toBe(LATER);
+    return new Map(
+      playerIds.map((id) => [
+        id,
+        id === ALICE ? { avatar: "crown", profile: "aaaaaaaaaaaaaaaa" } : { avatar: "owl" },
+      ]),
+    );
+  };
+
+  it("puts each player's card beside them in the list and the details, and still no player id", async () => {
+    const matches = setup({ cards: { cardsFor } });
+    await matches.recordFinished({ room: room(), outcome: aliceWins() });
+
+    const [listed] = await matches.listForPlayer({ playerId: BOB, limit: 10, now: LATER });
+    const details = await matches.getForPlayer({ matchId: MATCH_ID, playerId: BOB, now: LATER });
+
+    for (const view of [listed, details]) {
+      expect(view.players).toEqual([
+        {
+          playerId: idIn(MATCH_ID, ALICE),
+          displayName: "Alice",
+          avatar: "crown",
+          profile: "aaaaaaaaaaaaaaaa",
+        },
+        { playerId: idIn(MATCH_ID, BOB), displayName: "Bob", avatar: "owl" },
+      ]);
+      expect(JSON.stringify(view).match(PLAYER_ID)).toBeNull();
+    }
+  });
+
+  it("refuses cards that cannot answer", () => {
+    expect(() => setup({ cards: {} })).toThrow(/cards.cardsFor/);
+  });
+});

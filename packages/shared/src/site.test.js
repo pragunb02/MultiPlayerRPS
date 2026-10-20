@@ -137,6 +137,18 @@ describe("describePage", () => {
     expect(PUBLIC_PAGE_PATHS).toContain("/daily/chess");
   });
 
+  it("describes a player's profile without naming anyone, never listed, and nothing for a malformed handle (CC-034)", () => {
+    expect(describePage("/players/0123456789abcdef")).toMatchObject({
+      found: true,
+      indexable: false,
+      title: "A player on ClassiCade",
+      path: "/players/0123456789abcdef",
+    });
+    for (const path of ["/players", "/players/user_abc", "/players/0123456789ABCDEF", "/players/a/b"]) {
+      expect(describePage(path).found, path).toBe(false);
+    }
+  });
+
   it("lists the legal pages, whatever the letter case and trailing slash", () => {
     expect(describePage("/privacy")).toMatchObject({ found: true, indexable: true, path: "/privacy" });
     expect(describePage("/Terms/")).toMatchObject({ found: true, indexable: true, path: "/terms" });

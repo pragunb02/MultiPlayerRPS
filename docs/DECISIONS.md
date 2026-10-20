@@ -98,6 +98,52 @@ thinking crashed` with `game` only.
   move. On a 0.1 CPU plan the thread still shares the one CPU quota, so the search itself is as slow as before. A
   second server (CC-061) still needs one owner per room for the line.
 
+### ADR-065 — Public profiles by a random handle, adults only, private by default, and a curated avatar set
+
+- **Status:** Accepted · 2026-10-20 by the owner ([CC-034](tickets/CC-034.md), research with sources there),
+  with point 3 amended for avatars (below). Built in the CC-034 pull request. It settles what ADR-011 left open ("public player profiles are a
+  separate decision") and fills in ADR-028.8's first prerequisite.
+- **Context.** Friends and invites (CC-052) need a safe way to look at someone you met. No client may ever get
+  another person's player id (ADR-057, CC-297), every player counts as a minor until they give a year (ADR-028.1,
+  ADR-048.10), and a block must look like nothing at all (ADR-053).
+- **Decision.**
+  1. **The address is a random handle**, `/players/:handle`: 16 characters of lower case Crockford base 32, 80
+     random bits, stored in a new `player_profiles` document and made the first time it is needed. Never a player id,
+     never a keyed id of one (that would change with `SESSION_SECRET` and the server could work it out from the id),
+     never the username (renames, CC-185), unrelated to every room code and match id.
+  2. **Only adult accounts are linked.** A handle is sent on a leaderboard row whose name is shown, and beside a past
+     opponent in history, only when that player is an adult account. Guests, minors, accounts of unknown age, hidden
+     rows and computer players get no link. A player sees their own handle on their own profile.
+  3. **What a handle shows**, decided on the server for each read, in this order: not found for a handle nobody has,
+     a malformed one and a deleted account's, one body for all. A blocked pair, either way, gets exactly what a signed-out visitor gets for that handle: the boards and history hand out the handle, and anyone can open it signed out, so a 404 kept only for the blocked viewer would tell them they were blocked (ADR-053, found in the review of #135). "Hidden player" with the avatar they
+     picked and nothing else (no stats) for anyone not surely an adult. The username and avatar of an adult's private profile.
+     The username, avatar, level, games played and won, and the chess rating (CC-042) of an adult's public profile.
+     Never a date, a streak, last seen, history, an email or an id. `own: true` when the viewer is its owner.
+  4. **Private by default** (GDPR Article 25(2), the ICO children's code standard 7), `DEFAULT_PROFILE_VISIBILITY`.
+     Only an adult account can make it public. Anyone can make it private.
+  5. **Avatars are a curated set of twelve**, drawn by us in code in the neon arcade style (ADR-012), no uploads and
+     no photos. `AVATARS` in `@classicade/shared` gives each an unlock rule, today all `free`, and the server checks
+     the rule (`domain/profiles/avatarRules.js`). Coin cosmetics (ADR-026, CC-143) add a rule kind and its check. Ids
+     are permanent: a retired avatar stays for those who have it.
+  6. **Where avatars show.** On a room seat, kept on the seat when the person sits down, so every view shows it
+     without a lookup. On every leaderboard row, a hidden row too, which still never links to a profile. Beside a past
+     opponent in history. On both profiles. A player without one gets a neutral silhouette.
+  7. **Guests pick too, and it moves on sign up** (ADR-014, a transfer participant before leaderboards): the account
+     keeps its own avatar and handle, and takes the guest's avatar when it has none, or the guest's whole profile when
+     it has no profile. The guest's handle then leads nowhere.
+  8. **Abuse.** No directory, no search, no list. Lookups: 30 a minute per signed-in player, then 150 a minute per
+     address (five players' worth, as blocks do, so one player cannot use up a school's address), counting only what
+     the player limit let through (amended in the review of #135, which had both at 30). Avatar and visibility changes: 30 in 10 minutes.
+  9. **Deletion and export** (ADR-048): `player_profiles` is a participant. Export: handle, avatar, visibility.
+- **Consequences.** One new collection with two unique indexes, nothing existing changed or migrated. Rooms stored
+  before this have no avatars on their seats, and show the silhouette. A board read can make the profile of an adult
+  listed on it (one small write, the first time only). CC-278 adds friends-only visibility and moves the switch into
+  the privacy settings page. CC-052 reads the same handle and `blockedWith`.
+- **Decided by the owner, 2026-10-20.** (1) Profiles stay private by default. (2) A hidden profile, a hidden
+  leaderboard row and a history row show the player's chosen avatar, not the silhouette: avatars come from our
+  curated set and identify nobody. (3) Room seats do not link to profiles. Still open: the Hinglish lines in
+  `apps/web/src/components/Profile/profileCopy.js`, which are the builder's drafts.
+
 ### ADR-062 — The chess rating: one game per period, a sixth outbox step, the guest move and the level seed
 
 - **Status:** Accepted · 2026-10-20 by the owner, all points, including the three seed numbers, the guest move

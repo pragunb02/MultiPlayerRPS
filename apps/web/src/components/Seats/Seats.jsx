@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PRESENCE, ROOM_END_REASONS, ROOM_STATUS } from "@classicade/shared";
+import { Avatar } from "../../art/avatars/Avatar.jsx";
 import { usePresenceNotice } from "../../games/usePresenceNotice.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useBlockPlayer } from "../../hooks/useBlocks.js";
@@ -127,11 +128,11 @@ function BlockDialog({ room, seat, index, onClose, onBlocked }) {
 }
 
 /**
- * Who is in the room: names, host, you, and where each player is (CC-158). A computer character is always
+ * Who is in the room: avatars and names (CC-034), host, you, and where each player is (CC-158). A computer character is always
  * labelled as one, with its level (ADR-025). Changes to the other players are read
  * out once they settle, with a soft sound. A seated viewer can block another person from their seat (CC-044).
  *
- * @param {{ room: { code: string, seats: Array<{ playerId: string, displayName: string, connected: boolean, presence: string, graceUntil: number, bot?: { character: string, level: string }, deleted?: true }>, hostId: string, you: string, players: { max: number }, status: string, serverTime: number, game?: object } }} props  every id in a room view is a seat id (CC-253)
+ * @param {{ room: { code: string, seats: Array<{ playerId: string, displayName: string, avatar?: string, connected: boolean, presence: string, graceUntil: number, bot?: { character: string, level: string }, deleted?: true }>, hostId: string, you: string, players: { max: number }, status: string, serverTime: number, game?: object } }} props  every id in a room view is a seat id (CC-253)
  */
 export function Seats({ room }) {
   const open = Math.max(0, room.players.max - room.seats.length);
@@ -152,6 +153,7 @@ export function Seats({ room }) {
         {room.seats.map((seat, index) => (
           <li key={seat.playerId} className={styles.seat}>
             <span className={seat.connected ? styles.online : styles.offline} aria-hidden="true" />
+            {!isComputer(seat) && <Avatar avatar={seat.avatar} size={28} />}
             <span className={styles.name}>{seat.displayName}</span>
             {seat.playerId === room.you && <span className={styles.tag}>you</span>}
             {isComputer(seat) && <span className={styles.tag}>computer · {levelNameOf(seat)}</span>}

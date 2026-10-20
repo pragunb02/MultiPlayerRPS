@@ -1,0 +1,99 @@
+/* The avatar picker, the visibility switch and the two line messages of the profile pages (CC-034). */
+.bilingual {
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.hinglish {
+  font-weight: 700;
+}
+.english {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.done {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.error {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.picker {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  min-width: 0;
+}
+.legend {
+  padding: 0 var(--space-2);
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+/* Four across on a phone, six on a laptop. Each choice is at least 44 px to tap. */
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+  gap: var(--space-2);
+}
+.choice {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  min-height: 44px;
+}
+.choice:hover {
+  background: var(--color-surface-raised);
+}
+.choice:has(.radio:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.choice:has(.radio:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+/* The native radio stays in the page for keyboards and screen readers, under the picture. */
+.radio {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.choiceArt {
+  pointer-events: none;
+}
+.choiceName {
+  font-size: var(--text-xs);
+  text-align: center;
+  color: var(--color-text);
+}
+
+.visibility {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+.visibility h3 {
+  margin: 0;
+}

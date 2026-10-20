@@ -31,6 +31,7 @@ export const SHARDS = Object.freeze([
     "names.spec.js", // 4
     "privacy.spec.js", // new (CC-035, CC-152), about 25 s locally
     "blocks.spec.js", // new (CC-044), not measured yet
+    "profiles.spec.js", // new (CC-034), not measured yet
     "feedback.spec.js", // new (CC-290), not measured yet
   ]),
   // 1078 s

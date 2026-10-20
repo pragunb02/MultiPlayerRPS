@@ -19,6 +19,8 @@ import {
 
 // How many matches one read of a player's history takes.
 const HISTORY_PAGE = 100;
+// Without profiles nobody in history has an avatar or a profile link. Tests that are not about profiles leave it out.
+const NO_CARDS = Object.freeze({ cardsFor: async () => new Map() });
 
 /**
  * Match history: turns finished rooms into permanent match records and answers "what did I play?". Also judges
@@ -28,12 +30,20 @@ const HISTORY_PAGE = 100;
  *   matchAccessor: ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor>,
  *   matchPlayerIds: Pick<ReturnType<typeof import("./matchPlayerIds.js").createMatchPlayerIds>, "playerIdIn">,
  *   newUuid?: () => string,   a fresh random id for each deleted player's stand-in (CC-035). Tests pick them
+ *   cards?: Pick<ReturnType<typeof import("../profiles/profileCards.js").createProfileCards>, "cardsFor">,
  * }} deps  `matchPlayerIds` names the players in every match a player reads (CC-297). It has no default, so history
- *   can never fall back to player ids
+ *   can never fall back to player ids. `cards` are the avatar and the profile link history shows beside a past
+ *   opponent (CC-034). Without it there are none
  */
-export function createMatchComponent({ matchAccessor, matchPlayerIds, newUuid = randomUUID }) {
+export function createMatchComponent({
+  matchAccessor,
+  matchPlayerIds,
+  newUuid = randomUUID,
+  cards = NO_CARDS,
+}) {
   assertDefined(matchAccessor, "matchAccessor");
   assertFunction(matchPlayerIds?.playerIdIn, "matchPlayerIds.playerIdIn");
+  assertFunction(cards?.cardsFor, "cards.cardsFor");
 
   const isPlayer = (match, playerId) => match.players.some((p) => p.playerId === playerId);
 
@@ -89,6 +99,16 @@ export function createMatchComponent({ matchAccessor, matchPlayerIds, newUuid = 
    */
   const labelled = (players) =>
     players.map((player) => (isBotPlayerId(player.playerId) ? { ...player, computer: true } : player));
+
+  /**
+   * The players with their cards (CC-034): the avatar each picked, and the profile handle of an adult account. A
+   * card holds no player id, so naming the players by match player ids afterwards leaves it as it is.
+   */
+  async function withCards(matches, now) {
+    const playerIds = [...new Set(matches.flatMap((match) => match.players.map((p) => p.playerId)))];
+    const cardOf = await cards.cardsFor({ playerIds, now });
+    return (players) => labelled(players).map((player) => ({ ...player, ...cardOf.get(player.playerId) }));
+  }
 
   /**
    * The match a finished room holds, as it is recorded: players, seed, moves, result and times, never the
@@ -260,15 +280,17 @@ export function createMatchComponent({ matchAccessor, matchPlayerIds, newUuid = 
      * not (CC-095). A computer character among the players has `computer: true`. Every player is named by their
      * match player id, and `you` is the viewer's (CC-297).
      *
-     * @param {{ playerId: string, limit: number, before?: number }} query
+     * @param {{ playerId: string, limit: number, before?: number, now: number }} query  `now` decides who is an
+     *   adult today, for the profile links
      */
-    async listForPlayer({ playerId, limit, before }) {
+    async listForPlayer({ playerId, limit, before, now }) {
       const matches = await matchAccessor.listForPlayer(playerId, { limit, before });
+      const shown = await withCards(matches, now);
       return matches.map((match) =>
         asSeenBy(match, playerId, {
           matchId: match.matchId,
           gameId: match.gameId,
-          players: labelled(match.players),
+          players: shown(match.players),
           result: match.result,
           startedAt: match.startedAt,
           endedAt: match.endedAt,
@@ -283,13 +305,14 @@ export function createMatchComponent({ matchAccessor, matchPlayerIds, newUuid = 
      * match ids cannot be probed. How it counted is told for the viewer only: the other players' limits are
      * theirs. Every player is named by their match player id, and `you` is the viewer's (CC-297).
      *
-     * @param {{ matchId: string, playerId: string }} query
+     * @param {{ matchId: string, playerId: string, now: number }} query
      */
-    async getForPlayer({ matchId, playerId }) {
+    async getForPlayer({ matchId, playerId, now }) {
       const { credit, ...match } = await participantsMatch({ matchId, playerId });
+      const shown = await withCards([match], now);
       return asSeenBy(match, playerId, {
         ...match,
-        players: labelled(match.players),
+        players: shown(match.players),
         outcomeForYou: outcomeFor(match, playerId),
         countsForYou: creditFor({ ...match, credit }, playerId),
       });

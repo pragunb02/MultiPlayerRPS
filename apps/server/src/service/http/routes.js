@@ -9,6 +9,7 @@ import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
 import { createMatchRoutes } from "./matchRoutes.js";
+import { createProfileRoutes } from "./profileRoutes.js";
 import { createProgressRoutes } from "./progressRoutes.js";
 import { createSessionRoutes } from "./sessionRoutes.js";
 
@@ -19,6 +20,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
+ *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
@@ -42,6 +44,8 @@ export function apiRouter({
   accountLimits,
   blockComponent,
   blockLimits,
+  profileComponent,
+  profileLimits,
   feedbackComponent,
   feedbackLimits,
   dailyPuzzleComponent,
@@ -81,8 +85,9 @@ export function apiRouter({
       ...(accountLimits && { limits: accountLimits }),
     }),
   );
-  router.use(createMatchRoutes({ matchComponent }));
+  router.use(createMatchRoutes({ matchComponent, now }));
   router.use(createBlockRoutes({ blockComponent, now, ...(blockLimits && { limits: blockLimits }) }));
+  router.use(createProfileRoutes({ profileComponent, now, ...(profileLimits && { limits: profileLimits }) }));
   router.use(createProgressRoutes({ progressionComponent }));
   router.use(createGamificationRoutes({ gamificationComponent, now }));
   router.use(

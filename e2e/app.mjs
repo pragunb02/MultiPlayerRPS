@@ -19,6 +19,8 @@ const limits = {
   api: { windowMs: 60_000, limit: 10_000 },
   // Blocking keeps its real limit per player (CC-044). Only the one per address is raised.
   blocks: { perAddress: { windowMs: 60_000, limit: 10_000 } },
+  // Profile lookups keep their real limit per player (CC-034). Only the one per address is raised.
+  profiles: { lookupsPerAddress: { windowMs: 60_000, limit: 10_000 } },
   // Feedback keeps its real limit per session (CC-290). The ones per address and for the site are raised.
   feedback: {
     perAddress: { windowMs: 60_000, limit: 10_000 },

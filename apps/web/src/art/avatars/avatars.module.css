@@ -1,0 +1,101 @@
+/*
+ * Paint for the avatars (CC-034): the neon inks on the dark arcade tile, in both themes, from the tokens only. The
+ * tile keeps its dark ink in light mode too, as an arcade screen does, so every avatar reads the same everywhere.
+ */
+.avatar {
+  display: inline-block;
+  flex: none;
+  border-radius: var(--radius-md);
+  vertical-align: middle;
+}
+
+.tile {
+  fill: var(--color-art-ink);
+  stroke-width: 3;
+}
+.grid {
+  fill: none;
+  stroke: var(--color-art-white);
+  stroke-width: 1;
+  opacity: 0.08;
+}
+
+.toneGold {
+  stroke: var(--color-neon-gold);
+}
+.toneXp {
+  stroke: var(--color-neon-xp);
+}
+.toneAccent {
+  stroke: var(--color-neon-accent);
+}
+.toneRps {
+  stroke: var(--color-neon-rps);
+}
+.toneTicTacToe {
+  stroke: var(--color-neon-tictactoe);
+}
+.toneChess {
+  stroke: var(--color-neon-accent);
+}
+.toneNone {
+  stroke: var(--color-border);
+}
+
+.gold {
+  fill: var(--color-neon-gold);
+}
+.xp {
+  fill: var(--color-neon-xp);
+}
+.accent {
+  fill: var(--color-neon-accent);
+}
+.rps {
+  fill: var(--color-neon-rps);
+}
+.tictactoe {
+  fill: var(--color-neon-tictactoe);
+}
+.chess {
+  fill: var(--color-neon-xp);
+}
+.white {
+  fill: var(--color-art-white);
+}
+.ink {
+  fill: var(--color-art-ink);
+}
+
+.whiteLine,
+.inkLine,
+.goldLine,
+.xpLine {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.whiteLine {
+  stroke: var(--color-art-white);
+}
+.inkLine {
+  stroke: var(--color-art-ink);
+}
+.goldLine {
+  stroke: var(--color-neon-gold);
+}
+.xpLine {
+  stroke: var(--color-neon-xp);
+}
+.xpRing {
+  fill: none;
+  stroke: var(--color-neon-xp);
+  stroke-width: 4;
+}
+
+/* The silhouette for a player without an avatar, or one whose profile is hidden. */
+.silhouette {
+  fill: var(--color-text-muted);
+  opacity: 0.7;
+}

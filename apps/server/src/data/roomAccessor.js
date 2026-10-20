@@ -10,6 +10,8 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @property {boolean} connected        the room page is open (CC-158)
  * @property {boolean} [away]          on another page of the site (CC-207). Older seats leave it out
  * @property {number} [since]          when the presence last changed. Older seats leave it out
+ * @property {string} [avatar]         the avatar the person had picked when they sat down (CC-034). Seats without one,
+ *   computer characters and older seats leave it out
  *
  * @typedef {{ kind: "move", playerId: string, move: unknown, at: number }
  *   | { kind: "forfeit", playerId: string, at: number }

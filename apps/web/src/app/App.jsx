@@ -18,6 +18,7 @@ import { NotFoundPage } from "../pages/NotFoundPage/NotFoundPage.jsx";
 import { PassAndPlayPage } from "../pages/PassAndPlayPage/PassAndPlayPage.jsx";
 import { PlayPage } from "../pages/PlayPage/PlayPage.jsx";
 import { ProfilePage } from "../pages/ProfilePage/ProfilePage.jsx";
+import { PublicProfilePage } from "../pages/PublicProfilePage/PublicProfilePage.jsx";
 import { RoomPage } from "../pages/RoomPage/RoomPage.jsx";
 import { SignupPage } from "../pages/SignupPage/SignupPage.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
@@ -49,6 +50,7 @@ export function App({ services }) {
                     <Route path={ROUTES.LOGIN} element={<LoginPage />} />
                     <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
                     <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                    <Route path={ROUTES.PLAYER} element={<PublicProfilePage />} />
                     <Route path={ROUTES.DAILY} element={<DailyPuzzlePage />} />
                     <Route path={ROUTES.LEADERBOARD} element={<LeaderboardPage />} />
                     <Route

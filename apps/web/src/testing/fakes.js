@@ -84,6 +84,13 @@ export const PROGRESS = Object.freeze({
 export const unauthorized = () =>
   new AppRequestError({ code: "UNAUTHORIZED", message: "No active session", status: 401 });
 
+/** A new player's own profile, as GET /api/profile returns it (CC-034): no avatar yet, private. */
+export const OWN_PROFILE = Object.freeze({
+  handle: "k3m9q2x7p4w8z1ab",
+  visibility: "private",
+  canBePublic: false,
+});
+
 /** A fake API client: every method is a spy with a sensible default; override per test. */
 export function fakeApi(overrides = {}) {
   return {
@@ -102,6 +109,10 @@ export function fakeApi(overrides = {}) {
     getBlocks: vi.fn().mockResolvedValue([]),
     blockPlayer: vi.fn(),
     unblockPlayer: vi.fn().mockResolvedValue(undefined),
+    getOwnProfile: vi.fn().mockResolvedValue(OWN_PROFILE),
+    setAvatar: vi.fn(async (avatar) => ({ ...OWN_PROFILE, avatar })),
+    setProfileVisibility: vi.fn(async (visibility) => ({ ...OWN_PROFILE, visibility })),
+    getPlayerProfile: vi.fn(() => new Promise(() => {})),
     getProgress: vi.fn().mockResolvedValue(PROGRESS),
     // An empty history, so a page that lists matches draws instead of failing on a missing answer (CC-288).
     getMatches: vi.fn().mockResolvedValue({ matches: [] }),
