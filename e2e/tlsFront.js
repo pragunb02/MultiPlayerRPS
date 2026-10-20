@@ -13,6 +13,18 @@ import tls from "node:tls";
 export const LOOPBACK_HOSTS = Object.freeze(["127.0.0.1", "::1"]);
 
 /**
+ * How Chromium is started for the browser tests, so that it accepts this run's certificate during the TLS handshake
+ * (CC-319). `ignoreHTTPSErrors` alone makes Chromium fail every new connection with a certificate error first, and
+ * then start the request again with the error allowed. Chromium allows 32 such restarts per request, and while
+ * other requests are opening connections at the same time, the first stylesheet of a page is restarted once for
+ * each of them. On a busy CI runner it passed 32 and the page lost its stylesheet with
+ * `net::ERR_TOO_MANY_RETRIES`. With this switch no certificate error happens, so nothing restarts. It trusts no
+ * more than `ignoreHTTPSErrors` already does, and only test browsers get it. Firefox and WebKit accept the
+ * certificate without restarting, so they need nothing.
+ */
+export const CHROMIUM_ACCEPTS_TEST_CERTIFICATE = Object.freeze(["--ignore-certificate-errors"]);
+
+/**
  * Makes a self-signed certificate for localhost, 127.0.0.1 and ::1 in `dir`, valid for two days, and returns it.
  * Only the test browsers see it, and they are told to accept it. It is made fresh for every run and never leaves
  * the temporary folder, so there is no private key in the repository. Needs `openssl`, which GitHub's runners and
