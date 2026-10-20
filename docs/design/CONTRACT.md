@@ -106,8 +106,15 @@ Every `z-index` is one of these. The order is the one the app had before CC-314,
 
 ### Motion
 
-The five durations and three easings in `tokens.css` stay. The exit curve, the motion recipes and the check on raw
-timings are [CC-281](../tickets/CC-281.md)'s, and this contract links them rather than repeating them.
+The five durations and three easings in `tokens/motion.css` stay. The exit curve, the motion recipes and the check
+on raw timings are [CC-281](../tickets/CC-281.md)'s, and this contract links them rather than repeating them.
+
+Which tool animates what is [ADR-075](../DECISIONS.md) and [EFFECTS-STACK.md](EFFECTS-STACK.md): CSS on these tokens
+for simple motion, Motion presets for intermediate, and the effect registry's canvas for celebrations. Its one
+measured rule for this contract: **no `var()` inside `@keyframes`**, because it moves the animation off the
+compositor. A keyframe holds literal values. Timing and easing still come from the tokens on the `animation` line. One keyframe
+breaks this today, `confetti-fall` in `art/effects/effects.module.css`, and it goes when CC-099 moves the confetti
+into the effect registry (ADR-075). Review checks this rule, not lint.
 
 ## 2. Component contracts
 
@@ -190,6 +197,10 @@ speaks, so it is listed too.
 
 <!-- popup-components:end -->
 
+**Coming with ADR-075:** the effect registry's `EffectHost` and its canvas (`apps/web/src/effects/`) are a
+celebration. They join this list, at `--layer-effect`, in the pull request that builds them (CC-099). The list only
+names files that exist, so the row is added then.
+
 The banners that do not need a live region of their own (`RequestBanner`, `SiteRequests`, `ConnectionBanner`,
 `StreakAtRisk`, `SaveProgressCard`, `ComputerNote`) use `role="status"` or `role="alert"`, which the rule allows.
 
@@ -203,7 +214,10 @@ The banners that do not need a live region of their own (`RequestBanner`, `SiteR
 3. **A raw size** in `font-size`, `line-height`, `border-radius`, `gap`, `padding` or `margin` (and their longhands),
    written in `px` or `rem`, also inside `calc()` or a `var()` fallback. Zero, `auto`, percentages, `em`, `ch`,
    viewport units and `calc()` over tokens are fine.
-4. **A custom property** that holds a raw colour or a raw `px` or `rem` size. Values are defined in the token files only.
+4. **A custom property** that holds a raw colour or a raw `px` or `rem` size. Values are defined in the token files
+   only. One allowance: a seasonal event theme in `apps/web/src/effects/themes/` (ADR-075) overrides tokens under
+   `[data-event-theme="…"]`, so its custom properties may hold raw values. Every other declaration in it follows
+   these rules.
 5. **`position: fixed`** outside the pop-up components above.
 
 Each message names the file, the line and the token to use. When a token already holds the raw value, the message

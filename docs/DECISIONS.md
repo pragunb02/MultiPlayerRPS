@@ -103,7 +103,7 @@ the owner may change it.
   can see.
 - **Consequences.** A new token, role, layer, pop-up file or exception is a contract change in the same pull request.
   Five raw spacing and radius values are listed exceptions. The design page shows the device's theme, not both side
-  by side, until CC-280 adds a theme choice. Moving to stylelint 18 is a small follow-up once it is released.
+  by side, until CC-280 adds a theme choice. Moving to stylelint 18 is a small follow-up once it is released. Aligned with ADR-075: an event theme in `effects/themes/` may override tokens with raw values, the `EffectHost` joins the pop-up list when CC-099 builds it, and keyframes hold literal values (no `var()`).
 - **Builder notes (CC-314, 2026-10-21).** The build added `--layer-banner-alert` (the connection strip stays at 20)
   and `--layer-menu` (CC-139's inbox panel). It moved the SVG and board font sizes to `--type-svg-*` and
   `--type-board-*` tokens instead of exceptions. The pop-up list has 18 files, seven of them announcers. "Escape waits
