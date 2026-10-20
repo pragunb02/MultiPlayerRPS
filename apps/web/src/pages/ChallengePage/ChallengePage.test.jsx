@@ -188,7 +188,9 @@ describe("ChallengePage (CC-139)", () => {
   it("names a game this build does not know as a game", async () => {
     openPage({ view: challenge({ gameId: "ludo" }) });
 
-    expect(await screen.findByRole("heading", { name: "You've been challenged to a game" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "You've been challenged to a game" }),
+    ).toBeInTheDocument();
   });
 
   it("says a link that leads nowhere may have expired, and offers a game", async () => {
