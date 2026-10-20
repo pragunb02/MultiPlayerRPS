@@ -25,10 +25,10 @@ const invite = (overrides = {}) => ({
   ...overrides,
 });
 
-async function open() {
+async function open(overrides = {}) {
   const socket = fakeSocket();
   socket.connect();
-  const api = fakeApi({ getSession: async () => USER });
+  const api = fakeApi({ getSession: async () => USER, ...overrides });
   const view = renderApp({ path: "/", socket, sound: fakeSound(), api });
   await screen.findByText(USER.displayName);
   const push = (challenge) => act(() => socket.push("challenge:updated", { challenge }));
@@ -85,5 +85,21 @@ describe("SiteRequests: how invites end (CC-052 part 2)", () => {
     expect(screen.queryByText(/Game filled/)).toBeNull();
     // The popup of the invite is gone: it can no longer be accepted.
     expect(screen.queryByRole("region", { name: "Challenge" })).toBeNull();
+  });
+  it("keeps an invite pushed while the inbox was being read, which the older list does not have", async () => {
+    let answer;
+    const { push } = await open({
+      getChallenges: () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    });
+    push(invite({ own: false, forYou: true, toName: undefined, fromName: "Meera" }));
+
+    await act(async () => answer([]));
+
+    expect(screen.getByRole("region", { name: "Challenge" })).toHaveTextContent(
+      "Meera challenges you to Chess.",
+    );
   });
 });

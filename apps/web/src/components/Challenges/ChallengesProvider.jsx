@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHALLENGE_LIFETIME_MS, CHALLENGE_STATES, SOCKET_EVENTS } from "@classicade/shared";
 import { useServices } from "../../app/servicesContext.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -40,6 +40,8 @@ export function ChallengesProvider({ children }) {
   const { identity } = useSession();
   const who = identity?.id ?? "";
   const [state, setState] = useState(EMPTY);
+  // The views pushed while the inbox is being read. The list was read before them, so they are newer and win.
+  const pushedDuringRead = useRef(new Map());
   const [now, setNow] = useState(() => Date.now());
   const known = knownFor(state, who);
   // The tab looks again the moment the next challenge's time is up, so the inbox never offers one that has gone.
@@ -57,24 +59,32 @@ export function ChallengesProvider({ children }) {
 
   /** Keeps one view, the newest the tab got from a push or an answer. */
   const remember = useCallback(
-    (challenge) =>
-      setState((current) => {
-        return { who, byId: { ...knownFor(current, who), [challenge.id]: challenge } };
-      }),
+    (challenge) => {
+      pushedDuringRead.current.set(challenge.id, challenge);
+      setState((current) => ({ who, byId: { ...knownFor(current, who), [challenge.id]: challenge } }));
+    },
     [who],
   );
 
   useEffect(() => {
     if (who === "") return undefined;
     let cancelled = false;
-    // The list replaces what the tab knew.
-    const load = () =>
-      api.getChallenges().then(
+    // The list replaces what the tab knew, except what was pushed while it was being read (CC-052).
+    const load = () => {
+      pushedDuringRead.current = new Map();
+      return api.getChallenges().then(
         (list) =>
           !cancelled &&
-          setState({ who, byId: Object.fromEntries(list.map((challenge) => [challenge.id, challenge])) }),
+          setState({
+            who,
+            byId: {
+              ...Object.fromEntries(list.map((challenge) => [challenge.id, challenge])),
+              ...Object.fromEntries(pushedDuringRead.current),
+            },
+          }),
         () => undefined,
       );
+    };
     load();
     const unsubscribers = [
       socket.on("connect", load),
