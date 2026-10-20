@@ -83,6 +83,10 @@ describe("the CSS token check", () => {
     }
   });
 
+  it("points at the layer tokens when no layer has the raw value", () => {
+    expect(messages(".a { z-index: 99; }")).toEqual([expect.stringContaining("Use a var(--layer-*) token")]);
+  });
+
   it("names the font size tokens when a size matches one", () => {
     expect(messages(".a { font-size: 1rem; }")).toEqual([expect.stringContaining("Use var(--text-md)")]);
   });
