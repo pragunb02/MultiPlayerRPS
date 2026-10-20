@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { captureLogger } from "../../testing/captureLogger.js";
 import { ForbiddenError, GoneError, NotFoundError } from "../../utils/errors.js";
-import { handleSocketGone, handleSocketOnline } from "./roomHandlers.js";
+import { handleSocketGone, handleSocketOnline, markOnSite } from "./roomHandlers.js";
 
 /** An io stand-in whose channels are empty (the player has no other sockets left). */
 const emptyIo = { in: () => ({ fetchSockets: async () => [] }) };
@@ -76,5 +76,38 @@ describe("handleSocketOnline (CC-207)", () => {
     });
 
     expect(capture.find("failed to record that the player came online")).toHaveLength(1);
+  });
+});
+
+describe("markOnSite (CC-139)", () => {
+  const ioWith = (sockets) => ({ in: () => ({ fetchSockets: async () => sockets }) });
+
+  it("records a player with a tab open as on the site, and leaves an offline one alone", async () => {
+    const online = [];
+    const roomComponent = { playerOnline: async ({ playerId }) => online.push(playerId) };
+    const { logger } = captureLogger();
+
+    await markOnSite({ io: ioWith([{}]), roomComponent, playerId: "guest_a", now: () => 0, logger });
+    await markOnSite({ io: ioWith([]), roomComponent, playerId: "guest_b", now: () => 0, logger });
+
+    expect(online).toEqual(["guest_a"]);
+  });
+
+  it("logs a failure instead of throwing", async () => {
+    const capture = captureLogger();
+
+    await markOnSite({
+      io: ioWith([{}]),
+      roomComponent: {
+        playerOnline: async () => {
+          throw new Error("store unavailable");
+        },
+      },
+      playerId: "guest_a",
+      now: () => 0,
+      logger: capture.logger,
+    });
+
+    expect(capture.find("failed to record that a player is on the site")).toHaveLength(1);
   });
 });

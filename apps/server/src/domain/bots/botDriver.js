@@ -78,19 +78,26 @@ export function createBotDriver({
   assertDefined(logger, "logger");
 
   /**
-   * One plan per room code: what it is for, and its timer. A plan stays while it is being carried out, so a change
-   * that arrives meanwhile and asks for the same thing does not plan it a second time.
+   * One plan per room code: what it is for, its timer, and whether it is being carried out. A room has at most one
+   * action in flight (CC-318). A change that arrives meanwhile is kept as `next`, the newest saved room, and the
+   * driver plans from it when the action ends. Two actions at once could both read the same sealed throw, and the
+   * second, sent after the first had ended the round, was refused as not the move it locked in.
    */
   const plans = new Map();
   let stopped = false;
 
   function plan(code, key, waitMs, attempt) {
-    const entry = { key, timer: undefined };
+    const entry = { key, timer: undefined, running: false, next: undefined };
     entry.timer = setTimeout(() => {
       entry.timer = undefined;
-      act(code, key, attempt)
+      entry.running = true;
+      act(code, entry, attempt)
         .catch((err) => logger.error({ err, roomCode: code }, "computer player failed"))
-        .finally(() => plans.get(code) === entry && plans.delete(code));
+        .finally(() => {
+          if (plans.get(code) !== entry) return;
+          plans.delete(code);
+          if (entry.next !== undefined) watch(entry.next);
+        });
     }, waitMs);
     entry.timer.unref();
     plans.set(code, entry);
@@ -107,12 +114,18 @@ export function createBotDriver({
   /** Plans what the room's computer player should do, or drops a plan that no longer fits. */
   function watch(room) {
     if (stopped) return;
+    const planned = plans.get(room.code);
+    if (planned?.running) {
+      // An older room that arrives late never replaces a newer one.
+      if (!(room.version < planned.next?.version)) planned.next = room;
+      return;
+    }
     const action = botTurns.nextAction(room);
     if (action.kind === "none") {
       cancel(room.code);
       return;
     }
-    if (plans.get(room.code)?.key === action.key) return;
+    if (planned?.key === action.key) return;
     cancel(room.code);
     plan(room.code, action.key, delayMs(action), 1);
   }
@@ -144,8 +157,9 @@ export function createBotDriver({
     return Promise.all(fresh.map(() => roomComponent.makeMove({ ...input, now: now(), move })));
   }
 
-  async function act(code, key, attempt) {
+  async function act(code, entry, attempt) {
     if (stopped) return;
+    const { key } = entry;
     try {
       const [room] = await stillPlanned(code, key);
       if (room === undefined) {
@@ -155,7 +169,8 @@ export function createBotDriver({
       // The person in the room only hears about it through this: nobody's socket made the change.
       changed.forEach((after) => events.emit(ROOM_EVENTS.UPDATED, { room: after }));
     } catch (err) {
-      if (isGone(err)) return;
+      // The room changed while it acted: what to do next is planned from the room as it is now, at once.
+      if (isGone(err) || entry.next !== undefined) return;
       if (attempt >= MAX_ATTEMPTS) throw err;
       logger.warn({ err, roomCode: code, attempt }, "computer player will try again");
       plan(code, key, retryMs, attempt + 1);

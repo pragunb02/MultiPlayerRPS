@@ -1,5 +1,6 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { installMatchMedia } from "../testing/matchMedia.js";
 import { installVisibility } from "../testing/visibility.js";
 import { FAVICON, FAVICON_ALERT, TURN_TITLE, useDocumentHidden, useTurnAlert } from "./useTurnAlert.js";
 
@@ -44,6 +45,18 @@ describe("useTurnAlert (CC-104)", () => {
     expect(document.title).toBe("Chess · Room AB2CD3");
     act(() => vi.advanceTimersByTime(1_000));
     expect(document.title).toBe(TURN_TITLE);
+  });
+
+  it("changes the title once without flashing for a player who asked for less motion (CC-207)", () => {
+    installMatchMedia({ reducedMotion: true });
+    installVisibility({ hidden: true });
+
+    render(<Page yourTurn />);
+    act(() => vi.advanceTimersByTime(3_000));
+
+    expect(document.title).toBe(TURN_TITLE);
+    expect(icon()).toBe(FAVICON_ALERT);
+    installMatchMedia();
   });
 
   it("puts everything back the moment the tab is visible again", () => {

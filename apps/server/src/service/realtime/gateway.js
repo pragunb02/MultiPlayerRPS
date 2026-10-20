@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { CHALLENGE_STATES, SOCKET_EVENTS } from "@classicade/shared";
+import { CHALLENGE_EVENTS } from "../../domain/challenges/challengeComponent.js";
 import { GAMIFICATION_EVENTS } from "../../domain/gamification/gamificationComponent.js";
 import { PROGRESSION_EVENTS } from "../../domain/progression/progressionComponent.js";
 import { CHESS_RATING_EVENTS } from "../../domain/ratings/chessRatingComponent.js";
@@ -21,6 +22,7 @@ import {
   createRoomHandlers,
   handleSocketGone,
   handleSocketOnline,
+  markOnSite,
   playerChannel,
   pushRequests,
   roomChannel,
@@ -57,6 +59,7 @@ const playerRoom = playerChannel;
  *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
  *   chessRatingComponent?: Pick<ReturnType<typeof import("../../domain/ratings/chessRatingComponent.js").createChessRatingComponent>, "ratingsOf">,
  *   recordSocketEvent?: import("../../utils/operationsMetrics.js").OperationsMetrics["recordSocketEvent"],
+ *   challengeComponent: Pick<ReturnType<typeof import("../../domain/challenges/challengeComponent.js").createChallengeComponent>, "viewFor">,
  *   friends: {
  *     presence: Pick<ReturnType<typeof import("../../domain/friends/presenceTracker.js").createPresenceTracker>, "connected" | "disconnected">,
  *     friendComponent: Parameters<typeof connectFriendPushes>[0]["friendComponent"],
@@ -64,7 +67,8 @@ const playerRoom = playerChannel;
  * }} deps  without `botComponent` nobody can start a game against a computer character (CC-138), and without
  *   `chessRatingComponent` no tab can ask for a room's ratings (CC-042). Without `recordSocketEvent` socket
  *   events are not timed for operations telemetry (ADR-055). `friends` is the presence tracker, told about every
- *   tab, and the friend component, whose changes are pushed (CC-052)
+ *   tab, and the friend component, whose changes are pushed (CC-052). `challengeComponent` gives each player their own view of a challenge
+ *   that changed (CC-139)
  */
 export function createRealtimeGateway({
   httpServer,
@@ -81,6 +85,7 @@ export function createRealtimeGateway({
   botComponent,
   chessRatingComponent,
   recordSocketEvent = NO_OPERATIONS_METRICS.recordSocketEvent,
+  challengeComponent,
   friends,
 }) {
   assertDefined(httpServer, "httpServer");
@@ -92,6 +97,7 @@ export function createRealtimeGateway({
   assertFunction(checkSession, "checkSession");
   assertDefined(trustProxyHops, "trustProxyHops");
   assertFunction(networkOf, "networkOf");
+  assertFunction(challengeComponent?.viewFor, "challengeComponent.viewFor");
   assertFunction(friends?.presence?.connected, "friends.presence.connected");
   assertDefined(friends.friendComponent, "friends.friendComponent");
 
@@ -112,6 +118,8 @@ export function createRealtimeGateway({
   // reconnect to the next server, which starts by marking everyone away (CC-101). Recording each cut here
   // would only race the database closing.
   let closing = false;
+  /** Closed tabs whose rooms are still being told. Closing waits for them, before the database closes (CC-318). */
+  const recording = new Set();
   const connections = trackConnections(httpServer);
   const admission = createSocketAdmission({ limits, now });
   /**
@@ -212,14 +220,15 @@ export function createRealtimeGateway({
       socketLogger.info({ reason }, "socket disconnected");
       if (closing) return;
       friendPushes.tabClosed(identity.id);
-      handleSocketGone({
+      const gone = handleSocketGone({
         io,
         roomComponent,
         playerId: identity.id,
         channels: roomChannels,
         now,
         logger: socketLogger,
-      });
+      }).finally(() => recording.delete(gone));
+      recording.add(gone);
     });
 
     registerHandlers(
@@ -294,6 +303,20 @@ export function createRealtimeGateway({
     pushRequests({ io, roomComponent, room, playerIds, now }),
   );
 
+  // Domain to transport: a challenge changed, so every tab of the players it names hears about it on any page, each
+  // with their own view (CC-139). The challenger of a room just made from their challenge sits in it as offline. If
+  // a tab of theirs is open on the site, they are away instead, so the one who took it sees them as on the site.
+  domainEvents.on(CHALLENGE_EVENTS.CHANGED, ({ challenge, playerIds }) => {
+    for (const playerId of playerIds) {
+      io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.CHALLENGE_UPDATED, {
+        challenge: challengeComponent.viewFor(challenge, playerId, now()),
+      });
+    }
+    if (challenge.state === CHALLENGE_STATES.ACCEPTED && challenge.roomCode !== "") {
+      markOnSite({ io, roomComponent, playerId: challenge.fromId, now, logger });
+    }
+  });
+
   // Domain → transport: a room changed on its own (e.g. a clock ran out) — push everyone their new view.
   domainEvents.on(ROOM_EVENTS.UPDATED, ({ room }) => {
     broadcastRoom({ io, roomComponent, room, now }).catch((err) =>
@@ -332,11 +355,12 @@ export function createRealtimeGateway({
     },
     /** @returns {{ connections: number, players: number }} realtime connections and connected players, for the gauge */
     counts: () => admission.counts(),
-    /** Disconnects all sockets and closes the underlying HTTP server. */
-    close() {
+    /** Waits for the tabs that already closed to be recorded, then disconnects all sockets and closes the HTTP server. */
+    async close() {
       closing = true;
       // Players hear why they are cut off, and that their game is kept for the next server (CC-158).
       io.emit(SOCKET_EVENTS.SERVER_RESTARTING, {});
+      await Promise.allSettled([...recording]);
       return new Promise((resolve, reject) => {
         io.close((err) => (err ? reject(err) : resolve()));
         connections.closeIdle();

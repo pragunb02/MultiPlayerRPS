@@ -6,6 +6,7 @@ import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "../data/blockAccessor.js";
+import { createChallengeAccessor } from "../data/challengeAccessor.js";
 import { createFriendAccessor } from "../data/friendAccessor.js";
 import { createPrivacyAccessor } from "../data/privacyAccessor.js";
 import { createFeedbackAccessor } from "../data/feedbackAccessor.js";
@@ -26,6 +27,7 @@ import { createAccountComponent } from "../domain/accounts/accountComponent.js";
 import { createPlayerDataComponent } from "../domain/accounts/playerDataComponent.js";
 import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
 import { createBlockComponent } from "../domain/blocks/blockComponent.js";
+import { createChallengeComponent } from "../domain/challenges/challengeComponent.js";
 import { createProfileCards } from "../domain/profiles/profileCards.js";
 import { createProfileComponent } from "../domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "../domain/safety/safetyComponent.js";
@@ -80,6 +82,7 @@ import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.js";
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
+import { createInMemoryChallengeDao } from "./inMemoryChallengeDao.js";
 import {
   createInMemoryFriendLinkDao,
   createInMemoryFriendRequestDao,
@@ -133,6 +136,9 @@ import { testConfig } from "./testConfig.js";
  *     part in deleting an account (e.g. one that fails, CC-035)
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
  *   profileLimits?: object,   the limits on profile lookups and changes (CC-034)
+ *   challengeLimits?: object,   the rate limits of the challenge routes (CC-139)
+ *   challengeRecipients?: { resolve: Function },   who a challenge to one person may name. Nobody unless a test
+ *     gives its own, as in production until CC-052
  *   friendLimits?: object,   the limits on friend requests, changes and link lookups (CC-052)
  *   friendRules?: object,   the friends rules (FRIEND_LIMITS), such as how many requests may wait (CC-052)
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
@@ -166,6 +172,8 @@ export function createTestApp({
   dataParticipants = (participants) => participants,
   blockLimits,
   profileLimits,
+  challengeLimits,
+  challengeRecipients,
   friendLimits,
   friendRules,
   feedbackLimits,
@@ -299,6 +307,8 @@ export function createTestApp({
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
       { name: "profiles", transferPlayer: profileComponent.transferPlayer },
+      // Made after the room component, which it needs, and called only once a guest signs in.
+      { name: "challenges", transferPlayer: (transfer) => challengeComponent.transferPlayer(transfer) },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ]),
     matches: matchComponent,
@@ -336,6 +346,15 @@ export function createTestApp({
     seatIds,
     avatars: profileCards,
   });
+  const challengeComponent = createChallengeComponent({
+    challengeAccessor: createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() }),
+    rooms: roomComponent,
+    blocks: blockComponent,
+    safety: safetyComponent,
+    events: domainEvents,
+    ...(challengeRecipients && { recipients: challengeRecipients }),
+  });
+  const networkOf = createNetworkKey({ now }).networkOf;
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const friends = wireFriends({
     friendAccessor: createFriendAccessor({
@@ -440,6 +459,11 @@ export function createTestApp({
         erasePlayer: profileComponent.erasePlayer,
         exportPlayer: profileComponent.exportPlayer,
       },
+      {
+        name: "challenges",
+        erasePlayer: challengeComponent.erasePlayer,
+        exportPlayer: challengeComponent.exportPlayer,
+      },
     ]),
   });
   const endedSessions = [];
@@ -472,6 +496,9 @@ export function createTestApp({
     blockLimits,
     profileComponent,
     profileLimits,
+    challengeComponent,
+    challengeLimits,
+    networkOf,
     friendComponent: friends.friendComponent,
     friendLimits,
     feedbackComponent,
@@ -519,6 +546,8 @@ export function createTestApp({
     chessRatingComponent,
     blockComponent,
     profileComponent,
+    challengeComponent,
+    networkOf,
     friends,
     feedbackComponent,
     dailyPuzzleComponent,
@@ -570,7 +599,8 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     domainEvents: testApp.domainEvents,
     checkSession: testApp.checkSession,
     trustProxyHops: testApp.config.trustProxyHops,
-    networkOf: createNetworkKey({ now }).networkOf,
+    networkOf: testApp.networkOf,
+    challengeComponent: testApp.challengeComponent,
     now,
     ...(options.roomLimits && { limits: options.roomLimits }),
     botComponent: testApp.botComponent,

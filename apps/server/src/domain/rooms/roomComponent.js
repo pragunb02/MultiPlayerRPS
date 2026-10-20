@@ -663,6 +663,51 @@ export function createRoomComponent({
     );
   }
 
+  /** A new room needs the network of the player making it, and the earlier names of that network (CC-249). */
+  function checkNetworks(network, earlierNetworks) {
+    if (typeof network !== "string" || network === "") {
+      throw new TypeError("a new room needs the network the player connects from");
+    }
+    if (
+      !Array.isArray(earlierNetworks) ||
+      !earlierNetworks.every((name) => typeof name === "string" && name !== "")
+    ) {
+      throw new TypeError("a new room needs earlier network names as a list of names");
+    }
+  }
+
+  /** The game's options as its engine accepts them. An unknown game or invalid options are refused. */
+  function validOptions(gameId, options) {
+    if (typeof gameId !== "string" || !engines.has(gameId)) {
+      throw new ValidationError("That game is not available", { details: { field: "gameId" } });
+    }
+    const validated = engines.get(gameId).validateOptions(options ?? {});
+    if (!validated.ok) {
+      throw new ValidationError(validated.message, { details: { field: "options" } });
+    }
+    return validated.value;
+  }
+
+  /**
+   * Stores a new room under a code that is not in use and did not close recently, so an old link never leads into a
+   * stranger's new room.
+   */
+  async function createWithFreshCode(fields) {
+    for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
+      const code = generateCode();
+      if ((await roomAccessor.exists(code)) || (await roomAccessor.wasClosed(code))) {
+        continue;
+      }
+      try {
+        return await roomAccessor.create(stamp({ code, ...fields }));
+      } catch (err) {
+        // Another room took the same code a moment ago: try the next one.
+        if (!(err instanceof ConflictError)) throw err;
+      }
+    }
+    throw new Error(`Could not find a free room code after ${MAX_CODE_ATTEMPTS} attempts`);
+  }
+
   const component = {
     /**
      * Creates a room with the host seated. Unknown games and invalid options are rejected. A code is never one
@@ -684,57 +729,81 @@ export function createRoomComponent({
      * @throws {ServerBusyError} when the server holds as many rooms as it can
      */
     async createRoom({ host, network, earlierNetworks = [], gameId, options, now }) {
-      if (typeof network !== "string" || network === "") {
-        throw new TypeError("createRoom needs the network the host connects from");
-      }
-      if (
-        !Array.isArray(earlierNetworks) ||
-        !earlierNetworks.every((name) => typeof name === "string" && name !== "")
-      ) {
-        throw new TypeError("createRoom needs earlier network names as a list of names");
-      }
-      if (typeof gameId !== "string" || !engines.has(gameId)) {
-        throw new ValidationError("That game is not available", { details: { field: "gameId" } });
-      }
-      const validated = engines.get(gameId).validateOptions(options ?? {});
-      if (!validated.ok) {
-        throw new ValidationError(validated.message, { details: { field: "options" } });
-      }
+      checkNetworks(network, earlierNetworks);
+      const value = validOptions(gameId, options);
       await checkRoomLimits(host, [network, ...earlierNetworks], now);
       const hostAvatar = avatarField(await avatars.avatarOf({ playerId: host.id }));
-      for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
-        const code = generateCode();
-        if ((await roomAccessor.exists(code)) || (await roomAccessor.wasClosed(code))) {
-          continue;
-        }
-        const room = {
-          code,
-          gameId,
-          options: validated.value,
-          status: ROOM_STATUS.WAITING,
-          hostId: host.id,
-          network,
-          seats: [
-            {
-              playerId: host.id,
-              displayName: host.displayName,
-              ...hostAvatar,
-              connected: true,
-              away: false,
-              since: now,
-            },
-          ],
-          createdAt: now,
-          lastActivityAt: now,
-        };
-        try {
-          return await roomAccessor.create(stamp(room));
-        } catch (err) {
-          // Another room took the same code a moment ago: try the next one.
-          if (!(err instanceof ConflictError)) throw err;
-        }
-      }
-      throw new Error(`Could not find a free room code after ${MAX_CODE_ATTEMPTS} attempts`);
+      return createWithFreshCode({
+        gameId,
+        options: value,
+        status: ROOM_STATUS.WAITING,
+        hostId: host.id,
+        network,
+        seats: [
+          {
+            playerId: host.id,
+            displayName: host.displayName,
+            ...hostAvatar,
+            connected: true,
+            away: false,
+            since: now,
+          },
+        ],
+        createdAt: now,
+        lastActivityAt: now,
+      });
+    },
+
+    /**
+     * A game's options as its engine accepts them, the same check a new room makes. A challenge (CC-139) stores
+     * them so the room made from it later gets exactly these.
+     *
+     * @param {{ gameId: string, options: unknown }} input
+     * @returns {Readonly<object>}
+     * @throws {ValidationError} for an unknown game or invalid options
+     */
+    checkOptions: ({ gameId, options }) => validOptions(gameId, options),
+
+    /**
+     * Makes the room of a challenge someone took (CC-139, ADR-069), with both players seated and the game waiting
+     * for both to open its page. The challenger is the host and sits first. They are offline until their browser is
+     * known to be on the site, which the service layer then records as away. The player who took it is away until
+     * their room page opens a moment later. The room counts against the limits of the player who took it and of
+     * their network, because they are the one making it now. The challenge has already checked blocks.
+     *
+     * @param {{
+     *   challenger: Readonly<{ id: string, displayName: string }>,
+     *   accepter: import("../../models/identity.js").Identity,
+     *   network: string,
+     *   earlierNetworks?: ReadonlyArray<string>,
+     *   gameId: string,
+     *   options: unknown,
+     *   now: number,
+     * }} input  `network` and `earlierNetworks` as in `createRoom`, for the player who took the challenge
+     * @throws {ConflictError} or {ServerBusyError} as `createRoom` does
+     */
+    async createChallengeRoom({ challenger, accepter, network, earlierNetworks = [], gameId, options, now }) {
+      checkNetworks(network, earlierNetworks);
+      const value = validOptions(gameId, options);
+      await checkRoomLimits(accepter, [network, ...earlierNetworks], now);
+      const seat = async (player, away) => ({
+        playerId: player.id,
+        displayName: player.displayName,
+        ...avatarField(await avatars.avatarOf({ playerId: player.id })),
+        connected: false,
+        away,
+        since: now,
+      });
+      return createWithFreshCode({
+        gameId,
+        options: value,
+        status: ROOM_STATUS.WAITING,
+        hostId: challenger.id,
+        network,
+        seats: [await seat(challenger, false), await seat(accepter, true)],
+        createdAt: now,
+        lastActivityAt: now,
+      });
     },
 
     /**
