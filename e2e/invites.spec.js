@@ -75,6 +75,8 @@ test.describe("invites to friends (CC-052)", () => {
   test("the first friend to accept plays, the sender hears it, and the other friend reads Game filled", async ({
     players,
   }) => {
+    // Four browsers, three sign-ups and two friendships before the invite: slow on CI's WebKit runners.
+    test.slow();
     await turnInvitesOn(players);
     const riya = await players.open("riya");
     const arjun = await players.open("arjun");
