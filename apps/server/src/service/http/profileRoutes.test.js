@@ -3,6 +3,7 @@ import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { hasPlayerIdShape } from "../../models/playerIdShape.js";
 import { createSocketClients, send, startRoom } from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
+import { PROFILE_LIMITS } from "./profileRoutes.js";
 
 // CC-034, ADR-065: profiles and avatars over HTTP. A profile is reached by its random handle only, an adult's only
 // when they made it public, and nobody else is ever shown but as "Hidden player".
@@ -229,7 +230,7 @@ describe("a profile by its handle (CC-034)", () => {
     });
   });
 
-  it("answers exactly the same 404 for a handle nobody has, a malformed one and a blocked pair, both ways", async () => {
+  it("answers exactly the same 404 for a handle nobody has and a malformed one, and a blocked pair what a visitor gets", async () => {
     server = await startTestServer();
     const riya = await account("RiyaTest", ADULT_YEAR);
     const arjun = await account("ArjunTest", ADULT_YEAR);
@@ -250,8 +251,6 @@ describe("a profile by its handle (CC-034)", () => {
       await lookUp("0000000000000000"),
       await lookUp("not-a-handle"),
       await lookUp(riya.identity.id),
-      await lookUp((await own(arjun)).handle, riya),
-      await lookUp((await own(riya)).handle, arjun),
     ];
 
     for (const answer of answers) {
@@ -260,7 +259,22 @@ describe("a profile by its handle (CC-034)", () => {
         error: { code: ERROR_CODES.NOT_FOUND, message: "No such player", requestId: "-" },
       });
     }
-    expect((await lookUp((await own(arjun)).handle)).status).toBe(200);
+    // A blocked pair, both ways, gets exactly the visitor's answer, so the block never shows (ADR-053).
+    for (const [owner, viewer] of [
+      [arjun, riya],
+      [riya, arjun],
+    ]) {
+      const { handle } = await own(owner);
+      const blockedView = await lookUp(handle, viewer);
+      const visitorView = await lookUp(handle);
+      expect(blockedView.status).toBe(200);
+      expect(blockedView.body).toEqual(visitorView.body);
+    }
+  });
+
+  it("gives a network more lookups than one player, so one player cannot use up a school's address", () => {
+    expect(PROFILE_LIMITS.lookupsPerAddress.limit).toBeGreaterThan(PROFILE_LIMITS.lookupsPerPlayer.limit);
+    expect(PROFILE_LIMITS.lookupsPerAddress.limit).toBe(5 * PROFILE_LIMITS.lookupsPerPlayer.limit);
   });
 
   it("finds nothing at a deleted account's handle", async () => {

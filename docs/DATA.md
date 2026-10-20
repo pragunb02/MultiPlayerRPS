@@ -351,8 +351,9 @@ ADR-053)
    rating shown at the handle are already public on the boards.
 3. **Who can read it:** the player, as their own profile. Anyone with a handle (`GET /api/profiles/:handle`): an
    adult account's public profile, the name and avatar of an adult's private one, "Hidden player" with their avatar and nothing else
-   for anyone not surely an adult, and the same 404 for a handle nobody has, a deleted player's and a blocked pair.
-   Lookups are limited to 30 a minute per address and per player. Nothing lists profiles. The owner.
+   for anyone not surely an adult, and the same 404 for a handle nobody has and a deleted player's. A blocked pair sees what a signed-out visitor
+   sees, so the block never shows (ADR-053).
+   Lookups are limited to 30 a minute per player and 150 a minute per address. Nothing lists profiles. The owner.
 4. **Kept for:** until the account is deleted. A guest's profile becomes the account's when the account has none,
    and is otherwise deleted after its avatar moves to an account without one (ADR-014). A guest who never signs in
    keeps theirs as long as other guest data (CC-098).

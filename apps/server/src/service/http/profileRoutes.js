@@ -10,13 +10,14 @@ const MINUTE_MS = 60 * 1000;
 /**
  * The limits on profiles (CC-034, ADR-065). Each is a business rule, and tests and browser tests may change them.
  *
- * 1. `lookupsPerAddress`: profiles opened per network address in a minute. Plenty for someone reading a board, far
+ * 1. `lookupsPerAddress`: profiles opened per network address in a minute, five times one player's budget, so one
+ *    player cannot use up a school's or a carrier's address. Plenty for everyone behind it, and far
  *    too few to try handles: 80 random bits would take longer than the universe has existed.
- * 2. `lookupsPerPlayer`: the same per signed-in player, so one player cannot use up a school's address.
+ * 2. `lookupsPerPlayer`: profiles opened per signed-in player in a minute. Plenty for someone reading a board.
  * 3. `changesPerPlayer`: avatar and visibility changes per player in 10 minutes.
  */
 export const PROFILE_LIMITS = Object.freeze({
-  lookupsPerAddress: Object.freeze({ windowMs: MINUTE_MS, limit: 30 }),
+  lookupsPerAddress: Object.freeze({ windowMs: MINUTE_MS, limit: 150 }),
   lookupsPerPlayer: Object.freeze({ windowMs: MINUTE_MS, limit: 30 }),
   changesPerPlayer: Object.freeze({ windowMs: 10 * MINUTE_MS, limit: 30 }),
 });
@@ -48,7 +49,8 @@ function onlyField(body, field) {
  * 3. `PUT /profile/visibility` with `{ visibility: "public" | "private" }` sets who can see it. Only an adult account
  *    may choose public (403 for anyone else).
  * 4. `GET /profiles/:handle` answers `{ player }`, what the viewer may see of that profile, for visitors too. A
- *    handle nobody has, a malformed one, a deleted player's and a blocked pair all get the same 404.
+ *    handle nobody has, a malformed one and a deleted player's get the same 404. A blocked pair gets what a visitor
+ *    gets, so a block never shows (ADR-053).
  *
  * Every answer is `Cache-Control: no-store`: what a profile shows depends on who asks and can change at any time.
  *

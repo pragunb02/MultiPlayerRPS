@@ -12,10 +12,7 @@ import { canPickAvatar } from "./avatarRules.js";
 
 const VISIBILITIES = new Set(Object.values(PROFILE_VISIBILITY));
 
-/**
- * The one answer for a handle nobody has, a deleted player's, and a player on either side of a block with the viewer,
- * so a lookup can never tell them apart (ADR-053, OWASP IDOR).
- */
+/** The one answer for a handle nobody has and a deleted player's, so a lookup can never tell them apart (OWASP IDOR). */
 const notFound = (cause) => new NotFoundError("No such player", cause === undefined ? {} : { cause });
 
 const avatarField = (profile) => (isAvatarId(profile.avatar) ? { avatar: profile.avatar } : {});
@@ -27,8 +24,11 @@ const visibilityOf = (profile) => profile.visibility ?? DEFAULT_PROFILE_VISIBILI
  * 1. Every person has a profile, made the first time it is needed, with a random handle as its address.
  * 2. Anyone, a guest too, picks an avatar from the catalogue for their own profile.
  * 3. Only an adult account's profile can be public, and only when its owner made it public. It starts private.
- * 4. A profile is looked up by its handle only. A handle nobody has, a deleted player's and a blocked pair all get
- *    the same "not found". Anyone not surely an adult, guests included, is "Hidden player" with their avatar and nothing else.
+ * 4. A profile is looked up by its handle only. A handle nobody has and a deleted player's get the same "not
+ *    found". Anyone not surely an adult, guests included, is "Hidden player" with their avatar and nothing else.
+ * 5. Blocks are not read. A blocked pair sees exactly what a signed-out visitor sees, because a refusal that a
+ *    visitor does not get would tell the blocked player they were blocked (ADR-053). A profile shows nothing a
+ *    visitor cannot see anyway.
  *
  * @param {{
  *   profileAccessor: ReturnType<typeof import("../../data/profileAccessor.js").createProfileAccessor>,
@@ -36,17 +36,15 @@ const visibilityOf = (profile) => profile.visibility ?? DEFAULT_PROFILE_VISIBILI
  *   accounts: { profileOf: (query: { playerId: string, now: number }) => Promise<Readonly<{ username: string }>> },
  *   progress: { getProgress: (playerId: string) => Promise<Readonly<{ level: number, matchesPlayed: number, wins: number }>> },
  *   ratings: { ratingsOf: (query: { gameId: string, playerIds: ReadonlyArray<string>, matchId: string }) => Promise<ReadonlyArray<Readonly<{ rating: number, games: number, provisional: boolean }>>> },
- *   blocks: { blockedWith: (query: { playerId: string }) => Promise<ReadonlySet<string>> },
  * }} deps  `accounts` gives an adult's username, `progress` their level and games, `ratings` their chess rating
- *   (CC-042) and `blocks` everyone on either side of a block with the viewer (CC-044)
+ *   (CC-042)
  */
-export function createProfileComponent({ profileAccessor, ages, accounts, progress, ratings, blocks }) {
+export function createProfileComponent({ profileAccessor, ages, accounts, progress, ratings }) {
   assertDefined(profileAccessor, "profileAccessor");
   assertFunction(ages?.adultsAmong, "ages.adultsAmong");
   assertFunction(accounts?.profileOf, "accounts.profileOf");
   assertFunction(progress?.getProgress, "progress.getProgress");
   assertFunction(ratings?.ratingsOf, "ratings.ratingsOf");
-  assertFunction(blocks?.blockedWith, "blocks.blockedWith");
 
   /** Whether the player is an account surely 18 or older. Guests never are (ADR-028.1). */
   const isAdult = async (playerId, now) =>
@@ -137,7 +135,7 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
     /**
      * What a viewer sees at a handle. Checked in this order, on every read:
      *
-     * 1. No such handle, a deleted account, or a block either way: not found, all alike.
+     * 1. No such handle, or a deleted account: not found, both alike. A block changes nothing (point 5 above).
      * 2. Not surely an adult: `{ hidden: true }` as "Hidden player" with the avatar they picked, nothing else.
      *    Avatars come from our own set and identify nobody (owner, ADR-065).
      * 3. A private adult profile: the username and the avatar, `private: true`.
@@ -158,9 +156,6 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
       }
       const { playerId } = profile;
       const own = viewerId !== "" && viewerId === playerId;
-      if (viewerId !== "" && !own && (await blocks.blockedWith({ playerId: viewerId })).has(playerId)) {
-        throw notFound();
-      }
       const base = { handle, ...(own && { own: true }) };
       if (!(await isAdult(playerId, now))) {
         return Object.freeze({

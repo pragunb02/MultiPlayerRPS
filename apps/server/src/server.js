@@ -730,7 +730,6 @@ export async function startServer({
     accounts: accountComponent,
     progress: progressionComponent,
     ratings: chessRatingComponent,
-    blocks: blockComponent,
   });
   // Everything stored by player id moves with a guest who signs in (ADR-014), in this order. Leaderboards go
   // last: they are recomputed from the progress and matches that have moved by then.

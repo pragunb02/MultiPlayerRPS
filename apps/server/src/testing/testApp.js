@@ -242,7 +242,6 @@ export function createTestApp({
     accounts: accountComponent,
     progress: progressionComponent,
     ratings: chessRatingComponent,
-    blocks: blockComponent,
   });
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,

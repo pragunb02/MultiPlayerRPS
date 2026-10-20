@@ -28,13 +28,12 @@ const stringsIn = (value) =>
       ? [...Object.keys(value), ...Object.values(value)].flatMap(stringsIn)
       : [];
 
-function setup({ blocked = [], deleted = [] } = {}) {
+function setup({ deleted = [] } = {}) {
   let n = 0;
   const profileAccessor = createProfileAccessor({
     profileDao: createInMemoryProfileDao(),
     newHandle: () => `${++n}`.padStart(16, "h"),
   });
-  const pairs = [...blocked];
   const component = createProfileComponent({
     profileAccessor,
     ages: { adultsAmong: async ({ playerIds }) => new Set(playerIds.filter((id) => ADULTS.has(id))) },
@@ -50,10 +49,6 @@ function setup({ blocked = [], deleted = [] } = {}) {
         expect({ gameId, matchId }).toEqual({ gameId: "chess", matchId: "" });
         return [{ playerId: playerIds[0], rating: 1532, deviation: 80, games: 14, provisional: false }];
       },
-    },
-    blocks: {
-      blockedWith: async ({ playerId }) =>
-        new Set(pairs.flatMap(([a, b]) => (a === playerId ? [b] : b === playerId ? [a] : []))),
     },
   });
   const handleOf = async (player) => (await component.ownProfile({ player, now: T0 })).handle;
@@ -192,22 +187,16 @@ describe("profileComponent: what a viewer sees at a handle (CC-034)", () => {
     },
   );
 
-  it("answers the same not found for a handle nobody has, a deleted account and a block either way", async () => {
-    const { component, handleOf } = setup({ blocked: [[RIYA.id, ARJUN.id]], deleted: [KABIR.id] });
-    const riya = await handleOf(RIYA);
-    const arjun = await handleOf(ARJUN);
-    await component.setVisibility({ player: RIYA, visibility: "public", now: T0 });
-    await component.setVisibility({ player: ARJUN, visibility: "public", now: T0 });
+  it("answers the same not found for a handle nobody has and a deleted account", async () => {
+    const { component } = setup({ deleted: [KABIR.id] });
     ADULTS.add(KABIR.id);
-    const kabir = await handleOf(KABIR);
+    const kabir = (await component.ownProfile({ player: KABIR, now: T0 })).handle;
 
     try {
       const refusals = await Promise.all(
         [
           { handle: "nnnnnnnnnnnnnnnn", viewerId: "" },
           { handle: kabir, viewerId: "" },
-          { handle: arjun, viewerId: RIYA.id },
-          { handle: riya, viewerId: ARJUN.id },
         ].map((query) => component.publicView({ ...query, now: T0 }).catch((err) => err)),
       );
 
@@ -221,15 +210,28 @@ describe("profileComponent: what a viewer sees at a handle (CC-034)", () => {
     }
   });
 
-  it("hides a blocked minor too, never Hidden player", async () => {
-    const { component, handleOf } = setup({ blocked: [[KABIR.id, RIYA.id]] });
-    const handle = await handleOf(KABIR);
+  it("shows a blocked pair, both ways, exactly what a visitor sees, so a block cannot be told apart (ADR-053)", async () => {
+    // A 404 for a blocked viewer would say "you are blocked": the same handle answers a signed-out visitor. So
+    // the component never reads blocks at all, whoever blocked whom.
+    const { component, handleOf } = setup();
+    const riya = await handleOf(RIYA);
+    const arjun = await handleOf(ARJUN);
+    const kabir = await handleOf(KABIR);
+    await component.setVisibility({ player: RIYA, visibility: "public", now: T0 });
 
-    await expect(component.publicView({ handle, viewerId: RIYA.id, now: T0 })).rejects.toThrow(NotFoundError);
+    for (const [handle, viewerId] of [
+      [riya, ARJUN.id],
+      [arjun, RIYA.id],
+      [kabir, RIYA.id],
+    ]) {
+      expect(await component.publicView({ handle, viewerId, now: T0 })).toEqual(
+        await component.publicView({ handle, viewerId: "", now: T0 }),
+      );
+    }
   });
 
   it("shows a visitor and anyone unblocked the same profile", async () => {
-    const { component, handleOf } = setup({ blocked: [[ARJUN.id, MEENA.id]] });
+    const { component, handleOf } = setup();
     const handle = await handleOf(RIYA);
 
     const visitor = await component.publicView({ handle, viewerId: "", now: T0 });
@@ -257,7 +259,6 @@ describe("profileComponent: what a viewer sees at a handle (CC-034)", () => {
       accounts: { profileOf: async () => Promise.reject(new Error("database down")) },
       progress: { getProgress: async () => ({}) },
       ratings: { ratingsOf: async () => [] },
-      blocks: { blockedWith: async () => new Set() },
     });
 
     await expect(broken.publicView({ handle, viewerId: "", now: T0 })).rejects.toThrow("database down");
@@ -270,7 +271,6 @@ describe("profileComponent: what a viewer sees at a handle (CC-034)", () => {
       accounts: { profileOf: async () => ({}) },
       progress: { getProgress: async () => ({}) },
       ratings: { ratingsOf: async () => [] },
-      blocks: { blockedWith: async () => new Set() },
     });
 
     await expect(broken.publicView({ handle: "hhhhhhhhhhhhhhh1", viewerId: "", now: T0 })).rejects.toThrow(
@@ -368,7 +368,6 @@ describe("profileComponent: a guest signs in (ADR-014)", () => {
       accounts: { profileOf: async () => ({}) },
       progress: { getProgress: async () => ({}) },
       ratings: { ratingsOf: async () => [] },
-      blocks: { blockedWith: async () => new Set() },
     });
 
     expect(await racing.transferPlayer({ from: GUEST.id, to: RIYA, now: T0 })).toEqual({
@@ -386,7 +385,6 @@ describe("profileComponent: a guest signs in (ADR-014)", () => {
       accounts: { profileOf: async () => ({}) },
       progress: { getProgress: async () => ({}) },
       ratings: { ratingsOf: async () => [] },
-      blocks: { blockedWith: async () => new Set() },
     });
 
     await expect(broken.transferPlayer({ from: GUEST.id, to: RIYA, now: T0 })).rejects.toThrow(

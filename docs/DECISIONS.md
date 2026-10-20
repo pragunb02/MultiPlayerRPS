@@ -76,7 +76,7 @@ the owner may change it.
      opponent in history, only when that player is an adult account. Guests, minors, accounts of unknown age, hidden
      rows and computer players get no link. A player sees their own handle on their own profile.
   3. **What a handle shows**, decided on the server for each read, in this order: not found for a handle nobody has,
-     a malformed one, a deleted account's and a block either way, one body for all. "Hidden player" with the avatar they
+     a malformed one and a deleted account's, one body for all. A blocked pair, either way, gets exactly what a signed-out visitor gets for that handle: the boards and history hand out the handle, and anyone can open it signed out, so a 404 kept only for the blocked viewer would tell them they were blocked (ADR-053, found in the review of #135). "Hidden player" with the avatar they
      picked and nothing else (no stats) for anyone not surely an adult. The username and avatar of an adult's private profile.
      The username, avatar, level, games played and won, and the chess rating (CC-042) of an adult's public profile.
      Never a date, a streak, last seen, history, an email or an id. `own: true` when the viewer is its owner.
@@ -92,8 +92,9 @@ the owner may change it.
   7. **Guests pick too, and it moves on sign up** (ADR-014, a transfer participant before leaderboards): the account
      keeps its own avatar and handle, and takes the guest's avatar when it has none, or the guest's whole profile when
      it has no profile. The guest's handle then leads nowhere.
-  8. **Abuse.** No directory, no search, no list. Lookups: 30 a minute per signed-in player, then 30 a minute per
-     address, counting only what the player limit let through. Avatar and visibility changes: 30 in 10 minutes.
+  8. **Abuse.** No directory, no search, no list. Lookups: 30 a minute per signed-in player, then 150 a minute per
+     address (five players' worth, as blocks do, so one player cannot use up a school's address), counting only what
+     the player limit let through (amended in the review of #135, which had both at 30). Avatar and visibility changes: 30 in 10 minutes.
   9. **Deletion and export** (ADR-048): `player_profiles` is a participant. Export: handle, avatar, visibility.
 - **Consequences.** One new collection with two unique indexes, nothing existing changed or migrated. Rooms stored
   before this have no avatars on their seats, and show the silhouette. A board read can make the profile of an adult
