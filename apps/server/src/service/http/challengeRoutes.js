@@ -84,7 +84,7 @@ function challengeIdOf(req) {
  *
  * 1. `POST /challenges` with `{ gameId, options?, to? }` makes one and answers 201 `{ challenge }`. Guests and
  *    accounts, visitors get 401. A limit answers 409 with `details.reason`.
- * 2. `GET /challenges` answers `{ challenges }`, the player's inbox.
+ * 2. `GET /challenges` answers `{ challenges }`, the player's inbox, empty for a visitor.
  * 3. `GET /challenges/:id` answers `{ challenge }` for anyone with the link, visitors too. An unknown, malformed or
  *    forgotten id is one 404.
  * 4. `POST /challenges/:id/accept` takes it and answers `{ challenge, room: { code, gameId } }`. One no longer open
@@ -157,7 +157,13 @@ export function createChallengeRoutes({ challengeComponent, networkOf, now = Dat
     res.status(201).json({ challenge });
   });
 
-  router.get("/challenges", noStore, signedIn, lookupsPerPlayer, async (req, res) => {
+  // A visitor has nothing in an inbox. Answering that, instead of 401, keeps a tab that is signing in or out at
+  // that very moment from showing a failed request.
+  router.get("/challenges", noStore, lookupsPerPlayer, lookupsPerAddress, async (req, res) => {
+    if (req.session.identity === undefined) {
+      res.json({ challenges: [] });
+      return;
+    }
     const { id: playerId } = requireIdentity(req.session);
     res.json({ challenges: await challengeComponent.inbox({ playerId, now: now() }) });
   });

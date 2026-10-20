@@ -189,7 +189,10 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
   });
 
   it("shows nothing that is already in the inbox, or on the page it would lead to", async () => {
-    const { push } = await open({ path: "/challenge/c0000000000000000001" });
+    const { push } = await open({
+      path: "/challenge/c0000000000000000001",
+      api: { getChallenge: vi.fn(() => new Promise(() => {})) },
+    });
 
     push(sentToYou());
     push(yoursTaken({ later: true }));

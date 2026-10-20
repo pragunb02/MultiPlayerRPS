@@ -50,7 +50,8 @@ export function ChallengesProvider({ children }) {
   );
   useEffect(() => {
     if (nextEnd === Infinity) return undefined;
-    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, nextEnd - Date.now()));
+    // A timer may fire a moment early, so the moment it stands for is never earlier than the end it waited for.
+    const timer = setTimeout(() => setNow(Math.max(Date.now(), nextEnd)), Math.max(0, nextEnd - Date.now()));
     return () => clearTimeout(timer);
   }, [nextEnd]);
 

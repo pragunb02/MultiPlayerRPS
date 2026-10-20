@@ -84,7 +84,7 @@ describe("challenge routes (CC-139)", () => {
     expect(visitor.headers.get("cache-control")).toBe("no-store");
     expect(visitor.body.challenge).toMatchObject({ state: CHALLENGE_STATES.OPEN, own: false, fromName: "" });
     expect((await call("POST", "/challenges", { body: { gameId: "race" } })).status).toBe(401);
-    expect((await call("GET", "/challenges")).status).toBe(401);
+    expect(await call("GET", "/challenges")).toMatchObject({ status: 200, body: { challenges: [] } });
     expect((await call("POST", `/challenges/${body.challenge.id}/accept`)).status).toBe(401);
   });
 
