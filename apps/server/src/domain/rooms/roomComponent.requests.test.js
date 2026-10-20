@@ -6,6 +6,7 @@ import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { ConflictError, ValidationError } from "../../utils/errors.js";
 import { createRoomComponent, ROOM_EVENTS } from "./roomComponent.js";
 import { ROOM_LIFETIMES } from "./roomLifetimes.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 // Requests of a game during play (CC-159), through the chess draw offer: one open at a time, thirty seconds to
 // answer, three a game for each player, declined by moving, and gone once the game is over.
@@ -23,6 +24,7 @@ const chessEngine = ENGINES.find((engine) => engine.id === "chess");
 function setup() {
   const published = [];
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([chessEngine, raceEngine, trioRace]),
     events: { emit: (event, payload) => published.push({ event, payload }) },

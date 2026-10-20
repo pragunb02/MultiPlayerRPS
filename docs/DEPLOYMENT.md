@@ -27,21 +27,26 @@ owner links it as a Blueprint, the file is what Render applies. Until then the d
 
 ### Environment variables (dashboard → Environment)
 
-Once the Blueprint is linked, only the secrets (`MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`) are set in the
-dashboard. Every other value below lives in `render.yaml` and changes by pull request.
+Once the Blueprint is linked, only the secrets (`MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`, and for operations telemetry
+`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS`) are set in the dashboard. Every other value below lives in `render.yaml` and changes by pull request.
 
-| Variable            | Required      | Notes                                                                                                                                                                                                                                                                       |
-| ------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MONGO_URI`         | yes           | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                                                             |
-| `SESSION_SECRET`    | yes           | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                                                              |
-| `NODE_ENV`          | yes           | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                                                                   |
-| `ALLOWED_ORIGINS`   | yes           | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047)                                     |
-| `PORT`              | set by Render |                                                                                                                                                                                                                                                                             |
-| `HOST`              | yes           | `0.0.0.0` on Render (see Render settings). Default `127.0.0.1`: this machine only, so local runs are never offered to the network. An IP address or a hostname; anything else stops the boot. The startup log `server listening` shows the bound `host` and `port` (CC-287) |
-| `WEB_DIST_DIR`      | yes           | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                                                                   |
-| `LOG_LEVEL`         | no            | default `info`                                                                                                                                                                                                                                                              |
-| `TRUST_PROXY_HOPS`  | no            | default `1` in production, `0` elsewhere. How many proxies in front of the server add to `X-Forwarded-For`; rate limits key on the address that many entries in from the right. See [Client addresses and rate limits](#client-addresses-and-rate-limits)                   |
-| `ADMIN_ACCOUNT_IDS` | no            | default empty: nobody can open the owner console. Comma separated account ids such as `user_65f0c2a1b2c3d4e5f6a7b8c9`. A guest id or a typo stops the boot. See [Owner console](#owner-console-cc-233)                                                                      |
+| Variable                      | Required          | Notes                                                                                                                                                                                                                                                                       |
+| ----------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MONGO_URI`                   | yes               | Atlas connection string, same database as the legacy app (legacy players log in from its `users`, CC-078). `MONGO_URI_PRODUCTION` is not read by the new server                                                                                                             |
+| `SESSION_SECRET`              | yes               | at least 32 characters (`openssl rand -hex 32`); changing it logs everyone out                                                                                                                                                                                              |
+| `NODE_ENV`                    | yes               | `production` (secure cookies, proxy trust, strict config)                                                                                                                                                                                                                   |
+| `ALLOWED_ORIGINS`             | yes               | `https://nocapgaming.onrender.com` — origins allowed to call the API and open sockets (CSRF defence, ADR-010). The **first** one is the site's public address in link previews, canonical URLs, `robots.txt` and `sitemap.xml` (CC-047)                                     |
+| `PORT`                        | set by Render     |                                                                                                                                                                                                                                                                             |
+| `HOST`                        | yes               | `0.0.0.0` on Render (see Render settings). Default `127.0.0.1`: this machine only, so local runs are never offered to the network. An IP address or a hostname; anything else stops the boot. The startup log `server listening` shows the bound `host` and `port` (CC-287) |
+| `WEB_DIST_DIR`                | yes               | `apps/web/dist` (relative to the repo root); the server refuses to boot without the build                                                                                                                                                                                   |
+| `LOG_LEVEL`                   | no                | default `info`                                                                                                                                                                                                                                                              |
+| `TRUST_PROXY_HOPS`            | no                | default `1` in production, `0` elsewhere. How many proxies in front of the server add to `X-Forwarded-For`; rate limits key on the address that many entries in from the right. See [Client addresses and rate limits](#client-addresses-and-rate-limits)                   |
+| `ADMIN_ACCOUNT_IDS`           | no                | default empty: nobody can open the owner console. Comma separated account ids such as `user_65f0c2a1b2c3d4e5f6a7b8c9`. A guest id or a typo stops the boot. See [Owner console](#owner-console-cc-233)                                                                      |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | no                | default unset: operations telemetry is off and no OpenTelemetry code is loaded. The `https://otlp-gateway-…/otlp` address of the Grafana Cloud stack. Must be `https://` in production. See [Operations telemetry](#operations-telemetry-cc-286-adr-055)                    |
+| `OTEL_EXPORTER_OTLP_HEADERS`  | with the endpoint | `Authorization=Basic%20…` with the write-only token. **A secret.** Set together with the endpoint or the boot stops (the error names the variable, never its value)                                                                                                         |
+| `OTEL_SDK_DISABLED`           | no                | `true` turns telemetry off and keeps the two variables in place                                                                                                                                                                                                             |
+| `OTEL_LOGS_EXPORTER`          | no                | `none` sends metrics only. Default `otlp`                                                                                                                                                                                                                                   |
+| `OTEL_METRIC_EXPORT_INTERVAL` | no                | milliseconds between exports, 1000 to 600000, default 60000                                                                                                                                                                                                                 |
 
 Secrets live only in Render and local `.env` files — never in the repo (it is public), chat, or PR text.
 
@@ -49,8 +54,10 @@ Secrets live only in Render and local `.env` files — never in the repo (it is 
 
 [`render.yaml`](../render.yaml) holds the service settings above and every env var the server reads (ADR-063).
 Plain settings have their value in the file: `NODE_ENV`, `HOST`, `LOG_LEVEL`, `ALLOWED_ORIGINS`, `WEB_DIST_DIR`,
-`TRUST_PROXY_HOPS`. Secrets are `sync: false` with no value: `MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`.
-`PORT` is not in the file because Render sets it. `scripts/renderBlueprint.test.mjs` fails if a variable the config
+`TRUST_PROXY_HOPS`, and operations telemetry's `OTEL_SDK_DISABLED`, `OTEL_LOGS_EXPORTER` and
+`OTEL_METRIC_EXPORT_INTERVAL` (CC-286). Secrets are `sync: false` with no value: `MONGO_URI`, `SESSION_SECRET`,
+`ADMIN_ACCOUNT_IDS`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`. `PORT` and `RENDER_GIT_COMMIT` are
+not in the file because Render sets them. `scripts/renderBlueprint.test.mjs` fails if a variable the config
 reads is missing from the file, or if a secret has a value. A CI job on pull requests checks the file against
 Render's published schema (`https://render.com/schema/render.yaml.json`).
 
@@ -362,8 +369,8 @@ GitHub's mobile app notifies you.
 
 What it does **not** cover yet (the rest of CC-049):
 
-- **Errors and slowness inside the app.** A page that loads but a game that fails, a socket error, a slow API: no
-  error tracking or metrics yet.
+- **Errors and slowness inside the app.** Covered by [Operations telemetry](#operations-telemetry-cc-286-adr-055) once
+  the owner sets its two variables. Until then, no metrics.
 - **Paging.** An issue and a GitHub notification is the only alert. Nobody is woken up.
 - **Exact timing.** GitHub runs schedules on a best effort basis, often a few minutes late and sometimes skipped
   under load, so "every 10 minutes" is roughly every 10 to 20. An outage shorter than two checks may never open an
@@ -375,6 +382,61 @@ What it does **not** cover yet (the rest of CC-049):
 Side effect: a request every 10 minutes keeps the free Render instance from going to sleep (it sleeps after 15 idle
 minutes), so visitors no longer meet cold starts. That uses the free instance hours (750 a month per workspace,
 enough for one service running all month). If a second free service is ever added, slow the schedule down.
+
+## Operations telemetry (CC-286, ADR-055)
+
+The server sends its own metrics and a short list of named log lines to a Grafana Cloud free stack over OTLP/HTTP
+(protobuf). Nothing personal is sent (ADR-055 point 2, the allowlist in
+`apps/server/src/dependency/telemetry/telemetrySchema.js`). **Merging changes nothing:** without
+`OTEL_EXPORTER_OTLP_ENDPOINT` the server loads no OpenTelemetry code and opens no connection. Render's logs stay the
+full record. The dashboard and the alert rules are files in [runbooks/grafana/](runbooks/grafana/).
+
+### Owner steps (once)
+
+Secrets go only into Grafana and Render. Never into the repository, a pull request, an issue or a chat.
+
+1. **Create the stack in India.** Sign up at grafana.com (free, no card) and create a stack in the India region,
+   AWS `ap-south-1`. If a free stack cannot be made there, use Singapore (AWS `ap-southeast-1`), and tell the
+   coordinator: the privacy page says "India region" and must change in the same week. A stack's region cannot be
+   changed later.
+2. **Turn on two-factor sign-in** for the grafana.com account (your profile, Security). Invite nobody else
+   (ADR-055, owner decision 5).
+3. **Create a write-only token.** In the Cloud Portal, Access policies, create a policy for this stack with only the
+   `metrics:write` and `logs:write` scopes (no read, no traces, no admin), then add one token to it. Copy the token
+   once. The OpenTelemetry tile of the stack shows the OTLP endpoint and the instance id.
+4. **Build the header on your own machine**, without the token landing in your shell history:
+   `read -rs TOKEN; printf 'Authorization=Basic%%20%s\n' "$(printf '%s:%s' '<instance id>' "$TOKEN" | base64)"; unset TOKEN`
+   (`base64 -w0` on Linux if the output wraps).
+5. **Set the two variables in Render** (Environment, by hand: `render.yaml` lists them as `sync: false`, and Render
+   reads such keys only when a Blueprint is first created): `OTEL_EXPORTER_OTLP_ENDPOINT` = the tile's
+   `https://otlp-gateway-prod-ap-south-1.grafana.net/otlp` (your stack's address), and
+   `OTEL_EXPORTER_OTLP_HEADERS` = the line from step 4. Save, which redeploys. Only after the code pull request has
+   merged, or with it.
+6. **Check it.** Render's log shows `telemetry on` after `server listening`, and no `telemetry export failed` in the
+   next two minutes. In Grafana, Explore, the metrics data source answers `http_server_request_duration_milliseconds_count`.
+7. **Import the dashboard.** Dashboards, New, Import, upload `docs/runbooks/grafana/classicade-operations.dashboard.json`,
+   and pick the stack's metrics (`grafanacloud-…-prom`), logs (`grafanacloud-…-logs`) and `grafanacloud-usage`
+   data sources.
+8. **Alerts.** Alerting, Contact points: put your email on the default email contact point (the address stays in
+   Grafana). Then create the five rules of `docs/runbooks/grafana/classicade-alerts.yaml` in Alerting, Alert rules,
+   one per entry: query A is its `expr` on the named data source, the threshold is its `gt`, the pending period is
+   its `for`, "no data" is OK. The three of ADR-055 point 6, plus the two free tier usage alerts at 80 %.
+9. **After the first week**, open the stack's usage page: active series should be about 1 000 to 1 500 (CC-286,
+   cardinality budget) against the free 10 000, and logs a few MB against 50 GB.
+
+### Switching it off
+
+At once: delete the value of `OTEL_EXPORTER_OTLP_ENDPOINT` and of `OTEL_EXPORTER_OTLP_HEADERS` in Render's dashboard
+(it redeploys; the two go together or the boot stops). For good, keeping the secrets: a pull request that sets
+`OTEL_SDK_DISABLED` to `"true"` in `render.yaml` (a dashboard edit of a Blueprint value is overwritten on the next
+sync). Without a redeploy, delete the token in the Cloud Portal: exports fail, the server logs `telemetry export failed` at most once a minute, and the
+game is unaffected. Export never runs inside a request, and a failed export never stops the server.
+
+### If the free tier gets tight (ADR-055, amended 2026-10-20)
+
+The usage alerts fire at 80 %. First find what grew on the dashboard (the series panel, `telemetry_logs_suppressed_total`)
+and tune it, or set `OTEL_LOGS_EXPORTER=none`. Then the owner decides: Grafana Cloud pay as you go, or a self-hosted
+Collector and Grafana. Either way only the two variables change, not the code.
 
 ## Known operational risks
 

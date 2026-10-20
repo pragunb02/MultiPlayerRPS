@@ -22,7 +22,25 @@ describe("loadConfig", () => {
       webDistDir: "",
       trustProxyHops: 0,
       adminAccountIds: [],
+      telemetry: { enabled: false },
     });
+  });
+
+  it("reads operations telemetry and lists its problems with the others (ADR-055)", () => {
+    const on = loadConfig({
+      ...REQUIRED,
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      OTEL_EXPORTER_OTLP_HEADERS: "x-test=1",
+    });
+
+    expect(on.telemetry).toMatchObject({
+      enabled: true,
+      endpoint: "http://127.0.0.1:4318",
+      environment: "development",
+    });
+    expect(() => loadConfig({ ...REQUIRED, OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318" })).toThrow(
+      "OTEL_EXPORTER_OTLP_HEADERS is required when OTEL_EXPORTER_OTLP_ENDPOINT is set",
+    );
   });
 
   it("reads the owner console's account ids, trimmed and without repeats", () => {

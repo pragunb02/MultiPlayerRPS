@@ -119,17 +119,20 @@ async function heard(player, event, test = () => true, { after = 0 } = {}) {
   }
 }
 
-const seatOf = (view, player) => view.seats.find((seat) => seat.playerId === player.identity.id);
+const seatOf = (view, player) => view.seats.find((seat) => seat.playerId === player.seatId);
 
 /** Alice hosts best-of-1 Rock Paper Scissors, Bob joins, Alice throws rock and Bob scissors: Alice wins. */
 async function finishedGame(server) {
   const alice = await guest(server);
   const bob = await guest(server);
-  const { code } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
+  const { code, you } = await send(alice.socket, SOCKET_EVENTS.ROOM_CREATE, {
     gameId: "rps",
     options: { bestOf: 1 },
   });
-  await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
+  const joined = await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
+  // Views name players by seat id (CC-253): each player's is the `you` of their own view.
+  alice.seatId = you;
+  bob.seatId = joined.you;
   await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "rock" } });
   const done = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "scissors" } });
   expect(done.status).toBe("finished");
@@ -156,12 +159,13 @@ describe("requests and presence through the real composition root (integration)"
     expect(pushed).toEqual({
       code,
       gameId: "rps",
-      names: { [alice.identity.id]: alice.identity.displayName, [bob.identity.id]: bob.identity.displayName },
+      you: alice.seatId,
+      names: { [alice.seatId]: alice.identity.displayName, [bob.seatId]: bob.identity.displayName },
       requests: [
         {
           type: "rematch",
-          from: bob.identity.id,
-          to: alice.identity.id,
+          from: bob.seatId,
+          to: alice.seatId,
           createdAt: server.clock.now,
           expiresAt: server.clock.now + MINUTE,
           state: "open",
@@ -171,7 +175,10 @@ describe("requests and presence through the real composition root (integration)"
       serverTime: server.clock.now,
     });
     const [stored] = await server.storedRooms();
-    expect(stored.requests).toEqual(pushed.requests);
+    // MongoDB keeps the players' ids. Only what goes to a browser names them by seat id (CC-253).
+    expect(stored.requests).toEqual([
+      { ...pushed.requests[0], from: bob.identity.id, to: alice.identity.id },
+    ]);
     expect(stored.dueAt).toBe(server.clock.now + MINUTE);
 
     await send(alice.socket, SOCKET_EVENTS.ROOM_ANSWER, { code, type: "rematch", answer: "accept" });
@@ -293,7 +300,7 @@ describe("requests and presence through the real composition root (integration)"
       (payload) => payload.requests[0]?.state === "open",
       { after: before },
     );
-    expect(again.requests[0].from).toBe(bob.identity.id);
+    expect(again.requests[0].from).toBe(bob.seatId);
     await send(alice.socket, SOCKET_EVENTS.ROOM_ANSWER, { code, type: "rematch", answer: "accept" });
     expect((await send(alice.socket, SOCKET_EVENTS.ROOM_JOIN, { code })).status).toBe("playing");
   });

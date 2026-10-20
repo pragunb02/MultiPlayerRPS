@@ -21,11 +21,13 @@ const REDACT_PATHS = [
 /**
  * Creates the structured (JSON) logger. Pipe through `npx pino-pretty` for human-readable local output.
  *
- * @param {{ level: string, destination?: import("pino").DestinationStream }} options
- *   `destination` defaults to stdout; tests pass an in-memory stream.
+ * @param {{ level: string, destination?: import("pino").DestinationStream, forward?: import("pino").DestinationStream }} options
+ *   `destination` defaults to stdout, and tests pass an in-memory stream. `forward`, when given, also receives every
+ *   line at info level and above, after redaction. Operations telemetry passes its log forwarder here (ADR-055).
  * @returns {Logger}
  */
-export function createLogger({ level, destination }) {
+export function createLogger({ level, destination, forward }) {
+  const stdout = destination ?? pino.destination(1);
   return pino(
     {
       level,
@@ -34,6 +36,11 @@ export function createLogger({ level, destination }) {
       redact: { paths: REDACT_PATHS, censor: "[REDACTED]" },
       serializers: { err: pino.stdSerializers.errWithCause },
     },
-    destination ?? pino.destination(1),
+    forward === undefined
+      ? stdout
+      : pino.multistream([
+          { level: "trace", stream: stdout },
+          { level: "info", stream: forward },
+        ]),
   );
 }

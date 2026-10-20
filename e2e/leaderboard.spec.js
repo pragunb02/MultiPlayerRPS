@@ -1,7 +1,8 @@
 import { expect, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
-// Leaderboards (CC-053): public boards with one URL each; accounts climb them, guests never appear on them.
+// Leaderboards (CC-053): public boards with one URL each. Accounts climb them, and so do guests under the name the
+// server gave them, until the guest signs up and its place moves to the account (ADR-060).
 
 const TABS = [
   ["Overall XP", "/leaderboards/overall"],
@@ -67,7 +68,7 @@ test.describe("leaderboards", () => {
     await at(page, "/leaderboards/chess", "Chess");
 
     // Without a session nobody is asked to sign up for a rank, and no session is started for browsing.
-    await expect(page.getByText(/Guests aren't ranked|Your rank|not on this board/)).toHaveCount(0);
+    await expect(page.getByText(/keep your place|Your rank|not on this board/)).toHaveCount(0);
     expect(await visitor.context.cookies()).toEqual([]);
   });
 
@@ -87,7 +88,9 @@ test.describe("leaderboards", () => {
     await expect(page).toHaveURL("/leaderboards/ludo");
   });
 
-  test("an account who wins climbs the boards; the guest they beat is never listed", async ({ players }) => {
+  test("a guest who wins is on the boards as its Guest name and sees its row as you; signing up moves it once", async ({
+    players,
+  }) => {
     const account = newAccount();
     const riya = await players.open("riya", { secrets: [account.email, account.password] });
     await signUp(riya, account);
@@ -96,7 +99,8 @@ test.describe("leaderboards", () => {
     await riya.page.getByRole("button", { name: "Create room" }).click();
     const invite = await riya.page.getByRole("textbox", { name: "Invite link" }).inputValue();
 
-    const bob = await players.open("bob");
+    const bobAccount = newAccount();
+    const bob = await players.open("bob", { secrets: [bobAccount.email, bobAccount.password] });
     await bob.page.goto("/");
     await bob.page.getByRole("button", { name: "Play as a guest" }).click();
     const bobName = await bob.page
@@ -104,42 +108,67 @@ test.describe("leaderboards", () => {
       .getByText(/^Guest-/)
       .textContent();
     await bob.page.goto(invite);
-    await riya.page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /Rock/ }).click();
-    await bob.page
+    await bob.page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /Rock/ }).click();
+    await riya.page
       .getByRole("group", { name: "Your choice" })
       .getByRole("button", { name: /Scissors/ })
       .click();
-    await expect(riya.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
+    await expect(bob.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
 
-    // Boards are updated in the background after the match is stored: reload until riya is on them.
-    const yourRow = riya.page.getByRole("listitem").filter({ hasText: account.username });
+    // Boards are updated in the background after the match is stored: reload until the guest is on them.
+    const guestRow = (page) => page.getByRole("listitem").filter({ hasText: bobName });
     await expect(async () => {
-      await riya.page.goto("/leaderboards/rock-paper-scissors");
-      await expect(yourRow).toContainText("1 win", { timeout: 1_000 });
+      await bob.page.goto("/leaderboards/rock-paper-scissors");
+      await expect(guestRow(bob.page)).toContainText("1 win", { timeout: 1_000 });
     }).toPass({ timeout: 10_000 });
-    await expect(yourRow).toHaveAttribute("aria-current", "true");
-    // A win is 30 XP; the day's quests may add a bonus (CC-089). A new account earned all of it this week.
-    // Quest bonuses reach the boards in the background too: reload until both boards agree.
-    await expect(async () => {
-      await riya.page.goto("/leaderboards/overall");
-      await expect(yourRow).toContainText(/\d+ XP/, { timeout: 1_000 });
-      const [, overallXp] = (await yourRow.textContent()).match(/(\d+) XP/);
-      expect(Number(overallXp)).toBeGreaterThanOrEqual(30);
-      await boardTabs(riya.page).getByRole("link", { name: "This week" }).click();
-      await expect(yourRow).toContainText(`${overallXp} XP`, { timeout: 1_000 });
-    }).toPass({ timeout: 10_000 });
-    await expect(riya.page.getByText(bobName)).toHaveCount(0);
-
-    await riya.page.goto("/profile");
-    await expect(riya.page.getByRole("region", { name: "Your rank" }).getByText(/^#\d+$/)).toHaveCount(2);
-
-    // The guest sees the boards too, with an invitation to get on them.
-    await bob.page.goto("/leaderboards/rock-paper-scissors");
-    await expect(bob.page.getByRole("listitem").filter({ hasText: account.username })).toBeVisible();
-    await expect(bob.page.getByRole("listitem").filter({ hasText: bobName })).toHaveCount(0);
-    const nudge = bob.page.getByText(/Guests aren't ranked/);
+    await expect(guestRow(bob.page)).toHaveAttribute("aria-current", "true");
+    await expect(guestRow(bob.page)).toContainText(`${bobName}you`);
+    const nudge = bob.page.getByText(/to keep your place on the boards/);
     await expect(nudge).toBeVisible();
-    await nudge.getByRole("link", { name: "Sign up" }).click();
-    await expect(bob.page).toHaveURL("/signup?next=%2Fleaderboards%2Frock-paper-scissors");
+    // A win is 30 XP and the day's quests may add a bonus (CC-089). The guest earned all of it this week.
+    let guestXp = 0;
+    await expect(async () => {
+      await bob.page.goto("/leaderboards/overall");
+      await expect(guestRow(bob.page)).toContainText(/\d+ XP/, { timeout: 1_000 });
+      [, guestXp] = (await guestRow(bob.page).textContent()).match(/(\d+) XP/);
+      expect(Number(guestXp)).toBeGreaterThanOrEqual(30);
+      await boardTabs(bob.page).getByRole("link", { name: "This week" }).click();
+      await expect(guestRow(bob.page)).toContainText(`${guestXp} XP`, { timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
+
+    // Everyone sees the guest under its server-given name, and the account sees only its own row as you.
+    await riya.page.goto("/leaderboards/rock-paper-scissors");
+    await expect(guestRow(riya.page)).toContainText("1 win");
+    await expect(guestRow(riya.page)).not.toHaveAttribute("aria-current", "true");
+    await riya.page.goto("/leaderboards/overall");
+    const riyaRow = riya.page.getByRole("listitem").filter({ hasText: account.username });
+    await expect(riyaRow).toHaveAttribute("aria-current", "true");
+    await expect(riya.page.getByText(/keep your place/)).toHaveCount(0);
+
+    // The guest signs up from the board. Its place moves to the account: the same XP, once, under its username.
+    await bob.page.goto("/leaderboards/overall");
+    await bob.page
+      .getByText(/to keep your place on the boards/)
+      .getByRole("link", { name: "Sign up" })
+      .click();
+    await expect(bob.page).toHaveURL("/signup?next=%2Fleaderboards%2Foverall");
+    await bob.page.getByLabel("Username").fill(bobAccount.username);
+    await bob.page.getByLabel("Email").fill(bobAccount.email);
+    await bob.page.getByLabel("Password").fill(bobAccount.password);
+    await bob.page.getByLabel("Year of birth").selectOption("1990");
+    await bob.page.getByRole("button", { name: "Create account" }).click();
+    await expect(bob.page).toHaveURL("/leaderboards/overall");
+    const bobRow = bob.page.getByRole("listitem").filter({ hasText: bobAccount.username });
+    for (const [tab, score] of [
+      ["Overall XP", `${guestXp} XP`],
+      ["This week", `${guestXp} XP`],
+      ["Rock Paper Scissors", "1 win"],
+    ]) {
+      await boardTabs(bob.page).getByRole("link", { name: tab, exact: true }).click();
+      await expect(bobRow).toContainText(score);
+      await expect(bobRow).toHaveAttribute("aria-current", "true");
+      await expect(guestRow(bob.page)).toHaveCount(0);
+    }
+    await expect(bob.page.getByText(/keep your place/)).toHaveCount(0);
   });
 });

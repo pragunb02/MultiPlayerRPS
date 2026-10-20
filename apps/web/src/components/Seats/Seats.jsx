@@ -72,7 +72,7 @@ function PresenceChip({ room, seat }) {
  * never a computer character or a deleted player's stand-in.
  */
 const canBlock = (room, seat) =>
-  room.you !== "" && seat.playerId !== room.you && !isComputer(seat) && !seat.playerId.startsWith("deleted_");
+  room.you !== "" && seat.playerId !== room.you && !isComputer(seat) && seat.deleted !== true;
 
 /**
  * The question asked before a block, and the block itself (CC-044, ADR-053). The block is silent: the other player
@@ -131,7 +131,7 @@ function BlockDialog({ room, seat, index, onClose, onBlocked }) {
  * labelled as one, with its level (ADR-025). Changes to the other players are read
  * out once they settle, with a soft sound. A seated viewer can block another person from their seat (CC-044).
  *
- * @param {{ room: { code: string, seats: Array<{ playerId: string, displayName: string, connected: boolean, presence: string, graceUntil: number, bot?: { character: string, level: string } }>, hostId: string, you: string, players: { max: number }, status: string, serverTime: number, game?: object } }} props
+ * @param {{ room: { code: string, seats: Array<{ playerId: string, displayName: string, connected: boolean, presence: string, graceUntil: number, bot?: { character: string, level: string }, deleted?: true }>, hostId: string, you: string, players: { max: number }, status: string, serverTime: number, game?: object } }} props  every id in a room view is a seat id (CC-253)
  */
 export function Seats({ room }) {
   const open = Math.max(0, room.players.max - room.seats.length);

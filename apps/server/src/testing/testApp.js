@@ -11,6 +11,7 @@ import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
 import { createLegacyUserAccessor } from "../data/legacyUserAccessor.js";
+import { GUEST_NAME_ALPHABET } from "../models/identity.js";
 import { createMatchAccessor } from "../data/matchAccessor.js";
 import { createPendingMatchAccessor } from "../data/pendingMatchAccessor.js";
 import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js";
@@ -31,9 +32,11 @@ import { createIdentityComponent } from "../domain/identity/identityComponent.js
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
+import { createMatchPlayerIds, matchPlayerSecretFrom } from "../domain/matches/matchPlayerIds.js";
 import { createMatchOutboxComponent } from "../domain/matches/matchOutboxComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
+import { createSeatIds, seatSecretFrom } from "../domain/rooms/seatIds.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
 import {
   connectLeaderboardBonuses,
@@ -98,6 +101,8 @@ import { testConfig } from "./testConfig.js";
  *     part in deleting an account (e.g. one that fails, CC-035)
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
+ *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
+ *     to see what the service layer records (ADR-055)
  * }} [options]
  */
 export function createTestApp({
@@ -119,6 +124,7 @@ export function createTestApp({
   dataParticipants = (participants) => participants,
   blockLimits,
   feedbackLimits,
+  metrics = {},
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -131,7 +137,9 @@ export function createTestApp({
   let guestNumber = 0;
   const identityComponent = createIdentityComponent({
     generateId: () => `00000000-0000-4000-8000-${String(++guestNumber).padStart(12, "0")}`,
-    generateGuestSuffix: () => `T${String(guestNumber).padStart(3, "0")}`,
+    // Counted in the guest name alphabet, so the boards show test guests as server-given names (ADR-060).
+    generateGuestSuffix: () =>
+      `T${[2, 1, 0].map((place) => GUEST_NAME_ALPHABET[Math.floor(guestNumber / 32 ** place) % 32]).join("")}`,
   });
   const accountAccessor = createAccountAccessor({ accountDao });
   const legacyUserAccessor = createLegacyUserAccessor({
@@ -150,16 +158,21 @@ export function createTestApp({
   const domainEvents = new EventEmitter();
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
-  const matchComponent = createMatchComponent({ matchAccessor });
+  const matchComponent = createMatchComponent({
+    matchAccessor,
+    matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
+  });
   const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const playerTransferAccessor = createPlayerTransferAccessor({
     playerTransferDao: createInMemoryPlayerTransferDao(),
   });
+  const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
   const blockComponent = createBlockComponent({
     blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
     rooms: roomAccessor,
     matches: matchComponent,
     transfers: playerTransferAccessor,
+    seatIds,
   });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -174,6 +187,7 @@ export function createTestApp({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
     matchAccessor,
     progressAccessor,
+    transfers: playerTransferAccessor,
     ages: accountComponent,
   });
   const gamificationComponent = createGamificationComponent({
@@ -225,6 +239,7 @@ export function createTestApp({
     botTurns,
     keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
     blocks: blockComponent,
+    seatIds,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
@@ -333,6 +348,7 @@ export function createTestApp({
       otherEndedListeners.forEach((listener) => listener(which));
     },
     checkSession,
+    ...(metrics.recordHttpRequest && { recordRequest: metrics.recordHttpRequest }),
   });
 
   return {
@@ -404,6 +420,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     now,
     ...(options.roomLimits && { limits: options.roomLimits }),
     botComponent: testApp.botComponent,
+    ...(options.metrics?.recordSocketEvent && { recordSocketEvent: options.metrics.recordSocketEvent }),
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));

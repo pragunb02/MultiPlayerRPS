@@ -23,6 +23,13 @@ export function createInMemoryLeaderboardDao() {
       ...(expiresAt && { expiresAt }),
     });
 
+  /** Adds `inc` to an entry (creating it from zero) with the key lists in `keys`. */
+  function add({ board, period, playerId, displayName, level, inc, at, expiresAt }, keys) {
+    const ref = { board, period, playerId };
+    const current = entries.get(keyOf(ref));
+    write(ref, { displayName, level, score: (current?.score ?? 0) + inc, ...keys, updatedAt: at, expiresAt });
+  }
+
   return Object.freeze({
     ensureIndexes: async () => {},
 
@@ -34,21 +41,45 @@ export function createInMemoryLeaderboardDao() {
       return { raised };
     },
 
-    async addOnce({ board, period, playerId, displayName, level, key, inc, at, expiresAt }) {
-      const ref = { board, period, playerId };
-      const current = entries.get(keyOf(ref));
-      if (current?.recentKeys.includes(key)) {
+    async addOnce({ key, ...write }) {
+      const current = entries.get(keyOf(write));
+      if (current?.recentKeys.includes(key) || current?.mergedKeys?.includes(key)) {
         return { applied: false };
       }
-      write(ref, {
-        displayName,
-        level,
-        score: (current?.score ?? 0) + inc,
-        recentKeys: [...(current?.recentKeys ?? []), key].slice(-200),
-        updatedAt: at,
-        expiresAt,
+      add(write, { recentKeys: [...(current?.recentKeys ?? []), key].slice(-200) });
+      return { applied: true };
+    },
+
+    async mergeOnce({ from, keys, ...write }) {
+      const current = entries.get(keyOf(write));
+      if (current?.mergedFrom?.includes(from)) {
+        return { applied: false };
+      }
+      add(write, {
+        mergedFrom: [...(current?.mergedFrom ?? []), from],
+        mergedKeys: [...(current?.mergedKeys ?? []), ...keys].slice(-200),
       });
       return { applied: true };
+    },
+
+    async listWithKeys({ board, playerId }) {
+      return [...entries.values()]
+        .filter((entry) => entry.board === board && entry.playerId === playerId)
+        .map(({ period, score, updatedAt, recentKeys, expiresAt }) => ({
+          period,
+          score,
+          updatedAt: new Date(updatedAt),
+          recentKeys: [...recentKeys],
+          ...(expiresAt && { expiresAt: new Date(expiresAt) }),
+        }));
+    },
+
+    async extendLifetime({ playerId, period, expiresAt }) {
+      const rows = [...entries.values()].filter(
+        (entry) => entry.playerId === playerId && entry.period === period && entry.expiresAt < expiresAt,
+      );
+      rows.forEach((entry) => write(entry, { expiresAt }));
+      return rows.length;
     },
 
     async top({ board, period, limit }) {

@@ -25,8 +25,9 @@ const viewOf = (block) =>
 /**
  * @typedef {{ roomCode: string, seat: number, seatId: string } | { matchId: string, seat: number }} BlockTarget   who
  *   to block, by a seat in an open room or among the players of a stored match. A room's seats move (a player leaves,
- *   another joins, a rematch swaps them), so a room seat also carries `seatId`, the id the room view showed for that
- *   seat, and the block goes ahead only while the seat still holds that person. A match's players never move.
+ *   another joins, a rematch swaps them), so a room seat also carries `seatId`, the seat id the room view showed for
+ *   that seat (CC-253), and the block goes ahead only while the seat still holds that person. A match's players never
+ *   move.
  */
 
 /**
@@ -36,29 +37,34 @@ const viewOf = (block) =>
  *
  * @param {{
  *   blockAccessor: ReturnType<typeof import("../../data/blockAccessor.js").createBlockAccessor>,
- *   rooms: { getByCode: (code: string) => Promise<Readonly<{ seats: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
- *   matches: { getForPlayer: (query: { matchId: string, playerId: string }) => Promise<Readonly<{ players: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
+ *   rooms: { getByCode: (code: string) => Promise<Readonly<{ code: string, createdAt: number, seats: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
+ *   matches: { playersFor: (query: { matchId: string, playerId: string }) => Promise<ReadonlyArray<Readonly<{ playerId: string, displayName: string }>>> },
  *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom" | "listTo">,
+ *   seatIds: Pick<ReturnType<typeof import("../rooms/seatIds.js").createSeatIds>, "seatIdOf">,
  *   newBlockId?: () => string,
  *   limit?: number,
  * }} deps  `rooms` is the room accessor: the room component reads blocks itself, so it cannot be read here. A
- *   room that has closed is gone from it. `matches` is the match component. `transfers` are the guests who signed
+ *   room that has closed is gone from it. `matches` is the match component, read for the real players of a match
+ *   (CC-297). `transfers` are the guests who signed
  *   in: a block that names a guest after that guest became an account still applies to the account (ADR-014).
- *   `limit` is for tests only
+ *   `seatIds` are the seat ids the room views show (CC-253), the same ones the room component uses. `limit` is for
+ *   tests only
  */
 export function createBlockComponent({
   blockAccessor,
   rooms,
   matches,
   transfers,
+  seatIds,
   newBlockId = randomUUID,
   limit = MAX_BLOCKS_PER_PLAYER,
 }) {
   assertDefined(blockAccessor, "blockAccessor");
   assertFunction(rooms?.getByCode, "rooms.getByCode");
-  assertFunction(matches?.getForPlayer, "matches.getForPlayer");
+  assertFunction(matches?.playersFor, "matches.playersFor");
   assertFunction(transfers?.listFrom, "transfers.listFrom");
   assertFunction(transfers?.listTo, "transfers.listTo");
+  assertFunction(seatIds?.seatIdOf, "seatIds.seatIdOf");
   assertFunction(newBlockId, "newBlockId");
 
   /** Each id as it is now: a guest who signed in is their account. Other ids stay as they are. */
@@ -69,13 +75,17 @@ export function createBlockComponent({
     return (id) => moved.get(id) ?? id;
   }
 
-  /** The people a reference points at: the seats of an open room or the players of a stored match. */
+  /**
+   * The people a reference points at: the seats of an open room or the players of a stored match. A room seat also
+   * answers the seat id its room view shows, so the page's `seatId` can be checked against it (CC-253).
+   */
   async function playersOf(target, blockerId) {
     try {
       if ("roomCode" in target) {
-        return (await rooms.getByCode(target.roomCode)).seats;
+        const room = await rooms.getByCode(target.roomCode);
+        return room.seats.map((seat) => ({ ...seat, seatId: seatIds.seatIdOf(room, seat.playerId) }));
       }
-      return (await matches.getForPlayer({ matchId: target.matchId, playerId: blockerId })).players;
+      return await matches.playersFor({ matchId: target.matchId, playerId: blockerId });
     } catch (err) {
       // A closed room or a missing one is a stranger's room as far as the blocker is concerned.
       if (err instanceof NotFoundError || err instanceof GoneError) throw notPlayedWith(err);
@@ -90,7 +100,7 @@ export function createBlockComponent({
     if (
       !players.some((player) => player.playerId === blockerId) ||
       person === undefined ||
-      ("seatId" in target && person.playerId !== target.seatId) ||
+      ("seatId" in target && person.seatId !== target.seatId) ||
       !isOtherPerson(person.playerId, blockerId)
     ) {
       throw notPlayedWith();

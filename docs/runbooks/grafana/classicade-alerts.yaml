@@ -1,0 +1,147 @@
+# Grafana-managed alert rules for ClassiCade operations telemetry (ADR-055 point 6, CC-286).
+# Grafana's alerting provisioning format. Import steps: docs/DEPLOYMENT.md, Operations telemetry.
+# No contact address is in this file: the rules use the default notification policy, whose email
+# contact point the owner sets in Grafana. A sleeping instance sends no data, which counts as OK.
+# The data source uids are Grafana Cloud's defaults. Check them under Connections, Data sources.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: classicade-operations
+    folder: ClassiCade
+    interval: 1m
+    rules:
+      - uid: classicade-game-failed
+        title: "A finished game failed for good"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: 'sum(increase(match_pipeline_failed_total{job="classicade-server"}[15m]))'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          service: classicade-server
+        annotations:
+          summary: "A finished game gave up after every retry of a match pipeline step (ADR-047). Its XP, quests or boards are missing until it is run again."
+          description: "The step is in the panel 'Match pipeline'. The full error line is in Render's logs (match pipeline failed)."
+      - uid: classicade-errors
+        title: "Errors above 5 percent"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: '(((sum(increase(http_server_request_duration_milliseconds_count{job="classicade-server",http_response_status_class="5xx"}[10m])) or vector(0)) + (sum(increase(socket_event_duration_milliseconds_count{job="classicade-server",outcome="failed"}[10m])) or vector(0))) / ((sum(increase(http_server_request_duration_milliseconds_count{job="classicade-server"}[10m])) or vector(0)) + (sum(increase(socket_event_duration_milliseconds_count{job="classicade-server"}[10m])) or vector(0)))) and on() (((sum(increase(http_server_request_duration_milliseconds_count{job="classicade-server"}[10m])) or vector(0)) + (sum(increase(socket_event_duration_milliseconds_count{job="classicade-server"}[10m])) or vector(0))) >= 20)'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          service: classicade-server
+        annotations:
+          summary: "Server errors (5xx requests plus failed socket events) are above 5 % of everything over 10 minutes, with at least 20 of them."
+          description: "Look at 'Error share' and the forwarded errors panel, then Render's logs."
+      - uid: classicade-strain
+        title: "Server under strain"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: '(max(process_memory_rss_bytes{job="classicade-server"}) > 435000000) or (max(nodejs_eventloop_delay_p99_milliseconds{job="classicade-server"}) > 250) or (sum(rooms_open{job="classicade-server"}) > 1600)'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels:
+          service: classicade-server
+        annotations:
+          summary: "For 10 minutes: memory above 435 MB of 512, or event-loop p99 above 250 ms, or more than 1 600 of the 2 000 rooms open."
+          description: "ADR-005's triggers for paid hosting. Check the Runtime and Games rows."
+      - uid: classicade-usage-series
+        title: "Grafana Cloud free tier: active series at 80 percent"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: grafanacloud-usage
+            model:
+              refId: A
+              instant: true
+              expr: "max(grafanacloud_instance_active_series)"
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [8000] }
+        noDataState: OK
+        execErrState: Error
+        for: 1h
+        labels:
+          service: classicade-server
+        annotations:
+          summary: "Active series are above 8 000 of the free 10 000 for an hour."
+          description: "ADR-055 amendment of 2026-10-20: first find the label that grew (it must be one of the allowlisted ones), tune it, then decide on pay as you go or self-hosting."
+      - uid: classicade-usage-logs
+        title: "Grafana Cloud free tier: logs at 80 percent"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 86400, to: 0 }
+            datasourceUid: grafanacloud-usage
+            model:
+              refId: A
+              instant: true
+              expr: "sum(avg_over_time(grafanacloud_logs_instance_bytes_received_per_second[1d])) * 2592000"
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [4e+10] }
+        noDataState: OK
+        execErrState: Error
+        for: 1h
+        labels:
+          service: classicade-server
+        annotations:
+          summary: "At today's rate, logs reach more than 40 GB of the free 50 GB a month."
+          description: "Look for a named line repeating (the 30 a minute cap counts in telemetry_logs_suppressed_total), or set OTEL_LOGS_EXPORTER=none."

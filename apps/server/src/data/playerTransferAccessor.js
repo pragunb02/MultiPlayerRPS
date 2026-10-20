@@ -73,6 +73,16 @@ export function createPlayerTransferAccessor({ playerTransferDao }) {
     },
 
     /**
+     * The transfers into any of these accounts that are not done yet (CC-291).
+     *
+     * @param {ReadonlyArray<string>} playerIds  account player ids
+     * @returns {Promise<ReadonlyArray<Readonly<PlayerTransfer>>>}
+     */
+    async listPendingTo(playerIds) {
+      return Object.freeze((await playerTransferDao.listPendingTo([...playerIds])).map(toTransfer));
+    },
+
+    /**
      * The transfers into one account, oldest first (CC-035).
      *
      * @param {string} playerId  the account's player id

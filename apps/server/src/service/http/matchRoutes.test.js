@@ -39,9 +39,11 @@ describe("match history routes", () => {
       expect.objectContaining({
         gameId: "race",
         outcomeForYou: "win",
-        result: { result: "win", winners: [alice.identity.id], reason: "reached-target" },
+        // The winner is named by Alice's id for this match, not her player id (CC-297).
+        result: { result: "win", winners: [aliceList.matches[0].you], reason: "reached-target" },
       }),
     );
+    expect(JSON.stringify([aliceList, bobList])).not.toContain(alice.identity.id);
     expect(bobList.matches[0].outcomeForYou).toBe("loss");
     expect(aliceList).not.toHaveProperty("nextBefore");
   });

@@ -58,6 +58,90 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-060 — Guests on the leaderboards under their server-given name
+
+- **Status:** Accepted · 2026-10-20 by the owner (points 1 to 3). Points 4 to 8 are how
+  [CC-291](tickets/CC-291.md) builds it, with the research and sources there. Amends ADR-015.1 and makes an
+  exception to ADR-048.10.
+- **Context.** Most players start as guests and never see themselves on a board, so the boards mean nothing to them
+  until they sign up. ADR-015.1 kept the boards to accounts, and ADR-048.10 hides the name of anyone who is not
+  surely an adult as "Hidden player".
+- **Decision.**
+  1. **Guests are on every board** (overall, this week, wins per game), under the name the server gave them,
+     `Guest-XXXX`. This amends ADR-015.1 (accounts only).
+  2. **The exception to ADR-048.10.** A server-given guest name is shown whatever the player's age, because the
+     player did not choose it and it carries no personal data. The board shows a guest row's name only when it has
+     exactly the server-given shape (`isServerGivenGuestName`). Any other name on a guest row is hidden like an
+     account of unknown age.
+  3. **If guests can ever choose a name, the age rule applies to them.** Point 2 already does that for any name not
+     of the server-given shape. A feature that lets guests choose a name must keep that check.
+  4. **Fair play still decides what counts** (ADR-021). Guests go through the same writes as accounts: only games
+     against people that count for them, and quest bonuses those games earned. Scores only rise.
+  5. **A guest row lasts as long as a guest session can.** Its `expiresAt` is 30 days after the guest's latest
+     counted game or ranked quest bonus (`GUEST_ROW_LIFETIME_MS`, never longer than the 30 day session of ADR-030),
+     and a weekly row never past its week's own retention. Every counted game moves all the guest's all time rows on.
+     The existing TTL index removes them, so guest data cleanup (CC-098) finds no board rows behind it.
+  6. **The guest transfer moves the rows once** (ADR-014). Each weekly row of the guest is added to the account's
+     row of the same week once per guest (`mergedFrom`). It leaves out the games fair play withdrew in the merge
+     (ADR-021.6) and any moved match the account's week already counted under the same key. The guest's
+     remembered match and quest keys are kept on the account's row in `mergedKeys`, apart from its own
+     `recentKeys`, so none of them counts twice and a merge never pushes out the account's own keys. Then the
+     account's totals are recomputed as before (they only rise), and the guest's rows are deleted. This closes the
+     gap ADR-015 noted: a guest's quest XP from this week now reaches the account.
+  7. **No guest row outlives the transfer.** The board step skips a guest whose transfer has started, and skips an
+     account a guest is moving into until that move is done, because the move recomputes it. After writing, also
+     when a write failed, it removes the rows of every moved guest of the match. And the boards never list, or
+     rank as the viewer, a guest whose move is done. A race can only under-count.
+  8. **Abuse.** No new limit. The limits per address (ADR-035: 30 connections, 30 open rooms) and per player
+     (ADR-021: 20 counted games an hour, 10 per opponent in 24 hours) bound what one person can put on the boards
+     the same way for guests and accounts. Guests only make the start faster (15 minutes for 30 players instead of
+     3 hours), and they cannot write words on the board. The numbers are in CC-291.
+- **Consequences.** Each response that carries the viewer's own standing is `Cache-Control: private, no-store`.
+  `LEADERBOARD_UNLISTED.GUEST` is gone. Account deletion and export (ADR-048) are unchanged: they already erase under
+  every former guest id. If a flood of guests pushes real players down, the owner can hide guest rows from the
+  public list or ask for several counted games before a guest is listed, both changes to `getBoard` alone.
+
+### ADR-057 — Room views name players by opaque per-room seat ids
+
+- **Status:** Accepted · 2026-10-20 by the owner ([CC-253](tickets/CC-253.md), CC-241 F11, ADR-051.9)
+- **Context.** Every room view and request push sent every seat's player id to everyone in the room, spectators
+  included. An account's player id is a MongoDB ObjectId, whose first 4 bytes are its creation time, and the same id
+  in every room lets anyone follow a player from room to room. Quick match (CC-051) will seat strangers.
+- **Decision.**
+  1. Every player in a room view (`viewFor`) and in a request push (`requestsView`) is named by a seat id:
+     HMAC-SHA-256 of `[roomCode, createdAt, playerId]` under a key derived from `SESSION_SECRET` with the label
+     "classicade room seat ids", the first 16 bytes in base64url (22 characters). It is the same through rematches
+     and restarts, different in every other room, and cannot be worked out or turned back without the key.
+  2. Nothing is stored: the seat id is worked out for each view, so rooms already in MongoDB need no migration and a
+     rollback leaves nothing behind.
+  3. The view keeps its field names. `you` is the viewer's own seat id ("" without a seat). Every player id in the
+     view, the engine's own view included, is replaced as a value and as a key.
+  4. The engine is the source of truth for who plays: the engine contract gains `playersOf(state)`, every player of
+     the game in seat order, and the contract kit checks for every engine that no view, outcome or active list names
+     anyone else, in every state. A player who left a finished game is still renamed, in any stored room.
+  5. Fail closed: after that, any string in the view shaped like a player id (`guest_`, `user_`, `bot_`, `deleted_`,
+     `models/playerIdShape.js`) is replaced by its seat id, so a field nobody listed cannot leak.
+  6. `POST /api/blocks` keeps `{ roomCode, seat, seatId }`. The server works out the seat id of the person in that
+     seat and blocks only when it matches. A `seatId` that is not 22 base64url characters is refused with 400.
+  7. A deleted player's stand-in is labelled `deleted: true` on its seat.
+  8. Later features that show one player another (public profiles CC-034, chat and emotes CC-169, spectating CC-056,
+     quick match CC-051, challenges CC-277) name the other player by a seat id or an id made for that purpose, never
+     by a player id.
+- **Consequences.** A guest who signs in during a game, or a deleted player's stand-in, is a new player id and so
+  gets a new seat id, as they get a new name. Rotating `SESSION_SECRET` gives open rooms new seat ids. Match history
+  still sends past opponents' player ids to the participants: CC-297.
+- **Amended 2026-10-20 ([CC-297](tickets/CC-297.md)): match history too.** The same rule covers a second context.
+  `GET /api/matches` and `GET /api/matches/:matchId` name every player of a match, the viewer included, by a match
+  player id: HMAC-SHA-256 of `[matchId, playerId]` under a key derived from `SESSION_SECRET` with the label
+  "classicade match player ids", 22 base64url characters, as a value and as a key in the players, the winners and
+  every log entry, then the last pass of point 5 with match player ids. Each answer has `you`, the viewer's own match player id. Both participants see the same ids for a
+  match, and unrelated ids in every other match and in the room the match was played in. The field names stay.
+  Nothing is stored or migrated. Room seat ids and match player ids now share one helper, `utils/keyedIds.js`, with
+  one label per purpose, so every later keyed id is one more label there; the seat ids it gives are unchanged. The
+  server's own readers (the block route's `{ matchId, seat }`, the match pipeline) read the real record through
+  methods no route sends. The account export keeps its `you` and `player-2` labels (ADR-048.6). Every identifier a
+  client can receive is listed in DATA.md, Identifiers, which every new feature checks.
+
 ### ADR-059 — In-app feedback: unlinked, masked, 180 days, reply email for adults only, and the console's first per-person view
 
 - **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-290](tickets/CC-290.md)), the number reserved
@@ -250,6 +334,34 @@ the owner may change it.
   3. Metrics and named warning and error lines only. No traces, until a new decision.
   4. The three alerts in point 6, by email to the owner.
   5. The stack is opened by the owner only, with two-factor sign-in.
+- **Amended 2026-10-20 (owner, with the code pull request of CC-286).** The owner looked at self-hosting the same
+  day and chose Grafana Cloud free after all, as decided above, with these additions so the free tier lasts and
+  growth stays easy:
+  1. **Vendor neutral.** The server speaks plain OTLP over HTTP (protobuf) to whatever `OTEL_EXPORTER_OTLP_ENDPOINT`
+     names, with `OTEL_EXPORTER_OTLP_HEADERS`. Nothing in the code assumes Grafana Cloud. The code lives in
+     `apps/server/src/dependency/telemetry/` (it calls another company's service), and only the composition root
+     imports it. The service layer receives two plain functions.
+  2. **Cardinality budget.** The metric names and attribute keys of point 1 are fixed in `telemetrySchema.js`, and
+     every value comes from a closed set. A test fails when an attribute key is not on the list. Expected active
+     series: about 1 250 per instance, at most about 5 100 per instance in the worst case (CC-286, "Cardinality
+     budget"). Durations use eleven bucket boundaries (5 ms to 10 s).
+  3. **Logs.** Never below info level: the named lines now include four info lines that mark a start or a stop
+     (`server listening`, `telemetry on`, `shutting down`, `shutdown complete`). The same line is sent at most 30
+     times a minute, the rest are counted in a new counter, `telemetry.logs.suppressed`. A body is always one of
+     the named lines, so its size is bounded, and each field value is limited to 128 characters.
+  4. **Instances.** The resource gets a fourth key, `service.instance.id`: a random UUID made when the process
+     starts, with nothing about the machine or anyone in it. Two servers (CC-061) then never mix their series.
+  5. **Traces** stay out (point 2). If a later decision adds them: head sampling read from `OTEL_TRACES_SAMPLER_ARG`
+     with about 10 % as the default, errors always kept, and their own allowlist.
+  6. **Usage alerts.** Two more alerts and a dashboard row from the stack's `grafanacloud-usage` data source: active
+     series above 8 000 (80 % of 10 000) and logs on course for more than 40 GB a month (80 % of 50 GB). Free tier
+     limits as read on https://grafana.com/pricing/ on 2026-10-20: 10k active series, 50 GB of logs, 14 days
+     retention, 3 users.
+  7. **Growth path.** When a usage alert fires: first tune or sample (find the label or line that grew, turn logs
+     off with `OTEL_LOGS_EXPORTER=none`), then move to Grafana Cloud pay as you go, or self-host a Collector with
+     Prometheus, Loki and Grafana on a VM. In each case only the two env vars change. The application code does not.
+  8. **Self-hosting now** was set aside: we would run, update and secure it ourselves, a single VM can fail with
+     nobody to notice, and free VMs have their own limits (CC-286 section 5).
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 
@@ -447,6 +559,10 @@ stable React. Still the browser's View Transitions, still no added bundle.
 - **Consequences.** On release every existing account is of unknown age, so every name on the public boards is
   hidden until its owner gives a year. Rule 8(3) of the DPDP Rules (a year of processing logs) is for the lawyer's
   review before 13 May 2027. Guests are not covered by deletion (no password): CC-098 removes old guest data.
+- **Amended · 2026-10-20** (owner, [ADR-060](#adr-060--guests-on-the-leaderboards-under-their-server-given-name),
+  CC-291). An exception to point 10: a guest row on a board shows the guest's server-given `Guest-XXXX` name,
+  because the player did not choose it and it carries no personal data. Any other name on a guest row is hidden as
+  point 10 says, so if guests can ever choose a name the age rule applies to them.
 
 ### ADR-047 — Finished games go through a stored outbox with named steps and retries
 
@@ -1372,6 +1488,10 @@ XP; if progression is ever recomputed downwards, boards keep the higher value un
 **Amended · 2026-10-17** (accepted [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D7). Weekly boards, and later
 leagues, reset on Monday at 00:00 India time instead of 00:00 UTC. The ISO week key ("2026-W42") stays, worked out
 in India time. Revisit if players from other regions grow. Built with CC-146. Until then the code uses UTC.
+
+**Amended · 2026-10-20** (owner, [ADR-060](#adr-060--guests-on-the-leaderboards-under-their-server-given-name),
+CC-291). Point 1 no longer holds: guests are on the boards under their server-given name, their rows last as long
+as a guest session can, and the guest transfer adds a guest's weekly rows to the account once, quest XP included.
 
 ### ADR-014 — Player data follows the identity
 

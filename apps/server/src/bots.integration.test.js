@@ -137,8 +137,10 @@ async function playComputer(player, payload) {
   return (await player.send(SOCKET_EVENTS.ROOM_JOIN, { code: started.data.code })).data;
 }
 
-const yourTurn = (player) => (view) =>
-  view.status !== "playing" || view.game.activePlayers.includes(player.identity.id);
+// Views name players by seat id (CC-253): the viewer's own is `you`.
+const yourTurn = (view) => view.status !== "playing" || view.game.activePlayers.includes(view.you);
+/** The seat id of the computer player in a view. */
+const computerIn = (view) => view.seats.find((seat) => seat.bot !== undefined).playerId;
 
 /** Plays Rock Paper Scissors with `choose` until the match is over. Answers the final view. */
 async function playRps(player, view, choose = () => "rock") {
@@ -155,7 +157,7 @@ async function playRps(player, view, choose = () => "rock") {
 async function playTicTacToe(player, view) {
   let current = view;
   while (current.status === "playing") {
-    current = await updateWhere(player, yourTurn(player));
+    current = await updateWhere(player, yourTurn);
     if (current.status !== "playing") break;
     const cell = current.game.view.board.indexOf("");
     current = (await player.send(SOCKET_EVENTS.GAME_MOVE, { code: current.code, move: { cell } })).data;
@@ -197,7 +199,7 @@ describe("playing computer characters on the real server (integration)", () => {
     );
 
     expect(final.status).toBe("finished");
-    expect(final.game.outcome.winners).not.toContain(alice.identity.id);
+    expect(final.game.outcome.winners).not.toContain(final.you);
     const [update] = await eventually(async () => (alice.progress.length > 0 ? alice.progress : undefined));
     expect(update).toEqual(
       expect.objectContaining({ counted: true, botXpLeft: BOT_DAILY_XP - update.xpGained }),
@@ -211,7 +213,8 @@ describe("playing computer characters on the real server (integration)", () => {
     await server.start();
     const alice = await guest(server);
     await playComputer(alice, { gameId: "chess", level: "easy" });
-    const white = (await updateWhere(alice, yourTurn(alice))).game.view.colors[alice.identity.id] === "w";
+    const first = await updateWhere(alice, yourTurn);
+    const white = first.game.view.colors[first.you] === "w";
     const moves = white
       ? [
           ["e2", "e4"],
@@ -224,10 +227,10 @@ describe("playing computer characters on the real server (integration)", () => {
 
     // A move the beginner's reply made impossible is simply refused, and the next one is tried.
     for (const [from, to] of moves) {
-      const { code } = await updateWhere(alice, yourTurn(alice));
+      const { code } = await updateWhere(alice, yourTurn);
       await alice.send(SOCKET_EVENTS.GAME_MOVE, { code, move: { type: CHESS_ACTIONS.MOVE, from, to } });
     }
-    const view = await updateWhere(alice, yourTurn(alice));
+    const view = await updateWhere(alice, yourTurn);
     await alice.send(SOCKET_EVENTS.ROOM_REQUEST, { code: view.code, type: "draw" });
     await updateWhere(alice, (v) => v.requests.some((r) => r.type === "draw" && r.state === "declined"));
     const resigned = await alice.send(SOCKET_EVENTS.GAME_MOVE, {
@@ -236,7 +239,7 @@ describe("playing computer characters on the real server (integration)", () => {
     });
 
     expect(resigned.data.status).toBe("finished");
-    expect(resigned.data.game.outcome.winners).toEqual(["bot_queen-vee_easy"]);
+    expect(resigned.data.game.outcome.winners).toEqual([computerIn(resigned.data)]);
   });
 
   it("gives at most the day's XP from computer games, apart from quest XP, and every game still counts", async () => {
@@ -267,7 +270,7 @@ describe("playing computer characters on the real server (integration)", () => {
     await server.start();
     const alice = await guest(server);
     let view = await playComputer(alice, { gameId: "tictactoe", level: "easy" });
-    if (view.game.activePlayers.includes(alice.identity.id)) {
+    if (view.game.activePlayers.includes(view.you)) {
       view = (
         await alice.send(SOCKET_EVENTS.GAME_MOVE, {
           code: view.code,
@@ -275,7 +278,7 @@ describe("playing computer characters on the real server (integration)", () => {
         })
       ).data;
     }
-    expect(view.game.activePlayers).toEqual([`bot_pip_easy`]);
+    expect(view.game.activePlayers).toEqual([computerIn(view)]);
     const marks = view.game.view.board.filter((cell) => cell !== "").length;
 
     await server.restart(NO_PAUSE);
@@ -286,7 +289,7 @@ describe("playing computer characters on the real server (integration)", () => {
       const board = answer?.data?.game.view.board ?? [];
       return board.filter((cell) => cell !== "").length > marks ? answer.data : undefined;
     }, 20_000);
-    expect(after.game.activePlayers).toEqual(after.status === "playing" ? [alice.identity.id] : []);
-    expect(after.seats.find((seat) => seat.playerId === "bot_pip_easy").connected).toBe(true);
+    expect(after.game.activePlayers).toEqual(after.status === "playing" ? [after.you] : []);
+    expect(after.seats.find((seat) => seat.playerId === computerIn(after)).connected).toBe(true);
   });
 });

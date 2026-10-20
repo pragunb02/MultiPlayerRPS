@@ -119,6 +119,22 @@ describe("createLocalMatch", () => {
 });
 
 describe("the room view a board is drawn from", () => {
+  it.each([rpsEngine, tictactoeEngine, chessEngine])(
+    "seats the players $id lists, in its order, with the names in the same order (CC-253)",
+    (engine) => {
+      const { match } = controllerFor(engine);
+      const session = match.start({ names: NAMES, options: {} });
+
+      const room = match.roomView(session);
+
+      expect(room.seats.map((seat) => seat.playerId)).toEqual(engine.playersOf(session.state));
+      expect(room.seats.map((seat) => [seat.playerId, seat.displayName])).toEqual([
+        [P1, NAMES[0]],
+        [P2, NAMES[1]],
+      ]);
+    },
+  );
+
   it("seats both names and gives the view of the player holding the phone", () => {
     const { match } = controllerFor(rpsEngine);
     const session = play(match, match.start({ names: NAMES, options: {} }), { choice: "rock" });

@@ -23,6 +23,8 @@ import {
   ServerBusyError,
   ValidationError,
 } from "../../utils/errors.js";
+import { isDeletedPlayerId } from "../../models/deletedPlayer.js";
+import { renameIdShapes } from "../identity/idShapes.js";
 import { NO_BOT_TURNS } from "../bots/botTurns.js";
 import { lifetimeOf, roomLifetimes } from "./roomLifetimes.js";
 import { roomLimits } from "./roomLimits.js";
@@ -137,11 +139,14 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  *     blockedWith: (query: { playerId: string }) => Promise<ReadonlySet<string>>,
  *     relationsOf: (query: { playerId: string }) => Promise<Readonly<{ blocked: ReadonlySet<string>, blockedBy: ReadonlySet<string> }>>,
  *   },
+ *   seatIds: Pick<ReturnType<typeof import("./seatIds.js").createSeatIds>, "seatIdOf">,
  * }} deps  lifetimes, limits and generators can be given so tests are short and exact. `botTurns` are the rules for
  *   computer players (CC-138, CC-225). Without them no room ever seats one. `keepFinishedGame` stores a finished
  *   game for the match pipeline (CC-111). It runs before every change to a finished room, so a game is never
  *   replaced by a rematch or closed with its room before it is safe. Without it nothing is kept. `blocks` answers
- *   the players on either side of a block with someone (CC-044): they are never seated together or rematched
+ *   the players on either side of a block with someone (CC-044): they are never seated together or rematched.
+ *   `seatIds` names the players in every view (CC-253). It has no default, so a view can never fall back to
+ *   showing player ids
  */
 export function createRoomComponent({
   roomAccessor,
@@ -155,6 +160,7 @@ export function createRoomComponent({
   botTurns = NO_BOT_TURNS,
   keepFinishedGame = async () => {},
   blocks = NOBODY_BLOCKED,
+  seatIds,
 }) {
   assertDefined(roomAccessor, "roomAccessor");
   assertDefined(engines, "engines");
@@ -167,6 +173,7 @@ export function createRoomComponent({
   assertFunction(keepFinishedGame, "keepFinishedGame");
   assertFunction(blocks?.blockedWith, "blocks.blockedWith");
   assertFunction(blocks?.relationsOf, "blocks.relationsOf");
+  assertFunction(seatIds?.seatIdOf, "seatIds.seatIdOf");
 
   const engineFor = (room) => engines.get(room.gameId);
   const seatOf = (room, playerId) => room.seats.find((seat) => seat.playerId === playerId);
@@ -202,6 +209,42 @@ export function createRoomComponent({
     if (relations.blockedBy.has(request.from)) return REQUEST_STATES.WITHDRAWN;
     return undefined;
   };
+
+  /**
+   * Every player a room names anywhere: the seats and the host, the players of its game as its engine lists them
+   * (the engine is the one that knows, a player who left is still in the game), and anyone the result, the series,
+   * the requests or the game's log names.
+   */
+  const playersNamedIn = (room) =>
+    new Set([
+      room.hostId,
+      ...room.seats.map((seat) => seat.playerId),
+      ...(room.game === undefined ? [] : engineFor(room).playersOf(room.game.state)),
+      ...(room.game?.log ?? []).flatMap((entry) =>
+        [entry.playerId, entry.from, ...(entry.playerIds ?? [])].filter((id) => id !== undefined),
+      ),
+      ...(room.result?.winners ?? []),
+      ...Object.keys(room.series?.wins ?? {}),
+      ...(room.requests ?? []).flatMap((request) => [request.from, request.to]),
+    ]);
+  /**
+   * `value` with every player of the room named by their seat id instead of their player id, wherever it names
+   * them, as a value or as a key (CC-253). Player ids are unique strings, so nothing else is changed. Last, anything
+   * still shaped like a player id is named by its seat id too, so an id that nobody listed is never sent as it is.
+   */
+  const withSeatIds = (room, value) => {
+    const seatIdOf = (playerId) => seatIds.seatIdOf(room, playerId);
+    return renameIdShapes(
+      [...playersNamedIn(room)].reduce(
+        (renamed, playerId) => renamePlayer(renamed, playerId, seatIdOf(playerId)),
+        value,
+      ),
+      seatIdOf,
+    );
+  };
+  /** The viewer's own seat id, or "" for a viewer without a seat. */
+  const yourSeatId = (room, viewerId) =>
+    seatOf(room, viewerId) === undefined ? "" : seatIds.seatIdOf(room, viewerId);
 
   /**
    * Adds what storage needs to find the room again at the right moment: when something next happens in it by
@@ -950,16 +993,23 @@ export function createRoomComponent({
     seatedRooms: ({ playerId }) => roomAccessor.listBySeat(playerId),
 
     /**
-     * What the players of a room are told about its requests on any page of the site (CC-207): the requests, and
-     * the names to put in the question.
+     * What one player of a room is told about its requests on any page of the site (CC-207): the requests, the
+     * names to put in the question, and which seat is theirs. Players are named by seat id (CC-253).
      *
      * @param {Readonly<import("../../data/roomAccessor.js").Room>} room
+     * @param {string} viewerId
      */
-    requestsView: (room) => ({
+    requestsView: (room, viewerId) => ({
       code: room.code,
       gameId: room.gameId,
-      names: Object.fromEntries(room.seats.map((seat) => [seat.playerId, seat.displayName])),
-      requests: (room.requests ?? []).map((request) => ({ ...request })),
+      you: yourSeatId(room, viewerId),
+      names: Object.fromEntries(
+        room.seats.map((seat) => [seatIds.seatIdOf(room, seat.playerId), seat.displayName]),
+      ),
+      requests: withSeatIds(
+        room,
+        (room.requests ?? []).map((request) => ({ ...request })),
+      ),
     }),
 
     /**
@@ -1130,6 +1180,14 @@ export function createRoomComponent({
     countRooms: () => roomAccessor.countByStatus(),
 
     /**
+     * How many open rooms there are of each game in each status, zero included, for the operations gauge
+     * (ADR-055). Read only when telemetry takes a reading.
+     *
+     * @returns {Promise<ReadonlyArray<Readonly<{ gameId: string, status: string, rooms: number }>>>}
+     */
+    countRoomsByGame: () => roomAccessor.countByGameAndStatus(),
+
+    /**
      * The game of every stored room that is finished, as `room.gameFinished` announced it. The match pipeline adds
      * them again at startup and now and then (CC-111): a game whose announcement was lost to a crash or a database
      * blip still reaches it while its room waits for a rematch. Rooms whose time is up are listed too, because a
@@ -1147,21 +1205,29 @@ export function createRoomComponent({
     /**
      * What one viewer may see. Seated players get their own game view, anyone else sees the spectator view.
      *
+     * Every player is named by their seat id, never by their player id (CC-253, ADR-057). The fields keep their
+     * names: `hostId`, `seats[].playerId`, `you`, the requests' `from` and `to`, the winners, the active players,
+     * the series' wins and everything in the game's own view hold seat ids. `you` is the viewer's own seat id, ""
+     * for a viewer without a seat.
+     *
      * @param {Readonly<import("../../data/roomAccessor.js").Room>} room
      * @param {string} viewerId
      */
     viewFor(room, viewerId) {
       const engine = engineFor(room);
       const seated = seatOf(room, viewerId) !== undefined;
+      const seatIdOf = (playerId) => seatIds.seatIdOf(room, playerId);
       const view = {
         code: room.code,
         gameId: room.gameId,
         status: room.status,
-        hostId: room.hostId,
+        hostId: seatIdOf(room.hostId),
         players: { min: engine.players.min, max: engine.players.max },
         seats: room.seats.map((seat) => ({
-          playerId: seat.playerId,
+          playerId: seatIdOf(seat.playerId),
           displayName: seat.displayName,
+          // The page needs to know a deleted player's stand-in cannot be blocked, without reading its id.
+          ...(isDeletedPlayerId(seat.playerId) && { deleted: true }),
           connected: seat.connected,
           presence: presenceOf(seat),
           since: presenceSince(room, seat),
@@ -1169,9 +1235,12 @@ export function createRoomComponent({
           // A computer player is labelled in every view, so nobody takes it for a person (ADR-025).
           ...(seat.bot !== undefined && { bot: { character: seat.bot.character, level: seat.bot.level } }),
         })),
-        you: seated ? viewerId : "",
+        you: yourSeatId(room, viewerId),
         // Rooms stored before requests existed (CC-159) have none.
-        requests: (room.requests ?? []).map((request) => ({ ...request })),
+        requests: withSeatIds(
+          room,
+          (room.requests ?? []).map((request) => ({ ...request })),
+        ),
         requestsLeft: requestsLeft(room, { viewerId, engine, lifetimes }),
         askAgainAt: askAgainAt(room, { viewerId, lifetimes }),
       };
@@ -1190,9 +1259,12 @@ export function createRoomComponent({
             ...(room.rematch.leftName !== undefined && { leftName: room.rematch.leftName }),
           },
         }),
-        ...(room.series && { series: { games: room.series.games, wins: { ...room.series.wins } } }),
-        ...(room.game.seals?.length > 0 && { fairness: botTurns.fairness(room) }),
-        game: {
+        ...(room.series && {
+          series: { games: room.series.games, wins: withSeatIds(room, { ...room.series.wins }) },
+        }),
+        ...(room.game.seals?.length > 0 && { fairness: withSeatIds(room, botTurns.fairness(room)) }),
+        // The game's own view names players however its engine likes, so all of it is renamed.
+        game: withSeatIds(room, {
           // Which match this is, so the result can show the progress update the server sends for it (CC-235).
           matchId: room.game.matchId,
           view: engine.viewFor(room.game.state, seated ? viewerId : "spectator"),
@@ -1200,7 +1272,7 @@ export function createRoomComponent({
           outcome,
           number: gameNumberOf(room),
           turnEndsAt: turnLimit(room, { engine, lifetimes }).endsAt,
-        },
+        }),
       };
     },
   };

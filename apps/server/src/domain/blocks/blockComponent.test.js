@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createBlockAccessor } from "../../data/blockAccessor.js";
 import { createInMemoryBlockDao } from "../../testing/inMemoryBlockDao.js";
 import { GoneError, NotFoundError } from "../../utils/errors.js";
+import { createSeatIds } from "../rooms/seatIds.js";
 import { createBlockComponent, MAX_BLOCKS_PER_PLAYER } from "./blockComponent.js";
 
 const RIYA = Object.freeze({ kind: "user", id: "user_0123456789abcdef01234567", displayName: "Riya" });
@@ -17,6 +18,9 @@ const STRANGER = Object.freeze({
   displayName: "Guest-T009",
 });
 const T0 = Date.UTC(2026, 9, 19, 12);
+const SEAT_IDS = createSeatIds({ secret: "seat-secret-for-tests-only-0123456789abcdef" });
+// A seat id of the right shape that no seat holds.
+const NOBODY = "A".repeat(22);
 const MATCH_ID = "11111111-2222-4333-8444-555555555555";
 
 const seat = (player, extra = {}) => ({ playerId: player.id, displayName: player.displayName, ...extra });
@@ -32,15 +36,18 @@ function fakeRooms(rooms = {}, closed = []) {
   };
 }
 
-/** Stored matches by id. Only their players may read them, as `matchComponent.getForPlayer` does. */
+/**
+ * Stored matches by id. Only their players may read them, and by their real player ids, as
+ * `matchComponent.playersFor` answers them (CC-297).
+ */
 function fakeMatches(matches = {}) {
   return {
-    async getForPlayer({ matchId, playerId }) {
+    async playersFor({ matchId, playerId }) {
       const match = matches[matchId];
       if (match === undefined || !match.players.some((p) => p.playerId === playerId)) {
         throw new NotFoundError("Match not found");
       }
-      return match;
+      return match.players;
     },
   };
 }
@@ -66,15 +73,19 @@ function setup({ rooms = {}, closed = [], matches = {}, limit, transfers = fakeT
     rooms: fakeRooms(rooms, closed),
     matches: fakeMatches(matches),
     transfers,
+    seatIds: SEAT_IDS,
     newBlockId: () => `00000000-0000-4000-9000-${String(++ids).padStart(12, "0")}`,
     ...(limit !== undefined && { limit }),
   });
-  /** A seat of a room as the page names it: its place and the id the room view showed for it. */
-  const at = (roomCode, seatIndex) => ({
-    roomCode,
-    seat: seatIndex,
-    seatId: rooms[roomCode]?.seats[seatIndex]?.playerId ?? "nobody",
-  });
+  /** A seat of a room as the page names it: its place and the seat id the room view showed for it (CC-253). */
+  const at = (roomCode, seatIndex) => {
+    const person = rooms[roomCode]?.seats[seatIndex];
+    return {
+      roomCode,
+      seat: seatIndex,
+      seatId: person === undefined ? NOBODY : SEAT_IDS.seatIdOf(rooms[roomCode], person.playerId),
+    };
+  };
   return { blocks, dao, at };
 }
 
@@ -160,6 +171,42 @@ describe("blockComponent: who can be blocked (CC-044, ADR-053)", () => {
     },
   );
 
+  it("refuses a seat named by the player id of the person in it: the page only ever knows seat ids (CC-253)", async () => {
+    const { blocks, dao } = setup({ rooms: sharedRoom });
+
+    const refusal = blocks.block({
+      blocker: RIYA,
+      target: { roomCode: "ROOM22", seat: 1, seatId: GUEST.id },
+      now: T0,
+    });
+
+    await expect(refusal).rejects.toThrow(NotFoundError);
+    expect(await dao.listInvolving(RIYA.id)).toEqual([]);
+  });
+
+  it("refuses to be built without seat ids", () => {
+    expect(() =>
+      createBlockComponent({
+        blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
+        rooms: fakeRooms(),
+        matches: fakeMatches(),
+        transfers: fakeTransfers(),
+      }),
+    ).toThrow(TypeError);
+  });
+
+  it("refuses to be built without a way to read the real players of a match (CC-297)", () => {
+    expect(() =>
+      createBlockComponent({
+        blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
+        rooms: fakeRooms(),
+        matches: { getForPlayer: async () => ({ players: [] }) },
+        transfers: fakeTransfers(),
+        seatIds: SEAT_IDS,
+      }),
+    ).toThrow(TypeError);
+  });
+
   it("refuses a computer character in a stored match like a stranger", async () => {
     const { blocks } = setup({
       matches: {
@@ -186,8 +233,9 @@ describe("blockComponent: who can be blocked (CC-044, ADR-053)", () => {
       },
       matches: fakeMatches(),
       transfers: fakeTransfers(),
+      seatIds: SEAT_IDS,
     });
-    const target = { roomCode: "ROOM22", seat: 1, seatId: GUEST.id };
+    const target = { roomCode: "ROOM22", seat: 1, seatId: NOBODY };
 
     await expect(blocks.block({ blocker: RIYA, target, now: T0 })).rejects.toBe(failing);
   });

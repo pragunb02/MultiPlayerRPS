@@ -4,6 +4,7 @@ import { raceEngine } from "@classicade/games/testing";
 import { createRoomAccessor } from "../../data/roomAccessor.js";
 import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { createRoomComponent, ROOM_EVENTS } from "./roomComponent.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 const BOB = Object.freeze({ kind: "guest", id: "guest_b", displayName: "Bob" });
@@ -14,6 +15,7 @@ function setup() {
   const published = [];
   const queue = ["ROOM22", "ROOM33", "ROOM44"];
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine]),
     events: { emit: (event, payload) => event !== ROOM_EVENTS.CHANGED && published.push({ event, payload }) },

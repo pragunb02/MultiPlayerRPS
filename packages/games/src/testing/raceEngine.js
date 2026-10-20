@@ -68,6 +68,8 @@ export const raceEngine = defineEngine({
     };
   },
 
+  playersOf: (state) => [...state.players],
+
   activePlayers(state) {
     return state.winner === "" ? [state.players[state.turn]] : [];
   },

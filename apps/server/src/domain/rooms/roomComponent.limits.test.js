@@ -8,6 +8,7 @@ import { ConflictError, ServerBusyError } from "../../utils/errors.js";
 import { createRoomComponent } from "./roomComponent.js";
 import { ROOM_LIFETIMES } from "./roomLifetimes.js";
 import { roomLimits } from "./roomLimits.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 const BOB = Object.freeze({ kind: "guest", id: "guest_b", displayName: "Bob" });
@@ -18,6 +19,7 @@ const nextCode = () => `R${String(++codeNumber).padStart(5, "0")}`;
 
 function setup(limits = {}) {
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine]),
     events: { emit: () => {} },
@@ -230,5 +232,17 @@ describe("room limits (CC-107)", () => {
     await create(rooms);
 
     expect(await rooms.countRooms()).toEqual({ waiting: 1, playing: 1, finished: 0 });
+  });
+
+  it("counts open rooms per catalogue game and status for the operations gauge", async () => {
+    const rooms = setup();
+    const started = await create(rooms);
+    await rooms.joinRoom({ code: started.code, player: BOB, now: T0 + 1 });
+
+    const counts = await rooms.countRoomsByGame();
+
+    // The race engine of these tests is not a catalogue game, so only the catalogue's games appear, at zero.
+    expect(counts).toContainEqual({ gameId: "rps", status: "playing", rooms: 0 });
+    expect(counts.some((row) => row.gameId === started.gameId)).toBe(false);
   });
 });

@@ -9,6 +9,7 @@ let server;
 const clients = createSocketClients(() => server.baseUrl);
 
 afterEach(async () => {
+  seatIds.clear();
   clients.disconnectAll();
   await server?.close();
   server = undefined;
@@ -37,22 +38,44 @@ const block = (player, target) => call("POST", "/blocks", { body: target, cookie
 const list = async (player) => (await call("GET", "/blocks", { cookie: player.cookie })).body.blocks;
 const error = (res) => ({ code: res.body.error?.code, message: res.body.error?.message });
 
+/**
+ * The seat id each player had in each room, as their own room view told them (`you`). A page knows the other
+ * players only by these, never by their player ids (CC-253).
+ *
+ * @type {Map<string, Map<object, string>>}
+ */
+const seatIds = new Map();
+
 /** Alice hosts a race, Bob joins and moves first (seed 42), Alice wins. Resolves once the match is stored. */
 async function finishedRace(alice, bob) {
   const { code } = await startRoom(alice, bob, { gameId: "race", options: { target: 3 } });
-  await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
+  const moved = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
   const ended = await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 2 } });
   await server.tasks.drain();
+  seatIds.set(
+    code,
+    new Map([
+      [alice, ended.data.you],
+      [bob, moved.data.you],
+    ]),
+  );
   return { code, matchId: ended.data.game.matchId, seats: ended.data.seats };
 }
 
-const seatOf = (seats, player) => seats.findIndex((seat) => seat.playerId === player.identity.id);
-/** A seat of an open room as the page names it: its place, and the id the room view showed for it. */
+const seatIdIn = (roomCode, player) => seatIds.get(roomCode).get(player);
+/**
+ * The other player's place among a match's players, as the caller's own history shows them. History names players
+ * by match player ids only, and `you` is the caller's (CC-297).
+ */
+const opponentSeatIn = (match) => match.players.findIndex((p) => p.playerId !== match.you);
+/** A seat of an open room as the page names it: its place, and the seat id the room view showed for it. */
 const inRoom = (roomCode, seats, player) => ({
   roomCode,
-  seat: seatOf(seats, player),
-  seatId: player.identity.id,
+  seat: seats.findIndex((seat) => seat.playerId === seatIdIn(roomCode, player)),
+  seatId: seatIdIn(roomCode, player),
 });
+// A seat id of the right shape that no seat holds.
+const NOBODY = "A".repeat(22);
 
 describe("POST /api/blocks (CC-044)", () => {
   it("blocks the other player of a room both sit in, and answers the record without any player id", async () => {
@@ -81,7 +104,7 @@ describe("POST /api/blocks (CC-044)", () => {
     await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code });
     const { body } = await call("GET", `/matches/${matchId}`, { cookie: alice.cookie });
 
-    const res = await block(alice, { matchId, seat: seatOf(body.match.players, bob) });
+    const res = await block(alice, { matchId, seat: opponentSeatIn(body.match) });
 
     expect(res.status).toBe(200);
     expect(res.body.block.displayName).toBe(bob.identity.displayName);
@@ -104,13 +127,13 @@ describe("POST /api/blocks (CC-044)", () => {
       const answers = [
         await block(mallory, inRoom(code, seats, alice)),
         await block(mallory, { matchId, seat: 0 }),
-        await block(mallory, { roomCode: "ZZZZZZ", seat: 0, seatId: alice.identity.id }),
+        await block(mallory, { roomCode: "ZZZZZZ", seat: 0, seatId: seatIdIn(code, alice) }),
         await block(mallory, { matchId: "99999999-2222-4333-8444-555555555555", seat: 0 }),
         await block(alice, inRoom(code, seats, alice)),
-        await block(alice, { roomCode: code, seat: 7, seatId: bob.identity.id }),
+        await block(alice, { roomCode: code, seat: 7, seatId: seatIdIn(code, bob) }),
         // The seat no longer holds the person the page named: someone else, or the seats moved.
-        await block(alice, { roomCode: code, seat: seatOf(seats, bob), seatId: mallory.identity.id }),
-        await block(alice, { roomCode: code, seat: seatOf(seats, alice), seatId: bob.identity.id }),
+        await block(alice, { ...inRoom(code, seats, bob), seatId: NOBODY }),
+        await block(alice, { ...inRoom(code, seats, alice), seatId: seatIdIn(code, bob) }),
       ];
 
       expect(answers.map((res) => res.status)).toEqual(answers.map(() => 404));
@@ -122,19 +145,19 @@ describe("POST /api/blocks (CC-044)", () => {
     it("refuses a player id, or any field but the reference, so nobody blocks by id or for someone else", async () => {
       server = await startTestServer();
       const [alice, bob] = [await clients.player(), await clients.player()];
-      const { code } = await finishedRace(alice, bob);
+      const { code, seats } = await finishedRace(alice, bob);
 
       const answers = [
         await block(alice, { playerId: bob.identity.id }),
-        await block(alice, { ...inRoom(code, [], bob), seat: 1, blockerId: bob.identity.id }),
+        await block(alice, { ...inRoom(code, seats, bob), seat: 1, blockerId: bob.identity.id }),
         await block(alice, {
-          ...inRoom(code, [], bob),
+          ...inRoom(code, seats, bob),
           seat: 1,
           matchId: "11111111-2222-4333-8444-555555555555",
         }),
-        await block(alice, { ...inRoom(code, [], bob), seat: "1" }),
-        await block(alice, { ...inRoom(code, [], bob), seat: -1 }),
-        await block(alice, { ...inRoom("nope", [], bob), seat: 1 }),
+        await block(alice, { ...inRoom(code, seats, bob), seat: "1" }),
+        await block(alice, { ...inRoom(code, seats, bob), seat: -1 }),
+        await block(alice, { ...inRoom(code, seats, bob), roomCode: "nope" }),
         await block(alice, { matchId: "not-a-match", seat: 1 }),
         // A room seat must say who the page saw there, and a match seat needs no more than its place.
         await block(alice, { roomCode: code, seat: 1 }),
@@ -142,8 +165,10 @@ describe("POST /api/blocks (CC-044)", () => {
         await block(alice, {
           matchId: "11111111-2222-4333-8444-555555555555",
           seat: 1,
-          seatId: bob.identity.id,
+          seatId: seatIdIn(code, bob),
         }),
+        // A player id is never a seat id, whoever sits in the seat (CC-253).
+        await block(alice, { ...inRoom(code, seats, bob), seatId: bob.identity.id }),
         await block(alice, [code, 1]),
       ];
 
@@ -279,7 +304,7 @@ describe("rate limits on blocking (CC-044)", () => {
 
     const flood = [];
     for (let i = 0; i < 6; i++)
-      flood.push((await block(alice, { roomCode: "ZZZZZZ", seat: 0, seatId: "x" })).status);
+      flood.push((await block(alice, { roomCode: "ZZZZZZ", seat: 0, seatId: NOBODY })).status);
     const bobBlocks = await block(bob, inRoom(code, seats, alice));
 
     expect(flood).toEqual([404, 404, 429, 429, 429, 429]);

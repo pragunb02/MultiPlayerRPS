@@ -42,9 +42,12 @@ describe("playing a computer character over sockets", () => {
 
     expect(answer.ok).toBe(true);
     expect(answer.data.status).toBe("playing");
+    // Rocky is named by his seat id, as any player (CC-253), and labelled as a computer.
+    const rocky = answer.data.seats[1].playerId;
+    expect(rocky).not.toContain("bot_");
     expect(answer.data.seats[1]).toEqual(
       expect.objectContaining({
-        playerId: "bot_rocky_easy",
+        playerId: rocky,
         displayName: "Rocky",
         connected: true,
         presence: "here",
@@ -52,7 +55,7 @@ describe("playing a computer character over sockets", () => {
       }),
     );
     expect(answer.data.fairness.locked).toEqual([
-      { playerId: "bot_rocky_easy", turn: 0, commitment: expect.stringMatching(/^[0-9a-f]{64}$/) },
+      { playerId: rocky, turn: 0, commitment: expect.stringMatching(/^[0-9a-f]{64}$/) },
     ]);
   });
 
@@ -65,6 +68,7 @@ describe("playing a computer character over sockets", () => {
       options: { bestOf: 3 },
     });
     const { code } = started.data;
+    const rocky = started.data.seats.find((seat) => seat.bot !== undefined).playerId;
     const locksSeen = [started.data.fairness.locked[0]];
     let view = started.data;
 
@@ -85,7 +89,7 @@ describe("playing a computer character over sockets", () => {
     );
     checks.forEach((check, index) => {
       expect(sha256(`${check.text}:${check.salt}`)).toBe(check.commitment);
-      expect(JSON.parse(check.text).choice).toBe(view.game.view.rounds[index].choices.bot_rocky_hard);
+      expect(JSON.parse(check.text).choice).toBe(view.game.view.rounds[index].choices[rocky]);
     });
   });
 
@@ -101,11 +105,11 @@ describe("playing a computer character over sockets", () => {
       if (view.revision > latest.revision) latest = view;
     };
     alice.socket.on(SOCKET_EVENTS.ROOM_UPDATED, keep);
-    keep((await send(alice.socket, SOCKET_EVENTS.ROOM_JOIN, { code })).data);
+    const joined = (await send(alice.socket, SOCKET_EVENTS.ROOM_JOIN, { code })).data;
+    keep(joined);
     const settled = async () => {
       for (;;) {
-        if (latest.status !== "playing" || latest.game.activePlayers.includes(alice.identity.id))
-          return latest;
+        if (latest.status !== "playing" || latest.game.activePlayers.includes(joined.you)) return latest;
         await new Promise((resolve) => setTimeout(resolve, 5));
       }
     };
@@ -117,7 +121,7 @@ describe("playing a computer character over sockets", () => {
 
     const final = await settled();
     expect(final.status).toBe("finished");
-    expect(final.game.outcome.winners).not.toContain(alice.identity.id);
+    expect(final.game.outcome.winners).not.toContain(joined.you);
   });
 
   it("accepts a rematch the person asks for, and the new game starts", async () => {
@@ -168,7 +172,8 @@ describe("playing a computer character over sockets", () => {
     const started = (
       await send(alice.socket, SOCKET_EVENTS.ROOM_PLAY_COMPUTER, { gameId: "tictactoe", level: "easy" })
     ).data;
-    const pip = started.seats.find((seat) => seat.bot !== undefined).playerId;
+    // The stored room names Pip by his player id. Views name him by seat id (CC-253).
+    const pip = "bot_pip_easy";
     const aliceFirst = started.game.activePlayers.includes(started.you);
     if (aliceFirst) {
       expect(

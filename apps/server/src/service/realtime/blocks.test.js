@@ -19,19 +19,24 @@ const FULL = { ok: false, error: { code: ERROR_CODES.CONFLICT, message: "This ro
 /** Alice hosts a race, Bob joins and moves first (seed 42), Alice wins. */
 async function finishedRace(alice, bob) {
   const { code } = await startRoom(alice, bob, { gameId: "race", options: { target: 3 } });
-  await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
+  const moved = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
   const ended = await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 2 } });
-  return { code, seats: ended.data.seats };
+  // Each player's seat id, as their own view told them (CC-253).
+  const seatIds = new Map([
+    [alice, ended.data.you],
+    [bob, moved.data.you],
+  ]);
+  return { code, seats: ended.data.seats, seatIds };
 }
 
-async function block(blocker, { code, seats }, blocked) {
+async function block(blocker, { code, seats, seatIds }, blocked) {
   const res = await fetch(`${server.baseUrl}/api/blocks`, {
     method: "POST",
     headers: { "Content-Type": "application/json", cookie: blocker.cookie },
     body: JSON.stringify({
       roomCode: code,
-      seat: seats.findIndex((s) => s.playerId === blocked.identity.id),
-      seatId: blocked.identity.id,
+      seat: seats.findIndex((s) => s.playerId === seatIds.get(blocked)),
+      seatId: seatIds.get(blocked),
     }),
   });
   expect(res.status).toBe(200);
@@ -54,7 +59,7 @@ describe("blocks in rooms over sockets (CC-044)", () => {
     expect(toldAtBlock).toEqual([]);
     expect(fromBob.ok).toBe(true);
     expect(fromBob.data.requests).toEqual([
-      expect.objectContaining({ from: bob.identity.id, state: "open" }),
+      expect.objectContaining({ from: room.seatIds.get(bob), state: "open" }),
     ]);
   });
 
@@ -78,7 +83,9 @@ describe("blocks in rooms over sockets (CC-044)", () => {
     expect(accepted.ok).toBe(true);
     expect(accepted.data.status).toBe("finished");
     expect(pushed.status).toBe("finished");
-    expect(pushed.requests).toEqual([expect.objectContaining({ from: bob.identity.id, state: "declined" })]);
+    expect(pushed.requests).toEqual([
+      expect.objectContaining({ from: room.seatIds.get(bob), state: "declined" }),
+    ]);
   });
 
   it.each([
@@ -99,7 +106,7 @@ describe("blocks in rooms over sockets (CC-044)", () => {
     const view = await send(host.socket, SOCKET_EVENTS.ROOM_JOIN, { code: created.data.code });
 
     expect(joined).toEqual(FULL);
-    expect(view.data.seats.map((seat) => seat.playerId)).toEqual([host.identity.id]);
+    expect(view.data.seats.map((seat) => seat.playerId)).toEqual([view.data.you]);
   });
 
   it("keeps the blocker's other rooms open to everyone else", async () => {

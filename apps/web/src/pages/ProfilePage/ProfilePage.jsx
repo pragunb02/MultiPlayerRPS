@@ -72,7 +72,7 @@ function ProgressCard() {
   );
 }
 
-function MatchHistory({ you }) {
+function MatchHistory() {
   const history = useMatchHistory();
   const more = useAction(history.loadMore, { id: "profile.matches.more" });
   if (history.status === "loading") return <p>Loading matches…</p>;
@@ -95,8 +95,9 @@ function MatchHistory({ you }) {
       <ul className={styles.matches} aria-label="Match history">
         {history.matches.map((match) => {
           // A computer character is labelled as one, so it never reads as a person of the same name (ADR-025).
+          // Players are named by ids made for this match, and `you` is yours (CC-297).
           const opponents = match.players
-            .filter((p) => p.playerId !== you)
+            .filter((p) => p.playerId !== match.you)
             .map((p) => (p.computer ? `${p.displayName} (computer)` : p.displayName));
           return (
             <li key={match.matchId} className={styles.match}>
@@ -195,7 +196,7 @@ export function ProfilePage() {
       <YourRank identity={session.identity} />
       <PlayerConsole guest={session.identity.kind === "guest"} />
       <h2>Recent matches</h2>
-      <MatchHistory you={session.identity.id} />
+      <MatchHistory />
       <BlockedPlayers />
       {session.identity.kind === "user" && <AccountSettings />}
       {session.identity.kind === "user" && <PrivacySettings />}

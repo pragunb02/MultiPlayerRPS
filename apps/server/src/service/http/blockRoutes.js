@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { SEAT_ID_PATTERN } from "../../domain/rooms/seatIds.js";
 import { parseRoomCode } from "../../models/roomCode.js";
 import { assertDefined } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
@@ -9,8 +10,6 @@ const MINUTE_MS = 60 * 1000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // Seats are positions in a room or a match. No game has more than a few players.
 const MAX_SEAT = 7;
-// The id the room view shows for a seat: today the player id, opaque per room once CC-253 lands.
-const SEAT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * The limits on blocking and unblocking together (ADR-053). Each is a business rule, and tests and browser tests
@@ -33,8 +32,9 @@ const isPlainObject = (value) =>
 
 /**
  * Who to block: `{ roomCode, seat, seatId }` or `{ matchId, seat }`, and nothing else. A player id alone is never
- * enough: `seatId` only confirms who the page saw in that seat of a room the caller sits in. So
- * nobody can name a player they never met.
+ * enough: `seatId` only confirms who the page saw in that seat of a room the caller sits in. It is the opaque seat
+ * id of the room view (CC-253), so a player id has the wrong shape and is refused here. So nobody can name a player
+ * they never met.
  *
  * @returns {import("../../domain/blocks/blockComponent.js").BlockTarget}
  */

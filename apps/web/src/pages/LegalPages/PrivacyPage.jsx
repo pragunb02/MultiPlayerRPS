@@ -74,9 +74,11 @@ export function PrivacyPage() {
             from the games you play.
           </li>
           <li>
-            <strong>Leaderboards.</strong> Accounts appear on the public leaderboards with their level and
-            score. The username shows only for adults: for anyone under 18, or who has not given a year of
-            birth, the board shows &quot;Hidden player&quot; instead. Guests never appear on a leaderboard.
+            <strong>Leaderboards.</strong> Accounts and guests appear on the public leaderboards with their
+            level and score. The username shows only for adults: for anyone under 18, or who has not given a
+            year of birth, the board shows &quot;Hidden player&quot; instead. A guest shows the name we gave
+            it, such as Guest-7K2Q, which it did not choose and which says nothing about it. A guest&apos;s
+            places move to the account it signs up for.
           </li>
           <li>
             <strong>Players you block.</strong> When you block a player, we store that you blocked them, the
@@ -140,7 +142,7 @@ export function PrivacyPage() {
       </LegalSection>
 
       <LegalSection title="5. Who else handles it">
-        <p>Three services run the site for us and only handle data to do that:</p>
+        <p>Four services run the site for us and only handle data to do that:</p>
         <ul>
           <li>
             <strong>Render</strong> hosts the server. Like any web host it sees the requests your browser
@@ -154,6 +156,11 @@ export function PrivacyPage() {
             the whole database and puts it in a storage bucket the owner rents. The copy is locked on the way,
             so only the owner can open it, and the bucket&apos;s provider only ever holds locked data. Each
             copy is deleted after 30 days.
+          </li>
+          <li>
+            <strong>Grafana Labs</strong> (Grafana Cloud, India region) receives counts and timings about how
+            the server runs, and the names of its warnings and errors. Never your IP address, email, player
+            id, name, room code, cookies or session. We use it to see when the site is slow or failing.
           </li>
         </ul>
         <p>Their servers may be outside your country, including in the United States.</p>
@@ -182,6 +189,7 @@ export function PrivacyPage() {
           </li>
           <li>
             Daily quests are kept for about a week, weekly leaderboard entries for four weeks after the week.
+            A guest&apos;s leaderboard places are kept 30 days after its last counted game.
           </li>
           <li>
             Accounts, match history, progress and achievements are kept until you delete your account. Guest
@@ -197,6 +205,9 @@ export function PrivacyPage() {
             such as signing up, logging in, joining a room and finishing a match, with the player id, room
             code or match id involved. Our own log lines never hold your IP address, email or password. Render
             keeps them for 7 to 14 days, depending on the plan.
+          </li>
+          <li>
+            Counts and timings about how the server runs are kept for 14 days by Grafana Labs (section 5).
           </li>
         </ul>
       </LegalSection>

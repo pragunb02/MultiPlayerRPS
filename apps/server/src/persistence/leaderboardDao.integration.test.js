@@ -69,6 +69,27 @@ describe("MongoDB leaderboard DAO honours the leaderboard DAO contract (integrat
     expect(stored).toEqual(expect.objectContaining({ score: 40, expiresAt: AT }));
   });
 
+  it("finds one player's rows by index, not by reading the whole collection (CC-291)", async () => {
+    const { dao, database } = await connect();
+    await dao.raiseScore({ ...ENTRY, score: 10, at: AT });
+    await dao.raiseScore({ ...ENTRY, playerId: "user_b", score: 20, at: AT });
+    const entries = database.connection.db.collection("leaderboard_entries");
+    const plan = async (filter) =>
+      JSON.stringify((await entries.find(filter).explain("queryPlanner")).queryPlanner);
+
+    expect(await entries.indexes()).toContainEqual(
+      expect.objectContaining({ key: { playerId: 1, period: 1 } }),
+    );
+    for (const filter of [
+      { playerId: "user_a" },
+      { playerId: "user_a", period: "all", expiresAt: { $lt: AT } },
+    ]) {
+      const winning = await plan(filter);
+      expect(winning).toContain("IXSCAN");
+      expect(winning).not.toContain("COLLSCAN");
+    }
+  });
+
   it("passes other database errors through", async () => {
     const { dao } = await connect();
 

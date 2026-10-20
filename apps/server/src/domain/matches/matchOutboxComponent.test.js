@@ -103,6 +103,7 @@ describe("matchOutboxComponent (CC-111)", () => {
       error: new Error("b failed"),
       attempts: 1,
       nextAttemptAt: T0 + 1_000,
+      ran: ["a"],
     });
     expect(tooEarly).toEqual([]);
     expect(second).toEqual(
@@ -129,6 +130,7 @@ describe("matchOutboxComponent (CC-111)", () => {
       step: "a",
       error: new Error("a failed"),
       attempts: 4,
+      ran: [],
     });
     expect(afterwards).toEqual([]);
     expect(await pendingMatchAccessor.get("m1")).toEqual(
@@ -152,7 +154,9 @@ describe("matchOutboxComponent (CC-111)", () => {
     const first = await outbox.run({ matchId: "m1", now: T0 });
     const second = (await outbox.runDue({ now: T0 + 1_000 }))[0];
 
-    expect(first).toEqual(expect.objectContaining({ status: "retrying", step: "quests" }));
+    expect(first).toEqual(
+      expect.objectContaining({ status: "retrying", step: "quests", ran: ["record", "boards"] }),
+    );
     expect(second).toEqual({ matchId: "m1", status: "done", ran: ["quests", "after quests"] });
     expect(names()).toEqual(["record", "quests", "boards", "quests", "after quests"]);
   });

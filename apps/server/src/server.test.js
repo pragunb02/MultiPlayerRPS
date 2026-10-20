@@ -15,6 +15,8 @@ import {
   startHousekeeping,
 } from "./server.js";
 import { createPendingMatchAccessor } from "./data/pendingMatchAccessor.js";
+import { GUEST_ROW_LIFETIME_MS } from "./domain/leaderboards/boards.js";
+import { SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createMatchOutboxComponent, matchRetryPolicy } from "./domain/matches/matchOutboxComponent.js";
 import { createInMemoryPendingMatchDao } from "./testing/inMemoryPendingMatchDao.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
@@ -168,6 +170,7 @@ describe("the match pipeline (CC-111)", () => {
     });
     let now = T;
     const domainEvents = new EventEmitter();
+    const recorded = [];
     const pipeline = connectMatchPipeline({
       domainEvents,
       matchComponent,
@@ -176,6 +179,7 @@ describe("the match pipeline (CC-111)", () => {
       tasks,
       logger: capture.logger,
       now: () => now,
+      recordPipelineStep: (attempt) => recorded.push(attempt),
     });
     const finish = async () => {
       domainEvents.emit(ROOM_EVENTS.GAME_FINISHED, event);
@@ -187,7 +191,18 @@ describe("the match pipeline (CC-111)", () => {
       await tasks.drain();
     };
     const names = () => calls.map(([name]) => name);
-    return { steps, calls, names, finish, later, pipeline, pendingMatchAccessor, tasks, ...capture };
+    return {
+      steps,
+      calls,
+      names,
+      finish,
+      later,
+      pipeline,
+      pendingMatchAccessor,
+      tasks,
+      recorded,
+      ...capture,
+    };
   }
 
   it("has five named steps in order, the boards needing progression but not gamification", () => {
@@ -325,6 +340,29 @@ describe("the match pipeline (CC-111)", () => {
     expect(names()[0]).toBe("record");
   });
 
+  it("counts each step attempt for operations telemetry, and the step that failed for good (ADR-055)", async () => {
+    const { finish, later, recorded } = setup({ fail: { progression: 2 } });
+
+    await finish();
+    await later(1_000);
+
+    expect(recorded).toEqual([
+      { step: MATCH_STEPS.RECORD, failedForGood: false },
+      { step: MATCH_STEPS.JUDGE, failedForGood: false },
+      { step: MATCH_STEPS.PROGRESSION, failedForGood: false },
+      { step: MATCH_STEPS.PROGRESSION, failedForGood: true },
+    ]);
+  });
+
+  it("counts every step of a game that went through at once", async () => {
+    const { finish, recorded } = setup();
+
+    await finish();
+
+    expect(recorded.map(({ step }) => step)).toEqual(Object.values(MATCH_STEPS));
+    expect(recorded.every(({ failedForGood }) => !failedForGood)).toBe(true);
+  });
+
   it("says nothing about runs that changed nothing", () => {
     const { logger, entries } = captureLogger();
 
@@ -333,6 +371,12 @@ describe("the match pipeline (CC-111)", () => {
     logPipelineOutcome(logger, { matchId: "m1", status: "failed" });
 
     expect(entries).toEqual([]);
+  });
+});
+
+describe("guest rows on the boards and guest sessions (ADR-060)", () => {
+  it("end a guest's rows no later than the session that could still move them to an account", () => {
+    expect(GUEST_ROW_LIFETIME_MS).toBeLessThanOrEqual(SESSION_TTL_SECONDS * 1000);
   });
 });
 

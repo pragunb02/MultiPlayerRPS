@@ -238,7 +238,9 @@ describe("games through the real composition root (integration)", () => {
       });
 
       expect(final.data.status).toBe("finished");
-      expect(final.data.game.outcome.winners).toEqual([alice.identity.id]);
+      // Views name players by seat id (CC-253): Alice's is the `you` of her own view.
+      expect(final.data.game.outcome.winners).toEqual([room.you]);
+      expect(JSON.stringify(final.data)).not.toContain(alice.identity.id);
 
       // The match is stored in MongoDB and replays to exactly the same result.
       const summary = await eventually(async () => {
@@ -296,7 +298,7 @@ describe("games through the real composition root (integration)", () => {
       const update = await aliceHears;
 
       expect(left).toEqual({ ok: true, data: { left: true } });
-      expect(update.seats.map((seat) => seat.playerId)).toEqual([alice.identity.id]);
+      expect(update.seats.map((seat) => seat.playerId)).toEqual([room.you]);
       expect(update.rematch).toEqual(
         expect.objectContaining({ available: false, leftName: bob.identity.displayName }),
       );
@@ -558,6 +560,14 @@ describe("a guest's progress moving to their account through the real compositio
       await play(alice, bob);
       await progressOf(app.url, alice.cookie, 1);
       const bonus = await questBonusOf(app.url, alice.cookie);
+      // Before signing up, the guest is on the boards under its server-given name (ADR-060). The list and `you`
+      // are two reads, so the probe waits until both show the whole score.
+      const asGuest = await eventually(async () => {
+        const weekly = await api(app.url, "/leaderboards/weekly", alice.cookie);
+        const row = weekly.entries.find((entry) => entry.displayName === alice.identity.displayName);
+        return row?.score === 30 + bonus ? weekly : undefined;
+      });
+      expect(asGuest.you).toEqual(expect.objectContaining({ listed: true, score: 30 + bonus }));
 
       const signup = await fetch(`${app.url}/api/auth/signup`, {
         method: "POST",
@@ -582,20 +592,33 @@ describe("a guest's progress moving to their account through the real compositio
       const { streaks } = await api(app.url, "/streaks", cookie);
 
       const boards = await eventually(async () => {
-        const [overallBoard, winsBoard] = await Promise.all(
-          ["overall", "rock-paper-scissors"].map((id) => api(app.url, `/leaderboards/${id}`, cookie)),
+        const [overallBoard, weeklyBoard, winsBoard] = await Promise.all(
+          ["overall", "weekly", "rock-paper-scissors"].map((id) =>
+            api(app.url, `/leaderboards/${id}`, cookie),
+          ),
         );
-        return overallBoard.you.listed && winsBoard.you.listed ? { overallBoard, winsBoard } : undefined;
+        return overallBoard.you.listed && winsBoard.you.listed
+          ? { overallBoard, weeklyBoard, winsBoard }
+          : undefined;
       });
+      const guestRows = (await readCollection(app.config.mongoUri, "leaderboard_entries")).filter(
+        (entry) => entry.playerId === alice.identity.id,
+      );
 
       expect(body.carriedOver).toEqual({ xp: 30 + bonus, matchesPlayed: 1, matches: 1 });
-      // The carried-over XP and win put the new account on the leaderboards (CC-053).
-      expect(boards.overallBoard.entries).toEqual([
-        expect.objectContaining({ rank: 1, displayName: "Riya", score: 30 + bonus }),
-      ]);
+      // The carried-over XP and win put the new account on the leaderboards (CC-053), and the guest's rows went
+      // with it: its quest XP is on this week's board too, and nothing is there twice (ADR-060).
+      for (const board of [boards.overallBoard, boards.weeklyBoard]) {
+        expect(board.entries.map(({ displayName, score }) => [displayName, score])).toEqual(
+          expect.arrayContaining([["Riya", 30 + bonus]]),
+        );
+        expect(board.entries.map((entry) => entry.displayName)).not.toContain(alice.identity.displayName);
+        expect(board.you).toEqual(expect.objectContaining({ listed: true, score: 30 + bonus }));
+      }
       expect(boards.winsBoard.entries).toEqual([
         expect.objectContaining({ rank: 1, displayName: "Riya", score: 1 }),
       ]);
+      expect(guestRows).toEqual([]);
       expect((await api(app.url, "/progress", cookie)).progress).toEqual(
         expect.objectContaining({ xp: 30 + bonus, matchesPlayed: 1, wins: 1 }),
       );
@@ -605,8 +628,10 @@ describe("a guest's progress moving to their account through the real compositio
       );
       expect(streaks.win.current).toBe(1);
       expect(streaks.daily.current).toBe(1);
-      expect(match.players[0]).toEqual({ playerId: body.identity.id, displayName: "Riya" });
-      expect(match.result.winners).toEqual([body.identity.id]);
+      // History names the account by its id for this match (CC-297), consistently enough to replay the game.
+      expect(match.players[0]).toEqual({ playerId: match.you, displayName: "Riya" });
+      expect(match.result.winners).toEqual([match.you]);
+      expect(JSON.stringify(match)).not.toContain(body.identity.id);
       expect(rps.getOutcome(replayed)).toEqual({ status: "finished", ...match.result });
       expect(transfer).toEqual(
         expect.objectContaining({ from: alice.identity.id, status: "done", to: body.identity }),
@@ -815,7 +840,7 @@ describe("leaderboards and rematches through the real composition root (integrat
     return data.code;
   }
 
-  it("ranks the accounts of stored matches, never the guest, and replays a rematch as a second match", async () => {
+  it("ranks the accounts and the guest of stored matches, and replays a rematch as a second match", async () => {
     const app = await start();
     const players = [];
     try {
@@ -826,12 +851,14 @@ describe("leaderboards and rematches through the real composition root (integrat
 
       const code = await newRoom(riya, sam);
       await playRound(code, riya, sam);
-      await send(sam.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+      const asked = await send(sam.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
       const rematch = await send(riya.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+      // Views name players by seat id (CC-253): each player's is the `you` of their own view.
+      const seat = { riya: rematch.data.you, sam: asked.data.you };
       expect(rematch.data.status).toBe("playing");
-      expect(rematch.data.seats.map((seat) => seat.playerId)).toEqual([sam.identity.id, riya.identity.id]);
+      expect(rematch.data.seats.map((each) => each.playerId)).toEqual([seat.sam, seat.riya]);
       const second = await playRound(code, sam, riya);
-      expect(second.data.series).toEqual({ games: 2, wins: { [riya.identity.id]: 1, [sam.identity.id]: 1 } });
+      expect(second.data.series).toEqual({ games: 2, wins: { [seat.riya]: 1, [seat.sam]: 1 } });
       await playRound(await newRoom(visitor, riya), visitor, riya);
 
       const board = await eventually(async () => {
@@ -839,42 +866,54 @@ describe("leaderboards and rematches through the real composition root (integrat
           headers: { cookie: visitor.cookie },
         });
         const body = await res.json();
-        return body.entries.length === 2 ? body : undefined;
+        return body.entries.length === 3 ? body : undefined;
       });
-      // 50 and 40 XP from the matches, plus whatever daily quests paid (they depend on the player and the day).
+      const guestName = visitor.identity.displayName;
+      // 50, 40 and 30 XP from the matches, plus whatever daily quests paid (they depend on the player and the day).
       const xpOf = async ({ cookie }) => {
         const res = await fetch(`${app.url}/api/progress`, { headers: { cookie } });
         return (await res.json()).progress.xp;
       };
-      const { overall, weekly, riyaXp, samXp } = await eventually(async () => {
-        const [riyaXp, samXp] = [await xpOf(riya), await xpOf(sam)];
+      const { overall, weekly, riyaXp, samXp, guestXp } = await eventually(async () => {
+        const [riyaXp, samXp, guestXp] = [await xpOf(riya), await xpOf(sam), await xpOf(visitor)];
         const boardFor = async (id) =>
           (await fetch(`${app.url}/api/leaderboards/${id}`, { headers: { cookie: sam.cookie } })).json();
         const [overall, weekly] = [await boardFor("overall"), await boardFor("weekly")];
         const scores = (body) => Object.fromEntries(body.entries.map((e) => [e.displayName, e.score]));
-        const settled = (body) => scores(body).riya === riyaXp && scores(body).sam === samXp;
-        return riyaXp >= 50 && samXp >= 40 && settled(overall) && settled(weekly)
-          ? { overall, weekly, riyaXp, samXp }
+        const settled = (body) =>
+          scores(body).riya === riyaXp && scores(body).sam === samXp && scores(body)[guestName] === guestXp;
+        return riyaXp >= 50 && samXp >= 40 && guestXp >= 30 && settled(overall) && settled(weekly)
+          ? { overall, weekly, riyaXp, samXp, guestXp }
           : undefined;
       });
       const matches = await readCollection(app.config.mongoUri, "matches");
 
+      // One win each: the earlier win ranks higher, so the guest who won last is third (ADR-060).
       expect(board.entries.map(({ displayName, score }) => [displayName, score])).toEqual([
         ["riya", 1],
         ["sam", 1],
+        [guestName, 1],
       ]);
-      expect(board.you).toEqual({ listed: false, reason: "guest" });
+      expect(board.you).toEqual({ listed: true, rank: 3, score: 1 });
       // Overall and this week's XP agree for new accounts: match XP and quest bonuses both count for the week.
       for (const body of [overall, weekly]) {
-        expect(body.entries.map(({ displayName, score }) => [displayName, score]).sort()).toEqual([
-          ["riya", riyaXp],
-          ["sam", samXp],
-        ]);
+        expect(body.entries.map(({ displayName, score }) => [displayName, score]).sort()).toEqual(
+          [
+            ["riya", riyaXp],
+            ["sam", samXp],
+            [guestName, guestXp],
+          ].sort(),
+        );
         expect(body.you).toEqual(expect.objectContaining({ listed: true, score: samXp }));
       }
       expect(matches.filter((match) => match.roomCode === code)).toHaveLength(2);
+      // The guest's rows end 30 days after its game, the accounts' all time rows never (ADR-060).
       const entries = await readCollection(app.config.mongoUri, "leaderboard_entries");
-      expect(entries.some((entry) => entry.playerId === visitor.identity.id)).toBe(false);
+      const allTime = entries.filter((entry) => entry.period === "all");
+      expect(allTime.filter((entry) => entry.playerId === visitor.identity.id)).toHaveLength(2);
+      for (const entry of allTime) {
+        expect(entry.expiresAt !== undefined).toBe(entry.playerId === visitor.identity.id);
+      }
     } finally {
       players.forEach((player) => player.socket.disconnect());
       await app.close();

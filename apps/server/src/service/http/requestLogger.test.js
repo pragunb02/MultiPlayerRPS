@@ -2,16 +2,18 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { captureLogger } from "../../testing/captureLogger.js";
-import { createRequestLogger } from "./requestLogger.js";
+import { createRequestLogger, keepRoutePrefix } from "./requestLogger.js";
 
 /** Minimal app around the middleware, with a deterministic id generator and clock. */
 function setup() {
   const capture = captureLogger();
+  const recorded = [];
   let time = 1_000;
   const app = express();
   app.use(
     createRequestLogger({
       logger: capture.logger,
+      recordRequest: (request) => recorded.push(request),
       generateId: () => "generated-id-0001",
       now: () => {
         time += 12.345;
@@ -29,7 +31,7 @@ function setup() {
     req.log.info("inside handler");
     res.end();
   });
-  return { app, ...capture };
+  return { app, recorded, ...capture };
 }
 
 describe("createRequestLogger", () => {
@@ -117,5 +119,65 @@ describe("createRequestLogger", () => {
     await request(app).get("/child");
 
     expect(find("inside handler")[0].requestId).toBe("generated-id-0001");
+  });
+
+  describe("timing for operations telemetry (ADR-055)", () => {
+    it("records each request by its route template, never its path", async () => {
+      const { app, recorded, find } = setup();
+      app.get("/rooms/:code", (req, res) => res.end());
+
+      await request(app).get("/rooms/AB2CDE?from=sam@example.com");
+
+      expect(recorded).toEqual([
+        { route: "/rooms/:code", method: "GET", status: 200, durationMs: expect.closeTo(12.345, 6) },
+      ]);
+      expect(find("request completed")[0].route).toBe("/rooms/:code");
+    });
+
+    it("records a request no route answered as unmatched", async () => {
+      const { app, recorded } = setup();
+
+      await request(app).get("/room/AB2CDE");
+
+      expect(recorded).toEqual([expect.objectContaining({ route: "unmatched", status: 404 })]);
+    });
+
+    it("records a route written as a pattern as pattern", async () => {
+      const { app, recorded } = setup();
+      app.get(/^\/page\/.*/, (req, res) => res.end());
+      app.get(["/a", "/b"], (req, res) => res.end());
+
+      await request(app).get("/page/AB2CDE");
+      await request(app).get("/b");
+
+      expect(recorded.map(({ route }) => route)).toEqual(["pattern", "pattern"]);
+    });
+
+    it("keeps the prefix of the router the route is mounted on, also when the handler fails", async () => {
+      const { app, recorded } = setup();
+      const router = express.Router();
+      router.get("/fine/:id", (req, res) => res.end());
+      router.get("/broken/:id", async () => {
+        throw new Error("boom");
+      });
+      app.use("/api", keepRoutePrefix, router);
+      app.use((err, req, res, _next) => res.status(500).end());
+
+      await request(app).get("/api/fine/user_1");
+      await request(app).get("/api/broken/user_1");
+
+      expect(recorded.map(({ route, status }) => [route, status])).toEqual([
+        ["/api/fine/:id", 200],
+        ["/api/broken/:id", 500],
+      ]);
+    });
+
+    it("records nothing when no recorder is given", async () => {
+      const app = express();
+      app.use(createRequestLogger({ logger: captureLogger().logger }));
+      app.get("/ok", (req, res) => res.end());
+
+      await request(app).get("/ok").expect(200);
+    });
   });
 });

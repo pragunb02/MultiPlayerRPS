@@ -5,6 +5,7 @@ import { createRoomAccessor } from "../../data/roomAccessor.js";
 import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { ConflictError } from "../../utils/errors.js";
 import { createRoomComponent } from "./roomComponent.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 // CC-044, ADR-053: a blocked pair is never seated together and never rematched, both ways. The blocked player can
 // never tell a block from what anyone might do: a full room, or an opponent who declines or withdraws.
@@ -34,6 +35,7 @@ function fakeBlocks(pairs = []) {
 function setup(blocks) {
   let code = 0;
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine]),
     events: { emit() {} },
