@@ -45,3 +45,8 @@ services:
         sync: false
       - key: ADMIN_ACCOUNT_IDS
         sync: false
+      # Operations telemetry (ADR-055, CC-286). Off while unset. The headers hold a write-only token.
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: OTEL_EXPORTER_OTLP_HEADERS
+        sync: false
