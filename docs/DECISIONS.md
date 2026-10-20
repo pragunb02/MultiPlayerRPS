@@ -59,6 +59,39 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-073 — Our own feature flags: one registry in code, keyed buckets on the server, console overrides
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-312](tickets/CC-312.md), research there).
+  Our own system, the console as the place to change it and the measures come from the owner's brief; the rows of
+  the ticket's Open decisions table are built as their recommended defaults.
+- **Context.** Decision-first rule 7 (ADR-072.8) needs new player-facing features to ship behind a flag with a
+  removal date. Merging deploys to production, so without flags a feature reaches everyone at once and leaves only
+  with another deploy. Hosted flag services count persons by id, which ADR-034 rules out.
+- **Decision.**
+  1. **One registry in code**, `packages/shared/src/flags.js`: `name`, `description`, `ticket`, `default` (always
+     `false`), `removeBy`, `rollout` (`off`, `on` or a whole percentage), `audience` (`everyone`, `signed-in`,
+     `adults`, `admins`), `client` and `success`. Checked at boot and in tests.
+  2. **Buckets.** The first 4 bytes of a keyed id (ADR-057, label `FLAG_BUCKETS`) of `[flag, playerId]`, modulo
+     10 000. On when below `percent × 100`, so a ramp only adds players. Never stored, logged or sent. A visitor with
+     no id is on only at `on`.
+  3. **Audiences.** `signed-in` is an account; `adults` uses `accountComponent.adultsAmong` (CC-152's rule, so
+     unknown age is not adult); `admins` is the console allowlist (ADR-036.1).
+  4. **Overrides** in a new `feature_flags` collection (`name`, `rollout`, `updatedAt`), read into memory every
+     30 seconds. A failed read keeps the last good overrides for 5 minutes, then the code's rollout. Unknown names in
+     the collection are ignored. Changed only by an admin, from the console's Flags tab.
+  5. **The client gets booleans only**, from `GET /api/flags?names=…` (`no-store`), for flags marked `client`.
+  6. **Counts**, ADR-034 style: exposures and successes per flag, India day and side, in a new
+     `feature_flag_counts` collection, no id of any kind, kept 90 days. The console shows 30 days with `"<5"` for 1
+     to 4 (ADR-036.2). Not operations telemetry: ADR-055's instruments are unchanged.
+  7. **Hygiene.** A test fails on a flag past `removeBy`, on a flag without a `flagPaths` suite (on and off), and on
+     a flag name in the source that is not registered. `isOn` and `useFlag` throw on an unknown name.
+- **Why.** Fowler's toggle router with time bombs, Unleash's per-flag stickiness and fallback, PostHog's
+  flag-and-person bucket, Google SRE's canary with a control group; keyed so nobody can work out a known player's
+  bucket, and first party so no id leaves us.
+- **Consequences.** A new feature adds one registry entry and a `flagPaths` suite, and a later ticket removes both.
+  Success counts can be inflated by one player up to the API rate limit, accepted: they are a guide. A second
+  instance (CC-061) shares the overrides through MongoDB already, and each instance adds its own counts.
+
 ### ADR-072 — Decision-first tickets: open decisions answered before build, two templates, a CI gate
 
 - **Status:** Accepted · 2026-10-20 (owner approved the process upgrade from research.
