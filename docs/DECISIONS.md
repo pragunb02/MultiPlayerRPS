@@ -465,6 +465,12 @@ the owner may change it.
      Prometheus, Loki and Grafana on a VM. In each case only the two env vars change. The application code does not.
   8. **Self-hosting now** was set aside: we would run, update and secure it ourselves, a single VM can fail with
      nobody to notice, and free VMs have their own limits (CC-286 section 5).
+- **Amended 2026-10-20 ([CC-305](tickets/CC-305.md)): the last line of every way out is sent.** The crash and
+  shutdown lines were named but never left the process, which exited before the batch. Now each way out (a clean
+  shutdown, a failed close, the drain timeout, an uncaught exception, an unhandled rejection) writes its last line,
+  then runs telemetry's shutdown as the last flush, raced against 5 seconds, then exits. A shutdown can therefore
+  take up to 15 seconds (the 10 second drain and the 5 second flush), inside the 30 seconds Render waits after
+  SIGTERM. `shutdown complete` stays a named line.
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 

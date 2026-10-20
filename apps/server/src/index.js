@@ -30,14 +30,12 @@ const telemetry = await startTelemetry({
   onExportFailed: ({ signal, error }) => logger.warn({ signal, err: error }, "telemetry export failed"),
 });
 const logger = createLogger({ level: config.logLevel, forward: telemetry.forward });
-handleFatalErrors({ logger });
+// Telemetry's last flush is its shutdown, which each handler runs after writing its last line and before exiting,
+// also when closing the server fails (CC-305). Shutting telemetry down inside `close` would drop that line.
+handleFatalErrors({ logger, flush: telemetry.shutdown });
 if (config.telemetry.enabled) {
   logger.info({ logs: config.telemetry.logs, intervalMs: config.telemetry.exportIntervalMs }, "telemetry on");
 }
 
 const server = await startServer({ config, logger, metrics: telemetry.metrics });
-const close = async () => {
-  await server.close();
-  await telemetry.shutdown();
-};
-handleShutdownSignals({ close, logger });
+handleShutdownSignals({ close: server.close, flush: telemetry.shutdown, logger });

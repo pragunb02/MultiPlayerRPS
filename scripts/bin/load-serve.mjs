@@ -15,7 +15,7 @@ import { createProbe, PROBE_PREFIX } from "../load/probe.mjs";
 
 const config = loadConfig(process.env);
 const logger = createLogger({ level: config.logLevel });
-handleFatalErrors({ logger });
+handleFatalErrors({ logger, flush: async () => undefined });
 
 const open = { windowMs: 60_000, limit: 1_000_000 };
 const limits = { auth: { perIp: open, signupPerIp: open }, guest: open, leaderboard: open, api: open };
@@ -34,4 +34,5 @@ setInterval(() => process.stdout.write(`${PROBE_PREFIX}${JSON.stringify(probe.re
 
 const { port, close } = await startServer({ config, logger, limits, rooms });
 logger.warn({ port, env: config.env }, "load test server listening, with the limits per address raised");
-handleShutdownSignals({ close, logger });
+// No telemetry here, so there is nothing to flush before exit (CC-305).
+handleShutdownSignals({ close, flush: async () => undefined, logger });
