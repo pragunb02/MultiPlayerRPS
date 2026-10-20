@@ -29,6 +29,10 @@ import { ROOM_REQUEST_TYPES } from "@classicade/shared";
  * @property {(state: State) => Outcome} getOutcome
  * @property {(state: State, viewer: PlayerId | "spectator") => unknown} viewFor   hides what the viewer may not see
  * @property {(state: State) => PlayerId[]} activePlayers                         who may move right now
+ * @property {(state: State) => PlayerId[]} playersOf
+ *   every player of the game, in seat order. Anyone the state, a view or the outcome names is one of them, so the
+ *   server can rename all of them before a view leaves it (CC-253). The contract kit checks that no view names
+ *   anyone else
  * @property {(state: State) => number} [deadline]
  *   Optional time hook: the time (ms timestamp) when something happens if nobody acts, for example when a
  *   chess player runs out of time. 0 means "no deadline". It is worked out from the state alone. The server
@@ -107,6 +111,7 @@ const REQUIRED_FUNCTIONS = [
   "getOutcome",
   "viewFor",
   "activePlayers",
+  "playersOf",
 ];
 const MAX_PLAYERS = 8;
 

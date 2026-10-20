@@ -5,6 +5,7 @@ import { createBotTurns } from "../domain/bots/botTurns.js";
 import { createSealMaker } from "../domain/bots/seals.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
+import { TEST_SEAT_IDS } from "./seatIds.js";
 
 export const SEAL_SECRET = "seal-secret-for-tests-only-0123456789abcdef";
 export const NETWORK = "net-a";
@@ -34,6 +35,7 @@ export function botRooms({ seed = 1, onChange = () => {} } = {}) {
     },
   };
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor,
     engines,
     events,

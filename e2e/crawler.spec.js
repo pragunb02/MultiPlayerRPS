@@ -60,7 +60,7 @@ test.describe("crawler and link preview bot", () => {
     expect(status).toBe(200);
     expect(html).toContain("<title data-server-head>Join my Chess game on ClassiCade</title>");
     expect(tag(html, "property", "og:title")).toBe("Join my Chess game on ClassiCade");
-    expect(tag(html, "property", "og:url")).toBe(room.invite);
+    expect(tag(html, "property", "og:url")).toBe(new URL(room.path, room.invite).href);
     expect(tag(html, "property", "og:image")).toMatch(/\/og\/chess\.[0-9a-f]{8}\.jpg$/);
     expect(tag(html, "name", "robots")).toBe("noindex");
     // The preview neither took a seat nor said anything about who is in the room.

@@ -44,6 +44,7 @@ import {
 import { createRoomComponent, ROOM_EVENTS } from "./domain/rooms/roomComponent.js";
 import { roomLifetimes } from "./domain/rooms/roomLifetimes.js";
 import { roomLimits } from "./domain/rooms/roomLimits.js";
+import { createSeatIds, seatSecretFrom } from "./domain/rooms/seatIds.js";
 import { deletedPlayer } from "./models/deletedPlayer.js";
 import { createAccountDao } from "./persistence/accountDao.js";
 import { createAccountDeletionDao } from "./persistence/accountDeletionDao.js";
@@ -619,11 +620,14 @@ export async function startServer({
     accountDeletionAccessor,
   });
   const matchComponent = createMatchComponent({ matchAccessor });
+  // One set of seat ids for rooms and blocks, so a seat id the room view shows is the one a block is checked against.
+  const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
   const blockComponent = createBlockComponent({
     blockAccessor,
     rooms: roomAccessor,
     matches: matchComponent,
     transfers: playerTransferAccessor,
+    seatIds,
   });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -698,6 +702,7 @@ export async function startServer({
     botTurns,
     keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
     blocks: blockComponent,
+    seatIds,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const botDriver = createBotDriver({

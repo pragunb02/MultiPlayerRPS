@@ -18,36 +18,36 @@ async function rpsMatch(bestOf) {
   server = await startTestServer({ engines: ENGINES });
   const alice = await clients.player();
   const bob = await clients.player();
-  const { code } = await startRoom(alice, bob, { gameId: "rps", options: { bestOf } });
-  return { alice, bob, code };
+  const { code, seat } = await startRoom(alice, bob, { gameId: "rps", options: { bestOf } });
+  return { alice, bob, code, seat: { alice: seat.host, bob: seat.guest } };
 }
 
 describe("Rock Paper Scissors over sockets", () => {
   it("never sends a pending choice to the opponent — only that they have chosen (SEC-09)", async () => {
-    const { alice, bob, code } = await rpsMatch(3);
+    const { seat, alice, bob, code } = await rpsMatch(3);
     const bobSeesAliceChoose = nextEvent(bob.socket);
 
     const own = await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "scissors" } });
     const bobsView = await bobSeesAliceChoose;
 
     expect(own.data.game.view.yourChoice).toBe("scissors");
-    expect(bobsView.game.view.hasChosen).toEqual({ [alice.identity.id]: true, [bob.identity.id]: false });
-    expect(bobsView.game.activePlayers).toEqual([bob.identity.id]);
+    expect(bobsView.game.view.hasChosen).toEqual({ [seat.alice]: true, [seat.bob]: false });
+    expect(bobsView.game.activePlayers).toEqual([seat.bob]);
     expect(JSON.stringify(bob.received)).not.toContain("scissors");
   });
 
   it("plays a best-of-1 match to a result both players see, scissors included (BUG-01)", async () => {
-    const { alice, bob, code } = await rpsMatch(1);
+    const { seat, alice, bob, code } = await rpsMatch(1);
     await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "scissors" } });
     const aliceSeesResult = nextEvent(alice.socket);
 
     const final = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { choice: "paper" } });
 
-    const outcome = { status: "finished", result: "win", winners: [alice.identity.id], reason: "best-of-1" };
+    const outcome = { status: "finished", result: "win", winners: [seat.alice], reason: "best-of-1" };
     expect(final.data.game.outcome).toEqual(outcome);
     expect((await aliceSeesResult).game.outcome).toEqual(outcome);
     expect(final.data.game.view.rounds).toEqual([
-      { choices: { [alice.identity.id]: "scissors", [bob.identity.id]: "paper" }, winner: alice.identity.id },
+      { choices: { [seat.alice]: "scissors", [seat.bob]: "paper" }, winner: seat.alice },
     ]);
   });
 

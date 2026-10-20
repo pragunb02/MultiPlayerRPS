@@ -286,6 +286,8 @@ export const chessEngine = defineEngine({
     };
   },
 
+  playersOf: (state) => [...state.players],
+
   activePlayers(state) {
     return isOver(state) ? [] : [state.byColor[sideToMove(state)]];
   },

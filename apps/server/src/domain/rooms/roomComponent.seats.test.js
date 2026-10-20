@@ -5,6 +5,7 @@ import { createRoomAccessor } from "../../data/roomAccessor.js";
 import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { ConflictError } from "../../utils/errors.js";
 import { createRoomComponent } from "./roomComponent.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 // BUG-17: a game started after the host had left the waiting room. A game now starts only when every seat is
 // taken and every seated player is connected (CC-112).
@@ -16,6 +17,7 @@ const T0 = 1_000_000;
 /** Alice's waiting race room, over the real accessor and the in-memory store. */
 async function waitingRoom() {
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
     engines: createEngineRegistry([raceEngine]),
     events: { emit() {} },

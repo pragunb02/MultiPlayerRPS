@@ -4,7 +4,8 @@
 import { expect } from "./fixtures.js";
 import { installProbe } from "./controlProbe.js";
 
-const control = (page, id) => page.locator(`main [data-cc-control="${id}"]`);
+// Dialogs are drawn on the page's body, outside main (Modal.jsx), so their buttons are looked for there too.
+const control = (page, id) => page.locator(`:is(main, [role="dialog"]) [data-cc-control="${id}"]`);
 /** Where the questions from other rooms show on any page (CC-207). */
 export const SITE_REQUESTS = "[data-cc-site-requests]";
 const phaseOf = (player) => player.page.locator("[data-cc-phase]");

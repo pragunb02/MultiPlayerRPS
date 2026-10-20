@@ -101,7 +101,7 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
       gameId: "rps",
       options: { bestOf: 3 },
     });
-    await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
+    const { data: joined } = await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
     await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { choice: "rock" } });
 
     const aliceBack = rejoinOnReconnect(alice.socket, room.code);
@@ -111,7 +111,8 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
 
     expect(aliceJoin).toEqual(expect.objectContaining({ ok: true }));
     expect(bobJoin.data.status).toBe("playing");
-    expect(bobJoin.data.seats.map((seat) => seat.playerId)).toEqual([alice.identity.id, bob.identity.id]);
+    // The seat ids are the ones from before the restart (CC-253).
+    expect(bobJoin.data.seats.map((seat) => seat.playerId)).toEqual([room.you, joined.you]);
     // Alice's hidden choice is still waiting for Bob's.
     const moved = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, {
       code: room.code,
@@ -144,7 +145,7 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     expect(bobJoin.data.status).toBe("finished");
     expect(bobJoin.data.rematch).toEqual(expect.objectContaining({ available: true }));
     expect(bobJoin.data.requests).toEqual([
-      expect.objectContaining({ type: "rematch", from: alice.identity.id, state: "open" }),
+      expect.objectContaining({ type: "rematch", from: room.you, state: "open" }),
     ]);
     const accepted = await send(bob.socket, SOCKET_EVENTS.ROOM_ANSWER, {
       code: room.code,
@@ -152,7 +153,7 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
       answer: "accept",
     });
     expect(accepted.data.status).toBe("playing");
-    expect(accepted.data.series).toEqual({ games: 1, wins: { [alice.identity.id]: 1 } });
+    expect(accepted.data.series).toEqual({ games: 1, wins: { [room.you]: 1 } });
   });
 
   it("shows who is really connected after a restart: nobody, until they come back", async () => {
@@ -184,10 +185,12 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     });
     const { data: started } = await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
     const whiteId = Object.keys(started.game.view.colors).find((id) => started.game.view.colors[id] === "w");
-    const [white, black] = whiteId === alice.identity.id ? [alice, bob] : [bob, alice];
+    // Views name players by seat id (CC-253): Alice's is the `you` of her own view.
+    const [white, black] = whiteId === room.you ? [alice, bob] : [bob, alice];
+    const whiteSeat = whiteId;
     const move = (player, from, to) =>
       send(player.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { type: "move", from, to } });
-    return { code: room.code, white, black, move };
+    return { code: room.code, white, black, whiteSeat, move };
   }
 
   it("keeps chess clocks running from the stored times while the server is down", async () => {
@@ -218,7 +221,7 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     let time = Date.UTC(2026, 9, 16, 12, 0, 0);
     const server = serverProcess({ now: () => time });
     await server.start();
-    const { code, white, black, move } = await chessGame(server, "bullet-1+0");
+    const { code, white, black, whiteSeat, move } = await chessGame(server, "bullet-1+0");
     await move(white, "e2", "e4");
 
     const blackBack = rejoinOnReconnect(black.socket, code);
@@ -228,9 +231,7 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     const { data } = await blackBack;
 
     expect(data.status).toBe("finished");
-    expect(data.game.outcome).toEqual(
-      expect.objectContaining({ winners: [white.identity.id], reason: "timeout" }),
-    );
+    expect(data.game.outcome).toEqual(expect.objectContaining({ winners: [whiteSeat], reason: "timeout" }));
   });
 
   // PR #67 review: the idle limit of a turn ran on while the server was down, so a player lost for it at startup.
@@ -246,7 +247,7 @@ describe("rooms survive a server restart (integration, CC-101)", () => {
     });
     const code = room.code;
     const { data: started } = await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
-    const byId = { [alice.identity.id]: alice, [bob.identity.id]: bob };
+    const byId = { [room.you]: alice, [started.you]: bob };
     const first = byId[started.game.activePlayers[0]];
     const second = first === alice ? bob : alice;
     await send(first.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { cell: 0 } });

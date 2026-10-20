@@ -29,6 +29,7 @@ export {
   ROOM_STATUS,
 } from "./rooms.js";
 export { RPS_BEST_OF, RPS_CHOICES } from "./rps.js";
+export { isShareChannel, SHARE_CHANNEL_PARAM, SHARE_CHANNELS, SHARED_LINK_ENTRY } from "./shareChannels.js";
 export { TTT_CELLS, TTT_MARKS } from "./tictactoe.js";
 export {
   CHESS_ACTIONS,

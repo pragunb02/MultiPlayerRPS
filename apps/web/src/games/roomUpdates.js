@@ -1,5 +1,6 @@
 import { REQUEST_ANSWERS, REQUEST_STATES, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
 import { SOUNDS } from "../lib/sound/sounds.js";
+import { outcomeMoment } from "./outcomeMoment.js";
 import { gameView } from "./registry.js";
 import { gameNumber, isYourTurn, nameOf } from "./roomView.js";
 
@@ -219,19 +220,13 @@ const sameGame = (previous, next) =>
   next.game !== undefined &&
   gameNumber(previous) === gameNumber(next);
 
-/** The viewer's result sound for a game that just ended. Spectators get none: it is not their win or loss. */
+/**
+ * The viewer's result sound for a game that just ended, from its outcome moment (CC-163): a win, a quiet win, the
+ * soft loss, a draw or the void note of an aborted game. Spectators get none: it is not their win or loss.
+ */
 function resultSound(room) {
-  const { outcome } = room.game;
-  if (room.you === "" || !room.seats.some((seat) => seat.playerId === room.you)) {
-    return NONE;
-  }
-  if (outcome.result === "draw") {
-    return [SOUNDS.DRAW];
-  }
-  if (outcome.winners.length === 0) {
-    return NONE;
-  }
-  return [outcome.winners.includes(room.you) ? SOUNDS.WIN : SOUNDS.LOSS];
+  const { sound } = outcomeMoment(room);
+  return sound === "" ? NONE : [sound];
 }
 
 /**

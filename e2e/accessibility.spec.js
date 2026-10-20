@@ -48,7 +48,8 @@ async function scan(player, screen) {
 const desktopOnly = (testInfo) =>
   test.skip(testInfo.project.name !== "desktop", "each screen is scanned once");
 
-const control = (page, id) => page.locator(`main [data-cc-control="${id}"]`);
+// Dialogs are drawn on the page's body, outside main (Modal.jsx), so their buttons are looked for there too.
+const control = (page, id) => page.locator(`:is(main, [role="dialog"]) [data-cc-control="${id}"]`);
 
 test.describe("pages", () => {
   test("pages a visitor can open", async ({ players }, testInfo) => {

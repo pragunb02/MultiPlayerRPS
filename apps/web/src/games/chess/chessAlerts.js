@@ -1,5 +1,6 @@
 import { CHESS_END_REASONS as END, CHESS_REQUEST_TYPES } from "@classicade/shared";
 import { SOUNDS } from "../../lib/sound/sounds.js";
+import { outcomeLine as line, wordsFrom } from "../outcomeLine.js";
 
 /**
  * The sound a chess move makes, read from its notation: a check ("+") is announced over everything else, then
@@ -65,3 +66,50 @@ const REASON_PHRASES = Object.freeze({
  * @param {string} reason  the outcome's reason (CHESS_END_REASONS)
  */
 export const chessReasonPhrase = (reason) => REASON_PHRASES[reason] ?? "";
+
+// Most draws are the board's own doing, so one line fits them all.
+const NOBODY_COULD_WIN = {
+  drew: () => line("Yeh game koi nahi jeet sakta tha.", "Nobody could win that one."),
+};
+
+/** The words of each chess ending (CC-163), accepted by the owner on 2026-10-20 (docs/tickets/CC-163.md). */
+const OUTCOME_WORDS = {
+  [END.CHECKMATE]: {
+    won: () => line("Ekdum saaf finish.", "Clean finish."),
+    lost: () => line("Achha game tha. Ek aur?", "Good game. Want another?"),
+  },
+  [END.RESIGNATION]: {
+    won: ({ loser }) => line(`${loser} ne haar maan li.`, `${loser} resigned.`),
+    lost: () => line("Naya board lagaoge?", "Fresh board?"),
+    watched: ({ loser }) => line(`${loser} ne haar maan li.`, `${loser} resigned.`),
+  },
+  [END.TIMEOUT]: {
+    won: ({ loser }) => line(`${loser} ka time khatam ho gaya.`, `${loser}'s clock ran out.`),
+    lost: () => line("Kaafi close tha. Agli baar lamba clock lo.", "Close one. Try a longer clock next."),
+    watched: ({ loser }) => line(`${loser} ka time khatam ho gaya.`, `${loser}'s clock ran out.`),
+  },
+  [END.STALEMATE]: NOBODY_COULD_WIN,
+  [END.INSUFFICIENT_MATERIAL]: NOBODY_COULD_WIN,
+  [END.THREEFOLD_REPETITION]: NOBODY_COULD_WIN,
+  [END.FIFTY_MOVE_RULE]: NOBODY_COULD_WIN,
+  [END.AGREEMENT]: { drew: () => line("Dono players ne draw maan liya.", "Both players agreed on a draw.") },
+  [END.TIMEOUT_VS_INSUFFICIENT_MATERIAL]: {
+    drew: () => line("Time khatam, par mate mumkin nahi tha.", "Time ran out, but no mate was possible."),
+  },
+};
+
+/**
+ * What chess adds to the outcome moments (CC-163): the words of each ending, and Queen Vee's tip after a loss.
+ *
+ * @type {import("../outcomeLine.js").OutcomeText}
+ */
+export const CHESS_OUTCOME_TEXT = Object.freeze({
+  words: wordsFrom(OUTCOME_WORDS),
+  hint: ({ character }) =>
+    character === "queen-vee"
+      ? line(
+          "Queen Vee pehle attack karti hai. Pieces bachao.",
+          "Queen Vee attacks first. Guard your pieces.",
+        )
+      : undefined,
+});

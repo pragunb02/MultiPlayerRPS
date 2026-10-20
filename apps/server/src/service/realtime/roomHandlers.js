@@ -211,7 +211,10 @@ export async function handleSocketOnline({ socket, roomComponent, now, logger })
   try {
     await roomComponent.playerOnline({ playerId, now: now() });
     for (const room of await roomComponent.seatedRooms({ playerId })) {
-      socket.emit(SOCKET_EVENTS.REQUEST_UPDATED, { ...roomComponent.requestsView(room), serverTime: now() });
+      socket.emit(SOCKET_EVENTS.REQUEST_UPDATED, {
+        ...roomComponent.requestsView(room, playerId),
+        serverTime: now(),
+      });
     }
   } catch (err) {
     logger.error({ err }, "failed to record that the player came online");
@@ -220,13 +223,17 @@ export async function handleSocketOnline({ socket, roomComponent, now, logger })
 
 /**
  * Tells every tab of the players named about a room's requests whenever they open or end, on whatever page those
- * tabs are (CC-207). The room component names them, including a player whose seat the change gave up.
+ * tabs are (CC-207). The room component names them, including a player whose seat the change gave up. Each player
+ * gets their own payload, which says which seat is theirs (CC-253).
  *
  * @param {{ io: import("socket.io").Server, roomComponent: any, room: any, playerIds: string[], now: () => number }} args
  */
 export function pushRequests({ io, roomComponent, room, playerIds, now }) {
-  const payload = { ...roomComponent.requestsView(room), serverTime: now() };
+  const serverTime = now();
   for (const playerId of playerIds) {
-    io.to(playerChannel(playerId)).emit(SOCKET_EVENTS.REQUEST_UPDATED, payload);
+    io.to(playerChannel(playerId)).emit(SOCKET_EVENTS.REQUEST_UPDATED, {
+      ...roomComponent.requestsView(room, playerId),
+      serverTime,
+    });
   }
 }

@@ -98,8 +98,9 @@ test.describe("blocks", () => {
     const code = new URL(invite).pathname.split("/").at(-1);
     mallory.expect(404, "/api/blocks");
 
+    // A seat id of the right shape (CC-253). A player id is not one, and is refused before anything is looked up.
     const refused = await mallory.page.request.post("/api/blocks", {
-      data: { roomCode: code, seat: 0, seatId: "guest_00000000-0000-4000-8000-000000000000" },
+      data: { roomCode: code, seat: 0, seatId: "A".repeat(22) },
     });
 
     expect(refused.status()).toBe(404);

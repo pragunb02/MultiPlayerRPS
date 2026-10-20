@@ -73,7 +73,9 @@ export const eventWhere = (socket, test, event = SOCKET_EVENTS.ROOM_UPDATED) =>
 /**
  * Host creates a room, guest joins, and the host has seen the game start.
  *
- * @returns {Promise<{ code: string, hostStart: object, joined: object }>}
+ * `seat` holds each player's seat id, as their own view tells them: room views name players by seat id only (CC-253).
+ *
+ * @returns {Promise<{ code: string, hostStart: object, joined: object, created: object, seat: { host: string, guest: string } }>}
  */
 export async function startRoom(host, guest, { gameId, options = {} }) {
   const created = await send(host.socket, SOCKET_EVENTS.ROOM_CREATE, { gameId, options });
@@ -82,5 +84,11 @@ export async function startRoom(host, guest, { gameId, options = {} }) {
   }
   const hostSeesStart = nextEvent(host.socket);
   const joined = await send(guest.socket, SOCKET_EVENTS.ROOM_JOIN, { code: created.data.code });
-  return { code: created.data.code, joined, created, hostStart: await hostSeesStart };
+  return {
+    code: created.data.code,
+    joined,
+    created,
+    hostStart: await hostSeesStart,
+    seat: { host: created.data.you, guest: joined.data.you },
+  };
 }

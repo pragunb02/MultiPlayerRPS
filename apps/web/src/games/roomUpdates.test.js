@@ -96,7 +96,7 @@ describe("roomSounds (CC-103)", () => {
     expect(roomSounds({ previous: room(), next: room(), hidden: false })).toEqual([]);
   });
 
-  it("follows the deciding move with the viewer's result, and an aborted game has none", () => {
+  it("follows the deciding move with the viewer's result, and an aborted game ends on the void note", () => {
     const win = { status: "finished", result: "win", winners: [ME] };
     const loss = { status: "finished", result: "win", winners: [BOB] };
     const draw = { status: "finished", result: "draw", winners: [] };
@@ -106,7 +106,23 @@ describe("roomSounds (CC-103)", () => {
     expect(roomSounds({ previous: room(), next: over(win), hidden: false })).toEqual(["win"]);
     expect(roomSounds({ previous: room(), next: over(loss), hidden: false })).toEqual(["loss"]);
     expect(roomSounds({ previous: room(), next: over(draw), hidden: false })).toEqual(["draw"]);
-    expect(roomSounds({ previous: room(), next: over(aborted), hidden: false })).toEqual([]);
+    expect(roomSounds({ previous: room(), next: over(aborted), hidden: false })).toEqual(["game-void"]);
+  });
+
+  it("plays the quiet win for a win by forfeit or the move timer, and the soft loss for the other side (CC-163)", () => {
+    const over = (outcome) => room({ status: "finished", game: { outcome, activePlayers: [] } });
+    const by = (winner, reason) => over({ status: "finished", result: "win", winners: [winner], reason });
+
+    expect(roomSounds({ previous: room(), next: by(ME, "forfeit"), hidden: false })).toEqual(["win-quiet"]);
+    expect(roomSounds({ previous: room(), next: by(ME, "idle"), hidden: false })).toEqual(["win-quiet"]);
+    expect(roomSounds({ previous: room(), next: by(BOB, "idle"), hidden: false })).toEqual(["loss"]);
+  });
+
+  it("plays no result for a spectator, not even the void note of an aborted game", () => {
+    const aborted = { status: "finished", result: "aborted", winners: [], reason: "aborted" };
+    const watched = room({ you: "", status: "finished", game: { outcome: aborted, activePlayers: [] } });
+
+    expect(roomSounds({ previous: room({ you: "" }), next: watched, hidden: false })).toEqual([]);
   });
 
   it("plays the checkmating move and then the win", () => {
