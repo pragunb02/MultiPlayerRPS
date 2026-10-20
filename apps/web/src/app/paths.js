@@ -178,9 +178,9 @@ export const paths = Object.freeze({
   /**
    * The console's report queue (CC-044), for one status.
    *
-   * @param {{ status?: string }} [filters]  open when left out
+   * @param {{ status?: string, page?: string }} [filters]  open and the first page when left out
    */
-  adminReports: (filters = {}) => `/admin/reports${queryOf(filters, ["status"])}`,
+  adminReports: (filters = {}) => `/admin/reports${queryOf(filters, ["status", "page"])}`,
 });
 
 /**

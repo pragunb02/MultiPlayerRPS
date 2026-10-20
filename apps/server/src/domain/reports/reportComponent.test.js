@@ -419,7 +419,7 @@ describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
   it("groups open reports by reported player, counts reasons and reporters, and sends no player id", async () => {
     const { reports } = await threeReports();
 
-    const { groups } = await reports.queue({ status: "open", limit: 100 });
+    const { groups } = await reports.queue({ status: "open", page: 0 });
 
     expect(groups).toHaveLength(2);
     const [arjun] = groups.filter((group) => group.names.includes("Arjun"));
@@ -452,22 +452,22 @@ describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
   it("lists groups with the most reporters first, and set aside reports last", async () => {
     const { reports } = await threeReports();
 
-    const { groups } = await reports.queue({ status: "open", limit: 100 });
+    const { groups } = await reports.queue({ status: "open", page: 0 });
 
     expect(groups.map((group) => group.reporters)).toEqual([2, 1]);
   });
 
   it("dismisses every open report about the player of a group at once", async () => {
     const { reports } = await threeReports();
-    const { groups } = await reports.queue({ status: "open", limit: 100 });
+    const { groups } = await reports.queue({ status: "open", page: 0 });
     const arjun = groups.find((group) => group.names.includes("Arjun"));
 
-    const result = await reports.act({ reportId: arjun.items[1].reportId, action: "dismiss", now: T0 + 99 });
+    const result = await reports.act({ reportId: arjun.groupId, action: "dismiss", now: T0 + 99 });
 
     expect(result).toEqual({ closed: 2 });
-    const after = await reports.queue({ status: "open", limit: 100 });
+    const after = await reports.queue({ status: "open", page: 0 });
     expect(after.groups.map((group) => group.kind)).toEqual(["guest"]);
-    const dismissed = await reports.queue({ status: "dismissed", limit: 100 });
+    const dismissed = await reports.queue({ status: "dismissed", page: 0 });
     expect(
       dismissed.groups[0].items.every((item) => item.action === "dismiss" && item.closedAt === T0 + 99),
     ).toBe(true);
@@ -475,19 +475,19 @@ describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
 
   it("renames an account to the safe default and closes its reports as acted on", async () => {
     const { reports, renamed } = await threeReports();
-    const { groups } = await reports.queue({ status: "open", limit: 100 });
+    const { groups } = await reports.queue({ status: "open", page: 0 });
     const arjun = groups.find((group) => group.names.includes("Arjun"));
 
     const result = await reports.act({ reportId: arjun.groupId, action: "rename", now: T0 + 99 });
 
     expect(result).toEqual({ closed: 2, displayName: "Player_ABCDEF" });
     expect(renamed).toEqual([ARJUN.id]);
-    expect((await reports.queue({ status: "actioned", limit: 100 })).groups).toHaveLength(1);
+    expect((await reports.queue({ status: "actioned", page: 0 })).groups).toHaveLength(1);
   });
 
   it("refuses to rename a guest, whose name the server gave, and to act on a closed or unknown report", async () => {
     const { reports, renamed } = await threeReports();
-    const { groups } = await reports.queue({ status: "open", limit: 100 });
+    const { groups } = await reports.queue({ status: "open", page: 0 });
     const guest = groups.find((group) => group.kind === "guest");
     const arjun = groups.find((group) => group.names.includes("Arjun"));
     await reports.act({ reportId: arjun.groupId, action: "dismiss", now: T0 + 99 });
@@ -567,5 +567,70 @@ describe("reportComponent: guests who sign in, export and deletion (ADR-071.7)",
     expect(kept.reporterId).toMatch(/^deleted_/);
     expect(kept).not.toHaveProperty("note");
     await expect(dao.getById(about.reportId)).rejects.toBeInstanceOf(RangeError);
+  });
+});
+
+describe("reportComponent: the queue against floods and late reports (review of #150)", () => {
+  const rooms = () => ({
+    ROOM22: room(),
+    ROOM33: room({ code: "ROOM33", seats: [seat(MEERA), seat(ARJUN)] }),
+    ROOM44: room({ code: "ROOM44", seats: [seat(RIYA), seat(GUEST)], requests: [] }),
+  });
+
+  it("closes only the reports up to the one the owner saw, so a later one stays open", async () => {
+    const { reports, inRoom } = setup({ rooms: rooms() });
+    await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 });
+    const { groups } = await reports.queue({ status: "open", page: 0 });
+    await reports.report({ reporter: MEERA, target: inRoom(1, "ROOM33"), reason: "name", now: T0 + 10 });
+
+    const result = await reports.act({ reportId: groups[0].groupId, action: "dismiss", now: T0 + 20 });
+
+    expect(result).toEqual({ closed: 1 });
+    const open = await reports.queue({ status: "open", page: 0 });
+    expect(open.groups.map((group) => group.reports)).toEqual([1]);
+  });
+
+  it("lists set aside reports last within a group", async () => {
+    const { reports, inRoom } = setup({ rooms: rooms() });
+    // Riya's reports were dismissed three times, so her next one is set aside.
+    for (let day = 0; day < REPORTER_TRUST.dismissedAtLeast; day += 1) {
+      const { reportId } = await reports.report({
+        reporter: RIYA,
+        target: inRoom(1),
+        reason: "name",
+        now: T0 + day * DAY_MS,
+      });
+      await reports.act({ reportId, action: "dismiss", now: T0 + day * DAY_MS + 1 });
+    }
+    await reports.report({ reporter: RIYA, target: inRoom(1), reason: "other", now: T0 + 9 * DAY_MS });
+    await reports.report({
+      reporter: MEERA,
+      target: inRoom(1, "ROOM33"),
+      reason: "cheating",
+      now: T0 + 8 * DAY_MS,
+    });
+
+    const [group] = (await reports.queue({ status: "open", page: 0 })).groups;
+
+    expect(group.items.map((item) => [item.reason, item.setAside])).toEqual([
+      ["cheating", false],
+      ["other", true],
+    ]);
+    expect(group).toMatchObject({ reporters: 1, setAside: 1 });
+  });
+
+  it("groups before it pages, so a flood about one player never pushes another out, and says the total", async () => {
+    const { reports, inRoom } = setup({ rooms: rooms() });
+    await reports.report({ reporter: RIYA, target: inRoom(1, "ROOM44"), reason: "other", now: T0 + 99 });
+    await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 });
+    await reports.report({ reporter: MEERA, target: inRoom(1, "ROOM33"), reason: "name", now: T0 + 1 });
+
+    const first = await reports.queue({ status: "open", page: 0, pageSize: 1 });
+    const second = await reports.queue({ status: "open", page: 1, pageSize: 1 });
+
+    expect(first).toMatchObject({ total: 2, page: 0, more: true });
+    expect(first.groups.map((group) => group.names)).toEqual([["Arjun"]]);
+    expect(second).toMatchObject({ total: 2, page: 1, more: false });
+    expect(second.groups.map((group) => group.names)).toEqual([["Guest-T001"]]);
   });
 });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   REPORT_ACTION,
   REPORT_CONTEXT,
@@ -127,6 +127,29 @@ function RenameButton({ name, run }) {
   );
 }
 
+/** How many groups a page of the queue holds: REPORT_QUEUE.groupsPerPage on the server. */
+const PAGE_SIZE = 25;
+
+/** Links to the pages before and after this one, when there are any. Each page is an address, so Back works. */
+function Pages({ status, page, more }) {
+  const at = (number) => paths.adminReports({ status, page: number === 0 ? undefined : String(number) });
+  if (page === 0 && !more) return null;
+  return (
+    <nav aria-label="Report pages" className={styles.actions}>
+      {page > 0 && (
+        <Link to={at(page - 1)} data-cc-control="admin.reports.previous">
+          Previous page
+        </Link>
+      )}
+      {more && (
+        <Link to={at(page + 1)} data-cc-control="admin.reports.next">
+          Next page
+        </Link>
+      )}
+    </nav>
+  );
+}
+
 /** One reported player: the names seen, counts by reason, every report, and the actions. */
 function Group({ group, open, act, onDone }) {
   const name = group.names.join(" / ");
@@ -188,7 +211,8 @@ export function ReportQueue() {
   const [search] = useSearchParams();
   const navigate = useNavigate();
   const status = search.get("status") ?? undefined;
-  const queue = useReportQueue(status);
+  const page = search.get("page") ?? undefined;
+  const queue = useReportQueue({ status, page });
   const [notice, setNotice] = useState("");
 
   if (queue.status === "error" && isNotFound(queue.error)) {
@@ -245,6 +269,11 @@ export function ReportQueue() {
         </div>
       )}
       {queue.status === "ready" && queue.groups.length === 0 && <p>No reports here.</p>}
+      {queue.status === "ready" && queue.groups.length > 0 && (
+        <p className={consoleStyles.lede}>
+          {`Players ${queue.page * PAGE_SIZE + 1} to ${queue.page * PAGE_SIZE + queue.groups.length} of ${queue.total} reported.`}
+        </p>
+      )}
       {queue.groups.length > 0 && (
         <ol className={styles.list}>
           {queue.groups.map((group) => (
@@ -254,6 +283,7 @@ export function ReportQueue() {
           ))}
         </ol>
       )}
+      <Pages status={status} page={queue.page} more={queue.more} />
     </section>
   );
 }

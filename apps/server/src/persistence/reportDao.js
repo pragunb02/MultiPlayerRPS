@@ -33,6 +33,14 @@ const DUPLICATE_KEY_CODE = 11000;
  * @property {string} [action]       one of REPORT_ACTIONS, once closed
  * @property {Date} createdAt        MongoDB removes the report REPORT_KEEP_DAYS after this
  * @property {Date} [closedAt]
+ *
+ * @typedef {Object} ReportGroupDoc  the reports of one status about one player, counted (the console's queue)
+ * @property {string} reportedId
+ * @property {number} reports        how many
+ * @property {number} reporters      how many people, not counting set aside reports
+ * @property {number} setAside       how many were set aside
+ * @property {Date} lastAt           when the newest was made
+ * @property {string} newestId       the newest report's id, which names the group in the console
  */
 
 const recentSchema = new mongoose.Schema(
@@ -168,26 +176,81 @@ export function createReportDao({ connection }) {
     },
 
     /**
-     * @param {{ status: string, limit: number }} query
+     * The reports of one status grouped by reported player, the groups with the most reporters first (set aside
+     * reports do not count as reporters), then the newest, and one page of them. Grouping happens before the page is
+     * cut, so many reports about one player can never push another player out of the queue (review of #150).
+     *
+     * @param {{ status: string, skip: number, limit: number }} query
+     * @returns {Promise<{ total: number, groups: ReportGroupDoc[] }>}
+     */
+    async listGroups({ status, skip, limit }) {
+      const [{ total, page }] = await Report.aggregate([
+        { $match: { status } },
+        { $sort: { createdAt: -1, reportId: -1 } },
+        {
+          $group: {
+            _id: "$reportedId",
+            reports: { $sum: 1 },
+            setAside: { $sum: { $cond: ["$setAside", 1, 0] } },
+            reporters: { $addToSet: { $cond: ["$setAside", null, "$reporterId"] } },
+            lastAt: { $first: "$createdAt" },
+            newestId: { $first: "$reportId" },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            reportedId: "$_id",
+            reports: 1,
+            reporters: { $size: { $setDifference: ["$reporters", [null]] } },
+            setAside: 1,
+            lastAt: 1,
+            newestId: 1,
+          },
+        },
+        { $sort: { reporters: -1, lastAt: -1, reportedId: 1 } },
+        { $facet: { total: [{ $count: "n" }], page: [{ $skip: skip }, { $limit: limit }] } },
+      ]);
+      return {
+        total: total[0]?.n ?? 0,
+        groups: page.map(({ reportedId, reports, reporters, setAside, lastAt, newestId }) => ({
+          reportedId,
+          reports,
+          reporters,
+          setAside,
+          lastAt,
+          newestId,
+        })),
+      };
+    },
+
+    /**
+     * @param {{ reportedId: string, status: string, limit: number }} query
      * @returns {Promise<ReportDoc[]>} newest first
      */
-    listByStatus: ({ status, limit }) =>
-      Report.find({ status }, FIELDS).sort(NEWEST_FIRST).limit(limit).lean(),
+    listAbout: ({ reportedId, status, limit }) =>
+      Report.find({ reportedId, status }, FIELDS).sort(NEWEST_FIRST).limit(limit).lean(),
 
     /** @param {string} reporterId @returns {Promise<ReportDoc[]>} newest first */
     listByReporter: (reporterId) => Report.find({ reporterId }, FIELDS).sort(NEWEST_FIRST).lean(),
 
-    /** @param {string} reportedId @returns {Promise<ReportDoc[]>} the open reports about the player, newest first */
-    listOpenAbout: (reportedId) =>
-      Report.find({ reportedId, status: "open" }, FIELDS).sort(NEWEST_FIRST).lean(),
-
     /**
-     * @param {{ reportedId: string, status: string, action: string, closedAt: Date }} change
+     * Closes the open reports about one player up to `upTo`, the newest report the owner saw, so a report that came
+     * in after the owner loaded the queue stays open (review of #150). Two in the same moment are told apart by id.
+     *
+     * @param {{ reportedId: string, upTo: { createdAt: Date, reportId: string }, status: string, action: string, closedAt: Date }} change
      * @returns {Promise<number>} reports closed
      */
-    async closeOpen({ reportedId, status, action, closedAt }) {
+    async closeOpen({ reportedId, upTo, status, action, closedAt }) {
       const { modifiedCount } = await Report.updateMany(
-        { reportedId, status: "open" },
+        {
+          reportedId,
+          status: "open",
+          $or: [
+            { createdAt: { $lt: upTo.createdAt } },
+            { createdAt: upTo.createdAt, reportId: { $lte: upTo.reportId } },
+          ],
+        },
         { $set: { status, action, closedAt } },
       );
       return modifiedCount;

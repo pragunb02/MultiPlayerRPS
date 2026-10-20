@@ -564,20 +564,23 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
 
 /**
  * How the owner's rename of a reported account reaches everywhere the name shows (CC-044, ADR-071.6): the account
- * gets the safe default name and its sessions end, its leaderboard rows take the new name, and its sockets are cut
- * through REPORT_EVENTS.PLAYER_RENAMED, so the player signs in again under the new name.
+ * gets the safe default name and its sessions end, its seats in open rooms take the new name (so a game that ends
+ * later records it, and the boards keep it), its leaderboard rows take it, and its sockets are cut through
+ * REPORT_EVENTS.PLAYER_RENAMED, so the player signs in again under the new name.
  *
  * @param {{
  *   accountComponent: Pick<ReturnType<typeof createAccountComponent>, "resetName">,
+ *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">,
  *   leaderboardComponent: Pick<ReturnType<typeof createLeaderboardComponent>, "renamePlayer">,
  *   domainEvents: import("node:events").EventEmitter,
  * }} deps
  * @returns {Parameters<typeof createReportComponent>[0]["names"]}
  */
-export function reportedNames({ accountComponent, leaderboardComponent, domainEvents }) {
+export function reportedNames({ accountComponent, roomComponent, leaderboardComponent, domainEvents }) {
   return {
     async resetName({ playerId, now }) {
       const displayName = await accountComponent.resetName({ playerId, now });
+      await roomComponent.renamePlayer({ playerId, displayName, now });
       await leaderboardComponent.renamePlayer({ playerId, displayName });
       domainEvents.emit(REPORT_EVENTS.PLAYER_RENAMED, { playerId });
       return displayName;
@@ -769,6 +772,9 @@ export async function startServer({
     ratings: chessRatingComponent,
   });
   // Reports are read by blocks (the one-tap block after a report), so they are made first (ADR-071.4).
+  // Rooms read blocks, which read reports, so the room component is made after them. A rename reaches the rooms
+  // through this, which gets the room component's rename as soon as it exists (long before any owner can rename).
+  const roomsToRename = /** @type {Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">} */ ({});
   const reportComponent = createReportComponent({
     reportAccessor,
     references: createPlayerReferences({
@@ -779,7 +785,12 @@ export async function startServer({
     }),
     matches: matchComponent,
     profiles: profileComponent,
-    names: reportedNames({ accountComponent, leaderboardComponent, domainEvents }),
+    names: reportedNames({
+      accountComponent,
+      roomComponent: roomsToRename,
+      leaderboardComponent,
+      domainEvents,
+    }),
   });
   const blockComponent = createBlockComponent({
     blockAccessor,
@@ -846,6 +857,7 @@ export async function startServer({
     seatIds,
     avatars: profileCards,
   });
+  roomsToRename.renamePlayer = roomComponent.renamePlayer;
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Heavy computer thinking runs on worker threads, off the event loop (ADR-067).
   const thinkingWorkers = (bots.thinkingWorkers ?? createBotThinkingClient)({

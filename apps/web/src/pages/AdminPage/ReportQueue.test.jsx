@@ -47,11 +47,19 @@ const group = (fields = {}) => ({
   ...fields,
 });
 
+/** One page of the queue, as the server answers it: the groups, how many there are, and whether more follow. */
+const page = (groups, { total = groups.length, page: number = 0, more = false } = {}) => ({
+  groups,
+  total,
+  page: number,
+  more,
+});
+
 const ownerApi = (overrides = {}) =>
   fakeApi({
     getSession: async () => OWNER,
     getAdminStatus: vi.fn().mockResolvedValue(true),
-    getReportQueue: vi.fn().mockResolvedValue([group()]),
+    getReportQueue: vi.fn().mockResolvedValue(page([group()])),
     ...overrides,
   });
 
@@ -127,7 +135,7 @@ describe("the report queue (CC-044)", () => {
       api: ownerApi({
         getReportQueue: vi
           .fn()
-          .mockResolvedValue([group({ kind: "guest", canRename: false, setAside: 1, reporters: 1 })]),
+          .mockResolvedValue(page([group({ kind: "guest", canRename: false, setAside: 1, reporters: 1 })])),
       }),
     });
     const [entry] = await screen.findAllByRole("article");
@@ -138,7 +146,7 @@ describe("the report queue (CC-044)", () => {
 
   it("reads another status from the address, without actions on closed reports", async () => {
     const api = ownerApi({
-      getReportQueue: vi.fn().mockResolvedValue([group({ canRename: false })]),
+      getReportQueue: vi.fn().mockResolvedValue(page([group({ canRename: false })])),
     });
     const { user } = await openQueue({ path: "/admin/reports?status=dismissed", api });
 
@@ -190,7 +198,7 @@ describe("the report queue's other states (CC-044)", () => {
         },
       ],
     });
-    await openQueue({ api: ownerApi({ getReportQueue: vi.fn().mockResolvedValue([profileReport]) }) });
+    await openQueue({ api: ownerApi({ getReportQueue: vi.fn().mockResolvedValue(page([profileReport])) }) });
     const [entry] = await screen.findAllByRole("article");
 
     expect(entry).toHaveTextContent("Profile");
@@ -199,7 +207,7 @@ describe("the report queue's other states (CC-044)", () => {
   });
 
   it("says there is nothing to read", async () => {
-    await openQueue({ api: ownerApi({ getReportQueue: vi.fn().mockResolvedValue([]) }) });
+    await openQueue({ api: ownerApi({ getReportQueue: vi.fn().mockResolvedValue(page([])) }) });
 
     expect(await screen.findByText("No reports here.")).toBeVisible();
   });
@@ -224,7 +232,7 @@ describe("the report queue's other states (CC-044)", () => {
       .mockRejectedValueOnce(
         new AppRequestError({ code: "NETWORK", message: "The network failed", status: 0 }),
       )
-      .mockResolvedValue([group()]);
+      .mockResolvedValue(page([group()]));
     renderApp({ path: "/admin/reports", api: ownerApi({ getReportQueue }) });
 
     const alert = await screen.findByRole("alert");
@@ -232,5 +240,25 @@ describe("the report queue's other states (CC-044)", () => {
     await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
 
     expect(await screen.findAllByRole("article")).toHaveLength(1);
+  });
+});
+
+describe("the report queue's pages (review of #150)", () => {
+  it("says how many players were reported, and offers the next page when the list is cut off", async () => {
+    const getReportQueue = vi
+      .fn()
+      .mockResolvedValueOnce(page([group()], { total: 30, more: true }))
+      .mockResolvedValue(
+        page([group({ groupId: "00000000-0000-4000-d000-000000000099" })], { total: 30, page: 1 }),
+      );
+    const { user } = await openQueue({ api: ownerApi({ getReportQueue }) });
+
+    expect(await screen.findByText("Players 1 to 1 of 30 reported.")).toBeVisible();
+    await user.click(screen.getByRole("link", { name: "Next page" }));
+
+    expect(getReportQueue).toHaveBeenLastCalledWith({ page: "1" });
+    expect(await screen.findByText("Players 26 to 26 of 30 reported.")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Previous page" })).toHaveAttribute("href", "/admin/reports");
+    expect(screen.queryByRole("link", { name: "Next page" })).toBeNull();
   });
 });

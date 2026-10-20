@@ -57,17 +57,32 @@ describe("reportAccessor (CC-044, ADR-071)", () => {
     await expect(reports.get("00000000-0000-4000-c000-ffffffffffff")).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("lists open reports, those about a player, closes them with the action and moves and erases them", async () => {
+  it("groups open reports by player, lists those about one, closes them up to one with the action and moves and erases them", async () => {
     const reports = createReportAccessor({ reportDao: createInMemoryReportDao() });
     const about = (await reports.add(input())).report;
     const other = (await reports.add(input({ reportedId: GUEST, day: "2026-10-18" }))).report;
 
-    expect((await reports.listByStatus({ status: "open", limit: 10 })).map((r) => r.reportId).sort()).toEqual(
-      [about.reportId, other.reportId].sort(),
-    );
-    expect(await reports.listOpenAbout(ARJUN)).toEqual([about]);
+    const { total, groups } = await reports.listGroups({ status: "open", skip: 0, limit: 10 });
+    expect(total).toBe(2);
+    expect(groups.find((group) => group.reportedId === ARJUN)).toEqual({
+      reportedId: ARJUN,
+      reports: 1,
+      reporters: 1,
+      setAside: 0,
+      lastAt: T0,
+      newestId: about.reportId,
+    });
+    expect(Object.isFrozen(groups[0])).toBe(true);
+    expect(await reports.listAbout({ reportedId: ARJUN, status: "open", limit: 10 })).toEqual([about]);
+    const upTo = { createdAt: about.createdAt, reportId: about.reportId };
     expect(
-      await reports.closeOpen({ reportedId: ARJUN, status: "dismissed", action: "dismiss", at: T0 + 5 }),
+      await reports.closeOpen({
+        reportedId: ARJUN,
+        upTo,
+        status: "dismissed",
+        action: "dismiss",
+        at: T0 + 5,
+      }),
     ).toBe(1);
     expect(await reports.get(about.reportId)).toEqual({
       ...about,

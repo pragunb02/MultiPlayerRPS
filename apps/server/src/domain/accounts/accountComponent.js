@@ -106,6 +106,7 @@ const signInOf = (account) =>
  *   legacyPasswords: ReturnType<typeof import("../../utils/legacyPassword.js").createLegacyPasswordChecker>,
  *   accountDeletionAccessor: Pick<ReturnType<typeof import("../../data/accountDeletionAccessor.js").createAccountDeletionAccessor>, "closeLegacy" | "isLegacyClosed">,
  *     the legacy rows whose player deleted their account (CC-035)
+ *   newNameSuffix?: () => string,   six letters for a safe default name (CC-044). Tests pick them
  * }} deps
  */
 export function createAccountComponent({
@@ -382,17 +383,10 @@ export function createAccountComponent({
     },
 
     /**
-     * Signs out every session of the account. The session that asked keeps going by taking the new version.
-     *
-     * @param {{ playerId: string }} input
-     * @returns {Promise<number>} the new session version
-     * @throws {ForbiddenError} for a guest
-     * @throws {NotFoundError} when the account is not there any more
-     */
-    /**
      * Gives the account a safe default name, `Player_` and six letters, after the owner looked at reports on it
-     * (CC-044, ADR-071.6). The name passes the name filter (ADR-022). Every session ends in the same write, so the
-     * player signs in again and sees the new name everywhere. A name another account has is skipped for another.
+     * (CC-044, ADR-071.6). The name passes the name filter (ADR-022): letters that happen to spell a refused word
+     * are drawn again, as is a name another account has. Every session ends in the same write, so the player signs
+     * in again and sees the new name everywhere.
      *
      * @param {{ playerId: string, now: number }} input
      * @returns {Promise<string>} the new name
@@ -402,16 +396,25 @@ export function createAccountComponent({
     async resetName({ playerId }) {
       const accountId = accountIdOf(playerId);
       for (let attempt = 1; ; attempt += 1) {
-        const username = parseUsername(`${SAFE_NAME_PREFIX}${newNameSuffix()}`);
         try {
+          const username = parseUsername(`${SAFE_NAME_PREFIX}${newNameSuffix()}`);
           await accountAccessor.bumpSessionVersion({ accountId, username });
           return username;
         } catch (err) {
-          if (!(err instanceof ConflictError) || attempt >= USERNAME_ATTEMPTS) throw err;
+          const drawAgain = err instanceof ConflictError || err instanceof ValidationError;
+          if (!drawAgain || attempt >= USERNAME_ATTEMPTS) throw err;
         }
       }
     },
 
+    /**
+     * Signs out every session of the account. The session that asked keeps going by taking the new version.
+     *
+     * @param {{ playerId: string }} input
+     * @returns {Promise<number>} the new session version
+     * @throws {ForbiddenError} for a guest
+     * @throws {NotFoundError} when the account is not there any more
+     */
     signOutOtherDevices: async ({ playerId }) =>
       accountAccessor.bumpSessionVersion({ accountId: accountIdOf(playerId) }),
 

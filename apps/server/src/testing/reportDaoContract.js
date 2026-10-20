@@ -74,21 +74,6 @@ export function runReportDaoContract(createDao) {
     ).rejects.toBeInstanceOf(RangeError);
   });
 
-  it("lists the reports of one status newest first, at most `limit`", async () => {
-    const dao = await createDao();
-    const old = reportRecord({ seconds: 1 });
-    const newer = reportRecord({ seconds: 2, reportedId: GUEST });
-    const closed = reportRecord({ seconds: 3, day: "2026-10-21", status: "dismissed" });
-    for (const report of [old, newer, closed]) await dao.insert(report);
-
-    expect(idsOf(await dao.listByStatus({ status: "open", limit: 10 }))).toEqual([
-      newer.reportId,
-      old.reportId,
-    ]);
-    expect(idsOf(await dao.listByStatus({ status: "open", limit: 1 }))).toEqual([newer.reportId]);
-    expect(idsOf(await dao.listByStatus({ status: "dismissed", limit: 10 }))).toEqual([closed.reportId]);
-  });
-
   it("lists the reports one player made, newest first", async () => {
     const dao = await createDao();
     const mine = reportRecord({ seconds: 1 });
@@ -100,22 +85,28 @@ export function runReportDaoContract(createDao) {
     expect(idsOf(await dao.listByReporter(RIYA))).toEqual([later.reportId, mine.reportId]);
   });
 
-  it("closes every open report about one player at once, and only those", async () => {
+  it("closes the open reports about one player up to a report, and none that came after it", async () => {
     const dao = await createDao();
-    const open = [reportRecord(), reportRecord({ reporterId: GUEST })];
+    const open = [reportRecord({ seconds: 1 }), reportRecord({ reporterId: GUEST, seconds: 2 })];
+    const tie = reportRecord({ reporterId: "guest_00000000-0000-4000-8000-000000000003", seconds: 2 });
+    const later = reportRecord({ reporterId: "guest_00000000-0000-4000-8000-000000000002", seconds: 3 });
     const other = reportRecord({ reportedId: GUEST });
     const done = reportRecord({ day: "2026-10-19", status: "dismissed" });
-    for (const report of [...open, other, done]) await dao.insert(report);
+    for (const report of [...open, tie, later, other, done]) await dao.insert(report);
+    // Two reports in the same moment are told apart by id: only the one up to the given id closes.
+    const upTo = { createdAt: open[1].createdAt, reportId: [open[1].reportId, tie.reportId].sort()[0] };
+    const [closedTie, openTie] = upTo.reportId === open[1].reportId ? [open[1], tie] : [tie, open[1]];
 
     const closed = await dao.closeOpen({
       reportedId: ARJUN,
+      upTo,
       status: "actioned",
       action: "rename",
       closedAt: at(60),
     });
 
     expect(closed).toBe(2);
-    for (const report of open) {
+    for (const report of [open[0], closedTie]) {
       expect(await dao.getById(report.reportId)).toEqual({
         ...report,
         status: "actioned",
@@ -123,18 +114,76 @@ export function runReportDaoContract(createDao) {
         closedAt: at(60),
       });
     }
-    expect(await dao.getById(other.reportId)).toEqual(other);
-    expect(await dao.getById(done.reportId)).toEqual(done);
+    for (const report of [openTie, later, other, done]) {
+      expect(await dao.getById(report.reportId)).toEqual(report);
+    }
   });
 
-  it("lists the open reports about one player", async () => {
+  it("groups the reports of one status by reported player, set aside reports not counted as reporters", async () => {
     const dao = await createDao();
-    const open = reportRecord();
-    await dao.insert(open);
+    const flood = Array.from({ length: 3 }, (_, i) =>
+      reportRecord({
+        reportedId: GUEST,
+        reporterId: RIYA,
+        day: `2026-10-1${i}`,
+        seconds: 10 + i,
+        setAside: true,
+      }),
+    );
+    const real = [
+      reportRecord({ seconds: 1 }),
+      reportRecord({ reporterId: GUEST, seconds: 5 }),
+      reportRecord({ reporterId: GUEST, day: "2026-10-21", seconds: 6, setAside: true }),
+    ];
+    for (const report of [...flood, ...real]) await dao.insert(report);
+    await dao.insert(reportRecord({ reportedId: RIYA, reporterId: ARJUN, status: "dismissed" }));
+
+    const all = await dao.listGroups({ status: "open", skip: 0, limit: 10 });
+    const first = await dao.listGroups({ status: "open", skip: 0, limit: 1 });
+    const second = await dao.listGroups({ status: "open", skip: 1, limit: 1 });
+
+    expect(all).toEqual({
+      total: 2,
+      groups: [
+        {
+          reportedId: ARJUN,
+          reports: 3,
+          reporters: 2,
+          setAside: 1,
+          lastAt: at(6),
+          newestId: real[2].reportId,
+        },
+        {
+          reportedId: GUEST,
+          reports: 3,
+          reporters: 0,
+          setAside: 3,
+          lastAt: at(12),
+          newestId: flood[2].reportId,
+        },
+      ],
+    });
+    expect(first.groups.map((g) => g.reportedId)).toEqual([ARJUN]);
+    expect(second).toEqual({ total: 2, groups: [all.groups[1]] });
+    expect((await dao.listGroups({ status: "dismissed", skip: 0, limit: 10 })).total).toBe(1);
+  });
+
+  it("lists the reports of one status about one player, newest first, at most `limit`", async () => {
+    const dao = await createDao();
+    const old = reportRecord({ seconds: 1 });
+    const newer = reportRecord({ reporterId: GUEST, seconds: 2 });
+    await dao.insert(old);
+    await dao.insert(newer);
     await dao.insert(reportRecord({ day: "2026-10-19", status: "dismissed" }));
     await dao.insert(reportRecord({ reportedId: GUEST }));
 
-    expect(idsOf(await dao.listOpenAbout(ARJUN))).toEqual([open.reportId]);
+    expect(idsOf(await dao.listAbout({ reportedId: ARJUN, status: "open", limit: 10 }))).toEqual([
+      newer.reportId,
+      old.reportId,
+    ]);
+    expect(idsOf(await dao.listAbout({ reportedId: ARJUN, status: "open", limit: 1 }))).toEqual([
+      newer.reportId,
+    ]);
   });
 
   it("moves a guest's reports to the account on both sides, dropping one that would repeat a day's pair", async () => {

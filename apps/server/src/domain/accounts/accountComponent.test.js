@@ -901,6 +901,21 @@ describe("accountComponent", () => {
       expect(await accounts.resetName({ playerId: arjun.id, now: NOW })).toBe("Player_BBBBBB");
     });
 
+    it("draws again when the random letters spell a word the name filter refuses (review of #150)", async () => {
+      const suffixes = ["FUCKAB", "BBBBBB"];
+      const accounts = createAccountComponent({
+        accountAccessor: createAccountAccessor({ accountDao: createInMemoryAccountDao() }),
+        legacyUserAccessor: legacyAccessor(),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
+        accountDeletionAccessor: noDeletions(),
+        newNameSuffix: () => suffixes.shift(),
+      });
+      const riya = (await accounts.signup({ ...RIYA, now: NOW })).identity;
+
+      expect(await accounts.resetName({ playerId: riya.id, now: NOW })).toBe("Player_BBBBBB");
+    });
+
     it("refuses a guest, and answers NotFoundError for an account that is gone", async () => {
       const { accounts } = setup();
 

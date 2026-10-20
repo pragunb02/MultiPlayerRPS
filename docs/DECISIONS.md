@@ -174,6 +174,15 @@ the owner may change it.
   new write (the rename), the legacy `users` is never touched. The name filter does not learn words from renames
   (a person adds them with a test, ADR-022). Follow-ups: account suspension; the reporter's status list (ICO
   standard 15); urgent reports. A restart forgets the in-memory limits, as every other limit.
+- **Amended after the review of #150 (2026-10-20).** (1) A rename also gives the account's seats in open rooms the
+  new name (`roomComponent.renamePlayer`), so the room stops showing the old one and a game that ends there later
+  does not put it back on the boards. (2) Dismiss and Rename close only the reports up to the one the console sent,
+  the newest of the group it showed (by time, then id), so a report that came in after the owner loaded the queue
+  stays open and never counts against an honest reporter. (3) A random name that the filter refuses is drawn again,
+  within the same 20 attempts as a taken one. (4) In a group, set aside reports are listed after the others. (5) The
+  queue groups in the store before it pages (a MongoDB aggregation by reported player: counts, distinct reporters
+  without set aside reports, the newest report), 25 groups a page with the total and whether more follow, and the 20
+  newest reports of each group, so a flood about one player cannot push another out of the queue.
 
 ### ADR-068 — Changelog fragments, folded by the coordinator, and numbers assigned at dispatch
 

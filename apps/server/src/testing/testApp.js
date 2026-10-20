@@ -247,6 +247,9 @@ export function createTestApp({
     ratings: chessRatingComponent,
   });
   // Reports are read by blocks (the one-tap block after a report), so they are made first (ADR-071.4).
+  // Rooms read blocks, which read reports, so the room component is made after them. A rename reaches the rooms
+  // through this, which gets the room component's rename as soon as it exists (long before any owner can rename).
+  const roomsToRename = /** @type {Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">} */ ({});
   const reportComponent = createReportComponent({
     reportAccessor: createReportAccessor({ reportDao }),
     references: createPlayerReferences({
@@ -257,7 +260,12 @@ export function createTestApp({
     }),
     matches: matchComponent,
     profiles: profileComponent,
-    names: reportedNames({ accountComponent, leaderboardComponent, domainEvents }),
+    names: reportedNames({
+      accountComponent,
+      roomComponent: roomsToRename,
+      leaderboardComponent,
+      domainEvents,
+    }),
   });
   const blockComponent = createBlockComponent({
     blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
@@ -315,6 +323,7 @@ export function createTestApp({
     seatIds,
     avatars: profileCards,
   });
+  roomsToRename.renamePlayer = roomComponent.renamePlayer;
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
   const botDriver = createBotDriver({

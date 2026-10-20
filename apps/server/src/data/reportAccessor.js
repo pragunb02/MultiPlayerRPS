@@ -92,20 +92,43 @@ export function createReportAccessor({ reportDao }) {
       }
     },
 
-    /** @param {{ status: string, limit: number }} query @returns {Promise<ReadonlyArray<Readonly<Report>>>} newest first */
-    listByStatus: async (query) => toReports(await reportDao.listByStatus(query)),
+    /**
+     * The reports of one status grouped by reported player, the most reporters first, one page (see the DAO).
+     *
+     * @param {{ status: string, skip: number, limit: number }} query
+     * @returns {Promise<Readonly<{ total: number, groups: ReadonlyArray<Readonly<{ reportedId: string, reports: number, reporters: number, setAside: number, lastAt: number, newestId: string }>> }>>}
+     */
+    async listGroups(query) {
+      const { total, groups } = await reportDao.listGroups(query);
+      return Object.freeze({
+        total,
+        groups: Object.freeze(
+          groups.map(({ lastAt, ...group }) => Object.freeze({ ...group, lastAt: lastAt.getTime() })),
+        ),
+      });
+    },
 
     /** @param {string} reporterId @returns {Promise<ReadonlyArray<Readonly<Report>>>} newest first */
     listByReporter: async (reporterId) => toReports(await reportDao.listByReporter(reporterId)),
 
-    /** @param {string} reportedId @returns {Promise<ReadonlyArray<Readonly<Report>>>} open ones, newest first */
-    listOpenAbout: async (reportedId) => toReports(await reportDao.listOpenAbout(reportedId)),
+    /**
+     * @param {{ reportedId: string, status: string, limit: number }} query
+     * @returns {Promise<ReadonlyArray<Readonly<Report>>>} newest first
+     */
+    listAbout: async (query) => toReports(await reportDao.listAbout(query)),
 
     /**
-     * @param {{ reportedId: string, status: string, action: string, at: number }} change
+     * Closes the open reports about a player up to `upTo`, the newest one the owner saw.
+     *
+     * @param {{ reportedId: string, upTo: { createdAt: number, reportId: string }, status: string, action: string, at: number }} change
      * @returns {Promise<number>} reports closed
      */
-    closeOpen: ({ at, ...change }) => reportDao.closeOpen({ ...change, closedAt: new Date(at) }),
+    closeOpen: ({ at, upTo, ...change }) =>
+      reportDao.closeOpen({
+        ...change,
+        upTo: { createdAt: new Date(upTo.createdAt), reportId: upTo.reportId },
+        closedAt: new Date(at),
+      }),
 
     /** @param {{ from: string, to: string }} transfer @returns {Promise<number>} */
     moveReporter: (transfer) => reportDao.moveReporter(transfer),

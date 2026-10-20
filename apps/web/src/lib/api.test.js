@@ -245,7 +245,7 @@ describe("api client", () => {
 
   it("reports a player by where they met, and reads and acts on the owner's report queue (CC-044, ADR-071)", async () => {
     const reported = respond(200, { report: { reportId: "r1", createdAt: 1 } });
-    const queued = respond(200, { groups: [{ groupId: "r1" }] });
+    const queued = respond(200, { groups: [{ groupId: "r1" }], total: 1, page: 0, more: false });
     const acted = respond(200, { result: { closed: 2 } });
     const target = { matchId: "m1", seat: 1, reason: "name", note: "rude" };
 
@@ -253,9 +253,12 @@ describe("api client", () => {
       reportId: "r1",
       createdAt: 1,
     });
-    expect(await createApiClient({ fetchImpl: queued }).getReportQueue({ status: "dismissed" })).toEqual([
-      { groupId: "r1" },
-    ]);
+    expect(await createApiClient({ fetchImpl: queued }).getReportQueue({ status: "dismissed" })).toEqual({
+      groups: [{ groupId: "r1" }],
+      total: 1,
+      page: 0,
+      more: false,
+    });
     expect(await createApiClient({ fetchImpl: acted }).actOnReports("a/b", "dismiss")).toEqual({ closed: 2 });
 
     expect(reported.mock.calls[0]).toEqual([

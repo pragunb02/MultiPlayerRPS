@@ -243,6 +243,7 @@ describe("the owner's report queue, /api/admin/reports (CC-044, ADR-071.6)", () 
     expect(asOwner.headers.get("cache-control")).toBe("no-store");
     expect(asOwner.headers.get("x-robots-tag")).toBe("noindex, nofollow");
     expect(asOwner.headers.get("content-type")).toMatch(/^application\/json/);
+    expect(asOwner.body).toMatchObject({ total: 1, page: 0, more: false });
     const [group] = asOwner.body.groups;
     expect(group).toMatchObject({
       kind: "guest",
@@ -257,12 +258,16 @@ describe("the owner's report queue, /api/admin/reports (CC-044, ADR-071.6)", () 
     expect(asOwner.text).not.toContain(bob.identity.id);
   });
 
-  it("refuses an unknown status or query parameter with 400", async () => {
+  it("refuses an unknown status, a bad page or another query parameter with 400, and pages the groups", async () => {
     server = await startTestServer(await withOwner());
     const owner = await logIn("owner@example.com");
 
     expect((await call("GET", "/admin/reports?status=all", { cookie: owner.cookie })).status).toBe(400);
     expect((await call("GET", "/admin/reports?player=x", { cookie: owner.cookie })).status).toBe(400);
+    expect((await call("GET", "/admin/reports?page=-1", { cookie: owner.cookie })).status).toBe(400);
+    expect((await call("GET", "/admin/reports?page=1.5", { cookie: owner.cookie })).status).toBe(400);
+    const later = await call("GET", "/admin/reports?status=dismissed&page=3", { cookie: owner.cookie });
+    expect(later.body).toEqual({ groups: [], total: 0, page: 3, more: false });
   });
 
   it("renames a reported account to the safe default everywhere, signs it out, and closes its reports", async () => {
@@ -287,6 +292,12 @@ describe("the owner's report queue, /api/admin/reports (CC-044, ADR-071.6)", () 
     expect(res.body).toEqual({
       result: { closed: 1, displayName: expect.stringMatching(/^Player_[A-Z2-9]{6}$/) },
     });
+    // The open room shows the new name at once, so a game that ends there later keeps it on the boards (review of #150).
+    const seated = (await server.roomComponent.getRoom(bobSeat.roomCode)).seats.map(
+      (seat) => seat.displayName,
+    );
+    expect(seated).toContain(res.body.result.displayName);
+    expect(seated).not.toContain("RudeName");
     await cut;
     expect((await call("GET", "/session", { cookie: rude.cookie })).body.authenticated).toBe(false);
     const again = await logIn("rude@example.com");

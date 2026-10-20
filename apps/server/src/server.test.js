@@ -912,7 +912,7 @@ describe("roomErasure (CC-035)", () => {
 });
 
 describe("reportedNames and cutSocketsOnRename (CC-044, ADR-071.6)", () => {
-  it("renames the account, its leaderboard rows and cuts its sockets, in that order", async () => {
+  it("renames the account, its seats in open rooms, its leaderboard rows and cuts its sockets, in that order", async () => {
     const calls = [];
     const domainEvents = new EventEmitter();
     cutSocketsOnRename({ domainEvents, disconnectPlayer: (playerId) => calls.push(["sockets", playerId]) });
@@ -921,6 +921,12 @@ describe("reportedNames and cutSocketsOnRename (CC-044, ADR-071.6)", () => {
         resetName: async ({ playerId }) => {
           calls.push(["account", playerId]);
           return "Player_ABCDEF";
+        },
+      },
+      roomComponent: {
+        renamePlayer: async (change) => {
+          calls.push(["rooms", change]);
+          return [];
         },
       },
       leaderboardComponent: {
@@ -937,6 +943,7 @@ describe("reportedNames and cutSocketsOnRename (CC-044, ADR-071.6)", () => {
     expect(name).toBe("Player_ABCDEF");
     expect(calls).toEqual([
       ["account", "user_0123456789abcdef01234567"],
+      ["rooms", { playerId: "user_0123456789abcdef01234567", displayName: "Player_ABCDEF", now: 0 }],
       ["boards", { playerId: "user_0123456789abcdef01234567", displayName: "Player_ABCDEF" }],
       ["sockets", "user_0123456789abcdef01234567"],
     ]);

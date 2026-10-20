@@ -13,8 +13,8 @@ import { createRateLimit } from "./rateLimits.js";
 import { requireIdentity } from "./session.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-// The console reads at most this many reports of one status, newest first. Far more than one owner reads.
-const QUEUE_LIMIT = 500;
+// The queue's pages: 0 is the first. A bigger number is an empty page, never an error.
+const PAGE_PATTERN = /^\d{1,6}$/;
 
 /**
  * The limits on reporting (ADR-071.5, in the style of ADR-035). Each is a business rule, and tests and browser tests
@@ -75,7 +75,7 @@ function parseReport(body) {
 
 /** The queue's one filter. Anything else in the query is refused, so a typo is never silently ignored. */
 function parseQueueQuery(query) {
-  const unknown = Object.keys(query).filter((key) => key !== "status");
+  const unknown = Object.keys(query).filter((key) => key !== "status" && key !== "page");
   if (unknown.length > 0) {
     throw new ValidationError("Unknown query parameters", { details: { fields: unknown } });
   }
@@ -83,7 +83,11 @@ function parseQueueQuery(query) {
   if (!REPORT_STATUSES.includes(status)) {
     throw invalid("status", `status must be one of ${REPORT_STATUSES.join(", ")}`);
   }
-  return { status };
+  const { page = "0" } = query;
+  if (typeof page !== "string" || !PAGE_PATTERN.test(page)) {
+    throw invalid("page", "page must be a whole number from 0");
+  }
+  return { status, page: Number(page) };
 }
 
 function parseAction(params, body) {
@@ -104,8 +108,9 @@ function parseAction(params, body) {
  *    optional `note`, from a guest or an account, answers `{ report: { reportId, createdAt } }`, the same for a repeat
  *    the same day. 404 for anyone the server cannot confirm, 400 for anything else in the body, 429 over a limit,
  *    401 for a visitor. Nothing is sent to the reported player.
- * 2. `GET /admin/reports?status=open|dismissed|actioned` answers an admin `{ groups }`, the reports grouped by
- *    reported player, without any player id.
+ * 2. `GET /admin/reports?status=open|dismissed|actioned&page=0` answers an admin `{ groups, total, page, more }`:
+ *    one page of the reports grouped by reported player, without any player id, how many groups there are, and
+ *    whether a later page has more.
  * 3. `POST /admin/reports/:reportId/actions` with `{ action: "dismiss" | "rename" }` acts on the player of that
  *    report and answers an admin `{ result: { closed, displayName? } }`. 409 when the reports are closed already or a
  *    guest would be renamed. Everyone else gets the console's 404 on both (ADR-036).
@@ -157,9 +162,9 @@ export function createReportRoutes({ reportComponent, requireAdmin, now = Date.n
   });
 
   router.get("/admin/reports", requireAdmin, async (req, res) => {
-    const { status } = parseQueueQuery(req.query);
-    const { groups } = await reportComponent.queue({ status, limit: QUEUE_LIMIT });
-    res.json({ groups });
+    const { status, page } = parseQueueQuery(req.query);
+    const { groups, total, more } = await reportComponent.queue({ status, page });
+    res.json({ groups, total, page, more });
   });
 
   router.post("/admin/reports/:reportId/actions", requireAdmin, async (req, res) => {

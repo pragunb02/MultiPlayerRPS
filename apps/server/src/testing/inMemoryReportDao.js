@@ -55,18 +55,41 @@ export function createInMemoryReportDao() {
       return copy(doc);
     },
 
-    listByStatus: async ({ status, limit }) =>
-      find((d) => d.status === status)
+    async listGroups({ status, skip, limit }) {
+      const byPlayer = new Map();
+      for (const doc of find((d) => d.status === status)) {
+        byPlayer.set(doc.reportedId, [...(byPlayer.get(doc.reportedId) ?? []), doc]);
+      }
+      const groups = [...byPlayer.entries()]
+        .map(([reportedId, docs]) => ({
+          reportedId,
+          reports: docs.length,
+          reporters: new Set(docs.filter((d) => !d.setAside).map((d) => d.reporterId)).size,
+          setAside: docs.filter((d) => d.setAside).length,
+          lastAt: copy(docs[0].createdAt),
+          newestId: docs[0].reportId,
+        }))
+        .sort(
+          (a, b) =>
+            b.reporters - a.reporters ||
+            b.lastAt - a.lastAt ||
+            (a.reportedId < b.reportedId ? -1 : a.reportedId > b.reportedId ? 1 : 0),
+        );
+      return { total: groups.length, groups: groups.slice(skip, skip + limit) };
+    },
+
+    listAbout: async ({ reportedId, status, limit }) =>
+      find((d) => d.reportedId === reportedId && d.status === status)
         .slice(0, limit)
         .map(copy),
 
     listByReporter: async (reporterId) => find((d) => d.reporterId === reporterId).map(copy),
 
-    listOpenAbout: async (reportedId) =>
-      find((d) => d.reportedId === reportedId && d.status === "open").map(copy),
-
-    async closeOpen({ reportedId, status, action, closedAt }) {
-      const open = find((d) => d.reportedId === reportedId && d.status === "open");
+    async closeOpen({ reportedId, upTo, status, action, closedAt }) {
+      const seen = (d) =>
+        d.createdAt < upTo.createdAt ||
+        (d.createdAt.getTime() === upTo.createdAt.getTime() && d.reportId <= upTo.reportId);
+      const open = find((d) => d.reportedId === reportedId && d.status === "open" && seen(d));
       open.forEach((doc) => reports.set(doc.reportId, { ...doc, status, action, closedAt }));
       return open.length;
     },

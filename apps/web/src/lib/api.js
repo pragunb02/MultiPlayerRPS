@@ -105,8 +105,13 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
      * @returns {Promise<{ reportId: string, createdAt: number }>}
      */
     reportPlayer: async (report) => (await request("POST", "/reports", report)).report,
-    /** The owner console's report queue, grouped by reported player (CC-044). @param {{ status?: string }} [query] */
-    getReportQueue: async (query = {}) => (await request("GET", `/admin/reports${toQuery(query)}`)).groups,
+    /**
+     * One page of the owner console's report queue, grouped by reported player (CC-044).
+     *
+     * @param {{ status?: string, page?: string }} [query]
+     * @returns {Promise<{ groups: object[], total: number, page: number, more: boolean }>}
+     */
+    getReportQueue: (query = {}) => request("GET", `/admin/reports${toQuery(query)}`),
     /** Dismisses the reports of one group, or renames its account to a safe default (CC-044). */
     actOnReports: async (reportId, action) =>
       (await request("POST", `/admin/reports/${encodeURIComponent(reportId)}/actions`, { action })).result,

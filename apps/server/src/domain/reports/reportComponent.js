@@ -27,6 +27,11 @@ export const REPORT_SNAPSHOT = Object.freeze({ moves: 10, requests: 5, textMax: 
  */
 export const REPORT_EVENTS = Object.freeze({ PLAYER_RENAMED: "report:player-renamed" });
 
+/**
+ * How much of the queue one answer holds: groups a page, and reports shown in each group (the counts cover all).
+ */
+export const REPORT_QUEUE = Object.freeze({ groupsPerPage: 25, itemsPerGroup: 20 });
+
 /** The one answer for every reference the server cannot confirm, so reporting cannot probe rooms, matches or handles. */
 const notFound = (cause) =>
   new NotFoundError("We couldn't find that player", cause === undefined ? {} : { cause });
@@ -177,19 +182,21 @@ export function createReportComponent({
       ...(report.action !== undefined && { action: report.action, closedAt: report.closedAt }),
     });
 
-  /** The reports about one player as one group of the console, named by its newest report's id. */
-  function groupOf(reports) {
-    const [newest] = reports;
-    const trusted = reports.filter((report) => !report.setAside);
-    const kind = isAccountId(newest.reportedId) ? "account" : "guest";
+  /**
+   * The reports about one player as one group of the console, named by its newest report's id. The counts come from
+   * the whole group; the items are the newest REPORT_QUEUE.itemsPerGroup, set aside ones last (ADR-071.5).
+   */
+  function groupOf(counted, reports) {
+    const kind = isAccountId(counted.reportedId) ? "account" : "guest";
+    const items = [...reports.filter((r) => !r.setAside), ...reports.filter((r) => r.setAside)];
     return Object.freeze({
-      groupId: newest.reportId,
+      groupId: counted.newestId,
       kind,
-      canRename: kind === "account" && newest.status === REPORT_STATUS.OPEN,
+      canRename: kind === "account" && reports[0]?.status === REPORT_STATUS.OPEN,
       names: Object.freeze([...new Set(reports.map((report) => report.reportedName))]),
-      reports: reports.length,
-      reporters: new Set(trusted.map((report) => report.reporterId)).size,
-      setAside: reports.length - trusted.length,
+      reports: counted.reports,
+      reporters: counted.reporters,
+      setAside: counted.setAside,
       reasons: Object.freeze(
         Object.fromEntries(
           REPORT_REASONS.map((reason) => [
@@ -198,8 +205,8 @@ export function createReportComponent({
           ]),
         ),
       ),
-      lastAt: newest.createdAt,
-      items: Object.freeze(reports.map(itemOf)),
+      lastAt: counted.lastAt,
+      items: Object.freeze(items.map(itemOf)),
     });
   }
 
@@ -249,24 +256,44 @@ export function createReportComponent({
 
     /**
      * The owner's queue: the reports of one status grouped by reported player, groups with the most reporters first
-     * (set aside reports do not count), then the newest. No player id, of the reporter or the reported, is in it.
+     * (set aside reports do not count), then the newest, one page at a time. Grouping happens in the store before the
+     * page is cut, so a flood about one player cannot push another out. No player id, of the reporter or the
+     * reported, is in it.
      *
-     * @param {{ status: string, limit: number }} query  `limit` is how many reports are read, newest first
+     * @param {{ status: string, page: number, pageSize?: number }} query  `page` counts from 0
+     * @returns {Promise<Readonly<{ groups: ReadonlyArray<object>, total: number, page: number, more: boolean }>>}
+     *   `total` is how many groups there are, `more` whether a later page has some
      */
-    async queue({ status, limit }) {
-      const byPlayer = new Map();
-      for (const report of await reportAccessor.listByStatus({ status, limit })) {
-        byPlayer.set(report.reportedId, [...(byPlayer.get(report.reportedId) ?? []), report]);
-      }
-      const groups = [...byPlayer.values()]
-        .map(groupOf)
-        .sort((a, b) => b.reporters - a.reporters || b.lastAt - a.lastAt);
-      return Object.freeze({ groups: Object.freeze(groups) });
+    async queue({ status, page, pageSize = REPORT_QUEUE.groupsPerPage }) {
+      const { total, groups } = await reportAccessor.listGroups({
+        status,
+        skip: page * pageSize,
+        limit: pageSize,
+      });
+      const shown = await Promise.all(
+        groups.map(async (counted) =>
+          groupOf(
+            counted,
+            await reportAccessor.listAbout({
+              reportedId: counted.reportedId,
+              status,
+              limit: REPORT_QUEUE.itemsPerGroup,
+            }),
+          ),
+        ),
+      );
+      return Object.freeze({
+        groups: Object.freeze(shown),
+        total,
+        page,
+        more: (page + 1) * pageSize < total,
+      });
     },
 
     /**
-     * Acts on the player of a report: dismisses all their open reports, or renames their account to a safe default
-     * and closes them as acted on.
+     * Acts on the player of a report: dismisses their open reports, or renames their account to a safe default and
+     * closes them as acted on. Only reports up to this one close, so one that came in after the owner loaded the
+     * queue stays open: the console sends the newest report of the group it showed (review of #150).
      *
      * @param {{ reportId: string, action: string, now: number }} input  `action` is one of REPORT_ACTIONS
      * @returns {Promise<Readonly<{ closed: number, displayName?: string }>>}
@@ -279,6 +306,7 @@ export function createReportComponent({
         throw new ConflictError("These reports are closed already");
       }
       const { reportedId } = report;
+      const upTo = { createdAt: report.createdAt, reportId };
       if (action === REPORT_ACTION.RENAME) {
         if (!isAccountId(reportedId)) {
           throw new ConflictError("A guest's name is given by the server and cannot be renamed");
@@ -286,6 +314,7 @@ export function createReportComponent({
         const displayName = await names.resetName({ playerId: reportedId, now });
         const closed = await reportAccessor.closeOpen({
           reportedId,
+          upTo,
           status: REPORT_STATUS.ACTIONED,
           action,
           at: now,
@@ -294,6 +323,7 @@ export function createReportComponent({
       }
       const closed = await reportAccessor.closeOpen({
         reportedId,
+        upTo,
         status: REPORT_STATUS.DISMISSED,
         action: REPORT_ACTION.DISMISS,
         at: now,
