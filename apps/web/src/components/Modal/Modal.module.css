@@ -4,7 +4,7 @@
   background: var(--color-backdrop);
   display: grid;
   place-items: center;
-  z-index: 30;
+  z-index: var(--layer-dialog);
   padding: var(--space-4);
   animation: fade-in var(--duration-slow) var(--ease-out);
 }

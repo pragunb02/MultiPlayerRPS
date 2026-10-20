@@ -1,0 +1,32 @@
+/*
+ * Type (CC-314): system font stacks, the seven sizes, and the roles components use. Nothing is downloaded (CSP).
+ */
+:root {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /* System fonts only: nothing is downloaded (CSP, performance). */
+  --font-display: ui-rounded, "SF Pro Rounded", "Nunito", "Trebuchet MS", system-ui, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+  --text-3xl: 3.25rem;
+  /* Type roles (CC-314): pick a size by its job, not by its number. */
+  --type-caption: var(--text-xs);
+  --type-label: var(--text-sm);
+  --type-body: var(--text-md);
+  --type-title: var(--text-xl);
+  --type-display: var(--text-2xl);
+  --leading-tight: 1.2;
+  --leading-body: 1.5;
+  /* A game's marks drawn as text: the Tic-Tac-Toe X and O, the chess board's coordinates. */
+  --type-board-mark: 3rem;
+  --type-board-coord: clamp(0.55rem, 1.6vw, 0.75rem);
+  /* Text inside SVG art and charts, in the drawing's own units, so it grows and shrinks with the picture. */
+  --type-svg-chart-tick: 11px;
+  --type-svg-medal-count: 14px;
+  --type-svg-badge-level: 20px;
+  --type-svg-badge-level-long: 15px;
+}

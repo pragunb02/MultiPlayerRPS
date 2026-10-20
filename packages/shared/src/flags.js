@@ -56,6 +56,18 @@ export const FLAGS = Object.freeze([
     success: "The owner pressed It works on that line.",
   }),
   Object.freeze({
+    name: "design_page",
+    description:
+      "Shows the console's Design page: every token of the design contract and the real components in their states, light or dark as the device shows them.",
+    ticket: "CC-314",
+    default: false,
+    removeBy: "2026-12-31",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.ADMINS,
+    client: true,
+    success: "The owner opened a dialog on the Design page.",
+  }),
+  Object.freeze({
     name: "friend_invites",
     description:
       "Invite beside each friend on the friends page: pick a game and the friend gets the invite on any page, or in their inbox. Off means nobody can be invited by name.",
