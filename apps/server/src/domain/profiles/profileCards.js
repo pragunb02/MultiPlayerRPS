@@ -17,12 +17,13 @@ const avatarOf = (profile) =>
  *
  * @param {{
  *   profileAccessor: Pick<ReturnType<typeof import("../../data/profileAccessor.js").createProfileAccessor>, "findMany" | "getOrCreateMany">,
- *   ages: { adultsAmong: (query: { playerIds: string[], now: number }) => Promise<ReadonlySet<string>> },
+ *   safety: Pick<ReturnType<typeof import("../safety/safetyComponent.js").createSafetyComponent>, "policiesFor">,  whose
+ *     `profileLink` says who is linked to (CC-152)
  * }} deps
  */
-export function createProfileCards({ profileAccessor, ages }) {
+export function createProfileCards({ profileAccessor, safety }) {
   assertDefined(profileAccessor, "profileAccessor");
-  assertFunction(ages?.adultsAmong, "ages.adultsAmong");
+  assertFunction(safety?.policiesFor, "safety.policiesFor");
 
   return Object.freeze({
     /**
@@ -46,7 +47,8 @@ export function createProfileCards({ profileAccessor, ages }) {
     async cardsFor({ playerIds, now }) {
       const people = [...new Set(playerIds.filter(isPerson))];
       if (people.length === 0) return new Map();
-      const adults = [...(await ages.adultsAmong({ playerIds: people, now }))];
+      const policies = await safety.policiesFor({ playerIds: people, now });
+      const adults = people.filter((playerId) => policies.get(playerId).profileLink);
       const linked =
         adults.length === 0
           ? new Map()

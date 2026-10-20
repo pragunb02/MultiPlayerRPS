@@ -124,7 +124,7 @@ describe("accountComponent birth year (CC-152)", () => {
     );
   });
 
-  it("names the adults among players: accounts with a year that makes them surely 18", async () => {
+  it("gives the age group of each account among players, and none for anyone who is not one", async () => {
     const { accounts } = setup();
     const adult = await accounts.signup({ ...RIYA, birthYear: 2007, now: NOW });
     const turning18 = await accounts.signup({
@@ -141,13 +141,83 @@ describe("accountComponent birth year (CC-152)", () => {
       now: NOW,
     });
 
-    const adults = await accounts.adultsAmong({
+    const groups = await accounts.ageGroupsOf({
       playerIds: [adult.identity.id, turning18.identity.id, unknown.identity.id, "guest_x", "bot_rocky_easy"],
       now: NOW,
     });
 
-    expect([...adults]).toEqual([adult.identity.id]);
-    expect([...(await accounts.adultsAmong({ playerIds: ["guest_x"], now: NOW }))]).toEqual([]);
+    expect(Object.fromEntries(groups)).toEqual({
+      [adult.identity.id]: "adult",
+      [turning18.identity.id]: "minor",
+      [unknown.identity.id]: "unknown",
+    });
+    expect([...(await accounts.ageGroupsOf({ playerIds: ["guest_x"], now: NOW }))]).toEqual([]);
+  });
+});
+
+describe("accountComponent birth year corrections by the owner (CC-152, ADR-048.9)", () => {
+  const groupOf = async (accounts, playerId) =>
+    (await accounts.ageGroupsOf({ playerIds: [playerId], now: NOW })).get(playerId);
+
+  it("replaces a set year by the account's email, records when, and the group follows at once", async () => {
+    const { accounts, accountDao } = setup();
+    const { identity } = await accounts.signup({ ...RIYA, birthYear: 1990, now: NOW });
+
+    const corrected = await accounts.correctBirthYear({
+      email: " Riya@Example.com ",
+      birthYear: 2010,
+      now: NOW + 1,
+    });
+
+    expect(corrected).toEqual({
+      playerId: identity.id,
+      username: "Riya",
+      birthYear: 2010,
+      ageGroup: "minor",
+    });
+    const stored = await accountDao.getById(identity.id.slice("user_".length));
+    expect(stored.birthYear).toBe(2010);
+    expect(stored.birthYearCorrectedAt).toEqual(new Date(NOW + 1));
+    expect(await groupOf(accounts, identity.id)).toBe("minor");
+  });
+
+  it("clears a year with null, so the account is of unknown age again and can set it once more", async () => {
+    const { accounts } = setup();
+    const { identity } = await accounts.signup({ ...RIYA, birthYear: 1990, now: NOW });
+
+    const cleared = await accounts.correctBirthYear({ email: RIYA.email, birthYear: null, now: NOW });
+
+    expect(cleared).toEqual({ playerId: identity.id, username: "Riya", ageGroup: "unknown" });
+    expect(await groupOf(accounts, identity.id)).toBe("unknown");
+    await accounts.setBirthYear({ playerId: identity.id, birthYear: 1991, now: NOW });
+    expect(await groupOf(accounts, identity.id)).toBe("adult");
+  });
+
+  it("refuses an under 13 year (that account is deleted instead) and anything but a picker year or null", async () => {
+    const { accounts } = setup();
+    const { identity } = await accounts.signup({ ...RIYA, birthYear: 1990, now: NOW });
+
+    await expect(
+      accounts.correctBirthYear({ email: RIYA.email, birthYear: 2020, now: NOW }),
+    ).rejects.toMatchObject({ details: { field: "birthYear", reason: "too-young" } });
+    await expect(
+      accounts.correctBirthYear({ email: RIYA.email, birthYear: "1990", now: NOW }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    await expect(accounts.correctBirthYear({ email: RIYA.email, now: NOW })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(await groupOf(accounts, identity.id)).toBe("adult");
+  });
+
+  it("answers not found for an email with no account, a legacy player's included, and refuses a bad email", async () => {
+    const { accounts } = setup({ legacyUsers: [LEGACY_SAM] });
+
+    await expect(
+      accounts.correctBirthYear({ email: LEGACY_SAM.email, birthYear: 1990, now: NOW }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      accounts.correctBirthYear({ email: "not an email", birthYear: 1990, now: NOW }),
+    ).rejects.toMatchObject({ details: { field: "email" } });
   });
 });
 
