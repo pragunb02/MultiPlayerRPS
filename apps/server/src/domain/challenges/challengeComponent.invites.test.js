@@ -25,14 +25,19 @@ const CHESS = Object.freeze({ timeControl: "5+0" });
  * Riya, Arjun and Meera are adults, Kabir is not. A friend is named by handle (their name in lower case here) or,
  * for an invite back, by player id, as the real policy is (friendInvites.js).
  */
-function setup({ blocked = [], adults = [RIYA.id, ARJUN.id, MEERA.id], rooms: roomOverrides = {} } = {}) {
+function setup({
+  blocked = [],
+  adults = [RIYA.id, ARJUN.id, MEERA.id],
+  rooms: roomOverrides = {},
+  wrap = (accessor) => accessor,
+} = {}) {
   const emitted = [];
   const madeRooms = [];
   let ids = 0;
   const accessor = createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() });
   const resolved = [];
   const challenges = createChallengeComponent({
-    challengeAccessor: accessor,
+    challengeAccessor: wrap(accessor),
     rooms: {
       checkOptions: ({ options }) => ({ timeControl: "5+0", ...options }),
       createChallengeRoom: async (input) => {
@@ -328,5 +333,36 @@ describe("challengeComponent: invites to friends (CC-052)", () => {
     // The friend in the block never hears of it, and their inbox never holds it.
     expect(blockedSetup.emitted.at(-1).playerIds).toEqual([RIYA.id]);
     expect(await blockedSetup.challenges.inbox({ playerId: ARJUN.id, now: T0 + MINUTE })).toEqual([]);
+  });
+  it("lets a friend take an invite again whose own earlier hold was cut off, the group still theirs", async () => {
+    const { invite, accept, accessor } = setup();
+    const { id } = await invite();
+    await accessor.claim({
+      challengeId: id,
+      acceptedBy: ARJUN.id,
+      acceptedName: "Arjun",
+      at: T0,
+      staleBefore: T0 - 1,
+    });
+    await accessor.claimGroup({ groupId: id, by: id, from: "" });
+
+    await expect(accept(id, ARJUN, T0 + MINUTE)).resolves.toMatchObject({ room: { code: "ROOM01" } });
+  });
+
+  it("tells nobody about an invite of the group that ended some other way while it was being filled", async () => {
+    let toMeera;
+    const { invite, accept, emitted } = setup({
+      wrap: (accessor) => ({
+        ...accessor,
+        end: async (end) =>
+          end.challengeId === toMeera.id && end.state === CHALLENGE_STATES.FILLED ? false : accessor.end(end),
+      }),
+    });
+    const toArjun = await invite();
+    toMeera = await invite({ to: "meera", now: T0 + 1 });
+
+    await accept(toArjun.id, ARJUN);
+
+    expect(emitted.filter(({ playerIds }) => playerIds?.includes(MEERA.id))).toHaveLength(1);
   });
 });

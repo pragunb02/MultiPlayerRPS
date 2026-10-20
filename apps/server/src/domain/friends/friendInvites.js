@@ -22,20 +22,21 @@ const flagPlayerOf = ({ id, kind }) => ({ id, kind, admin: false });
  *   friends: Pick<ReturnType<typeof import("./friendComponent.js").createFriendComponent>, "inviteeOf">,
  *   flags: Pick<ReturnType<typeof import("../flags/flagComponent.js").createFlagComponent>, "isOn" | "recordSuccess">,
  *   events: import("node:events").EventEmitter,
- *   onError?: (err: Error) => void,
- * }} deps  `events` carries the challenge component's events. `onError` hears a success that could not be counted
+ *   logger: Pick<import("../../utils/logger.js").Logger, "warn">,
+ * }} deps  `events` carries the challenge component's events. `logger` hears a success that could not be counted
  */
-export function createFriendInvites({ friends, flags, events, onError = () => undefined }) {
+export function createFriendInvites({ friends, flags, events, logger }) {
   assertFunction(friends?.inviteeOf, "friends.inviteeOf");
   assertFunction(flags?.isOn, "flags.isOn");
   assertFunction(flags?.recordSuccess, "flags.recordSuccess");
   assertFunction(events?.on, "events.on");
+  assertFunction(logger?.warn, "logger.warn");
 
   events.on(CHALLENGE_EVENTS.ACCEPTED, ({ challenge }) => {
     if (challenge.toId === "") return;
     flags
       .recordSuccess("friend_invites", flagPlayerOf({ id: challenge.fromId, kind: IDENTITY_KINDS.USER }))
-      .catch(onError);
+      .catch((err) => logger.warn({ err }, "counting an invite's success failed"));
   });
 
   return Object.freeze({

@@ -257,6 +257,8 @@ function FriendsView({ friends }) {
   const [removing, setRemoving] = useState(undefined);
   const [inviting, setInviting] = useState(undefined);
   const invites = useFlag("friend_invites");
+  // The dialog follows the friend's presence while it is open, and closes if they stop being a friend.
+  const invitingFriend = view.friends.find((friend) => friend.handle === inviting?.handle);
   return (
     <>
       {view.incoming.length > 0 && (
@@ -299,12 +301,8 @@ function FriendsView({ friends }) {
       )}
       <FriendLink />
       <AppearOffline on={view.settings.appearOffline} onChange={friends.setAppearOffline} />
-      {inviting !== undefined && (
-        <InviteDialog
-          // The dialog follows the friend's presence while it is open.
-          friend={view.friends.find((friend) => friend.handle === inviting.handle) ?? inviting}
-          onClose={() => setInviting(undefined)}
-        />
+      {invitingFriend !== undefined && (
+        <InviteDialog friend={invitingFriend} onClose={() => setInviting(undefined)} />
       )}
       {removing !== undefined && (
         <RemoveDialog friend={removing} onClose={() => setRemoving(undefined)} onRemove={friends.remove} />

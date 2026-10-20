@@ -1,4 +1,5 @@
 import { act, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { fakeApi, fakeSocket, fakeSound } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
@@ -80,6 +81,8 @@ describe("SiteRequests: how invites end (CC-052 part 2)", () => {
       "href",
       "/challenge/c0000000000000000001",
     );
+    await userEvent.click(within(toast.parentElement).getByRole("button", { name: "Close" }));
+    expect(screen.queryByText(/Game filled/)).toBeNull();
     // The popup of the invite is gone: it can no longer be accepted.
     expect(screen.queryByRole("region", { name: "Challenge" })).toBeNull();
   });

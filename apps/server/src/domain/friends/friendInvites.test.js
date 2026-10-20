@@ -13,7 +13,7 @@ const T0 = Date.UTC(2026, 9, 20, 12);
 function setup(on) {
   const asked = [];
   const successes = [];
-  const errors = [];
+  const warnings = [];
   const events = new EventEmitter();
   const invites = createFriendInvites({
     friends: {
@@ -37,9 +37,9 @@ function setup(on) {
       },
     },
     events,
-    onError: (err) => errors.push(err.message),
+    logger: { warn: ({ err }, message) => warnings.push([err.message, message]) },
   });
-  return { invites, events, asked, successes, errors };
+  return { invites, events, asked, successes, warnings };
 }
 
 describe("friend invites (CC-052 part 2)", () => {
@@ -82,7 +82,7 @@ describe("friend invites (CC-052 part 2)", () => {
     });
 
     it("counts the flag's success when a friend accepts an invite", async () => {
-      const { events, successes, errors } = setup(on);
+      const { events, successes, warnings } = setup(on);
 
       events.emit(CHALLENGE_EVENTS.ACCEPTED, { challenge: { fromId: RIYA.id, toId: ARJUN_ID } });
       events.emit(CHALLENGE_EVENTS.ACCEPTED, { challenge: { fromId: RIYA.id, toId: "" } });
@@ -93,7 +93,7 @@ describe("friend invites (CC-052 part 2)", () => {
 
       // The success is counted on the sender's side, which the server works out, so a link counts nothing.
       expect(successes).toEqual([["friend_invites", { id: RIYA.id, kind: "user", admin: false }]]);
-      expect(errors).toEqual(["counts down"]);
+      expect(warnings).toEqual([["counts down", "counting an invite's success failed"]]);
     });
   });
 });

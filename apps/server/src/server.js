@@ -922,7 +922,7 @@ export async function startServer({
       friends: friends.friendComponent,
       flags: flagComponent,
       events: domainEvents,
-      onError: (err) => logger.warn({ err }, "counting an invite's success failed"),
+      logger,
     }),
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });

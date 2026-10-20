@@ -228,13 +228,8 @@ export function createChallengeComponent({
   }
 
   /** Whether a challenge is taken by someone whose room is made, or is being made, at `now`. */
-  async function isTaken(challengeId, now) {
-    if (challengeId === "") return false;
-    const holder = await challengeAccessor
-      .get(challengeId)
-      .catch((err) => (err instanceof NotFoundError ? undefined : Promise.reject(err)));
-    return holder !== undefined && stateAt(holder, now) === CHALLENGE_STATES.ACCEPTED;
-  }
+  const isTaken = async (challengeId, now) =>
+    stateAt(await challengeAccessor.get(challengeId), now) === CHALLENGE_STATES.ACCEPTED;
 
   /**
    * Claims an invite's group for the invite just taken (CC-052 scenario 6): one conditional update on the group's

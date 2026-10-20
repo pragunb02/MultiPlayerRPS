@@ -47,7 +47,7 @@ function Sent({ friend, challenge }) {
   const offline = friend.presence === FRIEND_PRESENCE.OFFLINE;
   return (
     <div className={styles.sent} role="status">
-      <Bilingual copy={(SENT_COPY[friend.presence] ?? INVITE_COPY.sentOffline)(friend.displayName)} />
+      <Bilingual copy={SENT_COPY[friend.presence](friend.displayName)} />
       <p className={styles.actions}>
         {offline && (
           <WhatsAppLink

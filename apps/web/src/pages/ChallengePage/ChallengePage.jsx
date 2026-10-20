@@ -331,23 +331,16 @@ export function ChallengePage() {
       ) : (
         <Ended title="Challenge expired" copy={CHALLENGE_COPY.expired} gameId={challenge.gameId} />
       );
-    case CHALLENGE_STATES.DECLINED:
-      return challenge.own ? (
-        <NotRightNow challenge={challenge} />
-      ) : (
-        <Ended title="Challenge over" copy={CHALLENGE_COPY.over} gameId={challenge.gameId} />
-      );
     case CHALLENGE_STATES.FILLED:
       return <GameFilled challenge={challenge} />;
     case CHALLENGE_STATES.WITHDRAWN:
       return <Ended title="Challenge taken back" copy={CHALLENGE_COPY.withdrawn} gameId={challenge.gameId} />;
     default:
-      return (
-        <Ended
-          title="Challenge over"
-          copy={challenge.own ? CHALLENGE_COPY.notRightNow(challenge.toName) : CHALLENGE_COPY.over}
-          gameId={challenge.gameId}
-        />
+      // Declined. Its sender reads the same as for an invite nobody answered (CC-052).
+      return challenge.own ? (
+        <NotRightNow challenge={challenge} />
+      ) : (
+        <Ended title="Challenge over" copy={CHALLENGE_COPY.over} gameId={challenge.gameId} />
       );
   }
 }

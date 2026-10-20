@@ -362,7 +362,12 @@ export function createTestApp({
     events: domainEvents,
     recipients:
       challengeRecipients ??
-      createFriendInvites({ friends: friends.friendComponent, flags: flagComponent, events: domainEvents }),
+      createFriendInvites({
+        friends: friends.friendComponent,
+        flags: flagComponent,
+        events: domainEvents,
+        logger: capture.logger,
+      }),
   });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
   const botDriver = createBotDriver({
