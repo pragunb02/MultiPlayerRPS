@@ -2,9 +2,8 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-066**. Reserved for open work (2026-10-20): ADR-065 (CC-034) and ADR-067
-(CC-308). Never used: ADR-058 (reserved for CC-163, which needed no ADR) and ADR-064 (reserved for CC-297, which
-amended ADR-057 instead). A later change to a decision is a dated
+reused; the next free ID is **ADR-077**. Reserved for open work (2026-10-21): none. Never used: ADR-058 (reserved for
+CC-163, which needed no ADR) and ADR-064 (reserved for CC-297, which amended ADR-057 instead). A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -109,6 +108,54 @@ the owner may change it.
   and `--layer-menu` (CC-139's inbox panel). It moved the SVG and board font sizes to `--type-svg-*` and
   `--type-board-*` tokens instead of exceptions. The pop-up list has 18 files, seven of them announcers. "Escape waits
   while a destructive action runs" is not built.
+
+### ADR-075 — Effects and animation stack: CSS for simple, Motion for intermediate, our own canvas module behind one effect registry for advanced
+
+- **Status:** Accepted · 2026-10-21 (design lead, owner-delegated: the owner said on 2026-10-21 "make the
+  technical decisions yourself". [CC-321](tickets/CC-321.md); the evaluation, every measurement and the method are
+  in [design/EFFECTS-STACK.md](design/EFFECTS-STACK.md)). **Amends ADR-016.**
+- **Context.** A premium look needs celebrations, seasonal event themes and reward reveals, for players who are
+  mostly on mid-range Android phones in India. Our CSP (CC-030) has no `'unsafe-eval'`, no `'wasm-unsafe-eval'`,
+  no `blob:` workers and no inline styles in markup, and the first route already carries 192.2 kB gzip of
+  JavaScript against a 150 kB target (CC-135). Without one place for effects, each seasonal effect would be
+  hardcoded in whatever component wanted it and never removed.
+- **Decision.**
+  1. **Simple tier: CSS and the motion tokens.** Transitions and keyframes on `--duration-*` and `--ease-*`,
+     `transform` and `opacity` only (ADR-012), `@starting-style` for entrances, `@property` for colour on small
+     elements, and the View Transitions API through React's `<ViewTransition>` for page changes (92.9 % of users
+     worldwide, 94.2 % in India). **No `var()` inside `@keyframes`**: measured, it doubled main-thread time and fell
+     to 39 fps under stress, where literal keyframes held 60. Scroll-driven animations only as decoration (Firefox
+     has none).
+  2. **Intermediate tier: Motion, kept** (ADR-016), through named presets in `components/Motion/presets.js` built
+     from the same tokens: enter, exit, pop, stagger, celebrate, counters (a `MotionValue`, final number in the DOM
+     from the start), progress (`scaleX`) and CC-099's reward reveals. At most 30 animating `m.*` elements at once.
+  3. **Advanced tier: our own canvas particle module** (`apps/web/src/effects/particles.js`, about 0.75 kB gzip):
+     one canvas, a typed-array pool, a cap of 300 particles (150 by default, a third on low-end phones), DPR at most
+     2, paused while the tab is hidden, never started under reduced motion, stopped after at most 1.5 s. It needs
+     no CSP change and used the least main thread of every candidate at 600 particles.
+  4. **One effect registry**, `apps/web/src/effects/registry.js`: every celebration and seasonal theme is an entry
+     with a name, kind, ticket, CC-312 flag, India-day window and `removeBy` (themes), particle count, duration,
+     size budget and a lazy `load()`. One `EffectHost` in `Layout` owns the canvas, asks for the registry's flags in
+     one call and applies the gates in order: reduced motion, flag, window, device tier, visibility, one at a time
+     (ADR-012), then load, play and stop. Components only call `play(name)`; an ESLint rule forbids importing
+     scenes or themes anywhere else, and a test fails on a theme past its `removeBy`, as ADR-073 does for flags.
+  5. **Lazy loading.** Only the registry is on the first route (0.33 kB measured). Each effect is its own chunk,
+     prefetched at idle near the moment it may play (never with save-data), and a failed load is silent. CC-135's
+     bundle check gets two rules: no scene or theme in the first route, and each effect within its budget.
+  6. **Budgets** on the throttled profile (Chromium 4× CPU, 390 × 844): p95 frame at most 16.8 ms with under 1 %
+     of frames over 20 ms in every tier; simple 0 kB; intermediate 0 kB new; advanced at most 6 kB per effect, at
+     most 150 ms/s of main thread while playing and 30 ms to start. The full table is section 9 of the evaluation.
+  7. **Rejected:** GSAP (overlaps Motion; Webflow's free licence is revocable and not open source), AutoAnimate and
+     React Spring (overlap Motion), lottie-web and the dotLottie player, Rive (WebAssembly blocked by our CSP, 329 to
+     867 kB of wasm), tsParticles (50 kB, keeps drawing under reduced motion), canvas-confetti (worker blocked, our
+     module is a sixth of its size), PixiJS (needs `unsafe-eval`), three.js and React Three Fiber (186 and 241 kB),
+     OGL for now, Tailwind v4 and shadcn/ui (a second styling system mid-project, against CC-314), Radix Primitives
+     and React Aria Components (both inject a `<style>` our CSP blocks). No immersive hero scene.
+- **Consequences.** No new dependency and no CSP change. The 24-span CSS confetti and the other `art/effects/`
+  bursts move into the registry when CC-099 builds the reward queue. Seasonal themes ship as registry entries with
+  a flag and a removal day, switched from the console. Revisit: `lottie_light` only for real After Effects art
+  (ADR-016 amendment point 2), Rive only for an interactive story character with its own ADR adding
+  `'wasm-unsafe-eval'` and self-hosted wasm, OGL only if a ticket shows a hero scene helps players.
 
 ### ADR-074 — A merge queue on main: CI on `merge_group`, merges through the queue
 
@@ -2005,6 +2052,13 @@ Framer Motion under its old name (the same library, now published as `motion`).
 2. Lottie only if a designer makes real After Effects art for the characters (CC-194, CC-230). Not for effects that
    Motion or CSS already do.
 3. Video (a "how to play" clip or a trailer) is an idea in [IDEAS.md](IDEAS.md), not part of this decision.
+
+**Amended · 2026-10-21** (ADR-075, design lead, owner-delegated). Motion stays the one animation library for
+components, used through named presets. Added beside it: our own small canvas particle module for celebration
+bursts and seasonal themes, loaded only through the effect registry (`apps/web/src/effects/`), finite (at most
+1.5 s), capped (300 particles), paused when the tab is hidden and off under reduced motion. Point 1 still holds
+for backgrounds: nothing loops and no full-screen canvas runs behind a page. The Web Animations API may be used
+directly only inside `apps/web/src/effects/`. Point 2 is unchanged.
 
 ### ADR-015 — Leaderboards and rematch
 
