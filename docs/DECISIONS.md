@@ -110,7 +110,7 @@ the owner may change it.
   2. **Buckets.** The first 4 bytes of a keyed id (ADR-057, label `FLAG_BUCKETS`) of `[flag, playerId]`, modulo
      10 000. On when below `percent × 100`, so a ramp only adds players. Never stored, logged or sent. A visitor with
      no id is on only at `on`.
-  3. **Audiences.** `signed-in` is an account; `adults` uses `accountComponent.adultsAmong` (CC-152's rule, so
+  3. **Audiences.** `signed-in` is an account; `adults` reads CC-152's age policy (`safetyComponent.policyFor`, so
      unknown age is not adult); `admins` is the console allowlist (ADR-036.1).
   4. **Overrides** in a new `feature_flags` collection (`name`, `rollout`, `updatedAt`), read into memory every
      30 seconds. A failed read keeps the last good overrides for 5 minutes, then the code's rollout. A read that was
