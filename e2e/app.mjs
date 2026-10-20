@@ -35,4 +35,5 @@ const rooms = {
   limits: { socketsPerAddress: 10_000, openRoomsPerAddress: 10_000, ...requested.limits },
 };
 const { close } = await startServer({ config, logger, limits, rooms });
-handleShutdownSignals({ close, logger });
+// No telemetry here, so there is nothing to flush before exit (CC-305).
+handleShutdownSignals({ close, flush: async () => undefined, logger });
