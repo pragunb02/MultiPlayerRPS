@@ -195,7 +195,10 @@ test("the game cards can be reached and opened with the keyboard, with a visible
   const nextItem = testInfo.project.use.defaultBrowserType === "webkit" ? "Alt+Tab" : "Tab";
   const { page } = await players.open("visitor");
   await page.goto("/");
-  await expect(page.locator("main li")).toHaveCount(3);
+  // The game cards are the Games list. The daily puzzle has its own list after it (CC-144), so it is counted
+  // there, not with the games (CC-309).
+  await expect(page.getByRole("region", { name: "Games" }).getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByRole("region", { name: "Daily puzzle" }).getByRole("listitem")).toHaveCount(1);
   const focusedName = () => page.evaluate(() => document.activeElement?.textContent ?? "");
 
   const names = [];

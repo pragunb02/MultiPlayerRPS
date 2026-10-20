@@ -141,8 +141,16 @@ test.describe("leaderboards", () => {
     await expect(guestRow(riya.page)).toContainText("1 win");
     await expect(guestRow(riya.page)).not.toHaveAttribute("aria-current", "true");
     await riya.page.goto("/leaderboards/overall");
-    const riyaRow = riya.page.getByRole("listitem").filter({ hasText: account.username });
-    await expect(riyaRow).toHaveAttribute("aria-current", "true");
+    // Riya lost, so its few XP put it in the top 50 only while the shared server is young. Its own place is its
+    // row in the list, marked as current, or else the "Your rank" row pinned under the list, and exactly one of
+    // the two is shown (CC-309).
+    const riyaRow = riya.page
+      .getByRole("listitem")
+      .filter({ hasText: account.username })
+      .and(riya.page.locator('[aria-current="true"]'));
+    const pinnedRow = riya.page.locator("main p").filter({ hasText: /^Your rank: #\d+You\d+ XP$/ });
+    await expect(riyaRow.or(pinnedRow)).toHaveCount(1);
+    await expect(riya.page.locator('main [aria-current="true"]')).toHaveCount(await riyaRow.count());
     await expect(riya.page.getByText(/keep your place/)).toHaveCount(0);
 
     // The guest signs up from the board. Its place moves to the account: the same XP, once, under its username.
