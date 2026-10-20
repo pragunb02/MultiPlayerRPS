@@ -233,6 +233,10 @@ thinking crashed` with `game` only.
      quick match stranger (ADR-051.7). Every room today is joined by a link. A stored match does not say how its players met yet, so a
      request from match history counts as quick match for a pair with a minor. Quick match (CC-051) marks its rooms and
      matches, and `friendRules.js` already refuses them for a pair with a minor.
+     Every age rule here is read from the age policy (CC-152, `domain/safety/agePolicy.js`): `friendsMode` for who
+     may have friends and who may reach whom, `shareCardName` for a link maker's name, `profileLink` for a friend's
+     profile link and `treatedAsMinor` for the safety line. In a minor's quiet hours (22:00 to 07:00 India time) a
+     new request is not announced: it waits on the friends page.
   6. **Presence**, worked out in memory and never stored: `online`, `playing` (seated in a room whose game is on) or
      `offline`. Only friends see it, never which room or game, never a last seen. **Appear offline** shows the player
      offline to everyone, and is kept in `player_privacy` (the store CC-278 plans for every privacy switch). A block
