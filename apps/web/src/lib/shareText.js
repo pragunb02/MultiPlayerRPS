@@ -179,6 +179,17 @@ export function inviteText({ gameId, code }) {
 }
 
 /**
+ * The text of a challenge link (CC-139): the Hinglish line, then the English one. It never names the player who
+ * sends it, so a forwarded message says nothing about them (ADR-028.7).
+ *
+ * @param {{ gameId: string }} challenge
+ */
+export function challengeText({ gameId }) {
+  const game = getGame(gameId)?.name ?? "a game";
+  return `${game} mein mujhse jeet ke dikhao! Link 24 ghante chalega:\nI challenge you to ${game} on ${SITE_NAME}. The link works for 24 hours`;
+}
+
+/**
  * The text with the free lines under it, for a share sheet that takes the link apart.
  *
  * @param {string} text

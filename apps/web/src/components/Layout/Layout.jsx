@@ -8,13 +8,16 @@ import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { useDisclosureMenu } from "../../hooks/useDisclosureMenu.js";
 import { useSession } from "../../hooks/useSession.js";
 import { Button } from "../Button/Button.jsx";
+import { ChallengesProvider } from "../Challenges/ChallengesProvider.jsx";
 import { ConnectionBanner } from "../ConnectionBanner/ConnectionBanner.jsx";
 import { FeedbackDialog } from "../Feedback/FeedbackDialog.jsx";
 import { FEEDBACK_TEXT } from "../Feedback/feedbackText.js";
+import { Inbox } from "../Inbox/Inbox.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { PageAnnouncer } from "../PageAnnouncer/PageAnnouncer.jsx";
 import { useSaveProgress } from "../SaveProgress/saveProgressContext.js";
+import { InGameProvider } from "../SiteRequests/InGameProvider.jsx";
 import { SiteRequests } from "../SiteRequests/SiteRequests.jsx";
 import { SoundControl } from "../SoundControl/SoundControl.jsx";
 import { WakingUp } from "../WakingUp/WakingUp.jsx";
@@ -42,9 +45,21 @@ function identityAnnouncement(identity) {
  * player's own connection (CC-158) and the requests other players sent them from rooms they are not looking at
  * (CC-207), so both reach them on every page. On a phone the header is one row (CC-259): the sound controls, your
  * level and name, Log in and Sign up move into a menu behind one button. On a wider screen the same controls sit in
- * the row and the button is not shown.
+ * the row and the button is not shown. A player has an inbox in the header row on every screen size, for the
+ * challenges that wait for them (CC-139, CC-207).
  */
 export function Layout() {
+  return (
+    <ChallengesProvider>
+      <InGameProvider>
+        <Shell />
+      </InGameProvider>
+    </ChallengesProvider>
+  );
+}
+
+/** The header, the page and the footer, inside what the site-wide requests need. */
+function Shell() {
   const session = useSession();
   const navigate = useNavigate();
   const location = useLocation();
@@ -111,6 +126,7 @@ export function Layout() {
             </NavLink>
           )}
         </nav>
+        {identity && <Inbox key={identity.id} />}
         <button
           type="button"
           ref={buttonRef}

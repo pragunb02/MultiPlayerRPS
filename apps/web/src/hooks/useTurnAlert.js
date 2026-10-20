@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
+import { useReducedMotion } from "./useReducedMotion.js";
 
 export const TURN_TITLE = "Your turn! · ClassiCade";
 export const FAVICON = "/favicon.svg";
@@ -24,6 +25,8 @@ const setFavicon = (href) => document.querySelector("link[rel='icon']")?.setAttr
  * `title` and the page's own title once a second, and the favicon gets a badge. Everything is put back the moment
  * the tab is visible again or the alert is no longer wanted.
  *
+ * A player who asked their system for less motion gets the title and the badge without the flashing (CC-207).
+ *
  * The page's title belongs to React (each page renders its own), so it is read when the alert starts and written
  * back when it stops. If the page changes its title while the alert runs, that new title is the one restored.
  *
@@ -32,6 +35,7 @@ const setFavicon = (href) => document.querySelector("link[rel='icon']")?.setAttr
  */
 export function useTabAlert(wanted, title) {
   const hidden = useDocumentHidden();
+  const still = useReducedMotion();
   const active = wanted && hidden;
 
   useEffect(() => {
@@ -42,13 +46,15 @@ export function useTabAlert(wanted, title) {
     let showingAlert = true;
     document.title = title;
     setFavicon(FAVICON_ALERT);
-    const timer = setInterval(() => {
-      if (document.title !== title && document.title !== pageTitle) {
-        pageTitle = document.title;
-      }
-      showingAlert = !showingAlert;
-      document.title = showingAlert ? title : pageTitle;
-    }, FLASH_MS);
+    const timer = still
+      ? undefined
+      : setInterval(() => {
+          if (document.title !== title && document.title !== pageTitle) {
+            pageTitle = document.title;
+          }
+          showingAlert = !showingAlert;
+          document.title = showingAlert ? title : pageTitle;
+        }, FLASH_MS);
     return () => {
       clearInterval(timer);
       if (document.title === title) {
@@ -56,7 +62,7 @@ export function useTabAlert(wanted, title) {
       }
       setFavicon(FAVICON);
     };
-  }, [active, title]);
+  }, [active, title, still]);
 }
 
 /**

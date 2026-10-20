@@ -17,6 +17,7 @@ import {
  *   /login?next=…  /signup?next=…      account pages; `next` = where to return afterwards
  *   /profile                           your progress and match history (guests and accounts)
  *   /players/:handle                   a player's public profile, by its random handle (CC-034), never by id or name
+ *   /challenge/:id                     a challenge's own link, by its random id (CC-139), lasts a day
  *   /daily/:kind                       today's daily puzzle of a kind, such as /daily/chess (CC-144)
  *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
  *   /privacy  /terms                   the privacy policy and the terms of use
@@ -37,6 +38,7 @@ export const ROUTES = Object.freeze({
   SIGNUP: "signup",
   PROFILE: "profile",
   PLAYER: "players/:handle",
+  CHALLENGE: "challenge/:id",
   DAILY: "daily/:kind",
   LEADERBOARDS: "leaderboards",
   LEADERBOARD: "leaderboards/:board",
@@ -154,6 +156,8 @@ export const paths = Object.freeze({
   profile: () => "/profile",
   /** @param {string} handle  a profile handle the server gave (CC-034) */
   player: (handle) => `/players/${encodeURIComponent(handle)}`,
+  /** @param {string} id  a challenge id the server gave (CC-139) */
+  challenge: (id) => `/challenge/${encodeURIComponent(id)}`,
   /** @param {string} kind  a DAILY_PUZZLE_KINDS value */
   daily: (kind) => `/daily/${encodeURIComponent(kind)}`,
   /** @param {string} [boardId]  a leaderboard id (default: overall XP) */
