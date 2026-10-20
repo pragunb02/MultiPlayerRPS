@@ -1,6 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ServicesProvider } from "../app/ServicesProvider.jsx";
+import { SessionContext } from "../hooks/useSession.js";
 import { fakeSocket, fakeSound } from "../testing/fakes.js";
 import { renderApp } from "../testing/render.jsx";
 import { computerSeats, isComputer, levelNameOf } from "./computer.js";
@@ -37,7 +38,9 @@ describe("computer seats", () => {
   it("labels the computer in the list of players", () => {
     render(
       <ServicesProvider services={{ sound: fakeSound() }}>
-        <Seats room={{ ...room([PERSON, ROCKY]), status: "finished", serverTime: 0 }} />
+        <SessionContext.Provider value={{ status: "ready", identity: undefined }}>
+          <Seats room={{ ...room([PERSON, ROCKY]), status: "finished", serverTime: 0 }} />
+        </SessionContext.Provider>
       </ServicesProvider>,
     );
 

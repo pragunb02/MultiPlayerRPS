@@ -212,6 +212,21 @@ describe("match history names players by match player ids (CC-297)", () => {
     );
   });
 
+  it("says how the players of a match met, without a quick match mark no match has yet (CC-052)", async () => {
+    const matches = setup();
+    await matches.recordFinished({ room: room(), outcome: aliceWins() });
+
+    expect(await matches.meetingFor({ matchId: MATCH_ID, playerId: ALICE })).toEqual({
+      players: [
+        { playerId: ALICE, displayName: "Alice" },
+        { playerId: BOB, displayName: "Bob" },
+      ],
+    });
+    await expect(matches.meetingFor({ matchId: MATCH_ID, playerId: "guest_x" })).rejects.toThrow(
+      NotFoundError,
+    );
+  });
+
   it("has no default match player ids, so a view can never fall back to player ids", () => {
     expect(() => setup({ matchPlayerIds: undefined })).toThrow(TypeError);
   });

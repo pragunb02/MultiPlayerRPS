@@ -128,6 +128,13 @@ export function createInMemoryAccountDao() {
         .map(({ accountId, birthYear }) => ({ accountId, birthYear }));
     },
 
+    async listUsernames(accountIds) {
+      return [...new Set(accountIds)]
+        .map((accountId) => accounts.get(accountId))
+        .filter((doc) => doc !== undefined)
+        .map(({ accountId, username }) => ({ accountId, username }));
+    },
+
     async deleteById(accountId) {
       return { deleted: accounts.delete(accountId) };
     },

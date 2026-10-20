@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { AUDIENCES, agePolicyFor, clientPolicyOf } from "./agePolicy.js";
 import { createFeedbackComponent } from "../feedback/feedbackComponent.js";
+import { createFriendComponent } from "../friends/friendComponent.js";
 import { createLeaderboardComponent } from "../leaderboards/leaderboardComponent.js";
 import { createProfileCards } from "../profiles/profileCards.js";
 import { createProfileComponent } from "../profiles/profileComponent.js";
@@ -71,6 +72,18 @@ describe("the age policy is the one place for the under 18 defaults (CC-152)", (
         }),
     ],
     ["feedback replies (CC-290, ADR-059)", () => createFeedbackComponent({ feedbackAccessor: {} })],
+    [
+      "friends (CC-052)",
+      () =>
+        createFriendComponent({
+          friendAccessor: {},
+          privacyAccessor: {},
+          profiles: { getOrCreateMany() {}, getByHandle() {} },
+          coPlayers: { personAt() {} },
+          blocks: { blockedWith() {} },
+          accounts: { usernamesOf() {} },
+        }),
+    ],
   ])("%s cannot be made without the safety component", (_feature, make) => {
     expect(make).toThrow(/safety\.(policiesFor|policyFor)/);
   });

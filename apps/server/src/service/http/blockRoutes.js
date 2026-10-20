@@ -1,15 +1,11 @@
 import { Router } from "express";
-import { SEAT_ID_PATTERN } from "../../domain/rooms/seatIds.js";
-import { parseRoomCode } from "../../models/roomCode.js";
 import { assertDefined } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
+import { parsePlayedWith, UUID_PATTERN } from "./playedWith.js";
 import { createRateLimit } from "./rateLimits.js";
 import { requireIdentity } from "./session.js";
 
 const MINUTE_MS = 60 * 1000;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-// Seats are positions in a room or a match. No game has more than a few players.
-const MAX_SEAT = 7;
 
 /**
  * The limits on blocking and unblocking together (ADR-053). Each is a business rule, and tests and browser tests
@@ -23,48 +19,6 @@ export const BLOCK_LIMITS = Object.freeze({
   perPlayer: Object.freeze({ windowMs: 10 * MINUTE_MS, limit: 20 }),
   perAddress: Object.freeze({ windowMs: 10 * MINUTE_MS, limit: 100 }),
 });
-
-const isPlainObject = (value) =>
-  value !== null &&
-  typeof value === "object" &&
-  !Array.isArray(value) &&
-  Object.getPrototypeOf(value) === Object.prototype;
-
-/**
- * Who to block: `{ roomCode, seat, seatId }` or `{ matchId, seat }`, and nothing else. A player id alone is never
- * enough: `seatId` only confirms who the page saw in that seat of a room the caller sits in. It is the opaque seat
- * id of the room view (CC-253), so a player id has the wrong shape and is refused here. So nobody can name a player
- * they never met.
- *
- * @returns {import("../../domain/blocks/blockComponent.js").BlockTarget}
- */
-function parseTarget(body) {
-  if (!isPlainObject(body)) {
-    throw new ValidationError("Send a JSON object");
-  }
-  const reference = "roomCode" in body ? "roomCode" : "matchId";
-  const fields = reference === "roomCode" ? ["roomCode", "seat", "seatId"] : ["matchId", "seat"];
-  const unknown = Object.keys(body).filter((key) => !fields.includes(key));
-  if (unknown.length > 0) {
-    throw new ValidationError("Send a room code or a match id, and a seat", { details: { fields: unknown } });
-  }
-  const { seat } = body;
-  if (!Number.isInteger(seat) || seat < 0 || seat > MAX_SEAT) {
-    throw new ValidationError(`seat must be a whole number from 0 to ${MAX_SEAT}`, {
-      details: { field: "seat" },
-    });
-  }
-  if (reference === "roomCode") {
-    if (typeof body.seatId !== "string" || !SEAT_ID_PATTERN.test(body.seatId)) {
-      throw new ValidationError("Say who sits in that seat", { details: { field: "seatId" } });
-    }
-    return { roomCode: parseRoomCode(body.roomCode), seat, seatId: body.seatId };
-  }
-  if (typeof body.matchId !== "string" || !UUID_PATTERN.test(body.matchId)) {
-    throw new ValidationError("Invalid match id", { details: { field: "matchId" } });
-  }
-  return { matchId: body.matchId, seat };
-}
 
 /**
  * Blocks (CC-044, ADR-053), for guests and accounts alike. Visitors get 401.
@@ -111,7 +65,7 @@ export function createBlockRoutes({ blockComponent, now = Date.now, limits = {} 
   // The player's own limit first, so the network's budget counts only what it let through. One player hammering the
   // route can then use up at most their own share of a school's or a carrier's address.
   router.post("/blocks", signedIn, perPlayer, perAddress, async (req, res) => {
-    const target = parseTarget(req.body);
+    const target = parsePlayedWith(req.body);
     const blocker = requireIdentity(req.session);
     const block = await blockComponent.block({ blocker, target, now: now() });
     // Who was blocked is never logged: only the database holds it, for as long as the block lasts.
