@@ -1,11 +1,12 @@
 import { useCallback } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
-import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS } from "@classicade/shared";
+import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS, ROOM_STATUS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { MatchShell } from "../../components/MatchShell/MatchShell.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
+import { useMarkInGame } from "../../components/SiteRequests/inGameContext.js";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { gameView } from "../../games/registry.js";
 import { useRoomAlerts } from "../../games/useRoomAlerts.js";
@@ -89,6 +90,8 @@ export function RoomPage() {
     [toast],
   );
   useRoomAlerts(room.room, { notify, dismiss: toast.dismiss });
+  // A player in a game here is never interrupted by a request from elsewhere: it waits for the end (CC-207).
+  useMarkInGame(room.room?.status === ROOM_STATUS.PLAYING && room.room.you !== "");
 
   /**
    * Leaves the seat and opens the game's lobby. In a game still on this forfeits it. After a finished game it takes

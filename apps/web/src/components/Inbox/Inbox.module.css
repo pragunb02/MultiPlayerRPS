@@ -1,0 +1,92 @@
+/*
+ * The inbox (CC-207): a button in the header row on every screen size, and its list, which opens under the header.
+ */
+.inbox {
+  flex: none;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.button:hover,
+.button[aria-expanded="true"] {
+  border-color: var(--color-primary);
+}
+.button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-primary-contrast);
+  font-size: var(--text-sm);
+}
+.panel {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: var(--space-4);
+  z-index: 20;
+  width: min(24rem, calc(100vw - 2 * var(--space-4)));
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.open {
+  display: block;
+}
+.heading {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+.list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.item {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.item:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.waiting {
+  margin: 0;
+}
+.link {
+  font-weight: 700;
+}

@@ -6,7 +6,7 @@ import { fakeApi, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
 import { installVisibility } from "../../testing/visibility.js";
 
-// Requests that reach a player on any page (CC-207): the question with Accept and go and Decline, a chime and the
+// Requests that reach a player on any page (CC-207): the question with Accept and go and Not now, a chime and the
 // tab title, and for the asker a toast saying how it ended.
 
 // Pushes name players by their seat ids in the room, never by player ids (CC-253).
@@ -136,12 +136,12 @@ describe("SiteRequests (CC-207)", () => {
     expect(url()).toBe("/");
   });
 
-  it("declines with Decline, and the question goes once the server says so", async () => {
+  it("declines with Not now, and the question goes once the server says so", async () => {
     const user = userEvent.setup();
     const { push, socket } = await openHome();
     push(pushed([request()]));
 
-    await user.click(within(question()).getByRole("button", { name: "Decline" }));
+    await user.click(within(question()).getByRole("button", { name: "Not now" }));
     expect(socket.request).toHaveBeenCalledWith("room:answer", {
       code: "AB2CD3",
       type: "rematch",

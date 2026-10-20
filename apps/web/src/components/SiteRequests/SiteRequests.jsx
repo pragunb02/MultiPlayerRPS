@@ -1,6 +1,13 @@
 import { useEffect, useEffectEvent, useId, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { getGame, REQUEST_ANSWERS, REQUEST_STATES, SOCKET_EVENTS } from "@classicade/shared";
+import {
+  CHALLENGE_POPUP_MS,
+  CHALLENGE_STATES,
+  getGame,
+  REQUEST_ANSWERS,
+  REQUEST_STATES,
+  SOCKET_EVENTS,
+} from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { useServices } from "../../app/servicesContext.js";
 import { textsFor } from "../../games/roomUpdates.js";
@@ -8,16 +15,21 @@ import { useAction } from "../../hooks/useAction.js";
 import { useReconnecting } from "../../hooks/useReconnecting.js";
 import { useSiteRequests } from "../../hooks/useSiteRequests.js";
 import { useSound } from "../../hooks/useSound.js";
-import { useTabAlert } from "../../hooks/useTurnAlert.js";
+import { useDocumentHidden, useTabAlert } from "../../hooks/useTurnAlert.js";
 import { CATEGORIES } from "../../lib/notify/categories.js";
 import { SOUNDS } from "../../lib/sound/sounds.js";
 import { Button } from "../Button/Button.jsx";
+import { CHALLENGE_COPY } from "../Challenges/challengeCopy.js";
+import { useChallengeInbox } from "../Challenges/challengesContext.js";
+import { Bilingual } from "../Profile/Bilingual.jsx";
 import { RequestCountdown } from "../RequestBanner/RequestBanner.jsx";
 import { useHold, useToast } from "../Toast/toastContext.js";
+import { useInGame } from "./inGameContext.js";
 import styles from "./SiteRequests.module.css";
 
 const keyOf = (code, request) => `${code}:${request.type}:${request.from}:${request.createdAt}`;
 const gameName = (gameId) => getGame(gameId)?.name ?? "a game";
+const both = (copy) => `${copy.hi} ${copy.en}`;
 
 /**
  * The requests a player was asked in rooms whose page they are not on (CC-207), and how the ones they asked ended.
@@ -34,6 +46,26 @@ function useElsewhere() {
       .map((request) => ({ room, request, key: keyOf(room.code, request) })),
   );
   return { rooms, pathname, asked };
+}
+
+/**
+ * The challenges that call for the player now (CC-139): one sent to them that is still open, and one of theirs that
+ * someone took, while its room waits. Neither once it is in the inbox, nor on the page it would send them to.
+ */
+function useChallengeCalls(pathname) {
+  const { challenges } = useChallengeInbox();
+  return challenges.filter((challenge) => {
+    if (challenge.later) return false;
+    if (challenge.forYou && challenge.state === CHALLENGE_STATES.OPEN) {
+      return pathname !== paths.challenge(challenge.id);
+    }
+    return (
+      challenge.own &&
+      challenge.state === CHALLENGE_STATES.ACCEPTED &&
+      challenge.room !== undefined &&
+      pathname !== paths.room(challenge.room.gameId, challenge.room.code)
+    );
+  });
 }
 
 /**
@@ -85,7 +117,73 @@ function useAnswerToasts({ rooms, pathname }) {
   }, [rooms]);
 }
 
-/** One question from another room, with Accept and go, Decline and how long is left. */
+/**
+ * Tells the creator of a challenge to one person, on any page, that they said no: gently, "can't play right now".
+ * A block never shows here, because a blocked pair's challenge is never declined (ADR-053).
+ */
+function useDeclineToasts() {
+  const { challenges } = useChallengeInbox();
+  const toast = useToast();
+  const before = useRef(new Map());
+
+  useEffect(() => {
+    const previous = before.current;
+    before.current = new Map(challenges.map((challenge) => [challenge.id, challenge.state]));
+    for (const challenge of challenges) {
+      if (
+        challenge.own &&
+        challenge.state === CHALLENGE_STATES.DECLINED &&
+        previous.get(challenge.id) === CHALLENGE_STATES.OPEN
+      ) {
+        toast.show(both(CHALLENGE_COPY.declinedYours(challenge.toName)), {
+          tone: "info",
+          category: CATEGORIES.REQUEST,
+        });
+      }
+    }
+  }, [challenges, toast]);
+}
+
+/**
+ * Moves each challenge popup to the inbox once it has been on screen for about a minute (CC-207). Only the time the
+ * player could see it counts: while the tab is in the background, or a game holds the popups back, its clock
+ * stops, so a popup never moves away unseen and the tab alert keeps calling the player back.
+ */
+function useMoveToInbox(calls, paused) {
+  const { later } = useChallengeInbox();
+  // For each popup on the page: how long it has been seen, and since when it is being seen (0 while paused).
+  const clocks = useRef(new Map());
+  const ids = calls.map((challenge) => challenge.id).join(" ");
+  const seenFor = (clock, now) => clock.spent + (clock.since === 0 ? 0 : now - clock.since);
+
+  const moveDue = useEffectEvent(() => {
+    const now = Date.now();
+    for (const [id, clock] of clocks.current) {
+      if (seenFor(clock, now) >= CHALLENGE_POPUP_MS) {
+        clocks.current.delete(id);
+        later(id);
+      }
+    }
+  });
+
+  useEffect(() => {
+    const showing = ids === "" ? [] : ids.split(" ");
+    const now = Date.now();
+    for (const id of [...clocks.current.keys()]) {
+      if (!showing.includes(id)) clocks.current.delete(id);
+    }
+    for (const id of showing) {
+      const clock = clocks.current.get(id) ?? { spent: 0, since: 0 };
+      clocks.current.set(id, { spent: seenFor(clock, now), since: paused ? 0 : now });
+    }
+    if (paused || showing.length === 0) return undefined;
+    const next = Math.min(...showing.map((id) => CHALLENGE_POPUP_MS - clocks.current.get(id).spent));
+    const timer = setTimeout(moveDue, Math.max(0, next));
+    return () => clearTimeout(timer);
+  }, [ids, paused]);
+}
+
+/** One question from another room, with Accept and go, Not now and how long is left. */
 function SitePopup({ room, request, reason }) {
   const { socket } = useServices();
   const navigate = useNavigate();
@@ -102,6 +200,7 @@ function SitePopup({ room, request, reason }) {
     },
     { id: "site_request.accept" },
   );
+  // Rematch and draw requests end within a minute, so Not now answers them: the asker is not left waiting.
   const decline = useAction(() => answer(REQUEST_ANSWERS.DECLINE), { id: "site_request.decline" });
   const answering = accept.busy || decline.busy ? "Sending your answer" : "";
 
@@ -128,7 +227,7 @@ function SitePopup({ room, request, reason }) {
           action={decline}
           reason={reason || (accept.busy ? answering : "")}
         >
-          Decline
+          Not now
         </Button>
       </div>
     </section>
@@ -136,37 +235,104 @@ function SitePopup({ room, request, reason }) {
 }
 
 /**
- * Requests that reach a player on any page of the site (CC-207): "Bob wants a rematch at Chess" with Accept and
- * go (which accepts and opens the room) and Decline, a chime, the tab title calling them back, and an urgent
- * announcement. It sits at the top of the page, under the header, and pushes the page down instead of covering
- * it. While a question waits, reward toasts wait too (CC-208). The asker hears how it ended in a toast.
+ * A challenge that calls for the player (CC-139): one sent to them, with Accept and go, or one of theirs that
+ * someone took, with Go and play. Not now moves it to the inbox without answering, because a challenge waits a day.
+ */
+function ChallengePopup({ challenge, reason }) {
+  const { api } = useServices();
+  const navigate = useNavigate();
+  const { later, remember } = useChallengeInbox();
+  const titleId = useId();
+  const questionId = useId();
+  const game = gameName(challenge.gameId);
+  const taken = challenge.own;
+  const copy = taken
+    ? CHALLENGE_COPY.tookYours(challenge.acceptedName, game)
+    : CHALLENGE_COPY.challengesYou(challenge.fromName, game);
+  const go = useAction(
+    async () => {
+      if (taken) {
+        later(challenge.id);
+        navigate(paths.room(challenge.room.gameId, challenge.room.code));
+        return;
+      }
+      const { challenge: accepted, room } = await api.acceptChallenge(challenge.id);
+      remember(accepted);
+      navigate(paths.room(room.gameId, room.code));
+    },
+    { id: "site_challenge.accept" },
+  );
+
+  return (
+    <section className={styles.popup} aria-labelledby={titleId} aria-describedby={questionId}>
+      <h2 id={titleId} className={styles.title}>
+        {taken ? "Challenge taken" : "Challenge"}
+      </h2>
+      <div id={questionId} className={styles.question} role="alert">
+        <Bilingual copy={copy} />
+      </div>
+      <div className={styles.actions}>
+        <Button control="site_challenge.accept" action={go} reason={reason}>
+          {taken ? "Go and play" : "Accept and go"}
+        </Button>
+        <Button
+          control="site_challenge.later"
+          variant="secondary"
+          onClick={() => later(challenge.id)}
+          reason={go.busy ? "Sending your answer" : ""}
+        >
+          Not now
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Requests that reach a player on any page of the site (CC-207): a rematch or a draw offer from another room ("Bob
+ * wants a rematch at Chess"), a challenge sent to them, or one of theirs that someone took (CC-139). Each has Accept
+ * and go and Not now, a chime, the tab title calling them back, and an urgent announcement. It sits at the top of the
+ * page, under the header, and pushes the page down instead of covering it. While a question waits, reward toasts
+ * wait too (CC-208). A challenge left for about a minute moves to the inbox. A player in a game on the room page is
+ * never interrupted: everything waits, the sound and the tab alert too, until the game ends.
  */
 export function SiteRequests() {
   const { rooms, pathname, asked } = useElsewhere();
+  const calls = useChallengeCalls(pathname);
+  const held = useInGame();
   const sound = useSound();
   const reconnecting = useReconnecting();
   const heard = useRef(new Set());
   useAnswerToasts({ rooms, pathname });
-  useHold(CATEGORIES.REQUEST, asked.length > 0);
-  useTabAlert(
-    asked.length > 0,
-    asked.length > 0 ? `${textsFor(asked[0].room.gameId, asked[0].request.type).title} · ClassiCade` : "",
-  );
+  useDeclineToasts();
+  const hidden = useDocumentHidden();
+  useMoveToInbox(calls, held || hidden);
+  const waiting = !held && asked.length + calls.length > 0;
+  useHold(CATEGORIES.REQUEST, waiting);
+  const firstTitle =
+    asked.length > 0 ? textsFor(asked[0].room.gameId, asked[0].request.type).title : "Challenge";
+  useTabAlert(waiting, waiting ? `${firstTitle} · ClassiCade` : "");
 
-  const keys = asked.map(({ key }) => key).join(" ");
+  const keys = held
+    ? ""
+    : [...asked.map(({ key }) => key), ...calls.map(({ id, state }) => `${id}:${state}`)].join(" ");
   useEffect(() => {
     const fresh = keys.split(" ").filter((key) => key !== "" && !heard.current.has(key));
     fresh.forEach((key) => heard.current.add(key));
     if (fresh.length > 0) sound.play(SOUNDS.NOTIFY);
   }, [keys, sound]);
 
-  if (asked.length === 0) {
+  if (!waiting) {
     return null;
   }
+  const reason = reconnecting ? "Reconnecting" : "";
   return (
     <div className={styles.stack} data-cc-site-requests="">
       {asked.map(({ room, request, key }) => (
-        <SitePopup key={key} room={room} request={request} reason={reconnecting ? "Reconnecting" : ""} />
+        <SitePopup key={key} room={room} request={request} reason={reason} />
+      ))}
+      {calls.map((challenge) => (
+        <ChallengePopup key={`${challenge.id}:${challenge.state}`} challenge={challenge} reason={reason} />
       ))}
     </div>
   );

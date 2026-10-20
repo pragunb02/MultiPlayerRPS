@@ -27,6 +27,11 @@ const limits = {
     changesPerAddress: { windowMs: 60_000, limit: 10_000 },
     lookupsPerAddress: { windowMs: 60_000, limit: 10_000 },
   },
+  // Challenges keep their real limits per player (CC-139). Only the ones per address are raised.
+  challenges: {
+    createsPerAddress: { windowMs: 60_000, limit: 10_000 },
+    lookupsPerAddress: { windowMs: 60_000, limit: 10_000 },
+  },
   // Feedback keeps its real limit per session (CC-290). The ones per address and for the site are raised.
   feedback: {
     perAddress: { windowMs: 60_000, limit: 10_000 },

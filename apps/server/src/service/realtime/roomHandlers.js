@@ -222,6 +222,23 @@ export async function handleSocketOnline({ socket, roomComponent, now, logger })
 }
 
 /**
+ * A player who has a tab open on the site is away, not offline, in every room where they are offline. A room made
+ * for them while they were on another page (a challenge someone took, CC-139) seats them as offline, because the
+ * room component cannot know about their tabs. A failure is logged and never reaches the caller.
+ *
+ * @param {{ io: import("socket.io").Server, roomComponent: any, playerId: string, now: () => number, logger: any }} args
+ */
+export async function markOnSite({ io, roomComponent, playerId, now, logger }) {
+  try {
+    if ((await io.in(playerChannel(playerId)).fetchSockets()).length > 0) {
+      await roomComponent.playerOnline({ playerId, now: now() });
+    }
+  } catch (err) {
+    logger.error({ err }, "failed to record that a player is on the site");
+  }
+}
+
+/**
  * Tells every tab of the players named about a room's requests whenever they open or end, on whatever page those
  * tabs are (CC-207). The room component names them, including a player whose seat the change gave up. Each player
  * gets their own payload, which says which seat is theirs (CC-253).
