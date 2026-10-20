@@ -91,6 +91,18 @@ export const FLAGS = Object.freeze([
     client: true,
     success: "An interruption_ended event the server accepted.",
   }),
+  Object.freeze({
+    name: "design_page",
+    description:
+      "Shows the console's Design page: every token of the design contract and the real components in their states, light or dark as the device shows them.",
+    ticket: "CC-314",
+    default: false,
+    removeBy: "2026-12-31",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.ADMINS,
+    client: true,
+    success: "The owner opened a dialog on the Design page.",
+  }),
 ]);
 
 const NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;

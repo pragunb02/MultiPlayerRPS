@@ -81,6 +81,9 @@ export const SURFACES = Object.freeze([
   surface("dialog.delete_account", true, ESSENTIAL, PLAYER, "CC-035"),
   surface("dialog.remove_friend", true, ESSENTIAL, PLAYER, "CC-052"),
   surface("dialog.delete_feedback", true, ESSENTIAL, PLAYER, "CC-290"),
+  // The owner console's Design page shows a real dialog and a real toast on request (CC-314).
+  surface("dialog.design_sample", true, ESSENTIAL, PLAYER, "CC-314"),
+  surface("toast.design_sample", false, ESSENTIAL, PLAYER, "CC-314"),
   // The full screen while a cold server wakes up (CC-232).
   surface("screen.waking_up", true, ESSENTIAL, SYSTEM, "CC-232"),
 ]);
