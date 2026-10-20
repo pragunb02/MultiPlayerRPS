@@ -58,10 +58,10 @@ const playerRoom = playerChannel;
  *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
  *   chessRatingComponent?: Pick<ReturnType<typeof import("../../domain/ratings/chessRatingComponent.js").createChessRatingComponent>, "ratingsOf">,
  *   recordSocketEvent?: import("../../utils/operationsMetrics.js").OperationsMetrics["recordSocketEvent"],
- *   challengeComponent?: Pick<ReturnType<typeof import("../../domain/challenges/challengeComponent.js").createChallengeComponent>, "viewFor">,
+ *   challengeComponent: Pick<ReturnType<typeof import("../../domain/challenges/challengeComponent.js").createChallengeComponent>, "viewFor">,
  * }} deps  without `botComponent` nobody can start a game against a computer character (CC-138), and without
  *   `chessRatingComponent` no tab can ask for a room's ratings (CC-042). Without `recordSocketEvent` socket
- *   events are not timed for operations telemetry (ADR-055). Without `challengeComponent` no tab hears about challenges (CC-139)
+ *   events are not timed for operations telemetry (ADR-055). `challengeComponent` gives each player their own view of a challenge that changed (CC-139)
  */
 export function createRealtimeGateway({
   httpServer,
@@ -89,6 +89,7 @@ export function createRealtimeGateway({
   assertFunction(checkSession, "checkSession");
   assertDefined(trustProxyHops, "trustProxyHops");
   assertFunction(networkOf, "networkOf");
+  assertFunction(challengeComponent?.viewFor, "challengeComponent.viewFor");
 
   const io = new Server(httpServer, {
     serveClient: false,
@@ -280,18 +281,16 @@ export function createRealtimeGateway({
   // Domain to transport: a challenge changed, so every tab of the players it names hears about it on any page, each
   // with their own view (CC-139). The challenger of a room just made from their challenge sits in it as offline. If
   // a tab of theirs is open on the site, they are away instead, so the one who took it sees them as on the site.
-  if (challengeComponent) {
-    domainEvents.on(CHALLENGE_EVENTS.CHANGED, ({ challenge, playerIds }) => {
-      for (const playerId of playerIds) {
-        io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.CHALLENGE_UPDATED, {
-          challenge: challengeComponent.viewFor(challenge, playerId, now()),
-        });
-      }
-      if (challenge.state === CHALLENGE_STATES.ACCEPTED && challenge.roomCode !== "") {
-        markOnSite({ io, roomComponent, playerId: challenge.fromId, now, logger });
-      }
-    });
-  }
+  domainEvents.on(CHALLENGE_EVENTS.CHANGED, ({ challenge, playerIds }) => {
+    for (const playerId of playerIds) {
+      io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.CHALLENGE_UPDATED, {
+        challenge: challengeComponent.viewFor(challenge, playerId, now()),
+      });
+    }
+    if (challenge.state === CHALLENGE_STATES.ACCEPTED && challenge.roomCode !== "") {
+      markOnSite({ io, roomComponent, playerId: challenge.fromId, now, logger });
+    }
+  });
 
   // Domain → transport: a room changed on its own (e.g. a clock ran out) — push everyone their new view.
   domainEvents.on(ROOM_EVENTS.UPDATED, ({ room }) => {
