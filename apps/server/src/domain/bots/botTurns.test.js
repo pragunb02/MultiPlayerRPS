@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CHESS_ACTIONS, GAME_IDS, REQUEST_ANSWERS, RPS_CHOICES } from "@classicade/shared";
+import { createBotThinker } from "@classicade/games";
 import { botRooms, PERSON } from "../../testing/botRooms.js";
 import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 import { ForbiddenError } from "../../utils/errors.js";
@@ -55,7 +56,7 @@ describe("botTurns: Rock Paper Scissors seals (CC-225)", () => {
     const room = await playComputer({ gameId: GAME_IDS.RPS });
 
     expect(botTurns.nextAction(room)).toEqual({ kind: "move", playerId: ROCKY, key: "m1:0:bot_rocky_easy" });
-    expect(botTurns.moveFor(room, ROCKY)).toEqual({ choice: sealedChoice(room) });
+    expect(botTurns.turnFor(room, ROCKY)).toEqual({ kind: "sealed", move: { choice: sealedChoice(room) } });
   });
 
   it("refuses any other move from the computer, also after the person chose", async () => {
@@ -148,12 +149,34 @@ describe("botTurns: turn based games", () => {
   });
 
   it("moves on its own turn, with the same move every time for the same turn", async () => {
-    const { room, botTurns, engines } = await startedWith(GAME_IDS.TIC_TAC_TOE, PIP);
+    const { room, botTurns, engines, bots } = await startedWith(GAME_IDS.TIC_TAC_TOE, PIP);
 
     expect(botTurns.nextAction(room)).toEqual({ kind: "move", playerId: PIP, key: `m1:0:${PIP}` });
-    const move = botTurns.moveFor(room, PIP);
-    expect(botTurns.moveFor(room, PIP)).toEqual(move);
+    const turn = botTurns.turnFor(room, PIP);
+    expect(botTurns.turnFor(room, PIP)).toEqual(turn);
+    const move = createBotThinker(bots).think(turn.request);
     expect(engines.get(GAME_IDS.TIC_TAC_TOE).validateMove(room.game.state, PIP, move, { now: 1 }).ok).toBe(
+      true,
+    );
+  });
+
+  it("hands over the turn as plain data with its own seat's view only (ADR-040, ADR-067)", async () => {
+    const { room, botTurns, engines } = await startedWith(GAME_IDS.TIC_TAC_TOE, PIP);
+
+    const turn = botTurns.turnFor(room, PIP);
+
+    expect(turn).toEqual({
+      kind: "think",
+      request: {
+        gameId: GAME_IDS.TIC_TAC_TOE,
+        botId: PIP,
+        difficulty: "easy",
+        seed: expect.any(Number),
+        view: engines.get(GAME_IDS.TIC_TAC_TOE).viewFor(room.game.state, PIP),
+      },
+    });
+    expect(structuredClone(turn.request)).toEqual(turn.request);
+    expect(Number.isInteger(turn.request.seed) && turn.request.seed >= 0 && turn.request.seed < 2 ** 32).toBe(
       true,
     );
   });

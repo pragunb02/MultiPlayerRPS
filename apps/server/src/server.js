@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import http from "node:http";
-import { BOTS, createBotRegistry, createEngineRegistry, ENGINES } from "@classicade/games";
+import { BOTS, createBotRegistry, createBotThinker, createEngineRegistry, ENGINES } from "@classicade/games";
 import { DAILY_PUZZLE_KINDS, getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
@@ -36,6 +36,7 @@ import { INDIA_CALENDAR } from "./domain/dailyPuzzles/schedule.js";
 import { createBotTurns } from "./domain/bots/botTurns.js";
 import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
 import { createThinkingQueue } from "./domain/bots/thinkingQueue.js";
+import { createBotThinkingClient } from "./dependency/thinking/botThinkingClient.js";
 import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
@@ -573,7 +574,10 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  *     limits?: Partial<import("./domain/rooms/roomLimits.js").RoomLimits>,
  *     sweepIntervalMs?: number,
  *   },
- *   bots?: { pauseMs?: { min: number, max: number } },
+ *   bots?: {
+ *     pauseMs?: { min: number, max: number },
+ *     thinkingWorkers?: (options: { size: number, budgetMs: number }) => ReturnType<typeof createBotThinkingClient>,
+ *   },
  *   pipeline?: {
  *     steps?: (steps: ReadonlyArray<import("./domain/matches/matchOutboxComponent.js").MatchStep>) => ReadonlyArray<import("./domain/matches/matchOutboxComponent.js").MatchStep>,
  *     policy?: Partial<typeof import("./domain/matches/matchOutboxComponent.js").MATCH_RETRY_POLICY>,
@@ -584,7 +588,7 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  * }} deps  `now`, `rooms`, `bots` and `pipeline` are for tests only. Production runs on the real clock, the
  *   standard room lifetimes and limits, a human-like pause before each computer move and the standard match
  *   pipeline. Integration tests move the clock, let computer players act at once and make a pipeline step fail or
- *   stop, and browser tests shorten lifetimes to watch a room close, raise the connections per address (every
+ *   stop, a shutdown test gives thinking threads that hang, and browser tests shorten lifetimes to watch a room close, raise the connections per address (every
  *   test player shares one) and fill the server on purpose.
  * @returns {Promise<{ server: http.Server, host: string, port: number, close: () => Promise<void> }>}
  */
@@ -788,12 +792,22 @@ export async function startServer({
     avatars: profileCards,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  // Heavy computer thinking runs on worker threads, off the event loop (ADR-067).
+  const thinkingWorkers = (bots.thinkingWorkers ?? createBotThinkingClient)({
+    size: config.bots.workers,
+    budgetMs: config.bots.budgetMs,
+  });
   const botDriver = createBotDriver({
     roomComponent,
     roomAccessor,
     botTurns,
     botComponent,
-    thinking: createThinkingQueue(),
+    thinking: createThinkingQueue({
+      thinker: createBotThinker(botRegistry),
+      workers: thinkingWorkers,
+      logger,
+      recordThinking: metrics.recordBotThinking,
+    }),
     events: domainEvents,
     delayMs: pauseBetween(bots.pauseMs ?? HUMAN_PAUSE_MS),
     logger,
@@ -878,6 +892,7 @@ export async function startServer({
     await botDriver.resume();
   } catch (err) {
     botDriver.stop();
+    await thinkingWorkers.close();
     await database.close();
     throw err;
   }
@@ -968,6 +983,7 @@ export async function startServer({
     keyRotation.stop();
     housekeeping.stop();
     botDriver.stop();
+    await thinkingWorkers.close();
     await gateway.close();
     await tasks.drain();
     await database.close();
@@ -980,6 +996,7 @@ export async function startServer({
   } catch (err) {
     keyRotation.stop();
     botDriver.stop();
+    await thinkingWorkers.close();
     await database.close();
     throw err;
   }

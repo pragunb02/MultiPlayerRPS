@@ -1,6 +1,6 @@
 import { CHESS_ACTIONS, CHESS_REQUEST_TYPES, GAME_IDS, REQUEST_ANSWERS } from "@classicade/shared";
 import { randomIndex } from "../../rng.js";
-import { defineBot } from "../bot.js";
+import { BOT_LEVEL_COSTS, defineBot } from "../bot.js";
 import { legalMoves, makeMove, moveFromSan, parseFen, squareName, START_FEN } from "./board.js";
 import { scoreMoves, searchMove } from "./search.js";
 
@@ -67,18 +67,23 @@ export const chessBot = defineBot({
       id: CHESS_BOT_LEVELS.BEGINNER,
       name: "Beginner",
       description: "Knows how the pieces move and grabs free pieces, but blunders often.",
+      cost: BOT_LEVEL_COSTS.HEAVY,
     },
     {
       id: CHESS_BOT_LEVELS.CLUB,
       name: "Club player",
       description: "Plays sensible moves and spots short tactics a few moves deep.",
+      cost: BOT_LEVEL_COSTS.HEAVY,
     },
     {
       id: CHESS_BOT_LEVELS.STRONG,
       name: "Strong",
       description: "Looks several moves ahead and punishes every mistake.",
+      cost: BOT_LEVEL_COSTS.HEAVY,
     },
   ],
+  // Every level replays the game on its own board first, and Club and Strong search, so all of them think off
+  // the event loop (ADR-067).
   chooseMove({ view, rng, difficulty }) {
     const board = boardFor(view);
     if (legalMoves(board).length === 0) {

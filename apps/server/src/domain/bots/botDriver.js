@@ -33,8 +33,8 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  * and plans again, and a computer player whose turn it was simply moves. The housekeeping sweep calls `resume`
  * every minute too, so a plan dropped after the database failed three times in a row is made again.
  *
- * Choosing a move waits for its turn in the server's one thinking queue (see thinkingQueue.js), so computer
- * players never hold up the people on the server. Accepting a rematch goes through the bot component, which keeps
+ * Choosing a move goes through the thinking queue (see thinkingQueue.js), which thinks hard moves off the event
+ * loop, so computer players never hold up the people on the server (ADR-067). Accepting a rematch goes through the bot component, which keeps
  * the person within their limit of games against computers.
  *
  * Before it acts it reads the room again and asks what to do once more. When the answer changed (the person moved,
@@ -44,7 +44,7 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  * @param {{
  *   roomComponent: Pick<ReturnType<typeof import("../rooms/roomComponent.js").createRoomComponent>, "getRoom" | "makeMove">,
  *   roomAccessor: Pick<ReturnType<typeof import("../../data/roomAccessor.js").createRoomAccessor>, "listAll">,
- *   botTurns: Pick<ReturnType<typeof import("./botTurns.js").createBotTurns>, "nextAction" | "moveFor">,
+ *   botTurns: Pick<ReturnType<typeof import("./botTurns.js").createBotTurns>, "nextAction" | "turnFor">,
  *   botComponent: Pick<ReturnType<typeof import("./botComponent.js").createBotComponent>, "acceptRematch">,
  *   thinking: ReturnType<typeof import("./thinkingQueue.js").createThinkingQueue>,
  *   events: { emit: (event: string, payload: unknown) => void },
@@ -72,6 +72,7 @@ export function createBotDriver({
   assertDefined(botTurns, "botTurns");
   assertFunction(botComponent?.acceptRematch, "botComponent.acceptRematch");
   assertFunction(thinking?.think, "thinking.think");
+  assertFunction(thinking?.stop, "thinking.stop");
   assertFunction(events?.emit, "events.emit");
   assertFunction(delayMs, "delayMs");
   assertDefined(logger, "logger");
@@ -135,7 +136,9 @@ export function createBotDriver({
     if (action.kind === "answer") {
       return [await roomComponent.answerRequest({ ...input, ...action.reply })];
     }
-    const move = await thinking.think(() => botTurns.moveFor(room, action.playerId));
+    const turn = botTurns.turnFor(room, action.playerId);
+    const move =
+      turn.kind === "sealed" ? turn.move : await thinking.think({ room: room.code, request: turn.request });
     // Waiting for its turn to think may take a while: the person may have left or resigned meanwhile.
     const fresh = await stillPlanned(room.code, action.key);
     return Promise.all(fresh.map(() => roomComponent.makeMove({ ...input, now: now(), move })));
@@ -177,10 +180,11 @@ export function createBotDriver({
       }
     },
 
-    /** Cancels every plan. Called when the server shuts down, before the database closes. */
+    /** Cancels every plan and every think waiting for a thread. Called when the server shuts down, before the database closes. */
     stop() {
       stopped = true;
       [...plans.keys()].forEach(cancel);
+      thinking.stop();
     },
   });
 }
