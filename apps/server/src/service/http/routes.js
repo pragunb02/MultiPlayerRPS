@@ -5,6 +5,7 @@ import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
 import { createFeedbackRoutes } from "./feedbackRoutes.js";
+import { createReportRoutes } from "./reportRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
@@ -22,6 +23,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
+ *   & { reportComponent: Parameters<typeof createReportRoutes>[0]["reportComponent"], reportLimits?: Parameters<typeof createReportRoutes>[0]["limits"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
  */
@@ -48,6 +50,8 @@ export function apiRouter({
   profileLimits,
   feedbackComponent,
   feedbackLimits,
+  reportComponent,
+  reportLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   build,
@@ -111,6 +115,15 @@ export function apiRouter({
       requireAdmin: adminAccess.requireAdmin,
       now,
       ...(feedbackLimits && { limits: feedbackLimits }),
+    }),
+  );
+
+  router.use(
+    createReportRoutes({
+      reportComponent,
+      requireAdmin: adminAccess.requireAdmin,
+      now,
+      ...(reportLimits && { limits: reportLimits }),
     }),
   );
 

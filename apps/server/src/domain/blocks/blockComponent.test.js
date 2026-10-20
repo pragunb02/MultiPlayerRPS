@@ -66,7 +66,7 @@ function fakeTransfers(moves = {}) {
 }
 
 let ids = 0;
-function setup({ rooms = {}, closed = [], matches = {}, limit, transfers = fakeTransfers() } = {}) {
+function setup({ rooms = {}, closed = [], matches = {}, limit, transfers = fakeTransfers(), reports } = {}) {
   const dao = createInMemoryBlockDao();
   const blocks = createBlockComponent({
     blockAccessor: createBlockAccessor({ blockDao: dao }),
@@ -76,6 +76,7 @@ function setup({ rooms = {}, closed = [], matches = {}, limit, transfers = fakeT
     seatIds: SEAT_IDS,
     newBlockId: () => `00000000-0000-4000-9000-${String(++ids).padStart(12, "0")}`,
     ...(limit !== undefined && { limit }),
+    ...(reports !== undefined && { reports }),
   });
   /** A seat of a room as the page names it: its place and the seat id the room view showed for it (CC-253). */
   const at = (roomCode, seatIndex) => {
@@ -436,5 +437,68 @@ describe("blockComponent: deletion and export (ADR-048.2)", () => {
     expect(await blocks.erasePlayer({ playerId: RIYA.id })).toEqual({ erased: { blocks: 0 } });
 
     expect(await blocks.listFor({ blockerId: ARJUN.id })).toEqual([]);
+  });
+});
+
+const REPORT_ID = "00000000-0000-4000-a000-000000000001";
+
+/** The reports Riya made, by id, answered the way the report component answers `reportedBy` (ADR-071.4). */
+const fakeReports = (made = { [REPORT_ID]: { reporterId: RIYA.id, person: seat(ARJUN) } }) => ({
+  async reportedBy({ reportId, reporterId }) {
+    const report = made[reportId];
+    if (report === undefined || report.reporterId !== reporterId) throw new NotFoundError("No such report");
+    return report.person;
+  },
+});
+
+describe("blockComponent: blocking someone you reported (CC-044, ADR-071)", () => {
+  it("blocks the player of the blocker's own report, by the report's id, in one tap after the thank-you", async () => {
+    const { blocks } = setup({ reports: fakeReports() });
+
+    const block = await blocks.block({ blocker: RIYA, target: { reportId: REPORT_ID }, now: T0 });
+
+    expect(block).toEqual({ blockId: expect.any(String), displayName: "Arjun", blockedAt: T0 });
+    expect(await blocks.eitherBlocked({ a: ARJUN.id, b: RIYA.id })).toBe(true);
+  });
+
+  it("answers the same 404 for someone else's report, an unknown one, and when reports are not wired", async () => {
+    const theirs = setup({ reports: fakeReports() });
+    const unwired = setup();
+    const refusal = { message: "You can only block someone you played with" };
+
+    await expect(
+      theirs.blocks.block({ blocker: GUEST, target: { reportId: REPORT_ID }, now: T0 }),
+    ).rejects.toMatchObject(refusal);
+    await expect(
+      theirs.blocks.block({ blocker: RIYA, target: { reportId: MATCH_ID }, now: T0 }),
+    ).rejects.toMatchObject(refusal);
+    await expect(
+      unwired.blocks.block({ blocker: RIYA, target: { reportId: REPORT_ID }, now: T0 }),
+    ).rejects.toMatchObject(refusal);
+  });
+
+  it("follows a reported guest who has signed in since to the account, and never blocks the blocker", async () => {
+    const transfers = fakeTransfers({ [GUEST.id]: RIYA });
+    const { blocks } = setup({
+      transfers,
+      reports: fakeReports({ [REPORT_ID]: { reporterId: RIYA.id, person: seat(GUEST) } }),
+    });
+
+    await expect(blocks.block({ blocker: RIYA, target: { reportId: REPORT_ID }, now: T0 })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+
+  it("refuses to be built with a reports dependency that cannot find a report", () => {
+    expect(() =>
+      createBlockComponent({
+        blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
+        rooms: fakeRooms(),
+        matches: fakeMatches(),
+        transfers: fakeTransfers(),
+        seatIds: SEAT_IDS,
+        reports: {},
+      }),
+    ).toThrow(TypeError);
   });
 });

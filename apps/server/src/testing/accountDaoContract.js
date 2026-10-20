@@ -143,6 +143,17 @@ export function runAccountDaoContract(createDao) {
     expect(await dao.getSessionVersion(accountId)).toBe(2);
   });
 
+  it("renames an account and counts up its version in one write, refusing a name another account has (CC-044)", async () => {
+    const dao = await createDao();
+    const { accountId } = await dao.insert(account());
+    await dao.insert(account({ username: "Arjun", email: "arjun@example.com" }));
+
+    expect(await dao.bumpSessionVersion({ accountId, username: "Player_ABCDEF" })).toBe(1);
+    expect(await dao.getById(accountId)).toMatchObject({ username: "Player_ABCDEF", sessionVersion: 1 });
+    await expect(dao.bumpSessionVersion({ accountId, username: "arjun" })).rejects.toThrow(DuplicateKey);
+    expect(await dao.getById(accountId)).toMatchObject({ username: "Player_ABCDEF", sessionVersion: 1 });
+  });
+
   it("refuses to count up the version of an account that is not there", async () => {
     const dao = await createDao();
 

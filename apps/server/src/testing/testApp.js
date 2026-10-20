@@ -27,6 +27,9 @@ import { createBlockComponent } from "../domain/blocks/blockComponent.js";
 import { createProfileCards } from "../domain/profiles/profileCards.js";
 import { createProfileComponent } from "../domain/profiles/profileComponent.js";
 import { createFeedbackComponent } from "../domain/feedback/feedbackComponent.js";
+import { createPlayerReferences } from "../domain/players/playerReferences.js";
+import { createReportComponent, REPORT_EVENTS } from "../domain/reports/reportComponent.js";
+import { createReportAccessor } from "../data/reportAccessor.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "../domain/dailyPuzzles/schedule.js";
@@ -54,6 +57,7 @@ import {
   identityFollowers,
   keepFinishedGameIn,
   matchPipelineSteps,
+  reportedNames,
   roomErasure,
 } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
@@ -71,6 +75,7 @@ import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.j
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
 import { createInMemoryProfileDao } from "./inMemoryProfileDao.js";
 import { createInMemoryFeedbackDao } from "./inMemoryFeedbackDao.js";
+import { createInMemoryReportDao } from "./inMemoryReportDao.js";
 import { TEST_CHESS_PUZZLES } from "./dailyPuzzleSet.js";
 import { createInMemoryDailyPuzzleAttemptDao } from "./inMemoryDailyPuzzleAttemptDao.js";
 import { createInMemoryChessRatingDao } from "./inMemoryChessRatingDao.js";
@@ -117,6 +122,8 @@ import { testConfig } from "./testConfig.js";
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
  *   profileLimits?: object,   the limits on profile lookups and changes (CC-034)
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
+ *   reportLimits?: object,   the limits on reporting a player (CC-044)
+ *   reportDao?: ReturnType<typeof createInMemoryReportDao>,   the reports store, which a test can read (CC-044)
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   daily puzzle moves and hints per player (CC-144)
  *   chessPuzzles?: ReadonlyArray<object>,   the daily chess puzzles, two known ones unless a test gives its own
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
@@ -145,6 +152,8 @@ export function createTestApp({
   blockLimits,
   profileLimits,
   feedbackLimits,
+  reportLimits,
+  reportDao = createInMemoryReportDao(),
   dailyPuzzleLimit,
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
@@ -194,13 +203,6 @@ export function createTestApp({
     playerTransferDao: createInMemoryPlayerTransferDao(),
   });
   const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
-  const blockComponent = createBlockComponent({
-    blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
-    rooms: roomAccessor,
-    matches: matchComponent,
-    transfers: playerTransferAccessor,
-    seatIds,
-  });
   const dailyPuzzleComponent = createDailyPuzzleComponent({
     dailyPuzzleAccessor: createDailyPuzzleAccessor({ attemptDao: dailyPuzzleAttemptDao, catalogues: {} }),
     kinds: [createChessKind({ puzzles: chessPuzzles })],
@@ -244,6 +246,27 @@ export function createTestApp({
     progress: progressionComponent,
     ratings: chessRatingComponent,
   });
+  // Reports are read by blocks (the one-tap block after a report), so they are made first (ADR-071.4).
+  const reportComponent = createReportComponent({
+    reportAccessor: createReportAccessor({ reportDao }),
+    references: createPlayerReferences({
+      rooms: roomAccessor,
+      matches: matchComponent,
+      transfers: playerTransferAccessor,
+      seatIds,
+    }),
+    matches: matchComponent,
+    profiles: profileComponent,
+    names: reportedNames({ accountComponent, leaderboardComponent, domainEvents }),
+  });
+  const blockComponent = createBlockComponent({
+    blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
+    rooms: roomAccessor,
+    matches: matchComponent,
+    transfers: playerTransferAccessor,
+    seatIds,
+    reports: reportComponent,
+  });
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,
     participants: transferParticipants([
@@ -252,6 +275,7 @@ export function createTestApp({
       { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
+      { name: "reports", transferPlayer: reportComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
       { name: "profiles", transferPlayer: profileComponent.transferPlayer },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
@@ -361,6 +385,7 @@ export function createTestApp({
         exportPlayer: playerTransferComponent.exportPlayer,
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
+      { name: "reports", erasePlayer: reportComponent.erasePlayer, exportPlayer: reportComponent.exportPlayer },
       {
         name: "dailyPuzzles",
         erasePlayer: dailyPuzzleComponent.erasePlayer,
@@ -405,6 +430,8 @@ export function createTestApp({
     profileLimits,
     feedbackComponent,
     feedbackLimits,
+    reportComponent,
+    reportLimits,
     dailyPuzzleComponent,
     dailyPuzzleLimit,
     analyticsComponent: createAnalyticsComponent({
@@ -446,6 +473,7 @@ export function createTestApp({
     blockComponent,
     profileComponent,
     feedbackComponent,
+    reportComponent,
     dailyPuzzleComponent,
     matchPipeline,
     playerDataComponent,
@@ -502,6 +530,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));
   testApp.onAccountDeleted((playerId) => gateway.disconnectPlayer(playerId));
+  testApp.domainEvents.on(REPORT_EVENTS.PLAYER_RENAMED, ({ playerId }) => gateway.disconnectPlayer(playerId));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = /** @type {import("node:net").AddressInfo} */ (server.address());
   return {

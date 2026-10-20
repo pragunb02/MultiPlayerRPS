@@ -297,6 +297,29 @@ describe("profileComponent: what a viewer sees at a handle (CC-034)", () => {
   });
 });
 
+describe("profileComponent: who a report from a profile names (CC-044, ADR-071.1)", () => {
+  it("answers the adult account behind a handle, public or private, with the username a viewer sees", async () => {
+    const { component, handleOf } = setup();
+    const handle = await handleOf(RIYA);
+
+    expect(await component.personByHandle({ handle, viewerId: ARJUN.id, now: T0 })).toEqual({
+      playerId: RIYA.id,
+      displayName: "RiyaTest",
+    });
+  });
+
+  it("answers not found for a hidden profile, a guest's, a deleted account's and a handle nobody has", async () => {
+    const { component, handleOf } = setup({ deleted: [ARJUN.id] });
+    const handles = [await handleOf(KABIR), await handleOf(GUEST), await handleOf(ARJUN), "zzzzzzzzzzzzzzzz"];
+
+    for (const handle of handles) {
+      await expect(component.personByHandle({ handle, viewerId: RIYA.id, now: T0 })).rejects.toMatchObject({
+        message: "No such player",
+      });
+    }
+  });
+});
+
 describe("profileComponent: a guest signs in (ADR-014)", () => {
   it("gives the whole profile to an account that has none, handle and avatar included", async () => {
     const { component, handleOf } = setup();

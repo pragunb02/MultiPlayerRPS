@@ -495,5 +495,15 @@ export function createLeaderboardComponent({
     erasePlayer: async ({ playerId }) => ({
       erased: { leaderboardEntries: await leaderboardAccessor.removePlayer(playerId) },
     }),
+
+    /**
+     * Shows the player's new name on every board at once, after the owner renamed a reported account (CC-044).
+     *
+     * @param {{ playerId: string, displayName: string }} change
+     * @returns {Promise<{ renamed: { leaderboardEntries: number } }>}
+     */
+    renamePlayer: async (change) => ({
+      renamed: { leaderboardEntries: await leaderboardAccessor.renamePlayer(change) },
+    }),
   });
 }

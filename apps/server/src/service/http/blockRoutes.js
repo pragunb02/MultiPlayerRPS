@@ -1,15 +1,11 @@
 import { Router } from "express";
-import { SEAT_ID_PATTERN } from "../../domain/rooms/seatIds.js";
-import { parseRoomCode } from "../../models/roomCode.js";
 import { assertDefined } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
+import { parseReference, REFERENCE_KIND, UUID_PATTERN } from "./playerReferenceInput.js";
 import { createRateLimit } from "./rateLimits.js";
 import { requireIdentity } from "./session.js";
 
 const MINUTE_MS = 60 * 1000;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-// Seats are positions in a room or a match. No game has more than a few players.
-const MAX_SEAT = 7;
 
 /**
  * The limits on blocking and unblocking together (ADR-053). Each is a business rule, and tests and browser tests
@@ -24,54 +20,27 @@ export const BLOCK_LIMITS = Object.freeze({
   perAddress: Object.freeze({ windowMs: 10 * MINUTE_MS, limit: 100 }),
 });
 
-const isPlainObject = (value) =>
-  value !== null &&
-  typeof value === "object" &&
-  !Array.isArray(value) &&
-  Object.getPrototypeOf(value) === Object.prototype;
-
 /**
- * Who to block: `{ roomCode, seat, seatId }` or `{ matchId, seat }`, and nothing else. A player id alone is never
- * enough: `seatId` only confirms who the page saw in that seat of a room the caller sits in. It is the opaque seat
- * id of the room view (CC-253), so a player id has the wrong shape and is refused here. So nobody can name a player
- * they never met.
+ * Who to block: `{ roomCode, seat, seatId }`, `{ matchId, seat }` or `{ reportId }` (a report the caller made,
+ * ADR-071.4), and nothing else. Never a player id (playerReferenceInput.js).
  *
  * @returns {import("../../domain/blocks/blockComponent.js").BlockTarget}
  */
-function parseTarget(body) {
-  if (!isPlainObject(body)) {
-    throw new ValidationError("Send a JSON object");
-  }
-  const reference = "roomCode" in body ? "roomCode" : "matchId";
-  const fields = reference === "roomCode" ? ["roomCode", "seat", "seatId"] : ["matchId", "seat"];
-  const unknown = Object.keys(body).filter((key) => !fields.includes(key));
-  if (unknown.length > 0) {
-    throw new ValidationError("Send a room code or a match id, and a seat", { details: { fields: unknown } });
-  }
-  const { seat } = body;
-  if (!Number.isInteger(seat) || seat < 0 || seat > MAX_SEAT) {
-    throw new ValidationError(`seat must be a whole number from 0 to ${MAX_SEAT}`, {
-      details: { field: "seat" },
-    });
-  }
-  if (reference === "roomCode") {
-    if (typeof body.seatId !== "string" || !SEAT_ID_PATTERN.test(body.seatId)) {
-      throw new ValidationError("Say who sits in that seat", { details: { field: "seatId" } });
-    }
-    return { roomCode: parseRoomCode(body.roomCode), seat, seatId: body.seatId };
-  }
-  if (typeof body.matchId !== "string" || !UUID_PATTERN.test(body.matchId)) {
-    throw new ValidationError("Invalid match id", { details: { field: "matchId" } });
-  }
-  return { matchId: body.matchId, seat };
-}
+const parseTarget = (body) =>
+  /** @type {import("../../domain/blocks/blockComponent.js").BlockTarget} */ (
+    parseReference(body, {
+      kinds: [REFERENCE_KIND.ROOM, REFERENCE_KIND.MATCH, REFERENCE_KIND.REPORT],
+      message: "Send a room code or a match id, and a seat",
+    })
+  );
 
 /**
  * Blocks (CC-044, ADR-053), for guests and accounts alike. Visitors get 401.
  *
  * 1. `GET /blocks` answers `{ blocks: [{ blockId, displayName, blockedAt }] }`, the player's own blocks, newest first.
- * 2. `POST /blocks` with `{ roomCode, seat, seatId }` or `{ matchId, seat }` blocks the player in that seat, and answers
- *    `{ block }`. Anyone the server did not see the caller play with gets 404.
+ * 2. `POST /blocks` with `{ roomCode, seat, seatId }`, `{ matchId, seat }` or `{ reportId }` blocks the player in that
+ *    seat or of that report, and answers `{ block }`. Anyone the server did not see the caller play with or report
+ *    gets 404.
  * 3. `DELETE /blocks/:blockId` removes one of the player's own blocks and answers 204. Anyone else's gets 404.
  *
  * @param {{

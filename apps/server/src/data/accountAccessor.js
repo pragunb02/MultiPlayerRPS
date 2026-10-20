@@ -141,13 +141,24 @@ export function createAccountAccessor({ accountDao }) {
     getSessionVersion: (accountId) => orNotFound(() => accountDao.getSessionVersion(accountId)),
 
     /**
-     * Signs out every session made so far, and sets a new password hash at the same moment when one is given.
+     * Signs out every session made so far, and sets a new password hash or username at the same moment when one is
+     * given (CC-044).
      *
-     * @param {{ accountId: string, passwordHash?: string }} change
+     * @param {{ accountId: string, passwordHash?: string, username?: string }} change
      * @returns {Promise<number>} the new session version
      * @throws {NotFoundError}
+     * @throws {ConflictError} with `details.field` "username" when another account has that username
      */
-    bumpSessionVersion: (change) => orNotFound(() => accountDao.bumpSessionVersion(change)),
+    async bumpSessionVersion(change) {
+      try {
+        return await orNotFound(() => accountDao.bumpSessionVersion(change));
+      } catch (err) {
+        if (err instanceof DuplicateKey) {
+          throw new ConflictError("That username is taken", { details: { field: "username" }, cause: err });
+        }
+        throw err;
+      }
+    },
 
     /**
      * Sets the birth year of an account that has none (CC-152).

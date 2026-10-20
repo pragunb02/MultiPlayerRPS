@@ -82,15 +82,21 @@ export function createInMemoryAccountDao() {
       return accounts.get(accountId).sessionVersion;
     },
 
-    async bumpSessionVersion({ accountId, passwordHash }) {
+    async bumpSessionVersion({ accountId, passwordHash, username }) {
       const doc = accounts.get(accountId);
       if (doc === undefined) {
         throw new RangeError(`No account ${accountId}`);
+      }
+      const taken = (other) =>
+        other.accountId !== accountId && other.username.toLowerCase() === username.toLowerCase();
+      if (username !== undefined && [...accounts.values()].some(taken)) {
+        throw Object.assign(new DuplicateKey("username already registered"), { field: "username" });
       }
       const next = {
         ...doc,
         sessionVersion: doc.sessionVersion + 1,
         ...(passwordHash !== undefined && { passwordHash }),
+        ...(username !== undefined && { username }),
       };
       accounts.set(accountId, next);
       return next.sessionVersion;
