@@ -100,6 +100,18 @@ export function PrivacyPage() {
             never told, and only you can see your list.
           </li>
           <li>
+            <strong>Feedback.</strong> When you send feedback with the Feedback button, we store its type,
+            your message, the page you were on (never a room code or a name), the app version, the kind of
+            device (phone, tablet or computer) and whether you were a visitor, a guest or signed in. We keep
+            it to find and fix what is broken and to learn what players want. Before your message is saved,
+            any email address or phone number in it is replaced with a marker. We never store your player id,
+            your IP address or your browser details with it. A signed-in adult who asks for a reply can leave
+            an email address, and we keep it with the message to reply. Only the site's owner reads feedback,
+            in the owner console, and can delete any of it. Feedback is deleted 180 days after it was sent. It
+            is not linked to your account, so it is not in your data export and deleting your account cannot
+            find it: to have it deleted sooner, ask the owner at the contact address above.
+          </li>
+          <li>
             <strong>Daily puzzles.</strong> When you make a move or take a hint in a daily puzzle, we store
             how that day&apos;s puzzle went for you: the moves you found, your mistakes and hints, and your
             puzzle streak, until you delete your account. Just looking at a puzzle stores nothing. The result
@@ -174,10 +186,10 @@ export function PrivacyPage() {
         <p>Their servers may be outside your country, including in the United States.</p>
         <p>
           To stop one person from flooding the site, the server counts recent requests and connections per IP
-          address, for 1 minute to 1 hour, and for as long as a connection stays open. To protect accounts
-          from password guessing, it also counts wrong passwords for 15 minutes, and it remembers for 30 days
-          which networks signed in to each account, up to 10 per account, so a network you use is never slowed
-          down during an attack on your account. For logins it keeps only keyed hashes made with a random key,
+          address, for 1 minute to 1 day, and for as long as a connection stays open. To protect accounts from
+          password guessing, it also counts wrong passwords for 15 minutes, and it remembers for 30 days which
+          networks signed in to each account, up to 10 per account, so a network you use is never slowed down
+          during an attack on your account. For logins it keeps only keyed hashes made with a random key,
           never the email or the address itself. All of this lives in the server&apos;s memory only, is not
           saved anywhere, and is forgotten when the server restarts.
         </p>

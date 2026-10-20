@@ -31,6 +31,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   blockLimits?: Parameters<typeof import("./blockRoutes.js").createBlockRoutes>[0]["limits"],
  *   profileComponent: Parameters<typeof import("./profileRoutes.js").createProfileRoutes>[0]["profileComponent"],
  *   profileLimits?: Parameters<typeof import("./profileRoutes.js").createProfileRoutes>[0]["limits"],
+ *   feedbackComponent: ReturnType<typeof import("../../domain/feedback/feedbackComponent.js").createFeedbackComponent>,
+ *   feedbackLimits?: Parameters<typeof import("./feedbackRoutes.js").createFeedbackRoutes>[0]["limits"],
  *   dailyPuzzleComponent: ReturnType<typeof import("../../domain/dailyPuzzles/dailyPuzzleComponent.js").createDailyPuzzleComponent>,
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   moves and hints per player (CC-144)
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
@@ -66,6 +68,8 @@ export function createHttpApp({
   blockLimits,
   profileComponent,
   profileLimits,
+  feedbackComponent,
+  feedbackLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   authLimits,
@@ -106,7 +110,13 @@ export function createHttpApp({
   // never promoted to live. Outside /api: no session, no CSRF guard.
   app.get("/health", (req, res) => {
     const up = isDatabaseUp();
-    res.status(up ? 200 : 503).json({ status: up ? "ok" : "unavailable", database: up ? "up" : "down" });
+    res.status(up ? 200 : 503).json({
+      status: up ? "ok" : "unavailable",
+      database: up ? "up" : "down",
+      // Which deploy is answering, so a merge can be checked live (CC-303). The repository is public, so the sha is too.
+      commit: config.build.commit,
+      version: config.build.version,
+    });
   });
 
   app.use(express.json({ limit: "100kb" }));
@@ -146,8 +156,11 @@ export function createHttpApp({
       blockLimits,
       profileComponent,
       profileLimits,
+      feedbackComponent,
+      feedbackLimits,
       dailyPuzzleComponent,
       dailyPuzzleLimit,
+      build: config.build,
     }),
   );
 

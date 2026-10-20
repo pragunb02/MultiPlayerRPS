@@ -8,6 +8,7 @@ import { DAILY_PUZZLE_KINDS, getGame, IDENTITY_KINDS } from "@classicade/shared"
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "./data/blockAccessor.js";
+import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
 import { createProfileAccessor } from "./data/profileAccessor.js";
@@ -28,6 +29,7 @@ import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/bot
 import { createBlockComponent } from "./domain/blocks/blockComponent.js";
 import { createProfileCards } from "./domain/profiles/profileCards.js";
 import { createProfileComponent } from "./domain/profiles/profileComponent.js";
+import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "./domain/dailyPuzzles/schedule.js";
@@ -58,6 +60,7 @@ import { createAchievementDao } from "./persistence/achievementDao.js";
 import { createAnalyticsDao } from "./persistence/analyticsDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createBlockDao } from "./persistence/blockDao.js";
+import { createFeedbackDao } from "./persistence/feedbackDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
@@ -76,6 +79,7 @@ import { createStatsDao } from "./persistence/statsDao.js";
 import { createHttpApp } from "./service/http/app.js";
 import { createSessionCheck, createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
+import { assertFunction } from "./utils/assert.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
 import { createLegacyPasswordChecker } from "./utils/legacyPassword.js";
 import { createNetworkKey, dropOldNetworkKeysEveryMidnight } from "./utils/networkKey.js";
@@ -84,6 +88,9 @@ import { NO_OPERATIONS_METRICS } from "./utils/operationsMetrics.js";
 import { createTtlCache } from "./utils/ttlCache.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
+// The time the last flush of telemetry gets before the process exits. With the drain above it stays well inside
+// the 30 seconds Render waits after SIGTERM (CC-305).
+const FINAL_FLUSH_MS = 5_000;
 const SESSION_ENDED = "sessionEnded";
 const OTHER_SESSIONS_ENDED = "otherSessionsEnded";
 const ACCOUNT_DELETED = "accountDeleted";
@@ -557,7 +564,7 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object },
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object, feedback?: object },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
@@ -613,6 +620,7 @@ export async function startServer({
   const pendingMatchDao = createPendingMatchDao({ connection: database.connection });
   const accountDeletionDao = createAccountDeletionDao({ connection: database.connection });
   const blockDao = createBlockDao({ connection: database.connection });
+  const feedbackDao = createFeedbackDao({ connection: database.connection });
   const dailyPuzzleAttemptDao = createDailyPuzzleAttemptDao({ connection: database.connection });
   const chessRatingDao = createChessRatingDao({ connection: database.connection });
   const profileDao = createProfileDao({ connection: database.connection });
@@ -631,6 +639,7 @@ export async function startServer({
       pendingMatchDao,
       accountDeletionDao,
       blockDao,
+      feedbackDao,
       dailyPuzzleAttemptDao,
       chessRatingDao,
       profileDao,
@@ -652,6 +661,7 @@ export async function startServer({
   const accountDeletionAccessor = createAccountDeletionAccessor({ accountDeletionDao });
   const sessionAccessor = createSessionAccessor({ sessionDao });
   const blockAccessor = createBlockAccessor({ blockDao });
+  const feedbackAccessor = createFeedbackAccessor({ feedbackDao });
   const chessPuzzles = loadChessPuzzles();
   const dailyPuzzleAccessor = createDailyPuzzleAccessor({
     attemptDao: dailyPuzzleAttemptDao,
@@ -680,6 +690,7 @@ export async function startServer({
   });
   // One set of seat ids for rooms and blocks, so a seat id the room view shows is the one a block is checked against.
   const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
+  const feedbackComponent = createFeedbackComponent({ feedbackAccessor, ages: accountComponent });
   const blockComponent = createBlockComponent({
     blockAccessor,
     rooms: roomAccessor,
@@ -893,6 +904,8 @@ export async function startServer({
     blockComponent,
     profileLimits: limits.profiles,
     profileComponent,
+    feedbackLimits: limits.feedback,
+    feedbackComponent,
     dailyPuzzleComponent,
     leaderboardComponent,
     analyticsComponent,
@@ -993,49 +1006,104 @@ function listen(server, { port, host }) {
 }
 
 /**
- * Closes the server on SIGINT/SIGTERM, forcing exit if open connections don't drain in time.
+ * The one way out of the process for a handler: flush what is waiting, then exit. Telemetry sends log lines in a
+ * batch once a minute, so a line written just before `exit` is lost unless it is flushed first. The flush gets
+ * `withinMs` and no more, so an endpoint that never answers cannot keep a crashed process alive, and a failed
+ * flush still exits. Only the first call exits. `started` tells a late caller that the way out has begun (CC-305).
  *
- * @param {{ close: () => Promise<void>, logger: Logger, proc?: ProcessLike, timeoutMs?: number }} options
- *   `proc` and `timeoutMs` are injectable so the behaviour can be unit tested without real signals.
+ * @param {{ flush: () => Promise<void>, proc: ProcessLike, withinMs: number }} options
  */
-export function handleShutdownSignals({ close, logger, proc = process, timeoutMs = SHUTDOWN_TIMEOUT_MS }) {
-  const shutdown = (signal) => {
+function exitAfterFlush({ flush, proc, withinMs }) {
+  let started = false;
+  return Object.freeze({
+    started: () => started,
+    /** @param {number} code */
+    async exit(code) {
+      if (started) return;
+      started = true;
+      let timer;
+      // Not unref'd: after a crash nothing else may hold the process open, and it must still exit with its code.
+      const limit = new Promise((resolve) => {
+        timer = setTimeout(resolve, withinMs);
+      });
+      // A failed flush loses the last lines, which also stay in the platform's logs. Exiting matters more.
+      await Promise.race([
+        Promise.resolve()
+          .then(flush)
+          .catch(() => undefined),
+        limit,
+      ]);
+      clearTimeout(timer);
+      proc.exit(code);
+    },
+  });
+}
+
+/**
+ * Closes the server on SIGINT/SIGTERM, forcing exit if open connections don't drain in time. Every way out writes
+ * its last line, then flushes (CC-305), then exits.
+ *
+ * @param {{
+ *   close: () => Promise<void>,
+ *   flush: () => Promise<void>,
+ *   logger: Logger,
+ *   proc?: ProcessLike,
+ *   timeoutMs?: number,
+ *   flushWithinMs?: number,
+ * }} options  `flush` sends what telemetry still holds. `proc`, `timeoutMs` and `flushWithinMs` are injectable so
+ *   the behaviour can be unit tested without real signals.
+ */
+export function handleShutdownSignals({
+  close,
+  flush,
+  logger,
+  proc = process,
+  timeoutMs = SHUTDOWN_TIMEOUT_MS,
+  flushWithinMs = FINAL_FLUSH_MS,
+}) {
+  assertFunction(close, "close");
+  assertFunction(flush, "flush");
+  const way = exitAfterFlush({ flush, proc, withinMs: flushWithinMs });
+  const shutdown = async (signal) => {
     logger.info({ signal }, "shutting down");
     const forceExit = setTimeout(() => {
       logger.error({ timeoutMs }, "shutdown timed out, forcing exit");
-      proc.exit(1);
+      way.exit(1);
     }, timeoutMs);
     forceExit.unref();
-    close().then(
-      () => {
-        clearTimeout(forceExit);
-        logger.info("shutdown complete");
-        proc.exit(0);
-      },
-      (err) => {
-        clearTimeout(forceExit);
-        logger.error({ err }, "error during shutdown");
-        proc.exit(1);
-      },
-    );
+    let code = 1;
+    try {
+      await close();
+      code = 0;
+      // A close that ends after the timeout must not claim the shutdown completed: the process is already leaving.
+      if (!way.started()) logger.info("shutdown complete");
+    } catch (err) {
+      if (!way.started()) logger.error({ err }, "error during shutdown");
+    } finally {
+      clearTimeout(forceExit);
+    }
+    await way.exit(code);
   };
   proc.once("SIGINT", shutdown);
   proc.once("SIGTERM", shutdown);
 }
 
 /**
- * A crash we did not anticipate leaves the process in an unknown state: log it as fatal and exit,
+ * A crash we did not anticipate leaves the process in an unknown state: log it as fatal, flush (CC-305) and exit,
  * so the platform restarts a clean instance.
  *
- * @param {{ logger: Logger, proc?: ProcessLike }} options
+ * @param {{ flush: () => Promise<void>, logger: Logger, proc?: ProcessLike, flushWithinMs?: number }} options
+ *   `flush` sends what telemetry still holds
  */
-export function handleFatalErrors({ logger, proc = process }) {
+export function handleFatalErrors({ flush, logger, proc = process, flushWithinMs = FINAL_FLUSH_MS }) {
+  assertFunction(flush, "flush");
+  const way = exitAfterFlush({ flush, proc, withinMs: flushWithinMs });
   proc.on("uncaughtException", (err) => {
     logger.fatal({ err }, "uncaught exception");
-    proc.exit(1);
+    way.exit(1);
   });
   proc.on("unhandledRejection", (reason) => {
     logger.fatal({ err: reason }, "unhandled promise rejection");
-    proc.exit(1);
+    way.exit(1);
   });
 }

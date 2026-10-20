@@ -334,15 +334,63 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 14
 
+  # Whether this pull request changes a file the screens are drawn from (CC-300). The list is the same as the paths
+  # that start visual-refresh.yml on main. A pull request that changes none of them cannot change a screen, so a
+  # visual difference on it can only mean main's baselines are stale, and the merge that made them stale has already
+  # started the refresh. A job of its own, on a plain runner, because the Playwright image has no GitHub CLI.
+  visual-scope:
+    name: Visual baselines, does this PR change the screens
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      screens: ${{ steps.scope.outputs.screens }}
+      refresh: ${{ steps.refresh.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      # A pull request's run checks out GitHub's merge of it into main. Its first parent is main as it is now, so the
+      # difference from it is exactly what the pull request changes. Anything unexpected counts as changing the
+      # screens, so a doubt never hides a real difference.
+      - name: Files this pull request changes
+        id: scope
+        shell: bash
+        run: |
+          screens=true
+          if git rev-parse --verify --quiet HEAD^2 > /dev/null && changed=$(git diff --name-only HEAD^1 HEAD); then
+            if ! grep -Eq '^(apps/|packages/|e2e/|package\.json$|package-lock\.json$)' <<< "$changed"; then
+              screens=false
+            fi
+          fi
+          echo "screens=$screens" >> "$GITHUB_OUTPUT"
+          echo "Changes a file the screens are drawn from: $screens" >> "$GITHUB_STEP_SUMMARY"
+      # Only to name it in the message. The verdict never depends on it.
+      - name: The open refresh pull request, if there is one
+        id: refresh
+        shell: bash
+        run: |
+          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --head visual-baselines/refresh --base main --state open --json url --jq '.[0].url // ""' || true)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   # Screenshot baselines of the main screens, light and dark, laptop and phone (CC-155). They run inside the pinned
   # Playwright image (VISUAL_IMAGE in scripts/visual/docker.mjs), so the fonts and the browser are the ones the baselines
-  # were made with. Advisory for its first week: not a required check until the owner decides. To accept a change
-  # on purpose, run the "Visual baselines (update)" workflow on the branch, or `npm run test:visual:update`.
+  # were made with. Advisory: not a required check until the owner decides. It compares with main's baselines.
+  # After each merge, visual-refresh.yml proposes main's new images in one pull request (CC-300), so a pull request
+  # need not make its own. It may, with the "Visual baselines (update)" workflow on its branch or
+  # `npm run test:visual:update`.
   visual:
     name: Visual baselines (advisory)
     # Pull requests only. On a push to main a visual diff would turn main's CI red, and a red main stops every
     # merge, which an advisory check must not do. A PR is compared before it merges, so main loses nothing.
     if: github.event_name == 'pull_request'
+    needs: visual-scope
     runs-on: ubuntu-latest
     timeout-minutes: 15
     container:
@@ -360,7 +408,10 @@ jobs:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-visual-${{ hashFiles('package-lock.json') }}
       - run: npm ci
+      # A difference does not stop the job here. The verdict, the last step, decides, after the images are kept.
       - name: Compare every screen with its baseline
+        id: compare
+        continue-on-error: true
         working-directory: e2e
         run: npx playwright test -c playwright.visual.config.js --workers=2
         env:
@@ -374,12 +425,51 @@ jobs:
           retention-days: 14
       # The expected, actual and diff image of each screen that changed, with a video and a trace of its test.
       - name: Differences, videos and traces
-        if: failure()
+        if: steps.compare.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: visual-results
           path: e2e/visual-results/
           retention-days: 14
+      # A difference fails the check only when this pull request changes the screens. Otherwise the differences are
+      # main's stale baselines, not this pull request's doing, and the check passes with a notice (CC-300).
+      - name: Verdict
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [[ "$COMPARE" == success ]]; then
+            echo "Every screen matches main's baselines." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ "$COMPARE" != failure ]]; then
+            echo "::error title=Visual baselines::the comparison did not run"
+            exit 1
+          fi
+          pending="${REFRESH:-the Visual baselines (refresh) workflow on main opens it}"
+          if [[ "$SCREENS" == false ]]; then
+            echo "::notice title=Visual baselines::baselines on main are stale; a refresh PR is pending: $pending"
+            {
+              echo "Baselines on main are stale; a refresh PR is pending: $pending."
+              echo
+              echo "This pull request changes no file the screens are drawn from, so the differences are main's, not its own."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::error title=Visual baselines::a screen differs from main's baselines. The visual-results artifact has the expected, actual and diff images."
+          {
+            echo "A screen differs from main's baselines, and this pull request changes files the screens are drawn from."
+            echo
+            echo "1. Look at the diff images in the visual-results artifact."
+            echo "2. A change made on purpose may make its own images with the Visual baselines (update) workflow. Otherwise the refresh after its merge proposes them."
+            if [[ -n "$REFRESH" ]]; then
+              echo "3. Main's baselines are stale too, and its refresh pull request is open: $REFRESH. Once it is merged, run this check again. What still differs then is this pull request's."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        env:
+          COMPARE: ${{ steps.compare.outcome }}
+          SCREENS: ${{ needs.visual-scope.outputs.screens }}
+          REFRESH: ${{ needs.visual-scope.outputs.refresh }}
 
   docker:
     name: Docker image builds and serves (docker compose)

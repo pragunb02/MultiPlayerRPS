@@ -47,9 +47,9 @@ const FACTS = [
     page: /keyed hashes made with a random key, never the email or the address itself/,
   },
   {
-    fact: "the HTTP rate limits keep addresses for 1 minute to 1 hour",
+    fact: "the HTTP rate limits keep addresses for 1 minute to 1 day",
     data: "the window: 1 minute (API), 15 minutes (auth, guest sessions), 1 hour (sign-ups)",
-    page: /counts recent requests and connections per IP address, for 1 minute to 1 hour/,
+    page: /counts recent requests and connections per IP address, for 1 minute to 1 day/,
   },
   {
     fact: "the chess rating keeps its last 200 changes and the room sees it",
@@ -90,6 +90,11 @@ const FACTS = [
     fact: "profiles start private, only adults can be public, everyone else is Hidden player (CC-034)",
     data: "once chosen: left out means private",
     page: /It starts private: others see only your name and avatar\. If you are 18 or over you can make it public.*the profile shows "Hidden player" and nothing else/,
+  },
+  {
+    fact: "feedback is kept 180 days, without a player id or an address",
+    data: "| [`feedback`](#feedback) | the message as typed, and a reply email from an adult who gave one | 180 days after it was sent |",
+    page: /We never store your player id, your IP address or your browser details with it\..*Feedback is deleted 180 days after it was sent/,
   },
   {
     fact: "blocks are kept until unblocked or an account is deleted",

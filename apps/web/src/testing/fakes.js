@@ -131,6 +131,12 @@ export function fakeApi(overrides = {}) {
     }),
     getAdminStatus: vi.fn().mockResolvedValue(false),
     getAnalytics: vi.fn(() => new Promise(() => {})),
+    sendFeedback: vi.fn(),
+    getFeedbackForm: vi.fn().mockResolvedValue({ replyEmail: false }),
+    getFeedbackInbox: vi.fn(() => new Promise(() => {})),
+    setFeedbackStatus: vi.fn(),
+    getFeedbackItem: vi.fn(),
+    deleteFeedback: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

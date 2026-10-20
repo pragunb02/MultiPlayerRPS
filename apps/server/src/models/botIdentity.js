@@ -1,5 +1,6 @@
 import { BOT_CHARACTERS, IDENTITY_KINDS } from "@classicade/shared";
 import { ValidationError } from "../utils/errors.js";
+import { BOT_ID_PREFIX } from "./playerIdShape.js";
 
 /**
  * A computer character in one seat (ADR-025, CC-138). It has the same three fields as a person's identity, so a room
@@ -13,8 +14,7 @@ import { ValidationError } from "../utils/errors.js";
  * @property {Readonly<{ character: string, level: string }>} bot   which character, and which level pick
  */
 
-/** How a computer player's id starts. People's ids start with `guest_` or `user_`. */
-export const BOT_ID_PREFIX = "bot_";
+export { BOT_ID_PREFIX } from "./playerIdShape.js";
 
 /**
  * Whether a player id belongs to a computer character.

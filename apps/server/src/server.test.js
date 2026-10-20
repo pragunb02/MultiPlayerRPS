@@ -27,11 +27,11 @@ import { captureLogger } from "./testing/captureLogger.js";
 const fakeProcess = () => Object.assign(new EventEmitter(), { exit: vi.fn() });
 
 describe("handleShutdownSignals", () => {
-  const setup = (close) => {
+  const setup = (close, flush = vi.fn().mockResolvedValue()) => {
     const proc = fakeProcess();
     const capture = captureLogger();
-    handleShutdownSignals({ close, logger: capture.logger, proc, timeoutMs: 1_000 });
-    return { proc, ...capture };
+    handleShutdownSignals({ close, flush, logger: capture.logger, proc, timeoutMs: 1_000 });
+    return { proc, flush, ...capture };
   };
 
   afterEach(() => {
@@ -61,15 +61,86 @@ describe("handleShutdownSignals", () => {
     expect(proc.exit).toHaveBeenCalledWith(1);
   });
 
-  it("forces exit 1 when connections do not drain in time", () => {
+  it("forces exit 1 when connections do not drain in time", async () => {
     vi.useFakeTimers();
     const { proc, find } = setup(() => new Promise(() => {}));
 
     proc.emit("SIGTERM", "SIGTERM");
-    vi.advanceTimersByTime(1_000);
+    await vi.advanceTimersByTimeAsync(1_000);
 
     expect(proc.exit).toHaveBeenCalledWith(1);
     expect(find("shutdown timed out, forcing exit")).toHaveLength(1);
+  });
+
+  it("flushes after the last line on every way out, then exits (CC-305)", async () => {
+    const order = [];
+    const flush = vi.fn(async () => order.push("flush"));
+    const { proc, entries } = setup(vi.fn().mockRejectedValue(new Error("close failed")), flush);
+    proc.exit.mockImplementation((code) => order.push(`exit ${code}`));
+
+    proc.emit("SIGTERM", "SIGTERM");
+    await vi.waitFor(() => expect(proc.exit).toHaveBeenCalled());
+
+    expect(entries.at(-1).msg).toBe("error during shutdown");
+    expect(order).toEqual(["flush", "exit 1"]);
+  });
+
+  it("exits within the flush limit when the flush never answers (CC-305)", async () => {
+    vi.useFakeTimers();
+    const { proc } = setup(vi.fn().mockResolvedValue(), () => new Promise(() => {}));
+
+    proc.emit("SIGTERM", "SIGTERM");
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(proc.exit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(proc.exit).toHaveBeenCalledWith(0);
+  });
+
+  it("still exits when the flush fails (CC-305)", async () => {
+    const { proc } = setup(
+      vi.fn().mockResolvedValue(),
+      vi.fn().mockRejectedValue(new Error("export failed")),
+    );
+
+    proc.emit("SIGTERM", "SIGTERM");
+    await vi.waitFor(() => expect(proc.exit).toHaveBeenCalled());
+
+    expect(proc.exit).toHaveBeenCalledWith(0);
+  });
+
+  it("exits once when closing ends after the drain timed out, without saying it completed (CC-305)", async () => {
+    vi.useFakeTimers();
+    let finishClose;
+    const { proc, find } = setup(() => new Promise((resolve) => (finishClose = resolve)));
+
+    proc.emit("SIGTERM", "SIGTERM");
+    await vi.advanceTimersByTimeAsync(1_000);
+    finishClose();
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(proc.exit.mock.calls).toEqual([[1]]);
+    expect(find("shutdown complete")).toHaveLength(0);
+  });
+
+  it("exits once when closing fails after the drain timed out, without a second error (CC-305)", async () => {
+    vi.useFakeTimers();
+    let failClose;
+    const { proc, find } = setup(() => new Promise((resolve, reject) => (failClose = reject)));
+
+    proc.emit("SIGTERM", "SIGTERM");
+    await vi.advanceTimersByTimeAsync(1_000);
+    failClose(new Error("close failed late"));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(proc.exit.mock.calls).toEqual([[1]]);
+    expect(find("error during shutdown")).toHaveLength(0);
+  });
+
+  it("refuses to be wired without a flush, so the last line cannot be forgotten (CC-305)", () => {
+    expect(() =>
+      handleShutdownSignals({ close: vi.fn(), logger: captureLogger().logger, proc: fakeProcess() }),
+    ).toThrow(TypeError);
   });
 
   it("handles each signal only once", async () => {
@@ -88,17 +159,38 @@ describe("handleFatalErrors", () => {
   it.each([
     ["uncaughtException", "uncaught exception"],
     ["unhandledRejection", "unhandled promise rejection"],
-  ])("logs %s as fatal and exits 1", (event, message) => {
+  ])("logs %s as fatal, flushes, and exits 1", async (event, message) => {
     const proc = fakeProcess();
+    const order = [];
+    proc.exit.mockImplementation((code) => order.push(`exit ${code}`));
     const { logger, find } = captureLogger();
-    handleFatalErrors({ logger, proc });
+    handleFatalErrors({ logger, flush: async () => order.push("flush"), proc });
 
     proc.emit(event, new Error("kaboom"));
+    await vi.waitFor(() => expect(proc.exit).toHaveBeenCalled());
 
     const [entry] = find(message);
     expect(entry.level).toBe(60);
     expect(entry.err.message).toBe("kaboom");
+    expect(order).toEqual(["flush", "exit 1"]);
+  });
+
+  it("exits 1 within the flush limit when the flush never answers (CC-305)", async () => {
+    vi.useFakeTimers();
+    const proc = fakeProcess();
+    handleFatalErrors({ logger: captureLogger().logger, flush: () => new Promise(() => {}), proc });
+
+    proc.emit("uncaughtException", new Error("kaboom"));
+    await vi.advanceTimersByTimeAsync(5_000);
+    vi.useRealTimers();
+
     expect(proc.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("refuses to be wired without a flush (CC-305)", () => {
+    expect(() => handleFatalErrors({ logger: captureLogger().logger, proc: fakeProcess() })).toThrow(
+      TypeError,
+    );
   });
 });
 

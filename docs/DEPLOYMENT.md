@@ -57,7 +57,8 @@ Plain settings have their value in the file: `NODE_ENV`, `HOST`, `LOG_LEVEL`, `A
 `TRUST_PROXY_HOPS`, and operations telemetry's `OTEL_SDK_DISABLED`, `OTEL_LOGS_EXPORTER` and
 `OTEL_METRIC_EXPORT_INTERVAL` (CC-286). Secrets are `sync: false` with no value: `MONGO_URI`, `SESSION_SECRET`,
 `ADMIN_ACCOUNT_IDS`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`. `PORT` and `RENDER_GIT_COMMIT` are
-not in the file because Render sets them. `scripts/renderBlueprint.test.mjs` fails if a variable the config
+not in the file because Render sets them, at build and at run time. `RENDER_GIT_COMMIT` is the telemetry service
+version and the `commit` on `/health`, and the build turns it into `/health`'s `version` (CC-303). `scripts/renderBlueprint.test.mjs` fails if a variable the config
 reads is missing from the file, or if a secret has a value. A CI job on pull requests checks the file against
 Render's published schema (`https://render.com/schema/render.yaml.json`).
 
@@ -123,7 +124,8 @@ Do these on a laptop, in the dashboard only. Nothing is applied before step 8.
 **After linking:**
 
 9. Watch NoCapGaming → **Events** until the deploy is **Live**, then
-   `curl https://nocapgaming.onrender.com/health` must answer `{"status":"ok","database":"up"}`.
+   `curl https://nocapgaming.onrender.com/health` must answer `"status":"ok"` and `"database":"up"`, with the
+   deployed `commit` and `version` (CC-303).
 10. Check **Environment** again: the same keys as in step 3, and `MONGO_URI` and `SESSION_SECRET` still have their
     (hidden) values. Check **Settings**: Auto-Deploy still "After CI Checks Pass". The service list must show one
     NoCapGaming, now with the Blueprint icon, and no new service.
@@ -333,7 +335,13 @@ the **Deployment impact** section of the PR template. If anything below changes,
 ## After merging
 
 1. Watch the deploy in Render → Events/Logs until it is **Live**.
-2. Check: `curl https://nocapgaming.onrender.com/health` → `{"status":"ok","database":"up"}`; open one game page.
+2. Check: `curl https://nocapgaming.onrender.com/health` →
+   `{"status":"ok","database":"up","commit":"<sha>","version":"<YYYY.MM.DD+short sha>"}`; open one game page.
+3. Confirm the merge is the deploy that answers (CC-303): `git fetch origin && git rev-parse origin/main` must print
+   the same sha as `/health`'s `commit`. Until they match, Render is still building or kept the last good deploy
+   (Events says which). `version` is the commit's UTC day and short sha, the same for every build of that commit.
+   `"unknown"` in production means `RENDER_GIT_COMMIT` was missing or the build step `scripts/bin/build-info.mjs`
+   could not ask git: the deploy is fine, only the label is missing.
 
 ## Rollback
 

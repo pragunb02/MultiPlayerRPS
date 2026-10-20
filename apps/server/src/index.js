@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { loadConfig } from "./config/index.js";
 import { startTelemetry } from "./dependency/telemetry/telemetry.js";
 import { createLogger } from "./utils/logger.js";
@@ -8,9 +8,13 @@ if (existsSync(".env")) {
   process.loadEnvFile(".env");
 }
 
+// Written by the last step of `npm run build:web`: the commit and version /health shows (CC-303). None off Render.
+const BUILD_INFO = new URL("../build-info.json", import.meta.url);
+const buildInfoText = existsSync(BUILD_INFO) ? readFileSync(BUILD_INFO, "utf8") : "";
+
 let config;
 try {
-  config = loadConfig(process.env);
+  config = loadConfig(process.env, { buildInfoText });
 } catch (err) {
   // No validated log level yet: report the config problem with a default logger, then stop.
   createLogger({ level: "info" }).fatal({ err }, "invalid configuration");
@@ -26,14 +30,12 @@ const telemetry = await startTelemetry({
   onExportFailed: ({ signal, error }) => logger.warn({ signal, err: error }, "telemetry export failed"),
 });
 const logger = createLogger({ level: config.logLevel, forward: telemetry.forward });
-handleFatalErrors({ logger });
+// Telemetry's last flush is its shutdown, which each handler runs after writing its last line and before exiting,
+// also when closing the server fails (CC-305). Shutting telemetry down inside `close` would drop that line.
+handleFatalErrors({ logger, flush: telemetry.shutdown });
 if (config.telemetry.enabled) {
   logger.info({ logs: config.telemetry.logs, intervalMs: config.telemetry.exportIntervalMs }, "telemetry on");
 }
 
 const server = await startServer({ config, logger, metrics: telemetry.metrics });
-const close = async () => {
-  await server.close();
-  await telemetry.shutdown();
-};
-handleShutdownSignals({ close, logger });
+handleShutdownSignals({ close: server.close, flush: telemetry.shutdown, logger });

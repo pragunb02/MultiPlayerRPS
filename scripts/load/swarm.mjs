@@ -35,11 +35,14 @@ const HTTPS = Object.freeze({ "X-Forwarded-Proto": "https" });
  * closes every socket.
  *
  * @param {SwarmDeps} deps
- * @returns {{ grow: (target: number, spreadMs: number) => Promise<void>, players: () => number, stop: () => Promise<void> }}
+ * @returns {{ grow: (target: number, spreadMs: number) => Promise<void>, players: () => number, playing: () => number, stop: () => Promise<void> }}
+ *   `players` counts open sockets, `playing` the players whose games are still going. A player whose games ended
+ *   (a refusal, no answer) is counted as a failure, closed and no longer playing
  */
 export function createSwarm({ base, origin = base, recorder, rng, model, waitMs = 30_000, pause = sleep }) {
   let stopping = false;
   let planned = 0;
+  let playing = 0;
   const sockets = new Set();
   const loops = new Set();
 
@@ -105,19 +108,24 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
    * `room:updated`, and an update can overtake an answer, so the higher revision wins. A computer may even move
    * before the answer that opened its room arrives, so updates are kept for every room, not only the current one.
    */
-  async function arrive() {
+  async function arrive(owned) {
     const socket = await connect(await signIn());
     sockets.add(socket);
+    owned.push(socket);
     // A player who arrives after the swarm stopped goes again at once, so no socket outlives the run.
     if (stopping) socket.close();
     socket.on("disconnect", (reason) => {
       sockets.delete(socket);
+      player.gone = true;
+      player.wake();
       if (!stopping && reason !== "io client disconnect") recorder.fail(`disconnected ${reason}`);
     });
     const views = new Map();
     const player = {
       socket,
       code: "",
+      // Set when the socket closes, so a game of a player who left ends instead of waiting for nothing.
+      gone: false,
       wake: () => {},
       get view() {
         return views.get(player.code);
@@ -142,7 +150,7 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
   async function until(player, ready) {
     const deadline = performance.now() + waitMs;
     for (;;) {
-      if (stopping) throw ENDED;
+      if (stopping || player.gone) throw ENDED;
       if (ready(player.view)) return;
       const left = deadline - performance.now();
       if (left <= 0) {
@@ -198,9 +206,9 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
   }
 
   /** Friends: one opens a room, the other joins with its code, and they play until the swarm stops. */
-  async function pairLoop(plan) {
+  async function pairLoop(plan, owned) {
     const { gameId } = plan;
-    const [host, guest] = await Promise.all([arrive(), arrive()]);
+    const [host, guest] = await Promise.all([arrive(owned), arrive(owned)]);
     for (;;) {
       const options = roomOptions(gameId, model);
       const name = `room:create ${gameId}`;
@@ -222,9 +230,9 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
   }
 
   /** One player against a computer character, rematching it or starting a new game. */
-  async function computerLoop(plan) {
+  async function computerLoop(plan, owned) {
     const { gameId, level } = plan;
-    const player = await arrive();
+    const player = await arrive(owned);
     for (;;) {
       const options = roomOptions(gameId, model);
       const name = `room:play-computer ${gameId}`;
@@ -245,11 +253,20 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
 
   function start(delayMs) {
     const plan = pickPlan(rng, model);
-    planned += plan.computer ? 1 : 2;
+    const size = plan.computer ? 1 : 2;
+    planned += size;
+    const owned = [];
     const loop = (async () => {
       await pause(delayMs);
       if (stopping) return;
-      await (plan.computer ? computerLoop(plan) : pairLoop(plan));
+      playing += size;
+      try {
+        await (plan.computer ? computerLoop(plan, owned) : pairLoop(plan, owned));
+      } finally {
+        // A player whose games ended leaves, so the counts show who is really still playing.
+        playing -= size;
+        owned.forEach((socket) => socket.close());
+      }
     })().catch((err) => {
       if (err !== ENDED && !stopping) recorder.fail(`player ${err.message}`);
     });
@@ -264,6 +281,7 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
       }
     },
     players: () => sockets.size,
+    playing: () => playing,
     async stop() {
       stopping = true;
       sockets.forEach((socket) => socket.close());

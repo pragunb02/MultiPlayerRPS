@@ -1,7 +1,8 @@
+import { parseCommit, UNKNOWN_BUILD } from "@classicade/shared";
+
 const DEFAULT_EXPORT_INTERVAL_MS = 60_000;
 const MIN_EXPORT_INTERVAL_MS = 1_000;
 const MAX_EXPORT_INTERVAL_MS = 600_000;
-const COMMIT = /^[0-9a-f]{7,40}$/;
 const COMMIT_SHOWN = 12;
 const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 
@@ -61,9 +62,7 @@ export function parseTelemetry(env, { isProduction, nodeEnv, errors }) {
     endpoint,
     logs,
     exportIntervalMs,
-    serviceVersion: COMMIT.test(env.RENDER_GIT_COMMIT ?? "")
-      ? env.RENDER_GIT_COMMIT.slice(0, COMMIT_SHOWN)
-      : "unknown",
+    serviceVersion: shortCommit(parseCommit(env.RENDER_GIT_COMMIT)),
     environment: nodeEnv,
   };
   Object.defineProperty(settings, "headers", { value: headers, enumerable: false });
@@ -71,6 +70,9 @@ export function parseTelemetry(env, { isProduction, nodeEnv, errors }) {
 }
 
 const OFF = Object.freeze({ enabled: false });
+
+/** The commit as the service version: its first characters, by the same rule as /health (CC-303). */
+const shortCommit = (commit) => (commit === UNKNOWN_BUILD ? UNKNOWN_BUILD : commit.slice(0, COMMIT_SHOWN));
 
 /**
  * @param {string | undefined} raw

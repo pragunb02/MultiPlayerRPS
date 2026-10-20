@@ -139,6 +139,20 @@ describe("isReservedName", () => {
     expect(isReservedName(name)).toBe(false);
   });
 
+  it.each(["user_bob", "USER_x", "guest_bob", "bot_rocky_easy", "deleted_bob", "deleted_"])(
+    "reserves %j, which starts like a player id (CC-304)",
+    (name) => {
+      expect(isReservedName(name)).toBe(true);
+    },
+  );
+
+  it.each(["username", "users_club", "deletedscenes", "Bob_user_1"])(
+    "allows %j, which only has the letters of an id prefix",
+    (name) => {
+      expect(isReservedName(name)).toBe(false);
+    },
+  );
+
   it("allows a name that is only digits", () => {
     expect(isReservedName("12345")).toBe(false);
   });

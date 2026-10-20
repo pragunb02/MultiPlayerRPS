@@ -23,7 +23,7 @@
     "test:coverage": "vitest run --coverage --tags-filter=\"not slow\"",
     "test:all": "vitest run --coverage",
     "dev:web": "npm run dev -w @classicade/web",
-    "build:web": "npm run build -w @classicade/web",
+    "build:web": "npm run build -w @classicade/web && node scripts/bin/build-info.mjs",
     "test:e2e": "npm test -w @classicade/e2e",
     "test:visual": "node scripts/bin/visual.mjs",
     "test:visual:update": "node scripts/bin/visual.mjs --update",

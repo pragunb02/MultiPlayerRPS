@@ -21,6 +21,7 @@ import {
  *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
  *   /privacy  /terms                   the privacy policy and the terms of use
  *   /admin  /admin/:section?from=…&to=…&bucket=…   the owner console (CC-233), not found for anyone but an admin
+ *   /admin/feedback?type=…&status=…    the console's feedback inbox (CC-290)
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
@@ -43,6 +44,7 @@ export const ROUTES = Object.freeze({
   TERMS: "terms",
   ADMIN: "admin",
   ADMIN_SECTION: "admin/:section",
+  ADMIN_FEEDBACK: "admin/feedback",
 });
 
 /** The owner console's pages after its overview, in tab order (CC-233). Each is the URL segment after /admin. */
@@ -54,6 +56,10 @@ export const ADMIN_SECTIONS = Object.freeze([
   "conversion",
   "engagement",
 ]);
+
+/** The owner console's range in the address, and the feedback inbox's filters. */
+const RANGE_KEYS = Object.freeze(["from", "to", "bucket"]);
+const FEEDBACK_FILTER_KEYS = Object.freeze(["type", "status"]);
 
 /** URLs that were public once and must keep working (they redirect to the canonical URL). */
 export const LEGACY_ROUTES = Object.freeze({
@@ -160,12 +166,26 @@ export const paths = Object.freeze({
    * @param {string} [section]  an ADMIN_SECTIONS value, or omitted for the overview
    * @param {{ from?: string, to?: string, bucket?: string }} [range]
    */
-  admin: (section, range = {}) => `/admin${section ? `/${section}` : ""}${rangeQuery(range)}`,
+  admin: (section, range = {}) => `/admin${section ? `/${section}` : ""}${queryOf(range, RANGE_KEYS)}`,
+  /**
+   * The console's feedback inbox (CC-290), with its filters.
+   *
+   * @param {{ type?: string, status?: string }} [filters]  each left out for all
+   */
+  adminFeedback: (filters = {}) => `/admin/feedback${queryOf(filters, FEEDBACK_FILTER_KEYS)}`,
 });
 
-function rangeQuery(range) {
+/**
+ * A page's query: the given keys that have a value, in the order given, and nothing else. Every address with a query
+ * is written with this, so a key is never misspelled or left in by one page and not another.
+ *
+ * @param {Record<string, string | undefined>} values
+ * @param {ReadonlyArray<string>} keys
+ * @returns {string} "" when no key has a value, else "?" and the query
+ */
+export function queryOf(values, keys) {
   const params = new URLSearchParams(
-    ["from", "to", "bucket"].filter((key) => range[key] !== undefined).map((key) => [key, range[key]]),
+    keys.filter((key) => values[key] !== undefined).map((key) => [key, values[key]]),
   );
   const text = params.toString();
   return text === "" ? "" : `?${text}`;

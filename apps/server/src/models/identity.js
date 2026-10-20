@@ -1,13 +1,13 @@
 import { IDENTITY_KINDS } from "@classicade/shared";
 import { ValidationError } from "../utils/errors.js";
+import { PLAYER_ID_PATTERNS } from "./playerIdShape.js";
 
-/** How a guest's player id starts. */
-export const GUEST_ID_PREFIX = "guest_";
-/** How an account's player id starts. */
-export const ACCOUNT_ID_PREFIX = "user_";
+export { ACCOUNT_ID_PREFIX, GUEST_ID_PREFIX } from "./playerIdShape.js";
+
+// A person signs in as a guest or an account only. Computer players and stand-ins are never an identity here.
 const ID_PATTERNS = Object.freeze({
-  [IDENTITY_KINDS.GUEST]: new RegExp(`^${GUEST_ID_PREFIX}[0-9a-f-]{36}$`),
-  [IDENTITY_KINDS.USER]: new RegExp(`^${ACCOUNT_ID_PREFIX}[0-9a-f]{24}$`),
+  [IDENTITY_KINDS.GUEST]: PLAYER_ID_PATTERNS[IDENTITY_KINDS.GUEST],
+  [IDENTITY_KINDS.USER]: PLAYER_ID_PATTERNS[IDENTITY_KINDS.USER],
 });
 const DISPLAY_NAME_PATTERN = /^[A-Za-z0-9_-]{3,24}$/;
 

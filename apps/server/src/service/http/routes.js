@@ -4,6 +4,7 @@ import { createAccountRoutes } from "./accountRoutes.js";
 import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
+import { createFeedbackRoutes } from "./feedbackRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
@@ -20,7 +21,9 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
- *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }} deps
+ *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
+ *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
+ *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
  */
 export function apiRouter({
   matchComponent,
@@ -43,14 +46,17 @@ export function apiRouter({
   blockLimits,
   profileComponent,
   profileLimits,
+  feedbackComponent,
+  feedbackLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
+  build,
   ...sessionDeps
 }) {
   const router = Router();
 
   router.get("/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", commit: build.commit, version: build.version });
   });
 
   router.get("/games", (req, res) => {
@@ -96,6 +102,15 @@ export function apiRouter({
       leaderboardComponent,
       now,
       ...(leaderboardLimit && { limit: leaderboardLimit }),
+    }),
+  );
+
+  router.use(
+    createFeedbackRoutes({
+      feedbackComponent,
+      requireAdmin: adminAccess.requireAdmin,
+      now,
+      ...(feedbackLimits && { limits: feedbackLimits }),
     }),
   );
 

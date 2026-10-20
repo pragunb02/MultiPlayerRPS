@@ -21,6 +21,12 @@ const limits = {
   blocks: { perAddress: { windowMs: 60_000, limit: 10_000 } },
   // Profile lookups keep their real limit per player (CC-034). Only the one per address is raised.
   profiles: { lookupsPerAddress: { windowMs: 60_000, limit: 10_000 } },
+  // Feedback keeps its real limit per session (CC-290). The ones per address and for the site are raised.
+  feedback: {
+    perAddress: { windowMs: 60_000, limit: 10_000 },
+    perAddressDaily: { windowMs: 60_000, limit: 10_000 },
+    site: { windowMs: 60_000, limit: 10_000 },
+  },
 };
 // Standard room lifetimes and limits, unless a test asked the next process for others (CC-101, CC-107). The
 // realtime connections and the open rooms per address are raised for the same reason as above. Every other room
@@ -31,4 +37,5 @@ const rooms = {
   limits: { socketsPerAddress: 10_000, openRoomsPerAddress: 10_000, ...requested.limits },
 };
 const { close } = await startServer({ config, logger, limits, rooms });
-handleShutdownSignals({ close, logger });
+// No telemetry here, so there is nothing to flush before exit (CC-305).
+handleShutdownSignals({ close, flush: async () => undefined, logger });

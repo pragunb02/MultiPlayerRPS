@@ -16,12 +16,35 @@ describe("HTTP app", () => {
     const res = await request(app).get("/api/health");
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: "ok" });
+    expect(res.body).toEqual({ status: "ok", commit: "unknown", version: "unknown" });
+  });
+
+  it("shows the deployed commit and its version on both health checks (CC-303)", async () => {
+    const commit = "a40ce5b9d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f";
+    const { app } = createTestApp({
+      env: { RENDER_GIT_COMMIT: commit },
+      buildInfoText: JSON.stringify({ commit, version: "2026.10.20+a40ce5b" }),
+    });
+
+    const health = await request(app).get("/health");
+    const apiHealth = await request(app).get("/api/health");
+
+    expect(health.body).toEqual({ status: "ok", database: "up", commit, version: "2026.10.20+a40ce5b" });
+    expect(apiHealth.body).toEqual({ status: "ok", commit, version: "2026.10.20+a40ce5b" });
+  });
+
+  it("never echoes a RENDER_GIT_COMMIT that is not a commit (CC-303)", async () => {
+    const { app } = createTestApp({ env: { RENDER_GIT_COMMIT: "SECRET=hunter2" } });
+
+    const res = await request(app).get("/health");
+
+    expect(res.text).not.toContain("hunter2");
+    expect(res.body.commit).toBe("unknown");
   });
 
   it.each([
-    [true, 200, { status: "ok", database: "up" }],
-    [false, 503, { status: "unavailable", database: "down" }],
+    [true, 200, { status: "ok", database: "up", commit: "unknown", version: "unknown" }],
+    [false, 503, { status: "unavailable", database: "down", commit: "unknown", version: "unknown" }],
   ])("GET /health reports the database to the hosting platform (up: %s)", async (up, status, body) => {
     const { app } = createTestApp({ isDatabaseUp: () => up });
 

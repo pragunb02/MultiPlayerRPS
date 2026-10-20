@@ -271,10 +271,14 @@ describe("room views name players by seat id (CC-253)", () => {
 
   it("names by seat id anything shaped like a player id that a game's view names, even someone it does not list", async () => {
     const STRANGER = "user_65f1a2b3c4d5e6f7081900ff";
+    const GUEST_STRANGER = "guest_00000000-0000-4000-8000-0000000000ff";
     const leaky = defineEngine({
       ...raceEngine,
       id: "leaky",
-      viewFor: (state) => ({ ...raceEngine.viewFor(state), [STRANGER]: [STRANGER, "guest_x", "not-an-id"] }),
+      viewFor: (state) => ({
+        ...raceEngine.viewFor(state),
+        [STRANGER]: [STRANGER, GUEST_STRANGER, "not-an-id"],
+      }),
     });
     const { rooms, seatIds } = setup({ engines: [leaky] });
     const room = await rooms.createRoom({
@@ -289,9 +293,62 @@ describe("room views name players by seat id (CC-253)", () => {
     const view = rooms.viewFor(started, ALICE.id);
 
     const stranger = seatIds.seatIdOf(started, STRANGER);
-    expect(view.game.view[stranger]).toEqual([stranger, seatIds.seatIdOf(started, "guest_x"), "not-an-id"]);
+    expect(view.game.view[stranger]).toEqual([
+      stranger,
+      seatIds.seatIdOf(started, GUEST_STRANGER),
+      "not-an-id",
+    ]);
     expect(wire(view)).not.toContain(STRANGER);
-    expect(wire(view)).not.toContain("guest_x");
+    expect(wire(view)).not.toContain(GUEST_STRANGER);
+  });
+
+  it("keeps a display name that only starts like a player id, and still renames the real ids (CC-304)", async () => {
+    const USER_BOB = Object.freeze({
+      kind: "user",
+      id: "user_0123456789abcdef01234567",
+      displayName: "user_bob",
+    });
+    const { rooms, seatIds } = setup();
+    const room = await rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "rps",
+      options: { bestOf: 1 },
+      now: T0,
+    });
+    const joined = await rooms.joinRoom({ code: room.code, player: USER_BOB, now: T0 + 1 });
+
+    const view = rooms.viewFor(joined, ALICE.id);
+    const requests = rooms.requestsView(joined, ALICE.id);
+
+    const bob = seatIds.seatIdOf(joined, USER_BOB.id);
+    expect(view.seats[1]).toEqual(expect.objectContaining({ playerId: bob, displayName: "user_bob" }));
+    expect(requests.names[bob]).toBe("user_bob");
+    expect(wire([view, requests])).not.toContain(USER_BOB.id);
+    expect(wire([view, requests])).not.toContain(ALICE.id);
+  });
+
+  it("keeps text in a game's view that only starts like a player id, and renames a real id beside it (CC-304)", async () => {
+    const STRANGER = "user_65f1a2b3c4d5e6f7081900ff";
+    const named = defineEngine({
+      ...raceEngine,
+      id: "named",
+      viewFor: (state) => ({ ...raceEngine.viewFor(state), caption: ["user_bob", "deleted_bob", STRANGER] }),
+    });
+    const { rooms, seatIds } = setup({ engines: [named] });
+    const room = await rooms.createRoom({
+      network: "net-a",
+      host: ALICE,
+      gameId: "named",
+      options: { target: 3 },
+      now: T0,
+    });
+    const started = await rooms.joinRoom({ code: room.code, player: BOB, now: T0 + 1 });
+
+    const view = rooms.viewFor(started, ALICE.id);
+
+    expect(view.game.view.caption).toEqual(["user_bob", "deleted_bob", seatIds.seatIdOf(started, STRANGER)]);
+    expect(wire(view)).not.toContain(STRANGER);
   });
 
   it("refuses to be built without seat ids, so a room view can never fall back to player ids", () => {

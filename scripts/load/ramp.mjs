@@ -35,20 +35,33 @@ export function parseSteps(raw) {
 }
 
 /**
- * Whether a step broke the server: the move p95 over the limit, or any failure at all.
+ * Whether a step broke the server: the move p95 over the limit, no moves at all, or any failure, in the measured
+ * window or while the step's players arrived and warmed up. A player who failed in the warm-up has stopped playing,
+ * so leaving those failures out would let a step pass with fewer players than it claims.
  *
- * @param {{ moves: { count: number, p95: number }, failures: Record<string, number> }} step
+ * @param {{ moves: { count: number, p95: number }, failures: Record<string, number>, warmupFailures?: Record<string, number> }} step
  * @param {{ moveP95LimitMs?: number }} [limits]
  * @returns {{ broken: boolean, reasons: string[] }}
  */
-export function verdict({ moves, failures }, { moveP95LimitMs = MOVE_P95_LIMIT_MS } = {}) {
+export function verdict(
+  { moves, failures, warmupFailures = {} },
+  { moveP95LimitMs = MOVE_P95_LIMIT_MS } = {},
+) {
   const reasons = [];
+  if (moves.count === 0) {
+    reasons.push("no moves were answered");
+  }
   if (moves.p95 > moveP95LimitMs) {
     reasons.push(`move p95 ${moves.p95} ms is over ${moveP95LimitMs} ms`);
   }
-  const failed = Object.values(failures).reduce((sum, count) => sum + count, 0);
-  if (failed > 0) {
-    reasons.push(`${failed} failures: ${Object.keys(failures).join(", ")}`);
+  for (const [when, found] of [
+    ["", failures],
+    [" while warming up", warmupFailures],
+  ]) {
+    const failed = Object.values(found).reduce((sum, count) => sum + count, 0);
+    if (failed > 0) {
+      reasons.push(`${failed} failures${when}: ${Object.keys(found).join(", ")}`);
+    }
   }
   return { broken: reasons.length > 0, reasons };
 }
@@ -91,4 +104,45 @@ export function opsPerSecond(before, after, seconds) {
     }),
   );
   return { ...rates, total: Math.round(kinds.reduce((sum, kind) => sum + rates[kind], 0) * 10) / 10 };
+}
+
+/**
+ * Reads the harness's settings from the environment, refusing anything that is not a valid value, so a typo never
+ * turns into a silent default.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @returns {{ size: string, steps: ReadonlyArray<number>, stepSeconds: number, warmupSeconds: number, idleSeconds: number, seed: number, port: number, computerShare: number, stop: string, unplayableMs: number }}
+ */
+export function readSettings(env) {
+  const size = env.LOAD_SIZE ?? "free";
+  if (!Object.hasOwn(RENDER_SIZES, size)) {
+    throw new RangeError(`LOAD_SIZE must be one of ${Object.keys(RENDER_SIZES).join(", ")} (got "${size}")`);
+  }
+  const stop = env.LOAD_STOP ?? "nfr3";
+  if (!["nfr3", "unplayable"].includes(stop)) {
+    throw new RangeError(`LOAD_STOP must be nfr3 or unplayable (got "${stop}")`);
+  }
+  const number = (name, fallback, { min, max, whole = true }) => {
+    const raw = env[name];
+    const value = raw === undefined ? fallback : Number(raw);
+    if (!(value >= min && value <= max) || (whole && !Number.isInteger(value))) {
+      throw new RangeError(
+        `${name} must be a ${whole ? "whole " : ""}number from ${min} to ${max} (got "${raw}")`,
+      );
+    }
+    return value;
+  };
+  const stepSeconds = number("LOAD_STEP_S", 60, { min: 10, max: 3_600 });
+  return {
+    size,
+    steps: parseSteps(env.LOAD_STEPS),
+    stepSeconds,
+    warmupSeconds: number("LOAD_WARMUP_S", 15, { min: 0, max: stepSeconds - 5 }),
+    idleSeconds: number("LOAD_IDLE_S", 30, { min: 0, max: 3_600 }),
+    seed: number("LOAD_SEED", 289, { min: 0, max: 2 ** 31 - 1 }),
+    port: number("LOAD_PORT", 4977, { min: 1_024, max: 65_534 }),
+    computerShare: number("LOAD_COMPUTER_SHARE", 0.4, { min: 0, max: 1, whole: false }),
+    stop,
+    unplayableMs: number("LOAD_UNPLAYABLE_MS", 1_000, { min: MOVE_P95_LIMIT_MS, max: 60_000 }),
+  };
 }

@@ -1,0 +1,97 @@
+/* The Hinglish line first, the English line under it, as the share texts show them (CC-217). */
+.lines {
+  display: flex;
+  flex-direction: column;
+}
+.hinglish {
+  font-weight: 700;
+}
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+.types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.types legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm);
+}
+/* Each type is a pill with its radio inside, so the whole pill can be pressed. */
+.type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  padding: var(--space-1) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  font-weight: 700;
+  cursor: pointer;
+}
+.type:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.type:has(input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.message {
+  display: grid;
+  gap: var(--space-1);
+}
+.message label {
+  font-weight: 700;
+}
+.message textarea {
+  font: inherit;
+  resize: vertical;
+  min-height: 6rem;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.message textarea:focus-visible {
+  border-color: var(--color-primary);
+}
+.message textarea[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+.under {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.hint,
+.context {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.count {
+  flex: none;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+.error {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-danger);
+}
+.thanks {
+  margin: 0;
+}

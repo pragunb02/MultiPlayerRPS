@@ -4,6 +4,7 @@ import {
   gameForSlug,
   normaliseRoomCode,
   paths,
+  queryOf,
   returnPathFor,
   returnsToRoom,
   safeNext,
@@ -66,6 +67,23 @@ describe("owner console paths (CC-233)", () => {
   it("is not a public page", () => {
     expect(PUBLIC_PAGE_PATHS).not.toContain("/admin");
     expect(describePage(paths.admin("players")).found).toBe(false);
+  });
+});
+
+describe("queryOf: one way to write a page's query (CC-290)", () => {
+  it("writes the given keys in their order, leaves out the missing ones and ignores the rest", () => {
+    expect(queryOf({ to: "2025-03-09", from: "2025-03-03", other: "x" }, ["from", "to", "bucket"])).toBe(
+      "?from=2025-03-03&to=2025-03-09",
+    );
+    expect(queryOf({}, ["type", "status"])).toBe("");
+  });
+
+  it("is what the console's addresses use", () => {
+    expect(paths.admin("games", { bucket: "week", from: "2025-03-03" })).toBe(
+      "/admin/games?from=2025-03-03&bucket=week",
+    );
+    expect(paths.adminFeedback({ status: "done", type: "bug" })).toBe("/admin/feedback?type=bug&status=done");
+    expect(paths.adminFeedback()).toBe("/admin/feedback");
   });
 });
 
