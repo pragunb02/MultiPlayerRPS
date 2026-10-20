@@ -31,7 +31,9 @@ What problem this solves and for whom.
 - [ ] …
 - [ ] Tests cover the change
 - [ ] `npm run lint`, `npm run format:check`, `npm test` pass
-- [ ] Docs updated (BACKLOG status, KNOWN_ISSUES, PROGRESS)
+- [ ] Changelog fragment `docs/changes/CC-###.md` added (ticket, date, type, status, ADRs, the line; the board row
+      if new). PROGRESS.md, the board rows and the next free lines are not edited (CLAUDE.md workflow rule 5)
+- [ ] Docs updated (KNOWN_ISSUES, ADRs with the numbers the coordinator assigned)
 
 ## Plan / notes
 
