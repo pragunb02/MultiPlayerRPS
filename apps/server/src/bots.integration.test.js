@@ -15,6 +15,7 @@ let mongo;
 let dbCounter = 0;
 const cleanups = [];
 const NO_PAUSE = Object.freeze({ pauseMs: { min: 0, max: 0 } });
+const NOON = Date.UTC(2026, 9, 20, 12);
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -30,15 +31,19 @@ afterAll(async () => {
   await mongo?.stop();
 });
 
-/** One server process on one database. `restart` stops it the way a deploy does and starts the next one. */
-function serverProcess({ bots = NO_PAUSE } = {}) {
+/**
+ * One server process on one database. `restart` stops it the way a deploy does and starts the next one, and `stop`
+ * stops it for good. `rooms` and `now` go to the server as they are (see startServer).
+ */
+function serverProcess({ bots = NO_PAUSE, rooms, now } = {}) {
   let config = testConfig({ MONGO_URI: mongo.uri(`bots-${++dbCounter}`) });
   let running;
+  let capture;
   const logs = [];
   onTestFailed(() => logs.flat().forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)));
   async function start(options = bots) {
-    const capture = captureLogger();
-    running = await startServer({ config, logger: capture.logger, bots: options });
+    capture = captureLogger();
+    running = await startServer({ config, logger: capture.logger, bots: options, rooms, now });
     logs.push(capture.entries);
     config = testConfig({ MONGO_URI: config.mongoUri, PORT: String(running.port) });
     return running;
@@ -49,6 +54,13 @@ function serverProcess({ bots = NO_PAUSE } = {}) {
     config: () => config,
     url: () => `http://127.0.0.1:${running.port}`,
     logs: () => logs.flat(),
+    /** The first line of the running process with this message, when it is written. */
+    once: (msg) => capture.once(msg),
+    async stop() {
+      const stopped = running;
+      running = undefined;
+      await stopped.close();
+    },
     async restart(options) {
       const stopped = running;
       running = undefined;
@@ -79,6 +91,7 @@ async function guest(server) {
   const keep = (view) => {
     if (view?.code === undefined) return;
     if (player.latest?.code !== view.code || view.revision > player.latest.revision) player.latest = view;
+    settle(player.waiting.rooms, player.latest);
   };
   const player = {
     identity,
@@ -87,6 +100,7 @@ async function guest(server) {
     room: { code: "" },
     progress: [],
     latest: undefined,
+    waiting: { rooms: [], progress: [] },
     async send(event, payload) {
       const answer = await socket.timeout(4_000).emitWithAck(event, payload);
       keep(answer.data);
@@ -94,22 +108,39 @@ async function guest(server) {
     },
   };
   socket.on(SOCKET_EVENTS.ROOM_UPDATED, keep);
-  socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, (update) => player.progress.push(update));
+  socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, (update) => {
+    player.progress.push(update);
+    settle(player.waiting.progress, player.progress);
+  });
   socket.io.on("reconnect", () => {
     if (player.room.code !== "") socket.emit(SOCKET_EVENTS.ROOM_JOIN, { code: player.room.code }, () => {});
   });
   return player;
 }
 
-/** Waits until the newest view of the player's room passes `test`, and answers it. */
-async function updateWhere(player, test) {
-  const deadline = Date.now() + 10_000;
-  while (player.latest === undefined || !test(player.latest)) {
-    if (Date.now() > deadline) throw new Error("timed out waiting for the room");
-    await new Promise((resolve) => setTimeout(resolve, 5));
+/** Answers every waiter whose test `value` passes, and keeps the others waiting. */
+function settle(waiters, value) {
+  for (const waiter of waiters.filter(({ test }) => test(value))) {
+    waiters.splice(waiters.indexOf(waiter), 1);
+    waiter.resolve(value);
   }
-  return player.latest;
 }
+
+/** Resolves with `value()` once it passes `test`: at once, or when the update that makes it pass arrives. */
+function when(waiters, value, test) {
+  return test(value()) ? Promise.resolve(value()) : new Promise((resolve) => waiters.push({ test, resolve }));
+}
+
+/** Waits for the update after which the newest view of the player's room passes `test`, and answers that view. */
+const updateWhere = (player, test) =>
+  when(
+    player.waiting.rooms,
+    () => player.latest,
+    (view) => view !== undefined && test(view),
+  );
+
+/** Waits for the progress update after which the player's updates pass `test`, and answers them all. */
+const progressWhere = (player, test) => when(player.waiting.progress, () => player.progress, test);
 
 /** Polls `probe` until it returns a value. */
 async function eventually(probe, timeoutMs = 8_000) {
@@ -149,7 +180,12 @@ async function playRps(player, view, choose = () => "rock") {
   let current = view;
   for (let round = 0; current.status === "playing"; round++) {
     const over = (v) => v.status !== "playing" || v.game.view.rounds.length > round;
-    await player.send(SOCKET_EVENTS.GAME_MOVE, { code: current.code, move: { choice: choose(round) } });
+    const answer = await player.send(SOCKET_EVENTS.GAME_MOVE, {
+      code: current.code,
+      move: { choice: choose(round) },
+    });
+    // A refused throw fails here, with its reason, instead of leaving the test to wait for a round that never ends.
+    expect(answer).toMatchObject({ ok: true });
     current = await updateWhere(player, over);
   }
   return current;
@@ -202,7 +238,7 @@ describe("playing computer characters on the real server (integration)", () => {
 
     expect(final.status).toBe("finished");
     expect(final.game.outcome.winners).not.toContain(final.you);
-    const [update] = await eventually(async () => (alice.progress.length > 0 ? alice.progress : undefined));
+    const [update] = await progressWhere(alice, (updates) => updates.length > 0);
     expect(update).toEqual(
       expect.objectContaining({ counted: true, botXpLeft: BOT_DAILY_XP - update.xpGained }),
     );
@@ -245,25 +281,37 @@ describe("playing computer characters on the real server (integration)", () => {
   });
 
   it("gives at most the day's XP from computer games, apart from quest XP, and every game still counts", async () => {
-    const server = serverProcess();
+    // Noon UTC on a fixed day, so the five games always fall in one day of the limit (ADR-025). The clock still runs.
+    const started = Date.now();
+    const server = serverProcess({
+      now: () => NOON + (Date.now() - started),
+      // A script throws far faster than a person: the event budget would refuse it after about twenty (CC-107).
+      rooms: { limits: { eventBurstPerPlayer: 1_000 } },
+    });
     await server.start();
     const alice = await guest(server);
     // Quests completed by these games give their own XP, which is not part of the limit (ADR-025).
-    const fromGames = () => alice.progress.filter((update) => update.source === "match");
+    const fromGames = (updates) => updates.filter((update) => update.source === "match");
 
     for (let game = 0; game < 5; game++) {
       const view = await playComputer(alice, { gameId: "rps", level: "easy", options: { bestOf: 1 } });
       await playRps(alice, view, () => "paper");
-      await eventually(async () => (fromGames().length > game ? true : undefined));
+      await progressWhere(alice, (updates) => fromGames(updates).length > game);
     }
 
-    const gained = fromGames().reduce((sum, update) => sum + update.xpGained, 0);
+    const counted = fromGames(alice.progress);
+    const gained = counted.reduce((sum, update) => sum + update.xpGained, 0);
     // Five games give at least 50 XP without a limit, so a total above it would show the limit is missing.
     expect(gained).toBeLessThanOrEqual(BOT_DAILY_XP);
-    expect(fromGames().at(-1).botXpLeft).toBe(BOT_DAILY_XP - gained);
-    expect(fromGames().every((update) => update.counted)).toBe(true);
+    expect(counted.at(-1).botXpLeft).toBe(BOT_DAILY_XP - gained);
+    expect(counted.every((update) => update.counted)).toBe(true);
     const progress = await readCollection(server.config().mongoUri, "player_progress");
     expect(progress[0].matchesPlayed).toBe(5);
+    // The computer played each moment once, and the tab that closed was recorded before the database closed.
+    alice.socket.disconnect();
+    await server.once("socket disconnected");
+    await server.stop();
+    expect(server.logs().filter((entry) => entry.level >= 40)).toEqual([]);
   });
 
   it("moves on after a restart in the middle of a game: the computer whose turn it was plays", async () => {
