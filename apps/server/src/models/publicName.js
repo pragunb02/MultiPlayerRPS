@@ -11,6 +11,7 @@ import {
   STAFF_WORDS,
   STAFF_WORDS_ANYWHERE,
 } from "./nameLists.js";
+import { PLAYER_ID_PREFIXES } from "./playerIdShape.js";
 
 // Common leetspeak, so "4dm1n" and "5h1t" are read as the words they spell.
 const LEET = Object.freeze({ 0: "o", 1: "i", 3: "e", 4: "a", 5: "s", 7: "t", "@": "a", $: "s" });
@@ -84,6 +85,8 @@ const looksLikeBot = (reading) =>
 /**
  * Whether a public name passes as staff, the company, a bot or a game, for example "Admin_1", "a_d_m_i_n",
  * "ClassiCade_HQ", "ChessBot" or "Tic_Tac_Toe". Case, separators, leetspeak and padding digits do not matter.
+ * A name that starts like a player id, such as "user_bob", is reserved too, so a name never looks like an id
+ * (CC-304).
  *
  * @param {string} name  a name that already has the right shape (for example a username)
  * @returns {boolean}
@@ -91,7 +94,9 @@ const looksLikeBot = (reading) =>
 export function isReservedName(name) {
   const { whole, parts } = wholeAndParts(name);
   const readings = [...whole, ...parts];
+  const lower = name.toLowerCase();
   return (
+    PLAYER_ID_PREFIXES.some((prefix) => lower.startsWith(prefix)) ||
     whole.some((reading) => GAME_WORDS.includes(reading)) ||
     readings.some((reading) => STAFF_WORDS.includes(reading) || looksLikeBot(reading)) ||
     whole.some(

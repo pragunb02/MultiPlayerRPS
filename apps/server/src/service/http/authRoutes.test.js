@@ -94,6 +94,21 @@ describe("auth routes", () => {
     }
   });
 
+  it("refuses a username that starts like a player id with 400, as a reserved name (CC-304)", async () => {
+    server = await startTestServer();
+
+    const res = await post("/api/auth/signup", { ...RIYA, username: "user_bob" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toEqual(
+      expect.objectContaining({
+        code: ERROR_CODES.VALIDATION_FAILED,
+        message: "That name is reserved. Please choose another name.",
+        details: { field: "username" },
+      }),
+    );
+  });
+
   it("refuses a taken username (case-insensitive) with 409", async () => {
     server = await startTestServer();
     await post("/api/auth/signup", RIYA);
