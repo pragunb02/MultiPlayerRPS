@@ -9,7 +9,12 @@ import { X509Certificate } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { LOOPBACK_HOSTS, makeCertificate, startTlsFront } from "./tlsFront.js";
+import {
+  CHROMIUM_ACCEPTS_TEST_CERTIFICATE,
+  LOOPBACK_HOSTS,
+  makeCertificate,
+  startTlsFront,
+} from "./tlsFront.js";
 
 // Real sockets on free ports, and a real certificate from openssl, because what matters is that a browser can
 // talk HTTPS to the app through it.
@@ -158,5 +163,20 @@ describe("startTlsFront", () => {
     const again = http.createServer().listen(appPort, "::1");
     await new Promise((resolve, reject) => again.once("listening", resolve).once("error", reject));
     await new Promise((resolve) => again.close(resolve));
+  });
+});
+
+describe("the test browsers", () => {
+  // Without it Chromium restarts each request after the certificate error, and a page's first stylesheet could be
+  // restarted past Chromium's limit of 32 and fail with net::ERR_TOO_MANY_RETRIES on a busy runner (CC-319).
+  it("start Chromium accepting this run's certificate in every project of both browser test configurations", async () => {
+    const { default: suite } = await import("./playwright.config.js");
+    const { default: visual } = await import("./playwright.visual.config.js");
+    for (const config of [suite, visual]) {
+      for (const project of config.projects) {
+        const args = { ...config.use, ...project.use }.launchOptions?.args ?? [];
+        expect(args, project.name).toEqual(expect.arrayContaining([...CHROMIUM_ACCEPTS_TEST_CERTIFICATE]));
+      }
+    }
   });
 });

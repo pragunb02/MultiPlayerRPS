@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL } from "./personas.js";
+import { CHROMIUM_ACCEPTS_TEST_CERTIFICATE } from "./tlsFront.js";
 
 // Screenshot baselines of the main screens (CC-155). Pixels depend on the fonts, the browser build and the CPU, so
 // these run only inside one pinned container image, VISUAL_IMAGE in scripts/visual/docker.mjs: in CI (the visual job in ci.yml),
@@ -35,6 +36,9 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     ignoreHTTPSErrors: true,
+    // Both projects are Chromium. It accepts the certificate during the handshake instead of restarting each
+    // request after the error (CC-319).
+    launchOptions: { args: [...CHROMIUM_ACCEPTS_TEST_CERTIFICATE] },
     trace: "retain-on-failure",
     video: "retain-on-failure",
     screenshot: "only-on-failure",
