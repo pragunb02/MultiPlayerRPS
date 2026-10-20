@@ -29,6 +29,7 @@ import { createIdentityComponent } from "../domain/identity/identityComponent.js
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
+import { createMatchPlayerIds, matchPlayerSecretFrom } from "../domain/matches/matchPlayerIds.js";
 import { createMatchOutboxComponent } from "../domain/matches/matchOutboxComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
@@ -146,7 +147,10 @@ export function createTestApp({
   const domainEvents = new EventEmitter();
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
-  const matchComponent = createMatchComponent({ matchAccessor });
+  const matchComponent = createMatchComponent({
+    matchAccessor,
+    matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
+  });
   const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const playerTransferAccessor = createPlayerTransferAccessor({
     playerTransferDao: createInMemoryPlayerTransferDao(),

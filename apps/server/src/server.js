@@ -31,6 +31,7 @@ import { createIdentityComponent } from "./domain/identity/identityComponent.js"
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "./domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "./domain/matches/matchComponent.js";
+import { createMatchPlayerIds, matchPlayerSecretFrom } from "./domain/matches/matchPlayerIds.js";
 import { createMatchOutboxComponent, matchRetryPolicy } from "./domain/matches/matchOutboxComponent.js";
 import {
   createProgressionComponent,
@@ -606,7 +607,10 @@ export async function startServer({
     legacyPasswords: createLegacyPasswordChecker(),
     accountDeletionAccessor,
   });
-  const matchComponent = createMatchComponent({ matchAccessor });
+  const matchComponent = createMatchComponent({
+    matchAccessor,
+    matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
+  });
   // One set of seat ids for rooms and blocks, so a seat id the room view shows is the one a block is checked against.
   const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
   const blockComponent = createBlockComponent({

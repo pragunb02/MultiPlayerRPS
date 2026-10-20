@@ -607,8 +607,10 @@ describe("a guest's progress moving to their account through the real compositio
       );
       expect(streaks.win.current).toBe(1);
       expect(streaks.daily.current).toBe(1);
-      expect(match.players[0]).toEqual({ playerId: body.identity.id, displayName: "Riya" });
-      expect(match.result.winners).toEqual([body.identity.id]);
+      // History names the account by its id for this match (CC-297), consistently enough to replay the game.
+      expect(match.players[0]).toEqual({ playerId: match.you, displayName: "Riya" });
+      expect(match.result.winners).toEqual([match.you]);
+      expect(JSON.stringify(match)).not.toContain(body.identity.id);
       expect(rps.getOutcome(replayed)).toEqual({ status: "finished", ...match.result });
       expect(transfer).toEqual(
         expect.objectContaining({ from: alice.identity.id, status: "done", to: body.identity }),

@@ -4,7 +4,7 @@ import { XP_AWARDS } from "@classicade/shared";
 import { isBotPlayerId } from "../../models/botIdentity.js";
 import { deletedPlayer, earnsNothing } from "../../models/deletedPlayer.js";
 import { anonymisedMatch } from "./anonymise.js";
-import { assertDefined } from "../../utils/assert.js";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
 import { resultFor } from "../progression/progressionComponent.js";
 import {
@@ -25,11 +25,14 @@ const HISTORY_PAGE = 100;
  *
  * @param {{
  *   matchAccessor: ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor>,
+ *   matchPlayerIds: Pick<ReturnType<typeof import("./matchPlayerIds.js").createMatchPlayerIds>, "playerIdIn">,
  *   newUuid?: () => string,   a fresh random id for each deleted player's stand-in (CC-035). Tests pick them
- * }} deps
+ * }} deps  `matchPlayerIds` names the players in every match a player reads (CC-297). It has no default, so history
+ *   can never fall back to player ids
  */
-export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
+export function createMatchComponent({ matchAccessor, matchPlayerIds, newUuid = randomUUID }) {
   assertDefined(matchAccessor, "matchAccessor");
+  assertFunction(matchPlayerIds?.playerIdIn, "matchPlayerIds.playerIdIn");
 
   const isPlayer = (match, playerId) => match.players.some((p) => p.playerId === playerId);
 
@@ -107,6 +110,41 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
       // When the game finished. The room's last activity moves on with rematch requests and leaving.
       endedAt: room.finishedAt,
     });
+  }
+
+  /**
+   * Every player a match names: its players, and anyone a log entry or the result names, so a player who is not
+   * among the players (an older record, a later kind of entry) is never shown by their player id either.
+   */
+  const playersNamedIn = (match) =>
+    new Set([
+      ...match.players.map((p) => p.playerId),
+      ...match.log.flatMap((entry) =>
+        [entry.playerId, entry.from, ...(entry.playerIds ?? [])].filter((id) => id !== undefined),
+      ),
+      ...match.result.winners,
+    ]);
+
+  /**
+   * A view of the match as a player reads it (CC-297). Every player of the match, the viewer too, is named by their
+   * match player id instead of their player id, wherever the view names them, as a value or as a key. `you` is the
+   * viewer's own. Player ids are unique strings, so nothing else is changed.
+   */
+  function asSeenBy(match, viewerId, view) {
+    const renamed = [...playersNamedIn(match)].reduce(
+      (named, playerId) => renamePlayer(named, playerId, matchPlayerIds.playerIdIn(match, playerId)),
+      view,
+    );
+    return { ...renamed, you: matchPlayerIds.playerIdIn(match, viewerId) };
+  }
+
+  /** The stored match, for one of its players only. Others get "not found", so match ids cannot be probed. */
+  async function participantsMatch({ matchId, playerId }) {
+    const match = await matchAccessor.getById(matchId);
+    if (!isPlayer(match, playerId)) {
+      throw new NotFoundError("Match not found");
+    }
+    return match;
   }
 
   /** How the match went for one player. */
@@ -216,43 +254,52 @@ export function createMatchComponent({ matchAccessor, newUuid = randomUUID }) {
 
     /**
      * A player's history, newest first. `countsForYou` says whether the game counted for this player, and why
-     * not (CC-095). A computer character among the players has `computer: true`.
+     * not (CC-095). A computer character among the players has `computer: true`. Every player is named by their
+     * match player id, and `you` is the viewer's (CC-297).
      *
      * @param {{ playerId: string, limit: number, before?: number }} query
      */
     async listForPlayer({ playerId, limit, before }) {
       const matches = await matchAccessor.listForPlayer(playerId, { limit, before });
-      return matches.map((match) => ({
-        matchId: match.matchId,
-        gameId: match.gameId,
-        players: labelled(match.players),
-        result: match.result,
-        startedAt: match.startedAt,
-        endedAt: match.endedAt,
-        outcomeForYou: outcomeFor(match, playerId),
-        countsForYou: creditFor(match, playerId),
-      }));
+      return matches.map((match) =>
+        asSeenBy(match, playerId, {
+          matchId: match.matchId,
+          gameId: match.gameId,
+          players: labelled(match.players),
+          result: match.result,
+          startedAt: match.startedAt,
+          endedAt: match.endedAt,
+          outcomeForYou: outcomeFor(match, playerId),
+          countsForYou: creditFor(match, playerId),
+        }),
+      );
     },
 
     /**
-     * The full record (including the move log for replays) — for participants only. Others get
-     * "not found", so match ids cannot be probed. How it counted is told for the viewer only: the other
-     * players' limits are theirs.
+     * The full record (including the move log for replays), for participants only. Others get "not found", so
+     * match ids cannot be probed. How it counted is told for the viewer only: the other players' limits are
+     * theirs. Every player is named by their match player id, and `you` is the viewer's (CC-297).
      *
      * @param {{ matchId: string, playerId: string }} query
      */
     async getForPlayer({ matchId, playerId }) {
-      const { credit, ...match } = await matchAccessor.getById(matchId);
-      if (!isPlayer(match, playerId)) {
-        throw new NotFoundError("Match not found");
-      }
-      return {
+      const { credit, ...match } = await participantsMatch({ matchId, playerId });
+      return asSeenBy(match, playerId, {
         ...match,
         players: labelled(match.players),
         outcomeForYou: outcomeFor(match, playerId),
         countsForYou: creditFor({ ...match, credit }, playerId),
-      };
+      });
     },
+
+    /**
+     * The players of a match by their player ids, for the server's own checks (whom a block from a match names),
+     * never for a client: see `getForPlayer`. For participants only, as `getForPlayer`.
+     *
+     * @param {{ matchId: string, playerId: string }} query
+     * @returns {Promise<ReadonlyArray<Readonly<{ playerId: string, displayName: string }>>>}
+     */
+    playersFor: async (query) => (await participantsMatch(query)).players,
 
     /**
      * The full record, for the server's own pipeline (never for a client: see `getForPlayer`).

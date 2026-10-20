@@ -36,15 +36,18 @@ function fakeRooms(rooms = {}, closed = []) {
   };
 }
 
-/** Stored matches by id. Only their players may read them, as `matchComponent.getForPlayer` does. */
+/**
+ * Stored matches by id. Only their players may read them, and by their real player ids, as
+ * `matchComponent.playersFor` answers them (CC-297).
+ */
 function fakeMatches(matches = {}) {
   return {
-    async getForPlayer({ matchId, playerId }) {
+    async playersFor({ matchId, playerId }) {
       const match = matches[matchId];
       if (match === undefined || !match.players.some((p) => p.playerId === playerId)) {
         throw new NotFoundError("Match not found");
       }
-      return match;
+      return match.players;
     },
   };
 }
@@ -188,6 +191,18 @@ describe("blockComponent: who can be blocked (CC-044, ADR-053)", () => {
         rooms: fakeRooms(),
         matches: fakeMatches(),
         transfers: fakeTransfers(),
+      }),
+    ).toThrow(TypeError);
+  });
+
+  it("refuses to be built without a way to read the real players of a match (CC-297)", () => {
+    expect(() =>
+      createBlockComponent({
+        blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
+        rooms: fakeRooms(),
+        matches: { getForPlayer: async () => ({ players: [] }) },
+        transfers: fakeTransfers(),
+        seatIds: SEAT_IDS,
       }),
     ).toThrow(TypeError);
   });

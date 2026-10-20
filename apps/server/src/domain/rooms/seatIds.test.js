@@ -60,6 +60,12 @@ describe("seat ids (CC-253)", () => {
     expect(() => createSeatIds({ secret: "short" })).toThrow(RangeError);
   });
 
+  it("gives the same seat id as before the keyed id helper, so open rooms and blocks keep theirs (CC-297)", () => {
+    const seatIds = createSeatIds({ secret: seatSecretFrom("session-secret-for-tests-only-0123456789") });
+
+    expect(seatIds.seatIdOf(ROOM, ACCOUNT)).toBe("4RlCAtH-PzunzFNMlAWzlA");
+  });
+
   it("derives its key from the session secret under its own label, apart from the seals' key", () => {
     const sessionSecret = "session-secret-for-tests-only-0123456789";
 
