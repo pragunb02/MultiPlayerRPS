@@ -273,6 +273,41 @@ describe("createSwarm when a player plays the computer", () => {
 });
 
 describe("createSwarm when it stops", () => {
+  // On a busy runner the run that ends at the first refused room stopped while some players were still signing
+  // in. Each of them then connected, was closed at once, and sent its first call on the closed socket, waiting
+  // the whole `waitMs` (30 s) for an answer, so `stop` and the cleanup hook hung (CC-309).
+  it("resolves at once when a player is still signing in, and that player sends nothing", async () => {
+    let release;
+    const signedIn = new Promise((resolve) => {
+      release = resolve;
+    });
+    let asked = false;
+    const calls = [];
+    const base = await fakeServer({
+      guest: (res) => {
+        asked = true;
+        signedIn.then(() => res.writeHead(200, { "set-cookie": "cc.sid=s1; Path=/" }).end());
+      },
+      handlers: {
+        [SOCKET_EVENTS.ROOM_PLAY_COMPUTER]: ({ ack }) => {
+          calls.push(SOCKET_EVENTS.ROOM_PLAY_COMPUTER);
+          ack({ ok: false, error: { code: "SERVER_BUSY" } });
+        },
+      },
+    });
+    const { recorder, swarm } = swarmOn(base, { model: { ...QUICK, computerShare: 1 }, waitMs: 30_000 });
+
+    await swarm.grow(1, 0);
+    await until(() => asked);
+    const stopped = swarm.stop();
+    release();
+    await stopped;
+
+    expect(calls).toEqual([]);
+    expect(swarm.players()).toBe(0);
+    expect(recorder.take().failures).toEqual({});
+  });
+
   it("stops players who have not arrived yet, so nobody connects after the end", async () => {
     const server = await realServer();
     const { recorder, swarm } = swarmOn(server.baseUrl);
