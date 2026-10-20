@@ -198,6 +198,22 @@ describe("asking, answering and the pushes (CC-052)", () => {
     expect(pushes(riya, SOCKET_EVENTS.FRIENDS_UPDATED)).toHaveLength(pushedToRiya);
   });
 
+  it("cancels a request the player sent, which leaves the other player's view", async () => {
+    server = await startTestServer();
+    const riya = await account("RiyaTest");
+    const arjun = await account("ArjunTest");
+    const { bobSeat } = await together(riya, arjun);
+    await ask(riya, bobSeat);
+    const [request] = (await view(riya)).outgoing;
+
+    const cancelled = await call("DELETE", `/friends/requests/${request.requestId}`, { cookie: riya.cookie });
+    const again = await call("DELETE", `/friends/requests/${request.requestId}`, { cookie: riya.cookie });
+
+    expect(cancelled.status).toBe(204);
+    expect(again.status).toBe(404);
+    expect((await view(arjun)).incoming).toEqual([]);
+  });
+
   it("refuses a malformed request, answer, request id, handle or token", async () => {
     server = await startTestServer();
     const riya = await account("RiyaTest");
@@ -218,7 +234,7 @@ describe("asking, answering and the pushes (CC-052)", () => {
       await call("DELETE", "/friends/user_aaaaaaaaaaaaaaaaaaaaaaaa", { cookie: riya.cookie }),
       await call("GET", "/friends/links/short"),
       await call("POST", "/friends/links/short", { cookie: riya.cookie }),
-      await call("PUT", "/friends/settings", { body: "yes", cookie: riya.cookie }),
+      await call("PUT", "/friends/settings", { body: [true], cookie: riya.cookie }),
     ];
 
     expect(results.map((res) => res.status)).toEqual([400, 400, 400, 400, 404, 404, 404, 404, 404, 400]);
