@@ -87,6 +87,7 @@ import { testConfig } from "./testConfig.js";
  *
  * @param {{
  *   env?: Record<string, string>,
+ *   buildInfoText?: string,   the build file the server reads at boot (CC-303), none by default
  *   guestLimit?: { windowMs: number, limit: number },
  *   engines?: ReadonlyArray<any>,
  *   authLimits?: object,
@@ -115,6 +116,7 @@ import { testConfig } from "./testConfig.js";
  */
 export function createTestApp({
   env = {},
+  buildInfoText = "",
   guestLimit,
   authLimits,
   engines = [raceEngine],
@@ -136,7 +138,7 @@ export function createTestApp({
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
   metrics = {},
 } = {}) {
-  const config = testConfig(env);
+  const config = testConfig(env, { buildInfoText });
   const capture = captureLogger();
   const store = new session.MemoryStore();
   const sessionMiddleware = createSessionMiddleware({

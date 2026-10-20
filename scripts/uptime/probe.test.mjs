@@ -11,6 +11,17 @@ const timeout = () =>
 const refused = () => Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } });
 
 describe("judgeHealth", () => {
+  it("passes a 200 that also names the deployed commit and version (CC-303)", () => {
+    const body = JSON.stringify({
+      status: "ok",
+      database: "up",
+      commit: "a40ce5b9d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f",
+      version: "2026.10.20+a40ce5b",
+    });
+
+    expect(judgeHealth({ status: 200, contentType: "application/json", body }).ok).toBe(true);
+  });
+
   it("passes a 200 with the database up", () => {
     expect(judgeHealth({ status: 200, contentType: "application/json", body: HEALTHY })).toEqual({
       ok: true,

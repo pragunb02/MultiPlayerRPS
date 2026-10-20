@@ -33,7 +33,8 @@ const PLAIN = Object.freeze({
 });
 
 /** Render sets these itself. Declaring one would replace Render's own value. */
-// RENDER_GIT_COMMIT is the commit being deployed, the service version in operations telemetry (CC-286).
+// RENDER_GIT_COMMIT is the commit being deployed: the service version in operations telemetry (CC-286), and the
+// commit and version on /health (CC-303).
 const RENDER_OWNED = Object.freeze(["PORT", "RENDER_GIT_COMMIT"]);
 
 /** @returns {Promise<Record<string, any>>} */
@@ -51,6 +52,7 @@ async function namesConfigReads() {
   const source = [
     await read("apps/server/src/config/index.js"),
     await read("apps/server/src/config/telemetry.js"),
+    await read("apps/server/src/config/build.js"),
   ].join("\n");
   return [...new Set([...source.matchAll(/\benv\.([A-Z][A-Z0-9_]*)\b/g)].map((match) => match[1]))].sort();
 }
@@ -123,6 +125,12 @@ describe("render.yaml", () => {
       (await namesConfigReads()).filter((name) => !RENDER_OWNED.includes(name)),
     );
     expect([...declared].sort()).toEqual([...SECRETS, ...Object.keys(PLAIN)].sort());
+  });
+
+  it("leaves out only names the server really reads, such as RENDER_GIT_COMMIT for /health (CC-303)", async () => {
+    const reads = await namesConfigReads();
+
+    expect(RENDER_OWNED.filter((name) => !reads.includes(name))).toEqual([]);
   });
 
   it("keeps every secret in the dashboard: sync false and no value in the file", async () => {

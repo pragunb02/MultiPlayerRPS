@@ -23,6 +23,7 @@ describe("loadConfig", () => {
       trustProxyHops: 0,
       adminAccountIds: [],
       telemetry: { enabled: false },
+      build: { commit: "unknown", version: "unknown" },
     });
   });
 
@@ -202,5 +203,23 @@ describe("loadConfig", () => {
     const config = loadConfig(TEST_ENV);
     expect(Object.isFrozen(config)).toBe(true);
     expect(Object.isFrozen(config.allowedOrigins)).toBe(true);
+  });
+});
+
+describe("loadConfig: the deployed build (CC-303)", () => {
+  const BASE = { MONGO_URI: "mongodb://127.0.0.1:27017/x", SESSION_SECRET: "s".repeat(32) };
+  const commit = "a40ce5b9d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f";
+
+  it("reads the commit and the version written by the build", () => {
+    const config = loadConfig(
+      { ...BASE, RENDER_GIT_COMMIT: commit },
+      { buildInfoText: JSON.stringify({ commit, version: "2026.10.20+a40ce5b" }) },
+    );
+
+    expect(config.build).toEqual({ commit, version: "2026.10.20+a40ce5b" });
+  });
+
+  it("knows neither without Render and without a build file, and still boots", () => {
+    expect(loadConfig(BASE).build).toEqual({ commit: "unknown", version: "unknown" });
   });
 });
