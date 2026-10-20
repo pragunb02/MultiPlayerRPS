@@ -168,6 +168,7 @@ describe("the chess puzzle referee", () => {
 
   it("writes the whole solution in SAN, the opponent's replies included", () => {
     expect(chessSolution(TWO_STEPS)).toEqual(["Rd8", "Qxd8+", "Bxd8"]);
+    expect(chessSolution(PROMOTION)).toEqual(["e8=Q+"]);
   });
 
   it("accepts a puzzle whose moves are all legal", () => {
