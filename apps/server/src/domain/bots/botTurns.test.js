@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHESS_ACTIONS, GAME_IDS, REQUEST_ANSWERS, RPS_CHOICES } from "@classicade/shared";
 import { botRooms, PERSON } from "../../testing/botRooms.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 import { ForbiddenError } from "../../utils/errors.js";
 import { NO_ACTION, NO_BOT_TURNS } from "./botTurns.js";
 import { commitmentOf } from "./seals.js";
@@ -40,7 +41,10 @@ describe("botTurns: Rock Paper Scissors seals (CC-225)", () => {
     const view = rooms.viewFor(room, PERSON.id);
     expect(view.fairness).toEqual({
       game: expect.stringMatching(/^[0-9a-f]{16}$/),
-      locked: [{ playerId: ROCKY, turn: 0, commitment: room.game.seals[0].commitment }],
+      // The view names Rocky by his seat id, as every player (CC-253).
+      locked: [
+        { playerId: TEST_SEAT_IDS.seatIdOf(room, ROCKY), turn: 0, commitment: room.game.seals[0].commitment },
+      ],
       checks: [],
     });
     expect(JSON.stringify(view)).not.toContain(room.game.seals[0].salt);
@@ -107,7 +111,13 @@ describe("botTurns: Rock Paper Scissors seals (CC-225)", () => {
 
     expect(rooms.viewFor(played, PERSON.id).fairness).toEqual({
       game: rooms.viewFor(started, PERSON.id).fairness.game,
-      locked: [{ playerId: ROCKY, turn: 0, commitment: started.game.seals[0].commitment }],
+      locked: [
+        {
+          playerId: TEST_SEAT_IDS.seatIdOf(played, ROCKY),
+          turn: 0,
+          commitment: started.game.seals[0].commitment,
+        },
+      ],
       checks: [],
     });
   });
