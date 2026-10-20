@@ -73,6 +73,28 @@ describe("lineChart", () => {
     expect(log).toContain('<text x="80" y="492" text-anchor="middle" fill="#444">1</text>');
   });
 
+  it("stops the y axis at its cap and draws higher points on the top line", () => {
+    const capped = lineChart({
+      title: "t",
+      xLabel: "x",
+      yLabel: "y",
+      series: [
+        {
+          name: "a",
+          points: [
+            [1, 50],
+            [2, 5000],
+          ],
+        },
+      ],
+      yMax: 500,
+    });
+
+    expect(capped).toContain(">500</text>");
+    expect(capped).not.toContain(">5000</text>");
+    expect(capped).toContain('cy="60"');
+  });
+
   it("draws an empty chart without failing", () => {
     expect(lineChart({ title: "t", xLabel: "x", yLabel: "y", series: [] })).toContain("</svg>");
   });

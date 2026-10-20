@@ -199,3 +199,66 @@ describe("createSwarm when the server lets players down", () => {
     expect(Object.keys(await failuresOf(base, peopleOnly))).toEqual(["stuck waiting for the server"]);
   });
 });
+
+describe("createSwarm when it stops", () => {
+  it("stops players who have not arrived yet, so nobody connects after the end", async () => {
+    const server = await realServer();
+    const { recorder, swarm } = swarmOn(server.baseUrl);
+
+    await swarm.grow(4, 300);
+    await swarm.stop();
+
+    expect(swarm.players()).toBe(0);
+    expect(recorder.take().failures).toEqual({});
+  });
+
+  it("does not count a call cut off by the end of the run as a failure", async () => {
+    let asked = false;
+    const base = await fakeServer({
+      handlers: {
+        [SOCKET_EVENTS.ROOM_PLAY_COMPUTER]: () => {
+          asked = true;
+        },
+      },
+    });
+    const { recorder, swarm } = swarmOn(base, { model: { ...QUICK, computerShare: 1 } });
+
+    await swarm.grow(1, 0);
+    await until(() => asked);
+    await swarm.stop();
+
+    expect(recorder.take().failures).toEqual({});
+  });
+});
+
+describe("createSwarm when a game ends while the player thinks", () => {
+  it("counts the game and sends no move, as when a chess clock runs out", async () => {
+    const board = Array(9).fill("");
+    const room = (status, revision, activePlayers) => ({
+      code: "BBBBBB",
+      status,
+      revision,
+      you: "p1",
+      game: { number: 1, activePlayers, view: { board } },
+    });
+    const base = await fakeServer({
+      handlers: {
+        [SOCKET_EVENTS.ROOM_PLAY_COMPUTER]: ({ socket, ack }) => {
+          ack({ ok: true, data: room(ROOM_STATUS.PLAYING, 1, ["p1"]) });
+          setTimeout(() => socket.emit(SOCKET_EVENTS.ROOM_UPDATED, room(ROOM_STATUS.FINISHED, 2, [])), 20);
+        },
+      },
+    });
+    const model = { ...QUICK, computerShare: 1, gameShare: { [GAME_IDS.TIC_TAC_TOE]: 1 } };
+    const { recorder, swarm } = swarmOn(base, { model, waitMs: 2_000 });
+
+    await swarm.grow(1, 0);
+    let counts = {};
+    await until(() => {
+      counts = { ...counts, ...recorder.take().counts };
+      return Object.keys(counts).length > 0;
+    });
+
+    expect(counts).toEqual({ "games tictactoe computer": 1 });
+  });
+});

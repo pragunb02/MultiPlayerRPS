@@ -36,11 +36,13 @@ export function niceStep(max) {
  *   series: ReadonlyArray<{ name: string, points: ReadonlyArray<[number, number]> }>,
  *   limits?: ReadonlyArray<{ name: string, value: number }>,
  *   logX?: boolean,
+ *   yMax?: number,
  * }} chart   points are `[x, y]`. With `logX` the x axis is logarithmic, for players from 2 to thousands, and every
- *   x must be at least 1
+ *   x must be at least 1. With `yMax` the y axis stops there and higher points are drawn on its top line, so a
+ *   collapse does not flatten the interesting part of the chart
  * @returns {string} an SVG document
  */
-export function lineChart({ title, xLabel, yLabel, series, limits = [], logX = false }) {
+export function lineChart({ title, xLabel, yLabel, series, limits = [], logX = false, yMax: cap }) {
   const xs = series.flatMap(({ points }) => points.map(([x]) => x));
   const ys = [
     ...series.flatMap(({ points }) => points.map(([, y]) => y)),
@@ -49,14 +51,14 @@ export function lineChart({ title, xLabel, yLabel, series, limits = [], logX = f
   const xStep = niceStep(Math.max(1, ...xs));
   // A logarithmic axis ends at the next power of ten and marks 1, 2 and 5 of every decade.
   const decades = Math.ceil(Math.log10(Math.max(10, ...xs)));
-  const yStep = niceStep(Math.max(1, ...ys));
+  const yStep = niceStep(cap ?? Math.max(1, ...ys));
   const xMax = logX ? 10 ** decades : Math.ceil(Math.max(1, ...xs) / xStep) * xStep;
-  const yMax = Math.ceil(Math.max(1, ...ys) / yStep) * yStep;
+  const yMax = cap ?? Math.ceil(Math.max(1, ...ys) / yStep) * yStep;
   const plotW = WIDTH - PAD.left - PAD.right;
   const plotH = HEIGHT - PAD.top - PAD.bottom;
   const logMax = Math.log10(xMax);
   const px = logX ? (x) => PAD.left + (Math.log10(x) / logMax) * plotW : (x) => PAD.left + (x / xMax) * plotW;
-  const py = (y) => PAD.top + plotH - (y / yMax) * plotH;
+  const py = (y) => PAD.top + plotH - (Math.min(y, yMax) / yMax) * plotH;
   const ticks = (step, max) => Array.from({ length: Math.round(max / step) + 1 }, (_, index) => index * step);
   const label = (value) => String(Math.round(value * 100) / 100);
 

@@ -13,7 +13,8 @@
 // 6. LOAD_COMPUTER_SHARE: the share of players who play a computer character (default 0.4, scripts/load/model.mjs).
 // 7. LOAD_STOP: nfr3 (default) stops at the first step over NFR-3 or with a failure. unplayable goes on past NFR-3
 //    until a failure or a move p95 over LOAD_UNPLAYABLE_MS (default 1000), to show how the server degrades.
-// 8. LOAD_OUT: where the results go (default scripts/load/results/<size>.json).
+// 8. LOAD_CPU_PROFILE: a folder for a V8 CPU profile of the server, written when it stops (off by default).
+// 9. LOAD_OUT: where the results go (default scripts/load/results/<size>.json).
 import { execFile, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -54,6 +55,7 @@ if (!["nfr3", "unplayable"].includes(stop)) {
   throw new RangeError("LOAD_STOP must be nfr3 or unplayable");
 }
 const unplayableMs = Number(process.env.LOAD_UNPLAYABLE_MS ?? 1000);
+const profileDir = process.env.LOAD_CPU_PROFILE;
 const model = {
   ...DEFAULT_MODEL,
   computerShare: Number(process.env.LOAD_COMPUTER_SHARE ?? DEFAULT_MODEL.computerShare),
@@ -106,7 +108,9 @@ async function main() {
     ...["-e", `SESSION_SECRET=${randomBytes(32).toString("hex")}`],
     ...["-v", `${path.join(ROOT, "scripts/load")}:/app/scripts/load:ro`],
     ...["-v", `${path.join(ROOT, "scripts/bin/load-serve.mjs")}:/app/scripts/bin/load-serve.mjs:ro`],
-    ...[APP_IMAGE, "node", "scripts/bin/load-serve.mjs"],
+    ...(profileDir === undefined ? [] : ["-v", `${path.resolve(profileDir)}:/prof`]),
+    ...[APP_IMAGE, "node", ...(profileDir === undefined ? [] : ["--cpu-prof", "--cpu-prof-dir=/prof"])],
+    "scripts/bin/load-serve.mjs",
   );
   await waitFor("The server", async () => (await fetch(`${base}/health`)).ok);
 
@@ -201,8 +205,17 @@ async function main() {
   } finally {
     await swarm.stop();
     logs.kill();
-    await mongo.close();
   }
+  // What the run left in the database, for the data retention estimate.
+  const db = mongo.db("load");
+  const { dataSize, indexSize } = await db.stats();
+  const database = {
+    matches: await db.collection("matches").countDocuments(),
+    sessions: await db.collection("player_sessions").countDocuments(),
+    dataMb: Math.round(dataSize / 1e5) / 10,
+    indexMb: Math.round(indexSize / 1e5) / 10,
+  };
+  await mongo.close();
   // The capacity is the last step before the first break, never a later step that happened to pass.
   const before = (key) => {
     const first = results.findIndex((step) => step[key].broken);
@@ -237,6 +250,7 @@ async function main() {
       },
     },
     idle,
+    database,
     steps: results,
   };
   mkdirSync(path.dirname(out), { recursive: true });
@@ -246,6 +260,8 @@ async function main() {
 
 /** Removes only what this run started, whatever state it was left in. */
 async function cleanUp() {
+  // Stopping first lets the server close cleanly, which is when Node writes a CPU profile.
+  await docker("stop", "-t", "15", names.app).catch(() => {});
   for (const container of [names.app, names.mongo]) {
     await docker("rm", "-f", container).catch(() => {});
   }

@@ -43,12 +43,18 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
   const sockets = new Set();
   const loops = new Set();
 
+  // Ends one player's games: the server refused or did not answer (already counted), or the swarm is stopping.
+  const ENDED = new Error("the player's games ended");
+  const need = (value) => {
+    if (value === undefined) throw ENDED;
+    return value;
+  };
+
   /** Times one call, records how it went, and answers its data, or undefined when it failed. */
   async function call(socket, event, payload, name = event) {
     const began = performance.now();
     try {
       const ack = await socket.timeout(waitMs).emitWithAck(event, payload);
-      if (stopping) return undefined;
       recorder.time(name, performance.now() - began);
       if (!ack.ok) {
         recorder.fail(`${event} ${ack.error.code}`);
@@ -102,6 +108,8 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
   async function arrive() {
     const socket = await connect(await signIn());
     sockets.add(socket);
+    // A player who arrives after the swarm stopped goes again at once, so no socket outlives the run.
+    if (stopping) socket.close();
     socket.on("disconnect", (reason) => {
       sockets.delete(socket);
       if (!stopping && reason !== "io client disconnect") recorder.fail(`disconnected ${reason}`);
@@ -130,21 +138,28 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
     return player;
   }
 
-  /** Waits until `ready` holds for the player's newest view. Answers false when the swarm stops or nothing comes. */
+  /** Waits until `ready` holds for the player's newest view, and ends the player's games when nothing comes. */
   async function until(player, ready) {
     const deadline = performance.now() + waitMs;
-    while (!stopping && !ready(player.view)) {
+    for (;;) {
+      if (stopping) throw ENDED;
+      if (ready(player.view)) return;
       const left = deadline - performance.now();
       if (left <= 0) {
         recorder.fail("stuck waiting for the server");
-        return false;
+        throw ENDED;
       }
       const woken = new Promise((resolve) => {
         player.wake = resolve;
       });
       await Promise.race([woken, sleep(Math.min(left, 1_000))]);
     }
-    return !stopping;
+  }
+
+  /** A pause drawn from a span, after which a stopping swarm ends the player's games. */
+  async function rest(span) {
+    await pause(draw(rng, span));
+    if (stopping) throw ENDED;
   }
 
   const myTurn = (view) => view.status === ROOM_STATUS.PLAYING && view.game.activePlayers.includes(view.you);
@@ -157,105 +172,74 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
   async function playGame(player, { gameId, computer }, number) {
     let ownMoves = 0;
     const resignAt = draw(rng, model.chessOwnMoves);
-    if (!(await until(player, (view) => view.game?.number === number))) return false;
-    while (await until(player, (view) => over(view) || myTurn(view))) {
+    await until(player, (view) => view.game?.number === number);
+    for (;;) {
+      await until(player, (view) => over(view) || myTurn(view));
       if (over(player.view)) {
         recorder.count(`games ${gameId} ${computer ? "computer" : "people"}`);
-        return true;
+        return;
       }
-      await pause(draw(rng, model.thinkMs[gameId]));
-      if (stopping) return false;
+      await rest(model.thinkMs[gameId]);
       // A chess clock may have run out while the player thought. Then the game is over and there is no move.
       if (!myTurn(player.view)) continue;
       const { code, game } = player.view;
       ownMoves += 1;
       const sent = performance.now();
-      const answer = await call(
-        player.socket,
-        SOCKET_EVENTS.GAME_MOVE,
-        { code, move: chooseMove({ gameId, game, rng, resign: ownMoves > resignAt }) },
-        `${MOVE} ${gameId}`,
+      const move = chooseMove({ gameId, game, rng, resign: ownMoves > resignAt });
+      player.see(
+        need(await call(player.socket, SOCKET_EVENTS.GAME_MOVE, { code, move }, `${MOVE} ${gameId}`)),
       );
-      if (answer === undefined) return false;
-      player.see(answer);
       if (computer && !over(player.view) && !myTurn(player.view)) {
         // The computer replies after a human-like pause (400 to 900 ms) plus its thinking in the server's queue.
-        if (!(await until(player, (view) => over(view) || myTurn(view)))) return false;
+        await until(player, (view) => over(view) || myTurn(view));
         recorder.time(`computer reply ${gameId}`, performance.now() - sent);
       }
     }
-    return false;
   }
 
   /** Friends: one opens a room, the other joins with its code, and they play until the swarm stops. */
   async function pairLoop(plan) {
+    const { gameId } = plan;
     const [host, guest] = await Promise.all([arrive(), arrive()]);
-    while (!stopping) {
-      const created = await call(
-        host.socket,
-        SOCKET_EVENTS.ROOM_CREATE,
-        { gameId: plan.gameId, options: roomOptions(plan.gameId, model) },
-        `room:create ${plan.gameId}`,
-      );
-      if (created === undefined) return;
-      host.enter(created);
-      const joined = await call(guest.socket, SOCKET_EVENTS.ROOM_JOIN, { code: created.code });
-      if (joined === undefined) return;
-      guest.enter(joined);
-      for (let number = 1; ; number += 1) {
-        const played = await Promise.all([playGame(host, plan, number), playGame(guest, plan, number)]);
-        if (!played.every(Boolean)) return;
-        await pause(draw(rng, model.resultMs));
-        if (stopping) return;
-        if (rng() >= model.rematchShare) break;
-        const { code } = host.view;
-        const asked = await call(host.socket, SOCKET_EVENTS.ROOM_REQUEST, {
-          code,
-          type: ROOM_REQUEST_TYPES.REMATCH,
-        });
-        if (asked === undefined) return;
-        host.see(asked);
-        const accepted = await call(guest.socket, SOCKET_EVENTS.ROOM_ANSWER, {
-          code,
-          type: ROOM_REQUEST_TYPES.REMATCH,
-          answer: REQUEST_ANSWERS.ACCEPT,
-        });
-        if (accepted === undefined) return;
-        guest.see(accepted);
-      }
+    for (;;) {
+      const options = roomOptions(gameId, model);
+      const name = `room:create ${gameId}`;
+      host.enter(need(await call(host.socket, SOCKET_EVENTS.ROOM_CREATE, { gameId, options }, name)));
       const { code } = host.view;
-      if ((await call(guest.socket, SOCKET_EVENTS.ROOM_LEAVE, { code })) === undefined) return;
-      if ((await call(host.socket, SOCKET_EVENTS.ROOM_LEAVE, { code })) === undefined) return;
+      guest.enter(need(await call(guest.socket, SOCKET_EVENTS.ROOM_JOIN, { code })));
+      for (let number = 1; ; number += 1) {
+        await Promise.all([playGame(host, plan, number), playGame(guest, plan, number)]);
+        await rest(model.resultMs);
+        if (rng() >= model.rematchShare) break;
+        const type = ROOM_REQUEST_TYPES.REMATCH;
+        host.see(need(await call(host.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type })));
+        const answer = REQUEST_ANSWERS.ACCEPT;
+        guest.see(need(await call(guest.socket, SOCKET_EVENTS.ROOM_ANSWER, { code, type, answer })));
+      }
+      need(await call(guest.socket, SOCKET_EVENTS.ROOM_LEAVE, { code }));
+      need(await call(host.socket, SOCKET_EVENTS.ROOM_LEAVE, { code }));
     }
   }
 
   /** One player against a computer character, rematching it or starting a new game. */
   async function computerLoop(plan) {
+    const { gameId, level } = plan;
     const player = await arrive();
-    while (!stopping) {
-      const started = await call(
-        player.socket,
-        SOCKET_EVENTS.ROOM_PLAY_COMPUTER,
-        { gameId: plan.gameId, level: plan.level, options: roomOptions(plan.gameId, model) },
-        `room:play-computer ${plan.gameId}`,
-      );
-      if (started === undefined) return;
-      player.enter(started);
+    for (;;) {
+      const options = roomOptions(gameId, model);
+      const name = `room:play-computer ${gameId}`;
+      const payload = { gameId, level, options };
+      player.enter(need(await call(player.socket, SOCKET_EVENTS.ROOM_PLAY_COMPUTER, payload, name)));
+      const { code } = player.view;
       for (let number = 1; ; number += 1) {
-        if (!(await playGame(player, plan, number))) return;
-        await pause(draw(rng, model.resultMs));
-        if (stopping) return;
+        await playGame(player, plan, number);
+        await rest(model.resultMs);
         if (rng() >= model.rematchShare) break;
-        const asked = await call(player.socket, SOCKET_EVENTS.ROOM_REQUEST, {
-          code: player.view.code,
-          type: ROOM_REQUEST_TYPES.REMATCH,
-        });
-        if (asked === undefined) return;
         // The computer accepts after its pause, and the next game starts.
-        player.see(asked);
+        const type = ROOM_REQUEST_TYPES.REMATCH;
+        player.see(need(await call(player.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type })));
       }
-      if ((await call(player.socket, SOCKET_EVENTS.ROOM_LEAVE, { code: player.view.code })) === undefined)
-        return;
+      need(await call(player.socket, SOCKET_EVENTS.ROOM_LEAVE, { code }));
     }
   }
 
@@ -267,7 +251,7 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
       if (stopping) return;
       await (plan.computer ? computerLoop(plan) : pairLoop(plan));
     })().catch((err) => {
-      if (!stopping) recorder.fail(`player ${err.message}`);
+      if (err !== ENDED && !stopping) recorder.fail(`player ${err.message}`);
     });
     loops.add(loop);
     loop.finally(() => loops.delete(loop));
