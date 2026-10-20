@@ -94,6 +94,49 @@ the owner may change it.
 - **Consequences.** A new collection, `daily_puzzle_attempts`, with one unique index, kept until the account is
   deleted. About 108 KB of JSON in the server. A new kind is a referee, a catalogue, a board and two registry lines.
 
+### ADR-060 — Guests on the leaderboards under their server-given name
+
+- **Status:** Accepted · 2026-10-20 by the owner (points 1 to 3). Points 4 to 8 are how
+  [CC-291](tickets/CC-291.md) builds it, with the research and sources there. Amends ADR-015.1 and makes an
+  exception to ADR-048.10.
+- **Context.** Most players start as guests and never see themselves on a board, so the boards mean nothing to them
+  until they sign up. ADR-015.1 kept the boards to accounts, and ADR-048.10 hides the name of anyone who is not
+  surely an adult as "Hidden player".
+- **Decision.**
+  1. **Guests are on every board** (overall, this week, wins per game), under the name the server gave them,
+     `Guest-XXXX`. This amends ADR-015.1 (accounts only).
+  2. **The exception to ADR-048.10.** A server-given guest name is shown whatever the player's age, because the
+     player did not choose it and it carries no personal data. The board shows a guest row's name only when it has
+     exactly the server-given shape (`isServerGivenGuestName`). Any other name on a guest row is hidden like an
+     account of unknown age.
+  3. **If guests can ever choose a name, the age rule applies to them.** Point 2 already does that for any name not
+     of the server-given shape. A feature that lets guests choose a name must keep that check.
+  4. **Fair play still decides what counts** (ADR-021). Guests go through the same writes as accounts: only games
+     against people that count for them, and quest bonuses those games earned. Scores only rise.
+  5. **A guest row lasts as long as a guest session can.** Its `expiresAt` is 30 days after the guest's latest
+     counted game or ranked quest bonus (`GUEST_ROW_LIFETIME_MS`, never longer than the 30 day session of ADR-030),
+     and a weekly row never past its week's own retention. Every counted game moves all the guest's all time rows on.
+     The existing TTL index removes them, so guest data cleanup (CC-098) finds no board rows behind it.
+  6. **The guest transfer moves the rows once** (ADR-014). Each weekly row of the guest is added to the account's
+     row of the same week once per guest (`mergedFrom`). It leaves out the games fair play withdrew in the merge
+     (ADR-021.6) and any moved match the account's week already counted under the same key. The guest's
+     remembered match and quest keys are kept on the account's row in `mergedKeys`, apart from its own
+     `recentKeys`, so none of them counts twice and a merge never pushes out the account's own keys. Then the
+     account's totals are recomputed as before (they only rise), and the guest's rows are deleted. This closes the
+     gap ADR-015 noted: a guest's quest XP from this week now reaches the account.
+  7. **No guest row outlives the transfer.** The board step skips a guest whose transfer has started, and skips an
+     account a guest is moving into until that move is done, because the move recomputes it. After writing, also
+     when a write failed, it removes the rows of every moved guest of the match. And the boards never list, or
+     rank as the viewer, a guest whose move is done. A race can only under-count.
+  8. **Abuse.** No new limit. The limits per address (ADR-035: 30 connections, 30 open rooms) and per player
+     (ADR-021: 20 counted games an hour, 10 per opponent in 24 hours) bound what one person can put on the boards
+     the same way for guests and accounts. Guests only make the start faster (15 minutes for 30 players instead of
+     3 hours), and they cannot write words on the board. The numbers are in CC-291.
+- **Consequences.** Each response that carries the viewer's own standing is `Cache-Control: private, no-store`.
+  `LEADERBOARD_UNLISTED.GUEST` is gone. Account deletion and export (ADR-048) are unchanged: they already erase under
+  every former guest id. If a flood of guests pushes real players down, the owner can hide guest rows from the
+  public list or ask for several counted games before a guest is listed, both changes to `getBoard` alone.
+
 ### ADR-057 — Room views name players by opaque per-room seat ids
 
 - **Status:** Accepted · 2026-10-20 by the owner ([CC-253](tickets/CC-253.md), CC-241 F11, ADR-051.9)
@@ -462,6 +505,10 @@ stable React. Still the browser's View Transitions, still no added bundle.
 - **Consequences.** On release every existing account is of unknown age, so every name on the public boards is
   hidden until its owner gives a year. Rule 8(3) of the DPDP Rules (a year of processing logs) is for the lawyer's
   review before 13 May 2027. Guests are not covered by deletion (no password): CC-098 removes old guest data.
+- **Amended · 2026-10-20** (owner, [ADR-060](#adr-060--guests-on-the-leaderboards-under-their-server-given-name),
+  CC-291). An exception to point 10: a guest row on a board shows the guest's server-given `Guest-XXXX` name,
+  because the player did not choose it and it carries no personal data. Any other name on a guest row is hidden as
+  point 10 says, so if guests can ever choose a name the age rule applies to them.
 
 ### ADR-047 — Finished games go through a stored outbox with named steps and retries
 
@@ -1384,6 +1431,10 @@ XP; if progression is ever recomputed downwards, boards keep the higher value un
 **Amended · 2026-10-17** (accepted [PRODUCT_VISION.md](PRODUCT_VISION.md), decision D7). Weekly boards, and later
 leagues, reset on Monday at 00:00 India time instead of 00:00 UTC. The ISO week key ("2026-W42") stays, worked out
 in India time. Revisit if players from other regions grow. Built with CC-146. Until then the code uses UTC.
+
+**Amended · 2026-10-20** (owner, [ADR-060](#adr-060--guests-on-the-leaderboards-under-their-server-given-name),
+CC-291). Point 1 no longer holds: guests are on the boards under their server-given name, their rows last as long
+as a guest session can, and the guest transfer adds a guest's weekly rows to the account once, quest XP included.
 
 ### ADR-014 — Player data follows the identity
 

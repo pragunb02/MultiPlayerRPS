@@ -116,6 +116,12 @@ describe("account deletion through the real composition root (integration, CC-03
         const { body } = await call(app.url, "GET", "/progress", { cookie: guest.cookie });
         return body.progress.matchesPlayed === 1 ? true : undefined;
       });
+      // The guest is on the boards before signing up (ADR-060), so deletion must find those rows too.
+      await eventually(async () =>
+        (await readCollection(uri, "leaderboard_entries", { playerId: guest.body.identity.id })).length > 0
+          ? true
+          : undefined,
+      );
       const riyaUp = await signup("riya", { birthYear: 1995 }, guest.cookie);
       expect(riyaUp.status).toBe(201);
       const riya = { cookie: riyaUp.cookie, id: riyaUp.body.identity.id };

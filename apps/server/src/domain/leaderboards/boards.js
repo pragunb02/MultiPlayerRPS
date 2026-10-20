@@ -4,6 +4,13 @@ import { isoWeek } from "./isoWeek.js";
 /** Weekly entries are kept this long after their week ends (then MongoDB removes them). */
 export const WEEKLY_RETENTION_MS = 28 * 24 * 60 * 60 * 1000;
 
+/**
+ * A guest's rows end this long after the latest game or bonus that wrote them (ADR-060). It is the guest session's
+ * rolling lifetime (ADR-030), and a game is a visit, so a guest's row never outlives the session that could still
+ * move it to an account. The composition root's tests check the two stay in step.
+ */
+export const GUEST_ROW_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+
 /** Storage keys: one XP board (all time and per week) and one wins board per game. */
 export const XP_BOARD = "xp";
 export const winsBoard = (gameId) => `wins:${gameId}`;
@@ -45,3 +52,19 @@ export const hasWinsBoard = (gameId) =>
 /** Game ids that have a wins board. */
 export const gamesWithWinsBoards = () =>
   LEADERBOARDS.filter((info) => info.metric === LEADERBOARD_METRICS.WINS).map((info) => info.gameId);
+
+/**
+ * When a player's rows should end after a write at `at`. An account's all time rows never end, so they have no
+ * `allTime`. A guest's rows end `GUEST_ROW_LIFETIME_MS` later, and a weekly row never later than its week's own end.
+ *
+ * @param {{ isGuest: boolean, at: number }} write
+ * @returns {Readonly<{ week: number, allTime?: number }>}
+ */
+export function rowEnds({ isGuest, at }) {
+  const week = weekOf(at).expiresAt;
+  if (!isGuest) {
+    return Object.freeze({ week });
+  }
+  const guestEnd = at + GUEST_ROW_LIFETIME_MS;
+  return Object.freeze({ allTime: guestEnd, week: Math.min(week, guestEnd) });
+}

@@ -74,9 +74,11 @@ export function PrivacyPage() {
             from the games you play.
           </li>
           <li>
-            <strong>Leaderboards.</strong> Accounts appear on the public leaderboards with their level and
-            score. The username shows only for adults: for anyone under 18, or who has not given a year of
-            birth, the board shows &quot;Hidden player&quot; instead. Guests never appear on a leaderboard.
+            <strong>Leaderboards.</strong> Accounts and guests appear on the public leaderboards with their
+            level and score. The username shows only for adults: for anyone under 18, or who has not given a
+            year of birth, the board shows &quot;Hidden player&quot; instead. A guest shows the name we gave
+            it, such as Guest-7K2Q, which it did not choose and which says nothing about it. A guest&apos;s
+            places move to the account it signs up for.
           </li>
           <li>
             <strong>Players you block.</strong> When you block a player, we store that you blocked them, the
@@ -176,6 +178,7 @@ export function PrivacyPage() {
           </li>
           <li>
             Daily quests are kept for about a week, weekly leaderboard entries for four weeks after the week.
+            A guest&apos;s leaderboard places are kept 30 days after its last counted game.
           </li>
           <li>
             Accounts, match history, progress, achievements and daily puzzle days are kept until you delete
