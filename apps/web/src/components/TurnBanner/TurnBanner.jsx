@@ -1,5 +1,8 @@
 import styles from "./TurnBanner.module.css";
 
+/** The player colour of each kind of turn (CC-314). A spectator's banner keeps the quiet look. */
+const TURN_CLASS = Object.freeze({ you: styles.you, opponent: styles.opponent, watching: "" });
+
 /**
  * On one phone both players read the same screen, so "Your turn" could be either of them. The banner names the
  * player who holds the phone instead (CC-223).
@@ -30,7 +33,7 @@ export function TurnBanner({ room }) {
       : `Waiting for ${waitingFor.map((seat) => seat.displayName).join(" and ") || "the other player"}`;
   const turn = yourTurn ? "you" : room.you === "" ? "watching" : "opponent";
   return (
-    <p className={`${styles.banner} ${styles[turn] ?? ""}`} data-turn={turn} aria-live="polite">
+    <p className={`${styles.banner} ${TURN_CLASS[turn]}`} data-turn={turn} aria-live="polite">
       {text}
     </p>
   );

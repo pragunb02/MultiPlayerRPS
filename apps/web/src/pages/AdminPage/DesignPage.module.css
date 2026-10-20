@@ -1,0 +1,236 @@
+/* The console's design page (CC-314). Every colour, size and shadow here is a token, like the rest of the app. */
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.use {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--type-label);
+  font-weight: 400;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-label);
+}
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+/* A wide table scrolls inside its section on a phone, so the page itself never scrolls sideways. */
+section:has(> .table) {
+  overflow-x: auto;
+}
+.swatch {
+  display: inline-block;
+  min-width: 6rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+}
+.solid {
+  background: var(--swatch);
+  color: var(--swatch-on);
+}
+.soft {
+  background: var(--swatch-soft);
+  color: var(--swatch);
+}
+.success {
+  --swatch: var(--color-success);
+  --swatch-soft: var(--color-success-soft);
+  --swatch-on: var(--color-on-success);
+}
+.warning {
+  --swatch: var(--color-warning);
+  --swatch-soft: var(--color-warning-soft);
+  --swatch-on: var(--color-on-warning);
+}
+.danger {
+  --swatch: var(--color-danger);
+  --swatch-soft: var(--color-danger-soft);
+  --swatch-on: var(--color-on-danger);
+}
+.info {
+  --swatch: var(--color-info);
+  --swatch-soft: var(--color-info-soft);
+  --swatch-on: var(--color-on-info);
+}
+.you {
+  --swatch: var(--color-you);
+  --swatch-soft: var(--color-you-soft);
+  --swatch-on: var(--color-on-you);
+}
+.opponent {
+  --swatch: var(--color-opponent);
+  --swatch-soft: var(--color-opponent-soft);
+  --swatch-on: var(--color-on-opponent);
+}
+.brand {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+.brand li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dot {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-full);
+  background: var(--dot);
+}
+.primary {
+  --dot: var(--color-primary);
+}
+.accent {
+  --dot: var(--color-accent);
+}
+.xp {
+  --dot: var(--color-xp);
+}
+.gold {
+  --dot: var(--color-gold);
+}
+.streak {
+  --dot: var(--color-streak);
+}
+.game-rps {
+  --dot: var(--color-game-rps);
+}
+.game-tictactoe {
+  --dot: var(--color-game-tictactoe);
+}
+.game-chess {
+  --dot: var(--color-game-chess);
+}
+.tier-bronze {
+  --dot: var(--color-tier-bronze);
+}
+.tier-silver {
+  --dot: var(--color-tier-silver);
+}
+.tier-gold {
+  --dot: var(--color-tier-gold);
+}
+.tier-platinum {
+  --dot: var(--color-tier-platinum);
+}
+.stack {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stack p {
+  margin: 0;
+}
+.type-caption {
+  font-size: var(--type-caption);
+}
+.type-label {
+  font-size: var(--type-label);
+}
+.type-body {
+  font-size: var(--type-body);
+}
+.type-title {
+  font-size: var(--type-title);
+  font-family: var(--font-display);
+}
+.type-display {
+  font-size: var(--type-display);
+  font-family: var(--font-display);
+}
+.leading-tight {
+  line-height: var(--leading-tight);
+}
+.leading-body {
+  line-height: var(--leading-body);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.card h4 {
+  margin: 0;
+}
+.featured {
+  border-color: var(--color-primary);
+}
+.elevation-1 {
+  box-shadow: var(--elevation-1);
+}
+.elevation-2 {
+  box-shadow: var(--elevation-2);
+}
+.elevation-3 {
+  box-shadow: var(--elevation-3);
+}
+.example {
+  display: grid;
+  gap: var(--space-3);
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.example h3 {
+  margin: 0;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+}
+.badge {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+  font-size: var(--type-caption);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.badgeSuccess {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+.badgeCount {
+  background: var(--color-info);
+  color: var(--color-on-info);
+}
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.empty p {
+  margin: 0;
+}
