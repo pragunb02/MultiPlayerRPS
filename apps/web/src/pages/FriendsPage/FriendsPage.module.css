@@ -1,0 +1,109 @@
+/* The friends page and the friend link's page (CC-052). */
+.page {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 44rem;
+}
+.page h1,
+.page h2 {
+  margin: 0;
+}
+.page h1 {
+  font-size: var(--text-2xl);
+}
+.section {
+  display: grid;
+  gap: var(--space-3);
+}
+.card {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+/* A long name wraps on a phone, and the buttons stay at the end of the row. */
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.who {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  margin-right: auto;
+}
+.name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.buttons,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+.small {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+}
+.cta {
+  font-weight: 700;
+}
+.presence {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.online {
+  color: var(--color-success);
+}
+.playing {
+  color: var(--color-primary);
+}
+.label {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.label input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-weight: 400;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.invite {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}

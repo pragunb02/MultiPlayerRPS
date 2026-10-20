@@ -127,6 +127,13 @@ export function Layout() {
           {hasProgress && <span className={styles.menuDot} aria-hidden="true" />}
         </button>
         <div id="header-menu" ref={panelRef} className={`${styles.player} ${menuOpen ? styles.open : ""}`}>
+          {/* The laptop's row has no room for a fourth link, so Friends is on the profile there, and in the phone's
+              menu here (CC-052). A guest finds there how to save their progress to add friends. */}
+          {identity && (
+            <NavLink to={paths.friends()} className={styles.menuOnly} data-cc-control="header.menu_friends">
+              Friends
+            </NavLink>
+          )}
           <SoundControl />
           {identity && <LevelChip key={identity.id} />}
           <div className={styles.identity}>

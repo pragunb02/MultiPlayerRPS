@@ -244,6 +244,37 @@ describe("accountComponent birth year corrections by the owner (CC-152, ADR-048.
   });
 });
 
+describe("accountComponent usernames (CC-052)", () => {
+  it("answers the username of each account that exists, and nothing for anyone else", async () => {
+    const { accounts } = setup();
+    const riya = await accounts.signup({ ...RIYA, now: NOW });
+    const arjun = await accounts.signup({
+      username: "Arjun",
+      email: "arjun@example.com",
+      password: RIYA.password,
+      now: NOW,
+    });
+
+    const names = await accounts.usernamesOf({
+      playerIds: [
+        riya.identity.id,
+        arjun.identity.id,
+        "user_0123456789abcdef01234567",
+        "guest_x",
+        "bot_rocky_easy",
+      ],
+    });
+
+    expect(names).toEqual(
+      new Map([
+        [riya.identity.id, "Riya"],
+        [arjun.identity.id, "Arjun"],
+      ]),
+    );
+    expect(await accounts.usernamesOf({ playerIds: ["guest_x"] })).toEqual(new Map());
+  });
+});
+
 describe("accountComponent password checks and closing (CC-035)", () => {
   it("confirms the password and answers what the account holds", async () => {
     const { accounts } = setup();
