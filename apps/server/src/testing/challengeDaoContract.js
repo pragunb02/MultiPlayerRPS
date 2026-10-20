@@ -78,8 +78,20 @@ export function runChallengeDaoContract(createDao) {
     const dao = await createDao();
     const { challengeId } = await dao.insert(challengeRecord());
 
-    const first = await dao.claim({ challengeId, acceptedBy: GUEST, acceptedName: "Guest-T001", at: at(5) });
-    const second = await dao.claim({ challengeId, acceptedBy: ARJUN, acceptedName: "Arjun", at: at(6) });
+    const first = await dao.claim({
+      challengeId,
+      acceptedBy: GUEST,
+      acceptedName: "Guest-T001",
+      at: at(5),
+      staleBefore: at(5 - 30),
+    });
+    const second = await dao.claim({
+      challengeId,
+      acceptedBy: ARJUN,
+      acceptedName: "Arjun",
+      at: at(6),
+      staleBefore: at(6 - 30),
+    });
 
     expect([first, second]).toEqual([true, false]);
     expect(await dao.get(challengeId)).toMatchObject({
@@ -94,18 +106,35 @@ export function runChallengeDaoContract(createDao) {
     const dao = await createDao();
     const { challengeId } = await dao.insert(challengeRecord());
 
-    expect(await dao.claim({ challengeId, acceptedBy: GUEST, acceptedName: "G", at: at(DAY_SECONDS) })).toBe(
-      false,
-    );
-    expect(await dao.end({ challengeId, state: CHALLENGE_STATES.WITHDRAWN, at: at(DAY_SECONDS) })).toBe(
-      false,
-    );
+    expect(
+      await dao.claim({
+        challengeId,
+        acceptedBy: GUEST,
+        acceptedName: "G",
+        at: at(DAY_SECONDS),
+        staleBefore: at(DAY_SECONDS - 30),
+      }),
+    ).toBe(false);
+    expect(
+      await dao.end({
+        challengeId,
+        state: CHALLENGE_STATES.WITHDRAWN,
+        at: at(DAY_SECONDS),
+        staleBefore: at(DAY_SECONDS - 30),
+      }),
+    ).toBe(false);
   });
 
   it("opens a taken challenge again only while it has no room, and only for the one who took it", async () => {
     const dao = await createDao();
     const { challengeId } = await dao.insert(challengeRecord());
-    await dao.claim({ challengeId, acceptedBy: GUEST, acceptedName: "G", at: at(5) });
+    await dao.claim({
+      challengeId,
+      acceptedBy: GUEST,
+      acceptedName: "G",
+      at: at(5),
+      staleBefore: at(5 - 30),
+    });
 
     expect(await dao.release({ challengeId, acceptedBy: ARJUN })).toBe(false);
     expect(await dao.release({ challengeId, acceptedBy: GUEST })).toBe(true);
@@ -113,7 +142,13 @@ export function runChallengeDaoContract(createDao) {
     expect(open).toMatchObject({ state: CHALLENGE_STATES.OPEN, acceptedBy: "", acceptedName: "" });
     expect(open.endedAt).toBeUndefined();
 
-    await dao.claim({ challengeId, acceptedBy: ARJUN, acceptedName: "Arjun", at: at(6) });
+    await dao.claim({
+      challengeId,
+      acceptedBy: ARJUN,
+      acceptedName: "Arjun",
+      at: at(6),
+      staleBefore: at(6 - 30),
+    });
     expect(await dao.setRoom({ challengeId, acceptedBy: GUEST, roomCode: "AB2CD3" })).toBe(false);
     expect(await dao.setRoom({ challengeId, acceptedBy: ARJUN, roomCode: "AB2CD3" })).toBe(true);
     expect(await dao.setRoom({ challengeId, acceptedBy: ARJUN, roomCode: "ZZ2CD3" })).toBe(false);
@@ -125,8 +160,12 @@ export function runChallengeDaoContract(createDao) {
     const dao = await createDao();
     const { challengeId } = await dao.insert(challengeRecord({ toId: ARJUN }));
 
-    expect(await dao.end({ challengeId, state: CHALLENGE_STATES.DECLINED, at: at(9) })).toBe(true);
-    expect(await dao.end({ challengeId, state: CHALLENGE_STATES.WITHDRAWN, at: at(10) })).toBe(false);
+    expect(
+      await dao.end({ challengeId, state: CHALLENGE_STATES.DECLINED, at: at(9), staleBefore: at(9 - 30) }),
+    ).toBe(true);
+    expect(
+      await dao.end({ challengeId, state: CHALLENGE_STATES.WITHDRAWN, at: at(10), staleBefore: at(10 - 30) }),
+    ).toBe(false);
     expect(await dao.get(challengeId)).toMatchObject({ state: CHALLENGE_STATES.DECLINED, endedAt: at(9) });
   });
 
@@ -147,7 +186,13 @@ export function runChallengeDaoContract(createDao) {
     const sent = await dao.insert(challengeRecord({ fromId: RIYA, toId: GUEST }));
     await dao.addLater({ challengeId: sent.challengeId, playerId: GUEST });
     const taken = await dao.insert(challengeRecord({ fromId: RIYA }));
-    await dao.claim({ challengeId: taken.challengeId, acceptedBy: GUEST, acceptedName: "G", at: at(1) });
+    await dao.claim({
+      challengeId: taken.challengeId,
+      acceptedBy: GUEST,
+      acceptedName: "G",
+      at: at(1),
+      staleBefore: at(1 - 30),
+    });
     await dao.insert(challengeRecord({ fromId: RIYA }));
 
     const moved = await dao.movePlayer({ from: GUEST, to: ARJUN });
@@ -164,11 +209,64 @@ export function runChallengeDaoContract(createDao) {
     await dao.insert(challengeRecord({ fromId: GUEST }));
     await dao.insert(challengeRecord({ fromId: RIYA, toId: GUEST }));
     const taken = await dao.insert(challengeRecord({ fromId: RIYA }));
-    await dao.claim({ challengeId: taken.challengeId, acceptedBy: GUEST, acceptedName: "G", at: at(1) });
+    await dao.claim({
+      challengeId: taken.challengeId,
+      acceptedBy: GUEST,
+      acceptedName: "G",
+      at: at(1),
+      staleBefore: at(1 - 30),
+    });
     const kept = await dao.insert(challengeRecord({ fromId: RIYA, toId: ARJUN }));
 
     expect(await dao.deleteInvolving(GUEST)).toBe(3);
     expect(await dao.deleteInvolving(GUEST)).toBe(0);
     expect((await dao.listFrom(RIYA)).map((doc) => doc.challengeId)).toEqual([kept.challengeId]);
+  });
+  it("lets someone take a challenge whose hold is stale, and never one held a moment ago", async () => {
+    const dao = await createDao();
+    const { challengeId } = await dao.insert(challengeRecord());
+    await dao.claim({ challengeId, acceptedBy: GUEST, acceptedName: "G", at: at(5), staleBefore: at(-25) });
+
+    const early = await dao.claim({
+      challengeId,
+      acceptedBy: ARJUN,
+      acceptedName: "Arjun",
+      at: at(20),
+      staleBefore: at(-10),
+    });
+    const late = await dao.claim({
+      challengeId,
+      acceptedBy: ARJUN,
+      acceptedName: "Arjun",
+      at: at(40),
+      staleBefore: at(10),
+    });
+
+    expect([early, late]).toEqual([false, true]);
+    expect(await dao.get(challengeId)).toMatchObject({ acceptedBy: ARJUN, endedAt: at(40) });
+  });
+
+  it("ends a challenge whose hold is stale, and drops the hold", async () => {
+    const dao = await createDao();
+    const { challengeId } = await dao.insert(challengeRecord());
+    await dao.claim({ challengeId, acceptedBy: GUEST, acceptedName: "G", at: at(5), staleBefore: at(-25) });
+
+    expect(
+      await dao.end({ challengeId, state: CHALLENGE_STATES.WITHDRAWN, at: at(40), staleBefore: at(10) }),
+    ).toBe(true);
+    expect(await dao.get(challengeId)).toMatchObject({
+      state: CHALLENGE_STATES.WITHDRAWN,
+      acceptedBy: "",
+      acceptedName: "",
+    });
+  });
+
+  it("deletes one challenge by its id", async () => {
+    const dao = await createDao();
+    const { challengeId } = await dao.insert(challengeRecord());
+
+    expect(await dao.remove(challengeId)).toBe(true);
+    expect(await dao.remove(challengeId)).toBe(false);
+    await expect(dao.get(challengeId)).rejects.toThrow(RangeError);
   });
 }

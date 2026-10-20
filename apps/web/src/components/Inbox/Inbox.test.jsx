@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
 
@@ -51,6 +51,8 @@ async function openInbox(challenges, apiOverrides = {}) {
 }
 
 describe("Inbox (CC-207)", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("is only there for a player", async () => {
     renderApp({ api: fakeApi({ getSession: async () => undefined }) });
 
@@ -135,9 +137,34 @@ describe("Inbox (CC-207)", () => {
     );
   });
 
+  it("lets an open challenge go once it expires, and a taken one once its room stops waiting", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const now = Date.now();
+    await renderInbox([
+      challenge({ expiresAt: now + 10_000 }),
+      challenge({
+        id: "c0000000000000000002",
+        own: true,
+        forYou: false,
+        state: "accepted",
+        expiresAt: undefined,
+        acceptedName: "Arjun",
+        room: { code: "AB2CD3", gameId: "chess" },
+        until: now + 40_000,
+      }),
+    ]);
+    expect(await screen.findByRole("button", { name: "Inbox, 2 waiting" })).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(16_000));
+    expect(screen.getByRole("button", { name: "Inbox, 1 waiting" })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(30_000));
+    expect(screen.queryByRole("button", { name: /^Inbox/ })).not.toBeInTheDocument();
+  });
+
   it("leaves out what is over and what was never the player's to answer", async () => {
     const { api } = await renderInbox([
-      challenge({ state: "expired" }),
+      challenge({ state: "expired", createdAt: undefined, expiresAt: undefined }),
+      challenge({ id: "c0000000000000000009", state: "declined", createdAt: undefined }),
       challenge({ id: "c0000000000000000004", own: false, forYou: false }),
       challenge({ id: "c0000000000000000005", own: true, forYou: false, state: "accepted" }),
       challenge({ id: "c0000000000000000006", forYou: false, took: true, state: "accepted" }),

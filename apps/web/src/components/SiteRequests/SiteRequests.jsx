@@ -15,7 +15,7 @@ import { useAction } from "../../hooks/useAction.js";
 import { useReconnecting } from "../../hooks/useReconnecting.js";
 import { useSiteRequests } from "../../hooks/useSiteRequests.js";
 import { useSound } from "../../hooks/useSound.js";
-import { useTabAlert } from "../../hooks/useTurnAlert.js";
+import { useDocumentHidden, useTabAlert } from "../../hooks/useTurnAlert.js";
 import { CATEGORIES } from "../../lib/notify/categories.js";
 import { SOUNDS } from "../../lib/sound/sounds.js";
 import { Button } from "../Button/Button.jsx";
@@ -145,19 +145,22 @@ function useDeclineToasts() {
 }
 
 /**
- * Moves each challenge popup to the inbox once it has been on screen for about a minute (CC-207), counted from when
- * the player could first see it. While a game holds the popups back, nothing counts.
+ * Moves each challenge popup to the inbox once it has been on screen for about a minute (CC-207). Only the time the
+ * player could see it counts: while the tab is in the background, or a game holds the popups back, its clock
+ * stops, so a popup never moves away unseen and the tab alert keeps calling the player back.
  */
-function useMoveToInbox(calls, held) {
+function useMoveToInbox(calls, paused) {
   const { later } = useChallengeInbox();
-  const shownAt = useRef(new Map());
-  const ids = held ? "" : calls.map((challenge) => challenge.id).join(" ");
+  // For each popup on the page: how long it has been seen, and since when it is being seen (0 while paused).
+  const clocks = useRef(new Map());
+  const ids = calls.map((challenge) => challenge.id).join(" ");
+  const seenFor = (clock, now) => clock.spent + (clock.since === 0 ? 0 : now - clock.since);
 
   const moveDue = useEffectEvent(() => {
     const now = Date.now();
-    for (const [id, at] of shownAt.current) {
-      if (now - at >= CHALLENGE_POPUP_MS) {
-        shownAt.current.delete(id);
+    for (const [id, clock] of clocks.current) {
+      if (seenFor(clock, now) >= CHALLENGE_POPUP_MS) {
+        clocks.current.delete(id);
         later(id);
       }
     }
@@ -166,15 +169,18 @@ function useMoveToInbox(calls, held) {
   useEffect(() => {
     const showing = ids === "" ? [] : ids.split(" ");
     const now = Date.now();
-    for (const id of [...shownAt.current.keys()]) {
-      if (!showing.includes(id)) shownAt.current.delete(id);
+    for (const id of [...clocks.current.keys()]) {
+      if (!showing.includes(id)) clocks.current.delete(id);
     }
-    showing.forEach((id) => shownAt.current.set(id, shownAt.current.get(id) ?? now));
-    if (showing.length === 0) return undefined;
-    const next = Math.min(...[...shownAt.current.values()].map((at) => at + CHALLENGE_POPUP_MS)) - now;
+    for (const id of showing) {
+      const clock = clocks.current.get(id) ?? { spent: 0, since: 0 };
+      clocks.current.set(id, { spent: seenFor(clock, now), since: paused ? 0 : now });
+    }
+    if (paused || showing.length === 0) return undefined;
+    const next = Math.min(...showing.map((id) => CHALLENGE_POPUP_MS - clocks.current.get(id).spent));
     const timer = setTimeout(moveDue, Math.max(0, next));
     return () => clearTimeout(timer);
-  }, [ids]);
+  }, [ids, paused]);
 }
 
 /** One question from another room, with Accept and go, Not now and how long is left. */
@@ -299,7 +305,8 @@ export function SiteRequests() {
   const heard = useRef(new Set());
   useAnswerToasts({ rooms, pathname });
   useDeclineToasts();
-  useMoveToInbox(calls, held);
+  const hidden = useDocumentHidden();
+  useMoveToInbox(calls, held || hidden);
   const waiting = !held && asked.length + calls.length > 0;
   useHold(CATEGORIES.REQUEST, waiting);
   const firstTitle =

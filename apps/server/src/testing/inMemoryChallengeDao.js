@@ -17,7 +17,10 @@ export function createInMemoryChallengeDao() {
     challenges.set(challengeId, update(doc));
     return true;
   };
-  const stillOpen = (at) => (doc) => doc.state === CHALLENGE_STATES.OPEN && doc.expiresAt > at;
+  const stillOpen = (at, staleBefore) => (doc) =>
+    doc.expiresAt > at &&
+    (doc.state === CHALLENGE_STATES.OPEN ||
+      (doc.state === CHALLENGE_STATES.ACCEPTED && doc.roomCode === "" && doc.endedAt <= staleBefore));
 
   const dao = Object.freeze({
     ensureIndexes: async () => {},
@@ -50,8 +53,8 @@ export function createInMemoryChallengeDao() {
     listFrom: async (fromId) => list((doc) => doc.fromId === fromId),
     listTo: async (toId) => list((doc) => doc.toId === toId),
 
-    claim: async ({ challengeId, acceptedBy, acceptedName, at }) =>
-      changeIf(challengeId, stillOpen(at), (doc) => ({
+    claim: async ({ challengeId, acceptedBy, acceptedName, at, staleBefore }) =>
+      changeIf(challengeId, stillOpen(at, staleBefore), (doc) => ({
         ...doc,
         state: CHALLENGE_STATES.ACCEPTED,
         acceptedBy,
@@ -75,8 +78,16 @@ export function createInMemoryChallengeDao() {
         (doc) => ({ ...doc, roomCode }),
       ),
 
-    end: async ({ challengeId, state, at }) =>
-      changeIf(challengeId, stillOpen(at), (doc) => ({ ...doc, state, endedAt: at })),
+    end: async ({ challengeId, state, at, staleBefore }) =>
+      changeIf(challengeId, stillOpen(at, staleBefore), (doc) => ({
+        ...doc,
+        state,
+        endedAt: at,
+        acceptedBy: "",
+        acceptedName: "",
+      })),
+
+    remove: async (challengeId) => challenges.delete(challengeId),
 
     addLater: async ({ challengeId, playerId }) =>
       changeIf(

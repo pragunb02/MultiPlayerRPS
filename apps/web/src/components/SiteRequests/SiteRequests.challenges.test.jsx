@@ -155,6 +155,26 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     expect(api.challengeLater.mock.calls).toEqual([["c0000000000000000001"]]);
   });
 
+  it("counts only the time the tab is in front: a popup never moves to the inbox unseen", async () => {
+    const tab = installVisibility({ hidden: false });
+    const { push, api } = await open();
+    vi.useFakeTimers();
+    act(() => tab.setHidden(true));
+    push(sentToYou());
+
+    act(() => vi.advanceTimersByTime(2 * 60_000));
+    expect(popup()).toBeInTheDocument();
+    expect(api.challengeLater).not.toHaveBeenCalled();
+    expect(document.title).toMatch(/Challenge/);
+
+    act(() => tab.setHidden(false));
+    act(() => vi.advanceTimersByTime(59_000));
+    expect(popup()).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(popup()).not.toBeInTheDocument();
+    expect(api.challengeLater).toHaveBeenCalledWith("c0000000000000000001");
+  });
+
   it("tells the creator on any page that someone took their challenge, and Go and play opens the room", async () => {
     const user = userEvent.setup();
     const { push, api, url } = await open();

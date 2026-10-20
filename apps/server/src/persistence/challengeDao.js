@@ -71,10 +71,15 @@ const isDuplicate = (err) => err.code === DUPLICATE_KEY_CODE;
 export function createChallengeDao({ connection }) {
   const Challenge = connection.model("Challenge", challengeSchema);
   const changed = async (filter, update) => (await Challenge.updateOne(filter, update)).modifiedCount === 1;
-  const stillOpen = (challengeId, at) => ({
+  // Open until `at`: open, or held by a taker whose room was never recorded and whose hold began before
+  // `staleBefore`, so a crash in the middle of taking it never keeps it from everyone else.
+  const stillOpen = (challengeId, at, staleBefore) => ({
     challengeId,
-    state: CHALLENGE_STATES.OPEN,
     expiresAt: { $gt: at },
+    $or: [
+      { state: CHALLENGE_STATES.OPEN },
+      { state: CHALLENGE_STATES.ACCEPTED, roomCode: "", endedAt: { $lte: staleBefore } },
+    ],
   });
 
   const dao = Object.freeze({
@@ -117,13 +122,14 @@ export function createChallengeDao({ connection }) {
     listTo: (toId) => Challenge.find({ toId }, FIELDS).sort({ createdAt: -1 }).lean(),
 
     /**
-     * Takes an open challenge for `acceptedBy`, only while it is still open at `at`.
+     * Takes an open challenge for `acceptedBy`, only while it is still open at `at`. A hold that began before
+     * `staleBefore` with no room counts as open.
      *
-     * @param {{ challengeId: string, acceptedBy: string, acceptedName: string, at: Date }} claim
+     * @param {{ challengeId: string, acceptedBy: string, acceptedName: string, at: Date, staleBefore: Date }} claim
      * @returns {Promise<boolean>} whether this call took it
      */
-    claim: ({ challengeId, acceptedBy, acceptedName, at }) =>
-      changed(stillOpen(challengeId, at), {
+    claim: ({ challengeId, acceptedBy, acceptedName, at, staleBefore }) =>
+      changed(stillOpen(challengeId, at, staleBefore), {
         $set: { state: CHALLENGE_STATES.ACCEPTED, acceptedBy, acceptedName, endedAt: at },
       }),
 
@@ -152,13 +158,23 @@ export function createChallengeDao({ connection }) {
       ),
 
     /**
-     * Ends a challenge that is still open at `at`, as declined or withdrawn.
+     * Ends a challenge that is still open at `at`, as declined or withdrawn. A stale hold on it is dropped.
      *
-     * @param {{ challengeId: string, state: string, at: Date }} end
+     * @param {{ challengeId: string, state: string, at: Date, staleBefore: Date }} end
      * @returns {Promise<boolean>} whether this call ended it
      */
-    end: ({ challengeId, state, at }) =>
-      changed(stillOpen(challengeId, at), { $set: { state, endedAt: at } }),
+    end: ({ challengeId, state, at, staleBefore }) =>
+      changed(stillOpen(challengeId, at, staleBefore), {
+        $set: { state, endedAt: at, acceptedBy: "", acceptedName: "" },
+      }),
+
+    /**
+     * Deletes one challenge, such as a new one that broke a limit.
+     *
+     * @param {string} challengeId
+     * @returns {Promise<boolean>} whether it was there
+     */
+    remove: async (challengeId) => (await Challenge.deleteOne({ challengeId })).deletedCount === 1,
 
     /**
      * Notes that `playerId` moved the challenge to their inbox. Doing it again changes nothing.

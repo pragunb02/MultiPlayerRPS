@@ -5,7 +5,6 @@ import {
   CHALLENGE_STATES,
 } from "@classicade/shared";
 import { newChallengeId } from "../../models/challengeId.js";
-import { isAccountId } from "../../models/identity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import {
   ConflictError,
@@ -15,7 +14,8 @@ import {
   ValidationError,
 } from "../../utils/errors.js";
 
-const MINUTE_MS = 60 * 1000;
+const SECOND_MS = 1000;
+const MINUTE_MS = 60 * SECOND_MS;
 const HOUR_MS = 60 * MINUTE_MS;
 
 /** Events the challenge component publishes for other parts of the system to react to. */
@@ -36,11 +36,14 @@ export const CHALLENGE_EVENTS = Object.freeze({
  *    then MongoDB deletes it by itself.
  * 3. `acceptedShownMs`: a challenge someone took stays in its creator's inbox with "Go and play" for as long as a
  *    waiting room lasts (`roomLifetimes.js`), half an hour.
+ * 4. `claimLeaseMs`: taking a challenge holds it while its room is made, which takes well under a second. A hold
+ *    with no room after this long was cut off by a crash or a failed write, so the challenge is open again.
  */
 export const CHALLENGE_LIFETIMES = Object.freeze({
   openMs: CHALLENGE_LIFETIME_MS,
   keptMs: 24 * HOUR_MS,
   acceptedShownMs: 30 * MINUTE_MS,
+  claimLeaseMs: 30 * SECOND_MS,
 });
 
 /**
@@ -63,18 +66,28 @@ const ENDED_MESSAGES = Object.freeze({
 const ended = (state) => new GoneError(ENDED_MESSAGES[state], { details: { state } });
 
 const newestFirst = (a, b) => b.createdAt - a.createdAt;
+/** Oldest first, and by id for the same moment, so every reader puts challenges in the same order. */
+const oldestFirst = (a, b) => a.createdAt - b.createdAt || a.challengeId.localeCompare(b.challengeId);
+
+/** A hold on a challenge whose room was never recorded and whose lease is over (see `claimLeaseMs`). */
+const isStaleClaim = (challenge, now) =>
+  challenge.state === CHALLENGE_STATES.ACCEPTED &&
+  challenge.roomCode === "" &&
+  now >= challenge.endedAt + CHALLENGE_LIFETIMES.claimLeaseMs;
 
 /**
  * Where a challenge stands at `now`. Storage never writes "expired": an open challenge whose day is over is
- * expired from that moment, without anything having to sweep.
+ * expired from that moment, without anything having to sweep. A stale hold counts as open (see `claimLeaseMs`).
  *
  * @param {Readonly<import("../../data/challengeAccessor.js").Challenge>} challenge
  * @param {number} now
  */
-export const stateAt = (challenge, now) =>
-  challenge.state === CHALLENGE_STATES.OPEN && now >= challenge.expiresAt
-    ? CHALLENGE_STATES.EXPIRED
-    : challenge.state;
+export function stateAt(challenge, now) {
+  if (challenge.state !== CHALLENGE_STATES.OPEN && !isStaleClaim(challenge, now)) {
+    return challenge.state;
+  }
+  return now >= challenge.expiresAt ? CHALLENGE_STATES.EXPIRED : CHALLENGE_STATES.OPEN;
+}
 
 /**
  * @typedef {Object} ChallengeView   what one viewer is told about a challenge. Never a player id (ADR-057)
@@ -82,16 +95,17 @@ export const stateAt = (challenge, now) =>
  * @property {string} gameId
  * @property {Readonly<object>} options
  * @property {string} state           a CHALLENGE_STATES value
- * @property {number} createdAt
  * @property {string} fromName        "" when the viewer may not see who made it (ADR-028.7)
  * @property {boolean} own            the viewer made it
  * @property {boolean} forYou         it was sent to the viewer
  * @property {boolean} took           the viewer took it
  * @property {boolean} later          the viewer moved it from a popup to their inbox
+ * @property {number} [createdAt]     to its creator only. Anyone else could tell a blocked "expired" from a real one
  * @property {number} [expiresAt]     while it is open
  * @property {string} [toName]        to its creator, the one person it was sent to
  * @property {string} [acceptedName]  to its creator, who took it
  * @property {{ code: string, gameId: string }} [room]  to its creator and the one who took it, the room made
+ * @property {number} [until]         to its creator, how long a taken challenge stays in the inbox
  */
 
 /**
@@ -99,31 +113,31 @@ export const stateAt = (challenge, now) =>
  * opens it can take it, and a room is made with both of them seated. A challenge to one person (CC-052) works the
  * same way, reaches them on any page, and only they can take or decline it.
  *
- * Blocks never show (ADR-053). Someone in a blocked pair with the challenger sees an open challenge as expired, and
- * taking or declining it answers exactly what an expired one answers. A challenge to one person in a blocked pair is
- * never delivered to them, so the sender sees it wait and then expire, as if nobody had answered.
+ * Blocks never show (ADR-053). Someone in a blocked pair with the challenger sees an open challenge exactly as an
+ * expired one, and taking or declining it answers exactly what an expired one answers. A challenge to one person in
+ * a blocked pair is never delivered to them, so the sender sees it wait and then expire, as if nobody had answered.
  *
  * @param {{
  *   challengeAccessor: ReturnType<typeof import("../../data/challengeAccessor.js").createChallengeAccessor>,
  *   rooms: Pick<ReturnType<typeof import("../rooms/roomComponent.js").createRoomComponent>, "checkOptions" | "createChallengeRoom">,
  *   blocks: { blockedWith: (query: { playerId: string }) => Promise<ReadonlySet<string>> },
- *   ages: { adultsAmong: (query: { playerIds: ReadonlyArray<string>, now: number }) => Promise<ReadonlySet<string>> },
+ *   safety: Pick<ReturnType<typeof import("../safety/safetyComponent.js").createSafetyComponent>, "policyFor">,
  *   events: { emit: (event: string, payload: unknown) => void },
  *   recipients?: { resolve: (query: { from: Readonly<{ id: string }>, target: unknown, now: number }) => Promise<Readonly<{ id: string, displayName: string }>> },
  *   newId?: () => string,
  *   lifetimes?: Readonly<typeof CHALLENGE_LIFETIMES>,
  *   limits?: Readonly<typeof CHALLENGE_LIMITS>,
  * }} deps  `rooms` is the room component, which checks options and makes the room. `blocks` answers everyone on
- *   either side of a block with a player. `ages` answers which players are adult accounts, the only ones whose name
- *   a link may show (ADR-028.7). `recipients` names the one person a challenge is for, and refuses everyone it may
- *   not name: by default nobody can be named, until CC-052 passes in friends by handle. `newId`, `lifetimes` and
- *   `limits` are for tests
+ *   either side of a block with a player. `safety` gives each player's age policy (CC-152): a link shows the
+ *   creator's name only when their policy lets a share card carry it (ADR-028.7). `recipients` names the one person
+ *   a challenge is for, and refuses everyone it may not name: by default nobody can be named, until CC-052 passes
+ *   in friends by handle. `newId`, `lifetimes` and `limits` are for tests
  */
 export function createChallengeComponent({
   challengeAccessor,
   rooms,
   blocks,
-  ages,
+  safety,
   events,
   recipients = NOBODY_TO_NAME,
   newId = newChallengeId,
@@ -134,7 +148,7 @@ export function createChallengeComponent({
   assertFunction(rooms?.checkOptions, "rooms.checkOptions");
   assertFunction(rooms?.createChallengeRoom, "rooms.createChallengeRoom");
   assertFunction(blocks?.blockedWith, "blocks.blockedWith");
-  assertFunction(ages?.adultsAmong, "ages.adultsAmong");
+  assertFunction(safety?.policyFor, "safety.policyFor");
   assertFunction(events?.emit, "events.emit");
   assertFunction(recipients?.resolve, "recipients.resolve");
   assertFunction(newId, "newId");
@@ -143,49 +157,37 @@ export function createChallengeComponent({
   const blockedBetween = async (playerId, otherId) =>
     playerId !== "" && (await blocks.blockedWith({ playerId })).has(otherId);
 
-  /** Whether the challenger's name may be shown to anyone with the link: only an adult account's (ADR-028.7). */
-  const isPublic = async (playerId, now) =>
-    isAccountId(playerId) && (await ages.adultsAmong({ playerIds: [playerId], now })).has(playerId);
+  /** Holds older than this have lost their lease (see `claimLeaseMs`). */
+  const staleBefore = (now) => now - CHALLENGE_LIFETIMES.claimLeaseMs;
 
   /**
-   * What `viewerId` is told about `challenge`. A viewer in a blocked pair with its creator sees what an expired
-   * challenge shows, and nothing that only an open one has.
+   * What `viewerId` is told about `challenge`. A viewer in a blocked pair with its creator sees exactly what an
+   * expired challenge shows them: the same fields with the same values, and nothing that only an open one has.
    */
   function viewFor(challenge, viewerId, { now, blocked }) {
     const own = viewerId === challenge.fromId;
     const forYou = challenge.toId !== "" && viewerId === challenge.toId;
-    const base = {
+    const state = blocked && !own ? CHALLENGE_STATES.EXPIRED : stateAt(challenge, now);
+    const accepted = state === CHALLENGE_STATES.ACCEPTED;
+    const took = accepted && viewerId === challenge.acceptedBy;
+    const withRoom = accepted && challenge.roomCode !== "";
+    return Object.freeze({
       id: challenge.challengeId,
       gameId: challenge.gameId,
       options: challenge.options,
-      createdAt: challenge.createdAt,
       fromName: own || forYou || challenge.fromPublic ? challenge.fromName : "",
       own,
-    };
-    if (blocked && !own) {
-      return Object.freeze({
-        ...base,
-        forYou: false,
-        took: false,
-        later: false,
-        state: CHALLENGE_STATES.EXPIRED,
-      });
-    }
-    const state = stateAt(challenge, now);
-    const took = challenge.acceptedBy !== "" && viewerId === challenge.acceptedBy;
-    return Object.freeze({
-      ...base,
       forYou,
       took,
       later: challenge.laterBy.includes(viewerId),
       state,
+      ...(own && { createdAt: challenge.createdAt }),
       ...(state === CHALLENGE_STATES.OPEN && { expiresAt: challenge.expiresAt }),
       ...(own && challenge.toId !== "" && { toName: challenge.toName }),
-      ...(own && challenge.acceptedName !== "" && { acceptedName: challenge.acceptedName }),
+      ...(own && accepted && { acceptedName: challenge.acceptedName }),
       ...((own || took) &&
-        challenge.roomCode !== "" && {
-          room: Object.freeze({ code: challenge.roomCode, gameId: challenge.gameId }),
-        }),
+        withRoom && { room: Object.freeze({ code: challenge.roomCode, gameId: challenge.gameId }) }),
+      ...(own && withRoom && { until: challenge.endedAt + lifetimes.acceptedShownMs }),
     });
   }
 
@@ -224,8 +226,8 @@ export function createChallengeComponent({
       : ended(state);
   }
 
-  /** The one person a new challenge is for, after the limits that apply to them. */
-  async function recipientOf({ from, to, mine, now }) {
+  /** The one person a new challenge is for. Refuses yourself. */
+  async function recipientOf({ from, to, now }) {
     if (to === undefined) {
       return { id: "", displayName: "" };
     }
@@ -233,14 +235,34 @@ export function createChallengeComponent({
     if (recipient.id === from.id) {
       throw new ValidationError("You can't challenge yourself", { details: { field: "to" } });
     }
-    const last = mine.find((challenge) => challenge.toId === recipient.id);
-    if (last !== undefined && now < last.createdAt + limits.samePersonEveryMs) {
-      const retryAt = last.createdAt + limits.samePersonEveryMs;
-      throw new ConflictError("You challenged them a moment ago. Try again in a few minutes", {
-        details: { reason: CHALLENGE_LIMIT_REASONS.SAME_PERSON, retryAt },
-      });
-    }
     return recipient;
+  }
+
+  /**
+   * The limit a new challenge breaks, or undefined. It reads the sender's challenges with the new one stored, so
+   * challenges made at the same moment are judged in one order: the oldest within the limit stay, and any after
+   * them are refused. Checking before storing would let two at once both pass.
+   */
+  async function brokenLimit(challenge, now) {
+    const mine = [...(await challengeAccessor.listFrom(challenge.fromId))].sort(oldestFirst);
+    const open = mine.filter((each) => stateAt(each, now) === CHALLENGE_STATES.OPEN);
+    if (open.findIndex((each) => each.challengeId === challenge.challengeId) >= limits.openPerSender) {
+      return new ConflictError(
+        `You can have ${limits.openPerSender} challenges open at once. Take one back first`,
+        { details: { reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: limits.openPerSender } },
+      );
+    }
+    if (challenge.toId === "") return undefined;
+    const recent = mine.filter(
+      (each) => each.toId === challenge.toId && now < each.createdAt + limits.samePersonEveryMs,
+    );
+    if (recent[0].challengeId === challenge.challengeId) return undefined;
+    return new ConflictError("You challenged them a moment ago. Try again in a few minutes", {
+      details: {
+        reason: CHALLENGE_LIMIT_REASONS.SAME_PERSON,
+        retryAt: recent[0].createdAt + limits.samePersonEveryMs,
+      },
+    });
   }
 
   return Object.freeze({
@@ -256,20 +278,13 @@ export function createChallengeComponent({
      */
     async create({ from, gameId, options, to, now }) {
       const value = rooms.checkOptions({ gameId, options });
-      const mine = await challengeAccessor.listFrom(from.id);
-      const open = mine.filter((challenge) => stateAt(challenge, now) === CHALLENGE_STATES.OPEN);
-      if (open.length >= limits.openPerSender) {
-        throw new ConflictError(
-          `You can have ${limits.openPerSender} challenges open at once. Take one back first`,
-          { details: { reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: limits.openPerSender } },
-        );
-      }
-      const recipient = await recipientOf({ from, to, mine, now });
+      const recipient = await recipientOf({ from, to, now });
+      const policy = await safety.policyFor({ playerId: from.id, now });
       const challenge = await challengeAccessor.add({
         challengeId: newId(),
         fromId: from.id,
         fromName: from.displayName,
-        fromPublic: await isPublic(from.id, now),
+        fromPublic: policy.shareCardName,
         toId: recipient.id,
         toName: recipient.displayName,
         gameId,
@@ -278,6 +293,11 @@ export function createChallengeComponent({
         expiresAt: now + lifetimes.openMs,
         deleteAt: now + lifetimes.openMs + lifetimes.keptMs,
       });
+      const broken = await brokenLimit(challenge, now);
+      if (broken !== undefined) {
+        await challengeAccessor.remove(challenge.challengeId);
+        throw broken;
+      }
       await announce(challenge);
       return viewFor(challenge, from.id, { now, blocked: false });
     },
@@ -307,7 +327,7 @@ export function createChallengeComponent({
 
     /**
      * Takes a challenge: a room is made with both players seated, and the challenge is accepted. Only one person can
-     * take it. If the room cannot be made, the challenge is open again.
+     * take it. If the room cannot be made or recorded, the challenge is open again.
      *
      * @param {{ challengeId: string, player: import("../../models/identity.js").Identity, network: string, earlierNetworks?: ReadonlyArray<string>, now: number }} input
      *   `network` and `earlierNetworks` name the taker's network, for the room limits (see `createRoom`)
@@ -326,12 +346,18 @@ export function createChallengeComponent({
         throw new ForbiddenError("This challenge is for someone else");
       }
       const claim = { challengeId, acceptedBy: player.id };
-      if (!(await challengeAccessor.claim({ ...claim, acceptedName: player.displayName, at: now }))) {
+      const claimed = await challengeAccessor.claim({
+        ...claim,
+        acceptedName: player.displayName,
+        at: now,
+        staleBefore: staleBefore(now),
+      });
+      if (!claimed) {
         throw await endedSince(challengeId, now);
       }
-      let room;
+      let recorded;
       try {
-        room = await rooms.createChallengeRoom({
+        const room = await rooms.createChallengeRoom({
           challenger: { id: challenge.fromId, displayName: challenge.fromName },
           accepter: player,
           network,
@@ -340,16 +366,20 @@ export function createChallengeComponent({
           options: challenge.options,
           now,
         });
+        recorded = (await challengeAccessor.setRoom({ ...claim, roomCode: room.code })) ? room : undefined;
       } catch (err) {
         await challengeAccessor.release(claim);
         throw err;
       }
-      await challengeAccessor.setRoom({ ...claim, roomCode: room.code });
+      // The hold ran out and someone else took it meanwhile. The room made here closes by itself.
+      if (recorded === undefined) {
+        throw await endedSince(challengeId, now);
+      }
       const accepted = await challengeAccessor.get(challengeId);
       await announce(accepted);
       return {
         challenge: viewFor(accepted, player.id, { now, blocked: false }),
-        room: Object.freeze({ code: room.code, gameId: room.gameId }),
+        room: Object.freeze({ code: recorded.code, gameId: recorded.gameId }),
       };
     },
 
@@ -367,7 +397,8 @@ export function createChallengeComponent({
         throw new ForbiddenError("That challenge was not sent to you");
       }
       await openFor(challengeId, playerId, now);
-      if (!(await challengeAccessor.end({ challengeId, state: CHALLENGE_STATES.DECLINED, at: now }))) {
+      const end = { challengeId, state: CHALLENGE_STATES.DECLINED, at: now, staleBefore: staleBefore(now) };
+      if (!(await challengeAccessor.end(end))) {
         throw await endedSince(challengeId, now);
       }
       const declined = await challengeAccessor.get(challengeId);
@@ -391,7 +422,8 @@ export function createChallengeComponent({
       if (stateAt(stored, now) !== CHALLENGE_STATES.OPEN) {
         throw ended(stateAt(stored, now));
       }
-      if (!(await challengeAccessor.end({ challengeId, state: CHALLENGE_STATES.WITHDRAWN, at: now }))) {
+      const end = { challengeId, state: CHALLENGE_STATES.WITHDRAWN, at: now, staleBefore: staleBefore(now) };
+      if (!(await challengeAccessor.end(end))) {
         throw await endedSince(challengeId, now);
       }
       const withdrawn = await challengeAccessor.get(challengeId);
@@ -457,21 +489,23 @@ export function createChallengeComponent({
     }),
 
     /**
-     * The player's challenges for their data export (CC-035): the ones they made and the ones sent to them, with the
-     * other person by name only, never by id.
+     * The player's challenges for their data export (CC-035): the ones they made and the ones sent to them, each in
+     * the state it has now, with the other person by name only, never by id. A challenge sent by someone in a block
+     * with them is left out, as the inbox leaves it out, so the export never shows a block (ADR-053).
      *
-     * @param {{ playerId: string }} query
+     * @param {{ playerId: string, now: number }} query
      */
-    async exportPlayer({ playerId }) {
-      const [mine, sent] = await Promise.all([
+    async exportPlayer({ playerId, now }) {
+      const [mine, sent, blocked] = await Promise.all([
         challengeAccessor.listFrom(playerId),
         challengeAccessor.listTo(playerId),
+        blocks.blockedWith({ playerId }),
       ]);
       const row = (challenge, fields) => ({
         challengeId: challenge.challengeId,
         gameId: challenge.gameId,
         options: challenge.options,
-        state: challenge.state,
+        state: stateAt(challenge, now),
         createdAt: new Date(challenge.createdAt).toISOString(),
         expiresAt: new Date(challenge.expiresAt).toISOString(),
         ...fields,
@@ -481,10 +515,12 @@ export function createChallengeComponent({
           row(challenge, {
             made: true,
             ...(challenge.toName !== "" && { sentTo: challenge.toName }),
-            ...(challenge.acceptedName !== "" && { takenBy: challenge.acceptedName }),
+            ...(stateAt(challenge, now) === CHALLENGE_STATES.ACCEPTED && { takenBy: challenge.acceptedName }),
           }),
         ),
-        ...sent.map((challenge) => row(challenge, { made: false, from: challenge.fromName })),
+        ...sent
+          .filter((challenge) => !blocked.has(challenge.fromId))
+          .map((challenge) => row(challenge, { made: false, from: challenge.fromName })),
       ];
     },
 

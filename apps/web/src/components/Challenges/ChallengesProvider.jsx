@@ -1,10 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { CHALLENGE_LIFETIME_MS, CHALLENGE_STATES, SOCKET_EVENTS } from "@classicade/shared";
 import { useServices } from "../../app/servicesContext.js";
 import { useSession } from "../../hooks/useSession.js";
 import { ChallengesContext } from "./challengesContext.js";
 
 const EMPTY = Object.freeze({ who: "", byId: Object.freeze({}) });
+
+/**
+ * Whether a view still means something at `now`: an open challenge until it expires, and a taken one of the
+ * player's while the server says its room waits (`until`). The server's views carry no time from which a blocked
+ * player could tell their age, so the times here are only these two (ADR-069).
+ */
+const endOf = (challenge) =>
+  Math.min(
+    challenge.state === CHALLENGE_STATES.OPEN ? challenge.expiresAt : Infinity,
+    challenge.until ?? Infinity,
+  );
+const isLive = (challenge, now) => endOf(challenge) > now;
+
+/**
+ * When a challenge was made, for the order of the list. Only its creator is told `createdAt`, and an open one
+ * expires a day after it was made.
+ */
+const madeAt = (challenge) => challenge.createdAt ?? (challenge.expiresAt ?? 0) - CHALLENGE_LIFETIME_MS;
 
 /** What the tab knows about `who`'s challenges. Nothing it knew about another player counts. */
 const knownFor = (state, who) => (state.who === who ? state.byId : {});
@@ -22,6 +40,19 @@ export function ChallengesProvider({ children }) {
   const { identity } = useSession();
   const who = identity?.id ?? "";
   const [state, setState] = useState(EMPTY);
+  const [now, setNow] = useState(() => Date.now());
+  const known = knownFor(state, who);
+  // The tab looks again the moment the next challenge's time is up, so the inbox never offers one that has gone.
+  const nextEnd = Math.min(
+    ...Object.values(known)
+      .map(endOf)
+      .filter((end) => end > now),
+  );
+  useEffect(() => {
+    if (nextEnd === Infinity) return undefined;
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, nextEnd - Date.now()));
+    return () => clearTimeout(timer);
+  }, [nextEnd]);
 
   /** Keeps one view, the newest the tab got from a push or an answer. */
   const remember = useCallback(
@@ -70,12 +101,14 @@ export function ChallengesProvider({ children }) {
   const value = useMemo(
     () => ({
       challenges: Object.freeze(
-        Object.values(knownFor(state, who)).sort((a, b) => b.createdAt - a.createdAt),
+        Object.values(known)
+          .filter((challenge) => isLive(challenge, now))
+          .sort((a, b) => madeAt(b) - madeAt(a)),
       ),
       later,
       remember,
     }),
-    [state, who, later, remember],
+    [known, now, later, remember],
   );
 
   return <ChallengesContext.Provider value={value}>{children}</ChallengesContext.Provider>;

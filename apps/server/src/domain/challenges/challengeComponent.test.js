@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHALLENGE_LIMIT_REASONS, CHALLENGE_STATES, isChallengeId } from "@classicade/shared";
 import { createChallengeAccessor } from "../../data/challengeAccessor.js";
+import { safetyFromAdults } from "../../testing/fakeSafety.js";
 import { createInMemoryChallengeDao } from "../../testing/inMemoryChallengeDao.js";
 import {
   ConflictError,
@@ -54,7 +55,7 @@ function setup({ blocked = [], adults = [RIYA.id], rooms: roomOverrides = {}, na
       blockedWith: async ({ playerId }) =>
         new Set(blocked.flatMap(([a, b]) => (a === playerId ? [b] : b === playerId ? [a] : []))),
     },
-    ages: { adultsAmong: async ({ playerIds }) => new Set(playerIds.filter((id) => adults.includes(id))) },
+    safety: safetyFromAdults(({ playerIds }) => playerIds.filter((id) => adults.includes(id))),
     events: { emit: (event, payload) => emitted.push({ event, ...payload }) },
     ...(named && {
       recipients: {
@@ -107,7 +108,7 @@ describe("challengeComponent: making a challenge (CC-139)", () => {
       challengeAccessor: createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() }),
       rooms: { checkOptions: () => ({}), createChallengeRoom: async () => ({}) },
       blocks: { blockedWith: async () => new Set() },
-      ages: { adultsAmong: async () => new Set() },
+      safety: safetyFromAdults(() => []),
       events: { emit() {} },
     });
 
@@ -404,21 +405,35 @@ describe("challengeComponent: withdrawing", () => {
 });
 
 describe("challengeComponent: blocks never show (ADR-053)", () => {
-  it("shows a blocked person exactly what an expired challenge shows", async () => {
-    const blockedSetup = setup({ blocked: [[RIYA.id, GUEST.id]] });
-    const blockedView = await blockedSetup.challenges.view({
-      challengeId: (await blockedSetup.make()).id,
-      viewerId: GUEST.id,
-      now: T0 + 1,
-    });
-    const expiredSetup = setup();
-    const expiredView = await expiredSetup.challenges.view({
-      challengeId: (await expiredSetup.make()).id,
-      viewerId: GUEST.id,
-      now: T0 + DAY,
-    });
+  it("shows a blocked person exactly what an expired challenge shows, byte for byte", async () => {
+    for (const [viewer, to] of [
+      [GUEST, undefined],
+      [ARJUN, "Arjun"],
+    ]) {
+      const blockedSetup = setup({ blocked: [[RIYA.id, viewer.id]] });
+      const blockedView = await blockedSetup.challenges.view({
+        challengeId: (await blockedSetup.make({ to })).id,
+        viewerId: viewer.id,
+        now: T0 + 1,
+      });
+      const expiredSetup = setup();
+      const expiredView = await expiredSetup.challenges.view({
+        challengeId: (await expiredSetup.make({ to })).id,
+        viewerId: viewer.id,
+        now: T0 + DAY,
+      });
 
-    expect(blockedView).toEqual(expiredView);
+      expect(JSON.stringify(blockedView)).toBe(JSON.stringify(expiredView));
+    }
+  });
+
+  it("gives a blocked person no time from which the challenge's age could be told", async () => {
+    const { challenges, make } = setup({ blocked: [[RIYA.id, GUEST.id]] });
+    const { id } = await make();
+
+    const view = await challenges.view({ challengeId: id, viewerId: GUEST.id, now: T0 + 1 });
+
+    expect(Object.values(view).filter((value) => typeof value === "number")).toEqual([]);
   });
 
   it("answers taking it exactly as an expired challenge answers", async () => {
@@ -490,10 +505,107 @@ describe("challengeComponent: the inbox (CC-207, the minimal CC-147)", () => {
     const listed = await challenges.inbox({ playerId: RIYA.id, now: T0 + 10 });
 
     expect(listed.map((each) => each.id)).toEqual([received.id, open.id, taken.id]);
-    expect(listed[2]).toMatchObject({ acceptedName: "Guest-T001", room: { code: "ROOM01" } });
+    expect(listed[2]).toMatchObject({
+      acceptedName: "Guest-T001",
+      room: { code: "ROOM01" },
+      until: T0 + 1 + 30 * MINUTE,
+    });
     const muchLater = await challenges.inbox({ playerId: RIYA.id, now: T0 + 31 * MINUTE });
     expect(muchLater.map((each) => each.id)).toEqual([received.id, open.id]);
     expect(await challenges.inbox({ playerId: RIYA.id, now: T0 + DAY + 10 })).toEqual([]);
+  });
+});
+
+describe("challengeComponent: limits hold when challenges are made at the same moment", () => {
+  it("keeps 3 of 4 challenges made at once, and stores no more", async () => {
+    const { make, challenges } = setup();
+
+    const results = await Promise.allSettled([make(), make(), make(), make()]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(3);
+    const refused = results.find((result) => result.status === "rejected").reason;
+    expect(refused).toBeInstanceOf(ConflictError);
+    expect(refused.details.reason).toBe(CHALLENGE_LIMIT_REASONS.OPEN);
+    expect(await challenges.inbox({ playerId: RIYA.id, now: T0 + 1 })).toHaveLength(3);
+  });
+
+  it("keeps one of two challenges made at once to the same person", async () => {
+    const { make, challenges, emitted } = setup();
+
+    const results = await Promise.allSettled([make({ to: "Arjun" }), make({ to: "Arjun" })]);
+
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(results.find((result) => result.status === "rejected").reason.details.reason).toBe(
+      CHALLENGE_LIMIT_REASONS.SAME_PERSON,
+    );
+    expect(await challenges.inbox({ playerId: ARJUN.id, now: T0 + 1 })).toHaveLength(1);
+    expect(emitted).toHaveLength(1);
+  });
+});
+
+describe("challengeComponent: a hold that never got its room (claim lease)", () => {
+  /** Someone took it, and the process stopped before the room was recorded. */
+  async function cutOff() {
+    const parts = setup();
+    const { id } = await parts.make();
+    await parts.accessor.claim({
+      challengeId: id,
+      acceptedBy: CARA.id,
+      acceptedName: "Guest-T002",
+      at: T0 + 1,
+      staleBefore: T0,
+    });
+    return { ...parts, id };
+  }
+
+  it("is taken for a moment, then open again once its lease is over", async () => {
+    const { challenges, id, accept } = await cutOff();
+
+    const during = await challenges.view({ challengeId: id, viewerId: GUEST.id, now: T0 + 20 * 1000 });
+    expect(during.state).toBe(CHALLENGE_STATES.ACCEPTED);
+    expect((await accept(id, GUEST, T0 + 20 * 1000).catch((err) => err)).details).toEqual({
+      state: CHALLENGE_STATES.ACCEPTED,
+    });
+
+    const after = await challenges.view({ challengeId: id, viewerId: GUEST.id, now: T0 + 31 * 1000 });
+    expect(after).toMatchObject({ state: CHALLENGE_STATES.OPEN, took: false });
+    await expect(accept(id, GUEST, T0 + 31 * 1000)).resolves.toMatchObject({ room: { code: "ROOM01" } });
+  });
+
+  it("can be taken back by its creator once its lease is over, and shows in the inbox as open", async () => {
+    const { challenges, id } = await cutOff();
+
+    expect(
+      (await challenges.inbox({ playerId: RIYA.id, now: T0 + 31 * 1000 })).map((each) => each.state),
+    ).toEqual([CHALLENGE_STATES.OPEN]);
+    const withdrawn = await challenges.withdraw({ challengeId: id, playerId: RIYA.id, now: T0 + 31 * 1000 });
+    expect(withdrawn).toMatchObject({ state: CHALLENGE_STATES.WITHDRAWN, took: false });
+    expect(withdrawn.acceptedName).toBeUndefined();
+  });
+
+  it("is open again when recording the room fails, and the failure reaches the taker", async () => {
+    const { make, accept, challenges, dao } = setup();
+    const { id } = await make();
+    const down = new Error("database down");
+    dao.setRoom = async () => {
+      throw down;
+    };
+
+    await expect(accept(id)).rejects.toBe(down);
+    expect((await challenges.view({ challengeId: id, viewerId: CARA.id, now: T0 + 2 })).state).toBe(
+      CHALLENGE_STATES.OPEN,
+    );
+  });
+
+  it("answers how it ended when someone took it after the lease ran out", async () => {
+    const { make, accept, dao } = setup();
+    const { id } = await make();
+    dao.setRoom = async () => false;
+
+    const lost = await accept(id).catch((err) => err);
+
+    expect(lost).toBeInstanceOf(GoneError);
+    expect(lost.details).toEqual({ state: CHALLENGE_STATES.ACCEPTED });
   });
 });
 
@@ -515,7 +627,7 @@ describe("challengeComponent: a player's data", () => {
     await make({ to: "Arjun", now: T0 + 1 });
     await challenges.create({ from: ARJUN, gameId: "chess", options: {}, to: "Riya", now: T0 + 2 });
 
-    const rows = await challenges.exportPlayer({ playerId: RIYA.id });
+    const rows = await challenges.exportPlayer({ playerId: RIYA.id, now: T0 + 5 });
 
     expect(rows).toEqual([
       expect.objectContaining({ made: true, sentTo: "Arjun", state: CHALLENGE_STATES.OPEN }),
@@ -528,6 +640,16 @@ describe("challengeComponent: a player's data", () => {
       expect.objectContaining({ made: false, from: "Arjun", gameId: "chess" }),
     ]);
     expect(JSON.stringify(rows)).not.toMatch(/user_|guest_/);
+  });
+
+  it("exports each challenge in the state it has now, and nothing from someone in a block with the player", async () => {
+    const { challenges, make } = setup({ blocked: [[CARA.id, RIYA.id]] });
+    await make();
+    await challenges.create({ from: CARA, gameId: "chess", options: {}, to: "Riya", now: T0 + 1 });
+
+    const rows = await challenges.exportPlayer({ playerId: RIYA.id, now: T0 + DAY });
+
+    expect(rows).toEqual([expect.objectContaining({ made: true, state: CHALLENGE_STATES.EXPIRED })]);
   });
 
   it("erases every challenge the player made, was sent or took", async () => {

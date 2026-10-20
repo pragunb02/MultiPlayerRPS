@@ -78,20 +78,36 @@ describe("challenge accessor", () => {
     const challenges = accessor();
     const { challengeId } = await challenges.add(fresh());
 
-    expect(await challenges.claim({ challengeId, acceptedBy: GUEST, acceptedName: "G", at: T0 + 1 })).toBe(
-      true,
-    );
+    expect(
+      await challenges.claim({
+        challengeId,
+        acceptedBy: GUEST,
+        acceptedName: "G",
+        at: T0 + 1,
+        staleBefore: T0,
+      }),
+    ).toBe(true);
     expect((await challenges.get(challengeId)).endedAt).toBe(T0 + 1);
     expect(await challenges.release({ challengeId, acceptedBy: GUEST })).toBe(true);
-    expect(await challenges.claim({ challengeId, acceptedBy: GUEST, acceptedName: "G", at: T0 + 2 })).toBe(
-      true,
-    );
+    expect(
+      await challenges.claim({
+        challengeId,
+        acceptedBy: GUEST,
+        acceptedName: "G",
+        at: T0 + 2,
+        staleBefore: T0,
+      }),
+    ).toBe(true);
     expect(await challenges.setRoom({ challengeId, acceptedBy: GUEST, roomCode: "AB2CD3" })).toBe(true);
-    expect(await challenges.end({ challengeId, state: CHALLENGE_STATES.WITHDRAWN, at: T0 + 3 })).toBe(false);
+    expect(
+      await challenges.end({ challengeId, state: CHALLENGE_STATES.WITHDRAWN, at: T0 + 3, staleBefore: T0 }),
+    ).toBe(false);
     expect(await challenges.addLater({ challengeId, playerId: RIYA })).toBe(true);
     expect((await challenges.listFrom(RIYA)).map((each) => each.roomCode)).toEqual(["AB2CD3"]);
     expect(await challenges.listTo(RIYA)).toEqual([]);
     expect(await challenges.movePlayer({ from: GUEST, to: "user_ffffffffffffffffffffffff" })).toBe(1);
     expect(await challenges.removeInvolving(RIYA)).toBe(1);
+    const other = await challenges.add(fresh({ challengeId: "0123456789abcdefghjm" }));
+    expect(await challenges.remove(other.challengeId)).toBe(true);
   });
 });

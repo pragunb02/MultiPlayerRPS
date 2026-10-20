@@ -149,8 +149,9 @@ the owner may change it.
      from random bytes only. Never a player id, a room code or a profile handle (handles have 16 letters).
   2. **States:** open, accepted, declined, expired, withdrawn. **Expired is never stored**: an open challenge whose
      `expiresAt` has passed is expired on every read, so nothing sweeps. Taking a challenge is one conditional
-     update (`state: open` and not expired), so two people can never both take it. If its room cannot be made, it
-     is open again. **Accepted** means the room was made with both seated: the challenger first and as host,
+     update (`state: open` and not expired), so two people can never both take it. If its room cannot be made or
+     recorded, it is open again, and a hold with no room after 30 seconds (a crash in the middle) counts as open
+     for the next taker and for Take back. **Accepted** means the room was made with both seated: the challenger first and as host,
      offline until a tab of theirs is known to be on the site (then away), and the taker away until their room page
      opens. The game starts when both are on the room page, the rule of CC-112.
   3. **Lifetimes:** open for **24 hours**. The record stays one more day, so the link says "expired" rather than
@@ -164,7 +165,9 @@ the owner may change it.
      challenge to one person in a blocked pair is never delivered to them: the sender sees it wait and then expire,
      like a challenge nobody answered.
   6. **Limits:** at most **3 open challenges per sender**, and at most **one every 10 minutes to the same person**,
-     in the domain (409 with `details.reason`). Rate limits on the routes: 10 made per player and 50 per address in
+     in the domain (409 with `details.reason`). They are checked after the new challenge is stored, over the
+     sender's challenges in one order (oldest first, then by id), and a new one past a limit is deleted again, so
+     challenges made at the same moment can never get past them. Rate limits on the routes: 10 made per player and 50 per address in
      10 minutes, 60 answers per player in 10 minutes, and 60 reads per player and 300 per address a minute. The
      address counts only what the player's own limit let through.
   7. **API.** `POST /api/challenges` `{ gameId, options?, to? }`, `GET /api/challenges` (the inbox),
@@ -189,6 +192,13 @@ the owner may change it.
   12. **Data (ADR-048).** `challenges` is a participant of the guest move (ADR-014), of the export (the challenges a
       player made and was sent, with others by name only) and of deletion (every challenge they made, were sent or
       took).
+- **Amended 2026-10-20 (review of #152).** (1) A view tells `createdAt` to the creator only, so a blocked
+  player's "expired" view is the same, byte for byte, as a real expired one: `forYou` and `later` as for anyone,
+  and no time from which its age could be told. (2) A popup's minute counts only while the tab is in front. (3)
+  The claim lease of point 2. (4) The limits are checked after storing, as in point 6. (5) The export shows each
+  challenge's state now, and leaves out challenges sent by someone in a block with the player. (6) The creator's
+  view of a taken challenge carries `until`, and the web app drops open challenges at `expiresAt` and taken ones
+  at `until`.
 - **Consequences.** One new collection with five indexes, nothing existing changed or migrated. A challenger who
   is offline when someone takes their challenge leaves the taker in a waiting room that closes after 30 minutes;
   CC-052 scenario 4 adds "keep it for later". A blocked person who compares the page with a friend's can guess,

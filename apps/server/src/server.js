@@ -807,7 +807,7 @@ export async function startServer({
     challengeAccessor,
     rooms: roomComponent,
     blocks: blockComponent,
-    ages: accountComponent,
+    safety: safetyComponent,
     events: domainEvents,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });

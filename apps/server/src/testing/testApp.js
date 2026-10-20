@@ -307,7 +307,7 @@ export function createTestApp({
     challengeAccessor: createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() }),
     rooms: roomComponent,
     blocks: blockComponent,
-    ages: accountComponent,
+    safety: safetyComponent,
     events: domainEvents,
     ...(challengeRecipients && { recipients: challengeRecipients }),
   });

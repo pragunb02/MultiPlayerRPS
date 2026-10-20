@@ -81,8 +81,12 @@ export function createChallengeAccessor({ challengeDao }) {
     /** @param {string} playerId @returns {Promise<ReadonlyArray<Readonly<Challenge>>>} newest first */
     listTo: async (playerId) => toChallenges(await challengeDao.listTo(playerId)),
 
-    /** @param {{ challengeId: string, acceptedBy: string, acceptedName: string, at: number }} claim */
-    claim: ({ at, ...claim }) => challengeDao.claim({ ...claim, at: new Date(at) }),
+    /**
+     * @param {{ challengeId: string, acceptedBy: string, acceptedName: string, at: number, staleBefore: number }} claim
+     *   a hold that began before `staleBefore` with no room counts as open
+     */
+    claim: ({ at, staleBefore, ...claim }) =>
+      challengeDao.claim({ ...claim, at: new Date(at), staleBefore: new Date(staleBefore) }),
 
     /** @param {{ challengeId: string, acceptedBy: string }} claim */
     release: (claim) => challengeDao.release(claim),
@@ -90,8 +94,12 @@ export function createChallengeAccessor({ challengeDao }) {
     /** @param {{ challengeId: string, acceptedBy: string, roomCode: string }} room */
     setRoom: (room) => challengeDao.setRoom(room),
 
-    /** @param {{ challengeId: string, state: string, at: number }} end */
-    end: ({ at, ...end }) => challengeDao.end({ ...end, at: new Date(at) }),
+    /** @param {{ challengeId: string, state: string, at: number, staleBefore: number }} end */
+    end: ({ at, staleBefore, ...end }) =>
+      challengeDao.end({ ...end, at: new Date(at), staleBefore: new Date(staleBefore) }),
+
+    /** @param {string} challengeId @returns {Promise<boolean>} whether it was there */
+    remove: (challengeId) => challengeDao.remove(challengeId),
 
     /** @param {{ challengeId: string, playerId: string }} later */
     addLater: (later) => challengeDao.addLater(later),
