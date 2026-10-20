@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
@@ -8,16 +8,27 @@ import { startMemoryMongo } from "./testing/memoryMongo.js";
 import { testConfig } from "./testing/testConfig.js";
 
 // The chess rating through the real composition root, real MongoDB (in memory) and real HTTP and WebSocket
-// (CC-042): a guest's rated game, the rating moving on sign up, export and deletion.
+// (CC-042): a guest's rated game, the rating moving on sign up, export and deletion. One MongoDB and one server
+// for the file: the tests share no players, and starting a server builds every index, which took seconds of each
+// test's 5 s on a busy runner (CC-306, CC-309).
 let mongo;
-let dbCounter = 0;
+let app;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
+  const config = testConfig({ MONGO_URI: mongo.uri("chess-ratings") });
+  const capture = captureLogger();
+  const server = await startServer({ config, logger: capture.logger });
+  app = { ...server, ...capture, config, url: `http://127.0.0.1:${server.port}` };
 }, 120_000);
 
 afterAll(async () => {
+  await app?.close();
   await mongo?.stop();
+});
+
+beforeEach(() => {
+  onTestFailed(() => app.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)));
 });
 
 async function readCollection(uri, name, filter = {}) {
@@ -27,25 +38,6 @@ async function readCollection(uri, name, filter = {}) {
   } finally {
     await connection.close();
   }
-}
-
-/** Polls until `probe` answers something, for work the match pipeline does in the background. */
-async function eventually(probe, timeoutMs = 5_000) {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const value = await probe();
-    if (value !== undefined) return value;
-    if (Date.now() > deadline) throw new Error("timed out waiting for condition");
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-}
-
-async function start() {
-  const config = testConfig({ MONGO_URI: mongo.uri(`chess-ratings-${++dbCounter}`) });
-  const capture = captureLogger();
-  onTestFailed(() => capture.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)));
-  const app = await startServer({ config, logger: capture.logger });
-  return { ...app, ...capture, config, url: `http://127.0.0.1:${app.port}` };
 }
 
 const PASSWORD = "correct horse battery";
@@ -76,14 +68,27 @@ async function socketFor(url, cookie) {
 
 const send = (socket, event, payload) => socket.timeout(2_000).emitWithAck(event, payload);
 
-/** The host plays Black and mates in two (seed decides colours, so the host is told which side moves first). */
+/**
+ * Black mates in two. The room's seed decides the colours, so they are read from the joiner's view. Views name
+ * players by their seat in the room, the viewer's own as `you` (CC-253), never by player id: reading the colour
+ * by player id found none, so the host was always taken for White, and half the games stalled on a refused move
+ * until the test timed out (CC-306).
+ */
 async function playChess(host, joiner) {
   const { data: room } = await send(host.socket, SOCKET_EVENTS.ROOM_CREATE, { gameId: "chess", options: {} });
   const { data: started } = await send(joiner.socket, SOCKET_EVENTS.ROOM_JOIN, { code: room.code });
-  const white = started.game.view.colors[joiner.id] === "w" ? joiner : host;
+  const joinerColour = started.game.view.colors[started.you];
+  expect(["w", "b"]).toContain(joinerColour);
+  const white = joinerColour === "w" ? joiner : host;
   const black = white === joiner ? host : joiner;
-  const move = (player, from, to) =>
-    send(player.socket, SOCKET_EVENTS.GAME_MOVE, { code: room.code, move: { type: "move", from, to } });
+  // A refused move fails here, with the server's reason, instead of leaving the game unfinished.
+  const move = async (player, from, to) => {
+    const ack = await send(player.socket, SOCKET_EVENTS.GAME_MOVE, {
+      code: room.code,
+      move: { type: "move", from, to },
+    });
+    expect(ack.error).toBeUndefined();
+  };
   await move(white, "f2", "f3");
   await move(black, "e7", "e5");
   await move(white, "g2", "g4");
@@ -93,7 +98,6 @@ async function playChess(host, joiner) {
 
 describe("the chess rating through the real composition root (integration, CC-042)", () => {
   it("rates a guest, moves the rating on sign up, exports it and erases it with the account", async () => {
-    const app = await start();
     const sockets = [];
     try {
       const uri = app.config.mongoUri;
@@ -108,10 +112,10 @@ describe("the chess rating through the real composition root (integration, CC-04
       sockets.push(sam.socket, riya.socket);
 
       await playChess(riya, sam);
-      const [guestRating] = await eventually(async () => {
-        const docs = await readCollection(uri, "chess_ratings", { playerId: riya.id, games: 1 });
-        return docs.length === 1 ? docs : undefined;
-      });
+      // The match pipeline rates the game in the background: wait for it to say so, not on a timer.
+      await app.once("chess ratings applied");
+      const [guestRating] = await readCollection(uri, "chess_ratings", { playerId: riya.id, games: 1 });
+      expect(guestRating).toBeDefined();
       expect(app.find("chess ratings applied")).toHaveLength(1);
 
       const riyaUp = await call(app.url, "POST", "/auth/signup", {
@@ -147,20 +151,17 @@ describe("the chess rating through the real composition root (integration, CC-04
       expect(await readCollection(uri, "chess_ratings", { playerId: sam.id })).toHaveLength(1);
     } finally {
       sockets.forEach((socket) => socket.disconnect());
-      await app.close();
     }
   });
 
   it("builds the unique index on playerId at boot", async () => {
-    const app = await start();
+    const connection = await mongoose.createConnection(app.config.mongoUri).asPromise();
     try {
-      const connection = await mongoose.createConnection(app.config.mongoUri).asPromise();
       const indexes = await connection.db.collection("chess_ratings").indexes();
-      await connection.close();
 
       expect(indexes.find((index) => index.key.playerId === 1)).toMatchObject({ unique: true });
     } finally {
-      await app.close();
+      await connection.close();
     }
   });
 });
