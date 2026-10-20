@@ -1,0 +1,49 @@
+{
+  "GET /api/admin/flags (before)": {
+    "status": 200,
+    "cacheControl": "no-store",
+    "body": "{\"source\":\"database\",\"days\":30,\"countsRead\":true,\"flags\":[{\"name\":\"console_flag_check\",\"description\":\"Shows a line on the console's Flags page saying this flag is on for you, so the owner can check a rollout end to end before a real feature uses one.\",\"ticket\":\"CC-312\",\"audience\":\"admins\",\"removeBy\":\"2026-12-31\",\"overdue\":false,\"client\":true,\"success\":\"The owner pressed It works on that line.\",\"codeRollout\":\"off\",\"rollout\":\"off\",\"counts\":{\"on\":{\"exposures\":0,\"successes\":0},\"off\":{\"exposures\":0,\"successes\":0}}}]}"
+  },
+  "PUT /api/admin/flags/console_flag_check {rollout:on}": {
+    "status": 200,
+    "cacheControl": "no-store",
+    "body": "{\"flag\":{\"name\":\"console_flag_check\",\"description\":\"Shows a line on the console's Flags page saying this flag is on for you, so the owner can check a rollout end to end before a real feature uses one.\",\"ticket\":\"CC-312\",\"audience\":\"admins\",\"removeBy\":\"2026-12-31\",\"overdue\":false,\"client\":true,\"success\":\"The owner pressed It works on that line.\",\"codeRollout\":\"off\",\"rollout\":\"on\",\"override\":{\"rollout\":\"on\",\"updatedAt\":1792498701415},\"counts\":{\"on\":{\"exposures\":0,\"successes\":0},\"off\":{\"exposures\":0,\"successes\":0}}}}"
+  },
+  "GET /api/flags?names=console_flag_check (owner)": {
+    "status": 200,
+    "cacheControl": "no-store",
+    "body": "{\"flags\":{\"console_flag_check\":true}}"
+  },
+  "POST /api/flags/console_flag_check/success": {
+    "status": 204,
+    "body": ""
+  },
+  "GET /api/flags?names=no_such_flag": {
+    "status": 400,
+    "body": "{\"error\":{\"code\":\"VALIDATION_FAILED\",\"message\":\"Ask only for flags the web app may read\",\"details\":{\"field\":\"names\"},\"requestId\":\"b39942f3-cece-473b-9aa6-f635411bbf89\"}}"
+  },
+  "PUT /api/admin/flags/console_flag_check {rollout:150}": {
+    "status": 400,
+    "cacheControl": "no-store",
+    "body": "{\"error\":{\"code\":\"VALIDATION_FAILED\",\"message\":\"The rollout must be off, on or a whole percentage from 0 to 100\",\"details\":{\"field\":\"rollout\"},\"requestId\":\"c52dcf14-488f-4095-a5c5-2ec1d50b4a83\"}}"
+  },
+  "GET /api/admin/flags (after)": {
+    "status": 200,
+    "cacheControl": "no-store",
+    "body": "{\"source\":\"database\",\"days\":30,\"countsRead\":true,\"flags\":[{\"name\":\"console_flag_check\",\"description\":\"Shows a line on the console's Flags page saying this flag is on for you, so the owner can check a rollout end to end before a real feature uses one.\",\"ticket\":\"CC-312\",\"audience\":\"admins\",\"removeBy\":\"2026-12-31\",\"overdue\":false,\"client\":true,\"success\":\"The owner pressed It works on that line.\",\"codeRollout\":\"off\",\"rollout\":\"on\",\"override\":{\"rollout\":\"on\",\"updatedAt\":1792498701415},\"counts\":{\"on\":{\"exposures\":\"<5\",\"successes\":\"<5\"},\"off\":{\"exposures\":0,\"successes\":0}}}]}"
+  },
+  "DELETE /api/admin/flags/console_flag_check": {
+    "status": 200,
+    "cacheControl": "no-store",
+    "body": "{\"flag\":{\"name\":\"console_flag_check\",\"description\":\"Shows a line on the console's Flags page saying this flag is on for you, so the owner can check a rollout end to end before a real feature uses one.\",\"ticket\":\"CC-312\",\"audience\":\"admins\",\"removeBy\":\"2026-12-31\",\"overdue\":false,\"client\":true,\"success\":\"The owner pressed It works on that line.\",\"codeRollout\":\"off\",\"rollout\":\"off\",\"counts\":{\"on\":{\"exposures\":\"<5\",\"successes\":\"<5\"},\"off\":{\"exposures\":0,\"successes\":0}}}}"
+  },
+  "GET /api/flags?names=console_flag_check (guest)": {
+    "status": 200,
+    "cacheControl": "no-store",
+    "body": "{\"flags\":{\"console_flag_check\":false}}"
+  },
+  "GET /api/admin/flags (guest)": {
+    "status": 404,
+    "body": "{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Not found\",\"requestId\":\"8598f1d7-0f18-48d6-a3f8-8c3a9587aa0b\"}}"
+  }
+}
