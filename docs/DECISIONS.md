@@ -177,7 +177,8 @@ the owner may change it.
   10. **A player in a game on the room page is never interrupted.** Popups from elsewhere, their sound and the tab
       alert wait until the game ends. The sound follows `cc.sound` and its request category (CC-208). Under reduced
       motion the tab title changes once and does not flash.
-  11. **The inbox** is the minimal CC-147: a button in the header row on every screen size, with the challenges sent
+  11. **The inbox** is the minimal CC-147: a button in the header row on every screen size, shown only while it holds
+      something (a full header pushed the game below the fold at 1280 by 720), with the challenges sent
       to the player, theirs that someone took, and theirs still open. Nothing else yet.
   12. **Data (ADR-048).** `challenges` is a participant of the guest move (ADR-014), of the export (the challenges a
       player made and was sent, with others by name only) and of deletion (every challenge they made, were sent or

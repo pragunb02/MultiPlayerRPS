@@ -63,7 +63,6 @@ export const CHALLENGE_COPY = Object.freeze({
     hi: "Apna challenge banao aur dost ko bhejo.",
     en: "Make your own challenge and send it to a friend.",
   }),
-  inboxEmpty: Object.freeze({ hi: "Abhi kuch nahi hai.", en: "Nothing is waiting for you." }),
   signInFirst: Object.freeze({
     hi: "Khelne ke liye guest bano, ya log in karo.",
     en: "Play as a guest, or log in to keep your progress.",

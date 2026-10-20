@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
-import { CHALLENGE_COPY } from "../Challenges/challengeCopy.js";
 
 // CC-207, the minimal CC-147: the inbox in the header lists the challenges that wait for the player.
 const T = Date.UTC(2026, 9, 20, 12);
@@ -21,6 +20,19 @@ const challenge = (overrides = {}) => ({
   expiresAt: T + 86_400_000,
   ...overrides,
 });
+
+async function renderInbox(challenges, apiOverrides = {}) {
+  const socket = fakeSocket();
+  socket.connect();
+  const api = fakeApi({
+    getSession: async () => GUEST,
+    getChallenges: vi.fn().mockResolvedValue(challenges),
+    ...apiOverrides,
+  });
+  const view = renderApp({ socket, api });
+  await screen.findByText(GUEST.displayName);
+  return { ...view, api };
+}
 
 async function openInbox(challenges, apiOverrides = {}) {
   const user = userEvent.setup();
@@ -46,11 +58,17 @@ describe("Inbox (CC-207)", () => {
     expect(screen.queryByRole("button", { name: /^Inbox/ })).not.toBeInTheDocument();
   });
 
-  it("says when nothing is waiting", async () => {
-    const { panel, button } = await openInbox([]);
+  it("is not in the header while nothing is in it, and counts nothing for challenges that only wait", async () => {
+    const { api } = await renderInbox([]);
+    await waitFor(() => expect(api.getChallenges).toHaveBeenCalled());
+
+    expect(screen.queryByRole("button", { name: /^Inbox/ })).not.toBeInTheDocument();
+  });
+
+  it("names a challenge of the player's that only waits without a count", async () => {
+    const { button } = await openInbox([challenge({ own: true, forYou: false })]);
 
     expect(button).toHaveAccessibleName("Inbox");
-    expect(panel).toHaveTextContent(CHALLENGE_COPY.inboxEmpty.en);
   });
 
   it("counts what asks for an answer, and lists a challenge sent to the player with Accept and go", async () => {
@@ -83,7 +101,7 @@ describe("Inbox (CC-207)", () => {
     await user.click(within(panel).getByRole("button", { name: "No thanks" }));
 
     expect(api.declineChallenge).toHaveBeenCalledWith("c0000000000000000001");
-    await waitFor(() => expect(panel).toHaveTextContent(CHALLENGE_COPY.inboxEmpty.en));
+    await waitFor(() => expect(panel).not.toBeInTheDocument());
   });
 
   it("lists the player's own challenges: taken ones with Go and play, open ones with Share it and Take back", async () => {
@@ -118,13 +136,14 @@ describe("Inbox (CC-207)", () => {
   });
 
   it("leaves out what is over and what was never the player's to answer", async () => {
-    const { panel } = await openInbox([
+    const { api } = await renderInbox([
       challenge({ state: "expired" }),
       challenge({ id: "c0000000000000000004", own: false, forYou: false }),
       challenge({ id: "c0000000000000000005", own: true, forYou: false, state: "accepted" }),
       challenge({ id: "c0000000000000000006", forYou: false, took: true, state: "accepted" }),
     ]);
 
-    expect(panel).toHaveTextContent(CHALLENGE_COPY.inboxEmpty.en);
+    await waitFor(() => expect(api.getChallenges).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: /^Inbox/ })).not.toBeInTheDocument();
   });
 });

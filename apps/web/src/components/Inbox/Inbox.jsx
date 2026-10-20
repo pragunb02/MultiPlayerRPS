@@ -92,7 +92,8 @@ function Yours({ challenge }) {
 /**
  * The inbox under the header (CC-207, the minimal CC-147): challenges sent to the player, theirs that someone took,
  * and theirs still waiting. A challenge whose popup got Not now, or was left for a minute, is here. The button shows
- * how many ask for an answer. Signed-out visitors have no inbox.
+ * how many ask for an answer. It shows only while something is in it, so the header keeps its room for everyone
+ * else (a full header would push the game below the fold at 1280 by 720). Signed-out visitors have no inbox.
  */
 export function Inbox() {
   const { challenges } = useChallengeInbox();
@@ -101,6 +102,9 @@ export function Inbox() {
   const asks = listed.filter((challenge) => placeOf(challenge) === "asks").length;
   const label = asks === 0 ? "Inbox" : `Inbox, ${asks} waiting`;
 
+  if (listed.length === 0) {
+    return null;
+  }
   return (
     <div className={styles.inbox}>
       <button
@@ -127,17 +131,13 @@ export function Inbox() {
         aria-label="Inbox"
       >
         <h2 className={styles.heading}>Inbox</h2>
-        {listed.length === 0 ? (
-          <Bilingual copy={CHALLENGE_COPY.inboxEmpty} />
-        ) : (
-          <ul className={styles.list}>
-            {listed.map((challenge) => (
-              <li key={challenge.id} className={styles.item}>
-                {challenge.own ? <Yours challenge={challenge} /> : <SentToYou challenge={challenge} />}
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className={styles.list}>
+          {listed.map((challenge) => (
+            <li key={challenge.id} className={styles.item}>
+              {challenge.own ? <Yours challenge={challenge} /> : <SentToYou challenge={challenge} />}
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   );
