@@ -241,3 +241,18 @@ describe("Seats: blocking from a seat (CC-044)", () => {
     expect(toast.show).not.toHaveBeenCalled();
   });
 });
+
+describe("Seats: avatars (CC-034)", () => {
+  it("draws each person's avatar beside their name, the silhouette for none, and nothing for a computer", () => {
+    const pip = seat({ playerId: "seat_c", displayName: "Pip", bot: { character: "pip", level: "easy" } });
+    mount(room({ players: { min: 2, max: 3 }, seats: [seat({ avatar: "rocket" }), BOB, pip] }));
+
+    const [alice, bob, computer] = screen.getAllByRole("listitem");
+
+    expect(alice.querySelectorAll("svg")).toHaveLength(1);
+    expect(alice.querySelector("svg .silhouette")).toBeNull();
+    expect(bob.querySelector("svg .silhouette")).not.toBeNull();
+    expect(computer.querySelector("svg")).toBeNull();
+    expect(alice.textContent).toContain("Alice");
+  });
+});

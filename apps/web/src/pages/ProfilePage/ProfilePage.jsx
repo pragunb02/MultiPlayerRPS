@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router";
 import { getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
+import { Avatar } from "../../art/avatars/Avatar.jsx";
 import { LevelBadge } from "../../art/badges/LevelBadge.jsx";
 import { rankForLevel } from "../../art/badges/ranks.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
@@ -15,11 +16,13 @@ import { useStreakAtRisk } from "../../components/SaveProgress/saveProgressConte
 import { StreakAtRisk } from "../../components/SaveProgress/StreakAtRisk.jsx";
 import { StreakCard } from "../../components/Streaks/StreakCard.jsx";
 import { useMatchHistory } from "../../hooks/useMatchHistory.js";
+import { useOwnProfile } from "../../hooks/useProfile.js";
 import { useProgress } from "../../hooks/useProgress.js";
 import { useSession } from "../../hooks/useSession.js";
 import { AccountSettings } from "./AccountSettings.jsx";
 import { BlockedPlayers } from "./BlockedPlayers.jsx";
 import { PrivacySettings } from "./PrivacySettings.jsx";
+import { PublicProfileSettings } from "./PublicProfileSettings.jsx";
 import styles from "./ProfilePage.module.css";
 import { VisitorProfile } from "./VisitorProfile.jsx";
 
@@ -72,6 +75,27 @@ function ProgressCard() {
   );
 }
 
+/**
+ * A past opponent in history: their avatar and name, and a link to their profile when the server gave one, which it
+ * does only for an adult account (CC-034). A computer character is labelled as one (ADR-025).
+ */
+function Opponent({ player, last }) {
+  const name = player.computer ? `${player.displayName} (computer)` : player.displayName;
+  return (
+    <span className={styles.opponent}>
+      {!player.computer && <Avatar avatar={player.avatar} size={20} />}
+      {player.profile === undefined ? (
+        name
+      ) : (
+        <Link to={paths.player(player.profile)} data-cc-control="profile.matches.opponent">
+          {name}
+        </Link>
+      )}
+      {!last && ", "}
+    </span>
+  );
+}
+
 function MatchHistory() {
   const history = useMatchHistory();
   const more = useAction(history.loadMore, { id: "profile.matches.more" });
@@ -96,9 +120,7 @@ function MatchHistory() {
         {history.matches.map((match) => {
           // A computer character is labelled as one, so it never reads as a person of the same name (ADR-025).
           // Players are named by ids made for this match, and `you` is yours (CC-297).
-          const opponents = match.players
-            .filter((p) => p.playerId !== match.you)
-            .map((p) => (p.computer ? `${p.displayName} (computer)` : p.displayName));
+          const opponents = match.players.filter((p) => p.playerId !== match.you);
           return (
             <li key={match.matchId} className={styles.match}>
               <span className={`${styles.badge} ${styles[match.outcomeForYou]}`}>
@@ -107,7 +129,16 @@ function MatchHistory() {
               <span className={styles.game}>
                 <GameIcon gameId={match.gameId} />
                 <span>
-                  {getGame(match.gameId)?.name ?? match.gameId} vs {opponents.join(", ") || "—"}
+                  {getGame(match.gameId)?.name ?? match.gameId} vs{" "}
+                  {opponents.length === 0
+                    ? "—"
+                    : opponents.map((player, index) => (
+                        <Opponent
+                          key={player.playerId}
+                          player={player}
+                          last={index === opponents.length - 1}
+                        />
+                      ))}
                 </span>
               </span>
               <time className={styles.muted} dateTime={new Date(match.endedAt).toISOString()}>
@@ -157,6 +188,7 @@ function PlayerConsole({ guest }) {
  */
 export function ProfilePage() {
   const session = useSession();
+  const own = useOwnProfile();
   // Set by the deletion on this page, so the visitor it leaves behind is told it worked (CC-035).
   const accountDeleted = useLocation().state?.accountDeleted === true;
   if (session.status === "loading") {
@@ -182,7 +214,10 @@ export function ProfilePage() {
   return (
     <section className={styles.page}>
       <PageTitle>{session.identity.displayName}</PageTitle>
-      <h1>{session.identity.displayName}</h1>
+      <div className={styles.nameRow}>
+        <Avatar avatar={own.profile?.avatar} size={56} />
+        <h1>{session.identity.displayName}</h1>
+      </div>
       {session.identity.kind === "guest" && (
         <p className={styles.muted}>
           You're playing as a guest.{" "}
@@ -197,6 +232,7 @@ export function ProfilePage() {
       <PlayerConsole guest={session.identity.kind === "guest"} />
       <h2>Recent matches</h2>
       <MatchHistory />
+      <PublicProfileSettings own={own} guest={session.identity.kind === "guest"} />
       <BlockedPlayers />
       {session.identity.kind === "user" && <AccountSettings />}
       {session.identity.kind === "user" && <PrivacySettings />}

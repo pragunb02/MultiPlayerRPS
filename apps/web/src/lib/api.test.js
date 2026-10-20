@@ -217,6 +217,32 @@ describe("api client", () => {
     ]);
   });
 
+  it("reads and changes your own profile, and reads another's by handle only (CC-034)", async () => {
+    const profile = { handle: "k3m9q2x7p4w8z1ab", visibility: "private", canBePublic: true };
+    const read = respond(200, { profile });
+    const avatar = respond(200, { profile: { ...profile, avatar: "owl" } });
+    const visibility = respond(200, { profile: { ...profile, visibility: "public" } });
+    const player = respond(200, { player: { handle: "a/b", hidden: true, displayName: "Hidden player" } });
+
+    expect(await createApiClient({ fetchImpl: read }).getOwnProfile()).toEqual(profile);
+    expect((await createApiClient({ fetchImpl: avatar }).setAvatar("owl")).avatar).toBe("owl");
+    expect((await createApiClient({ fetchImpl: visibility }).setProfileVisibility("public")).visibility).toBe(
+      "public",
+    );
+    expect((await createApiClient({ fetchImpl: player }).getPlayerProfile("a/b")).hidden).toBe(true);
+
+    expect(read.mock.calls[0][0]).toBe("/api/profile");
+    expect(avatar.mock.calls[0]).toEqual([
+      "/api/profile/avatar",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ avatar: "owl" }) }),
+    ]);
+    expect(visibility.mock.calls[0]).toEqual([
+      "/api/profile/visibility",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ visibility: "public" }) }),
+    ]);
+    expect(player.mock.calls[0][0]).toBe("/api/profiles/a%2Fb");
+  });
+
   it("lists, adds and removes blocks, never with a player id (CC-044)", async () => {
     const listed = respond(200, { blocks: [{ blockId: "b1", displayName: "Bob", blockedAt: 1 }] });
     const added = respond(200, { block: { blockId: "b2", displayName: "Bob", blockedAt: 2 } });

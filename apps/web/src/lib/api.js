@@ -96,6 +96,16 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     unblockPlayer: async (blockId) => {
       await request("DELETE", `/blocks/${encodeURIComponent(blockId)}`);
     },
+    /** The player's own profile: handle, avatar, visibility and whether it may be public (CC-034). */
+    getOwnProfile: async () => (await request("GET", "/profile")).profile,
+    /** @param {string} avatar  an id from `AVATARS` */
+    setAvatar: async (avatar) => (await request("PUT", "/profile/avatar", { avatar })).profile,
+    /** @param {"public" | "private"} visibility */
+    setProfileVisibility: async (visibility) =>
+      (await request("PUT", "/profile/visibility", { visibility })).profile,
+    /** What this viewer may see of the profile at a handle (CC-034). Unknown and blocked are both NOT_FOUND. */
+    getPlayerProfile: async (handle) =>
+      (await request("GET", `/profiles/${encodeURIComponent(handle)}`)).player,
     getProgress: async () => (await request("GET", "/progress")).progress,
     getMatches: (query = {}) => request("GET", `/matches${toQuery(query)}`),
     getMatch: async (matchId) => (await request("GET", `/matches/${encodeURIComponent(matchId)}`)).match,

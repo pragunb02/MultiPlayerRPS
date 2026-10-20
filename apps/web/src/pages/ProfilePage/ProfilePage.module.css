@@ -185,3 +185,25 @@
   background: var(--color-primary-soft);
   font-weight: 700;
 }
+
+/* Your avatar beside your name (CC-034). A long name wraps beside it on a phone. */
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.nameRow h1 {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.opponent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  vertical-align: middle;
+}
+.publicProfile {
+  display: grid;
+  gap: var(--space-4);
+}

@@ -158,8 +158,16 @@
   top: 0.4rem;
   color: var(--color-on-tier);
 }
+/* The avatar, then the name, which is cut short with an ellipsis when the row is narrow (CC-034). */
 .name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
   font-weight: 700;
+}
+.nameText {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

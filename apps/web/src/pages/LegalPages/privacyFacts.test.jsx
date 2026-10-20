@@ -87,6 +87,11 @@ const FACTS = [
     page: /We do not count how you use the site\. If we ever do, it will be anonymous counts on our own server/,
   },
   {
+    fact: "profiles start private, only adults can be public, everyone else is Hidden player (CC-034)",
+    data: "once chosen: left out means private",
+    page: /It starts private: others see only your name and avatar\. If you are 18 or over you can make it public.*the profile shows "Hidden player" and nothing else/,
+  },
+  {
     fact: "blocks are kept until unblocked or an account is deleted",
     data: "Kept until the blocker unblocks, or either account is deleted",
     page: /we store that you blocked them, the name they had and when, until you unblock them or either account is deleted/,
