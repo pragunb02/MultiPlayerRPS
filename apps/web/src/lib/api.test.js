@@ -493,3 +493,45 @@ describe("api client, the account's data and age (CC-035, CC-152)", () => {
     ]);
   });
 });
+
+describe("api client: feature flags (CC-312)", () => {
+  it("asks for the flags a page needs and answers their booleans", async () => {
+    const fetchImpl = respond(200, { flags: { console_flag_check: true } });
+
+    expect(await createApiClient({ fetchImpl }).getFlags(["console_flag_check"])).toEqual({
+      console_flag_check: true,
+    });
+    expect(fetchImpl.mock.calls[0][0]).toBe("/api/flags?names=console_flag_check");
+  });
+
+  it("counts a flag's success event", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ status: 204, ok: true });
+
+    expect(await createApiClient({ fetchImpl }).sendFlagSuccess("console_flag_check")).toBeUndefined();
+    expect(fetchImpl.mock.calls[0]).toEqual([
+      "/api/flags/console_flag_check/success",
+      expect.objectContaining({ method: "POST" }),
+    ]);
+  });
+
+  it("reads the console's flags, sets a rollout and clears it", async () => {
+    const listed = respond(200, { source: "database", days: 30, flags: [] });
+    const flag = { name: "console_flag_check", rollout: 10 };
+    const changed = respond(200, { flag });
+
+    expect(await createApiClient({ fetchImpl: listed }).getAdminFlags()).toEqual({
+      source: "database",
+      days: 30,
+      flags: [],
+    });
+    const api = createApiClient({ fetchImpl: changed });
+    expect(await api.setFlagRollout("console_flag_check", 10)).toEqual(flag);
+    expect(await api.clearFlagRollout("console_flag_check")).toEqual(flag);
+
+    expect(listed.mock.calls[0][0]).toBe("/api/admin/flags");
+    expect(changed.mock.calls.map(([url, init]) => [url, init.method, init.body])).toEqual([
+      ["/api/admin/flags/console_flag_check", "PUT", JSON.stringify({ rollout: 10 })],
+      ["/api/admin/flags/console_flag_check", "DELETE", undefined],
+    ]);
+  });
+});

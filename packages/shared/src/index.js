@@ -40,6 +40,18 @@ export {
   REPORT_STATUS,
   REPORT_STATUSES,
 } from "./reports.js";
+export {
+  assertClientFlag,
+  assertFlagRegistry,
+  FLAG_AUDIENCES,
+  FLAG_ROLLOUT,
+  FLAG_SIDES,
+  FLAGS,
+  flagNamed,
+  isFlagName,
+  isRollout,
+  overdueFlags,
+} from "./flags.js";
 export { SOCKET_EVENTS } from "./events.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";
 export { ACCOUNT_MESSAGES, IDENTITY_KINDS } from "./identity.js";

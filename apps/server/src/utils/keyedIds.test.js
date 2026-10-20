@@ -51,12 +51,13 @@ describe("keyed ids (CC-253, CC-297)", () => {
     expect(keys).not.toContain(SESSION_SECRET);
   });
 
-  it("has a label for room seats and one for match players, and each label is different", () => {
+  it("has a label for room seats, one for match players and one for feature flag buckets, each different", () => {
     const labels = Object.values(KEYED_ID_LABELS);
 
     expect(KEYED_ID_LABELS).toEqual({
       ROOM_SEATS: "classicade room seat ids",
       MATCH_PLAYERS: "classicade match player ids",
+      FLAG_BUCKETS: "classicade feature flag buckets",
     });
     expect(new Set(labels).size).toBe(labels.length);
     expect(Object.isFrozen(KEYED_ID_LABELS)).toBe(true);

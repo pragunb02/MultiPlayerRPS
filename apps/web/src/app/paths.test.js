@@ -86,6 +86,7 @@ describe("queryOf: one way to write a page's query (CC-290)", () => {
     expect(paths.adminFeedback()).toBe("/admin/feedback");
     expect(paths.adminReports()).toBe("/admin/reports");
     expect(paths.adminReports({ status: "dismissed" })).toBe("/admin/reports?status=dismissed");
+    expect(paths.adminFlags()).toBe("/admin/flags");
   });
 });
 
