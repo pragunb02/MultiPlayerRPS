@@ -9,7 +9,9 @@
   font-size: var(--type-label);
   font-weight: 400;
 }
+/* A phone scrolls the table sideways inside its section rather than squeezing each column into a sliver. */
 .table {
+  min-width: 40rem;
   width: 100%;
   border-collapse: collapse;
   font-size: var(--type-label);
@@ -159,6 +161,7 @@ section:has(> .table) {
   line-height: var(--leading-body);
 }
 .cards {
+  justify-self: stretch;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   gap: var(--space-4);
@@ -190,8 +193,10 @@ section:has(> .table) {
 .elevation-3 {
   box-shadow: var(--elevation-3);
 }
+/* A button keeps its own width. The card grid and the empty state take the whole row. */
 .example {
   display: grid;
+  justify-items: start;
   gap: var(--space-3);
   padding-block: var(--space-4);
   border-top: 1px solid var(--color-border);
@@ -224,6 +229,7 @@ section:has(> .table) {
   color: var(--color-on-info);
 }
 .empty {
+  justify-self: stretch;
   display: grid;
   justify-items: start;
   gap: var(--space-3);
