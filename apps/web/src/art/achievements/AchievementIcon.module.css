@@ -16,5 +16,5 @@
   color: var(--color-on-tier);
 }
 .hundred {
-  font-size: 14px;
+  font-size: var(--type-svg-medal-count);
 }

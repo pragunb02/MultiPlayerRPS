@@ -44,6 +44,13 @@
 .seat:nth-child(4)::before {
   background: var(--color-gold);
 }
+/* A seated viewer: their own marker is the player colour "you", everyone else's is "opponent" (CC-314). */
+.seat.mine::before {
+  background: var(--color-you);
+}
+.seat.theirs::before {
+  background: var(--color-opponent);
+}
 .empty {
   color: var(--color-text-muted);
   border-style: dashed;
@@ -76,6 +83,9 @@
   border-radius: var(--radius-full);
   background: var(--color-primary-soft);
   color: var(--color-text);
+}
+.tagYou {
+  background: var(--color-you-soft);
 }
 /* Where the player is (CC-158): quiet while all is well, the warning colour while they are away or gone. */
 .status {
