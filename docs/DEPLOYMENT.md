@@ -292,6 +292,14 @@ scanning, are on.
 
 ## Merge queue (CC-298, ADR-074)
 
+> **Not available on this repository (2026-10-20).** GitHub rejects the `merge_queue` rule ("Invalid rule
+> 'merge_queue'") because merge queues exist only for organization repositories, and `pragunb02/MultiPlayerRPS`
+> belongs to a personal account. The owner applied the same JSON without that rule and with
+> `strict_required_status_checks_policy: true` instead (ruleset "main: required checks, branch up to date", id
+> 25472873): the seven required checks must pass on a branch that is up to date with `main`. The coordinator merges
+> with `gh pr update-branch <n>` and then `gh pr merge <n> --merge --auto`. The `merge_group` triggers in ci.yml stay,
+> harmless, for a move to an organization later. The steps below describe the queue as designed.
+
 Two pull requests that are each green can still break `main` together (CC-247, CC-257). The merge queue tests each
 pull request on top of the newest `main` and of the pull requests ahead of it, on a temporary branch
 `gh-readonly-queue/main/...`, and merges only when every required check passed there. ci.yml starts on
