@@ -236,6 +236,10 @@ test.describe("page changes", () => {
 
     await privacy.click();
     await expect(page).toHaveURL("/privacy");
+    // The URL changes as soon as the link is pressed, but the app draws the new page later (React Router renders it
+    // as a transition). Going Back before that leaves the home page that never went away, so nothing moves focus.
+    // Its focused heading is the sign that the privacy page is on screen (CC-317).
+    await expect(page.getByRole("heading", { level: 1, name: "Privacy policy" })).toBeFocused();
     await page.goBack();
 
     const heading = page.getByRole("heading", { level: 1 });
