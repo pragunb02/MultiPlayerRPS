@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
 import { AppRequestError } from "../../lib/errors.js";
-import { fakeApi, fakeSound } from "../../testing/fakes.js";
+import { SessionContext } from "../../hooks/useSession.js";
+import { fakeApi, fakeSound, GUEST } from "../../testing/fakes.js";
 import { ToastContext } from "../Toast/toastContext.js";
 import { Seats } from "./Seats.jsx";
 
@@ -31,21 +32,28 @@ const room = (overrides = {}) => ({
   ...overrides,
 });
 
-function mount(view, sound = fakeSound(), api = fakeApi()) {
+const ACCOUNT = { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "Bob" };
+
+function mount(view, sound = fakeSound(), api = fakeApi(), identity = ACCOUNT) {
   const toast = { show: vi.fn(), dismiss: vi.fn(), hold: vi.fn(() => () => undefined) };
   const ui = (next) => (
     <ServicesProvider services={{ sound, api }}>
-      <ToastContext.Provider value={toast}>
-        <Seats room={next} />
-      </ToastContext.Provider>
+      <SessionContext.Provider value={{ status: "ready", identity }}>
+        <ToastContext.Provider value={toast}>
+          <Seats room={next} />
+        </ToastContext.Provider>
+      </SessionContext.Provider>
     </ServicesProvider>
   );
   const result = render(ui(view));
   return { ...result, sound, api, toast, update: (next) => result.rerender(ui(next)) };
 }
 
-// The Block button at the end of another player's row has tests of its own (CC-044).
-const chips = () => screen.getAllByRole("listitem").map((item) => item.textContent.replace(/Block$/, ""));
+// The Add friend and Block buttons at the end of another player's row have tests of their own (CC-044, CC-052).
+const chips = () =>
+  screen
+    .getAllByRole("listitem")
+    .map((item) => item.textContent.replace(/Add friend[\s\S]*$/, "").replace(/Block$/, ""));
 
 describe("Seats (CC-158)", () => {
   afterEach(() => vi.useRealTimers());
@@ -243,6 +251,29 @@ describe("Seats: blocking from a seat (CC-044)", () => {
 });
 
 describe("Seats: avatars (CC-034)", () => {
+  it("offers Add friend beside Block, by the seat's place and seat id, and says once it is sent (CC-052)", async () => {
+    const api = fakeApi();
+    mount(room(), fakeSound(), api, ACCOUNT);
+
+    expect(
+      screen.getAllByRole("button", { name: /as a friend$/ }).map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Add Alice as a friend"]);
+    await userEvent.click(screen.getByRole("button", { name: "Add Alice as a friend" }));
+
+    expect(api.sendFriendRequest).toHaveBeenCalledWith({ roomCode: undefined, seat: 0, seatId: "guest_a" });
+    expect(await screen.findByText("request sent")).toBeVisible();
+  });
+
+  it("tells a guest viewer to save their progress instead of adding a friend (CC-052)", async () => {
+    const api = fakeApi();
+    mount(room(), fakeSound(), api, GUEST);
+
+    await userEvent.click(screen.getByRole("button", { name: "Add Alice as a friend" }));
+
+    expect(screen.getAllByText("Save your progress to add friends").length).toBeGreaterThan(0);
+    expect(api.sendFriendRequest).not.toHaveBeenCalled();
+  });
+
   it("draws each person's avatar beside their name, the silhouette for none, and nothing for a computer", () => {
     const pip = seat({ playerId: "seat_c", displayName: "Pip", bot: { character: "pip", level: "easy" } });
     mount(room({ players: { min: 2, max: 3 }, seats: [seat({ avatar: "rocket" }), BOB, pip] }));

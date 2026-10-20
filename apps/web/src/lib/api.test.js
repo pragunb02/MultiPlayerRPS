@@ -269,6 +269,48 @@ describe("api client", () => {
     ]);
   });
 
+  it("calls every friends route by request id, handle or token, never with a player id (CC-052)", async () => {
+    const calls = [];
+    const fetchImpl = vi.fn(async (url, init) => {
+      calls.push([url, init.method, init.body]);
+      if (init.method === "DELETE") return { status: 204, ok: true };
+      return {
+        status: 200,
+        ok: true,
+        json: async () => ({
+          result: "sent",
+          settings: { appearOffline: true },
+          link: { token: "t" },
+          invite: { displayName: "Riya" },
+          friends: [],
+        }),
+      };
+    });
+    const api = createApiClient({ fetchImpl });
+
+    expect(await api.getFriends()).toEqual(expect.objectContaining({ friends: [] }));
+    expect(await api.sendFriendRequest({ matchId: "m", seat: 1 })).toBe("sent");
+    expect(await api.answerFriendRequest("r/1", "accept")).toBe("sent");
+    expect(await api.cancelFriendRequest("r/1")).toBeUndefined();
+    expect(await api.removeFriend("h/1")).toBeUndefined();
+    expect(await api.setAppearOffline(true)).toEqual({ appearOffline: true });
+    expect(await api.makeFriendLink()).toEqual({ token: "t" });
+    expect(await api.getFriendLink("t/1")).toEqual({ displayName: "Riya" });
+    expect(await api.useFriendLink("t/1")).toBe("sent");
+
+    expect(calls).toEqual([
+      ["/api/friends", "GET", undefined],
+      ["/api/friends/requests", "POST", JSON.stringify({ matchId: "m", seat: 1 })],
+      ["/api/friends/requests/r%2F1/answer", "POST", JSON.stringify({ answer: "accept" })],
+      ["/api/friends/requests/r%2F1", "DELETE", undefined],
+      ["/api/friends/h%2F1", "DELETE", undefined],
+      ["/api/friends/settings", "PUT", JSON.stringify({ appearOffline: true })],
+      ["/api/friends/links", "POST", undefined],
+      ["/api/friends/links/t%2F1", "GET", undefined],
+      ["/api/friends/links/t%2F1", "POST", undefined],
+    ]);
+  });
+
   it("reads the leaderboard catalog and one board, with its limit", async () => {
     const boards = respond(200, { boards: [{ id: "overall" }] });
     const board = respond(200, { board: { id: "chess" }, entries: [] });

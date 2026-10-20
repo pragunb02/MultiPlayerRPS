@@ -7,6 +7,7 @@ import { useBlockPlayer } from "../../hooks/useBlocks.js";
 import { formatCountdown, useServerCountdown } from "../../hooks/useServerCountdown.js";
 import { Button } from "../Button/Button.jsx";
 import { isComputer, levelNameOf } from "../computer.js";
+import { AddFriendButton } from "../Friends/AddFriendButton.jsx";
 import { Modal } from "../Modal/Modal.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import styles from "./Seats.module.css";
@@ -130,7 +131,8 @@ function BlockDialog({ room, seat, index, onClose, onBlocked }) {
 /**
  * Who is in the room: avatars and names (CC-034), host, you, and where each player is (CC-158). A computer character is always
  * labelled as one, with its level (ADR-025). Changes to the other players are read
- * out once they settle, with a soft sound. A seated viewer can block another person from their seat (CC-044).
+ * out once they settle, with a soft sound. A seated viewer can add another person as a friend (CC-052) or block them
+ * from their seat (CC-044). The result screen shows these seats too, so both are there after a game.
  *
  * @param {{ room: { code: string, seats: Array<{ playerId: string, displayName: string, avatar?: string, connected: boolean, presence: string, graceUntil: number, bot?: { character: string, level: string }, deleted?: true }>, hostId: string, you: string, players: { max: number }, status: string, serverTime: number, game?: object } }} props  every id in a room view is a seat id (CC-253)
  */
@@ -163,15 +165,22 @@ export function Seats({ room }) {
               <span className={styles.tag}>blocked</span>
             ) : (
               canBlock(room, seat) && (
-                <Button
-                  control="room.seat.block"
-                  variant="ghost"
-                  className={styles.block}
-                  aria-label={`Block ${seat.displayName}`}
-                  onClick={() => setAsking({ seat, index, seating })}
-                >
-                  Block
-                </Button>
+                <>
+                  <AddFriendButton
+                    target={{ roomCode: room.code, seat: index, seatId: seat.playerId }}
+                    name={seat.displayName}
+                    control="room.seat.friend"
+                  />
+                  <Button
+                    control="room.seat.block"
+                    variant="ghost"
+                    className={styles.block}
+                    aria-label={`Block ${seat.displayName}`}
+                    onClick={() => setAsking({ seat, index, seating })}
+                  >
+                    Block
+                  </Button>
+                </>
               )
             )}
           </li>

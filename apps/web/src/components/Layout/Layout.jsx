@@ -104,6 +104,12 @@ export function Layout() {
               Profile
             </NavLink>
           )}
+          {/* A guest sees it too, and finds there how to save their progress to add friends (CC-052). */}
+          {identity && (
+            <NavLink to={paths.friends()} data-cc-control="header.friends">
+              Friends
+            </NavLink>
+          )}
           {/* Shown to admins only. Everyone else never sees a sign of the console (CC-233). */}
           {adminAccess === ADMIN_ACCESS.ADMIN && (
             <NavLink to={paths.admin()} data-cc-control="header.admin">

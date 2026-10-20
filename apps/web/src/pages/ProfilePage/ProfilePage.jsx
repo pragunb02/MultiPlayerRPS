@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { getGame } from "@classicade/shared";
+import { DELETED_PLAYER_NAME, getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { Avatar } from "../../art/avatars/Avatar.jsx";
 import { LevelBadge } from "../../art/badges/LevelBadge.jsx";
@@ -8,6 +8,7 @@ import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { EmptyMatches } from "../../art/illustrations/EmptyMatches.jsx";
 import { AchievementGrid } from "../../components/Achievements/AchievementGrid.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { AddFriendButton } from "../../components/Friends/AddFriendButton.jsx";
 import { YourRank } from "../../components/Leaderboard/YourRank.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
@@ -77,9 +78,11 @@ function ProgressCard() {
 
 /**
  * A past opponent in history: their avatar and name, and a link to their profile when the server gave one, which it
- * does only for an adult account (CC-034). A computer character is labelled as one (ADR-025).
+ * does only for an adult account (CC-034). A computer character is labelled as one (ADR-025). An account can add a
+ * person as a friend, named by the match and their place in it, never by id (CC-052). A guest is not offered it
+ * here: the Friends page and the room tell them how to save their progress.
  */
-function Opponent({ player, last }) {
+function Opponent({ player, last, target, canAddFriends }) {
   const name = player.computer ? `${player.displayName} (computer)` : player.displayName;
   return (
     <span className={styles.opponent}>
@@ -91,12 +94,15 @@ function Opponent({ player, last }) {
           {name}
         </Link>
       )}
+      {canAddFriends && !player.computer && player.displayName !== DELETED_PLAYER_NAME && (
+        <AddFriendButton target={target} name={player.displayName} control="profile.matches.friend" />
+      )}
       {!last && ", "}
     </span>
   );
 }
 
-function MatchHistory() {
+function MatchHistory({ canAddFriends }) {
   const history = useMatchHistory();
   const more = useAction(history.loadMore, { id: "profile.matches.more" });
   if (history.status === "loading") return <p>Loading matches…</p>;
@@ -137,6 +143,8 @@ function MatchHistory() {
                           key={player.playerId}
                           player={player}
                           last={index === opponents.length - 1}
+                          target={{ matchId: match.matchId, seat: match.players.indexOf(player) }}
+                          canAddFriends={canAddFriends}
                         />
                       ))}
                 </span>
@@ -231,7 +239,7 @@ export function ProfilePage() {
       <YourRank identity={session.identity} />
       <PlayerConsole guest={session.identity.kind === "guest"} />
       <h2>Recent matches</h2>
-      <MatchHistory />
+      <MatchHistory canAddFriends={session.identity.kind === "user"} />
       <PublicProfileSettings own={own} guest={session.identity.kind === "guest"} />
       <BlockedPlayers />
       {session.identity.kind === "user" && <AccountSettings />}

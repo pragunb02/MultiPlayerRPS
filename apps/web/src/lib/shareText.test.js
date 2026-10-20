@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GAMES } from "@classicade/shared";
 import {
+  friendLinkText,
   inviteText,
   RESULT_OUTCOMES,
   resultText,
@@ -100,6 +101,16 @@ describe("inviteText", () => {
     expect(inviteText({ gameId: "ludo", code: "AB2CD3" })).toBe(
       "Ek game ho jaaye? ClassiCade pe khelo, link kholo aur seedha khelo:\nPlay a game with me on ClassiCade — room AB2CD3",
     );
+  });
+});
+
+describe("friendLinkText (CC-052)", () => {
+  it("asks to be friends, Hinglish first with tum, and names nobody", () => {
+    const [hinglish, english] = friendLinkText().split("\n");
+
+    expect(hinglish).toBe("ClassiCade pe mere friend bano, phir saath mein khelenge:");
+    expect(english).toBe("Be my friend on ClassiCade, then we can play any time:");
+    expect(hinglish).not.toMatch(/\baap(ka|ke|ki)?\b/);
   });
 });
 
