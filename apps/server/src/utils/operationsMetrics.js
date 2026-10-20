@@ -12,6 +12,17 @@ export const SOCKET_OUTCOMES = Object.freeze({
   RATE_LIMITED: "rate_limited",
 });
 
+/**
+ * How a computer player's thinking ended (ADR-067). `timeout` and `crashed` gave the room the easiest level's move
+ * instead, and `failed` is the strategy throwing.
+ */
+export const BOT_THINKING_OUTCOMES = Object.freeze({
+  OK: "ok",
+  TIMEOUT: "timeout",
+  CRASHED: "crashed",
+  FAILED: "failed",
+});
+
 /** The route of a request no route answered: a static file or an unknown address. */
 export const ROUTE_UNMATCHED = "unmatched";
 
@@ -26,6 +37,9 @@ export const ROUTE_PATTERN = "pattern";
  *   one acknowledged socket event. `outcome` is a SOCKET_OUTCOMES value
  * @property {(attempt: { step: string, failedForGood: boolean }) => void} recordPipelineStep
  *   one attempt at one match pipeline step
+ * @property {(thinking: { game: string, outcome: string, durationMs: number }) => void} recordBotThinking
+ *   one computer player's think, from the ask to the answer. `game` is a catalogue id, `outcome` a
+ *   BOT_THINKING_OUTCOMES value
  * @property {(readers: {
  *   rooms: () => Promise<ReadonlyArray<{ gameId: string, status: string, rooms: number }>>,
  *   connections: () => number,
@@ -40,5 +54,6 @@ export const NO_OPERATIONS_METRICS = Object.freeze({
   recordHttpRequest: nothing,
   recordSocketEvent: nothing,
   recordPipelineStep: nothing,
+  recordBotThinking: nothing,
   watch: nothing,
 });

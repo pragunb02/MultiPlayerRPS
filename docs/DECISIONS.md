@@ -59,6 +59,45 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-067 — Computer players think on worker threads, several at once, in a fair line per room
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-308](tickets/CC-308.md), research there.
+  Replaces ADR-025's amendment point 3)
+- **Context.** CC-289 measured that a chess search on the event loop stalls every player on the server (hot spot
+  H1: a third of busy CPU, 0.3 to 1.5 s stalls on Render Free) and that one computer thinking at a time on the whole
+  server, with a rest after each, makes computer replies collapse under load (H2: p50 27 s at 1 600 players on
+  Standard). Bots are pure strategies on their own seat's view (ADR-040), so a turn is plain data.
+- **Decision.**
+  1. **Worker threads, our own small pool** (`apps/server/src/dependency/thinking/`), no new dependency (ADR-008).
+     Piscina was looked at: it has no per-task timeout, no fair line per room and does not describe replacing a
+     crashed thread, which are the three things we need.
+  2. **What crosses** is the turn as plain data, `{ gameId, botId, difficulty, seed, view }`, and the answer is the
+     raw move. The worker and the event loop call the same pure `createBotThinker` from `@classicade/games`, so the
+     same turn gives the same move wherever it runs (a parity test checks every game and level).
+  3. **Pool size** is `max(1, availableParallelism() - 1)`, at most 4, from config and no env var. Node reads the
+     container's CPU quota, so every Render size up to Pro gets one thread.
+  4. **Only heavy levels go to the pool.** A bot level may say `cost: "heavy"` (all chess levels); the others answer
+     at once on the event loop, as do the sealed Rock Paper Scissors throws.
+  5. **A fair line per room** (`domain/bots/thinkingQueue.js`): at most one think waiting and one running per room,
+     rooms served in the order they asked, a newer think replaces the waiting one (which ends as gone), and a room's
+     next think starts only after its last one ended. The driver still drops a move whose moment passed.
+  6. **No rest after a think.** Off the event loop the operating system shares the CPU between the thread and the
+     event loop, so ADR-025's "at most half of the event loop" holds without idling a free core.
+  7. **A hard budget** of 30 s per think (a Strong search takes 8 to 16 s under Render Free's 0.1 CPU). On a timeout, a thread that throws, exits or passes its 64 MB heap, the
+     thread is ended and replaced, and the room gets the bot's easiest level's move for the same view and seed, chosen
+     on the event loop. A strategy that throws is passed on as before.
+  8. **Telemetry** (ADR-055): `bots.thinking.duration` (ms) by `game` and `outcome` (`ok`, `timeout`, `crashed`,
+     `failed`), and the named warning lines `computer player ran out of time to think` and `computer player's
+thinking crashed` with `game` only.
+  9. **Shutdown** stops the line (waiting thinks end as gone) and ends the threads within 2 s, inside CC-305's 10 s.
+- **Alternatives.** Yielding inside the search every few thousand positions (keeps the work on one core and makes the
+  search code asynchronous). Piscina (point 1). A child process or another machine per search, as Lichess's fishnet
+  does for analysis (too much memory for 512 MB). Capping Strong by CPU time on small plans (changes its moves by
+  machine, against ADR-041).
+- **Consequences.** About 10 MB more memory per thread. A computer's chess reply no longer holds up anyone else's
+  move. On a 0.1 CPU plan the thread still shares the one CPU quota, so the search itself is as slow as before. A
+  second server (CC-061) still needs one owner per room for the line.
+
 ### ADR-062 — The chess rating: one game per period, a sixth outbox step, the guest move and the level seed
 
 - **Status:** Accepted · 2026-10-20 by the owner, all points, including the three seed numbers, the guest move
@@ -472,6 +511,10 @@ the owner may change it.
   then runs telemetry's shutdown as the last flush, raced against 5 seconds, then exits. A shutdown can therefore
   take up to 15 seconds (the 10 second drain and the 5 second flush), inside the 30 seconds Render waits after
   SIGTERM. `shutdown complete` stays a named line.
+- **Amended 2026-10-20 ([CC-308](tickets/CC-308.md), ADR-067): computer players' thinking.** One more histogram,
+  `bots.thinking.duration` (ms, the eleven duration buckets) with `game` (catalogue id) and `outcome` (`ok`,
+  `timeout`, `crashed`, `failed`), at most 3 games times 4 outcomes, and two more named warning lines,
+  `computer player ran out of time to think` and `computer player's thinking crashed`, with the `game` field only.
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 
@@ -1272,7 +1315,9 @@ behaviour, so Accepted. How the bots play, in plain words: [games/BOTS.md](games
    rematches a computer accepts both count, and the count is taken again after every start, so many starts at once
    cannot pass it (BUG-32).
 3. **One computer move is chosen at a time on the whole server**, and after each the server rests as long as the
-   search took (`thinkingQueue.js`). Computer players therefore use at most half of the event loop (BUG-33).
+   search took (`thinkingQueue.js`). Computer players therefore use at most half of the event loop (BUG-33). Replaced
+   by [ADR-067](#adr-067--computer-players-think-on-worker-threads-several-at-once-in-a-fair-line-per-room) on
+   2026-10-20 (CC-308): heavy thinks run on worker threads, several at once, without the rest.
 4. **100 bot XP a day** (`BOT_DAILY_XP`, per UTC day like the other fair-play caps), stored in the verdict as
    `credit.botXp`. When a guest's computer games move into an account (ADR-014), only what the account has left of
    that day's 100 XP moves; the rest is stored as `withdrawnXp` and taken out before the merge (BUG-36).

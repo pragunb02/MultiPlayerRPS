@@ -23,7 +23,13 @@ describe("defineBot", () => {
     expect(Object.isFrozen(bot)).toBe(true);
     expect(Object.isFrozen(bot.levels)).toBe(true);
     expect(Object.isFrozen(bot.levels[0])).toBe(true);
-    expect(bot.levels).toEqual(valid.levels);
+    expect(bot.levels).toEqual([{ ...valid.levels[0], cost: "light" }]);
+  });
+
+  it("keeps a heavy level heavy, so the server thinks it off the event loop (ADR-067)", () => {
+    const bot = defineBot({ ...valid, levels: [{ ...valid.levels[0], cost: "heavy" }] });
+
+    expect(bot.levels[0].cost).toBe("heavy");
   });
 
   it("passes a turn at a known level to the strategy", () => {
@@ -58,6 +64,10 @@ describe("defineBot", () => {
     [{ ...valid, levels: [{ id: "easy", name: "Easy" }] }, /level "easy" needs a description/],
     [{ ...valid, levels: [{ id: "easy", name: "Easy", description: "" }] }, /needs a description/],
     [{ ...valid, levels: [valid.levels[0], valid.levels[0]] }, /level ids must be unique/],
+    [
+      { ...valid, levels: [{ ...valid.levels[0], cost: "huge" }] },
+      /level "only" has a cost that is not light or heavy/,
+    ],
     [{ ...valid, chooseMove: "nope" }, /chooseMove must be a function/],
     [{ ...valid, answer: "nope" }, /answer, when given, must be a function/],
     [undefined, /Invalid bot for "undefined"/],

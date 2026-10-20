@@ -13,6 +13,7 @@ describe("createTelemetrySchema", () => {
   it("lists every metric ADR-055 names and nothing else", () => {
     expect(Object.keys(schema.metrics).sort()).toEqual(Object.values(METRICS).sort());
     expect(Object.values(METRICS).sort()).toEqual([
+      "bots.thinking.duration",
       "http.server.request.duration",
       "match_pipeline.attempts",
       "match_pipeline.failed",
@@ -40,6 +41,7 @@ describe("createTelemetrySchema", () => {
       [METRICS.CONNECTIONS]: [],
       [METRICS.PIPELINE_ATTEMPTS]: ["step"],
       [METRICS.PIPELINE_FAILED]: ["step"],
+      [METRICS.BOT_THINKING_DURATION]: ["game", "outcome"],
       [METRICS.EVENT_LOOP_P50]: [],
       [METRICS.EVENT_LOOP_P99]: [],
       [METRICS.MEMORY_RSS]: [],
@@ -104,6 +106,17 @@ describe("createTelemetrySchema", () => {
     expect(schema.metrics[METRICS.ROOMS_OPEN].status("closed")).toBe(false);
     expect(schema.metrics[METRICS.PIPELINE_FAILED].step("judge")).toBe(true);
     expect(schema.metrics[METRICS.PIPELINE_FAILED].step("apply bonus")).toBe(false);
+  });
+
+  it("allows the computer players' thinking by game and the four outcomes only (ADR-067)", () => {
+    const rules = schema.metrics[METRICS.BOT_THINKING_DURATION];
+
+    expect(["ok", "timeout", "crashed", "failed"].every(rules.outcome)).toBe(true);
+    expect(rules.outcome("closed")).toBe(false);
+    expect(rules.game(GAME_IDS.CHESS)).toBe(true);
+    expect(rules.game("bot_queenvee_strong")).toBe(false);
+    expect(schema.logs.lines["computer player ran out of time to think"]).toBe(40);
+    expect(schema.logs.lines["computer player's thinking crashed"]).toBe(40);
   });
 
   it("allows a scrubbed key only when it is a known key, or the word unknown", () => {

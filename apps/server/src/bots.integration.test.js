@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import { BOT_DAILY_XP, CHESS_ACTIONS, SOCKET_EVENTS } from "@classicade/shared";
+import { createBotThinkingClient } from "./dependency/thinking/botThinkingClient.js";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
@@ -47,6 +48,7 @@ function serverProcess({ bots = NO_PAUSE } = {}) {
     start,
     config: () => config,
     url: () => `http://127.0.0.1:${running.port}`,
+    logs: () => logs.flat(),
     async restart(options) {
       const stopped = running;
       running = undefined;
@@ -291,5 +293,59 @@ describe("playing computer characters on the real server (integration)", () => {
     }, 20_000);
     expect(after.game.activePlayers).toEqual(after.status === "playing" ? [after.you] : []);
     expect(after.seats.find((seat) => seat.playerId === computerIn(after)).connected).toBe(true);
+  });
+
+  it("still moves when Strong runs out of time to think, and says so without ids (CC-308)", async () => {
+    // A budget no Strong search fits in: every think ends in a timeout, and the room gets Beginner's move.
+    const server = serverProcess({
+      bots: {
+        ...NO_PAUSE,
+        thinkingWorkers: (settings) => createBotThinkingClient({ ...settings, budgetMs: 1 }),
+      },
+    });
+    await server.start();
+    const alice = await guest(server);
+    await playComputer(alice, { gameId: "chess", level: "hard" });
+    const first = await updateWhere(alice, yourTurn);
+    const white = first.game.view.colors[first.you] === "w";
+    const { code } = first;
+    await alice.send(SOCKET_EVENTS.GAME_MOVE, {
+      code,
+      move: { type: CHESS_ACTIONS.MOVE, from: white ? "e2" : "e7", to: white ? "e4" : "e5" },
+    });
+
+    const replied = await updateWhere(alice, (view) => yourTurn(view) && view.game.view.moves.length >= 2);
+
+    expect(replied.status).toBe("playing");
+    const lines = server.logs().filter((entry) => entry.msg === "computer player ran out of time to think");
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines[0]).toMatchObject({ level: 40, game: "chess" });
+    expect(JSON.stringify(lines)).not.toContain(code);
+    expect(JSON.stringify(lines)).not.toMatch(/bot_queenvee|guest_/);
+  });
+
+  it("ends its thinking threads well inside the shutdown budget, even mid-think (CC-305, CC-308)", async () => {
+    let workers;
+    const running = await startServer({
+      config: testConfig({ MONGO_URI: mongo.uri(`bots-${++dbCounter}`) }),
+      logger: captureLogger().logger,
+      bots: {
+        ...NO_PAUSE,
+        thinkingWorkers: (settings) => {
+          workers = createBotThinkingClient({
+            ...settings,
+            workerUrl: new URL("./testing/misbehavingThinkingWorker.js", import.meta.url),
+          });
+          return workers;
+        },
+      },
+    });
+    const stuck = workers.run({ gameId: "hang", seed: 1 });
+    const started = performance.now();
+
+    await running.close();
+
+    expect(performance.now() - started).toBeLessThan(5_000);
+    expect(await stuck).toEqual({ ok: false, reason: "closed" });
   });
 });

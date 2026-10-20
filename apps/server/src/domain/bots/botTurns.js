@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { BOT_CHARACTERS, REQUEST_STATES, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
-import { createSeededRng } from "@classicade/games";
+import { createBotThinker } from "@classicade/games";
 import { assertDefined } from "../../utils/assert.js";
 import { ForbiddenError } from "../../utils/errors.js";
 
@@ -26,6 +26,10 @@ import { ForbiddenError } from "../../utils/errors.js";
  *   | { kind: "answer", playerId: string, reply: { type: string, answer: string }, key: string }
  *   | { kind: "rematch", playerId: string, key: string }} BotAction   what a computer player should do next. `key`
  *   names the moment, so the driver knows whether a planned action is still the right one
+ *
+ * @typedef {{ kind: "sealed", move: unknown }
+ *   | { kind: "think", request: Readonly<import("@classicade/games").ThinkRequest> }} BotTurn   how a computer
+ *   player gets its move on its turn: the one it sealed earlier, or a turn to think about (ADR-067)
  *
  * @typedef {Object} FairnessView        what every viewer may see of the seals (CC-225)
  * @property {string} game               names the game the seals belong to, different after a rematch. It is
@@ -62,6 +66,7 @@ export function createBotTurns({ bots, engines, sealMaker }) {
   assertDefined(bots, "bots");
   assertDefined(engines, "engines");
   assertDefined(sealMaker, "sealMaker");
+  const thinker = createBotThinker(bots);
 
   const botSeats = (room) => room.seats.filter((seat) => seat.bot !== undefined);
   const sealsOf = (room) => room.game?.seals ?? [];
@@ -79,15 +84,14 @@ export function createBotTurns({ bots, engines, sealMaker }) {
     return character.levels.find((level) => level.id === seat.bot.level).botLevel;
   }
 
-  /** The move the computer player in `seat` chooses now, from its own view only. */
-  function choose(room, seat) {
-    const engine = engines.get(room.gameId);
-    return bots.get(room.gameId).chooseMove({
-      view: engine.viewFor(room.game.state, seat.playerId),
+  /** The turn of the computer player in `seat` as plain data: its own view only, its level and its seed. */
+  function requestFor(room, seat) {
+    return Object.freeze({
+      gameId: room.gameId,
       botId: seat.playerId,
-      rng: createSeededRng(seedFor(room.game, seat.playerId)),
       difficulty: botLevelOf(room, seat),
-      history: [],
+      seed: seedFor(room.game, seat.playerId),
+      view: engines.get(room.gameId).viewFor(room.game.state, seat.playerId),
     });
   }
 
@@ -113,7 +117,8 @@ export function createBotTurns({ bots, engines, sealMaker }) {
       const sealedAt = room.game.log.length;
       const { text, salt, commitment } = sealMaker.seal({
         key: `${room.game.matchId}:${sealedAt}:${seat.playerId}`,
-        text: JSON.stringify(choose(room, seat)),
+        // A throw chosen at the same time as a person's is light, so it is chosen here, inside the save.
+        text: JSON.stringify(thinker.think(requestFor(room, seat))),
       });
       return { playerId: seat.playerId, sealedAt, text, salt, commitment, revealed: false };
     });
@@ -180,7 +185,7 @@ export function createBotTurns({ bots, engines, sealMaker }) {
     /**
      * What a computer player in the room should do next: move when it is its turn, answer a question such as a
      * draw offer, or accept a rematch a person asked for. A computer player never asks for a rematch itself. The
-     * move itself is chosen later, by `moveFor`, because a strong chess level takes a moment to think.
+     * move itself is chosen later, from `turnFor`, because a strong chess level takes a moment to think.
      *
      * @param {Readonly<Room>} room
      * @returns {Readonly<BotAction>}
@@ -228,19 +233,24 @@ export function createBotTurns({ bots, engines, sealMaker }) {
     },
 
     /**
-     * The move a computer player makes on its turn: the one it sealed when it has one, otherwise its choice now.
+     * How a computer player gets its move on its turn: the one it sealed when it has one, otherwise a turn to think
+     * about, which the thinking queue answers.
      *
      * @param {Readonly<Room>} room
      * @param {string} playerId  a computer player whose turn it is
+     * @returns {Readonly<BotTurn>}
      */
-    moveFor(room, playerId) {
+    turnFor(room, playerId) {
       const seal = openSeal(room, playerId);
       return seal === undefined
-        ? choose(
-            room,
-            botSeats(room).find((seat) => seat.playerId === playerId),
-          )
-        : JSON.parse(seal.text);
+        ? Object.freeze({
+            kind: "think",
+            request: requestFor(
+              room,
+              botSeats(room).find((seat) => seat.playerId === playerId),
+            ),
+          })
+        : Object.freeze({ kind: "sealed", move: JSON.parse(seal.text) });
     },
   });
 }

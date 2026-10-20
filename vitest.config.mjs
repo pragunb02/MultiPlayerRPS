@@ -63,6 +63,9 @@ export default defineConfig({
         "**/*.test.{js,jsx,mjs}",
         "**/testing/**",
         "apps/server/src/index.js",
+        // A worker thread's entry point: it runs outside the test runner's coverage, and its one call is the pure
+        // createBotThinker, covered directly. botThinkingClient.test.js runs it for real (CC-308).
+        "apps/server/src/dependency/thinking/botThinkingWorker.js",
         "apps/web/src/main.jsx",
         "scripts/bin/**",
         "scripts/check-comments.mjs",

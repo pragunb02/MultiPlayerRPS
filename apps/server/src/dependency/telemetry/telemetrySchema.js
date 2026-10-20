@@ -1,5 +1,10 @@
 import { ERROR_CODES, GAMES, ROOM_STATUS, SOCKET_EVENTS } from "@classicade/shared";
-import { ROUTE_PATTERN, ROUTE_UNMATCHED, SOCKET_OUTCOMES } from "../../utils/operationsMetrics.js";
+import {
+  BOT_THINKING_OUTCOMES,
+  ROUTE_PATTERN,
+  ROUTE_UNMATCHED,
+  SOCKET_OUTCOMES,
+} from "../../utils/operationsMetrics.js";
 
 /** The metrics the server sends (ADR-055 point 1). Nothing else is exported. */
 export const METRICS = Object.freeze({
@@ -9,6 +14,7 @@ export const METRICS = Object.freeze({
   CONNECTIONS: "realtime.connections",
   PIPELINE_ATTEMPTS: "match_pipeline.attempts",
   PIPELINE_FAILED: "match_pipeline.failed",
+  BOT_THINKING_DURATION: "bots.thinking.duration",
   EVENT_LOOP_P50: "nodejs.eventloop.delay.p50",
   EVENT_LOOP_P99: "nodejs.eventloop.delay.p99",
   MEMORY_RSS: "process.memory.rss",
@@ -95,6 +101,8 @@ const NAMED_LINES = Object.freeze({
   "unhandled error": LEVEL.ERROR,
   "computer player failed": LEVEL.ERROR,
   "computer player will try again": LEVEL.WARN,
+  "computer player ran out of time to think": LEVEL.WARN,
+  "computer player's thinking crashed": LEVEL.WARN,
   "request completed": LEVEL.ERROR,
 });
 
@@ -145,6 +153,7 @@ export function createTelemetrySchema({ matchSteps }) {
     [METRICS.CONNECTIONS]: {},
     [METRICS.PIPELINE_ATTEMPTS]: { step },
     [METRICS.PIPELINE_FAILED]: { step },
+    [METRICS.BOT_THINKING_DURATION]: { game, outcome: oneOf(Object.values(BOT_THINKING_OUTCOMES)) },
     [METRICS.EVENT_LOOP_P50]: {},
     [METRICS.EVENT_LOOP_P99]: {},
     [METRICS.MEMORY_RSS]: {},

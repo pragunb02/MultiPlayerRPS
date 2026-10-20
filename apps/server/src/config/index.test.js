@@ -10,7 +10,7 @@ const REQUIRED = {
 
 describe("loadConfig", () => {
   it("applies documented defaults when only required values are set", () => {
-    expect(loadConfig(REQUIRED)).toEqual({
+    expect(loadConfig(REQUIRED, { parallelism: 4 })).toEqual({
       env: "development",
       isProduction: false,
       port: 4000,
@@ -23,8 +23,16 @@ describe("loadConfig", () => {
       trustProxyHops: 0,
       adminAccountIds: [],
       telemetry: { enabled: false },
+      bots: { workers: 3, budgetMs: 30_000 },
       build: { commit: "unknown", version: "unknown" },
     });
+  });
+
+  it("sizes the computer players' threads from this machine when no test gives a number (ADR-067)", () => {
+    const { bots } = loadConfig(REQUIRED);
+
+    expect(bots.workers).toBeGreaterThanOrEqual(1);
+    expect(bots.workers).toBeLessThanOrEqual(4);
   });
 
   it("reads operations telemetry and lists its problems with the others (ADR-055)", () => {

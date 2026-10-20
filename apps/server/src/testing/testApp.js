@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import http from "node:http";
 import session from "express-session";
-import { BOTS, createBotRegistry, createEngineRegistry } from "@classicade/games";
+import { BOTS, createBotRegistry, createBotThinker, createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
@@ -32,6 +32,7 @@ import { createBotDriver } from "../domain/bots/botDriver.js";
 import { createBotTurns } from "../domain/bots/botTurns.js";
 import { createSealMaker, sealSecretFrom } from "../domain/bots/seals.js";
 import { createThinkingQueue } from "../domain/bots/thinkingQueue.js";
+import { inProcessThinking } from "./inProcessThinking.js";
 import { createGamificationComponent } from "../domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
@@ -254,8 +255,9 @@ export function createTestApp({
     }),
   });
   const engineRegistry = createEngineRegistry(engines);
+  const botRegistry = createBotRegistry(BOTS.filter((bot) => engineRegistry.has(bot.gameId)));
   const botTurns = createBotTurns({
-    bots: createBotRegistry(BOTS.filter((bot) => engineRegistry.has(bot.gameId))),
+    bots: botRegistry,
     engines: engineRegistry,
     sealMaker: createSealMaker({ secret: sealSecretFrom(config.sessionSecret) }),
   });
@@ -277,7 +279,11 @@ export function createTestApp({
     roomAccessor,
     botTurns,
     botComponent,
-    thinking: createThinkingQueue(),
+    thinking: createThinkingQueue({
+      thinker: createBotThinker(botRegistry),
+      workers: inProcessThinking(createBotThinker(botRegistry)),
+      logger: capture.logger,
+    }),
     events: domainEvents,
     delayMs: () => 0,
     logger: capture.logger,

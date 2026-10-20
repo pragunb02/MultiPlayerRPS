@@ -78,8 +78,10 @@ instantly. The pause is decided by the server, never by the bot, and is zero in 
 - **The usual game limits apply** (ADR-021): each character counts as one opponent for the 10 counted games per
   opponent in any 24 hours, and computer games count toward the 20 counted games per hour.
 - **At most 3 games against computers at once** per player. Starting a fourth ends the oldest.
-- **One chess search at a time on the whole server.** After each search the server rests as long as the search took,
-  so computer players use at most half of the server's time and people's games stay fast.
+- **Chess searches run beside the game, not in its way** (ADR-067). They run on their own threads, so people's
+  moves are answered while a computer thinks, and several computers can think at once on a machine with more cores.
+  Each room waits its turn fairly. A search that takes longer than 30 seconds is stopped, and the computer plays its
+  Beginner move for that turn instead, so a game never waits for ever.
 - A room where only computers are still connected closes after the 2-hour away lifetime.
 - Computers accept a person's rematch and never ask for one themselves.
 

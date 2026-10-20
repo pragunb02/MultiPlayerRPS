@@ -1,13 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BOTS, createBotRegistry, createBotThinker } from "@classicade/games";
 import { GAME_IDS } from "@classicade/shared";
 import { botRooms, PERSON } from "../../testing/botRooms.js";
 import { captureLogger } from "../../testing/captureLogger.js";
+import { inProcessThinking } from "../../testing/inProcessThinking.js";
 import { GoneError } from "../../utils/errors.js";
 import { ROOM_EVENTS } from "../rooms/roomComponent.js";
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./botDriver.js";
 import { createThinkingQueue } from "./thinkingQueue.js";
 
 const PAUSE = 500;
+const thinker = createBotThinker(createBotRegistry(BOTS));
+/** The thinking queue as the composition root builds it, with every think on the event loop. */
+const thinkingQueue = () =>
+  createThinkingQueue({ thinker, workers: inProcessThinking(thinker), logger: captureLogger().logger });
 const ROCKY = "bot_rocky_easy";
 const UNBEATABLE_PIP = "bot_pip_hard";
 
@@ -21,7 +27,7 @@ function setup({
   wrapRooms = (rooms) => rooms,
   delayMs = () => PAUSE,
   wired = true,
-  thinking = createThinkingQueue(),
+  thinking = thinkingQueue(),
 } = {}) {
   const late = {};
   const base = botRooms({ seed, onChange: (room) => wired && late.driver.watch(room) });
@@ -240,8 +246,8 @@ describe("botDriver", () => {
   });
 
   it("chooses every move in the server's thinking queue", async () => {
-    const queue = createThinkingQueue();
-    const thinking = { think: vi.fn((work) => queue.think(work)) };
+    const queue = thinkingQueue();
+    const thinking = { think: vi.fn((input) => queue.think(input)), stop: queue.stop };
     const { playComputer, driver, updates } = setup({ thinking });
 
     driver.watch(await playComputer({ gameId: GAME_IDS.CHESS, level: "easy" }));
@@ -256,10 +262,11 @@ describe("botDriver", () => {
   it("makes no move when the person left while it waited for its turn to think", async () => {
     let release;
     const thinking = {
-      think: (work) =>
+      think: ({ request }) =>
         new Promise((resolve) => {
-          release = () => resolve(work());
+          release = () => resolve(thinker.think(request));
         }),
+      stop() {},
     };
     const { playComputer, driver, updates, rooms } = setup({ wired: false, thinking });
     const room = await playComputer({ gameId: GAME_IDS.TIC_TAC_TOE, level: "easy" });
@@ -277,6 +284,43 @@ describe("botDriver", () => {
 
     expect(updates).toEqual([]);
     expect((await rooms.getRoom(room.code)).game.log.filter((e) => e.playerId === pip)).toEqual([]);
+  });
+
+  it("passes the room and its turn to the thinking queue, and plays the move it answers", async () => {
+    const queue = thinkingQueue();
+    const thinking = { think: vi.fn((input) => queue.think(input)), stop: queue.stop };
+    const { playComputer, driver, updates } = setup({ thinking });
+    const room = await playComputer({ gameId: GAME_IDS.CHESS, level: "easy" });
+
+    driver.watch(room);
+    await vi.advanceTimersByTimeAsync(PAUSE);
+
+    const [[input]] = thinking.think.mock.calls;
+    expect(input).toEqual({
+      room: room.code,
+      request: expect.objectContaining({ gameId: GAME_IDS.CHESS, difficulty: "beginner" }),
+    });
+    expect(updates.at(-1).game.log.at(-1).move).toEqual(thinker.think(input.request));
+  });
+
+  it("drops a turn quietly when the thinking queue says it is gone", async () => {
+    const thinking = { think: () => Promise.reject(new GoneError("replaced")), stop() {} };
+    const { playComputer, driver, updates, capture } = setup({ thinking });
+
+    driver.watch(await playComputer({ gameId: GAME_IDS.CHESS, level: "easy" }));
+    await vi.advanceTimersByTimeAsync(PAUSE * 4);
+
+    expect(updates.filter((room) => room.game.log.length > 0)).toEqual([]);
+    expect(capture.entries.filter((entry) => entry.level >= 40)).toEqual([]);
+  });
+
+  it("stops the thinking queue when it stops", () => {
+    const thinking = { think: vi.fn(), stop: vi.fn() };
+    const { driver } = setup({ thinking });
+
+    driver.stop();
+
+    expect(thinking.stop).toHaveBeenCalledOnce();
   });
 
   it("does nothing once stopped", async () => {
@@ -311,7 +355,7 @@ describe("botDriver", () => {
       roomAccessor,
       botTurns,
       botComponent: botRooms().botComponent,
-      thinking: createThinkingQueue(),
+      thinking: thinkingQueue(),
       events: { emit() {} },
       delayMs: () => 0,
       logger: captureLogger().logger,
@@ -330,6 +374,7 @@ describe("botDriver", () => {
     ]) {
       expect(() => createBotDriver({ ...base, [missing]: undefined })).toThrow(TypeError);
     }
+    expect(() => createBotDriver({ ...base, thinking: { think() {} } })).toThrow(TypeError);
   });
 });
 

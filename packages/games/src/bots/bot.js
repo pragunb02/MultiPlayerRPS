@@ -13,6 +13,8 @@
  * @property {string} id            stable id used by the API and the database, never shown
  * @property {string} name          what players see on the difficulty picker, such as "Unbeatable"
  * @property {string} description   one short sentence for players about how this level plays
+ * @property {"light" | "heavy"} [cost]  how hard the level thinks, "light" when left out. A "heavy" level (a search)
+ *   is run by the server off its event loop, on a worker thread (ADR-067). Either way the move is the same
  *
  * @typedef {Object} BotTurn
  * @property {unknown} view                     what the bot's seat may see right now
@@ -39,6 +41,8 @@
  */
 
 const LEVEL_ID = /^[a-z][a-z0-9-]*$/;
+export const BOT_LEVEL_COSTS = Object.freeze({ LIGHT: "light", HEAVY: "heavy" });
+const COSTS = Object.values(BOT_LEVEL_COSTS);
 const NOTHING_TO_ANSWER = () => [];
 
 /**
@@ -68,6 +72,8 @@ export function defineBot(bot) {
       problems.push(`level ${JSON.stringify(level?.id)} needs a lowercase id and a name`);
     } else if (typeof level.description !== "string" || level.description === "") {
       problems.push(`level "${level.id}" needs a description`);
+    } else if (level.cost !== undefined && !COSTS.includes(level.cost)) {
+      problems.push(`level "${level.id}" has a cost that is not ${COSTS.join(" or ")}`);
     }
   }
   const ids = levels.map((level) => level?.id);
@@ -88,7 +94,9 @@ export function defineBot(bot) {
   const answer = bot.answer ?? NOTHING_TO_ANSWER;
   return Object.freeze({
     gameId: bot.gameId,
-    levels: Object.freeze(levels.map((level) => Object.freeze({ ...level }))),
+    levels: Object.freeze(
+      levels.map((level) => Object.freeze({ ...level, cost: level.cost ?? BOT_LEVEL_COSTS.LIGHT })),
+    ),
     chooseMove(turn) {
       if (!known.has(turn.difficulty)) {
         throw new RangeError(`Unknown ${bot.gameId} bot difficulty "${turn.difficulty}"`);
