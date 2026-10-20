@@ -24,6 +24,7 @@ import {
  *   /privacy  /terms                   the privacy policy and the terms of use
  *   /admin  /admin/:section?from=…&to=…&bucket=…   the owner console (CC-233), not found for anyone but an admin
  *   /admin/feedback?type=…&status=…    the console's feedback inbox (CC-290)
+ *   /admin/flags                       the console's feature flags (CC-312)
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
@@ -50,6 +51,7 @@ export const ROUTES = Object.freeze({
   ADMIN_SECTION: "admin/:section",
   ADMIN_FEEDBACK: "admin/feedback",
   ADMIN_AGES: "admin/ages",
+  ADMIN_FLAGS: "admin/flags",
 });
 
 /** The owner console's pages after its overview, in tab order (CC-233). Each is the URL segment after /admin. */
@@ -183,6 +185,8 @@ export const paths = Object.freeze({
   adminFeedback: (filters = {}) => `/admin/feedback${queryOf(filters, FEEDBACK_FILTER_KEYS)}`,
   /** The console's year of birth corrections (CC-152). */
   adminAges: () => "/admin/ages",
+  /** The console's feature flags (CC-312). */
+  adminFlags: () => "/admin/flags",
 });
 
 /**
