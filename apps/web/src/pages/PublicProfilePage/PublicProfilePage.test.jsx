@@ -38,7 +38,7 @@ describe("PublicProfilePage (CC-034)", () => {
 
   it("marks a provisional rating with a question mark, and says when there is none yet", async () => {
     open({ ...PUBLIC, chess: { rating: 1500, provisional: true, games: 0 } });
-    expect((await screen.findByText("Chess rating")).nextSibling).toHaveTextContent("Not rated yet");
+    expect((await screen.findByText("Chess rating")).nextSibling).toHaveTextContent("Unrated");
   });
 
   it("shows a provisional rating as 1500?", async () => {

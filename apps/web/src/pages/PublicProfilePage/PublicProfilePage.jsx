@@ -10,9 +10,9 @@ import { PROFILE_COPY } from "../../components/Profile/profileCopy.js";
 import { usePlayerProfile } from "../../hooks/useProfile.js";
 import styles from "./PublicProfilePage.module.css";
 
-/** "1532", or "1500?" while the rating is provisional (ADR-027.3), or "Not rated yet" before the first rated game. */
+/** "1532", or "1500?" while the rating is provisional (ADR-027.3), or "Unrated" before the first rated game. */
 const chessRating = ({ rating, provisional, games }) =>
-  games === 0 ? "Not rated yet" : `${rating}${provisional ? "?" : ""}`;
+  games === 0 ? "Unrated" : `${rating}${provisional ? "?" : ""}`;
 
 /** The public part of an adult's profile: level, games, wins and the chess rating (CC-034). Nothing else. */
 function PublicStats({ player }) {
@@ -36,7 +36,9 @@ function PublicStats({ player }) {
         </div>
         <div>
           <dt>Chess rating</dt>
-          <dd>{chessRating(player.chess)}</dd>
+          <dd className={player.chess.games === 0 ? styles.unrated : undefined}>
+            {chessRating(player.chess)}
+          </dd>
         </div>
       </dl>
     </div>

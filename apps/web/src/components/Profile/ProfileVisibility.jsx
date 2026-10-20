@@ -40,8 +40,8 @@ export function ProfileVisibility({ profile, onChange }) {
       >
         {isPublic ? "Make my profile private" : "Make my profile public"}
       </Button>
+      <Bilingual copy={PROFILE_COPY.link} />
       <p className={styles.muted}>
-        <Bilingual copy={PROFILE_COPY.link} as="span" />:{" "}
         <Link to={paths.player(profile.handle)} data-cc-control="profile.public_link">
           {paths.player(profile.handle)}
         </Link>

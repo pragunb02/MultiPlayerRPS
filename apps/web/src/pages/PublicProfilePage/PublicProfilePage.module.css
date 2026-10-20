@@ -88,6 +88,11 @@
   font-size: var(--text-xl);
   font-variant-numeric: tabular-nums;
 }
+/* "Unrated" is a word, not a number, so it is smaller and never broken inside on a phone. */
+.stats dd.unrated {
+  font-size: var(--text-base);
+  overflow-wrap: normal;
+}
 .problem {
   display: grid;
   gap: var(--space-2);
