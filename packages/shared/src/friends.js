@@ -23,7 +23,8 @@ export const FRIEND_REQUEST_RESULTS = Object.freeze({ SENT: "sent", FRIENDS: "fr
 export const FRIEND_LINK_TOKEN_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 
 /** @param {unknown} value */
-export const isFriendLinkToken = (value) => typeof value === "string" && FRIEND_LINK_TOKEN_PATTERN.test(value);
+export const isFriendLinkToken = (value) =>
+  typeof value === "string" && FRIEND_LINK_TOKEN_PATTERN.test(value);
 
 /**
  * The numbers players can be told (ADR-066.8). The page says them in its words, and the server enforces them.
