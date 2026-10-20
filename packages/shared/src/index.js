@@ -13,6 +13,21 @@ export { BOT_CHARACTERS, BOT_DAILY_XP, characterForGame } from "./bots.js";
 export { ACHIEVEMENT_METRICS, ACHIEVEMENT_TIERS, ACHIEVEMENTS, winsOfMetric } from "./achievements.js";
 export { ANALYTICS_MAX_RANGE_DAYS, ANALYTICS_NOT_COUNTED, ANALYTICS_NOT_KEPT } from "./analytics.js";
 export { ERROR_CODES } from "./errors.js";
+export {
+  FEEDBACK_DEFAULT_TYPE,
+  FEEDBACK_DEVICE,
+  FEEDBACK_DEVICES,
+  FEEDBACK_INITIAL_STATUS,
+  FEEDBACK_KEEP_DAYS,
+  FEEDBACK_KIND,
+  FEEDBACK_KINDS,
+  FEEDBACK_MESSAGE_MAX,
+  FEEDBACK_STATUS,
+  FEEDBACK_STATUSES,
+  FEEDBACK_TYPE,
+  FEEDBACK_TYPES,
+  isFeedbackPage,
+} from "./feedback.js";
 export { SOCKET_EVENTS } from "./events.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";
 export { ACCOUNT_MESSAGES, IDENTITY_KINDS } from "./identity.js";

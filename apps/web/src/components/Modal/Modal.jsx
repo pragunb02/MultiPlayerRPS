@@ -3,9 +3,10 @@ import { createPortal } from "react-dom";
 import styles from "./Modal.module.css";
 
 /**
- * Accessible confirmation dialog: focus moves into it, Escape cancels, focus returns to where it was.
+ * Accessible confirmation dialog: focus moves into it, Escape cancels, focus returns to where it was. The focus goes to
+ * the element marked `data-autofocus` when there is one, such as a form's first field, or else to the first button.
  *
- * @param {{ open: boolean, title: string, onClose: () => void, children: import("react").ReactNode, actions: import("react").ReactNode }} props
+ * @param {{ open: boolean, title: import("react").ReactNode, onClose: () => void, children: import("react").ReactNode, actions: import("react").ReactNode }} props
  */
 export function Modal({ open, title, onClose, children, actions }) {
   const dialog = useRef(null);
@@ -19,7 +20,7 @@ export function Modal({ open, title, onClose, children, actions }) {
       return undefined;
     }
     const previouslyFocused = document.activeElement;
-    dialog.current?.querySelector("button")?.focus();
+    (dialog.current?.querySelector("[data-autofocus]") ?? dialog.current?.querySelector("button"))?.focus();
     const onKey = (event) => event.key === "Escape" && close();
     document.addEventListener("keydown", onKey);
     return () => {

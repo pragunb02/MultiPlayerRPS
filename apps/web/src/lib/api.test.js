@@ -309,4 +309,65 @@ describe("api client, the account's data and age (CC-035, CC-152)", () => {
       ["/api/account/delete", "POST", JSON.stringify({ password: "pw" })],
     ]);
   });
+
+  it("sends feedback and reads whether the form offers an email reply (CC-290)", async () => {
+    const sent = respond(201, { feedback: { feedbackId: "f1", status: "new", createdAt: 1 } });
+    const form = respond(200, { form: { replyEmail: true } });
+    const body = { type: "bug", message: "Hi", page: "/", build: "dev", device: "phone" };
+
+    expect(await createApiClient({ fetchImpl: sent }).sendFeedback(body)).toEqual({
+      feedbackId: "f1",
+      status: "new",
+      createdAt: 1,
+    });
+    expect(await createApiClient({ fetchImpl: form }).getFeedbackForm()).toEqual({ replyEmail: true });
+
+    expect(sent.mock.calls[0]).toEqual([
+      "/api/feedback",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(body) }),
+    ]);
+    expect(form.mock.calls[0][0]).toBe("/api/feedback/form");
+  });
+
+  it("reads one feedback item and deletes one (CC-290)", async () => {
+    const read = respond(200, { item: { feedbackId: "a/b", replyEmail: "riya@example.com" } });
+    const deleted = respond(204, undefined);
+
+    expect(await createApiClient({ fetchImpl: read }).getFeedbackItem("a/b")).toEqual({
+      feedbackId: "a/b",
+      replyEmail: "riya@example.com",
+    });
+    expect(await createApiClient({ fetchImpl: deleted }).deleteFeedback("a/b")).toBeUndefined();
+
+    expect(read.mock.calls[0][0]).toBe("/api/admin/feedback/a%2Fb");
+    expect(deleted.mock.calls[0]).toEqual([
+      "/api/admin/feedback/a%2Fb",
+      expect.objectContaining({ method: "DELETE" }),
+    ]);
+  });
+
+  it("reads the feedback inbox with its filters and changes an item's status (CC-290)", async () => {
+    const listed = respond(200, { items: [], next: "1_x" });
+    const changed = respond(200, { item: { feedbackId: "a/b", status: "done" } });
+    const api = createApiClient({ fetchImpl: listed });
+
+    expect(await api.getFeedbackInbox({ type: "bug", status: undefined, before: "1_x" })).toEqual({
+      items: [],
+      next: "1_x",
+    });
+    await api.getFeedbackInbox();
+    expect(await createApiClient({ fetchImpl: changed }).setFeedbackStatus("a/b", "done")).toEqual({
+      feedbackId: "a/b",
+      status: "done",
+    });
+
+    expect(listed.mock.calls.map(([url]) => url)).toEqual([
+      "/api/admin/feedback?type=bug&before=1_x",
+      "/api/admin/feedback",
+    ]);
+    expect(changed.mock.calls[0]).toEqual([
+      "/api/admin/feedback/a%2Fb",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ status: "done" }) }),
+    ]);
+  });
 });
