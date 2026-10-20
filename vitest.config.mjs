@@ -29,7 +29,11 @@ export default defineConfig({
         },
       },
       {
-        plugins: [react()],
+        // JSX lives only in .jsx files. By default the React plugin also has every .js file outside node_modules
+        // rewritten by oxc, whose source map is coarser than the node project's, so a file both projects load
+        // (packages/shared, packages/games) got two copies of each arrow function in the merged report, and the
+        // web copy, never called there, counted as uncovered (CC-309).
+        plugins: [react({ include: /\.jsx$/ })],
         test: {
           name: "web",
           environment: "jsdom",
