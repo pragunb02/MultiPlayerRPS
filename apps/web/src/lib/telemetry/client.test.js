@@ -411,7 +411,11 @@ describe("the telemetry_client flag (CC-174)", () => {
 
       await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["telemetry_client"]));
       if (on) await waitFor(() => expect(telemetry.isAttached()).toBe(true));
-      else await waitFor(() => expect(telemetry.isAttached()).toBe(false));
+      else {
+        // Long enough for an idle load to have started, had the flag's answer let it.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(telemetry.isAttached()).toBe(false);
+      }
       window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false }));
 
       if (on) {
