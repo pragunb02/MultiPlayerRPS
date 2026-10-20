@@ -99,6 +99,19 @@ describe("Modal", () => {
     kept.remove();
   });
 
+  it("moves Tab from the dialog itself to its first control, and Shift+Tab to its last", async () => {
+    const user = userEvent.setup();
+    render(<Page dialogs={["Leave?"]} />);
+    await user.click(screen.getByRole("button", { name: "Open Leave?" }));
+    const dialog = screen.getByRole("dialog", { name: "Leave?" });
+    dialog.focus();
+    await user.tab();
+    expect(screen.getByRole("textbox", { name: "Reason" })).toHaveFocus();
+    dialog.focus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Confirm Leave?" })).toHaveFocus();
+  });
+
   it("holds Tab on the dialog itself when it has nothing to focus", async () => {
     const user = userEvent.setup();
     render(

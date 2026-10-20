@@ -25,27 +25,26 @@ function inertBehind(backdrop) {
 }
 
 /**
- * Keeps Tab and Shift+Tab inside the dialog: from its last control Tab goes to its first, and back. The `inert` page
- * already holds the focus in a browser. This also covers the address bar, which `inert` does not.
+ * Keeps Tab and Shift+Tab inside the dialog: each moves to the next or the previous control, and from the last
+ * control Tab goes back to the first. The dialog moves the focus itself on every press, because Safari's own Tab
+ * skips buttons, and in a dialog of only buttons it would leave for the address bar.
  *
  * @param {KeyboardEvent} event
  * @param {HTMLElement} dialog
  */
 function holdTab(event, dialog) {
+  event.preventDefault();
   const controls = [...dialog.querySelectorAll(FOCUSABLE)];
-  const inside = dialog.contains(document.activeElement);
   if (controls.length === 0) {
-    event.preventDefault();
     dialog.focus();
     return;
   }
-  const [first, last] = [controls[0], controls.at(-1)];
-  if (event.shiftKey && (!inside || document.activeElement === first || document.activeElement === dialog)) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && (!inside || document.activeElement === last)) {
-    event.preventDefault();
-    first.focus();
+  const at = controls.indexOf(document.activeElement);
+  const last = controls.length - 1;
+  if (event.shiftKey) {
+    controls[at <= 0 ? last : at - 1].focus();
+  } else {
+    controls[at === -1 || at === last ? 0 : at + 1].focus();
   }
 }
 
