@@ -10,6 +10,7 @@ CC-### — <title> · `docs/tickets/CC-###.md`
 
 - [ ] CI green (all required checks, branch up to date with `main`)
 - [ ] Ran it for real (what was checked):
+- [ ] Changelog fragment `docs/changes/CC-###.md` added; PROGRESS.md, board rows and next free lines untouched (CC-299)
 
 ## Evidence (required: show it working, not just that tests pass)
 
