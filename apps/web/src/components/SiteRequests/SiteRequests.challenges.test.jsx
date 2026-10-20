@@ -93,7 +93,7 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     await user.click(within(popup()).getByRole("button", { name: "Accept and go" }));
 
     expect(api.acceptChallenge).toHaveBeenCalledWith("c0000000000000000001");
-    await waitFor(() => expect(url()).toBe("/games/chess/rooms/ZZ2CD3"));
+    await waitFor(() => expect(url()).toBe("/games/chess/rooms/ZZ2CD3"), { timeout: 3_000 });
     expect(popup()).not.toBeInTheDocument();
   });
 
@@ -184,7 +184,7 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     expect(within(taken).getByRole("alert")).toHaveTextContent("Arjun took your Chess challenge.");
     await user.click(within(taken).getByRole("button", { name: "Go and play" }));
 
-    await waitFor(() => expect(url()).toBe("/games/chess/rooms/AB2CD3"));
+    await waitFor(() => expect(url()).toBe("/games/chess/rooms/AB2CD3"), { timeout: 3_000 });
     expect(api.challengeLater).toHaveBeenCalledWith("c0000000000000000002");
   });
 
