@@ -5,6 +5,12 @@ One list of every open decision across all tickets, so the owner answers once (C
 reaches Spec review, sends the list to the owner as one batch, and on an answer writes it into the ticket and its
 ADR and removes the row. A row with no answer takes its recommended default on its default day.
 
+> **Answered by the owner on 2026-10-20:** "Accept all, with stylelint". Every row below takes its recommended
+> default, except **CC-314 D4**, where the owner chose **stylelint** (a dev-only dependency) over our own script,
+> because it extends better (custom plugins, editor support). Three defaults are one-way for stored history and were
+> accepted knowingly: CC-175 stores event times to the hour and keeps raw events 30 days, and CC-176 keeps p50, p75
+> and p95. The builders write each answer into its ticket and ADR as their first commit, and remove these rows.
+
 ## Batch: UX monitoring (2026-10-20, PR #154)
 
 **Batch for the owner, 2026-10-20: UX monitoring (CC-174 to CC-177, CC-313).** The owner's ask of 2026-10-20 ("proper
