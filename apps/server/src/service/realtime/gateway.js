@@ -118,6 +118,8 @@ export function createRealtimeGateway({
   // reconnect to the next server, which starts by marking everyone away (CC-101). Recording each cut here
   // would only race the database closing.
   let closing = false;
+  /** Closed tabs whose rooms are still being told. Closing waits for them, before the database closes (CC-318). */
+  const recording = new Set();
   const connections = trackConnections(httpServer);
   const admission = createSocketAdmission({ limits, now });
   /**
@@ -218,14 +220,15 @@ export function createRealtimeGateway({
       socketLogger.info({ reason }, "socket disconnected");
       if (closing) return;
       friendPushes.tabClosed(identity.id);
-      handleSocketGone({
+      const gone = handleSocketGone({
         io,
         roomComponent,
         playerId: identity.id,
         channels: roomChannels,
         now,
         logger: socketLogger,
-      });
+      }).finally(() => recording.delete(gone));
+      recording.add(gone);
     });
 
     registerHandlers(
@@ -352,11 +355,12 @@ export function createRealtimeGateway({
     },
     /** @returns {{ connections: number, players: number }} realtime connections and connected players, for the gauge */
     counts: () => admission.counts(),
-    /** Disconnects all sockets and closes the underlying HTTP server. */
-    close() {
+    /** Waits for the tabs that already closed to be recorded, then disconnects all sockets and closes the HTTP server. */
+    async close() {
       closing = true;
       // Players hear why they are cut off, and that their game is kept for the next server (CC-158).
       io.emit(SOCKET_EVENTS.SERVER_RESTARTING, {});
+      await Promise.allSettled([...recording]);
       return new Promise((resolve, reject) => {
         io.close((err) => (err ? reject(err) : resolve()));
         connections.closeIdle();

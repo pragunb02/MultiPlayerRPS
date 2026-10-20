@@ -86,6 +86,75 @@ describe("botDriver", () => {
     expect(updates).toHaveLength(1);
   });
 
+  it("acts once at a time in a room, and plans a change made while it acted when it is done (CC-318)", async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let gated = true;
+    const { playComputer, driver, updates, rooms, capture } = setup({
+      wrapRooms: (base) => ({
+        ...base,
+        makeMove: async (input) => {
+          if (gated) {
+            gated = false;
+            await gate;
+          }
+          return base.makeMove(input);
+        },
+      }),
+    });
+    const room = await playComputer({ gameId: GAME_IDS.RPS, options: { bestOf: 3 } });
+    const rocky = JSON.parse(room.game.seals[0].text).choice;
+    driver.watch(room);
+    // Rocky's first throw is on its way into the room when the person throws the same.
+    await vi.advanceTimersByTimeAsync(PAUSE);
+    await rooms.makeMove({ code: room.code, playerId: PERSON.id, move: { choice: rocky }, now: 3 });
+    // A room that arrives late, older than the person's throw, is not what the driver plans from.
+    driver.watch(room);
+    await vi.advanceTimersByTimeAsync(PAUSE * 4);
+    expect(updates).toEqual([]);
+
+    release();
+    await vi.advanceTimersByTimeAsync(PAUSE);
+
+    // The drawn round was thrown once, and the throw of the next round came one pause later.
+    const throws = (await rooms.getRoom(room.code)).game.log.filter((entry) => entry.playerId === ROCKY);
+    expect(throws).toHaveLength(2);
+    expect(updates).toHaveLength(2);
+    expect(capture.entries).toEqual([]);
+  });
+
+  it("does not try a failed action again when the room changed meanwhile, but plans from the new room", async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let failing = true;
+    const { playComputer, driver, updates, rooms, capture } = setup({
+      wrapRooms: (base) => ({
+        ...base,
+        makeMove: async (input) => {
+          if (!failing) return base.makeMove(input);
+          failing = false;
+          await gate;
+          throw new Error("database down");
+        },
+      }),
+    });
+    const room = await playComputer({ gameId: GAME_IDS.RPS, options: { bestOf: 3 } });
+    driver.watch(room);
+    await vi.advanceTimersByTimeAsync(PAUSE);
+    await rooms.makeMove({ code: room.code, playerId: PERSON.id, move: { choice: "rock" }, now: 3 });
+
+    release();
+    await vi.advanceTimersByTimeAsync(PAUSE);
+
+    expect(capture.entries).toEqual([]);
+    expect(updates).toHaveLength(1);
+    expect(updates[0].game.log.filter((entry) => entry.playerId === ROCKY)).toHaveLength(1);
+  });
+
   it("drops its plan when the moment passed, and plans from the room as it is then", async () => {
     const { playComputer, driver, updates, rooms } = setup({ wired: false });
     const room = await playComputer({ gameId: GAME_IDS.RPS });
