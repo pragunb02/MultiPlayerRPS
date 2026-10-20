@@ -1,0 +1,21 @@
+/*
+ * Stacking layers (CC-314), lowest first. Every z-index in the app is one of these, so the order is written once.
+ * The chess board's own layers only stack inside the board.
+ */
+:root {
+  --layer-raised: 1;
+  --layer-banner: 10;
+  --layer-tooltip: 15;
+  --layer-toast: 20;
+  /* The lost connection strip sits over the other banners, at the toasts' height. */
+  --layer-banner-alert: 20;
+  /* A panel that opens from the header, such as the inbox, over the banners. */
+  --layer-menu: 20;
+  --layer-dialog: 30;
+  --layer-effect: 40;
+  --layer-skip: 50;
+  --layer-board-piece: 1;
+  --layer-board-slide: 3;
+  --layer-board-ghost: 5;
+  --layer-board-promotion: 10;
+}

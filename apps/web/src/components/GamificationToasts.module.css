@@ -3,6 +3,6 @@
   position: fixed;
   top: 4.5rem;
   right: var(--space-6);
-  z-index: 40;
+  z-index: var(--layer-effect);
   pointer-events: none;
 }

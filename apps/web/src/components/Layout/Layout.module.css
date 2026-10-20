@@ -11,7 +11,7 @@
 .skip {
   position: absolute;
   left: -999px;
-  z-index: 50;
+  z-index: var(--layer-skip);
 }
 .skip:focus {
   left: var(--space-4);
