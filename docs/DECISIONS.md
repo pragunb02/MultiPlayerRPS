@@ -222,6 +222,12 @@ the owner may change it.
   server's own readers (the block route's `{ matchId, seat }`, the match pipeline) read the real record through
   methods no route sends. The account export keeps its `you` and `player-2` labels (ADR-048.6). Every identifier a
   client can receive is listed in DATA.md, Identifiers, which every new feature checks.
+- **Amended 2026-10-20 ([CC-304](tickets/CC-304.md)): whole ids, and names cannot start like one.** The last pass of
+  point 5 replaces a string only when all of it is a player id: `guest_` and `user_` as `createIdentity` accepts
+  them, `bot_<character>_<level>` for the pairs in `BOT_CHARACTERS`, and `deleted_<uuid>`. Every kind's prefix and
+  pattern lives in `models/playerIdShape.js`. A name like `user_bob` is shown as typed. No new name may start with a
+  player id prefix, in any case (`isReservedName`, so sign-up and legacy accounts). Accounts that already have such
+  a name keep it (CC-185).
 
 ### ADR-059 — In-app feedback: unlinked, masked, 180 days, reply email for adults only, and the console's first per-person view
 

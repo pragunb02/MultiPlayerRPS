@@ -42,6 +42,13 @@ describe("credentials", () => {
     },
   );
 
+  it.each(["user_bob", "User_Bob", "guest_x", "bot_x", "deleted_x", "DELETED_player"])(
+    "refuses the username %j, which starts like a player id, as reserved (CC-304)",
+    (raw) => {
+      expect(() => parseUsername(raw)).toThrow(RESERVED_NAME);
+    },
+  );
+
   it.each(["fuuuck", "5h1t", "Big_Ass"])("refuses the rude username %j without naming the word", (raw) => {
     expect(() => parseUsername(raw)).toThrow(UNSUITABLE_NAME);
     expect(fieldOf(() => parseUsername(raw))).toBe("username");

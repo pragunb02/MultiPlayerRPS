@@ -140,6 +140,20 @@ describe("match history names players by match player ids (CC-297)", () => {
     });
   });
 
+  it("keeps an opponent's name that only starts like a player id, and still renames the real ids (CC-304)", async () => {
+    const matches = setup();
+    const seats = [seat(ALICE, "Alice"), seat(BOB, "user_bob")];
+    await matches.recordFinished({ room: room({ seats }), outcome: aliceWins() });
+
+    const [listed] = await matches.listForPlayer({ playerId: ALICE, limit: 10 });
+    const details = await matches.getForPlayer({ matchId: MATCH_ID, playerId: ALICE });
+
+    expect(listed.players[1]).toEqual({ playerId: idIn(MATCH_ID, BOB), displayName: "user_bob" });
+    expect(details.players[1].displayName).toBe("user_bob");
+    expect(JSON.stringify([listed, details])).not.toContain(BOB);
+    expect(JSON.stringify([listed, details])).not.toContain(ALICE);
+  });
+
   it("names a deleted player's stand-in by a match id, without its stand-in id", async () => {
     const matches = setup({ newUuid: () => "00000000-0000-4000-8000-0000000000d0" });
     await matches.recordFinished({ room: room(), outcome: aliceWins() });
