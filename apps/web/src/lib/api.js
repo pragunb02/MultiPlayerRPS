@@ -173,6 +173,26 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     /** Moves one item of the inbox to another status, and answers it as it is now (CC-290). */
     setFeedbackStatus: async (feedbackId, status) =>
       (await request("PATCH", `/admin/feedback/${encodeURIComponent(feedbackId)}`, { status })).item,
+    /**
+     * Whether each of these feature flags is on for this player (CC-312). Only booleans come back.
+     *
+     * @param {ReadonlyArray<string>} names  client flags from packages/shared/src/flags.js
+     * @returns {Promise<Record<string, boolean>>}
+     */
+    getFlags: async (names) =>
+      (await request("GET", `/flags?names=${names.map(encodeURIComponent).join(",")}`)).flags,
+    /** Counts the success event of a flag once, on the side the server works out for this player (CC-312). */
+    sendFlagSuccess: async (name) => {
+      await request("POST", `/flags/${encodeURIComponent(name)}/success`);
+    },
+    /** The owner console's flags with their rollouts and counts (CC-312). */
+    getAdminFlags: () => request("GET", "/admin/flags"),
+    /** Sets a flag's rollout from the console, and answers the flag as it is now (CC-312). */
+    setFlagRollout: async (name, rollout) =>
+      (await request("PUT", `/admin/flags/${encodeURIComponent(name)}`, { rollout })).flag,
+    /** Sends a flag back to the rollout in code, and answers the flag as it is now (CC-312). */
+    clearFlagRollout: async (name) =>
+      (await request("DELETE", `/admin/flags/${encodeURIComponent(name)}`)).flag,
   });
 }
 

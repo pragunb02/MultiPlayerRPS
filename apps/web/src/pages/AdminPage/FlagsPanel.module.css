@@ -1,0 +1,102 @@
+/* The console's feature flags (CC-312): one card per flag, its facts, counts and form. */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.flag {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  min-width: 0;
+}
+.flagHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* The name is what code writes, so it is shown as code, and a long one breaks rather than widening the page. */
+.name {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+.overdue {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: var(--color-primary-contrast);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+.description {
+  margin: 0;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.facts dt {
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.counts {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  width: 100%;
+  max-width: 28rem;
+}
+.counts caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: var(--space-1);
+}
+.counts th,
+.counts td {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+.counts td {
+  font-variant-numeric: tabular-nums;
+}
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+}
+.check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-soft);
+}
+.check p {
+  margin: 0;
+  font-weight: 700;
+}
+.warning {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-danger);
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+}

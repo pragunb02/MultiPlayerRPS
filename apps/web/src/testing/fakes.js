@@ -137,6 +137,11 @@ export function fakeApi(overrides = {}) {
     setFeedbackStatus: vi.fn(),
     getFeedbackItem: vi.fn(),
     deleteFeedback: vi.fn().mockResolvedValue(undefined),
+    getFlags: vi.fn(async (names) => Object.fromEntries(names.map((name) => [name, false]))),
+    sendFlagSuccess: vi.fn().mockResolvedValue(undefined),
+    getAdminFlags: vi.fn(() => new Promise(() => {})),
+    setFlagRollout: vi.fn(),
+    clearFlagRollout: vi.fn(),
     ...overrides,
   };
 }

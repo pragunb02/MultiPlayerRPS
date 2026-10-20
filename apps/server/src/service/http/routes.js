@@ -5,6 +5,7 @@ import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
 import { createFeedbackRoutes } from "./feedbackRoutes.js";
+import { createFlagRoutes } from "./flagRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
@@ -22,6 +23,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
+ *   & { flagComponent: Parameters<typeof createFlagRoutes>[0]["flagComponent"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
  */
@@ -50,6 +52,7 @@ export function apiRouter({
   feedbackLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
+  flagComponent,
   build,
   ...sessionDeps
 }) {
@@ -113,6 +116,8 @@ export function apiRouter({
       ...(feedbackLimits && { limits: feedbackLimits }),
     }),
   );
+
+  router.use(createFlagRoutes({ flagComponent, adminAccess }));
 
   router.use(createAdminRoutes({ analyticsComponent, requireAdmin: adminAccess.requireAdmin, now }));
 

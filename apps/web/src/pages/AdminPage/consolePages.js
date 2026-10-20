@@ -5,8 +5,8 @@ import { ADMIN_SECTIONS, paths, ROUTES } from "../../app/paths.js";
  * the app's routes all read this list, so a new console page is one entry here and its component.
  */
 
-/** The two parts of the console: the totals with their range, and the feedback inbox. Each loads on its own. */
-export const CONSOLE_VIEWS = Object.freeze({ TOTALS: "totals", FEEDBACK: "feedback" });
+/** The parts of the console: the totals with their range, the feedback inbox and the flags. Each loads on its own. */
+export const CONSOLE_VIEWS = Object.freeze({ TOTALS: "totals", FEEDBACK: "feedback", FLAGS: "flags" });
 
 const titleOf = (word) => word[0].toUpperCase() + word.slice(1);
 
@@ -15,13 +15,14 @@ const titleOf = (word) => word[0].toUpperCase() + word.slice(1);
  *   section in the address, none for the overview
  */
 
-/** Every page in tab order: the overview, each section of the totals, then the feedback inbox. */
+/** Every page in tab order: the overview, each section of the totals, the feedback inbox, then the flags. */
 export const CONSOLE_PAGES = Object.freeze([
   Object.freeze({ id: "overview", name: "Overview", view: CONSOLE_VIEWS.TOTALS }),
   ...ADMIN_SECTIONS.map((section) =>
     Object.freeze({ id: section, name: titleOf(section), view: CONSOLE_VIEWS.TOTALS, section }),
   ),
   Object.freeze({ id: "feedback", name: "Feedback", view: CONSOLE_VIEWS.FEEDBACK }),
+  Object.freeze({ id: "flags", name: "Flags", view: CONSOLE_VIEWS.FLAGS }),
 ]);
 
 /** The routes of the console and the part each one loads. */
@@ -29,6 +30,7 @@ export const CONSOLE_ROUTES = Object.freeze([
   Object.freeze({ path: ROUTES.ADMIN, view: CONSOLE_VIEWS.TOTALS }),
   Object.freeze({ path: ROUTES.ADMIN_SECTION, view: CONSOLE_VIEWS.TOTALS }),
   Object.freeze({ path: ROUTES.ADMIN_FEEDBACK, view: CONSOLE_VIEWS.FEEDBACK }),
+  Object.freeze({ path: ROUTES.ADMIN_FLAGS, view: CONSOLE_VIEWS.FLAGS }),
 ]);
 
 /**
@@ -38,5 +40,7 @@ export const CONSOLE_ROUTES = Object.freeze([
  * @param {ConsolePage} page
  * @param {{ from?: string, to?: string, bucket?: string }} range
  */
-export const consoleHref = (page, range) =>
-  page.view === CONSOLE_VIEWS.TOTALS ? paths.admin(page.section, range) : paths.adminFeedback();
+export function consoleHref(page, range) {
+  if (page.view === CONSOLE_VIEWS.TOTALS) return paths.admin(page.section, range);
+  return page.view === CONSOLE_VIEWS.FLAGS ? paths.adminFlags() : paths.adminFeedback();
+}
