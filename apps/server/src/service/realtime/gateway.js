@@ -15,6 +15,7 @@ import { registerHandlers } from "./acknowledgements.js";
 import { createBotHandlers } from "./botHandlers.js";
 import { createRatingHandlers, pushRoomRatings } from "./ratingHandlers.js";
 import { trackConnections } from "./connections.js";
+import { connectFriendPushes } from "./friendPushes.js";
 import {
   broadcastRoom,
   createRoomHandlers,
@@ -56,9 +57,14 @@ const playerRoom = playerChannel;
  *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
  *   chessRatingComponent?: Pick<ReturnType<typeof import("../../domain/ratings/chessRatingComponent.js").createChessRatingComponent>, "ratingsOf">,
  *   recordSocketEvent?: import("../../utils/operationsMetrics.js").OperationsMetrics["recordSocketEvent"],
+ *   friends: {
+ *     presence: Pick<ReturnType<typeof import("../../domain/friends/presenceTracker.js").createPresenceTracker>, "connected" | "disconnected">,
+ *     friendComponent: Parameters<typeof connectFriendPushes>[0]["friendComponent"],
+ *   },
  * }} deps  without `botComponent` nobody can start a game against a computer character (CC-138), and without
  *   `chessRatingComponent` no tab can ask for a room's ratings (CC-042). Without `recordSocketEvent` socket
- *   events are not timed for operations telemetry (ADR-055)
+ *   events are not timed for operations telemetry (ADR-055). `friends` is the presence tracker, told about every
+ *   tab, and the friend component, whose changes are pushed (CC-052)
  */
 export function createRealtimeGateway({
   httpServer,
@@ -75,6 +81,7 @@ export function createRealtimeGateway({
   botComponent,
   chessRatingComponent,
   recordSocketEvent = NO_OPERATIONS_METRICS.recordSocketEvent,
+  friends,
 }) {
   assertDefined(httpServer, "httpServer");
   assertDefined(sessionMiddleware, "sessionMiddleware");
@@ -85,6 +92,8 @@ export function createRealtimeGateway({
   assertFunction(checkSession, "checkSession");
   assertDefined(trustProxyHops, "trustProxyHops");
   assertFunction(networkOf, "networkOf");
+  assertFunction(friends?.presence?.connected, "friends.presence.connected");
+  assertDefined(friends.friendComponent, "friends.friendComponent");
 
   const io = new Server(httpServer, {
     serveClient: false,
@@ -166,6 +175,15 @@ export function createRealtimeGateway({
     }
   });
 
+  const friendPushes = connectFriendPushes({
+    io,
+    domainEvents,
+    friendComponent: friends.friendComponent,
+    presence: friends.presence,
+    logger,
+    now,
+  });
+
   io.on("connection", (socket) => {
     const { identity, sessionId } = socket.data;
     const socketLogger = logger.child({ socketId: socket.id, playerId: identity.id });
@@ -183,6 +201,8 @@ export function createRealtimeGateway({
     socket.join([sessionRoom(sessionId), playerRoom(identity.id)]);
     socketLogger.info("socket connected");
     handleSocketOnline({ socket, roomComponent, now, logger: socketLogger });
+    // Friends see the player online from their first tab (CC-052).
+    friendPushes.tabOpened(identity.id);
     let roomChannels = [];
     socket.on("disconnecting", () => {
       roomChannels = [...socket.rooms].filter((channel) => channel.startsWith("room:"));
@@ -191,6 +211,7 @@ export function createRealtimeGateway({
       socket.data.release();
       socketLogger.info({ reason }, "socket disconnected");
       if (closing) return;
+      friendPushes.tabClosed(identity.id);
       handleSocketGone({
         io,
         roomComponent,

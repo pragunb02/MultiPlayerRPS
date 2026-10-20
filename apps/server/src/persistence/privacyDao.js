@@ -47,7 +47,7 @@ export function createPrivacyDao({ connection }) {
       Privacy.findOneAndUpdate(
         { playerId },
         { $set: { appearOffline, updatedAt } },
-        { upsert: true, new: true },
+        { upsert: true, returnDocument: "after" },
       )
         .select(FIELDS)
         .lean(),
