@@ -28,7 +28,7 @@ const visibilityOf = (profile) => profile.visibility ?? DEFAULT_PROFILE_VISIBILI
  * 2. Anyone, a guest too, picks an avatar from the catalogue for their own profile.
  * 3. Only an adult account's profile can be public, and only when its owner made it public. It starts private.
  * 4. A profile is looked up by its handle only. A handle nobody has, a deleted player's and a blocked pair all get
- *    the same "not found". Anyone not surely an adult, guests included, is "Hidden player" with nothing else.
+ *    the same "not found". Anyone not surely an adult, guests included, is "Hidden player" with their avatar and nothing else.
  *
  * @param {{
  *   profileAccessor: ReturnType<typeof import("../../data/profileAccessor.js").createProfileAccessor>,
@@ -138,7 +138,8 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
      * What a viewer sees at a handle. Checked in this order, on every read:
      *
      * 1. No such handle, a deleted account, or a block either way: not found, all alike.
-     * 2. Not surely an adult: `{ hidden: true }` as "Hidden player", no avatar, nothing else.
+     * 2. Not surely an adult: `{ hidden: true }` as "Hidden player" with the avatar they picked, nothing else.
+     *    Avatars come from our own set and identify nobody (owner, ADR-065).
      * 3. A private adult profile: the username and the avatar, `private: true`.
      * 4. A public adult profile: also the level, games played and won, and the chess rating.
      *
@@ -162,7 +163,12 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
       }
       const base = { handle, ...(own && { own: true }) };
       if (!(await isAdult(playerId, now))) {
-        return Object.freeze({ ...base, hidden: true, displayName: HIDDEN_PLAYER_NAME });
+        return Object.freeze({
+          ...base,
+          hidden: true,
+          displayName: HIDDEN_PLAYER_NAME,
+          ...avatarField(profile),
+        });
       }
       const shown = { ...base, displayName: await usernameOf(playerId, now), ...avatarField(profile) };
       if (visibilityOf(profile) !== PROFILE_VISIBILITY.PUBLIC) {

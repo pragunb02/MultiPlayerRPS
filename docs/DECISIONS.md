@@ -61,8 +61,8 @@ the owner may change it.
 
 ### ADR-065 — Public profiles by a random handle, adults only, private by default, and a curated avatar set
 
-- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-034](tickets/CC-034.md), research with
-  sources there). Built in the CC-034 pull request. It settles what ADR-011 left open ("public player profiles are a
+- **Status:** Accepted · 2026-10-20 by the owner ([CC-034](tickets/CC-034.md), research with sources there),
+  with point 3 amended for avatars (below). Built in the CC-034 pull request. It settles what ADR-011 left open ("public player profiles are a
   separate decision") and fills in ADR-028.8's first prerequisite.
 - **Context.** Friends and invites (CC-052) need a safe way to look at someone you met. No client may ever get
   another person's player id (ADR-057, CC-297), every player counts as a minor until they give a year (ADR-028.1,
@@ -76,8 +76,8 @@ the owner may change it.
      opponent in history, only when that player is an adult account. Guests, minors, accounts of unknown age, hidden
      rows and computer players get no link. A player sees their own handle on their own profile.
   3. **What a handle shows**, decided on the server for each read, in this order: not found for a handle nobody has,
-     a malformed one, a deleted account's and a block either way, one body for all. "Hidden player" with nothing else
-     (no avatar, no stats) for anyone not surely an adult. The username and avatar of an adult's private profile.
+     a malformed one, a deleted account's and a block either way, one body for all. "Hidden player" with the avatar they
+     picked and nothing else (no stats) for anyone not surely an adult. The username and avatar of an adult's private profile.
      The username, avatar, level, games played and won, and the chess rating (CC-042) of an adult's public profile.
      Never a date, a streak, last seen, history, an email or an id. `own: true` when the viewer is its owner.
   4. **Private by default** (GDPR Article 25(2), the ICO children's code standard 7), `DEFAULT_PROFILE_VISIBILITY`.
@@ -87,7 +87,7 @@ the owner may change it.
      the rule (`domain/profiles/avatarRules.js`). Coin cosmetics (ADR-026, CC-143) add a rule kind and its check. Ids
      are permanent: a retired avatar stays for those who have it.
   6. **Where avatars show.** On a room seat, kept on the seat when the person sits down, so every view shows it
-     without a lookup. On a leaderboard row whose name is shown (a hidden row gets the silhouette). Beside a past
+     without a lookup. On every leaderboard row, a hidden row too, which still never links to a profile. Beside a past
      opponent in history. On both profiles. A player without one gets a neutral silhouette.
   7. **Guests pick too, and it moves on sign up** (ADR-014, a transfer participant before leaderboards): the account
      keeps its own avatar and handle, and takes the guest's avatar when it has none, or the guest's whole profile when
@@ -99,10 +99,10 @@ the owner may change it.
   before this have no avatars on their seats, and show the silhouette. A board read can make the profile of an adult
   listed on it (one small write, the first time only). CC-278 adds friends-only visibility and moves the switch into
   the privacy settings page. CC-052 reads the same handle and `blockedWith`.
-- **For the owner to decide.** (1) Private by default, or public by default for adults. (2) Whether a hidden
-  profile should show the player's avatar (now the silhouette). (3) The Hinglish lines in
-  `apps/web/src/components/Profile/profileCopy.js`, which are the builder's drafts. (4) Whether a room seat should
-  link to an adult opponent's profile (now only boards and history do, so spectators get no stable id).
+- **Decided by the owner, 2026-10-20.** (1) Profiles stay private by default. (2) A hidden profile, a hidden
+  leaderboard row and a history row show the player's chosen avatar, not the silhouette: avatars come from our
+  curated set and identify nobody. (3) Room seats do not link to profiles. Still open: the Hinglish lines in
+  `apps/web/src/components/Profile/profileCopy.js`, which are the builder's drafts.
 
 ### ADR-062 — The chess rating: one game per period, a sixth outbox step, the guest move and the level seed
 

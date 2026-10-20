@@ -1055,8 +1055,9 @@ describe("leaderboardComponent: avatars and profile links (CC-034)", () => {
     };
   };
 
-  it("puts the avatar and the profile link beside each name shown, and nothing beside a hidden one", async () => {
-    const cards = fakeCards([ALICE.id]);
+  it("puts the avatar beside every row, a hidden one too, and the profile link only beside a name shown", async () => {
+    // Even if the cards offered a link for the hidden row, the board leaves it out (owner, ADR-065).
+    const cards = fakeCards([ALICE.id, BOB.id]);
     const { play, entries } = setup({ adults: [ALICE.id], cards });
     await play({ winner: ALICE, loser: BOB }, [
       [ALICE, 60],
@@ -1070,22 +1071,49 @@ describe("leaderboardComponent: avatars and profile links (CC-034)", () => {
     expect(await entries("overall")).toEqual([
       { rank: 1, displayName: "alice", avatar: "owl", profile: "handle-of-a", level: 2, score: 70 },
       { rank: 2, displayName: "Guest-7K2Q", avatar: "owl", level: 1, score: 30 },
-      { rank: 3, displayName: "Hidden player", hidden: true, level: 1, score: 10 },
+      { rank: 3, displayName: "Hidden player", hidden: true, avatar: "owl", level: 1, score: 10 },
     ]);
-    expect(cards.asked.at(-1)).toEqual({ playerIds: [ALICE.id, GUEST.id], now: NOW });
+    expect(cards.asked.at(-1)).toEqual({ playerIds: [ALICE.id, GUEST.id, BOB.id], now: NOW });
   });
 
-  it("asks for no cards when every name on the board is hidden", async () => {
-    const cards = fakeCards([]);
+  it("shows the avatar of hidden rows with no link, and nothing for a player without a card", async () => {
+    const cards = {
+      cardsFor: async () => new Map([[ALICE.id, { avatar: "fox" }]]),
+    };
     const { play, entries } = setup({ adults: [], cards });
     await play({ winner: ALICE, loser: BOB }, [
       [ALICE, 60],
       [BOB, 10],
     ]);
 
-    expect((await entries("overall")).every((entry) => entry.hidden === true && !("avatar" in entry))).toBe(
-      true,
-    );
+    expect(await entries("overall")).toEqual([
+      { rank: 1, displayName: "Hidden player", hidden: true, avatar: "fox", level: 2, score: 60 },
+      { rank: 2, displayName: "Hidden player", hidden: true, level: 1, score: 10 },
+    ]);
+  });
+
+  it("shows a hidden row without an avatar when its card has none", async () => {
+    const cards = { cardsFor: async () => new Map([[BOB.id, {}]]) };
+    const { play, entries } = setup({ adults: [], cards });
+    await play({ winner: ALICE, loser: BOB }, [
+      [ALICE, 60],
+      [BOB, 10],
+    ]);
+
+    expect((await entries("overall"))[1]).toEqual({
+      rank: 2,
+      displayName: "Hidden player",
+      hidden: true,
+      level: 1,
+      score: 10,
+    });
+  });
+
+  it("asks for no cards for an empty board", async () => {
+    const cards = fakeCards([]);
+    const { entries } = setup({ adults: [], cards });
+
+    expect(await entries("overall")).toEqual([]);
     expect(cards.asked).toEqual([]);
   });
 

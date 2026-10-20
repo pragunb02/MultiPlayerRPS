@@ -22,6 +22,9 @@ import {
 } from "./boards.js";
 
 const ALL = "all";
+/** A row's card: all of it, or only the avatar on a hidden row, which never links to a profile (CC-034). */
+const avatarOnly = (card, hidden) =>
+  card === undefined ? {} : hidden ? (card.avatar === undefined ? {} : { avatar: card.avatar }) : card;
 // Without profiles nobody has an avatar or a profile link. Tests that are not about profiles build boards without.
 const NO_CARDS = Object.freeze({ cardsFor: async () => new Map() });
 const HISTORY_PAGE = 100;
@@ -312,8 +315,8 @@ export function createLeaderboardComponent({
     /**
      * One board's current period, best first. Entries carry public fields only, never player ids. A guest shows
      * its server-given name (ADR-060). The name of a minor or of an account of unknown age is hidden, with
-     * `hidden: true`. The rank and score stay (ADR-028). A row with a name shown also has the player's `avatar`,
-     * and an adult account's row the `profile` handle of their profile (CC-034).
+     * `hidden: true`. The rank and score stay (ADR-028). Every row has the player's `avatar` when they picked one,
+     * and an adult account's row whose name is shown the `profile` handle of their profile (CC-034).
      *
      * @param {{ boardId: string, limit: number, now: number }} query
      * @throws {NotFoundError} for an unknown board
@@ -331,9 +334,10 @@ export function createLeaderboardComponent({
       const accounts = top.map((e) => e.playerId).filter(isAccountId);
       const adults = accounts.length === 0 ? new Set() : await ages.adultsAmong({ playerIds: accounts, now });
       const shown = top.map((entry) => ({ entry, name: shownName(entry, adults) }));
-      // A hidden row gets no avatar and no link, so nothing on a public board joins up a minor's rows (CC-034).
-      const named = shown.filter(({ name }) => name.hidden !== true).map(({ entry }) => entry.playerId);
-      const cardOf = named.length === 0 ? new Map() : await cards.cardsFor({ playerIds: named, now });
+      // Every row shows the avatar its player picked, a hidden row too: avatars come from our own set and say
+      // nothing about who someone is (owner, ADR-065). A hidden row never gets a profile link (CC-034).
+      const cardOf =
+        top.length === 0 ? new Map() : await cards.cardsFor({ playerIds: top.map((e) => e.playerId), now });
       return {
         board: {
           id: info.id,
@@ -346,7 +350,7 @@ export function createLeaderboardComponent({
         entries: shown.map(({ entry, name }, index) => ({
           rank: index + 1,
           ...name,
-          ...(name.hidden === true ? {} : cardOf.get(entry.playerId)),
+          ...avatarOnly(cardOf.get(entry.playerId), name.hidden === true),
           level: entry.level,
           score: entry.score,
         })),

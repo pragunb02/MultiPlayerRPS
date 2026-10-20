@@ -196,7 +196,7 @@ describe("a profile by its handle (CC-034)", () => {
     });
   });
 
-  it("shows a minor, an account of unknown age and a guest as Hidden player, nothing more", async () => {
+  it("shows a minor, an account of unknown age and a guest as Hidden player with their avatar, nothing more", async () => {
     server = await startTestServer();
     const players = [
       await account("KabirTest", MINOR_YEAR),
@@ -211,6 +211,7 @@ describe("a profile by its handle (CC-034)", () => {
         handle,
         hidden: true,
         displayName: "Hidden player",
+        avatar: "fox",
       });
     }
   });
@@ -335,11 +336,19 @@ describe("avatars and links where players meet (CC-034)", () => {
 
     expect(board).toEqual([
       expect.objectContaining({ displayName: "RiyaTest", avatar: "crown", profile: handle }),
-      { rank: 2, displayName: "Hidden player", hidden: true, level: 1, score: expect.any(Number) },
+      // A hidden row shows the avatar but never a profile link (owner, ADR-065).
+      {
+        rank: 2,
+        displayName: "Hidden player",
+        hidden: true,
+        avatar: "fox",
+        level: 1,
+        score: expect.any(Number),
+      },
     ]);
     expect(history.players).toEqual([
       expect.objectContaining({ displayName: "RiyaTest", avatar: "crown", profile: handle }),
-      expect.not.objectContaining({ profile: expect.anything() }),
+      { playerId: expect.any(String), displayName: "KabirTest", avatar: "fox" },
     ]);
   });
 

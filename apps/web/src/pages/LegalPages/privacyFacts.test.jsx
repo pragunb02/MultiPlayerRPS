@@ -89,7 +89,7 @@ const FACTS = [
   {
     fact: "profiles start private, only adults can be public, everyone else is Hidden player (CC-034)",
     data: "once chosen: left out means private",
-    page: /It starts private: others see only your name and avatar\. If you are 18 or over you can make it public.*the profile shows "Hidden player" and nothing else/,
+    page: /It starts private: others see only your name and avatar\. If you are 18 or over you can make it public.*the profile shows "Hidden player" with the avatar they picked, and nothing else/,
   },
   {
     fact: "feedback is kept 180 days, without a player id or an address",

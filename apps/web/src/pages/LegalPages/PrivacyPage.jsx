@@ -91,8 +91,8 @@ export function PrivacyPage() {
             are. It starts private: others see only your name and avatar. If you are 18 or over you can make
             it public, and then anyone with the link sees your name, avatar, level, games, wins and chess
             rating, never your email, age or history. For anyone under 18, a guest, or anyone who has not
-            given a year of birth, the profile shows &quot;Hidden player&quot; and nothing else. We keep it
-            until you delete your account.
+            given a year of birth, the profile shows &quot;Hidden player&quot; with the avatar they picked,
+            and nothing else. We keep it until you delete your account.
           </li>
           <li>
             <strong>Players you block.</strong> When you block a player, we store that you blocked them, the

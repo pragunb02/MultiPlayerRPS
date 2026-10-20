@@ -59,7 +59,7 @@ function Level({ level }) {
 
 /**
  * The name on a row, with the player's avatar. An adult account's name links to their profile (CC-034). A hidden row
- * has the silhouette and no link, and so does a guest.
+ * shows the avatar but never a link, and neither does a guest's.
  */
 function RowName({ entry, you }) {
   return (

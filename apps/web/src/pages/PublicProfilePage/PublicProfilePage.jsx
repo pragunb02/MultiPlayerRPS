@@ -45,11 +45,11 @@ function PublicStats({ player }) {
   );
 }
 
-/** The top of every profile that is found: the avatar and the name. A hidden profile shows the silhouette only. */
+/** The top of every profile that is found: the avatar and the name, also of a hidden profile (owner, ADR-065). */
 function Header({ player }) {
   return (
     <header className={styles.header}>
-      <Avatar avatar={player.hidden ? undefined : player.avatar} size={96} />
+      <Avatar avatar={player.avatar} size={96} />
       <h1 className={player.hidden ? styles.hidden : undefined}>{player.displayName}</h1>
     </header>
   );

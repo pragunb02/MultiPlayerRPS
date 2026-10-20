@@ -55,14 +55,15 @@ describe("PublicProfilePage (CC-034)", () => {
     expect(screen.queryByText("Played")).toBeNull();
   });
 
-  it("shows a hidden player with the silhouette and no stats", async () => {
-    open({ handle: HANDLE, hidden: true, displayName: "Hidden player" });
+  it("shows a hidden player with the avatar they picked and no stats (owner, ADR-065)", async () => {
+    open({ handle: HANDLE, hidden: true, displayName: "Hidden player", avatar: "fox" });
 
     expect(await screen.findByRole("heading", { level: 1, name: "Hidden player" })).toBeInTheDocument();
     expect(screen.getByText("Is player ka profile chhupa hua hai.")).toBeInTheDocument();
     expect(screen.queryByText("Played")).toBeNull();
     const header = screen.getByRole("heading", { level: 1 }).parentElement;
-    expect(header.querySelector("svg .silhouette")).not.toBeNull();
+    expect(header.querySelector("svg .silhouette")).toBeNull();
+    expect(header.querySelector("svg path")).not.toBeNull();
   });
 
   it("tells a player that this is how others see their own profile", async () => {

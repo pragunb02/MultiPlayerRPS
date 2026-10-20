@@ -176,17 +176,21 @@ describe("profileComponent: what a viewer sees at a handle (CC-034)", () => {
     ["a minor", KABIR],
     ["an account of unknown age", MEENA],
     ["a guest", GUEST],
-  ])("shows %s as Hidden player, with no avatar and no stats", async (_, player) => {
-    const { component, handleOf } = setup();
-    const handle = await handleOf(player);
-    await component.setAvatar({ player, avatar: "fox", now: T0 });
+  ])(
+    "shows %s as Hidden player, with the avatar they picked and no stats (owner, ADR-065)",
+    async (_, player) => {
+      const { component, handleOf } = setup();
+      const handle = await handleOf(player);
+      await component.setAvatar({ player, avatar: "fox", now: T0 });
 
-    expect(await component.publicView({ handle, viewerId: RIYA.id, now: T0 })).toEqual({
-      handle,
-      hidden: true,
-      displayName: "Hidden player",
-    });
-  });
+      expect(await component.publicView({ handle, viewerId: RIYA.id, now: T0 })).toEqual({
+        handle,
+        hidden: true,
+        displayName: "Hidden player",
+        avatar: "fox",
+      });
+    },
+  );
 
   it("answers the same not found for a handle nobody has, a deleted account and a block either way", async () => {
     const { component, handleOf } = setup({ blocked: [[RIYA.id, ARJUN.id]], deleted: [KABIR.id] });
