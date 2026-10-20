@@ -1356,6 +1356,15 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
   is Regular plus Core on the last full week's Sunday against the Sunday before, and the console shows the moves
   between those two days. The 3-day weekly returning players number (PRODUCT_VISION.md 7.1) stays on the
   Overview without the North Star label, and 7.1 needs the owner's rewording (CC-268).
+- **Amended · 2026-10-20 (owner: "Accept all", the recommended defaults of CC-174 and CC-175).** How the counts are
+  sent and kept. (1) The first build sends every client event of EVENTS.md, within CC-174's cut line, in batches
+  every 10 seconds or 20 events and on `pagehide`, with no sampling while the day stays under 100 000 events. (2) The
+  privacy page section (CC-173) goes live first, with its date, and the client flag ramps no earlier than 7 days
+  later, with no banner. (3) A dead click counts only elements that look pressable (EVENTS.md 3.2). (4) Ingestion
+  takes at most 8 KB and 30 events a batch and 30 batches per 10 minutes per network, drops an invalid event alone
+  (counted as `invalid`), stores at most 100 000 events per India day, keeps them 30 days by a TTL index, stores the
+  arrival time to the India hour only, and drops known bots by a short User-Agent list read in memory and never
+  stored or logged. The hour and the 30 days are one-way for stored history and were accepted knowingly.
 
 ### ADR-033 — Every tab follows the session: server disconnects and a message without identity
 
