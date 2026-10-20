@@ -412,6 +412,33 @@ describe("startTelemetry when on", () => {
     expect(failures).toHaveLength(2);
   });
 
+  it("stops within its time limit even when the endpoint never answers", async () => {
+    const silent = {
+      export: () => undefined,
+      forceFlush: async () => undefined,
+      shutdown: async () => undefined,
+    };
+    const telemetry = await startTelemetry({
+      settings: SETTINGS,
+      matchSteps: STEPS,
+      onExportFailed: () => undefined,
+      exporters: { metrics: silent, logs: silent },
+      shutdownWithinMs: 50,
+    });
+    const logger = createLogger({
+      level: "info",
+      destination: { write: () => undefined },
+      forward: telemetry.forward,
+    });
+    telemetry.metrics.recordPipelineStep({ step: "judge", failedForGood: false });
+    logger.error("unhandled error");
+
+    const startedAt = Date.now();
+    await telemetry.shutdown();
+
+    expect(Date.now() - startedAt).toBeLessThan(1_000);
+  });
+
   it("flushes on shutdown", async () => {
     const { telemetry, metrics: exporter } = await start();
 

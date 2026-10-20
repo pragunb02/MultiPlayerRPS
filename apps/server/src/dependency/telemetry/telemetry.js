@@ -32,7 +32,8 @@ export const NO_TELEMETRY = Object.freeze({
  *   exporters?: { metrics: import("@opentelemetry/sdk-metrics").PushMetricExporter, logs: import("@opentelemetry/sdk-logs").LogRecordExporter },
  *   loadSdk?: () => Promise<typeof import("./openTelemetry.js")>,
  *   now?: () => number,
- * }} deps  `exporters`, `loadSdk` and `now` are for tests: production sends OTLP over HTTP to the endpoint
+ *   shutdownWithinMs?: number,
+ * }} deps  `exporters`, `loadSdk`, `now` and `shutdownWithinMs` are for tests: production sends OTLP over HTTP to the endpoint
  * @returns {Promise<Readonly<Telemetry>>}
  */
 export async function startTelemetry({
@@ -42,10 +43,18 @@ export async function startTelemetry({
   exporters,
   loadSdk = () => import("./openTelemetry.js"),
   now = Date.now,
+  shutdownWithinMs,
 }) {
   if (!settings.enabled) {
     return NO_TELEMETRY;
   }
   const { startOpenTelemetry } = await loadSdk();
-  return startOpenTelemetry({ settings, matchSteps, onExportFailed, exporters, now });
+  return startOpenTelemetry({
+    settings,
+    matchSteps,
+    onExportFailed,
+    exporters,
+    now,
+    ...(shutdownWithinMs !== undefined && { shutdownWithinMs }),
+  });
 }

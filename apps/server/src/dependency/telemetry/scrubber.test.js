@@ -142,6 +142,14 @@ describe("createScrubber, metrics", () => {
     expect(scrubbed).toEqual([{ signal: "metrics", key: "unknown" }]);
   });
 
+  it("keeps a resource that is a clean copy of the server's own", () => {
+    const { scrubber, scrubbed } = setup();
+    const copy = { attributes: { ...TRUSTED.attributes } };
+
+    expect(scrubber.scrubMetrics(exportOf({ attributes: goodHttp, resource: copy })).resource).toBe(copy);
+    expect(scrubbed).toEqual([]);
+  });
+
   it("puts back the server's own resource when a resource value breaks its rule", () => {
     const { scrubber, scrubbed } = setup();
     const resource = { attributes: { ...TRUSTED.attributes, "service.version": LEAKS.email } };

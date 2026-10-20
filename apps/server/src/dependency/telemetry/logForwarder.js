@@ -37,12 +37,12 @@ const MINUTE_MS = 60_000;
  * @param {{
  *   schema: ReturnType<typeof import("./telemetrySchema.js").createTelemetrySchema>,
  *   emit: (record: ForwardedLog) => void,   hands the record to the Logs SDK
- *   onSuppressed?: () => void,
+ *   onSuppressed: () => void,   counts a line held back by the cap
  *   now?: () => number,
  * }} deps
  * @returns {{ write: (line: string) => void }}
  */
-export function createLogForwarder({ schema, emit, onSuppressed = () => undefined, now = Date.now }) {
+export function createLogForwarder({ schema, emit, onSuppressed, now = Date.now }) {
   const { lines, fields } = schema.logs;
   const fieldNames = Object.keys(fields).filter((name) => name !== "error.type");
   const windows = new Map();

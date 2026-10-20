@@ -31,9 +31,17 @@ const SCOPE = "classicade-server";
  * Each exporter is wrapped by the scrubber, and each metric has a View that keeps only its listed attribute keys.
  *
  * @param {Parameters<typeof import("./telemetry.js").startTelemetry>[0] & { now: () => number }} deps
+ *   `shutdownWithinMs` is the time the last flush gets, 5 seconds unless a test makes it shorter
  * @returns {Readonly<import("./telemetry.js").Telemetry>}
  */
-export function startOpenTelemetry({ settings, matchSteps, onExportFailed, exporters, now }) {
+export function startOpenTelemetry({
+  settings,
+  matchSteps,
+  onExportFailed,
+  exporters,
+  now,
+  shutdownWithinMs = SHUTDOWN_FLUSH_MS,
+}) {
   const schema = createTelemetrySchema({ matchSteps });
   const resource = resourceFromAttributes({
     "service.name": schema.serviceName,
@@ -44,7 +52,7 @@ export function startOpenTelemetry({ settings, matchSteps, onExportFailed, expor
     "deployment.environment.name": settings.environment,
   });
   const reportFailure = atMostEvery(FAILURE_REPORT_INTERVAL_MS, onExportFailed, now);
-  let countScrubbed = () => undefined;
+  // The counter is made once the meter exists, below. Nothing is scrubbed before the first export, which is later.
   const scrubber = createScrubber({ schema, resource, onScrubbed: (item) => countScrubbed(item) });
 
   const metricExporter =
@@ -68,7 +76,9 @@ export function startOpenTelemetry({ settings, matchSteps, onExportFailed, expor
   const scrubbed = meter.createCounter(METRICS.SCRUBBED, {
     description: "Values the scrubber replaced before export. Should stay at zero.",
   });
-  countScrubbed = ({ signal, key }) => scrubbed.add(1, { signal, key });
+  function countScrubbed({ signal, key }) {
+    scrubbed.add(1, { signal, key });
+  }
   const suppressed = meter.createCounter(METRICS.LOGS_SUPPRESSED, {
     description: "Log lines not sent because the same line was sent 30 times that minute.",
   });
@@ -114,13 +124,24 @@ export function startOpenTelemetry({ settings, matchSteps, onExportFailed, expor
       await meterProvider.forceFlush();
       await loggerProvider?.forceFlush();
     },
+    // The last flush gets a fixed time and no more, so an endpoint that never answers cannot hold up a deploy.
+    // By then the game has already closed its sockets and the database, so a lost last minute is all it costs.
     shutdown() {
       stopped ??= (async () => {
         loopDelay.disable();
-        await Promise.allSettled([
-          meterProvider.shutdown({ timeoutMillis: SHUTDOWN_FLUSH_MS }),
-          loggerProvider?.shutdown(),
+        let timer;
+        const limit = new Promise((resolve) => {
+          timer = setTimeout(resolve, shutdownWithinMs);
+          timer.unref();
+        });
+        await Promise.race([
+          Promise.allSettled([
+            meterProvider.shutdown({ timeoutMillis: shutdownWithinMs }),
+            loggerProvider?.shutdown(),
+          ]),
+          limit,
         ]);
+        clearTimeout(timer);
       })();
       return stopped;
     },

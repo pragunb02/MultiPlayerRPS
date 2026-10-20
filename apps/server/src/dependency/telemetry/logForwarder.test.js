@@ -163,7 +163,11 @@ describe("createLogForwarder", () => {
 
   it("ignores a line that is not JSON instead of failing the logger", () => {
     const emitted = [];
-    const forwarder = createLogForwarder({ schema, emit: (record) => emitted.push(record) });
+    const forwarder = createLogForwarder({
+      schema,
+      emit: (record) => emitted.push(record),
+      onSuppressed: () => undefined,
+    });
 
     forwarder.write("not json\n");
     forwarder.write('{"level":50,broken,"msg":"unhandled error"}\n');
@@ -173,7 +177,11 @@ describe("createLogForwarder", () => {
 
   it("takes the time from the line", () => {
     const emitted = [];
-    const forwarder = createLogForwarder({ schema, emit: (record) => emitted.push(record) });
+    const forwarder = createLogForwarder({
+      schema,
+      emit: (record) => emitted.push(record),
+      onSuppressed: () => undefined,
+    });
 
     forwarder.write(
       `${JSON.stringify({ level: 50, time: "2026-10-20T10:00:00.000Z", msg: "unhandled error" })}\n`,
