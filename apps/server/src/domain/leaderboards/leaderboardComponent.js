@@ -37,9 +37,6 @@ const rankedEntry = ({ xp, level }, stored) => Object.freeze({ xp: xp - stored.u
 /** Accounts and guests have rows. Computer characters and the stand-ins of deleted accounts never do. */
 const hasRows = (playerId) => isAccountId(playerId) || isGuestId(playerId);
 
-/** The key a guest's weekly row is added to its account's under, so the move happens once (ADR-060). */
-const mergeKeyOf = (guestId) => `guest:${guestId}`;
-
 /**
  * The name a row shows. An adult account shows its username. A guest shows the name the server gave it, which it
  * did not choose and which says nothing about it (ADR-060). Everyone else is hidden (ADR-048.10). A guest row with
@@ -62,10 +59,13 @@ function shownName({ playerId, displayName }, adults) {
  *
  * @param {{
  *   leaderboardAccessor: ReturnType<typeof import("../../data/leaderboardAccessor.js").createLeaderboardAccessor>,
- *   matchAccessor: Pick<ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor>, "countWins" | "listForPlayer" | "listWithdrawn">,
+ *   matchAccessor: Pick<ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor>, "countWins" | "getById" | "listForPlayer" | "listWithdrawn">,
  *   progressAccessor: Pick<ReturnType<typeof import("../../data/progressAccessor.js").createProgressAccessor>, "get">,
- *   transfers: { listFrom: (playerIds: ReadonlyArray<string>) => Promise<ReadonlyArray<{ from: string }>> },  the
- *     guests who have started moving to an account (ADR-014). Their rows move with them, so none is written again
+ *   transfers: {
+ *     listFrom: (playerIds: ReadonlyArray<string>) => Promise<ReadonlyArray<{ from: string, status: string }>>,
+ *     listPendingTo: (playerIds: ReadonlyArray<string>) => Promise<ReadonlyArray<{ to: { id: string } }>>,
+ *   },  the guests who have started moving to an account, and the accounts being moved into (ADR-014). Their rows
+ *     move and are recomputed by the move, so the board step leaves them alone
  *   ages: { adultsAmong: (query: { playerIds: string[], now: number }) => Promise<ReadonlySet<string>> },  which
  *     players are adults. Every other account's name is hidden on the boards (CC-152)
  * }} deps
@@ -82,6 +82,7 @@ export function createLeaderboardComponent({
   assertDefined(matchAccessor, "matchAccessor");
   assertDefined(progressAccessor, "progressAccessor");
   assertFunction(transfers?.listFrom, "transfers.listFrom");
+  assertFunction(transfers?.listPendingTo, "transfers.listPendingTo");
 
   /** @param {string} boardId */
   function requireBoard(boardId) {
@@ -92,32 +93,55 @@ export function createLeaderboardComponent({
     return info;
   }
 
-  /** The guests among `playerIds` who have started moving to an account. Accounts are never asked about. */
-  async function movedGuestsAmong(playerIds) {
+  /**
+   * The guests among `playerIds` who have started moving to an account, or only those whose move is done.
+   * Accounts are never asked about.
+   *
+   * @param {ReadonlyArray<string>} playerIds
+   * @param {{ doneOnly: boolean }} which
+   */
+  async function movedGuestsAmong(playerIds, { doneOnly }) {
     const guests = playerIds.filter(isGuestId);
     if (guests.length === 0) {
       return new Set();
     }
-    return new Set((await transfers.listFrom(guests)).map(({ from }) => from));
+    const moved = (await transfers.listFrom(guests)).filter(({ status }) => !doneOnly || status === "done");
+    return new Set(moved.map(({ from }) => from));
+  }
+
+  /**
+   * The accounts among `playerIds` that a guest is moving into right now. Their board rows are recomputed by that
+   * move, so the step leaves them alone: writing them now could count a match the guest's row also brings.
+   *
+   * @param {ReadonlyArray<string>} playerIds
+   */
+  async function accountsBeingMovedInto(playerIds) {
+    const accounts = playerIds.filter(isAccountId);
+    if (accounts.length === 0) {
+      return new Set();
+    }
+    return new Set((await transfers.listPendingTo(accounts)).map(({ to }) => to.id));
   }
 
   /**
    * Writes the rows of the players for whom `write` is called, but not of a guest who has started moving to an
-   * account: its transfer moves its rows and recomputes the account's. A guest whose transfer started while the
-   * rows were being written has them taken off again, so no guest row is left beside its account. That race can
-   * only count too little, never twice (ADR-060).
+   * account: its transfer moves its rows and recomputes the account's. Afterwards, also when a write failed, every
+   * moved guest among them has its rows taken off, so no guest row is left beside its account. Removing them
+   * again changes nothing. That race can only count too little, never twice (ADR-060).
    *
    * @param {ReadonlyArray<string>} playerIds
    * @param {(playerId: string) => Promise<void>} write
    */
   async function writeRowsOf(playerIds, write) {
-    const movedBefore = await movedGuestsAmong(playerIds);
-    const writing = playerIds.filter((playerId) => !movedBefore.has(playerId));
-    for (const playerId of writing) {
-      await write(playerId);
-    }
-    for (const guestId of await movedGuestsAmong(writing)) {
-      await leaderboardAccessor.removePlayer(guestId);
+    const movedBefore = await movedGuestsAmong(playerIds, { doneOnly: false });
+    try {
+      for (const playerId of playerIds.filter((id) => !movedBefore.has(id))) {
+        await write(playerId);
+      }
+    } finally {
+      for (const guestId of await movedGuestsAmong(playerIds, { doneOnly: false })) {
+        await leaderboardAccessor.removePlayer(guestId);
+      }
     }
   }
 
@@ -202,6 +226,37 @@ export function createLeaderboardComponent({
   }
 
   /**
+   * The XP of the guest's matches that the account's week has counted already, under the same match key: the board
+   * step ran for the account after the match moved and before this move (#118). A key that is not a match (a quest)
+   * is not counted, and nor is a match the guest played against this same account, since both sides earned it.
+   *
+   * @param {{ from: string, to: string, keys: ReadonlyArray<string> }} overlap  keys both rows have
+   */
+  async function xpAlreadyCounted({ from, to, keys }) {
+    let xp = 0;
+    for (const key of keys) {
+      const match = await matchOrNone(key);
+      const moved = match !== undefined && !match.players.some(({ playerId }) => playerId === from);
+      if (moved && creditFor(match, to).counted && !hasComputerPlayer(match)) {
+        xp += XP_AWARDS[resultFor(match, to)];
+      }
+    }
+    return xp;
+  }
+
+  /** The stored match a board key names, or nothing when the key is not a match id (a quest key). */
+  async function matchOrNone(key) {
+    try {
+      return await matchAccessor.getById(key);
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return undefined;
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Adds each weekly row of the guest to the account's row of the same week, once (ADR-060). The guest's match and
    * quest keys go with it, so a game the guest already had on that week is never added to the account again.
    *
@@ -215,15 +270,26 @@ export function createLeaderboardComponent({
       return 0;
     }
     const withdrawn = await withdrawnXpByWeek({ from, to: player.playerId });
+    const accountWeeks = new Map(
+      (await leaderboardAccessor.listWithKeys({ board: XP_BOARD, playerId: player.playerId })).map((row) => [
+        row.period,
+        row.recentKeys,
+      ]),
+    );
     let merged = 0;
     for (const { period, score, updatedAt, recentKeys } of weeks) {
+      const counted = await xpAlreadyCounted({
+        from,
+        to: player.playerId,
+        keys: recentKeys.filter((key) => (accountWeeks.get(period) ?? []).includes(key)),
+      });
       const { applied } = await leaderboardAccessor.mergeOnce({
         ...player,
         board: XP_BOARD,
         period,
-        key: mergeKeyOf(from),
+        from,
         keys: recentKeys,
-        inc: Math.max(0, score - (withdrawn.get(period) ?? 0)),
+        inc: Math.max(0, score - (withdrawn.get(period) ?? 0) - counted),
         at: now,
         // The row was last written inside its week, so that moment names the week's end for the account.
         expiresAt: weekOf(updatedAt).expiresAt,
@@ -248,7 +314,13 @@ export function createLeaderboardComponent({
     async getBoard({ boardId, limit, now }) {
       const info = requireBoard(boardId);
       const { board, period, resetsAt } = storageFor(info, now);
-      const top = await leaderboardAccessor.listTop({ board, period, limit });
+      const stored = await leaderboardAccessor.listTop({ board, period, limit });
+      // A guest whose move to an account is done is never shown, even when a row of it was left behind (#118).
+      const gone = await movedGuestsAmong(
+        stored.map((e) => e.playerId),
+        { doneOnly: true },
+      );
+      const top = stored.filter((e) => !gone.has(e.playerId));
       const accounts = top.map((e) => e.playerId).filter(isAccountId);
       const adults = accounts.length === 0 ? new Set() : await ages.adultsAmong({ playerIds: accounts, now });
       return {
@@ -278,6 +350,9 @@ export function createLeaderboardComponent({
      */
     async standingFor({ boardId, viewer, now }) {
       const { board, period } = storageFor(requireBoard(boardId), now);
+      if ((await movedGuestsAmong([viewer.id], { doneOnly: true })).has(viewer.id)) {
+        return { listed: false, reason: LEADERBOARD_UNLISTED.UNRANKED };
+      }
       try {
         const { rank, score } = await leaderboardAccessor.getStanding({ board, period, playerId: viewer.id });
         return { listed: true, rank, score };
@@ -302,9 +377,11 @@ export function createLeaderboardComponent({
       if (hasComputerPlayer(match)) {
         return;
       }
-      const listed = match.players
+      const counted = match.players
         .map(({ playerId }) => playerId)
         .filter((playerId) => hasRows(playerId) && creditFor(match, playerId).counted);
+      const beingMovedInto = await accountsBeingMovedInto(counted);
+      const listed = counted.filter((playerId) => !beingMovedInto.has(playerId));
       const at = match.endedAt;
       await writeRowsOf(listed, async (playerId) => {
         const { displayName } = match.players.find((p) => p.playerId === playerId);

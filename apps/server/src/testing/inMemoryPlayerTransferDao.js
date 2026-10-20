@@ -42,6 +42,12 @@ export function createInMemoryPlayerTransferDao() {
       return froms.filter((from) => transfers.has(from)).map((from) => copy(transfers.get(from)));
     },
 
+    async listPendingTo(accountPlayerIds) {
+      return [...transfers.values()]
+        .filter((doc) => doc.status === "pending" && accountPlayerIds.includes(doc.to.id))
+        .map(copy);
+    },
+
     async listByTo(accountPlayerId) {
       return [...transfers.values()]
         .filter((doc) => doc.to.id === accountPlayerId)

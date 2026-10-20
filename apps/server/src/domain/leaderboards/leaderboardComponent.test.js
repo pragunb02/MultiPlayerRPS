@@ -47,17 +47,26 @@ function match({ winner = ALICE, loser = BOB, gameId = "rps", endedAt = NOW, rea
  * `adults`: the player ids that are adults. Without it, everyone is, so names show as before CC-152.
  * `transfers`: replaces the guest transfers the boards look at (CC-291).
  */
-function setup({ adults, transfers } = {}) {
+function setup({ adults, transfers, failing = () => false, matchReads } = {}) {
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
-  const leaderboardAccessor = createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() });
+  const stored = createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() });
+  // `failing(write)` makes a raise fail, as a database blip would in the middle of the board step.
+  const leaderboardAccessor = Object.freeze({
+    ...stored,
+    raiseScore: async (write) => {
+      if (failing(write)) throw new Error("database blip");
+      return stored.raiseScore(write);
+    },
+  });
   const transferAccessor = createPlayerTransferAccessor({
     playerTransferDao: createInMemoryPlayerTransferDao(),
   });
   const asked = [];
   const boards = createLeaderboardComponent({
     leaderboardAccessor,
-    matchAccessor,
+    // `matchReads` replaces how the boards read one match, as a database blip would.
+    matchAccessor: matchReads ? { ...matchAccessor, getById: matchReads } : matchAccessor,
     progressAccessor,
     transfers: transfers ?? transferAccessor,
     ages: {
@@ -279,10 +288,66 @@ describe("leaderboardComponent", () => {
     expect(await entries("rock-paper-scissors")).toEqual([]);
   });
 
+  it("takes off the rows a moved guest already had when its match is applied again (ADR-060)", async () => {
+    const { boards, play, leaderboardAccessor, transferAccessor } = setup();
+    const won = await play({ winner: GUEST, loser: BOB }, [[GUEST, 30]]);
+    await transferAccessor.start({ from: GUEST.id, to: ALICE, at: NOW });
+
+    await boards.applyMatch({ match: won });
+
+    expect(await leaderboardAccessor.listForPlayer(GUEST.id)).toEqual([]);
+  });
+
+  it("takes a guest's rows off when its move started while a failed write was under way (ADR-060)", async () => {
+    const started = [{ from: GUEST.id, to: ALICE, status: "pending", createdAt: NOW }];
+    let asks = 0;
+    const { boards, matchAccessor, progressTo, leaderboardAccessor } = setup({
+      transfers: { listFrom: async () => (asks++ === 0 ? [] : started), listPendingTo: async () => [] },
+      failing: (write) => write.board === "wins:rps",
+    });
+    const recorded = await matchAccessor.record(match({ winner: GUEST, loser: BOB }));
+    await progressTo(GUEST, 30);
+
+    await expect(boards.applyMatch({ match: recorded })).rejects.toThrow("database blip");
+
+    expect(await leaderboardAccessor.listForPlayer(GUEST.id)).toEqual([]);
+  });
+
+  it("never lists a guest whose move to an account is done, even if a row was left behind (ADR-060)", async () => {
+    const { boards, play, entries, transferAccessor } = setup();
+    await play({ winner: GUEST, loser: BOB }, [
+      [GUEST, 30],
+      [BOB, 10],
+    ]);
+    await transferAccessor.start({ from: GUEST.id, to: ALICE, at: NOW });
+    await transferAccessor.markDone({
+      from: GUEST.id,
+      at: NOW,
+      carriedOver: { xp: 30, matchesPlayed: 1, matches: 1 },
+    });
+
+    expect(await entries("overall")).toEqual([{ rank: 1, displayName: "bob", level: 1, score: 10 }]);
+    expect(await entries("rock-paper-scissors")).toEqual([]);
+    expect(await boards.standingFor({ boardId: "overall", viewer: GUEST, now: NOW })).toEqual({
+      listed: false,
+      reason: "unranked",
+    });
+  });
+
+  it("still lists a guest whose move has only started, until its rows move (ADR-060)", async () => {
+    const { play, entries, transferAccessor } = setup();
+    await play({ winner: GUEST, loser: BOB }, [[GUEST, 30]]);
+    await transferAccessor.start({ from: GUEST.id, to: ALICE, at: NOW });
+
+    expect((await entries("overall")).map((e) => e.displayName)).toEqual(["Guest-7K2Q"]);
+  });
+
   it("takes a guest's rows off again when its transfer started while the match was being written (ADR-060)", async () => {
     const started = [{ from: GUEST.id, to: ALICE, status: "pending", createdAt: NOW }];
     let asks = 0;
-    const { play, entries } = setup({ transfers: { listFrom: async () => (asks++ === 0 ? [] : started) } });
+    const { play, entries } = setup({
+      transfers: { listFrom: async () => (asks++ === 0 ? [] : started), listPendingTo: async () => [] },
+    });
 
     await play({ winner: GUEST, loser: BOB }, [
       [GUEST, 30],
@@ -294,11 +359,16 @@ describe("leaderboardComponent", () => {
     expect(await entries("rock-paper-scissors")).toEqual([]);
   });
 
-  it("asks nothing about transfers for a match of accounts", async () => {
+  it("asks only about moves into the accounts for a match of accounts, and nothing for a board of accounts", async () => {
+    const asked = [];
     const { play, entries } = setup({
       transfers: {
         listFrom: async () => {
           throw new Error("not for accounts");
+        },
+        listPendingTo: async (ids) => {
+          asked.push(ids);
+          return [];
         },
       },
     });
@@ -306,6 +376,7 @@ describe("leaderboardComponent", () => {
     await play({}, [[ALICE, 30]]);
 
     expect(await entries("overall")).toHaveLength(1);
+    expect(asked).toEqual([[ALICE.id, BOB.id]]);
   });
 
   it("changes nothing when the same match is applied twice", async () => {
@@ -507,7 +578,7 @@ describe("leaderboardComponent", () => {
         },
         matchAccessor: {},
         progressAccessor: {},
-        transfers: { listFrom: async () => [] },
+        transfers: { listFrom: async () => [], listPendingTo: async () => [] },
         ages: { adultsAmong: async () => new Set() },
       });
 
@@ -776,21 +847,107 @@ describe("leaderboardComponent", () => {
       ]);
     });
 
+    it("counts a match once when its board step ran again for the account before the move (medium, #118)", async () => {
+      // The guest's row has the match. The step then failed, the guest signed up and the matches moved, and the
+      // outbox ran the step again, now for the account. Then the move's own board step runs.
+      const { boards, entries, moved, progressTo, transferAccessor } = await guestWhoSignsUp();
+      await transferAccessor.start({ from: GUEST.id, to: ALICE, at: NOW });
+      await progressTo(ALICE, 50);
+
+      await boards.applyMatch({ match: moved });
+      await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 1 });
+
+      expect((await entries("weekly")).map((e) => [e.displayName, e.score])).toEqual([
+        ["alice", 50],
+        ["bob", 10],
+      ]);
+      expect((await entries("overall"))[0]).toEqual(
+        expect.objectContaining({ displayName: "alice", score: 50 }),
+      );
+    });
+
+    it("leaves out of the move a match the account's week already counted (medium, #118)", async () => {
+      // The same race when the step for the account ran before the move was recorded at all.
+      const { boards, entries, moved, progressTo, leaderboardAccessor } = await guestWhoSignsUp();
+      await leaderboardAccessor.addOnce({
+        board: "xp",
+        period: "2026-W42",
+        playerId: ALICE.id,
+        displayName: ALICE.displayName,
+        level: 1,
+        key: moved.matchId,
+        inc: 30,
+        at: NOW,
+        expiresAt: NOW + 30 * DAY_MS,
+      });
+      await progressTo(ALICE, 50);
+
+      await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 1 });
+
+      expect((await entries("weekly"))[0]).toEqual(
+        expect.objectContaining({ displayName: "alice", score: 50 }),
+      );
+    });
+
+    it("keeps both sides of a quest the guest and the account each completed under the same key", async () => {
+      const { boards, entries, progressTo, questBonus } = setup();
+      await questBonus(GUEST, 20, 20);
+      await questBonus(ALICE, 20, 20);
+      await progressTo(ALICE, 40);
+
+      await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 1 });
+
+      expect((await entries("weekly"))[0]).toEqual(
+        expect.objectContaining({ displayName: "alice", score: 40 }),
+      );
+    });
+
+    it("passes an unexpected failure to read a match through, moving nothing", async () => {
+      const failure = new Error("disk on fire");
+      const { boards, progressTo, questBonus, leaderboardAccessor } = setup({
+        matchReads: async () => {
+          throw failure;
+        },
+      });
+      await questBonus(GUEST, 20, 20);
+      await questBonus(ALICE, 20, 20);
+      await progressTo(ALICE, 40);
+
+      await expect(boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 1 })).rejects.toBe(failure);
+      expect(await leaderboardAccessor.listForPlayer(GUEST.id)).toHaveLength(2);
+    });
+
+    it("keeps both sides of a match the guest played against the same account (ADR-014)", async () => {
+      const { boards, play, entries, progressTo, questBonus } = setup();
+      const together = await play({ winner: GUEST, loser: ALICE }, [
+        [GUEST, 30],
+        [ALICE, 10],
+      ]);
+      await questBonus(GUEST, 20, 50);
+      expect(together.players.map((p) => p.playerId)).toContain(GUEST.id);
+      await progressTo(ALICE, 60);
+
+      await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 1 });
+
+      expect((await entries("weekly"))[0]).toEqual(
+        expect.objectContaining({ displayName: "alice", score: 60 }),
+      );
+    });
+
     it("runs again after a crash that left the guest's rows behind, and adds nothing twice", async () => {
       const { boards, entries, leaderboardAccessor, progressTo } = await guestWhoSignsUp();
       await progressTo(ALICE, 50);
       const rows = await leaderboardAccessor.listWithKeys({ board: "xp", playerId: GUEST.id });
       await boards.transferPlayer({ from: GUEST.id, to: ALICE, now: NOW + 1 });
       // The crash came after the weeks were added and before the guest's rows were deleted.
-      for (const { period, score, recentKeys } of rows.filter((row) => row.period !== "all")) {
-        await leaderboardAccessor.mergeOnce({
+      for (const { period, score } of rows.filter((row) => row.period !== "all")) {
+        await leaderboardAccessor.addOnce({
           board: "xp",
           period,
           playerId: GUEST.id,
           displayName: GUEST.displayName,
           level: 1,
           key: "restored",
-          keys: recentKeys,
           inc: score,
           at: NOW,
           expiresAt: NOW + DAY_MS,

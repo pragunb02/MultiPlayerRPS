@@ -57,10 +57,10 @@ export function createLeaderboardAccessor({ leaderboardDao }) {
     addOnce: (write) => leaderboardDao.addOnce(toWrite(write)),
 
     /**
-     * Adds to an entry's score once per key, and remembers `keys` too: the keys a guest's row counted, so none of
-     * them is added to the account again (CC-291).
+     * Adds a guest's weekly row to an entry once per guest (`from`), and remembers `keys`, the keys the guest's row
+     * counted, so none of them is added to the account again (CC-291).
      *
-     * @param {EntryWrite & { key: string, keys: ReadonlyArray<string>, inc: number }} write
+     * @param {EntryWrite & { from: string, keys: ReadonlyArray<string>, inc: number }} write
      * @returns {Promise<{ applied: boolean }>}
      */
     mergeOnce: ({ keys, ...write }) => leaderboardDao.mergeOnce({ ...toWrite(write), keys: [...keys] }),

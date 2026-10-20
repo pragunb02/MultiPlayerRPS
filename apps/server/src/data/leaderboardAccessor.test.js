@@ -40,13 +40,14 @@ describe("leaderboardAccessor", () => {
     const boards = setup();
     const week = { ...write("user_a", 0), period: "2026-W42", expiresAt: T0 + 1e9 };
 
-    await boards.mergeOnce({ ...week, key: "guest:g", keys: ["m1"], inc: 40 });
-    await boards.mergeOnce({ ...week, key: "guest:g", keys: ["m1"], inc: 40 });
+    await boards.mergeOnce({ ...week, from: "guest_g", keys: ["m1"], inc: 40 });
+    await boards.mergeOnce({ ...week, from: "guest_g", keys: ["m1"], inc: 40 });
     await boards.addOnce({ ...week, key: "m1", inc: 30 });
+    await boards.addOnce({ ...week, key: "m2", inc: 5 });
 
     const rows = await boards.listWithKeys({ board: "xp", playerId: "user_a" });
     expect(rows).toEqual([
-      { period: "2026-W42", score: 40, updatedAt: T0, recentKeys: ["m1", "guest:g"], expiresAt: T0 + 1e9 },
+      { period: "2026-W42", score: 45, updatedAt: T0, recentKeys: ["m2"], expiresAt: T0 + 1e9 },
     ]);
     expect(Object.isFrozen(rows)).toBe(true);
     expect(Object.isFrozen(rows[0])).toBe(true);

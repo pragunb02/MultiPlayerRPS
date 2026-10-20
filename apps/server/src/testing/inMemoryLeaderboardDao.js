@@ -23,22 +23,11 @@ export function createInMemoryLeaderboardDao() {
       ...(expiresAt && { expiresAt }),
     });
 
-  /** Adds `inc` once per `key`, and remembers `keys` with it (the keys a merged guest row already had). */
-  function addWithKeys({ board, period, playerId, displayName, level, key, keys, inc, at, expiresAt }) {
+  /** Adds `inc` to an entry (creating it from zero) with the key lists in `keys`. */
+  function add({ board, period, playerId, displayName, level, inc, at, expiresAt }, keys) {
     const ref = { board, period, playerId };
     const current = entries.get(keyOf(ref));
-    if (current?.recentKeys.includes(key)) {
-      return Promise.resolve({ applied: false });
-    }
-    write(ref, {
-      displayName,
-      level,
-      score: (current?.score ?? 0) + inc,
-      recentKeys: [...(current?.recentKeys ?? []), ...keys, key].slice(-200),
-      updatedAt: at,
-      expiresAt,
-    });
-    return Promise.resolve({ applied: true });
+    write(ref, { displayName, level, score: (current?.score ?? 0) + inc, ...keys, updatedAt: at, expiresAt });
   }
 
   return Object.freeze({
@@ -52,9 +41,26 @@ export function createInMemoryLeaderboardDao() {
       return { raised };
     },
 
-    addOnce: (write) => addWithKeys({ ...write, keys: [] }),
+    async addOnce({ key, ...write }) {
+      const current = entries.get(keyOf(write));
+      if (current?.recentKeys.includes(key) || current?.mergedKeys?.includes(key)) {
+        return { applied: false };
+      }
+      add(write, { recentKeys: [...(current?.recentKeys ?? []), key].slice(-200) });
+      return { applied: true };
+    },
 
-    mergeOnce: (write) => addWithKeys(write),
+    async mergeOnce({ from, keys, ...write }) {
+      const current = entries.get(keyOf(write));
+      if (current?.mergedFrom?.includes(from)) {
+        return { applied: false };
+      }
+      add(write, {
+        mergedFrom: [...(current?.mergedFrom ?? []), from],
+        mergedKeys: [...(current?.mergedKeys ?? []), ...keys].slice(-200),
+      });
+      return { applied: true };
+    },
 
     async listWithKeys({ board, playerId }) {
       return [...entries.values()]

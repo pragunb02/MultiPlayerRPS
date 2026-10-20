@@ -227,7 +227,9 @@ of every nightly backup.
 `apps/server/src/persistence/leaderboardDao.js`, retention in `apps/server/src/domain/leaderboards/boards.js`
 
 1. **Holds:** per board, period and player (accounts and guests, ADR-060): `playerId`, `displayName`, `level`,
-   `score`, `recentKeys`, `updatedAt`, and `expiresAt` on weekly entries and on every guest entry.
+   `score`, `recentKeys`, `updatedAt`, and `expiresAt` on weekly entries and on every guest entry. An account's
+   weekly entry that a guest's was added to also holds `mergedFrom` (the guest ids) and `mergedKeys` (the match and
+   quest keys the guest's entry had counted, at most 200), so nothing is counted twice.
 2. **Personal data:** yes for accounts. The username, level and score are public. A guest's entry is pseudonymous:
    its public name is the server-given `Guest-XXXX`, which the player did not choose.
 3. **Who can read it:** everyone, without signing in (`GET /api/leaderboards/:boardId`). Player ids are never sent.

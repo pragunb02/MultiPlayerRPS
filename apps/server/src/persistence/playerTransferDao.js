@@ -112,6 +112,16 @@ export function createPlayerTransferDao({ connection }) {
     },
 
     /**
+     * The transfers into any of these accounts that are not done yet (CC-291). The status index finds the few
+     * pending ones.
+     *
+     * @param {string[]} accountPlayerIds
+     * @returns {Promise<PlayerTransferDoc[]>}
+     */
+    listPendingTo: (accountPlayerIds) =>
+      Transfer.find({ status: "pending", "to.id": { $in: accountPlayerIds } }, FIELDS).lean(),
+
+    /**
      * The transfers into one account, oldest first, for its data export (CC-035).
      *
      * @param {string} accountPlayerId

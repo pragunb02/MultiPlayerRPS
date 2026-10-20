@@ -26,6 +26,10 @@ const entrySchema = new mongoose.Schema(
     level: { type: Number, required: true },
     score: { type: Number, required: true },
     recentKeys: { type: [String], default: [] },
+    // Guests whose weekly rows were added to this one (CC-291), and the match and quest keys those rows had
+    // counted. They are kept apart from `recentKeys`, so a merge never pushes out the account's own keys.
+    mergedFrom: { type: [String], default: undefined },
+    mergedKeys: { type: [String], default: undefined },
     updatedAt: { type: Date, required: true },
     expiresAt: { type: Date }, // weekly boards only; MongoDB removes the entry after this time
   },
@@ -35,6 +39,8 @@ entrySchema.index({ board: 1, period: 1, playerId: 1 }, { unique: true });
 // The board page: highest score first, earlier on a tie (player id last, so the order is total).
 entrySchema.index({ board: 1, period: 1, score: -1, updatedAt: 1, playerId: 1 });
 entrySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// One player's rows: export, deletion, and a guest's rows moving or living longer (CC-035, CC-291).
+entrySchema.index({ playerId: 1, period: 1 });
 
 const isDuplicate = (err) => err.code === DUPLICATE_KEY_CODE;
 
@@ -47,14 +53,8 @@ export function createLeaderboardDao({ connection }) {
   const Entry = connection.model("LeaderboardEntry", entrySchema);
   const names = ({ displayName, level }) => ({ displayName, level });
 
-  /** Adds `inc` once per `key`, and remembers `keys` with it. */
-  async function addWithKeys({ board, period, playerId, key, keys, inc, at, expiresAt, ...player }) {
-    const filter = { board, period, playerId, recentKeys: { $ne: key } };
-    const update = {
-      $inc: { score: inc },
-      $push: { recentKeys: { $each: [...keys, key], $slice: -RECENT_KEYS } },
-      $set: { updatedAt: at, ...names(player), ...(expiresAt && { expiresAt }) },
-    };
+  /** Applies `update` where `filter` still matches, creating the entry when there is none. */
+  async function applyOnce(filter, update) {
     try {
       await Entry.updateOne(filter, update, { upsert: true });
       return { applied: true };
@@ -63,7 +63,7 @@ export function createLeaderboardDao({ connection }) {
         throw err;
       }
     }
-    // Either the key was applied already, or another write created the entry just now.
+    // Either it was applied already, or another write created the entry just now.
     const { modifiedCount } = await Entry.updateOne(filter, update);
     return { applied: modifiedCount > 0 };
   }
@@ -103,16 +103,33 @@ export function createLeaderboardDao({ connection }) {
      * @param {EntryWrite & { key: string, inc: number }} write
      * @returns {Promise<{ applied: boolean }>}
      */
-    addOnce: (write) => addWithKeys({ ...write, keys: [] }),
+    async addOnce({ board, period, playerId, key, inc, at, expiresAt, ...player }) {
+      // A key the entry counted itself, or one a merged guest row had counted, is not added again.
+      const filter = { board, period, playerId, recentKeys: { $ne: key }, mergedKeys: { $ne: key } };
+      const update = {
+        $inc: { score: inc },
+        $push: { recentKeys: { $each: [key], $slice: -RECENT_KEYS } },
+        $set: { updatedAt: at, ...names(player), ...(expiresAt && { expiresAt }) },
+      };
+      return applyOnce(filter, update);
+    },
 
     /**
-     * Like `addOnce`, and also remembers `keys`: the match and quest keys a guest's row already counted, so none of
-     * them is added to this entry again (CC-291).
+     * Adds a guest's weekly row to this entry once per guest (`from`), and remembers `keys`, the match and quest
+     * keys the guest's row counted, so none of them is added to this entry again (CC-291).
      *
-     * @param {EntryWrite & { key: string, keys: string[], inc: number }} write
+     * @param {EntryWrite & { from: string, keys: string[], inc: number }} write
      * @returns {Promise<{ applied: boolean }>}
      */
-    mergeOnce: (write) => addWithKeys(write),
+    async mergeOnce({ board, period, playerId, from, keys, inc, at, expiresAt, ...player }) {
+      const filter = { board, period, playerId, mergedFrom: { $ne: from } };
+      const update = {
+        $inc: { score: inc },
+        $push: { mergedFrom: from, mergedKeys: { $each: keys, $slice: -RECENT_KEYS } },
+        $set: { updatedAt: at, ...names(player), ...(expiresAt && { expiresAt }) },
+      };
+      return applyOnce(filter, update);
+    },
 
     /**
      * One player's rows of one board, every period, with the keys they counted and when they end (CC-291).

@@ -82,12 +82,16 @@ the owner may change it.
      and a weekly row never past its week's own retention. Every counted game moves all the guest's all time rows on.
      The existing TTL index removes them, so guest data cleanup (CC-098) finds no board rows behind it.
   6. **The guest transfer moves the rows once** (ADR-014). Each weekly row of the guest is added to the account's
-     row of the same week once, keyed by the guest id, without the games fair play withdrew in the merge
-     (ADR-021.6), and the guest's remembered match and quest keys are copied to the account's row so none of them
-     counts twice. Then the account's totals are recomputed as before (they only rise), and the guest's rows are
-     deleted. This closes the gap ADR-015 noted: a guest's quest XP from this week now reaches the account.
-  7. **No guest row outlives the transfer.** The board step skips a guest whose transfer has started and, after
-     writing, removes the rows of a guest whose transfer started meanwhile. A race can only under-count.
+     row of the same week once per guest (`mergedFrom`). It leaves out the games fair play withdrew in the merge
+     (ADR-021.6) and any moved match the account's week already counted under the same key. The guest's
+     remembered match and quest keys are kept on the account's row in `mergedKeys`, apart from its own
+     `recentKeys`, so none of them counts twice and a merge never pushes out the account's own keys. Then the
+     account's totals are recomputed as before (they only rise), and the guest's rows are deleted. This closes the
+     gap ADR-015 noted: a guest's quest XP from this week now reaches the account.
+  7. **No guest row outlives the transfer.** The board step skips a guest whose transfer has started, and skips an
+     account a guest is moving into until that move is done, because the move recomputes it. After writing, also
+     when a write failed, it removes the rows of every moved guest of the match. And the boards never list, or
+     rank as the viewer, a guest whose move is done. A race can only under-count.
   8. **Abuse.** No new limit. The limits per address (ADR-035: 30 connections, 30 open rooms) and per player
      (ADR-021: 20 counted games an hour, 10 per opponent in 24 hours) bound what one person can put on the boards
      the same way for guests and accounts. Guests only make the start faster (15 minutes for 30 players instead of
