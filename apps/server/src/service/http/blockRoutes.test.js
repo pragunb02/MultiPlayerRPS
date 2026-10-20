@@ -63,8 +63,11 @@ async function finishedRace(alice, bob) {
 }
 
 const seatIdIn = (roomCode, player) => seatIds.get(roomCode).get(player);
-/** A player's place among a stored match's players, which still name players by id. */
-const matchSeatOf = (players, player) => players.findIndex((p) => p.playerId === player.identity.id);
+/**
+ * The other player's place among a match's players, as the caller's own history shows them. History names players
+ * by match player ids only, and `you` is the caller's (CC-297).
+ */
+const opponentSeatIn = (match) => match.players.findIndex((p) => p.playerId !== match.you);
 /** A seat of an open room as the page names it: its place, and the seat id the room view showed for it. */
 const inRoom = (roomCode, seats, player) => ({
   roomCode,
@@ -101,7 +104,7 @@ describe("POST /api/blocks (CC-044)", () => {
     await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code });
     const { body } = await call("GET", `/matches/${matchId}`, { cookie: alice.cookie });
 
-    const res = await block(alice, { matchId, seat: matchSeatOf(body.match.players, bob) });
+    const res = await block(alice, { matchId, seat: opponentSeatIn(body.match) });
 
     expect(res.status).toBe(200);
     expect(res.body.block.displayName).toBe(bob.identity.displayName);

@@ -130,6 +130,17 @@ the owner may change it.
 - **Consequences.** A guest who signs in during a game, or a deleted player's stand-in, is a new player id and so
   gets a new seat id, as they get a new name. Rotating `SESSION_SECRET` gives open rooms new seat ids. Match history
   still sends past opponents' player ids to the participants: CC-297.
+- **Amended 2026-10-20 ([CC-297](tickets/CC-297.md)): match history too.** The same rule covers a second context.
+  `GET /api/matches` and `GET /api/matches/:matchId` name every player of a match, the viewer included, by a match
+  player id: HMAC-SHA-256 of `[matchId, playerId]` under a key derived from `SESSION_SECRET` with the label
+  "classicade match player ids", 22 base64url characters, as a value and as a key in the players, the winners and
+  every log entry, then the last pass of point 5 with match player ids. Each answer has `you`, the viewer's own match player id. Both participants see the same ids for a
+  match, and unrelated ids in every other match and in the room the match was played in. The field names stay.
+  Nothing is stored or migrated. Room seat ids and match player ids now share one helper, `utils/keyedIds.js`, with
+  one label per purpose, so every later keyed id is one more label there; the seat ids it gives are unchanged. The
+  server's own readers (the block route's `{ matchId, seat }`, the match pipeline) read the real record through
+  methods no route sends. The account export keeps its `you` and `player-2` labels (ADR-048.6). Every identifier a
+  client can receive is listed in DATA.md, Identifiers, which every new feature checks.
 
 ### ADR-056 — Screenshot baselines in one pinned container, reviewed in the pull request
 
