@@ -1,3 +1,4 @@
+import { CHESS_RATING_START } from "@classicade/shared";
 import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
 import { assertDefined } from "../utils/assert.js";
 import { ConcurrentChangeError, ConflictError } from "../utils/errors.js";
@@ -21,7 +22,7 @@ import { ConcurrentChangeError, ConflictError } from "../utils/errors.js";
  *   who moved into one. `lastRatedAt` is 0 before the first rated game. `revision` 0 means nothing is stored yet
  */
 
-const START = Object.freeze({ rating: 1500, deviation: 350, volatility: 0.06 });
+const START = CHESS_RATING_START;
 const glickoOf = ({ rating, deviation, volatility }) => Object.freeze({ rating, deviation, volatility });
 
 /** @returns {ChessRating} */

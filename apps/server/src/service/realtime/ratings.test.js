@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { ENGINES } from "@classicade/games";
 import { createSocketClients, nextEvent, send, startRoom } from "../../testing/socketClients.js";
+import { hasPlayerIdShape } from "../../models/playerIdShape.js";
 import { startTestServer } from "../../testing/testApp.js";
 
 // Chess ratings over real sockets (CC-042): the outbox step rates a finished game, the room hears it, and a tab
@@ -34,18 +35,24 @@ async function chessRoom() {
   return { alice, bob, code, matchId: hostStart.game.matchId };
 }
 
-const unrated = (playerId) => ({ playerId, rating: 1500, deviation: 350, games: 0, provisional: true });
+// Ratings name a player by their seat (Alice hosts, so she has seat 0), never by player id (CC-253).
+const unrated = (seat) => ({ seat, rating: 1500, deviation: 350, games: 0, provisional: true });
+
+/** Every string anywhere in a payload. */
+const stringsIn = (value) =>
+  typeof value === "string"
+    ? [value]
+    : value !== null && typeof value === "object"
+      ? Object.values(value).flatMap(stringsIn)
+      : [];
 
 describe("chess ratings over sockets", () => {
   it("answers the starting rating of both players before their first game", async () => {
-    const { alice, bob, code } = await chessRoom();
+    const { alice, code } = await chessRoom();
 
     const answer = await send(alice.socket, SOCKET_EVENTS.RATING_ROOM, { code });
 
-    expect(answer).toEqual({
-      ok: true,
-      data: { ratings: [unrated(alice.identity.id), unrated(bob.identity.id)] },
-    });
+    expect(answer).toEqual({ ok: true, data: { ratings: [unrated(0), unrated(1)] } });
   });
 
   it("pushes both new ratings to the room after a counted game, and answers them with the change", async () => {
@@ -57,7 +64,7 @@ describe("chess ratings over sockets", () => {
     const answer = await send(bob.socket, SOCKET_EVENTS.RATING_ROOM, { code });
 
     const winner = {
-      playerId: alice.identity.id,
+      seat: 0,
       rating: 1662,
       deviation: 290,
       games: 1,
@@ -65,7 +72,7 @@ describe("chess ratings over sockets", () => {
       change: 162,
     };
     const loser = {
-      playerId: bob.identity.id,
+      seat: 1,
       rating: 1338,
       deviation: 290,
       games: 1,
@@ -74,6 +81,22 @@ describe("chess ratings over sockets", () => {
     };
     expect(pushed).toEqual({ matchId, ratings: [winner, loser] });
     expect(answer.data.ratings).toEqual([winner, loser]);
+  });
+
+  it("never names a player by their player id in any rating payload (CC-253)", async () => {
+    const { alice, bob, code } = await chessRoom();
+    const aliceHears = nextEvent(alice.socket, SOCKET_EVENTS.RATING_UPDATED);
+    const before = await send(bob.socket, SOCKET_EVENTS.RATING_ROOM, { code });
+
+    await foolsMate(alice, bob, code);
+    const pushed = await aliceHears;
+    const after = await send(alice.socket, SOCKET_EVENTS.RATING_ROOM, { code });
+
+    const strings = [before, pushed, after].flatMap(stringsIn);
+    expect(strings.filter(hasPlayerIdShape)).toEqual([]);
+    expect(strings.filter((text) => /guest_|user_/.test(text))).toEqual([]);
+    expect(strings).not.toContain(alice.identity.id);
+    expect(strings).not.toContain(bob.identity.id);
   });
 
   it("refuses a tab that has not opened the room", async () => {
@@ -114,6 +137,6 @@ describe("chess ratings over sockets", () => {
 
     const answer = await send(alice.socket, SOCKET_EVENTS.RATING_ROOM, { code: room.code });
 
-    expect(answer.data.ratings).toEqual([unrated(alice.identity.id)]);
+    expect(answer.data.ratings).toEqual([unrated(0)]);
   });
 });

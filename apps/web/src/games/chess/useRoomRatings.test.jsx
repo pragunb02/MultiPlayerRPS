@@ -5,10 +5,11 @@ import { ServicesProvider } from "../../app/ServicesProvider.jsx";
 import { fakeSocket } from "../../testing/fakes.js";
 import { useRoomRatings } from "./useRoomRatings.js";
 
-const ME = "guest_me";
-const THEM = "guest_them";
-const rating = (playerId, overrides = {}) => ({
-  playerId,
+// Ratings come by seat, never by player id (CC-253): the viewer sits in the first seat here.
+const ME = 0;
+const THEM = 1;
+const rating = (seat, overrides = {}) => ({
+  seat,
   rating: 1500,
   deviation: 350,
   games: 0,
@@ -114,5 +115,28 @@ describe("useRoomRatings", () => {
     const { socket } = setup(room({ status: "waiting", game: undefined }));
 
     expect(socket.request).not.toHaveBeenCalled();
+  });
+
+  it("asks again when the room's game ends, in case the push was missed", () => {
+    const { socket, rerender } = setup();
+
+    rerender({ shown: room({ status: "finished" }) });
+
+    expect(socket.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a pushed update when an older answer arrives after it", async () => {
+    const socket = fakeSocket();
+    let answer;
+    socket.request.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    const wrapper = ({ children }) => <ServicesProvider services={{ socket }}>{children}</ServicesProvider>;
+    const { result } = renderHook(() => useRoomRatings(room({ status: "finished" })), { wrapper });
+
+    act(() =>
+      socket.push(SOCKET_EVENTS.RATING_UPDATED, { matchId: "m1", ratings: [rating(ME, { change: 12 })] }),
+    );
+    await act(async () => answer({ ratings: [rating(ME)] }));
+
+    expect(result.current.get(ME).change).toBe(12);
   });
 });

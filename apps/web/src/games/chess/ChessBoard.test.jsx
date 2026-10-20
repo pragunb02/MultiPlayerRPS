@@ -1211,8 +1211,9 @@ describe("ChessBoard says why a press did nothing (CC-164)", () => {
   });
 
   describe("chess ratings (CC-042)", () => {
+    // The server names a rating by its seat, never by player id (CC-253).
     const rated = (playerId, overrides = {}) => ({
-      playerId,
+      seat: seats.findIndex((seat) => seat.playerId === playerId),
       rating: 1500,
       deviation: 350,
       games: 0,

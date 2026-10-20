@@ -119,7 +119,9 @@ export function ChessBoard({
   // On one phone both players read the same board, so each bar names its player instead of saying "You" (CC-223).
   const shownName = (colour) => (colour === yourColour && !room.sharedScreen ? "You" : names[colour]);
   const ratings = useRoomRatings(room);
-  const ratingOf = (colour) => ratings.get(byColour(colour));
+  // Ratings come by seat (CC-253), so each colour's rating is found through the seat its player sits in.
+  const ratingOf = (colour) =>
+    ratings.get(room.seats.findIndex((seat) => seat.playerId === byColour(colour)));
   const rated = ["w", "b"].filter((colour) => ratingOf(colour) !== undefined);
 
   const running = playing && view.lastMoveAt > 0 ? view.fen.split(" ")[1] : "";

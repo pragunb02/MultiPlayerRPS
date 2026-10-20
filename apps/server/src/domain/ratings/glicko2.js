@@ -1,3 +1,5 @@
+import { CHESS_RATING_START } from "@classicade/shared";
+
 /**
  * The Glicko-2 rating system, exactly as Mark Glickman publishes it in "Example of the Glicko-2 system"
  * (glicko.net/glicko/glicko2.pdf, revised 2022). Pure functions only: no clock, no storage. The step numbers in the
@@ -13,7 +15,7 @@ export const GLICKO2 = Object.freeze({
   /** Turns the familiar scale into Glicko-2's own (step 2). */
   SCALE: 173.7178,
   /** Where an unrated player starts (step 1a). The deviation never grows past it. */
-  START: Object.freeze({ rating: 1500, deviation: 350, volatility: 0.06 }),
+  START: CHESS_RATING_START,
   /** How much the volatility may change. The paper's example uses 0.5, within its advised 0.3 to 1.2. */
   TAU: 0.5,
   /** When the search for the new volatility stops (step 5). */

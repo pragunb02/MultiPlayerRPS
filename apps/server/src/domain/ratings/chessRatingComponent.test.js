@@ -87,15 +87,34 @@ describe("chess rating component", () => {
       expect(published).toEqual([{ roomCode: "ABC123", matchId: "m1", ratings: expected }]);
     });
 
-    it("changes nothing and publishes nothing when the step runs again", async () => {
+    it("changes nothing when the step runs again, and publishes the same ratings again", async () => {
       const { ratings, accessor, published } = setup();
-      await ratings.applyMatch({ match: chessMatch() });
+      const first = await ratings.applyMatch({ match: chessMatch() });
 
       const again = await ratings.applyMatch({ match: chessMatch() });
 
-      expect(again).toEqual([]);
-      expect(published).toHaveLength(1);
+      expect(again).toEqual(first);
+      expect(published).toEqual([published[0], published[0]]);
       expect(await accessor.get(A)).toMatchObject({ games: 1, revision: 1 });
+    });
+
+    it("still publishes the ratings when a crash came after both writes and before the push", async () => {
+      const dao = createInMemoryChessRatingDao();
+      const crashed = createChessRatingComponent({
+        chessRatingAccessor: createChessRatingAccessor({ chessRatingDao: dao }),
+        events: {
+          emit: () => {
+            throw new Error("process stopped");
+          },
+        },
+      });
+      await expect(crashed.applyMatch({ match: chessMatch() })).rejects.toThrow("process stopped");
+      const { ratings, published } = setup({ dao });
+
+      await ratings.applyMatch({ match: chessMatch() });
+
+      expect(published).toEqual([expect.objectContaining({ matchId: "m1", ratings: expect.any(Array) })]);
+      expect(published[0].ratings.map(({ games }) => games)).toEqual([1, 1]);
     });
 
     it("rates the second player against the first one's rating before the game after a crash between the writes", async () => {

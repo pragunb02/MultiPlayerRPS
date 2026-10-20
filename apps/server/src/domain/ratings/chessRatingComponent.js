@@ -16,7 +16,9 @@ import { aged, GLICKO2, rate } from "./glicko2.js";
 export const CHESS_RATING_EVENTS = Object.freeze({
   /**
    * A rated game changed the players' ratings. Payload: { roomCode, matchId, ratings }, where `ratings` holds a
-   * `RoomRating` for each of the two players, in seat order. Published once per game, when the change is written.
+   * `RoomRating` for each of the two players, in the match's order. Published every time the step runs for a game
+   * whose two changes are both written, so a crash after the writes and before the push is put right by the retry.
+   * Listeners must accept the same update twice.
    */
   UPDATED: "chessRatings.updated",
 });
@@ -89,14 +91,13 @@ export function createChessRatingComponent({ chessRatingAccessor, events }) {
     });
   }
 
-  /** Rates both players once. Answers whether anything was written now. */
+  /** Rates both players once. Answers false when the two seats are one person now, so nobody is rated. */
   async function rateBoth(match, ids) {
     const ratings = [await chessRatingAccessor.get(ids[0]), await chessRatingAccessor.get(ids[1])];
     if (ratings[0].playerId === ratings[1].playerId) {
       return false;
     }
     const before = ratings.map((rating) => ratingBefore(rating, match));
-    let wrote = false;
     for (const [index, rating] of ratings.entries()) {
       if (changeFor(rating, match.matchId).length > 0) continue;
       const opponent = before[1 - index];
@@ -108,9 +109,8 @@ export function createChessRatingComponent({ chessRatingAccessor, events }) {
         after,
       });
       await chessRatingAccessor.save({ rating: withGame(rating, change), at: match.endedAt });
-      wrote = true;
     }
-    return wrote;
+    return true;
   }
 
   /** The rating of each person among `playerIds`, with what `matchId` changed. Computer players are left out. */
@@ -128,10 +128,10 @@ export function createChessRatingComponent({ chessRatingAccessor, events }) {
   return Object.freeze({
     /**
      * Rates a recorded, judged match once (the match pipeline's "apply chess ratings" step). A counted game
-     * against Queen Vee only seeds an unrated player. Publishes the new ratings when this run wrote them.
+     * against Queen Vee only seeds an unrated player. Publishes the new ratings, also on a run that finds them written.
      *
      * @param {{ match: Readonly<import("../../data/matchAccessor.js").Match> }} input  as judged by fair play
-     * @returns {Promise<ReadonlyArray<RoomRating>>} the two players' ratings when this run changed them, or none
+     * @returns {Promise<ReadonlyArray<RoomRating>>} the two players' ratings after the game, or none when it is not rated
      * @throws {import("../../utils/errors.js").ConcurrentChangeError} when another game of a player was rated meanwhile
      */
     async applyMatch({ match }) {

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { CHESS_RATING_START } from "@classicade/shared";
 import { DuplicateKey, VersionConflict } from "./errors.js";
 
 const DUPLICATE_KEY_CODE = 11000;
@@ -125,7 +126,7 @@ export function createChessRatingDao({ connection }) {
           {
             $set: { mergedInto: to, updatedAt: at },
             $inc: { revision: 1 },
-            $setOnInsert: { rating: 1500, deviation: 350, volatility: 0.06, games: 0 },
+            $setOnInsert: { ...CHESS_RATING_START, games: 0 },
           },
           { upsert: true, returnDocument: "after", lean: true },
         );

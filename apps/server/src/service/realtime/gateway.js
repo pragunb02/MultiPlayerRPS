@@ -12,7 +12,7 @@ import { addressKey, clientAddress } from "../http/rateLimits.js";
 import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
 import { createBotHandlers } from "./botHandlers.js";
-import { createRatingHandlers } from "./ratingHandlers.js";
+import { createRatingHandlers, pushRoomRatings } from "./ratingHandlers.js";
 import { trackConnections } from "./connections.js";
 import {
   broadcastRoom,
@@ -248,8 +248,9 @@ export function createRealtimeGateway({
   );
 
   // Domain to transport: a rated game changed the chess ratings, so everyone with the room open sees them (CC-042).
-  domainEvents.on(CHESS_RATING_EVENTS.UPDATED, ({ roomCode, matchId, ratings }) => {
-    io.to(roomChannel(roomCode)).emit(SOCKET_EVENTS.RATING_UPDATED, { matchId, ratings });
+  // The ratings name players by seat id, as the room's views do (CC-253).
+  domainEvents.on(CHESS_RATING_EVENTS.UPDATED, (update) => {
+    pushRoomRatings({ io, roomComponent, logger, update });
   });
 
   // Domain → transport: achievements, quests and streaks go to every tab of the player concerned only (CC-054).

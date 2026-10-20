@@ -1,3 +1,4 @@
+import { CHESS_RATING_START } from "@classicade/shared";
 import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
 
 /** Test double with the same contract as `createChessRatingDao` (verified by the shared contract tests). */
@@ -38,9 +39,7 @@ export function createInMemoryChessRatingDao() {
       }
       const base = current ?? {
         playerId: from,
-        rating: 1500,
-        deviation: 350,
-        volatility: 0.06,
+        ...CHESS_RATING_START,
         games: 0,
         changes: [],
         mergedFrom: [],
