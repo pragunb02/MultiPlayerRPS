@@ -129,6 +129,14 @@ describe("profileAccessor (CC-034)", () => {
     await expect(profiles.rename({ from: GUEST, to: RIYA })).rejects.toThrow(ConflictError);
   });
 
+  it("passes any other storage failure on unchanged when moving a profile", async () => {
+    const failure = new Error("the store is down");
+    const dao = { ...createInMemoryProfileDao(), rename: async () => Promise.reject(failure) };
+    const { profiles } = setup({ dao });
+
+    await expect(profiles.rename({ from: GUEST, to: RIYA })).rejects.toBe(failure);
+  });
+
   it("removes a profile", async () => {
     const { profiles } = setup();
     await profiles.getOrCreate({ playerId: RIYA, at: T0 });
