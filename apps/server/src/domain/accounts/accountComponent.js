@@ -407,6 +407,22 @@ export function createAccountComponent({
     },
 
     /**
+     * The username of each account among these players that still exists (CC-052). Guests, computer characters and
+     * deleted accounts have none, and are left out.
+     *
+     * @param {{ playerIds: ReadonlyArray<string> }} query
+     * @returns {Promise<ReadonlyMap<string, string>>} usernames by player id
+     */
+    async usernamesOf({ playerIds }) {
+      const accountIds = playerIds.filter(isAccountId).map((id) => id.slice(ACCOUNT_ID_PREFIX.length));
+      if (accountIds.length === 0) {
+        return new Map();
+      }
+      const names = await accountAccessor.listUsernames(accountIds);
+      return new Map(names.map(({ accountId, username }) => [`${ACCOUNT_ID_PREFIX}${accountId}`, username]));
+    },
+
+    /**
      * The age group of each account among these players, from its birth year, in one read. An account without a
      * year, or one that is gone, is `unknown`. Guests, computer characters and anyone else get no entry. Only the
      * safety component asks: features read the age policy (domain/safety), never the group.

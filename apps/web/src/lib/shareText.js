@@ -179,6 +179,13 @@ export function inviteText({ gameId, code }) {
 }
 
 /**
+ * The text for a "be my friend" link (CC-052), Hinglish first. Like every shared text it names nobody, so a minor's
+ * name never travels with their link (ADR-028.7). Not in the owner's drafts: the builder's line for the owner.
+ */
+export const friendLinkText = () =>
+  `${SITE_NAME} pe mere friend bano, phir saath mein khelenge:\nBe my friend on ${SITE_NAME}, then we can play any time:`;
+
+/**
  * The text with the free lines under it, for a share sheet that takes the link apart.
  *
  * @param {string} text

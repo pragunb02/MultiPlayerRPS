@@ -229,6 +229,25 @@ export function runAccountDaoContract(createDao) {
     expect(other.birthYear).toBe(1980);
   });
 
+  it("lists the usernames of the accounts asked for that exist (CC-052)", async () => {
+    const dao = await createDao();
+    const riya = await dao.insert(account());
+    const arjun = await dao.insert(account({ username: "Arjun", email: "arjun@example.com" }));
+
+    const names = await dao.listUsernames([
+      arjun.accountId,
+      riya.accountId,
+      "0123456789abcdef01234567",
+      "not-an-id",
+    ]);
+
+    expect(names.sort((a, b) => a.username.localeCompare(b.username))).toEqual([
+      { accountId: arjun.accountId, username: "Arjun" },
+      { accountId: riya.accountId, username: riya.username },
+    ]);
+    expect(await dao.listUsernames([])).toEqual([]);
+  });
+
   it("deletes an account by id, and deleting again changes nothing (CC-035)", async () => {
     const dao = await createDao();
     const { accountId } = await dao.insert(account());

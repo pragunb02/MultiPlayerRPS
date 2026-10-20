@@ -81,6 +81,22 @@ describe("createRequestLogger", () => {
     expect(find("request completed")[0]).not.toHaveProperty("forwardedEntries");
   });
 
+  it("never logs a friend link's token, on the API or on the page (CC-052)", async () => {
+    const { app, find, entries } = setup();
+    const token = "AbCdEfGhIjKlMnOpQrSt_-";
+
+    for (const path of [`/api/friends/links/${token}`, `/friends/add/${token}`, "/api/friends/links"]) {
+      await request(app).get(path);
+    }
+
+    expect(find("request completed").map((entry) => entry.path)).toEqual([
+      "/api/friends/links/:token",
+      "/friends/add/:token",
+      "/api/friends/links",
+    ]);
+    expect(JSON.stringify(entries)).not.toContain(token);
+  });
+
   it("logs how many addresses X-Forwarded-For holds, but never the addresses", async () => {
     const { app, find, entries } = setup();
 
