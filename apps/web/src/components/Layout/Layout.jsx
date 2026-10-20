@@ -104,9 +104,10 @@ export function Layout() {
               Profile
             </NavLink>
           )}
-          {/* A guest sees it too, and finds there how to save their progress to add friends (CC-052). A phone has
-              no room for a fourth link in its row, so there it is in the menu instead. */}
-          {identity && (
+          {/* Friends are for accounts (CC-052), whose row has room for it: a guest's row holds Log in and Sign up.
+              A phone has no room for a fourth link in its row, so there it is in the menu, for guests too, who
+              find there how to save their progress to add friends. */}
+          {identity?.kind === "user" && (
             <NavLink to={paths.friends()} className={styles.wideOnly} data-cc-control="header.friends">
               Friends
             </NavLink>
