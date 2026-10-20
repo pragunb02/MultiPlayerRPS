@@ -403,6 +403,23 @@ export function runRoomDaoContract(createDao) {
     expect(await dao.countByStatus()).toEqual({ waiting: 1, playing: 2 });
   });
 
+  it("counts the open rooms per game and status, leaving out pairs with none", async () => {
+    const dao = await createDao();
+    expect(await dao.countByGameAndStatus()).toEqual([]);
+    await dao.insert(roomDoc({ code: "WAIT22", gameId: "rps", status: "waiting" }));
+    await dao.insert(roomDoc({ code: "WAIT33", gameId: "rps", status: "waiting" }));
+    await dao.insert(roomDoc({ code: "PLAY22", gameId: "chess", status: "playing" }));
+    await dao.insert(roomDoc({ code: "GONE22", gameId: "chess", status: "waiting" }));
+    await dao.close({ code: "GONE22", version: 1, record: closedRecord({ code: "GONE22" }) });
+
+    const counts = await dao.countByGameAndStatus();
+
+    expect([...counts].sort((a, b) => a.gameId.localeCompare(b.gameId))).toEqual([
+      { gameId: "chess", status: "playing", rooms: 1 },
+      { gameId: "rps", status: "waiting", rooms: 2 },
+    ]);
+  });
+
   it("returns copies from lists too", async () => {
     const dao = await createDao();
     await dao.insert(roomDoc());

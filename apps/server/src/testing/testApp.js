@@ -31,6 +31,7 @@ import { createIdentityComponent } from "../domain/identity/identityComponent.js
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
+import { createMatchPlayerIds, matchPlayerSecretFrom } from "../domain/matches/matchPlayerIds.js";
 import { createMatchOutboxComponent } from "../domain/matches/matchOutboxComponent.js";
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createChessRatingComponent } from "../domain/ratings/chessRatingComponent.js";
@@ -99,6 +100,8 @@ import { testConfig } from "./testConfig.js";
  *   dataParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who takes
  *     part in deleting an account (e.g. one that fails, CC-035)
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
+ *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
+ *     to see what the service layer records (ADR-055)
  * }} [options]
  */
 export function createTestApp({
@@ -119,6 +122,7 @@ export function createTestApp({
   accountLimits,
   dataParticipants = (participants) => participants,
   blockLimits,
+  metrics = {},
 } = {}) {
   const config = testConfig(env);
   const capture = captureLogger();
@@ -152,7 +156,10 @@ export function createTestApp({
   const domainEvents = new EventEmitter();
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
-  const matchComponent = createMatchComponent({ matchAccessor });
+  const matchComponent = createMatchComponent({
+    matchAccessor,
+    matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
+  });
   const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const playerTransferAccessor = createPlayerTransferAccessor({
     playerTransferDao: createInMemoryPlayerTransferDao(),
@@ -344,6 +351,7 @@ export function createTestApp({
       otherEndedListeners.forEach((listener) => listener(which));
     },
     checkSession,
+    ...(metrics.recordHttpRequest && { recordRequest: metrics.recordHttpRequest }),
   });
 
   return {
@@ -416,6 +424,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     ...(options.roomLimits && { limits: options.roomLimits }),
     botComponent: testApp.botComponent,
     chessRatingComponent: testApp.chessRatingComponent,
+    ...(options.metrics?.recordSocketEvent && { recordSocketEvent: options.metrics.recordSocketEvent }),
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));

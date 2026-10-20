@@ -7,6 +7,7 @@ import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
 import { roomLimits } from "../../domain/rooms/roomLimits.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { TooManyRequestsError } from "../../utils/errors.js";
+import { NO_OPERATIONS_METRICS } from "../../utils/operationsMetrics.js";
 import { toClientError } from "../errorTranslation.js";
 import { addressKey, clientAddress } from "../http/rateLimits.js";
 import { requireIdentity } from "../http/session.js";
@@ -54,8 +55,10 @@ const playerRoom = playerChannel;
  *   now?: () => number,
  *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
  *   chessRatingComponent?: Pick<ReturnType<typeof import("../../domain/ratings/chessRatingComponent.js").createChessRatingComponent>, "ratingsOf">,
+ *   recordSocketEvent?: import("../../utils/operationsMetrics.js").OperationsMetrics["recordSocketEvent"],
  * }} deps  without `botComponent` nobody can start a game against a computer character (CC-138), and without
- *   `chessRatingComponent` no tab can ask for a room's ratings (CC-042)
+ *   `chessRatingComponent` no tab can ask for a room's ratings (CC-042). Without `recordSocketEvent` socket
+ *   events are not timed for operations telemetry (ADR-055)
  */
 export function createRealtimeGateway({
   httpServer,
@@ -71,6 +74,7 @@ export function createRealtimeGateway({
   now = Date.now,
   botComponent,
   chessRatingComponent,
+  recordSocketEvent = NO_OPERATIONS_METRICS.recordSocketEvent,
 }) {
   assertDefined(httpServer, "httpServer");
   assertDefined(sessionMiddleware, "sessionMiddleware");
@@ -207,7 +211,7 @@ export function createRealtimeGateway({
         ...(chessRatingComponent && createRatingHandlers({ socket, roomComponent, chessRatingComponent })),
       },
       socketLogger,
-      { allow: () => admission.allowEvent(identity.id) },
+      { allow: () => admission.allowEvent(identity.id), recordEvent: recordSocketEvent },
     );
   });
 

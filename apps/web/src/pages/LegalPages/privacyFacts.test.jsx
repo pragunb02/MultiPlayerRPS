@@ -86,6 +86,16 @@ const FACTS = [
     data: "Kept until the blocker unblocks, or either account is deleted",
     page: /we store that you blocked them, the name they had and when, until you unblock them or either account is deleted/,
   },
+  {
+    fact: "operations telemetry goes to Grafana Labs with no personal data (ADR-055)",
+    data: "| [Operations telemetry](#operations-telemetry) | no: counts, timings and the names of warnings, never an id, name, email, IP address, room code, cookie or session |",
+    page: /Grafana Labs.*receives counts and timings about how the server runs, and the names of its warnings and errors\. Never your IP address, email, player id, name, room code, cookies or session/,
+  },
+  {
+    fact: "operations telemetry is kept 14 days",
+    data: "14 days (Grafana Cloud free tier)",
+    page: /Counts and timings about how the server runs are kept for 14 days by Grafana Labs/,
+  },
 ];
 
 /** Sentences the page used to say that DATA.md shows are wrong (CC-241 F1 to F4, F8, F9). */
@@ -94,6 +104,7 @@ const NO_LONGER_TRUE = [
   /We do not record your IP address/,
   /for a few minutes/,
   /Two services run the site/,
+  /Three services run the site/,
   /never written to the database/,
 ];
 

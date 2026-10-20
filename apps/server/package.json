@@ -12,6 +12,12 @@
   "dependencies": {
     "@classicade/games": "*",
     "@classicade/shared": "*",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-logs-otlp-proto": "^0.223.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "^0.223.0",
+    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/sdk-logs": "^0.223.0",
+    "@opentelemetry/sdk-metrics": "^2.12.0",
     "bcryptjs": "^3.0.3",
     "connect-mongo": "^6.0.0",
     "express": "^5.3.0",
@@ -23,6 +29,7 @@
     "socket.io": "^4.8.4"
   },
   "devDependencies": {
+    "@opentelemetry/otlp-transformer": "^0.223.0",
     "mongodb-memory-server": "^11.3.0",
     "socket.io-client": "^4.8.4",
     "supertest": "^7.3.1"

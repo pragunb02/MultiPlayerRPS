@@ -38,13 +38,14 @@ const viewOf = (block) =>
  * @param {{
  *   blockAccessor: ReturnType<typeof import("../../data/blockAccessor.js").createBlockAccessor>,
  *   rooms: { getByCode: (code: string) => Promise<Readonly<{ code: string, createdAt: number, seats: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
- *   matches: { getForPlayer: (query: { matchId: string, playerId: string }) => Promise<Readonly<{ players: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
+ *   matches: { playersFor: (query: { matchId: string, playerId: string }) => Promise<ReadonlyArray<Readonly<{ playerId: string, displayName: string }>>> },
  *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom" | "listTo">,
  *   seatIds: Pick<ReturnType<typeof import("../rooms/seatIds.js").createSeatIds>, "seatIdOf">,
  *   newBlockId?: () => string,
  *   limit?: number,
  * }} deps  `rooms` is the room accessor: the room component reads blocks itself, so it cannot be read here. A
- *   room that has closed is gone from it. `matches` is the match component. `transfers` are the guests who signed
+ *   room that has closed is gone from it. `matches` is the match component, read for the real players of a match
+ *   (CC-297). `transfers` are the guests who signed
  *   in: a block that names a guest after that guest became an account still applies to the account (ADR-014).
  *   `seatIds` are the seat ids the room views show (CC-253), the same ones the room component uses. `limit` is for
  *   tests only
@@ -60,7 +61,7 @@ export function createBlockComponent({
 }) {
   assertDefined(blockAccessor, "blockAccessor");
   assertFunction(rooms?.getByCode, "rooms.getByCode");
-  assertFunction(matches?.getForPlayer, "matches.getForPlayer");
+  assertFunction(matches?.playersFor, "matches.playersFor");
   assertFunction(transfers?.listFrom, "transfers.listFrom");
   assertFunction(transfers?.listTo, "transfers.listTo");
   assertFunction(seatIds?.seatIdOf, "seatIds.seatIdOf");
@@ -84,7 +85,7 @@ export function createBlockComponent({
         const room = await rooms.getByCode(target.roomCode);
         return room.seats.map((seat) => ({ ...seat, seatId: seatIds.seatIdOf(room, seat.playerId) }));
       }
-      return (await matches.getForPlayer({ matchId: target.matchId, playerId: blockerId })).players;
+      return await matches.playersFor({ matchId: target.matchId, playerId: blockerId });
     } catch (err) {
       // A closed room or a missing one is a stranger's room as far as the blocker is concerned.
       if (err instanceof NotFoundError || err instanceof GoneError) throw notPlayedWith(err);

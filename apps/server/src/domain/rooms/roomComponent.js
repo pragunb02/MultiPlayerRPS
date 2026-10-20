@@ -24,7 +24,7 @@ import {
   ValidationError,
 } from "../../utils/errors.js";
 import { isDeletedPlayerId } from "../../models/deletedPlayer.js";
-import { hasPlayerIdShape } from "../../models/playerIdShape.js";
+import { renameIdShapes } from "../identity/idShapes.js";
 import { NO_BOT_TURNS } from "../bots/botTurns.js";
 import { lifetimeOf, roomLifetimes } from "./roomLifetimes.js";
 import { roomLimits } from "./roomLimits.js";
@@ -232,25 +232,15 @@ export function createRoomComponent({
    * them, as a value or as a key (CC-253). Player ids are unique strings, so nothing else is changed. Last, anything
    * still shaped like a player id is named by its seat id too, so an id that nobody listed is never sent as it is.
    */
-  const withSeatIds = (room, value) =>
-    hideIdShapes(
-      room,
+  const withSeatIds = (room, value) => {
+    const seatIdOf = (playerId) => seatIds.seatIdOf(room, playerId);
+    return renameIdShapes(
       [...playersNamedIn(room)].reduce(
-        (renamed, playerId) => renamePlayer(renamed, playerId, seatIds.seatIdOf(room, playerId)),
+        (renamed, playerId) => renamePlayer(renamed, playerId, seatIdOf(playerId)),
         value,
       ),
+      seatIdOf,
     );
-  /** `value` with every string shaped like a player id, as a value or a key, replaced by its seat id. */
-  const hideIdShapes = (room, value) => {
-    const hidden = (text) => (hasPlayerIdShape(text) ? seatIds.seatIdOf(room, text) : text);
-    if (typeof value === "string") return hidden(value);
-    if (Array.isArray(value)) return value.map((item) => hideIdShapes(room, item));
-    if (value !== null && typeof value === "object") {
-      return Object.fromEntries(
-        Object.entries(value).map(([key, item]) => [hidden(key), hideIdShapes(room, item)]),
-      );
-    }
-    return value;
   };
   /** The viewer's own seat id, or "" for a viewer without a seat. */
   const yourSeatId = (room, viewerId) =>
@@ -1188,6 +1178,14 @@ export function createRoomComponent({
      * @returns {Promise<Readonly<Record<"waiting" | "playing" | "finished", number>>>}
      */
     countRooms: () => roomAccessor.countByStatus(),
+
+    /**
+     * How many open rooms there are of each game in each status, zero included, for the operations gauge
+     * (ADR-055). Read only when telemetry takes a reading.
+     *
+     * @returns {Promise<ReadonlyArray<Readonly<{ gameId: string, status: string, rooms: number }>>>}
+     */
+    countRoomsByGame: () => roomAccessor.countByGameAndStatus(),
 
     /**
      * The game of every stored room that is finished, as `room.gameFinished` announced it. The match pipeline adds
