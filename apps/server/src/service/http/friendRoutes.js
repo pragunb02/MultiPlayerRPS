@@ -195,7 +195,7 @@ export function createFriendRoutes({ friendComponent, now = Date.now, limits = {
   router.delete("/friends/:handle", noStore, signedIn, ...changes, async (req, res) => {
     const { handle } = req.params;
     if (!isProfileHandle(handle)) throw new NotFoundError("No such friend");
-    await friendComponent.removeFriend({ playerId: playerIdOf(req), handle });
+    await friendComponent.removeFriend({ playerId: playerIdOf(req), handle, now: now() });
     res.status(204).end();
   });
 

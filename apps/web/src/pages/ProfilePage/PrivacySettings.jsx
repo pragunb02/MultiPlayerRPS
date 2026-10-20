@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { HIDDEN_PLAYER_NAME, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
+import { isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { useServices } from "../../app/servicesContext.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
+import { AGE_COPY } from "../../components/YearSelect/ageCopy.js";
 import { YEAR_NOT_SAID, YearSelect } from "../../components/YearSelect/YearSelect.jsx";
 import { useAccount } from "../../hooks/useAccount.js";
 import { useAction } from "../../hooks/useAction.js";
+import { useSafety } from "../../hooks/useSafety.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./AccountSettings.module.css";
 
@@ -30,6 +32,7 @@ async function withFieldError(work, field, setError) {
  * @param {{ account: ReturnType<typeof useAccount> }} props
  */
 function BirthYear({ account }) {
+  const { safety, reload } = useSafety();
   const [year, setYear] = useState(YEAR_NOT_SAID);
   const [error, setError] = useState("");
   const [tooYoung, setTooYoung] = useState(false);
@@ -45,6 +48,7 @@ function BirthYear({ account }) {
         async () => {
           try {
             await account.setBirthYear(Number(year));
+            await reload();
           } catch (err) {
             if (err.details?.reason === "too-young") setTooYoung(true);
             throw err;
@@ -59,7 +63,7 @@ function BirthYear({ account }) {
   if (account.status === "loading") return <p>Loading…</p>;
   if (account.status === "error")
     return <p role="alert">Couldn&apos;t load your account. {account.error.message}</p>;
-  const { birthYear, ageGroup } = account.account;
+  const { birthYear } = account.account;
   return (
     <div className={styles.part}>
       <h3>Year of birth</h3>
@@ -84,15 +88,28 @@ function BirthYear({ account }) {
         </>
       ) : (
         <p className={styles.muted}>
-          {birthYear}. It can be set once. To correct it, ask the owner (see the{" "}
-          <Link to={paths.privacy()} data-cc-control="profile.privacy.policy">
-            privacy policy
-          </Link>
-          ).
+          <span lang="hi-Latn" className={styles.line}>
+            {birthYear}. {AGE_COPY.setOnce.hi}
+          </span>
+          <span lang="en" className={styles.line}>
+            {birthYear}. {AGE_COPY.setOnce.en} (see the{" "}
+            <Link to={paths.privacy()} data-cc-control="profile.privacy.policy">
+              privacy policy
+            </Link>
+            ).
+          </span>
         </p>
       )}
-      {ageGroup !== "adult" && (
-        <p className={styles.muted}>On the public leaderboards your name shows as {HIDDEN_PLAYER_NAME}.</p>
+      {/* Read from the age policy, never worked out here (CC-152). */}
+      {safety.boardName === "hidden" && (
+        <p className={styles.muted}>
+          <span lang="hi-Latn" className={styles.line}>
+            {AGE_COPY.hiddenOnBoards.hi}
+          </span>
+          <span lang="en" className={styles.line}>
+            {AGE_COPY.hiddenOnBoards.en}
+          </span>
+        </p>
       )}
     </div>
   );

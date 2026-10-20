@@ -16,6 +16,7 @@ import {
   createInMemoryFriendshipDao,
   createInMemoryPrivacyDao,
 } from "../../testing/inMemoryFriendDaos.js";
+import { safetyFromAdults } from "../../testing/fakeSafety.js";
 import { createInMemoryProfileDao } from "../../testing/inMemoryProfileDao.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../utils/errors.js";
 import { createCoPlayers } from "../players/coPlayers.js";
@@ -123,7 +124,7 @@ function setup({ rooms = [], blocked = [], limits, deleted = [], failing = [], m
             .map((id) => [id, NAMES.get(id)]),
         ),
     },
-    ages: { adultsAmong: async ({ playerIds }) => new Set(playerIds.filter((id) => ADULTS.has(id))) },
+    safety: safetyFromAdults(({ playerIds }) => playerIds.filter((id) => ADULTS.has(id))),
     presence: { statusOf: (playerId) => statuses.get(playerId) ?? FRIEND_PRESENCE.OFFLINE },
     events: { emit: (name, payload) => announced.push({ name, ...payload }) },
     newRequestId: () => `00000000-0000-4000-9000-${String(++requests).padStart(12, "0")}`,
@@ -179,7 +180,7 @@ describe("friendComponent: who can have friends (CC-052)", () => {
       () => friends.sendRequest({ playerId: GUEST, target, now: T0 }),
       () => friends.answerRequest({ playerId: GUEST, requestId: "x", answer: "accept", now: T0 }),
       () => friends.cancelRequest({ playerId: GUEST, requestId: "x", now: T0 }),
-      () => friends.removeFriend({ playerId: GUEST, handle: "hhhhhhhhhhhhhhh1" }),
+      () => friends.removeFriend({ playerId: GUEST, handle: "hhhhhhhhhhhhhhh1", now: T0 }),
       () => friends.setAppearOffline({ playerId: GUEST, appearOffline: true, now: T0 }),
       () => friends.makeLink({ playerId: GUEST, now: T0 }),
       () => friends.useLink({ playerId: GUEST, token: "T".repeat(22), now: T0 }),
@@ -501,6 +502,28 @@ describe("friendComponent: blocks and the minors' rule are silent (ADR-053, ADR-
   });
 });
 
+describe("friendComponent: quiet hours (CC-052 rule 3, the age policy)", () => {
+  // 18:00 UTC is 23:30 in India, inside the minors' quiet hours (22:00 to 07:00).
+  const NIGHT = Date.UTC(2026, 9, 20, 18);
+
+  it("does not announce a request to a minor in their quiet hours: it waits on their friends page", async () => {
+    const { ask, view, events } = setup({ rooms: shared() });
+
+    await ask(RIYA, KABIR, "ROOM33", NIGHT);
+
+    expect(events(FRIEND_EVENTS.REQUESTED)).toEqual([]);
+    expect((await view(KABIR, NIGHT)).incoming.map((request) => request.displayName)).toEqual(["RiyaTest"]);
+  });
+
+  it("announces a request to an adult at any hour", async () => {
+    const { ask, events } = setup({ rooms: shared() });
+
+    await ask(KABIR, RIYA, "ROOM33", NIGHT);
+
+    expect(events(FRIEND_EVENTS.REQUESTED).map((event) => event.recipientId)).toEqual([RIYA]);
+  });
+});
+
 describe("friendComponent: limits (ADR-066.8)", () => {
   it("lets a player have at most so many requests waiting, declined ones included", async () => {
     const rooms = [
@@ -602,7 +625,7 @@ describe("friendComponent: cancelling and removing (CC-052)", () => {
     await ask(ARJUN, RIYA);
     await ask(RIYA, KABIR, "ROOM33");
     await ask(KABIR, RIYA, "ROOM33");
-    const remove = async (playerId, handle) => friends.removeFriend({ playerId, handle });
+    const remove = async (playerId, handle) => friends.removeFriend({ playerId, handle, now: T0 });
 
     await remove(RIYA, await handleOf(ARJUN));
 

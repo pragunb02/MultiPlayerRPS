@@ -176,6 +176,9 @@ export function createPlayerDataComponent({
           email: account.email,
           createdAt: new Date(account.createdAt).toISOString(),
           ...(account.birthYear !== undefined && { birthYear: account.birthYear }),
+          ...(account.birthYearCorrectedAt !== undefined && {
+            birthYearCorrectedAt: account.birthYearCorrectedAt.toISOString(),
+          }),
           ageGroup,
         },
       };

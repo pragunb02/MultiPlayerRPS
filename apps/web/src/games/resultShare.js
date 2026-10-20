@@ -55,13 +55,21 @@ export function resultShareOf(room) {
  * The result share of a finished room: the text, and the game page's link (a finished room closes soon, so the link
  * never names it) once for each way it can leave, each marked with its channel (CC-279).
  *
+ * The player's own safety flags (CC-152, `GET /api/safety`) are required: `shareCardName` is the most a card may
+ * carry. It is false for a guest, a minor and an account of unknown age (ADR-028.7). The text names nobody, whatever
+ * the flag, so it stays inside every player's policy, and a card that ever names its sender must check the flag here.
+ *
  * @param {any} room  a finished RoomView
- * @param {{ origin: string }} site  the site's own address (app/siteOrigin.js)
+ * @param {{ origin: string, safety: { shareCardName: boolean } }} site  the site's own address (app/siteOrigin.js),
+ *   and the player's safety flags
  * @returns {{ line: string, text: string, shareUrl: string, message: string, whatsappMessage: string }}
  *   line: the result alone. text: the result and the free line, for the share sheet, which gets `shareUrl` apart.
  *   message: the whole message with the copied link. whatsappMessage: the same with WhatsApp's own link
  */
-export function resultShare(room, { origin }) {
+export function resultShare(room, { origin, safety }) {
+  if (typeof safety?.shareCardName !== "boolean") {
+    throw new TypeError("A result share needs the player's safety flags (safety.shareCardName)");
+  }
   const line = resultText(resultShareOf(room));
   const page = `${origin}${paths.game(room.gameId)}`;
   const messageVia = (channel) => shareMessage({ text: line, url: withShareChannel(page, channel) });

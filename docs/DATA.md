@@ -477,11 +477,17 @@ ADR-053)
 `apps/server/src/persistence/accountDao.js`, the rule in `packages/shared/src/ages.js` (CC-152)
 
 1. **Holds:** a four digit year on the account, only when the player chose one at sign-up or once in settings. Never
-   a date. No field means the age is unknown, which counts as a minor (ADR-028).
+   a date. No field means the age is unknown, which counts as a minor (ADR-028). `accounts.birthYearCorrectedAt`, a
+   time, only when the owner corrected or cleared the year on the player's request (`PUT
+/api/admin/accounts/birth-year`, CC-152, ADR-048.9). The log line of a correction names the account and the
+   admin, never the year or the email.
 2. **Personal data:** yes.
-3. **Who can read it:** the player (`GET /api/account`, the data export). It decides whether the username shows on
-   the public leaderboards: only adults' names show, everyone else's entry reads "Hidden player" (`hidden: true`),
-   worked out each time a board is read. The year itself is never sent to anyone else. The owner.
+3. **Who can read it:** the player (`GET /api/account`, the data export, which also carries
+   `birthYearCorrectedAt`). It is read only through the age policy (`apps/server/src/domain/safety/agePolicy.js`),
+   which every social feature asks: the public leaderboards (only adults' names show, everyone else's entry reads
+   "Hidden player", `hidden: true`), public profiles and their links, and the feedback reply email. Worked out each
+   time it is needed. `GET /api/safety` gives the player their own policy flags, never the year or the age group.
+   The year itself is never sent to anyone else. The owner.
 4. **Kept for:** until the account is deleted.
 5. **Deleted by:** account deletion.
 

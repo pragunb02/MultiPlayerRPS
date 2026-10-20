@@ -183,6 +183,37 @@ export function runAccountDaoContract(createDao) {
     await expect(dao.setBirthYear({ accountId: "not-an-id", birthYear: 1999 })).rejects.toThrow(RangeError);
   });
 
+  it("corrects a set birth year for the owner, or clears it, and records when (CC-152)", async () => {
+    const dao = await createDao();
+    const { accountId } = await dao.insert(account({ birthYear: 1990 }));
+    const at = new Date("2026-10-20T10:00:00.000Z");
+
+    await dao.correctBirthYear({ accountId, birthYear: 2009, at });
+    const corrected = await dao.getById(accountId);
+    expect(corrected.birthYear).toBe(2009);
+    expect(corrected.birthYearCorrectedAt).toEqual(at);
+
+    const later = new Date("2026-10-21T10:00:00.000Z");
+    await dao.correctBirthYear({ accountId, at: later });
+    const cleared = await dao.getById(accountId);
+    expect(cleared).not.toHaveProperty("birthYear");
+    expect(cleared.birthYearCorrectedAt).toEqual(later);
+    // Cleared, it can be set once again by its owner.
+    expect(await dao.setBirthYear({ accountId, birthYear: 1991 })).toEqual({ set: true });
+  });
+
+  it("refuses to correct the birth year of an account that is not there", async () => {
+    const dao = await createDao();
+    const at = new Date("2026-10-20T10:00:00.000Z");
+
+    await expect(
+      dao.correctBirthYear({ accountId: "0123456789abcdef01234567", birthYear: 1999, at }),
+    ).rejects.toThrow(RangeError);
+    await expect(dao.correctBirthYear({ accountId: "not-an-id", birthYear: 1999, at })).rejects.toThrow(
+      RangeError,
+    );
+  });
+
   it("lists the birth years of the accounts asked for that have one", async () => {
     const dao = await createDao();
     const stated = await dao.insert(account({ birthYear: 1990 }));

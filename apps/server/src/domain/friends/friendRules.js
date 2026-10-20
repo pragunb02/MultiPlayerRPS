@@ -1,4 +1,5 @@
 import { FRIEND_RULES } from "@classicade/shared";
+import { FRIENDS_MODES } from "../safety/agePolicy.js";
 
 const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
@@ -38,12 +39,15 @@ export const MET_THROUGH = Object.freeze({
 });
 
 /**
- * Whether a request between two accounts may reach its recipient, given how they met (ADR-051.7, ADR-066.5).
- * Someone met through a link, a room's or a friend link, is someone a person shared a link with by hand: our "know
- * them in real life". A quick match stranger is not, so a pair with anyone not surely an adult may not become friends
- * that way. Such a request is still answered "Request sent", so the answer never tells anyone the other's age.
+ * Whether a request between two accounts may reach its recipient, given how they met and each one's friends mode
+ * from the age policy (ADR-051.7, ADR-066.5, CC-152). Someone met through a link, a room's or a friend link, is
+ * someone a person shared a link with by hand: our "know them in real life", which `mutual-known` allows. A quick
+ * match stranger is not, so only a pair who may both befriend anyone (`mutual`) can become friends that way. Such a
+ * request is still answered "Request sent", so the answer never tells anyone the other's age.
  *
- * @param {{ met: string, bothAdults: boolean }} pair  `met` is a MET_THROUGH value
+ * @param {{ met: string, modes: ReadonlyArray<string> }} pair  `met` is a MET_THROUGH value, `modes` the
+ *   FRIENDS_MODES of the two
  * @returns {boolean}
  */
-export const mayReach = ({ met, bothAdults }) => met !== MET_THROUGH.QUICK_MATCH || bothAdults;
+export const mayReach = ({ met, modes }) =>
+  met !== MET_THROUGH.QUICK_MATCH || modes.every((mode) => mode === FRIENDS_MODES.MUTUAL);

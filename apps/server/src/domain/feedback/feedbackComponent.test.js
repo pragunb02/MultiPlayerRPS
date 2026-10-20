@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { safetyFromAdults, safetyWithNoAdults } from "../../testing/fakeSafety.js";
 import { createFeedbackAccessor } from "../../data/feedbackAccessor.js";
 import { createInMemoryFeedbackDao } from "../../testing/inMemoryFeedbackDao.js";
 import { NotFoundError, ValidationError } from "../../utils/errors.js";
@@ -15,12 +16,10 @@ function setUp() {
   const asked = [];
   const component = createFeedbackComponent({
     feedbackAccessor: createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() }),
-    ages: {
-      adultsAmong: async ({ playerIds, now }) => {
-        asked.push({ playerIds, now });
-        return new Set(playerIds.filter((id) => id === ADULT));
-      },
-    },
+    safety: safetyFromAdults(({ playerIds, now }) => {
+      asked.push({ playerIds, now });
+      return playerIds.filter((id) => id === ADULT);
+    }),
     newFeedbackId: () => `00000000-0000-4000-a000-${String(++counter).padStart(12, "0")}`,
   });
   return { component, asked };
@@ -184,7 +183,7 @@ describe("feedbackComponent (CC-290)", () => {
   it("lets anyone leave a reply email once the owner opens it to everyone", async () => {
     const component = createFeedbackComponent({
       feedbackAccessor: createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() }),
-      ages: { adultsAmong: async () => new Set() },
+      safety: safetyFromAdults(async () => new Set()),
       replyEmailOnlyForAdults: false,
     });
 
@@ -260,8 +259,8 @@ describe("feedbackComponent (CC-290)", () => {
 
   it("checks its dependencies when it is made", () => {
     expect(() =>
-      createFeedbackComponent({ feedbackAccessor: undefined, ages: { adultsAmong: () => {} } }),
+      createFeedbackComponent({ feedbackAccessor: undefined, safety: safetyWithNoAdults() }),
     ).toThrow();
-    expect(() => createFeedbackComponent({ feedbackAccessor: {}, ages: {} })).toThrow();
+    expect(() => createFeedbackComponent({ feedbackAccessor: {}, safety: {} })).toThrow();
   });
 });

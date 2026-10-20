@@ -78,6 +78,18 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     getAccount: async () => (await request("GET", "/account")).account,
     /** Sets a birth year the account does not have yet. Answers the account. */
     setBirthYear: async (birthYear) => (await request("PUT", "/account/birth-year", { birthYear })).account,
+    /**
+     * The player's own safety flags from the age policy (CC-152): what the features in the browser may do for
+     * them, such as whether a share card may carry their name. Never their age.
+     */
+    getSafety: async () => (await request("GET", "/safety")).safety,
+    /**
+     * The owner's correction of a player's birth year, on a request the owner checked (CC-152, ADR-048.9).
+     *
+     * @param {{ email: string, birthYear: number | null }} correction  null clears the year
+     */
+    correctBirthYear: async (correction) =>
+      (await request("PUT", "/admin/accounts/birth-year", correction)).account,
     /** Everything ClassiCade holds about the account, as JSON, after the password is given again (CC-035). */
     exportData: (password) => request("POST", "/account/export", { password }),
     /** Deletes the account and everything linked to it. This browser is signed out (CC-035). */

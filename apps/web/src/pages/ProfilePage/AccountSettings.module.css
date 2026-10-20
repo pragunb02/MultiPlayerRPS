@@ -40,3 +40,7 @@
   display: grid;
   gap: var(--space-2);
 }
+/* A Hinglish line and its English line, one under the other (ADR-051). */
+.line {
+  display: block;
+}

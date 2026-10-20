@@ -10,6 +10,7 @@ import {
 import { FRIEND_REQUEST_STATUS } from "../../data/friendAccessor.js";
 import { hashFriendLinkToken, newFriendLinkToken } from "../../models/friendLinkToken.js";
 import { isAccountId } from "../../models/identity.js";
+import { FRIENDS_MODES, isQuietTime } from "../safety/agePolicy.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../utils/errors.js";
 import { FRIEND_LIMITS, mayReach, MET_THROUGH } from "./friendRules.js";
@@ -41,22 +42,25 @@ const avatarField = (profile) => (isAvatarId(profile.avatar) ? { avatar: profile
 /** For a failed read: the caller's own refusal when nothing was found, and any other failure as it is. */
 const missingAs = (refusal) => (err) => Promise.reject(err instanceof NotFoundError ? refusal(err) : err);
 
-/**
- * The name a sender sees for the recipient of their request. Whoever opened a friend link of a player not surely an
- * adult does not learn their name until they accept, because the link may have been forwarded (ADR-028.7). The
- * friends view and the data export both name requests through this one rule.
- *
- * @param {{ request: Readonly<{ via: string, recipientId: string }>, names: ReadonlyMap<string, string>, adults: ReadonlySet<string> }} people
- */
-export const outgoingNameOf = ({ request, names, adults }) =>
-  request.via === FRIEND_REQUEST_VIA.LINK && !adults.has(request.recipientId)
-    ? FRIEND_LINK_MAKER_NAME
-    : names.get(request.recipientId);
+/** A friend link names its maker only when their policy lets their name travel (ADR-028.7, the age policy). */
+const linkNameOf = ({ playerId, names, policies }) =>
+  policies.get(playerId).shareCardName ? names.get(playerId) : FRIEND_LINK_MAKER_NAME;
 
-/** Friends need an account (owner, ADR-066.1). Guests are told to save their progress. */
-function requireAccount(playerId) {
-  if (!isAccountId(playerId)) throw guestsCannot();
-}
+/**
+ * The name a sender sees for the recipient of their request. Whoever opened a friend link of a player whose policy
+ * keeps their name off shared things (a minor, ADR-028.7) does not learn it until they accept, because the link may
+ * have been forwarded. The friends view and the data export both name requests through this one rule.
+ *
+ * @param {{
+ *   request: Readonly<{ via: string, recipientId: string }>,
+ *   names: ReadonlyMap<string, string>,
+ *   policies: ReadonlyMap<string, Readonly<{ shareCardName: boolean }>>,
+ * }} people
+ */
+export const outgoingNameOf = ({ request, names, policies }) =>
+  request.via === FRIEND_REQUEST_VIA.LINK
+    ? linkNameOf({ playerId: request.recipientId, names, policies })
+    : names.get(request.recipientId);
 
 /**
  * Friends (CC-052, ADR-066): mutual, between accounts only, asked from a game the two played or through a friend
@@ -73,7 +77,7 @@ function requireAccount(playerId) {
  *   coPlayers: ReturnType<typeof import("../players/coPlayers.js").createCoPlayers>,
  *   blocks: { blockedWith: (query: { playerId: string }) => Promise<ReadonlySet<string>> },
  *   accounts: { usernamesOf: (query: { playerIds: ReadonlyArray<string> }) => Promise<ReadonlyMap<string, string>> },
- *   ages: { adultsAmong: (query: { playerIds: string[], now: number }) => Promise<ReadonlySet<string>> },
+ *   safety: Pick<ReturnType<typeof import("../safety/safetyComponent.js").createSafetyComponent>, "policiesFor" | "policyFor">,
  *   presence: { statusOf: (playerId: string) => string },
  *   events: { emit: (name: string, payload: object) => unknown },
  *   limits?: Partial<typeof FRIEND_LIMITS>,
@@ -88,7 +92,7 @@ export function createFriendComponent({
   coPlayers,
   blocks,
   accounts,
-  ages,
+  safety,
   presence,
   events,
   limits = {},
@@ -102,12 +106,23 @@ export function createFriendComponent({
   assertFunction(coPlayers?.personAt, "coPlayers.personAt");
   assertFunction(blocks?.blockedWith, "blocks.blockedWith");
   assertFunction(accounts?.usernamesOf, "accounts.usernamesOf");
-  assertFunction(ages?.adultsAmong, "ages.adultsAmong");
+  assertFunction(safety?.policiesFor, "safety.policiesFor");
+  assertFunction(safety?.policyFor, "safety.policyFor");
   assertFunction(presence?.statusOf, "presence.statusOf");
   assertFunction(events?.emit, "events.emit");
   const rules = { ...FRIEND_LIMITS, ...limits };
 
   const changed = (...playerIds) => events.emit(FRIEND_EVENTS.CHANGED, { playerIds });
+
+  /** Whether the age policy lets the player have friends at all. A guest's does not (owner, ADR-066.1). */
+  const mayHaveFriends = (policy) => policy.friendsMode !== FRIENDS_MODES.NONE;
+
+  /** The player's policy, once it lets them have friends. A guest is told to save their progress. */
+  async function requireFriends(playerId, now) {
+    const policy = await safety.policyFor({ playerId, now });
+    if (!mayHaveFriends(policy)) throw guestsCannot();
+    return policy;
+  }
 
   /** What friends see of each player: their status, or offline for those who chose to appear offline. */
   async function presenceOf(playerIds) {
@@ -118,12 +133,12 @@ export function createFriendComponent({
   /** Names, avatars, handles and adulthood of the people among `playerIds`, read once for a whole view. */
   async function peopleOf(playerIds, now) {
     const ids = [...new Set(playerIds)];
-    const [names, cards, adults] = await Promise.all([
+    const [names, cards, policies] = await Promise.all([
       accounts.usernamesOf({ playerIds: ids }),
       profiles.getOrCreateMany({ playerIds: ids, at: now }),
-      ages.adultsAmong({ playerIds: ids, now }),
+      safety.policiesFor({ playerIds: ids, now }),
     ]);
-    return { names, cards, adults };
+    return { names, cards, policies };
   }
 
   /** The player's friends, without anyone on either side of a block with them, which a block ends anyway. */
@@ -136,7 +151,7 @@ export function createFriendComponent({
    * of a block with them, or one that ran out.
    */
   async function viewFor({ playerId, now }) {
-    requireAccount(playerId);
+    await requireFriends(playerId, now);
     const blocked = await blocks.blockedWith({ playerId });
     const [friends, incoming, outgoing] = await Promise.all([
       friendsOf(playerId, blocked),
@@ -150,7 +165,7 @@ export function createFriendComponent({
       ...incoming.map((request) => request.senderId),
       ...outgoing.map((request) => request.recipientId),
     ];
-    const [{ names, cards, adults }, presenceOfFriend, appearing] = await Promise.all([
+    const [{ names, cards, policies }, presenceOfFriend, appearing] = await Promise.all([
       peopleOf([playerId, ...others], now),
       presenceOf(friends.map((friend) => friend.friendId)),
       privacyAccessor.appearingOffline([playerId]),
@@ -167,8 +182,8 @@ export function createFriendComponent({
               ...avatarField(card(friendId)),
               presence: presenceOfFriend(friendId),
               since,
-              // A profile is linked for adults only, as on the boards and in history (ADR-065.2).
-              ...(adults.has(friendId) && { profile: card(friendId).handle }),
+              // A profile is linked only when the friend's policy allows it, as on the boards (ADR-065.2).
+              ...(policies.get(friendId).profileLink && { profile: card(friendId).handle }),
             }),
           ),
       ),
@@ -191,7 +206,7 @@ export function createFriendComponent({
           .map((request) =>
             Object.freeze({
               requestId: request.requestId,
-              displayName: outgoingNameOf({ request, names, adults }),
+              displayName: outgoingNameOf({ request, names, policies }),
               ...avatarField(card(request.recipientId)),
               sentAt: request.createdAt,
             }),
@@ -199,13 +214,17 @@ export function createFriendComponent({
       ),
       settings: Object.freeze({ appearOffline: appearing.has(playerId) }),
       // A player not surely an adult is shown "Only add people you know" beside the requests (Ofcom ICU F2.3).
-      safetyTips: !adults.has(playerId),
+      safetyTips: policies.get(playerId).treatedAsMinor,
     });
   }
 
-  /** Tells the recipient of a request they can see, on any page. */
+  /**
+   * Tells the recipient of a request they can see, on any page, unless it is their quiet time (22:00 to 07:00 India
+   * time for anyone not surely an adult, CC-052 rule 3): then the request waits on their friends page, unannounced.
+   */
   async function ring(request, now) {
-    const { names, cards } = await peopleOf([request.senderId], now);
+    const { names, cards, policies } = await peopleOf([request.senderId, request.recipientId], now);
+    if (isQuietTime(policies.get(request.recipientId), now)) return;
     events.emit(FRIEND_EVENTS.REQUESTED, {
       recipientId: request.recipientId,
       request: {
@@ -234,13 +253,13 @@ export function createFriendComponent({
 
   /** Whether a request may reach its recipient: no block either way, and the minors' rule (ADR-051.7). */
   async function reachOf({ senderId, recipientId, met, now }) {
-    const [blocked, adults] = await Promise.all([
+    const [blocked, policies] = await Promise.all([
       blocks.blockedWith({ playerId: senderId }),
-      ages.adultsAmong({ playerIds: [senderId, recipientId], now }),
+      safety.policiesFor({ playerIds: [senderId, recipientId], now }),
     ]);
     return (
       !blocked.has(recipientId) &&
-      mayReach({ met, bothAdults: adults.has(senderId) && adults.has(recipientId) })
+      mayReach({ met, modes: [senderId, recipientId].map((id) => policies.get(id).friendsMode) })
     );
   }
 
@@ -364,9 +383,9 @@ export function createFriendComponent({
      * @throws {ConflictError} when the other player is a guest, or the player is at a limit
      */
     async sendRequest({ playerId, target, now }) {
-      requireAccount(playerId);
+      await requireFriends(playerId, now);
       const person = await coPlayers.personAt({ target, askerId: playerId, refusal: notPlayedWith });
-      if (!isAccountId(person.playerId)) {
+      if (!mayHaveFriends(await safety.policyFor({ playerId: person.playerId, now }))) {
         throw new ConflictError(
           `${person.displayName} needs to save their progress before you can be friends`,
         );
@@ -393,7 +412,7 @@ export function createFriendComponent({
      * @throws {ConflictError} when the player has as many friends as allowed
      */
     async answerRequest({ playerId, requestId, answer, now }) {
-      requireAccount(playerId);
+      await requireFriends(playerId, now);
       if (!ANSWERS.has(answer)) {
         throw new ValidationError("Answer accept or decline", { details: { field: "answer" } });
       }
@@ -421,7 +440,7 @@ export function createFriendComponent({
      * @throws {NotFoundError} when the player has no waiting request with that id
      */
     async cancelRequest({ playerId, requestId, now }) {
-      requireAccount(playerId);
+      await requireFriends(playerId, now);
       const request = await friendAccessor.getLiveRequest({ requestId, now }).catch(missingAs(noSuchRequest));
       if (request.senderId !== playerId || !WAITING.includes(request.status)) throw noSuchRequest();
       await friendAccessor.updateRequest({
@@ -437,11 +456,11 @@ export function createFriendComponent({
     /**
      * Ends a friendship, for both. Nobody is told, and it looks the same as a block.
      *
-     * @param {{ playerId: string, handle: string }} input
+     * @param {{ playerId: string, handle: string, now: number }} input
      * @throws {NotFoundError} when the handle is not one of the player's friends
      */
-    async removeFriend({ playerId, handle }) {
-      requireAccount(playerId);
+    async removeFriend({ playerId, handle, now }) {
+      await requireFriends(playerId, now);
       const friendId = await friendByHandle({ playerId, handle });
       await friendAccessor.unfriend({ a: playerId, b: friendId });
       changed(playerId, friendId);
@@ -463,7 +482,7 @@ export function createFriendComponent({
      * @throws {ValidationError} for anything but true or false
      */
     async setAppearOffline({ playerId, appearOffline, now }) {
-      requireAccount(playerId);
+      await requireFriends(playerId, now);
       if (typeof appearOffline !== "boolean") {
         throw new ValidationError("appearOffline must be true or false", {
           details: { field: "appearOffline" },
@@ -482,7 +501,7 @@ export function createFriendComponent({
      * @returns {Promise<Readonly<{ token: string, expiresAt: number }>>}
      */
     async makeLink({ playerId, now }) {
-      requireAccount(playerId);
+      await requireFriends(playerId, now);
       const token = newToken();
       const { expiresAt } = await friendAccessor.addLink({
         tokenHash: hashFriendLinkToken(token),
@@ -505,10 +524,10 @@ export function createFriendComponent({
       const link = await friendAccessor
         .getLiveLink({ tokenHash: hashFriendLinkToken(token), now })
         .catch(missingAs(noSuchLink));
-      const { names, cards, adults } = await peopleOf([link.creatorId], now);
+      const { names, cards, policies } = await peopleOf([link.creatorId], now);
       if (!names.has(link.creatorId)) throw noSuchLink();
       return Object.freeze({
-        displayName: adults.has(link.creatorId) ? names.get(link.creatorId) : FRIEND_LINK_MAKER_NAME,
+        displayName: linkNameOf({ playerId: link.creatorId, names, policies }),
         ...avatarField(cards.get(link.creatorId)),
         ...(viewerId === link.creatorId && { own: true }),
       });
@@ -526,7 +545,7 @@ export function createFriendComponent({
      * @throws {ConflictError} for the maker's own link, or a player at a limit
      */
     async useLink({ playerId, token, now }) {
-      requireAccount(playerId);
+      await requireFriends(playerId, now);
       const tokenHash = hashFriendLinkToken(token);
       const link = await friendAccessor.getLiveLink({ tokenHash, now }).catch(missingAs(noSuchLink));
       if (link.creatorId === playerId) {
@@ -592,9 +611,9 @@ export function createFriendComponent({
         privacyAccessor.appearingOffline([playerId]),
       ]);
       const recipients = sent.map((request) => request.recipientId);
-      const [names, adults] = await Promise.all([
+      const [names, policies] = await Promise.all([
         accounts.usernamesOf({ playerIds: [...friends.map((friend) => friend.friendId), ...recipients] }),
-        ages.adultsAmong({ playerIds: recipients, now }),
+        safety.policiesFor({ playerIds: recipients, now }),
       ]);
       const iso = (ms) => new Date(ms).toISOString();
       return {
@@ -604,7 +623,7 @@ export function createFriendComponent({
         requestsSent: sent
           .filter((request) => names.has(request.recipientId))
           .map((request) => ({
-            displayName: outgoingNameOf({ request, names, adults }),
+            displayName: outgoingNameOf({ request, names, policies }),
             sentAt: iso(request.createdAt),
           })),
         friendLinks: links.map((link) => ({ madeAt: iso(link.createdAt), worksUntil: iso(link.expiresAt) })),
