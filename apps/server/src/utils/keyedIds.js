@@ -17,6 +17,8 @@ export const KEYED_ID_LABELS = Object.freeze({
   ROOM_SEATS: "classicade room seat ids",
   /** Players in match history, a match player id (CC-297). */
   MATCH_PLAYERS: "classicade match player ids",
+  /** A player's bucket for a feature flag, which never leaves the server (CC-312). */
+  FLAG_BUCKETS: "classicade feature flag buckets",
 });
 
 const LABELS = new Set(Object.values(KEYED_ID_LABELS));

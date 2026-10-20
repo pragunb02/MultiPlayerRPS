@@ -8,6 +8,7 @@ import { createBlockRoutes } from "./blockRoutes.js";
 import { createChallengeRoutes } from "./challengeRoutes.js";
 import { createFeedbackRoutes } from "./feedbackRoutes.js";
 import { createFriendRoutes } from "./friendRoutes.js";
+import { createFlagRoutes } from "./flagRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
@@ -28,6 +29,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
  *   & { friendComponent: Parameters<typeof createFriendRoutes>[0]["friendComponent"], friendLimits?: Parameters<typeof createFriendRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
+ *   & { flagComponent: Parameters<typeof createFlagRoutes>[0]["flagComponent"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { safetyComponent: Parameters<typeof createSafetyRoutes>[0]["safetyComponent"] }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
@@ -63,6 +65,7 @@ export function apiRouter({
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   safetyComponent,
+  flagComponent,
   build,
   ...sessionDeps
 }) {
@@ -136,6 +139,8 @@ export function apiRouter({
       ...(feedbackLimits && { limits: feedbackLimits }),
     }),
   );
+
+  router.use(createFlagRoutes({ flagComponent, adminAccess }));
 
   router.use(createAdminRoutes({ analyticsComponent, requireAdmin: adminAccess.requireAdmin, now }));
   router.use(createAdminAccountRoutes({ accountComponent, requireAdmin: adminAccess.requireAdmin, now }));

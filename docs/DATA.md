@@ -53,6 +53,8 @@ does not.
 | [`friend_links`](#friend_links)                       | pseudonymous: who made it, a SHA-256 of its token                                                                 | 7 days, or until it is used                                                                             | MongoDB TTL index, using it, making a sixth, account deletion |
 | [`player_privacy`](#player_privacy)                   | pseudonymous: player id, the Appear offline choice                                                                | until the player changes it or deletes the account                                                      | account deletion                                              |
 | [`feedback`](#feedback)                               | the message as typed, and a reply email from an adult who gave one                                                | 180 days after it was sent                                                                              | MongoDB TTL index, the owner's Delete in the inbox            |
+| [`feature_flags`](#feature_flags)                     | no: a flag name, its rollout and when it was set                                                                  | until the owner clears it                                                                               | the owner's Use the rollout in code                           |
+| [`feature_flag_counts`](#feature_flag_counts)         | no: per flag, India day and side, two counts                                                                      | 90 days after the day                                                                                   | MongoDB TTL index                                             |
 | [`daily_puzzle_attempts`](#daily_puzzle_attempts)     | pseudonymous: player id, how each day's puzzle went                                                               | until the account is deleted                                                                            | account deletion, the guest transfer                          |
 | [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)                                                       | until the player deletes the account                                                                    | account deletion (CC-035)                                     |
 | [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                                                                         | 30 days                                                                                                 | MongoDB TTL index                                             |
@@ -476,6 +478,39 @@ ADR-053)
    (`DELETE /api/admin/feedback/:feedbackId`), for anything that holds personal details. Because no player id is stored, account deletion and the data
    export cannot find a player's feedback and do not take part (ADR-048.2 covers stores kept by player id). A
    request to delete one sooner goes through the privacy contact, and the owner deletes it in the inbox.
+
+### `feature_flags`
+
+`apps/server/src/persistence/featureFlagDao.js`, rules in `apps/server/src/domain/flags/flagComponent.js` and
+`apps/server/src/service/http/flagRoutes.js` (CC-312, ADR-073)
+
+1. **Holds:** one document per flag whose rollout the owner set in the console: `name` (a flag in
+   `packages/shared/src/flags.js`), `rollout` (`off`, `on` or a whole percentage) and `updatedAt`. Index: unique on
+   `name`.
+2. **Not stored:** who set it. No player, session or device id.
+3. **Personal data:** none.
+4. **Who can read it:** the server, every 30 seconds, and an admin in the console's Flags tab. Players only ever get
+   `true` or `false` for a flag from `GET /api/flags`, never the rollout, and never their bucket, which is worked out
+   from a keyed hash each time and is not stored anywhere.
+5. **Kept for:** until the owner goes back to the rollout in code. A document for a flag no longer in the registry is
+   ignored by the flags, and listed in the Flags tab under "Overrides of removed flags" so the owner can clear it.
+6. **Deleted by:** the console's "Use the rollout in code", or Clear for a removed flag (`DELETE /api/admin/flags/:name`).
+
+### `feature_flag_counts`
+
+`apps/server/src/persistence/featureFlagDao.js`, rules in `apps/server/src/domain/flags/flagComponent.js` (CC-312,
+ADR-073, counts as ADR-034)
+
+1. **Holds:** one document per flag, India day and side (`on` or `off`): `flag`, `day`, `side`, `exposures` (times
+   the flag was worked out on that side), `successes` (the flag's success event on that side) and `expiresAt`.
+   Indexes: unique on `flag`, `day` and `side`, TTL on `expiresAt`.
+2. **Not stored:** any player, session, device or network id, or any hash of one. A count cannot be joined to a
+   person.
+3. **Personal data:** none.
+4. **Who can read it:** an admin, in the Flags tab, as the last 30 days with any count of 1 to 4 shown as fewer than
+   5 (ADR-036.2).
+5. **Kept for:** 90 days after its day (`COUNTS_KEEP_DAYS`).
+6. **Deleted by:** MongoDB's TTL index on `expiresAt`.
 
 ### `daily_puzzle_attempts`
 
