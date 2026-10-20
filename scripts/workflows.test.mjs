@@ -467,7 +467,17 @@ describe("changelog fragments check (CC-299)", () => {
     expect(changes.if).toBe("github.event_name == 'pull_request'");
     expect(changes.permissions ?? permissions).toEqual({ contents: "read" });
     expect(changes.steps[0].with).toEqual({ "fetch-depth": 2, "persist-credentials": false });
-    expect(changes.steps.at(-1).run).toBe("node scripts/bin/collect-changes.mjs --check --base HEAD^1");
+    const runs = changes.steps.map((/** @type {{ run?: string }} */ step) => step.run);
+    expect(runs).toContain("node scripts/bin/collect-changes.mjs --check --base HEAD^1");
     expect(job(workflow, "changes")).not.toMatch(/secrets\.|github\.token/);
+  });
+
+  it("also runs the decision gate on every ticket file (CC-311)", async () => {
+    const { jobs } = parse(await read(".github/workflows/ci.yml"));
+
+    expect(jobs.changes.steps.at(-1)).toEqual({
+      name: "Tickets at Ready or later pass the decision gate",
+      run: "node scripts/bin/check-tickets.mjs",
+    });
   });
 });
