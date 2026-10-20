@@ -59,6 +59,37 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-068 — Changelog fragments, folded by the coordinator, and numbers assigned at dispatch
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-299](tickets/CC-299.md), research there)
+- **Context.** Every pull request added its changelog line at the top of PROGRESS.md and changed its row on the
+  board, so parallel pull requests (up to five builders, CLAUDE.md workflow rule 9) conflicted on the same lines.
+  Builders were told to leave those files alone, so the coordinator copied each line by hand. The "next free" ID
+  lines were a second place where two pull requests collided.
+- **Decision.**
+  1. **One fragment per ticket**, `docs/changes/CC-###.md`: YAML front matter (`ticket`, `date`, `type`, `status`,
+     `adrs`, optional `pr`), then the changelog text, then optionally the ticket's whole board row. The format of
+     towncrier and Changesets, named by the ticket so two pull requests never add the same file.
+  2. **The collector**, `node scripts/bin/collect-changes.mjs` (logic in `scripts/changes/collectChanges.mjs`), folds
+     them into PROGRESS.md's changelog newest first in the existing line format, sets the Status cell, adds the ADRs
+     and `done in #PR` to the Links cell, links the ID to its ticket file, formats both files with Prettier and
+     deletes the fragments it folded. A second run changes nothing. `--check` validates and writes nothing. The pull
+     request number comes from the merge commit that added the fragment.
+  3. **CI** (`Changelog fragments` in ci.yml, pull requests only) runs `--check --base HEAD^1` on the merge commit.
+     It fails on a bad fragment and on a changelog entry added, changed or removed by hand. **The collector is
+     exempt by content:** an added entry passes only when it is the line of a fragment the same pull request
+     deletes, and nothing else in the changelog changes. Not chosen: a branch name or a label, which anyone can set.
+  4. **The coordinator runs the collector**, after a batch of merges, as a docs pull request. Not chosen: a workflow
+     on main that opens a bot pull request like CC-300's. It needs a job with write access, the repository setting,
+     and a person to close and reopen each bot pull request so CI runs (`GITHUB_TOKEN` starts no workflows). CC-300
+     needs CI because images must be made in the pinned container. A text fold is the same on a laptop, and
+     fragments that wait never conflict.
+  5. **Numbers at dispatch.** The coordinator assigns ticket and ADR numbers in each builder's brief and bumps the
+     next free lines itself. Builders never edit them.
+- **Consequences.** Builders edit no shared tracking line. The changelog lags main until the coordinator folds.
+  The stage counters and the Status table stay the coordinator's. A pull request with two tickets adds two
+  fragments, so two lines. If the coordinator forgets to fold too often, revisit point 4.
+
 ### ADR-067 — Computer players think on worker threads, several at once, in a fair line per room
 
 - **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-308](tickets/CC-308.md), research there.

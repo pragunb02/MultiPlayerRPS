@@ -19,6 +19,7 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 | [docs/BACKLOG.md](docs/BACKLOG.md)               | **Ticket board** — every task as `CC-###` with type, priority, status                            | Tickets added/started/completed |
 | [docs/tickets/](docs/tickets/)                   | One file per ticket (`CC-###.md`) from `TEMPLATE.md`, small ones included                        | Ticket started / progressed     |
 | [docs/PROGRESS.md](docs/PROGRESS.md)             | Current phase, in-flight work, dated changelog                                                   | **Every working session**       |
+| [docs/changes/](docs/changes/README.md)          | Changelog fragments: one `CC-###.md` per PR, folded into PROGRESS.md and the board (CC-299)      | Every PR that changes a ticket  |
 | [docs/DECISIONS.md](docs/DECISIONS.md)           | Architecture/product decision records (ADRs)                                                     | A decision is made or reversed  |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)         | **Production**: Render settings, env vars, pre/post-merge checks, rollback, incidents            | Deploy setup changes            |
 | [docs/ENGINEERING.md](docs/ENGINEERING.md)       | **How to write code**: layers, principles, patterns, coding/testing standards, dependency policy | Standards change                |
@@ -29,6 +30,11 @@ not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
 - `CC-###` — **tickets** (units of work). Sequential, permanent, never reused. Next free ID is at the top of `BACKLOG.md`.
 - `FR-*` / `NFR-*` — requirements (PRD). `SEC-*` / `BUG-*` / `DEBT-*` — audit findings. `ADR-*` — decisions.
 - Tickets link to requirements/findings/ADRs; every finding is linked from at least one ticket.
+- **Who assigns numbers (CC-299, ADR-068).** The coordinator assigns ticket (`CC-###`) and ADR numbers when it
+  dispatches a builder, writes them in the builder's brief, and bumps the "next free" lines itself (top of
+  `BACKLOG.md`, top of `DECISIONS.md`, the Process row of `PROGRESS.md`). **Builders never edit the next free
+  lines.** A builder who needs a new ticket or ADR asks the coordinator for a number, so two builders never take
+  the same one.
 
 ### Working agreement (owner, 17 October 2026)
 
@@ -46,7 +52,7 @@ These rules come first. Where they differ from anything below, they win.
    that section is written. A small fix under an hour (one-line hotfix, test fix) still gets a ticket file with Root
    cause and a short Research note, written before the PR is merged.
 5. **Document everything.** Decisions go in `docs/DECISIONS.md`, research in the ticket or `docs/investigations/`,
-   changes in `docs/PROGRESS.md`. Nothing decided only in chat.
+   changes in `docs/PROGRESS.md` (through a fragment in `docs/changes/`, workflow rule 5). Nothing decided only in chat.
 6. **Steady, not frantic.** At most six builders run at once, and only on independent work (no shared files).
    Builders run lint, format, coverage and only their own browser tests locally; CI runs the full browser suite.
    `main` stays green: a red `main` is fixed before anything else merges. **Fast mode ended 2026-10-18 (owner):** every check is required again, branches must be up to date, and builders run their own gates in full.
@@ -62,15 +68,23 @@ These rules come first. Where they differ from anything below, they win.
 
 1. Before starting work, read `docs/PROGRESS.md` and the ticket on `docs/BACKLOG.md`.
 2. **No untracked work**: anything new (including bugs found along the way) gets a ticket with the next free ID first.
-3. Starting a ticket: set 🟦 on the board and create `docs/tickets/CC-###.md` from the template. Every ticket gets a
-   file; a small one (under about an hour) gets Root cause and a short Research note (working agreement rule 4).
+3. Starting a ticket: create `docs/tickets/CC-###.md` from the template. Every ticket gets a file; a small one
+   (under about an hour) gets Root cause and a short Research note (working agreement rule 4). The board's 🟦
+   comes from the PR's fragment (rule 5), or from the coordinator at dispatch.
 4. Branch `cc-###-short-name`. Every commit message starts with the ticket ID: `CC-007: fix RPS Scissors mismatch (BUG-01)`.
    Multi-ticket commits list all IDs: `CC-003, CC-004: …`.
    Every PR fills the template's **Evidence** section: screenshots for UI changes (desktop and phone, before and
    after), request and response for API or socket changes, and the tests added (owner, 2026-10-19; ADR-039).
    Screenshots go on the `pr-evidence` branch, never on `main`, and show test accounts only.
-5. Finishing: ✅ on the board, update linked findings in `KNOWN_ISSUES.md`, add a dated changelog line in `PROGRESS.md`
-   using ticket IDs, update the stage counters.
+5. Finishing: add **one changelog fragment**, `docs/changes/CC-###.md` (format in `docs/changes/README.md`): front
+   matter with `ticket`, `date`, `type`, `status` (the board status after merge, usually `done`) and `adrs`, then
+   the changelog text, and optionally the ticket's whole board row when it is new or its title changed. Update
+   linked findings in `KNOWN_ISSUES.md`. **Builders do not edit `PROGRESS.md`'s changelog, the board rows in
+   `BACKLOG.md` or any next free line**: CI's `Changelog fragments` job fails a PR that edits the changelog by hand.
+   The coordinator runs `node scripts/bin/collect-changes.mjs` on a fresh `main` after a batch of merges and opens
+   the result as a docs PR: it writes each fragment's dated line newest first, sets the board's status and links
+   (`done in #PR`, the ADRs), and deletes the fragments. The coordinator also keeps the stage counters and the
+   Status table. A PR that only allocates numbers or notes owner answers puts that text in a fragment too.
 6. Non-trivial decisions (library, pattern, data model) get an ADR in `DECISIONS.md` first.
 7. **Every required check must be green before merging**, on a branch that is up to date with `main`. Branch
    protection requires eight: lint, format, audit, unit + integration (coverage gates); the Docker build; the browser

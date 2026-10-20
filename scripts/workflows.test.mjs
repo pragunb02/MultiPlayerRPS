@@ -457,3 +457,17 @@ describe("render.yaml schema check", () => {
     expect(check).not.toMatch(/secrets\./);
   });
 });
+
+describe("changelog fragments check (CC-299)", () => {
+  it("runs on pull requests, on the merge commit with main as its first parent, with a read-only token", async () => {
+    const workflow = await read(".github/workflows/ci.yml");
+    const { jobs, permissions } = parse(workflow);
+    const changes = jobs.changes;
+
+    expect(changes.if).toBe("github.event_name == 'pull_request'");
+    expect(changes.permissions ?? permissions).toEqual({ contents: "read" });
+    expect(changes.steps[0].with).toEqual({ "fetch-depth": 2, "persist-credentials": false });
+    expect(changes.steps.at(-1).run).toBe("node scripts/bin/collect-changes.mjs --check --base HEAD^1");
+    expect(job(workflow, "changes")).not.toMatch(/secrets\.|github\.token/);
+  });
+});
