@@ -650,6 +650,7 @@ export async function startServer({
     leaderboardAccessor,
     matchAccessor,
     progressAccessor,
+    transfers: playerTransferAccessor,
     ages: accountComponent,
   });
   const chessRatingComponent = createChessRatingComponent({ chessRatingAccessor, events: domainEvents });

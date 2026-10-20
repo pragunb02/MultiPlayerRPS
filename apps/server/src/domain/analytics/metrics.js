@@ -440,7 +440,7 @@ export function topItems(rows, catalog) {
 export const NOT_KEPT = ANALYTICS_NOT_KEPT;
 
 /**
- * How many accounts each leaderboard lists. A board needs 25 entries before its tab is worth showing (ADR-029).
+ * How many players (accounts and guests, ADR-060) each leaderboard lists. A board needs 25 entries before its tab is worth showing (ADR-029).
  * A week's entries are removed 28 days after it ends, so an older week says "not kept" rather than 0, which
  * would look like a week nobody played.
  *

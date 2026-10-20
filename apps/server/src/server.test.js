@@ -15,6 +15,8 @@ import {
   startHousekeeping,
 } from "./server.js";
 import { createPendingMatchAccessor } from "./data/pendingMatchAccessor.js";
+import { GUEST_ROW_LIFETIME_MS } from "./domain/leaderboards/boards.js";
+import { SESSION_TTL_SECONDS } from "./service/http/session.js";
 import { createMatchOutboxComponent, matchRetryPolicy } from "./domain/matches/matchOutboxComponent.js";
 import { createInMemoryPendingMatchDao } from "./testing/inMemoryPendingMatchDao.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
@@ -363,6 +365,12 @@ describe("the match pipeline (CC-111)", () => {
     logPipelineOutcome(logger, { matchId: "m1", status: "failed" });
 
     expect(entries).toEqual([]);
+  });
+});
+
+describe("guest rows on the boards and guest sessions (ADR-060)", () => {
+  it("end a guest's rows no later than the session that could still move them to an account", () => {
+    expect(GUEST_ROW_LIFETIME_MS).toBeLessThanOrEqual(SESSION_TTL_SECONDS * 1000);
   });
 });
 

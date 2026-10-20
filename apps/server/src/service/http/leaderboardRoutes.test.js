@@ -66,7 +66,7 @@ describe("leaderboard routes", () => {
     ]);
   });
 
-  it("ranks accounts by XP and by wins — never guests — with public fields only", async () => {
+  it("ranks accounts and guests by XP and by wins, guests under their server-given name (ADR-060)", async () => {
     server = await startTestServer({ engines: ENGINES });
     const riya = await account("riya");
     const sam = await account("sam");
@@ -80,15 +80,26 @@ describe("leaderboard routes", () => {
 
     const riyaNow = await progressOf(riya);
     const samNow = await progressOf(sam);
+    const guestNow = await progressOf(guest);
 
-    // 60 and 20 XP from the matches, plus whatever daily quests paid.
+    // 60, 20 and 40 XP from the matches, plus whatever daily quests paid.
     expect(riyaNow.xp).toBeGreaterThanOrEqual(60);
     expect(samNow.xp).toBeGreaterThanOrEqual(20);
-    expect(overall.body.entries).toEqual([
-      { rank: 1, displayName: "riya", level: riyaNow.level, score: riyaNow.xp },
-      { rank: 2, displayName: "sam", level: samNow.level, score: samNow.xp },
+    expect(guestNow.xp).toBeGreaterThanOrEqual(40);
+    expect(overall.body.entries.map(({ rank, ...entry }) => entry)).toEqual(
+      expect.arrayContaining([
+        { displayName: "riya", level: riyaNow.level, score: riyaNow.xp },
+        { displayName: "sam", level: samNow.level, score: samNow.xp },
+        { displayName: guest.identity.displayName, level: guestNow.level, score: guestNow.xp },
+      ]),
+    );
+    const scores = overall.body.entries.map((entry) => entry.score);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    expect(overall.body.entries.map((entry) => entry.rank)).toEqual([1, 2, 3]);
+    expect(wins.body.entries).toEqual([
+      { rank: 1, displayName: "riya", level: riyaNow.level, score: 2 },
+      { rank: 2, displayName: guest.identity.displayName, level: guestNow.level, score: 1 },
     ]);
-    expect(wins.body.entries).toEqual([{ rank: 1, displayName: "riya", level: riyaNow.level, score: 2 }]);
     expect(overall.body).not.toHaveProperty("you");
     expect(JSON.stringify(overall.body)).not.toMatch(/user_|guest_|@/);
   });
@@ -114,8 +125,38 @@ describe("leaderboard routes", () => {
     });
     expect((await get("/leaderboards/overall", guest.cookie)).body.you).toEqual({
       listed: false,
-      reason: "guest",
+      reason: "unranked",
     });
+  });
+
+  it("ranks a guest viewer like an account (ADR-060)", async () => {
+    server = await startTestServer({ engines: ENGINES });
+    const sam = await account("sam");
+    const guest = await clients.player();
+    await rps(guest, sam);
+    const guestNow = await progressOf(guest);
+
+    expect((await get("/leaderboards/rock-paper-scissors", guest.cookie)).body.you).toEqual({
+      listed: true,
+      rank: 1,
+      score: 1,
+    });
+    expect((await get("/leaderboards/overall", guest.cookie)).body.you).toEqual(
+      expect.objectContaining({ listed: true, score: guestNow.xp }),
+    );
+  });
+
+  it("keeps a response that says where the viewer stands out of every shared cache", async () => {
+    server = await startTestServer({ engines: ENGINES });
+    const guest = await clients.player();
+
+    const withSession = await fetch(`${server.baseUrl}/api/leaderboards/overall`, {
+      headers: { cookie: guest.cookie },
+    });
+    const without = await fetch(`${server.baseUrl}/api/leaderboards/overall`);
+
+    expect(withSession.headers.get("cache-control")).toBe("private, no-store");
+    expect(without.headers.get("cache-control")).toBeNull();
   });
 
   it("counts quest bonus XP on the overall and this week's boards (CC-089)", async () => {
@@ -146,12 +187,21 @@ describe("leaderboard routes", () => {
     ]);
   });
 
-  it("puts a guest's carried-over XP and wins on the boards once they sign up (CC-032)", async () => {
+  it("moves a guest's rows to the account it signs up for, once, quest XP included (CC-032, ADR-060)", async () => {
     server = await startTestServer({ engines: ENGINES });
     const alice = await clients.player();
     const bob = await clients.player();
     await rps(alice, bob);
-    expect((await get("/leaderboards/overall")).body.entries).toEqual([]);
+    const aliceAsGuest = await progressOf(alice);
+    const bobNow = await progressOf(bob);
+    const before = (await get("/leaderboards/overall")).body.entries.map((e) => [e.displayName, e.score]);
+    expect(before).toEqual(
+      expect.arrayContaining([
+        [alice.identity.displayName, aliceAsGuest.xp],
+        [bob.identity.displayName, bobNow.xp],
+      ]),
+    );
+    expect((await get("/leaderboards/weekly", alice.cookie)).body.you.score).toBe(aliceAsGuest.xp);
 
     const res = await fetch(`${server.baseUrl}/api/auth/signup`, {
       method: "POST",
@@ -167,18 +217,22 @@ describe("leaderboard routes", () => {
     const { xp, level } = await progressOf(riya);
 
     expect(res.status).toBe(201);
-    expect(xp).toBeGreaterThanOrEqual(30);
-    expect((await get("/leaderboards/overall", riya.cookie)).body).toEqual(
-      expect.objectContaining({
-        entries: [{ rank: 1, displayName: "riya", level, score: xp }],
-        you: { listed: true, rank: 1, score: xp },
-      }),
+    expect(xp).toBe(aliceAsGuest.xp);
+    const overall = (await get("/leaderboards/overall", riya.cookie)).body;
+    expect(overall.entries.map((e) => [e.displayName, e.score])).toEqual(
+      expect.arrayContaining([
+        ["riya", xp],
+        [bob.identity.displayName, bobNow.xp],
+      ]),
     );
+    expect(overall.entries).toHaveLength(2);
+    expect(overall.you).toEqual(expect.objectContaining({ listed: true, score: xp }));
     expect((await get("/leaderboards/rock-paper-scissors")).body.entries).toEqual([
       { rank: 1, displayName: "riya", level, score: 1 },
     ]);
-    // This week's board counts the moved match.
-    expect((await get("/leaderboards/weekly", riya.cookie)).body.you.score).toBeGreaterThanOrEqual(30);
+    // This week's board has all of it, the guest's quest XP included, and nothing twice.
+    expect((await get("/leaderboards/weekly", riya.cookie)).body.you.score).toBe(xp);
+    expect(JSON.stringify(await get("/leaderboards/weekly"))).not.toContain(alice.identity.displayName);
   });
 
   it("describes the weekly board with its ISO week and reset time", async () => {

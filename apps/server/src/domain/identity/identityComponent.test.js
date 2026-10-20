@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isServerGivenGuestName } from "../../models/identity.js";
 import { createIdentityComponent } from "./identityComponent.js";
 
 const UUID = "123e4567-e89b-12d3-a456-426614174000";
@@ -23,6 +24,14 @@ describe("identityComponent.createGuest", () => {
     for (const guest of guests) {
       expect(guest.displayName).toMatch(/^Guest-[A-HJ-NP-Z2-9]{4}$/);
     }
+  });
+
+  it("only makes names the boards trust as server-given (ADR-060)", () => {
+    const component = createIdentityComponent();
+
+    const names = Array.from({ length: 200 }, () => component.createGuest().displayName);
+
+    expect(names.filter((name) => !isServerGivenGuestName(name))).toEqual([]);
   });
 
   it("draws again when the random letters spell a rude word or a bot name", () => {
