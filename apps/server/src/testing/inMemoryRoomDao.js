@@ -101,5 +101,14 @@ export function createInMemoryRoomDao({ betweenClosedReads = async () => {} } = 
       }
       return counts;
     },
+
+    async countByGameAndStatus() {
+      const counts = new Map();
+      for (const { gameId, status } of rooms.values()) {
+        const key = `${gameId} ${status}`;
+        counts.set(key, { gameId, status, rooms: (counts.get(key)?.rooms ?? 0) + 1 });
+      }
+      return [...counts.values()];
+    },
   });
 }

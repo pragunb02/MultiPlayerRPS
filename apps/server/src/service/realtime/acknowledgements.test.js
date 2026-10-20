@@ -76,4 +76,70 @@ describe("registerHandlers", () => {
     expect(handler).not.toHaveBeenCalled();
     expect(find("socket event without acknowledgement ignored")[0].event).toBe("ping");
   });
+
+  describe("timing for operations telemetry (ADR-055)", () => {
+    /** Handlers whose events are timed on a clock that moves 4 ms between the start and the reply. */
+    function timed(handlers, { allow } = {}) {
+      const socket = new EventEmitter();
+      const recorded = [];
+      let time = 100;
+      registerHandlers(socket, handlers, captureLogger().logger, {
+        ...(allow && { allow }),
+        recordEvent: (event) => recorded.push(event),
+        now: () => (time += 4),
+      });
+      const emit = (event, ...args) => new Promise((resolve) => socket.emit(event, ...args, resolve));
+      return { socket, emit, recorded };
+    }
+
+    it("records an answered event as ok, with its name and time", async () => {
+      const { emit, recorded } = timed({ "room:create": () => ({}) });
+
+      await emit("room:create", {});
+
+      expect(recorded).toEqual([{ event: "room:create", outcome: "ok", durationMs: 4 }]);
+    });
+
+    it("records a typed error as refused", async () => {
+      const { emit, recorded } = timed({
+        "room:join": () => {
+          throw new ConflictError("Room is full");
+        },
+      });
+
+      await emit("room:join", { code: "AB2CDE" });
+
+      expect(recorded).toEqual([{ event: "room:join", outcome: "refused", durationMs: 4 }]);
+    });
+
+    it("records a fault of ours as failed", async () => {
+      const { emit, recorded } = timed({
+        "room:join": async () => {
+          throw new Error("database down");
+        },
+      });
+
+      await emit("room:join", {});
+
+      expect(recorded).toEqual([{ event: "room:join", outcome: "failed", durationMs: 4 }]);
+    });
+
+    it("records a refused flood as rate_limited", async () => {
+      const handler = vi.fn();
+      const { emit, recorded } = timed({ "game:move": handler }, { allow: () => false });
+
+      await emit("game:move", {});
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(recorded).toEqual([{ event: "game:move", outcome: "rate_limited", durationMs: 4 }]);
+    });
+
+    it("records nothing for an event without an acknowledgement", () => {
+      const { socket, recorded } = timed({ ping: vi.fn() });
+
+      socket.emit("ping", {});
+
+      expect(recorded).toEqual([]);
+    });
+  });
 });

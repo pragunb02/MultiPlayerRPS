@@ -1,4 +1,4 @@
-import { ROOM_STATUS } from "@classicade/shared";
+import { GAMES, ROOM_STATUS } from "@classicade/shared";
 import { ConcurrentChangeError, ConflictError, NotFoundError } from "../utils/errors.js";
 import { assertDefined } from "../utils/assert.js";
 import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
@@ -199,6 +199,25 @@ export function createRoomAccessor({ roomDao }) {
       const counts = await roomDao.countByStatus();
       return Object.freeze(
         Object.fromEntries(Object.values(ROOM_STATUS).map((status) => [status, counts[status] ?? 0])),
+      );
+    },
+
+    /**
+     * Open rooms for every game of the catalogue in every status, zero included, so a gauge falls back to zero
+     * when the last room of a kind closes instead of keeping its old value.
+     *
+     * @returns {Promise<ReadonlyArray<Readonly<{ gameId: string, status: string, rooms: number }>>>}
+     */
+    async countByGameAndStatus() {
+      const found = new Map(
+        (await roomDao.countByGameAndStatus()).map((row) => [`${row.gameId} ${row.status}`, row.rooms]),
+      );
+      return Object.freeze(
+        GAMES.flatMap(({ id }) =>
+          Object.values(ROOM_STATUS).map((status) =>
+            Object.freeze({ gameId: id, status, rooms: found.get(`${id} ${status}`) ?? 0 }),
+          ),
+        ),
       );
     },
   });

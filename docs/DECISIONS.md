@@ -283,6 +283,34 @@ the owner may change it.
   3. Metrics and named warning and error lines only. No traces, until a new decision.
   4. The three alerts in point 6, by email to the owner.
   5. The stack is opened by the owner only, with two-factor sign-in.
+- **Amended 2026-10-20 (owner, with the code pull request of CC-286).** The owner looked at self-hosting the same
+  day and chose Grafana Cloud free after all, as decided above, with these additions so the free tier lasts and
+  growth stays easy:
+  1. **Vendor neutral.** The server speaks plain OTLP over HTTP (protobuf) to whatever `OTEL_EXPORTER_OTLP_ENDPOINT`
+     names, with `OTEL_EXPORTER_OTLP_HEADERS`. Nothing in the code assumes Grafana Cloud. The code lives in
+     `apps/server/src/dependency/telemetry/` (it calls another company's service), and only the composition root
+     imports it. The service layer receives two plain functions.
+  2. **Cardinality budget.** The metric names and attribute keys of point 1 are fixed in `telemetrySchema.js`, and
+     every value comes from a closed set. A test fails when an attribute key is not on the list. Expected active
+     series: about 1 250 per instance, at most about 5 100 per instance in the worst case (CC-286, "Cardinality
+     budget"). Durations use eleven bucket boundaries (5 ms to 10 s).
+  3. **Logs.** Never below info level: the named lines now include four info lines that mark a start or a stop
+     (`server listening`, `telemetry on`, `shutting down`, `shutdown complete`). The same line is sent at most 30
+     times a minute, the rest are counted in a new counter, `telemetry.logs.suppressed`. A body is always one of
+     the named lines, so its size is bounded, and each field value is limited to 128 characters.
+  4. **Instances.** The resource gets a fourth key, `service.instance.id`: a random UUID made when the process
+     starts, with nothing about the machine or anyone in it. Two servers (CC-061) then never mix their series.
+  5. **Traces** stay out (point 2). If a later decision adds them: head sampling read from `OTEL_TRACES_SAMPLER_ARG`
+     with about 10 % as the default, errors always kept, and their own allowlist.
+  6. **Usage alerts.** Two more alerts and a dashboard row from the stack's `grafanacloud-usage` data source: active
+     series above 8 000 (80 % of 10 000) and logs on course for more than 40 GB a month (80 % of 50 GB). Free tier
+     limits as read on https://grafana.com/pricing/ on 2026-10-20: 10k active series, 50 GB of logs, 14 days
+     retention, 3 users.
+  7. **Growth path.** When a usage alert fires: first tune or sample (find the label or line that grew, turn logs
+     off with `OTEL_LOGS_EXPORTER=none`), then move to Grafana Cloud pay as you go, or self-host a Collector with
+     Prometheus, Loki and Grafana on a VM. In each case only the two env vars change. The application code does not.
+  8. **Self-hosting now** was set aside: we would run, update and secure it ourselves, a single VM can fail with
+     nobody to notice, and free VMs have their own limits (CC-286 section 5).
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 

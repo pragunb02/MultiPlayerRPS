@@ -1,11 +1,12 @@
 import express from "express";
 import helmet from "helmet";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { NO_OPERATIONS_METRICS } from "../../utils/operationsMetrics.js";
 import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
 import { createApiRateLimit, DEFAULT_API_LIMIT } from "./rateLimits.js";
 import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createAdminAccess } from "./adminAccess.js";
-import { createRequestLogger } from "./requestLogger.js";
+import { createRequestLogger, keepRoutePrefix } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
 import { createSessionGuard, createSessionRenewals } from "./session.js";
 import { createWebAppRouter } from "./webApp.js";
@@ -41,6 +42,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   analyticsComponent: ReturnType<typeof import("../../domain/analytics/analyticsComponent.js").createAnalyticsComponent>,
  *   isDatabaseUp: () => boolean,
  *   now?: () => number,   the clock for date-dependent answers (daily quests); tests pick a day
+ *   recordRequest?: import("../../utils/operationsMetrics.js").OperationsMetrics["recordHttpRequest"],  operations
+ *     telemetry's request timer (ADR-055). Without it nothing is recorded
  * }} deps
  */
 export function createHttpApp({
@@ -69,6 +72,7 @@ export function createHttpApp({
   apiLimit = DEFAULT_API_LIMIT,
   isDatabaseUp,
   now = Date.now,
+  recordRequest = NO_OPERATIONS_METRICS.recordHttpRequest,
 }) {
   assertDefined(config, "config");
   assertFunction(isDatabaseUp, "isDatabaseUp");
@@ -83,7 +87,7 @@ export function createHttpApp({
   // X-Forwarded-For. Zero means the header is ignored. The number comes from TRUST_PROXY_HOPS (see DEPLOYMENT.md).
   app.set("trust proxy", config.trustProxyHops === 0 ? false : config.trustProxyHops);
   logger.info({ trustProxyHops: config.trustProxyHops }, "client addresses read through trusted proxies");
-  app.use(createRequestLogger({ logger }));
+  app.use(createRequestLogger({ logger, recordRequest }));
   app.use(
     helmet({
       contentSecurityPolicy: contentSecurityPolicy({ isProduction: config.isProduction }),
@@ -98,6 +102,7 @@ export function createHttpApp({
   });
 
   app.use(express.json({ limit: "100kb" }));
+  app.use("/api", keepRoutePrefix);
   app.use("/api", createCsrfGuard({ allowedOrigins: config.allowedOrigins }));
   app.use("/api", sessionMiddleware);
   // After the session, so a signed-in or guest player is counted by session rather than by address.

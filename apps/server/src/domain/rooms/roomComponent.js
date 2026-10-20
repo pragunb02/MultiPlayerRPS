@@ -1180,6 +1180,14 @@ export function createRoomComponent({
     countRooms: () => roomAccessor.countByStatus(),
 
     /**
+     * How many open rooms there are of each game in each status, zero included, for the operations gauge
+     * (ADR-055). Read only when telemetry takes a reading.
+     *
+     * @returns {Promise<ReadonlyArray<Readonly<{ gameId: string, status: string, rooms: number }>>>}
+     */
+    countRoomsByGame: () => roomAccessor.countByGameAndStatus(),
+
+    /**
      * The game of every stored room that is finished, as `room.gameFinished` announced it. The match pipeline adds
      * them again at startup and now and then (CC-111): a game whose announcement was lost to a crash or a database
      * blip still reaches it while its room waits for a rematch. Rooms whose time is up are listed too, because a
