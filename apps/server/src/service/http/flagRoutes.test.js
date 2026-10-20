@@ -43,7 +43,7 @@ function setup() {
     registry: REGISTRY,
     flagAccessor: createFeatureFlagAccessor({ featureFlagDao: dao }),
     keyedIds: createKeyedIds({ secret: "a test key for feature flag buckets, 32+ chars" }),
-    ages: { adultsAmong: async () => new Set() },
+    safety: { policyFor: async () => ({ audience: "minor" }) },
     logger: captureLogger().logger,
   });
   const app = express();

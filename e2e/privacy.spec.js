@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "./fixtures.js";
+import { OWNER } from "./ownerConsole.js";
 import { newAccount } from "./personas.js";
 
 // An account holder's data and privacy (CC-035, CC-152): the year of birth at sign-up, a copy of their data, and
@@ -171,5 +172,35 @@ test.describe("the year of birth (CC-152)", () => {
 
     await bob.page.goto("/leaderboards/rock-paper-scissors");
     await expect(bob.page.getByRole("listitem").filter({ hasText: account.username })).toBeVisible();
+  });
+
+  test("the owner corrects a year from the console, and the player's own policy follows (CC-152)", async ({
+    players,
+  }) => {
+    const account = newAccount();
+    const riya = await players.open("riya", { secrets: [account.email, account.password] });
+    const owner = await players.open("owner", { secrets: [OWNER.password, OWNER.email] });
+    await signUp(riya.page, account, 1990);
+    await riya.page.goto("/profile");
+    const privacy = privacyOf(riya.page);
+    await expect(privacy.getByText(/^1990\. It can be set once/)).toBeVisible();
+    await expect(privacy.getByText(/your name shows as Hidden player/)).toHaveCount(0);
+
+    await owner.page.goto("/login");
+    await owner.page.getByLabel("Email").fill(OWNER.email);
+    await owner.page.getByLabel("Password").fill(OWNER.password);
+    await owner.page.getByRole("button", { name: "Log in" }).click();
+    await expect(owner.page).toHaveURL("/");
+    await owner.page.goto("/admin/ages");
+    await owner.page.getByLabel("Account email").fill(account.email);
+    await owner.page.getByLabel("Year of birth").selectOption("2010");
+    await owner.page.getByRole("button", { name: "Correct the year" }).click();
+    await expect(owner.page.getByText(`${account.username}: year of birth 2010, so minor.`)).toBeVisible();
+
+    await riya.page.reload();
+    await expect(privacy.getByText(/^2010\. It can be set once/)).toBeVisible();
+    await expect(
+      privacy.getByText("On the public leaderboards your name shows as Hidden player."),
+    ).toBeVisible();
   });
 });

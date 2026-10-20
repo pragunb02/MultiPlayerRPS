@@ -35,6 +35,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   feedbackLimits?: Parameters<typeof import("./feedbackRoutes.js").createFeedbackRoutes>[0]["limits"],
  *   dailyPuzzleComponent: ReturnType<typeof import("../../domain/dailyPuzzles/dailyPuzzleComponent.js").createDailyPuzzleComponent>,
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   moves and hints per player (CC-144)
+ *   safetyComponent: ReturnType<typeof import("../../domain/safety/safetyComponent.js").createSafetyComponent>,  the age
+ *     policy, whose own flags each player can read (CC-152)
  *   flagComponent: ReturnType<typeof import("../../domain/flags/flagComponent.js").createFlagComponent>,  feature
  *     flags (CC-312)
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
@@ -74,6 +76,7 @@ export function createHttpApp({
   feedbackLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
+  safetyComponent,
   flagComponent,
   authLimits,
   onSessionEnded,
@@ -163,6 +166,7 @@ export function createHttpApp({
       feedbackLimits,
       dailyPuzzleComponent,
       dailyPuzzleLimit,
+      safetyComponent,
       flagComponent,
       build: config.build,
     }),

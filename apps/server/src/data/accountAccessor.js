@@ -159,6 +159,21 @@ export function createAccountAccessor({ accountDao }) {
     setBirthYear: (change) => orNotFound(() => accountDao.setBirthYear(change)),
 
     /**
+     * The owner's correction (CC-152, ADR-048.9): sets the year, or clears it when `birthYear` is left out.
+     *
+     * @param {{ accountId: string, birthYear?: number, at: number }} change
+     * @throws {NotFoundError}
+     */
+    correctBirthYear: ({ accountId, birthYear, at }) =>
+      orNotFound(() =>
+        accountDao.correctBirthYear({
+          accountId,
+          ...(birthYear !== undefined && { birthYear }),
+          at: new Date(at),
+        }),
+      ),
+
+    /**
      * @param {ReadonlyArray<string>} accountIds
      * @returns {Promise<ReadonlyArray<Readonly<{ accountId: string, birthYear: number }>>>} those with a stated year
      */

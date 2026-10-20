@@ -348,3 +348,94 @@ describe("data export and birth year through the real composition root (integrat
     }
   }, 20_000);
 });
+
+describe("the age policy and the owner's corrections through the real composition root (integration, CC-152)", () => {
+  it("serves each player's own flags, and the owner's correction changes them and the profile rule at once", async () => {
+    const uri = mongo.uri(`account-data-${++dbCounter}`);
+    // The owner's account id is known only after sign-up, so the server starts again with it as the admin.
+    const first = await startServer({
+      config: testConfig({ MONGO_URI: uri }),
+      logger: captureLogger().logger,
+    });
+    const firstUrl = `http://127.0.0.1:${first.port}`;
+    const ownerUp = await call(firstUrl, "POST", "/auth/signup", {
+      body: { username: "owner", email: "owner@example.com", password: PASSWORD, birthYear: 1985 },
+    });
+    await call(firstUrl, "POST", "/auth/signup", {
+      body: { username: "sam", email: "sam@example.com", password: PASSWORD, birthYear: 1990 },
+    });
+    await first.close();
+
+    const capture = captureLogger();
+    onTestFailed(() =>
+      capture.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)),
+    );
+    const config = testConfig({ MONGO_URI: uri, ADMIN_ACCOUNT_IDS: ownerUp.body.identity.id });
+    const app = await startServer({ config, logger: capture.logger });
+    const url = `http://127.0.0.1:${app.port}`;
+    try {
+      const login = (email) => call(url, "POST", "/auth/login", { body: { email, password: PASSWORD } });
+      const owner = (await login("owner@example.com")).cookie;
+      const sam = (await login("sam@example.com")).cookie;
+      const legacyBefore = await readCollection(uri, "users");
+
+      expect((await call(url, "GET", "/safety", { cookie: sam })).body.safety).toEqual(
+        expect.objectContaining({ shareCardName: true, publicProfile: true, boardName: "own", emotes: "on" }),
+      );
+      const guest = await call(url, "POST", "/session/guest");
+      expect((await call(url, "GET", "/safety", { cookie: guest.cookie })).body.safety).toEqual(
+        expect.objectContaining({
+          shareCardName: false,
+          friendsMode: "none",
+          quietHours: expect.any(Object),
+        }),
+      );
+
+      const correction = { email: "sam@example.com", birthYear: 2010 };
+      const bySam = await call(url, "PUT", "/admin/accounts/birth-year", { body: correction, cookie: sam });
+      expect(bySam.status).toBe(404);
+
+      const byOwner = await call(url, "PUT", "/admin/accounts/birth-year", {
+        body: correction,
+        cookie: owner,
+      });
+      expect(byOwner.status).toBe(200);
+      expect(byOwner.body.account).toEqual({ username: "sam", birthYear: 2010, ageGroup: "minor" });
+
+      expect((await call(url, "GET", "/safety", { cookie: sam })).body.safety).toEqual(
+        expect.objectContaining({
+          shareCardName: false,
+          publicProfile: false,
+          boardName: "hidden",
+          emotes: "off",
+        }),
+      );
+      const goPublic = await call(url, "PUT", "/profile/visibility", {
+        body: { visibility: "public" },
+        cookie: sam,
+      });
+      expect(goPublic.status).toBe(403);
+      const [stored] = await readCollection(uri, "accounts", { username: "sam" });
+      expect(stored.birthYear).toBe(2010);
+      expect(stored.birthYearCorrectedAt).toBeInstanceOf(Date);
+      expect(await readCollection(uri, "users")).toEqual(legacyBefore);
+      // The player's export says the owner corrected the year, and when.
+      const exported = await call(url, "POST", "/account/export", {
+        body: { password: PASSWORD },
+        cookie: sam,
+      });
+      expect(exported.body.account).toEqual(
+        expect.objectContaining({
+          birthYear: 2010,
+          birthYearCorrectedAt: stored.birthYearCorrectedAt.toISOString(),
+          ageGroup: "minor",
+        }),
+      );
+      const line = capture.entries.find((entry) => entry.msg === "birth year corrected by the owner");
+      expect(line).toEqual(expect.objectContaining({ adminId: ownerUp.body.identity.id }));
+      expect(JSON.stringify(line)).not.toMatch(/2010|sam@example\.com/);
+    } finally {
+      await app.close();
+    }
+  }, 30_000);
+});

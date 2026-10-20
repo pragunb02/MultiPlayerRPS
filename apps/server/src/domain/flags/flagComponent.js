@@ -10,6 +10,7 @@ import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NotFoundError, ValidationError } from "../../utils/errors.js";
 import { dayOf } from "../../utils/indiaTime.js";
 import { peopleCount } from "../analytics/privacy.js";
+import { AUDIENCES } from "../safety/agePolicy.js";
 import { bucketFrom, inAudience, inRollout } from "./flagRules.js";
 
 /** How often the overrides are read again and the counts written, in production. */
@@ -46,23 +47,23 @@ const NO_COUNTS = Object.freeze({ exposures: 0, successes: 0 });
  *   registry?: ReadonlyArray<Readonly<FeatureFlag>>,
  *   flagAccessor: ReturnType<typeof import("../../data/featureFlagAccessor.js").createFeatureFlagAccessor>,
  *   keyedIds: ReturnType<typeof import("../../utils/keyedIds.js").createKeyedIds>,
- *   ages: Pick<ReturnType<typeof import("../accounts/accountComponent.js").createAccountComponent>, "adultsAmong">,
+ *   safety: Pick<ReturnType<typeof import("../safety/safetyComponent.js").createSafetyComponent>, "policyFor">,
  *   logger: import("../../utils/logger.js").Logger,
  *   now?: () => number,
  * }} deps  `registry` is FLAGS unless a test gives its own. `keyedIds` must be made under the FLAG_BUCKETS label.
- *   `ages` is the age rule of CC-152, asked only for the adults audience
+ *   `safety` is the one age policy of CC-152, asked only for the adults audience
  */
 export function createFlagComponent({
   registry = FLAGS,
   flagAccessor,
   keyedIds,
-  ages,
+  safety,
   logger,
   now = Date.now,
 }) {
   assertDefined(flagAccessor, "flagAccessor");
   assertFunction(keyedIds?.idOf, "keyedIds.idOf");
-  assertFunction(ages?.adultsAmong, "ages.adultsAmong");
+  assertFunction(safety?.policyFor, "safety.policyFor");
   assertDefined(logger, "logger");
   assertFlagRegistry(registry);
 
@@ -119,8 +120,8 @@ export function createFlagComponent({
   const rolloutOf = (flag) => (fresh() ? (overrides.get(flag.name)?.rollout ?? flag.rollout) : flag.rollout);
 
   /**
-   * Whether a flag is on for a player. Only the adults audience asks anything outside memory: the age rule, for an
-   * account. When that fails the flag's default (off) is the answer.
+   * Whether a flag is on for a player. Only the adults audience asks anything outside memory: the age policy, for
+   * an account. When that fails the flag's default (off) is the answer.
    *
    * @param {Readonly<FeatureFlag>} flag
    * @param {FlagPlayer | undefined} player
@@ -130,7 +131,7 @@ export function createFlagComponent({
       const adult =
         flag.audience === FLAG_AUDIENCES.ADULTS &&
         player?.kind === IDENTITY_KINDS.USER &&
-        (await ages.adultsAmong({ playerIds: [player.id], now: now() })).has(player.id);
+        (await safety.policyFor({ playerId: player.id, now: now() })).audience === AUDIENCES.ADULT;
       if (!inAudience({ audience: flag.audience, player, adult })) return false;
       const bucket = player === undefined ? undefined : bucketFrom(keyedIds.idOf([flag.name, player.id]));
       return inRollout({ rollout: rolloutOf(flag), bucket });

@@ -91,6 +91,30 @@ export const OWN_PROFILE = Object.freeze({
   canBePublic: false,
 });
 
+/** The safety flags of a player who is not surely an adult (GET /api/safety, CC-152). */
+export const MINOR_SAFETY = Object.freeze({
+  canFollow: false,
+  friendsMode: "mutual-known",
+  emotes: "off",
+  quietHours: Object.freeze({ timeZone: "Asia/Kolkata", from: "22:00", to: "07:00" }),
+  shareCardName: false,
+  maxOwnedCircleSize: 10,
+  publicProfile: false,
+  boardName: "hidden",
+});
+
+/** An adult account's safety flags. */
+export const ADULT_SAFETY = Object.freeze({
+  canFollow: true,
+  friendsMode: "mutual",
+  emotes: "on",
+  quietHours: null,
+  shareCardName: true,
+  maxOwnedCircleSize: 50,
+  publicProfile: true,
+  boardName: "own",
+});
+
 /** A fake API client: every method is a spy with a sensible default; override per test. */
 export function fakeApi(overrides = {}) {
   return {
@@ -104,6 +128,9 @@ export function fakeApi(overrides = {}) {
     signOutOtherDevices: vi.fn().mockResolvedValue(undefined),
     getAccount: vi.fn().mockResolvedValue({ username: "Riya", createdAt: 0, ageGroup: "unknown" }),
     setBirthYear: vi.fn(),
+    // A minor's flags, as an account of unknown age gets them (CC-152). Tests of an adult give their own.
+    getSafety: vi.fn().mockResolvedValue(MINOR_SAFETY),
+    correctBirthYear: vi.fn(),
     exportData: vi.fn(),
     deleteAccount: vi.fn().mockResolvedValue(undefined),
     getBlocks: vi.fn().mockResolvedValue([]),

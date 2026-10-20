@@ -52,7 +52,7 @@ function flakyDao() {
   return { dao: Object.freeze(guarded), state };
 }
 
-function setup({ registry = REGISTRY, adults = [ADULT.id], ages } = {}) {
+function setup({ registry = REGISTRY, adults = [ADULT.id], safety } = {}) {
   let clock = T0;
   const { dao, state } = flakyDao();
   const capture = captureLogger();
@@ -60,8 +60,8 @@ function setup({ registry = REGISTRY, adults = [ADULT.id], ages } = {}) {
     registry,
     flagAccessor: createFeatureFlagAccessor({ featureFlagDao: dao }),
     keyedIds: createKeyedIds({ secret: "a test key for feature flag buckets, 32+ chars" }),
-    ages: ages ?? {
-      adultsAmong: async ({ playerIds }) => new Set(playerIds.filter((id) => adults.includes(id))),
+    safety: safety ?? {
+      policyFor: async ({ playerId }) => ({ audience: adults.includes(playerId) ? "adult" : "minor" }),
     },
     logger: capture.logger,
     now: () => clock,
@@ -120,8 +120,8 @@ describe("flag component: who gets a flag (CC-312)", () => {
   it("does not ask the age rule for a guest or a visitor, and answers the flag's default when the rule fails", async () => {
     let asked = 0;
     const { flags, capture } = setup({
-      ages: {
-        adultsAmong: async () => {
+      safety: {
+        policyFor: async () => {
           asked += 1;
           throw new Error("account store down");
         },
@@ -218,7 +218,7 @@ describe("flag component: who gets a flag (CC-312)", () => {
           },
         },
         keyedIds: createKeyedIds({ secret: "a test key for feature flag buckets, 32+ chars" }),
-        ages: { adultsAmong: async () => new Set() },
+        safety: { policyFor: async () => ({ audience: "minor" }) },
         logger: captureLogger().logger,
         now: () => T0,
       });
@@ -362,7 +362,7 @@ describe("flag component: anonymous counts (CC-312)", () => {
           }),
       },
       keyedIds: createKeyedIds({ secret: "a test key for feature flag buckets, 32+ chars" }),
-      ages: { adultsAmong: async () => new Set() },
+      safety: { policyFor: async () => ({ audience: "minor" }) },
       logger: captureLogger().logger,
       now: () => T0,
     });
@@ -403,7 +403,7 @@ describe("flag component: anonymous counts (CC-312)", () => {
         },
       },
       keyedIds: createKeyedIds({ secret: "a test key for feature flag buckets, 32+ chars" }),
-      ages: { adultsAmong: async () => new Set() },
+      safety: { policyFor: async () => ({ audience: "minor" }) },
       logger: captureLogger().logger,
       // 19:00 UTC on 20 October is half past midnight on 21 October in India.
       now: () => Date.UTC(2026, 9, 20, 19),

@@ -30,6 +30,7 @@ import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/bot
 import { createBlockComponent } from "./domain/blocks/blockComponent.js";
 import { createProfileCards } from "./domain/profiles/profileCards.js";
 import { createProfileComponent } from "./domain/profiles/profileComponent.js";
+import { createSafetyComponent } from "./domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
 import { createFlagComponent } from "./domain/flags/flagComponent.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
@@ -692,8 +693,10 @@ export async function startServer({
     legacyPasswords: createLegacyPasswordChecker(),
     accountDeletionAccessor,
   });
+  // The under 18 defaults in one place: every social feature reads a player's age policy from here (CC-152).
+  const safetyComponent = createSafetyComponent({ ages: accountComponent });
   // What rooms, boards and history show beside a name: an avatar, and an adult's profile link (CC-034).
-  const profileCards = createProfileCards({ profileAccessor, ages: accountComponent });
+  const profileCards = createProfileCards({ profileAccessor, safety: safetyComponent });
   const matchComponent = createMatchComponent({
     matchAccessor,
     matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
@@ -701,14 +704,14 @@ export async function startServer({
   });
   // One set of seat ids for rooms and blocks, so a seat id the room view shows is the one a block is checked against.
   const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
-  const feedbackComponent = createFeedbackComponent({ feedbackAccessor, ages: accountComponent });
+  const feedbackComponent = createFeedbackComponent({ feedbackAccessor, safety: safetyComponent });
   // Feature flags (CC-312). Making the component checks the registry, so a broken one stops the boot.
   const flagComponent = createFlagComponent({
     flagAccessor: featureFlagAccessor,
     keyedIds: createKeyedIds({
       secret: keyedIdSecretFrom({ sessionSecret: config.sessionSecret, label: KEYED_ID_LABELS.FLAG_BUCKETS }),
     }),
-    ages: accountComponent,
+    safety: safetyComponent,
     logger,
     now,
   });
@@ -742,13 +745,13 @@ export async function startServer({
     matchAccessor,
     progressAccessor,
     transfers: playerTransferAccessor,
-    ages: accountComponent,
+    safety: safetyComponent,
     cards: profileCards,
   });
   const chessRatingComponent = createChessRatingComponent({ chessRatingAccessor, events: domainEvents });
   const profileComponent = createProfileComponent({
     profileAccessor,
-    ages: accountComponent,
+    safety: safetyComponent,
     accounts: accountComponent,
     progress: progressionComponent,
     ratings: chessRatingComponent,
@@ -939,6 +942,7 @@ export async function startServer({
     feedbackLimits: limits.feedback,
     feedbackComponent,
     dailyPuzzleComponent,
+    safetyComponent,
     flagComponent,
     leaderboardComponent,
     analyticsComponent,
