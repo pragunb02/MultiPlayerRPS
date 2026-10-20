@@ -58,6 +58,51 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-065 — Public profiles by a random handle, adults only, private by default, and a curated avatar set
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-034](tickets/CC-034.md), research with
+  sources there). Built in the CC-034 pull request. It settles what ADR-011 left open ("public player profiles are a
+  separate decision") and fills in ADR-028.8's first prerequisite.
+- **Context.** Friends and invites (CC-052) need a safe way to look at someone you met. No client may ever get
+  another person's player id (ADR-057, CC-297), every player counts as a minor until they give a year (ADR-028.1,
+  ADR-048.10), and a block must look like nothing at all (ADR-053).
+- **Decision.**
+  1. **The address is a random handle**, `/players/:handle`: 16 characters of lower case Crockford base 32, 80
+     random bits, stored in a new `player_profiles` document and made the first time it is needed. Never a player id,
+     never a keyed id of one (that would change with `SESSION_SECRET` and the server could work it out from the id),
+     never the username (renames, CC-185), unrelated to every room code and match id.
+  2. **Only adult accounts are linked.** A handle is sent on a leaderboard row whose name is shown, and beside a past
+     opponent in history, only when that player is an adult account. Guests, minors, accounts of unknown age, hidden
+     rows and computer players get no link. A player sees their own handle on their own profile.
+  3. **What a handle shows**, decided on the server for each read, in this order: not found for a handle nobody has,
+     a malformed one, a deleted account's and a block either way, one body for all. "Hidden player" with nothing else
+     (no avatar, no stats) for anyone not surely an adult. The username and avatar of an adult's private profile.
+     The username, avatar, level, games played and won, and the chess rating (CC-042) of an adult's public profile.
+     Never a date, a streak, last seen, history, an email or an id. `own: true` when the viewer is its owner.
+  4. **Private by default** (GDPR Article 25(2), the ICO children's code standard 7), `DEFAULT_PROFILE_VISIBILITY`.
+     Only an adult account can make it public. Anyone can make it private.
+  5. **Avatars are a curated set of twelve**, drawn by us in code in the neon arcade style (ADR-012), no uploads and
+     no photos. `AVATARS` in `@classicade/shared` gives each an unlock rule, today all `free`, and the server checks
+     the rule (`domain/profiles/avatarRules.js`). Coin cosmetics (ADR-026, CC-143) add a rule kind and its check. Ids
+     are permanent: a retired avatar stays for those who have it.
+  6. **Where avatars show.** On a room seat, kept on the seat when the person sits down, so every view shows it
+     without a lookup. On a leaderboard row whose name is shown (a hidden row gets the silhouette). Beside a past
+     opponent in history. On both profiles. A player without one gets a neutral silhouette.
+  7. **Guests pick too, and it moves on sign up** (ADR-014, a transfer participant before leaderboards): the account
+     keeps its own avatar and handle, and takes the guest's avatar when it has none, or the guest's whole profile when
+     it has no profile. The guest's handle then leads nowhere.
+  8. **Abuse.** No directory, no search, no list. Lookups: 30 a minute per signed-in player, then 30 a minute per
+     address, counting only what the player limit let through. Avatar and visibility changes: 30 in 10 minutes.
+  9. **Deletion and export** (ADR-048): `player_profiles` is a participant. Export: handle, avatar, visibility.
+- **Consequences.** One new collection with two unique indexes, nothing existing changed or migrated. Rooms stored
+  before this have no avatars on their seats, and show the silhouette. A board read can make the profile of an adult
+  listed on it (one small write, the first time only). CC-278 adds friends-only visibility and moves the switch into
+  the privacy settings page. CC-052 reads the same handle and `blockedWith`.
+- **For the owner to decide.** (1) Private by default, or public by default for adults. (2) Whether a hidden
+  profile should show the player's avatar (now the silhouette). (3) The Hinglish lines in
+  `apps/web/src/components/Profile/profileCopy.js`, which are the builder's drafts. (4) Whether a room seat should
+  link to an adult opponent's profile (now only boards and history do, so spectators get no stable id).
+
 ### ADR-062 — The chess rating: one game per period, a sixth outbox step, the guest move and the level seed
 
 - **Status:** Accepted · 2026-10-20 by the owner, all points, including the three seed numbers, the guest move

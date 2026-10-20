@@ -56,7 +56,10 @@ export function AvatarPicker({ current, guest, onPick }) {
           </label>
         ))}
       </div>
-      <p role={status.tone === "error" ? "alert" : "status"} className={styles[status.tone] ?? styles.muted}>
+      <p
+        role={status.tone === "error" ? "alert" : "status"}
+        className={status.tone === "" ? styles.muted : styles[status.tone]}
+      >
         {status.text}
       </p>
     </fieldset>

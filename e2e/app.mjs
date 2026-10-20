@@ -19,6 +19,8 @@ const limits = {
   api: { windowMs: 60_000, limit: 10_000 },
   // Blocking keeps its real limit per player (CC-044). Only the one per address is raised.
   blocks: { perAddress: { windowMs: 60_000, limit: 10_000 } },
+  // Profile lookups keep their real limit per player (CC-034). Only the one per address is raised.
+  profiles: { lookupsPerAddress: { windowMs: 60_000, limit: 10_000 } },
 };
 // Standard room lifetimes and limits, unless a test asked the next process for others (CC-101, CC-107). The
 // realtime connections and the open rooms per address are raised for the same reason as above. Every other room
