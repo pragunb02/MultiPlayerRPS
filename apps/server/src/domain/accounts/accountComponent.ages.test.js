@@ -219,6 +219,29 @@ describe("accountComponent birth year corrections by the owner (CC-152, ADR-048.
       accounts.correctBirthYear({ email: "not an email", birthYear: 1990, now: NOW }),
     ).rejects.toMatchObject({ details: { field: "email" } });
   });
+
+  it("changes nothing when two accounts hold the email under older spellings, so the owner picks by hand", async () => {
+    const accountAccessor = createAccountAccessor({ accountDao: createInMemoryAccountDao() });
+    const corrections = [];
+    const accounts = createAccountComponent({
+      accountAccessor: {
+        ...accountAccessor,
+        findByEmail: async () => [{ accountId: "a" }, { accountId: "b" }],
+        correctBirthYear: async (change) => corrections.push(change),
+      },
+      legacyUserAccessor: createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao([]) }),
+      passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }),
+      legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
+      accountDeletionAccessor: createAccountDeletionAccessor({
+        accountDeletionDao: createInMemoryAccountDeletionDao(),
+      }),
+    });
+
+    await expect(
+      accounts.correctBirthYear({ email: RIYA.email, birthYear: 1990, now: NOW }),
+    ).rejects.toMatchObject({ code: "CONFLICT", details: { field: "email" } });
+    expect(corrections).toEqual([]);
+  });
 });
 
 describe("accountComponent password checks and closing (CC-035)", () => {

@@ -79,6 +79,9 @@ describe("year of birth corrections in the owner console (CC-152)", () => {
     const user = await openAges(api);
 
     await user.click(screen.getByRole("button", { name: "Correct the year" }));
+    // Enter in the email box sends nothing either: only a button corrects or clears.
+    await user.type(screen.getByLabelText("Account email"), "x{Enter}");
+    await user.clear(screen.getByLabelText("Account email"));
     expect(api.correctBirthYear).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText("Account email"), "nobody@example.com");

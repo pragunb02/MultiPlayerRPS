@@ -96,6 +96,9 @@ describe("PUT /admin/accounts/birth-year: the owner corrects a year on request (
   it("refuses unknown fields, a missing field, an under 13 year and an email with no account", async () => {
     const { app } = await setup();
 
+    const list = await put(app, [RIYA.email, 1990], ADMIN);
+    expect(list.status).toBe(400);
+    expect(list.body.error.message).toBe("Send a JSON object");
     const extra = await put(app, { email: RIYA.email, birthYear: 1990, playerId: "x" }, ADMIN);
     expect(extra.status).toBe(400);
     expect(extra.body.error.details).toEqual({ fields: ["playerId"] });
