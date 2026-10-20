@@ -1,0 +1,198 @@
+import mongoose from "mongoose";
+import { CHALLENGE_STATES } from "@classicade/shared";
+import { DuplicateKey } from "./errors.js";
+
+const DUPLICATE_KEY_CODE = 11000;
+
+/**
+ * @typedef {Object} ChallengeDoc   persistence object: one challenge (CC-139, ADR-069)
+ * @property {string} challengeId   random id of the record, the id in its link, the only id a client ever sees
+ * @property {string} fromId        the player who made it
+ * @property {string} fromName      their display name when they made it
+ * @property {boolean} fromPublic   whether that name may be shown to anyone with the link (an adult account)
+ * @property {string} toId          the one player it is for, "" for a link anyone may take
+ * @property {string} toName        their display name, "" for a link anyone may take
+ * @property {string} gameId
+ * @property {object} options       the game's options, as its engine checked them
+ * @property {string} state         a CHALLENGE_STATES value, never `expired`: that comes from `expiresAt`
+ * @property {Date} createdAt
+ * @property {Date} expiresAt       when an open challenge stops being open
+ * @property {Date} [endedAt]       when it stopped being open by someone's answer
+ * @property {string} acceptedBy    the player who took it, "" until someone does
+ * @property {string} acceptedName  their display name, "" until someone does
+ * @property {string} roomCode      the room made for both, "" until it is made
+ * @property {string[]} laterBy     the players who moved it from a popup to their inbox
+ * @property {Date} deleteAt        when MongoDB deletes the record by itself
+ */
+
+const challengeSchema = new mongoose.Schema(
+  {
+    challengeId: { type: String, required: true },
+    fromId: { type: String, required: true },
+    fromName: { type: String, required: true },
+    fromPublic: { type: Boolean, required: true },
+    toId: { type: String, default: "" },
+    toName: { type: String, default: "" },
+    gameId: { type: String, required: true },
+    options: { type: mongoose.Schema.Types.Mixed, default: {} },
+    state: { type: String, required: true },
+    createdAt: { type: Date, required: true },
+    expiresAt: { type: Date, required: true },
+    endedAt: { type: Date },
+    acceptedBy: { type: String, default: "" },
+    acceptedName: { type: String, default: "" },
+    roomCode: { type: String, default: "" },
+    laterBy: { type: [String], default: [] },
+    deleteAt: { type: Date, required: true },
+  },
+  { collection: "challenges", versionKey: false, minimize: false },
+);
+challengeSchema.index({ challengeId: 1 }, { unique: true });
+// The sender's own challenges, newest first: their inbox, the limit of open ones and the one in ten minutes rule.
+challengeSchema.index({ fromId: 1, createdAt: -1 });
+// The challenges sent to one player, for their inbox.
+challengeSchema.index({ toId: 1, createdAt: -1 });
+// The challenges a player took, so deleting their account or moving a guest finds them.
+challengeSchema.index({ acceptedBy: 1 });
+// MongoDB deletes each record by itself once its time is up (ADR-069).
+challengeSchema.index({ deleteAt: 1 }, { expireAfterSeconds: 0 });
+
+const FIELDS =
+  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt";
+const PLAYER_FIELDS = Object.freeze(["fromId", "toId", "acceptedBy"]);
+const isDuplicate = (err) => err.code === DUPLICATE_KEY_CODE;
+
+/**
+ * Challenges in MongoDB (CC-139, ADR-069). Every change of state is one conditional update, so two people taking
+ * the same challenge at the same moment can never both win.
+ *
+ * @param {{ connection: mongoose.Connection }} deps
+ */
+export function createChallengeDao({ connection }) {
+  const Challenge = connection.model("Challenge", challengeSchema);
+  const changed = async (filter, update) => (await Challenge.updateOne(filter, update)).modifiedCount === 1;
+  const stillOpen = (challengeId, at) => ({
+    challengeId,
+    state: CHALLENGE_STATES.OPEN,
+    expiresAt: { $gt: at },
+  });
+
+  const dao = Object.freeze({
+    ensureIndexes: () => Challenge.syncIndexes(),
+
+    /**
+     * @param {ChallengeDoc} challenge
+     * @returns {Promise<ChallengeDoc>}
+     * @throws {DuplicateKey} when a challenge with that id exists
+     */
+    async insert(challenge) {
+      try {
+        await Challenge.create(challenge);
+      } catch (err) {
+        if (isDuplicate(err)) {
+          throw new DuplicateKey(`challenge ${challenge.challengeId} exists`, { cause: err });
+        }
+        throw err;
+      }
+      return dao.get(challenge.challengeId);
+    },
+
+    /**
+     * @param {string} challengeId
+     * @returns {Promise<ChallengeDoc>}
+     * @throws {RangeError} when there is no such challenge
+     */
+    async get(challengeId) {
+      const doc = await Challenge.findOne({ challengeId }, FIELDS).lean();
+      if (doc === null) {
+        throw new RangeError(`no challenge ${challengeId}`);
+      }
+      return doc;
+    },
+
+    /** @param {string} fromId @returns {Promise<ChallengeDoc[]>} the player's own challenges, newest first */
+    listFrom: (fromId) => Challenge.find({ fromId }, FIELDS).sort({ createdAt: -1 }).lean(),
+
+    /** @param {string} toId @returns {Promise<ChallengeDoc[]>} the challenges sent to the player, newest first */
+    listTo: (toId) => Challenge.find({ toId }, FIELDS).sort({ createdAt: -1 }).lean(),
+
+    /**
+     * Takes an open challenge for `acceptedBy`, only while it is still open at `at`.
+     *
+     * @param {{ challengeId: string, acceptedBy: string, acceptedName: string, at: Date }} claim
+     * @returns {Promise<boolean>} whether this call took it
+     */
+    claim: ({ challengeId, acceptedBy, acceptedName, at }) =>
+      changed(stillOpen(challengeId, at), {
+        $set: { state: CHALLENGE_STATES.ACCEPTED, acceptedBy, acceptedName, endedAt: at },
+      }),
+
+    /**
+     * Opens a taken challenge again when its room could not be made, only while no room is recorded for it.
+     *
+     * @param {{ challengeId: string, acceptedBy: string }} claim
+     * @returns {Promise<boolean>} whether it was open again
+     */
+    release: ({ challengeId, acceptedBy }) =>
+      changed(
+        { challengeId, state: CHALLENGE_STATES.ACCEPTED, acceptedBy, roomCode: "" },
+        { $set: { state: CHALLENGE_STATES.OPEN, acceptedBy: "", acceptedName: "" }, $unset: { endedAt: 1 } },
+      ),
+
+    /**
+     * Records the room made for a challenge `acceptedBy` took.
+     *
+     * @param {{ challengeId: string, acceptedBy: string, roomCode: string }} room
+     * @returns {Promise<boolean>}
+     */
+    setRoom: ({ challengeId, acceptedBy, roomCode }) =>
+      changed(
+        { challengeId, state: CHALLENGE_STATES.ACCEPTED, acceptedBy, roomCode: "" },
+        { $set: { roomCode } },
+      ),
+
+    /**
+     * Ends a challenge that is still open at `at`, as declined or withdrawn.
+     *
+     * @param {{ challengeId: string, state: string, at: Date }} end
+     * @returns {Promise<boolean>} whether this call ended it
+     */
+    end: ({ challengeId, state, at }) =>
+      changed(stillOpen(challengeId, at), { $set: { state, endedAt: at } }),
+
+    /**
+     * Notes that `playerId` moved the challenge to their inbox. Doing it again changes nothing.
+     *
+     * @param {{ challengeId: string, playerId: string }} later
+     * @returns {Promise<boolean>} whether it was noted now
+     */
+    addLater: ({ challengeId, playerId }) => changed({ challengeId }, { $addToSet: { laterBy: playerId } }),
+
+    /**
+     * Gives every mention of player `from` to `to`, in every field that names a player.
+     *
+     * @param {{ from: string, to: string }} transfer
+     * @returns {Promise<number>} records changed
+     */
+    async movePlayer({ from, to }) {
+      let moved = 0;
+      for (const field of PLAYER_FIELDS) {
+        moved += (await Challenge.updateMany({ [field]: from }, { $set: { [field]: to } })).modifiedCount;
+      }
+      const later = await Challenge.updateMany({ laterBy: from }, { $set: { "laterBy.$": to } });
+      return moved + later.modifiedCount;
+    },
+
+    /**
+     * @param {string} playerId
+     * @returns {Promise<number>} records deleted that the player made, was sent or took
+     */
+    async deleteInvolving(playerId) {
+      const { deletedCount } = await Challenge.deleteMany({
+        $or: PLAYER_FIELDS.map((field) => ({ [field]: playerId })),
+      });
+      return deletedCount;
+    },
+  });
+  return dao;
+}

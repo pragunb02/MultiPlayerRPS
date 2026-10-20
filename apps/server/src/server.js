@@ -8,6 +8,7 @@ import { DAILY_PUZZLE_KINDS, getGame, IDENTITY_KINDS } from "@classicade/shared"
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "./data/blockAccessor.js";
+import { createChallengeAccessor } from "./data/challengeAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
@@ -27,6 +28,7 @@ import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/anal
 import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botComponent.js";
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
 import { createBlockComponent } from "./domain/blocks/blockComponent.js";
+import { createChallengeComponent } from "./domain/challenges/challengeComponent.js";
 import { createProfileCards } from "./domain/profiles/profileCards.js";
 import { createProfileComponent } from "./domain/profiles/profileComponent.js";
 import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
@@ -61,6 +63,7 @@ import { createAchievementDao } from "./persistence/achievementDao.js";
 import { createAnalyticsDao } from "./persistence/analyticsDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createBlockDao } from "./persistence/blockDao.js";
+import { createChallengeDao } from "./persistence/challengeDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
@@ -565,7 +568,7 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object, feedback?: object },
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object, feedback?: object, challenges?: object },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
@@ -628,6 +631,7 @@ export async function startServer({
   const dailyPuzzleAttemptDao = createDailyPuzzleAttemptDao({ connection: database.connection });
   const chessRatingDao = createChessRatingDao({ connection: database.connection });
   const profileDao = createProfileDao({ connection: database.connection });
+  const challengeDao = createChallengeDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -647,6 +651,7 @@ export async function startServer({
       dailyPuzzleAttemptDao,
       chessRatingDao,
       profileDao,
+      challengeDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -673,6 +678,7 @@ export async function startServer({
   });
   const chessRatingAccessor = createChessRatingAccessor({ chessRatingDao });
   const profileAccessor = createProfileAccessor({ profileDao });
+  const challengeAccessor = createChallengeAccessor({ challengeDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -747,6 +753,8 @@ export async function startServer({
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
       { name: "profiles", transferPlayer: profileComponent.transferPlayer },
+      // Made after the room component, which it needs, and called only once a guest signs in.
+      { name: "challenges", transferPlayer: (transfer) => challengeComponent.transferPlayer(transfer) },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ],
     matches: matchComponent,
@@ -790,6 +798,14 @@ export async function startServer({
     blocks: blockComponent,
     seatIds,
     avatars: profileCards,
+  });
+  // Challenges to one person name nobody until CC-052 passes in friends by profile handle (ADR-069).
+  const challengeComponent = createChallengeComponent({
+    challengeAccessor,
+    rooms: roomComponent,
+    blocks: blockComponent,
+    ages: accountComponent,
+    events: domainEvents,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Heavy computer thinking runs on worker threads, off the event loop (ADR-067).
@@ -877,6 +893,11 @@ export async function startServer({
         erasePlayer: profileComponent.erasePlayer,
         exportPlayer: profileComponent.exportPlayer,
       },
+      {
+        name: "challenges",
+        erasePlayer: challengeComponent.erasePlayer,
+        exportPlayer: challengeComponent.exportPlayer,
+      },
     ],
   });
 
@@ -906,6 +927,7 @@ export async function startServer({
   const sessionEvents = new EventEmitter();
   // HTTP and realtime ask the same question of every signed-in session (CC-116).
   const checkSession = createSessionCheck({ accountComponent, now });
+  const networkKey = createNetworkKey({ now });
   const app = createHttpApp({
     config,
     logger,
@@ -918,6 +940,9 @@ export async function startServer({
     blockComponent,
     profileLimits: limits.profiles,
     profileComponent,
+    challengeLimits: limits.challenges,
+    challengeComponent,
+    networkOf: networkKey.networkOf,
     feedbackLimits: limits.feedback,
     feedbackComponent,
     dailyPuzzleComponent,
@@ -939,7 +964,6 @@ export async function startServer({
     recordRequest: metrics.recordHttpRequest,
   });
   const server = http.createServer(app);
-  const networkKey = createNetworkKey({ now });
   const gateway = createRealtimeGateway({
     httpServer: server,
     sessionMiddleware,
@@ -954,6 +978,7 @@ export async function startServer({
     now,
     botComponent,
     chessRatingComponent,
+    challengeComponent,
     recordSocketEvent: metrics.recordSocketEvent,
   });
   // Read only when telemetry takes a reading, once a minute in production.

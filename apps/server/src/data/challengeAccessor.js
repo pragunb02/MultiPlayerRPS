@@ -1,0 +1,105 @@
+import { CHALLENGE_STATES } from "@classicade/shared";
+import { assertDefined } from "../utils/assert.js";
+import { NotFoundError } from "../utils/errors.js";
+
+/**
+ * @typedef {Object} Challenge     domain model (frozen, times in ms): one challenge (CC-139, ADR-069)
+ * @property {string} challengeId   random id, the id in its link
+ * @property {string} fromId        the player who made it
+ * @property {string} fromName      their display name when they made it
+ * @property {boolean} fromPublic   whether that name may be shown to anyone with the link
+ * @property {string} toId          the one player it is for, "" for a link anyone may take
+ * @property {string} toName        their display name, "" for a link anyone may take
+ * @property {string} gameId
+ * @property {Readonly<object>} options
+ * @property {string} state         as stored: open, accepted, declined or withdrawn. Expired comes from the time
+ * @property {number} createdAt
+ * @property {number} expiresAt
+ * @property {number} endedAt       0 while nobody has answered it
+ * @property {string} acceptedBy    "" until someone takes it
+ * @property {string} acceptedName  "" until someone takes it
+ * @property {string} roomCode      "" until its room is made
+ * @property {ReadonlyArray<string>} laterBy  the players who moved it to their inbox
+ */
+
+/** @returns {Readonly<Challenge>} */
+const toChallenge = ({ createdAt, expiresAt, endedAt, deleteAt, options, laterBy, ...doc }) =>
+  Object.freeze({
+    ...doc,
+    options: Object.freeze({ ...options }),
+    createdAt: createdAt.getTime(),
+    expiresAt: expiresAt.getTime(),
+    endedAt: endedAt === undefined ? 0 : endedAt.getTime(),
+    laterBy: Object.freeze([...laterBy]),
+  });
+const toChallenges = (docs) => Object.freeze(docs.map(toChallenge));
+
+/**
+ * Provides challenges to the domain (CC-139, ADR-069).
+ *
+ * @param {{ challengeDao: ReturnType<typeof import("../persistence/challengeDao.js").createChallengeDao> }} deps
+ */
+export function createChallengeAccessor({ challengeDao }) {
+  assertDefined(challengeDao, "challengeDao");
+
+  return Object.freeze({
+    /**
+     * Stores a new open challenge.
+     *
+     * @param {Omit<Challenge, "state" | "endedAt" | "acceptedBy" | "acceptedName" | "roomCode" | "laterBy"> & { deleteAt: number }} challenge
+     *   `deleteAt` is when storage forgets it by itself
+     * @returns {Promise<Readonly<Challenge>>}
+     */
+    add: async ({ createdAt, expiresAt, deleteAt, ...challenge }) =>
+      toChallenge(
+        await challengeDao.insert({
+          ...challenge,
+          state: CHALLENGE_STATES.OPEN,
+          createdAt: new Date(createdAt),
+          expiresAt: new Date(expiresAt),
+          deleteAt: new Date(deleteAt),
+        }),
+      ),
+
+    /**
+     * @param {string} challengeId
+     * @returns {Promise<Readonly<Challenge>>}
+     * @throws {NotFoundError} when there is none, or storage has forgotten it
+     */
+    async get(challengeId) {
+      try {
+        return toChallenge(await challengeDao.get(challengeId));
+      } catch (err) {
+        if (!(err instanceof RangeError)) throw err;
+        throw new NotFoundError("No such challenge", { cause: err });
+      }
+    },
+
+    /** @param {string} playerId @returns {Promise<ReadonlyArray<Readonly<Challenge>>>} newest first */
+    listFrom: async (playerId) => toChallenges(await challengeDao.listFrom(playerId)),
+
+    /** @param {string} playerId @returns {Promise<ReadonlyArray<Readonly<Challenge>>>} newest first */
+    listTo: async (playerId) => toChallenges(await challengeDao.listTo(playerId)),
+
+    /** @param {{ challengeId: string, acceptedBy: string, acceptedName: string, at: number }} claim */
+    claim: ({ at, ...claim }) => challengeDao.claim({ ...claim, at: new Date(at) }),
+
+    /** @param {{ challengeId: string, acceptedBy: string }} claim */
+    release: (claim) => challengeDao.release(claim),
+
+    /** @param {{ challengeId: string, acceptedBy: string, roomCode: string }} room */
+    setRoom: (room) => challengeDao.setRoom(room),
+
+    /** @param {{ challengeId: string, state: string, at: number }} end */
+    end: ({ at, ...end }) => challengeDao.end({ ...end, at: new Date(at) }),
+
+    /** @param {{ challengeId: string, playerId: string }} later */
+    addLater: (later) => challengeDao.addLater(later),
+
+    /** @param {{ from: string, to: string }} transfer @returns {Promise<number>} */
+    movePlayer: (transfer) => challengeDao.movePlayer(transfer),
+
+    /** @param {string} playerId @returns {Promise<number>} */
+    removeInvolving: (playerId) => challengeDao.deleteInvolving(playerId),
+  });
+}

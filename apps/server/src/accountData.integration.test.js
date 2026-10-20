@@ -141,6 +141,19 @@ describe("account deletion through the real composition root (integration, CC-03
         options: { bestOf: 1 },
       });
       await send(riya.socket, SOCKET_EVENTS.ROOM_JOIN, { code: running.code });
+      // A challenge she made, and one of Sam's that she took (CC-139).
+      const challengeBody = { gameId: "rps", options: { bestOf: 1 } };
+      expect(
+        (await call(app.url, "POST", "/challenges", { body: challengeBody, cookie: riya.cookie })).status,
+      ).toBe(201);
+      const samChallenge = await call(app.url, "POST", "/challenges", {
+        body: challengeBody,
+        cookie: sam.cookie,
+      });
+      const taken = await call(app.url, "POST", `/challenges/${samChallenge.body.challenge.id}/accept`, {
+        cookie: riya.cookie,
+      });
+      expect(taken.status).toBe(200);
       await eventually(async () =>
         (await readCollection(uri, "leaderboard_entries", { playerId: riya.id })).length > 0
           ? true
@@ -200,6 +213,7 @@ describe("account deletion through the real composition root (integration, CC-03
         "player_transfers",
         "pending_matches",
         "chess_ratings",
+        "challenges",
       ]) {
         expect({ name, left: mentions(await readCollection(uri, name)) }).toEqual({ name, left: [] });
       }
@@ -298,6 +312,10 @@ describe("data export and birth year through the real composition root (integrat
       const sam = { cookie: samUp.cookie, socket: await socketFor(app.url, samUp.cookie) };
       sockets.push(riya.socket, sam.socket);
       await playRps(riya, sam);
+      await call(app.url, "POST", "/challenges", {
+        body: { gameId: "chess", options: {} },
+        cookie: riya.cookie,
+      });
       await eventually(async () =>
         (await readCollection(app.config.mongoUri, "leaderboard_entries")).length >= 2 ? true : undefined,
       );
@@ -326,6 +344,9 @@ describe("data export and birth year through the real composition root (integrat
       ]);
       expect(exported.body.progress).toEqual(expect.objectContaining({ xp: expect.any(Number), wins: 1 }));
       expect(exported.body.leaderboards.length).toBeGreaterThan(0);
+      expect(exported.body.challenges).toEqual([
+        expect.objectContaining({ made: true, gameId: "chess", state: "open" }),
+      ]);
       expect(JSON.stringify(exported.body)).not.toContain(samUp.body.identity.id);
       expect(JSON.stringify(exported.body)).not.toContain(riyaUp.body.identity.id);
 

@@ -118,6 +118,12 @@ export const SOCKET_EVENTS = Object.freeze({
    * and on connecting for every room with a request still open (CC-207).
    */
   REQUEST_UPDATED: "request:updated",
+  /**
+   * Server sends `{ challenge }` to every tab of a player when a challenge they made or were sent opens, is taken,
+   * declined, withdrawn or moved to their inbox (CC-139). `challenge` is the view `GET /api/challenges/:id`
+   * answers, which never carries a player id.
+   */
+  CHALLENGE_UPDATED: "challenge:updated",
   /** Server sends `{}` to everyone just before it stops for a restart (CC-158). Rooms are kept and rejoined. */
   SERVER_RESTARTING: "server:restarting",
   /**
