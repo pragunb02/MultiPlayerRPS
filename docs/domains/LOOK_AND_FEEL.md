@@ -52,6 +52,7 @@ string catalogue and translations (CC-218), hosting, bundle splitting as infrast
       6 kB to the main chunk (CC-153 acceptance). Effects, Bit poses below the fold and the reward queue load lazily.
    2. Animate only `transform` and `opacity` (ADR-012, web.dev animations guide). The two documented exceptions
       stay the only ones. No canvas backgrounds, no video, no full-screen particle systems (ADR-016 amendment).
+      The one exception is a finite, capped celebration burst through the effect registry (ADR-075).
    3. At most one full-screen effect at a time, nothing loops forever, celebrations finish within 1.5 s (ADR-012,
       ADR-050). UI transitions 300 ms or less (vision §5.13, NN/g).
    4. Layout never shifts because something loaded (target CLS under 0.1, Core Web Vitals) and a press answers
@@ -145,7 +146,8 @@ Sources read on 2026-10-19 unless another date is given. Earlier research for th
 
 **Our take:** CSS on SVG for everything that can be drawn in code; Motion only where it already is; Lottie
 (`lottie_light`, lazily, never on the first route) only if an artist delivers real After Effects animation for the
-characters (ADR-016 amendment point 2). No change to ADR-016.
+characters (ADR-016 amendment point 2). No change to ADR-016 here; ADR-075 later set the whole effects stack by
+tier, with measurements ([design/EFFECTS-STACK.md](../design/EFFECTS-STACK.md)).
 
 ### 3.5 Page transitions
 
