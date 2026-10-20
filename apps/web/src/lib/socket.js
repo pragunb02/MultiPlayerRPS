@@ -1,8 +1,10 @@
 import { io } from "socket.io-client";
-import { ERROR_CODES } from "@classicade/shared";
+import { bucketOf, ERROR_CODES, SOCKET_EVENTS, TELEMETRY_BUCKETS } from "@classicade/shared";
 import { AppRequestError } from "./errors.js";
 
 const ACK_TIMEOUT_MS = 8_000;
+/** The lower ends of the `after_s` buckets after the first: 10 s, a minute, 10 minutes (EVENTS.md 3.5). */
+const AWAY_EDGES_S = Object.freeze([10, 60, 600]);
 /** Socket.IO's reason when the server disconnected the socket on purpose. It does not reconnect after it. */
 const SERVER_DISCONNECT = "io server disconnect";
 
@@ -10,10 +12,47 @@ const SERVER_DISCONNECT = "io server disconnect";
  * The realtime client — the only place the web app touches Socket.IO. Requests resolve with `data` or reject
  * with AppRequestError (same codes as HTTP); pushes are subscribed with `on`, which returns an unsubscribe.
  *
- * @param {{ connect?: typeof io, url?: string }} [options]  injectable for tests
+ * Usage counts (CC-174) hear of each request (`onRequest`), of the connection failing, dropping and coming back
+ * (`onChange`, with Socket.IO's reason and, when back, how long it was gone as a bucket) and of the first move this
+ * page sent (`onFirstMove`, with the game's id).
+ *
+ * @param {{
+ *   connect?: typeof io,
+ *   url?: string,
+ *   onRequest?: () => void,
+ *   onChange?: (change: { state: "connect_failed" | "dropped" | "restored", reason: unknown, afterS?: string }) => void,
+ *   onFirstMove?: (gameId: string) => void,
+ *   now?: () => number,
+ * }} [options]  `connect`, `url` and `now` are injectable for tests
  */
-export function createSocketClient({ connect = io, url = undefined } = {}) {
+export function createSocketClient({
+  connect = io,
+  url = undefined,
+  onRequest = () => undefined,
+  onChange = () => undefined,
+  onFirstMove = () => undefined,
+  now = () => Date.now(),
+} = {}) {
   const socket = connect(url, { autoConnect: false, transports: ["websocket"], withCredentials: true });
+  let droppedAt;
+  let lastReason;
+  let moved = false;
+  socket.on("disconnect", (reason) => {
+    droppedAt = now();
+    lastReason = reason;
+    onChange({ state: "dropped", reason });
+  });
+  socket.on("connect_error", (error) => onChange({ state: "connect_failed", reason: error }));
+  socket.on("connect", () => {
+    if (droppedAt === undefined) return;
+    const awayS = (now() - droppedAt) / 1000;
+    droppedAt = undefined;
+    onChange({
+      state: "restored",
+      reason: lastReason,
+      afterS: bucketOf(awayS, AWAY_EDGES_S, TELEMETRY_BUCKETS.AFTER_S),
+    });
+  });
 
   return Object.freeze({
     connect: () => socket.connect(),
@@ -25,6 +64,7 @@ export function createSocketClient({ connect = io, url = undefined } = {}) {
      * @param {unknown} [payload]
      */
     async request(event, payload) {
+      onRequest();
       let ack;
       try {
         ack = await socket.timeout(ACK_TIMEOUT_MS).emitWithAck(event, payload);
@@ -33,6 +73,10 @@ export function createSocketClient({ connect = io, url = undefined } = {}) {
       }
       if (!ack?.ok) {
         throw new AppRequestError(ack?.error ?? { code: "UNKNOWN", message: "Something went wrong" });
+      }
+      if (event === SOCKET_EVENTS.GAME_MOVE && !moved && typeof ack.data?.gameId === "string") {
+        moved = true;
+        onFirstMove(ack.data.gameId);
       }
       return ack.data;
     },

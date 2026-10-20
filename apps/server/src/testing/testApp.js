@@ -33,6 +33,9 @@ import { createFeedbackComponent } from "../domain/feedback/feedbackComponent.js
 import { createFlagComponent } from "../domain/flags/flagComponent.js";
 import { createFeatureFlagAccessor } from "../data/featureFlagAccessor.js";
 import { createInMemoryFeatureFlagDao } from "./inMemoryFeatureFlagDao.js";
+import { createTelemetryAccessor } from "../data/telemetryAccessor.js";
+import { createTelemetryComponent } from "../domain/telemetry/telemetryComponent.js";
+import { createInMemoryTelemetryEventDao } from "./inMemoryTelemetryEventDao.js";
 import { createKeyedIds, KEYED_ID_LABELS, keyedIdSecretFrom } from "../utils/keyedIds.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
@@ -138,6 +141,9 @@ import { testConfig } from "./testConfig.js";
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
  *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
  *     to see what the service layer records (ADR-055)
+ *   telemetryLimits?: object,   the limits on usage counts (CC-175)
+ *   telemetryEventDao?: ReturnType<typeof createInMemoryTelemetryEventDao>,   where usage counts are stored, which a
+ *     test reads (CC-175)
  * }} [options]
  */
 export function createTestApp({
@@ -167,6 +173,8 @@ export function createTestApp({
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
   metrics = {},
+  telemetryLimits = {},
+  telemetryEventDao = createInMemoryTelemetryEventDao(),
 } = {}) {
   const config = testConfig(env, { buildInfoText });
   const capture = captureLogger();
@@ -244,6 +252,13 @@ export function createTestApp({
     safety: safetyComponent,
     logger: capture.logger,
     now,
+  });
+  const telemetryComponent = createTelemetryComponent({
+    telemetryAccessor: createTelemetryAccessor({ telemetryEventDao }),
+    now,
+    limits: telemetryLimits,
+    ...(metrics.recordTelemetryDropped && { onDropped: metrics.recordTelemetryDropped }),
+    serverBuild: config.build.version,
   });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
@@ -465,6 +480,7 @@ export function createTestApp({
     safetyComponent,
     dailyPuzzleLimit,
     flagComponent,
+    telemetryComponent,
     analyticsComponent: createAnalyticsComponent({
       analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
       cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }),
@@ -507,6 +523,8 @@ export function createTestApp({
     feedbackComponent,
     dailyPuzzleComponent,
     flagComponent,
+    telemetryComponent,
+    telemetryEventDao,
     matchPipeline,
     playerDataComponent,
     tasks,

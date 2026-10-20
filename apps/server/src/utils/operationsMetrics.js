@@ -23,6 +23,21 @@ export const BOT_THINKING_OUTCOMES = Object.freeze({
   FAILED: "failed",
 });
 
+/**
+ * Why telemetry was not stored (CC-175), the one attribute of the ops counter `telemetry.dropped`. Only the reason
+ * and how many leave the server, never anything about the event or who sent it. A whole batch dropped before its
+ * body is read counts one. `invalid` and `cap` count events.
+ */
+export const TELEMETRY_DROP_REASONS = Object.freeze({
+  OPTED_OUT: "opted_out",
+  ADMIN: "admin",
+  INVALID: "invalid",
+  RATE_LIMITED: "rate_limited",
+  CAP: "cap",
+  BOT: "bot",
+  FLAG_OFF: "flag_off",
+});
+
 /** The route of a request no route answered: a static file or an unknown address. */
 export const ROUTE_UNMATCHED = "unmatched";
 
@@ -40,6 +55,8 @@ export const ROUTE_PATTERN = "pattern";
  * @property {(thinking: { game: string, outcome: string, durationMs: number }) => void} recordBotThinking
  *   one computer player's think, from the ask to the answer. `game` is a catalogue id, `outcome` a
  *   BOT_THINKING_OUTCOMES value
+ * @property {(drop: { reason: string, count: number }) => void} recordTelemetryDropped
+ *   telemetry not stored (CC-175). `reason` is a TELEMETRY_DROP_REASONS value
  * @property {(readers: {
  *   rooms: () => Promise<ReadonlyArray<{ gameId: string, status: string, rooms: number }>>,
  *   connections: () => number,
@@ -55,5 +72,6 @@ export const NO_OPERATIONS_METRICS = Object.freeze({
   recordSocketEvent: nothing,
   recordPipelineStep: nothing,
   recordBotThinking: nothing,
+  recordTelemetryDropped: nothing,
   watch: nothing,
 });

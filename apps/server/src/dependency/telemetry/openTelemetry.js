@@ -176,6 +176,9 @@ function createOperationsMetrics(meter) {
     METRICS.BOT_THINKING_DURATION,
     "Time a computer player took to choose a move, waiting for a thread included.",
   );
+  const telemetryDropped = meter.createCounter(METRICS.TELEMETRY_DROPPED, {
+    description: "Usage counts (CC-175) not stored, by reason only.",
+  });
   const methods = new Set(HTTP_METHODS);
 
   return Object.freeze({
@@ -195,6 +198,9 @@ function createOperationsMetrics(meter) {
     },
     recordBotThinking({ game, outcome, durationMs }) {
       thinkingDuration.record(durationMs, { game, outcome });
+    },
+    recordTelemetryDropped({ reason, count }) {
+      telemetryDropped.add(count, { reason });
     },
     watch({ rooms, connections }) {
       const open = meter.createObservableGauge(METRICS.ROOMS_OPEN, {

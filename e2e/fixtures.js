@@ -28,6 +28,8 @@ import {
  */
 export const STORAGE_ALLOWLIST = Object.freeze({
   "cc.sound": isSoundSetting,
+  // The usage counts switch (CC-174): only ever "off", and only when the player turned counts off.
+  "cc.telemetry": (raw) => raw === "off",
 });
 
 /** The kinds of notice whose sound is set apart (CC-208, lib/notify/categories.js). */

@@ -2,6 +2,7 @@ import { ERROR_CODES, GAMES, ROOM_STATUS, SOCKET_EVENTS } from "@classicade/shar
 import {
   BOT_THINKING_OUTCOMES,
   ROUTE_PATTERN,
+  TELEMETRY_DROP_REASONS,
   ROUTE_UNMATCHED,
   SOCKET_OUTCOMES,
 } from "../../utils/operationsMetrics.js";
@@ -15,6 +16,7 @@ export const METRICS = Object.freeze({
   PIPELINE_ATTEMPTS: "match_pipeline.attempts",
   PIPELINE_FAILED: "match_pipeline.failed",
   BOT_THINKING_DURATION: "bots.thinking.duration",
+  TELEMETRY_DROPPED: "telemetry.dropped",
   EVENT_LOOP_P50: "nodejs.eventloop.delay.p50",
   EVENT_LOOP_P99: "nodejs.eventloop.delay.p99",
   MEMORY_RSS: "process.memory.rss",
@@ -154,6 +156,7 @@ export function createTelemetrySchema({ matchSteps }) {
     [METRICS.PIPELINE_ATTEMPTS]: { step },
     [METRICS.PIPELINE_FAILED]: { step },
     [METRICS.BOT_THINKING_DURATION]: { game, outcome: oneOf(Object.values(BOT_THINKING_OUTCOMES)) },
+    [METRICS.TELEMETRY_DROPPED]: { reason: oneOf(Object.values(TELEMETRY_DROP_REASONS)) },
     [METRICS.EVENT_LOOP_P50]: {},
     [METRICS.EVENT_LOOP_P99]: {},
     [METRICS.MEMORY_RSS]: {},

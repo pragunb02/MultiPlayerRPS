@@ -1,10 +1,12 @@
 import { Router } from "express";
+import { IDENTITY_KINDS } from "@classicade/shared";
 import { normaliseEmail } from "../../models/credentials.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { AppError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
+import { AppError, TooManyRequestsError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
 import { createLoginThrottle, LOGIN_THROTTLE } from "./loginThrottle.js";
 import { clientIpKey, createRateLimit } from "./rateLimits.js";
 import { establishAccountSession, requireIdentity } from "./session.js";
+import { NO_SERVER_EVENTS } from "./telemetryRoutes.js";
 
 const MINUTE_MS = 60 * 1000;
 
@@ -79,6 +81,7 @@ const TOO_MANY_ATTEMPTS = "Too many attempts, try again later";
  *   onIdentityChanged: (change: { previous: import("../../models/identity.js").Identity | undefined, identity: import("../../models/identity.js").Identity }) => Promise<{ carriedOver?: { xp: number, matchesPlayed: number, matches: number } }>,
  *   now?: () => number,
  *   limits?: Partial<typeof DEFAULT_LIMITS>,   any limit not given keeps its standard value
+ *   serverEvents?: { record: Function },   anonymous counts of sign-ups, logins and ended sessions (CC-175)
  * }} deps
  */
 export function createAuthRoutes({
@@ -89,6 +92,7 @@ export function createAuthRoutes({
   onIdentityChanged,
   now = Date.now,
   limits = {},
+  serverEvents = NO_SERVER_EVENTS,
 }) {
   assertDefined(accountComponent, "accountComponent");
   assertFunction(onSessionEnded, "onSessionEnded");
@@ -163,10 +167,29 @@ export function createAuthRoutes({
       now: now(),
     });
     req.log.info({ playerId: signedUp.identity.id }, "account created");
+    const fromGuest = req.session.identity?.kind === IDENTITY_KINDS.GUEST;
     await signIn(req, res, signedUp, 201);
+    serverEvents.record(req, "account_created", { from_guest: fromGuest });
   });
 
+  /** Why a login failed, as telemetry counts it. Never which email, never whether it exists. */
+  const failureOf = (err) => {
+    if (err instanceof TooManyRequestsError) return "throttled";
+    if (err instanceof ValidationError) return "validation";
+    return err instanceof UnauthorizedError ? "wrong_credentials" : undefined;
+  };
+
   router.post("/auth/login", perIp, async (req, res) => {
+    try {
+      await logIn(req, res);
+    } catch (err) {
+      const reason = failureOf(err);
+      if (reason !== undefined) serverEvents.record(req, "login_failed", { reason });
+      throw err;
+    }
+  });
+
+  async function logIn(req, res) {
     const { email, password } = requireFields(req.body, ["email", "password"]);
     const attempt = { email: normaliseEmail(email), address: clientIpKey(req) };
     await loginThrottle.before(attempt);
@@ -197,8 +220,10 @@ export function createAuthRoutes({
         "stored email left in an older spelling: another account already has the one spelling",
       );
     }
+    const fromGuest = req.session.identity?.kind === IDENTITY_KINDS.GUEST;
     await signIn(req, res, loggedIn, 200);
-  });
+    serverEvents.record(req, "login_succeeded", { from_guest: fromGuest });
+  }
 
   router.post("/auth/password", perIp, failedPasswordChanges, async (req, res) => {
     const { currentPassword, newPassword } = requireFields(req.body, ["currentPassword", "newPassword"]);
@@ -210,6 +235,7 @@ export function createAuthRoutes({
     });
     req.log.info({ playerId }, "password changed, other sessions signed out");
     res.status(204).end();
+    serverEvents.record(req, "session_ended", { cause: "password_changed" });
   });
 
   router.post("/auth/sign-out-others", perIp, async (req, res) => {
@@ -222,6 +248,7 @@ export function createAuthRoutes({
     });
     req.log.info({ playerId }, "other sessions signed out");
     res.status(204).end();
+    serverEvents.record(req, "session_ended", { cause: "signed_out_elsewhere" });
   });
 
   return router;

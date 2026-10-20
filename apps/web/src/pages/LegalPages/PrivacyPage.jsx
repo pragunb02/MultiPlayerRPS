@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
+import { UsageCountsSwitch } from "../../components/UsageCounts/UsageCountsSwitch.jsx";
 import { LegalPage, LegalSection } from "./LegalPage.jsx";
 
 /**
@@ -135,6 +136,10 @@ export function PrivacyPage() {
             you can share names nobody and shows no move.
           </li>
           <li>
+            <strong>Usage counts.</strong> Anonymous counts of how the site is used, with no id of anyone.
+            Section 4a says what they are and how to switch them off.
+          </li>
+          <li>
             <strong>Moving from guest to account.</strong> If you play as a guest and then sign up or log in,
             your guest progress and match history move to your account. We keep a note that the move happened
             so it is never done twice.
@@ -156,19 +161,19 @@ export function PrivacyPage() {
           or social media cookies.
         </p>
         <p>
-          Your browser also keeps one setting for this site, <code>cc.sound</code>: whether sound is on and
-          how loud. It is stored only in your browser, is never sent to us, and contains nothing about you.
-          Clearing your browser's site data removes it.
+          Your browser also keeps up to two settings for this site: <code>cc.sound</code>, whether sound is on
+          and how loud, and <code>cc.telemetry</code>, only if you switch usage counts off (section 4a). They
+          are stored only in your browser, are never sent to us, and contain nothing about you. Clearing your
+          browser's site data removes them.
         </p>
       </LegalSection>
 
       <LegalSection title="4. What we do not do">
         <ul>
-          <li>No ads, no tracking pixels, no third party analytics, no third party scripts or fonts.</li>
+          <li>No ads, no tracking pixels, no third-party analytics, scripts or fonts.</li>
           <li>
-            We do not count how you use the site. If we ever do, it will be anonymous counts on our own
-            server, with no id for you or your browser and a way to switch it off, and this page will say so
-            before it starts.
+            We never follow you from one visit to the next. The usage counts in section 4a carry no id of you
+            or your browser.
           </li>
           <li>We do not sell or rent your data, and we do not share it for marketing.</li>
           <li>
@@ -176,6 +181,33 @@ export function PrivacyPage() {
             in section 2.
           </li>
         </ul>
+      </LegalSection>
+
+      <LegalSection title="4a. How we count how the site is used">
+        <p>
+          New on 20 October 2026. Counting starts no earlier than 27 October 2026, a week after this section
+          was published.
+        </p>
+        <ul>
+          <li>
+            We count which pages are opened, which buttons are pressed, where presses do nothing, errors and
+            how long things take, so we can fix what is slow or confusing.
+          </li>
+          <li>
+            These counts go only to our own server and our own database. They never include your name, email,
+            IP address, what you type, or the code of your room. The time is kept to the hour only.
+          </li>
+          <li>
+            For everyone, adults included, the counts carry no id at all, so they cannot be linked to you or
+            to each other.
+          </li>
+          <li>The single counts are deleted after 30 days. Daily totals are kept 13 months.</li>
+          <li>
+            You can turn this off with the switch below, or in your profile. If your browser sends Global
+            Privacy Control or Do Not Track, it is off already. Nothing records that you turned it off.
+          </li>
+        </ul>
+        <UsageCountsSwitch control="legal.usage_counts" />
       </LegalSection>
 
       <LegalSection title="5. Who else handles it">
@@ -246,6 +278,7 @@ export function PrivacyPage() {
           <li>
             Counts and timings about how the server runs are kept for 14 days by Grafana Labs (section 5).
           </li>
+          <li>Usage counts: single counts 30 days, daily totals 13 months (section 4a).</li>
         </ul>
       </LegalSection>
 

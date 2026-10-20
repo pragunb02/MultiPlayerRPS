@@ -39,18 +39,23 @@ const pathOf = (url) => `${url.pathname}${url.search}${url.hash}`;
  *
  * Call it first in the browser entry point.
  *
+ * Usage counts (CC-174) hear of each: `onFailedLoad("stale_build_reload")` on the page a reload brought, and
+ * `onFailedLoad("chunk_load")` when a part failed to load and no reload can help.
+ *
  * @param {{
  *   window: Pick<Window, "location" | "history" | "addEventListener" | "removeEventListener">,
  *   now: () => number,
+ *   onFailedLoad?: (kind: "stale_build_reload" | "chunk_load") => void,
  * }} deps
  * @returns {() => void} stops listening
  */
-export function recoverFromStaleBuild({ window, now }) {
+export function recoverFromStaleBuild({ window, now, onFailedLoad = () => undefined }) {
   const address = new URL(window.location.href);
   const cameFromReload = address.searchParams.has(RELOADED_PARAM);
   if (cameFromReload) {
     address.searchParams.delete(RELOADED_PARAM);
     window.history.replaceState(window.history.state, "", pathOf(address));
+    onFailedLoad("stale_build_reload");
   }
   const startedAt = now();
   let reloading = false;
@@ -65,6 +70,7 @@ export function recoverFromStaleBuild({ window, now }) {
   /** @param {Event} event */
   function onPreloadError(event) {
     if (!reloading && cameFromReload && now() - startedAt < RELOAD_GUARD_MS) {
+      onFailedLoad("chunk_load");
       return;
     }
     event.preventDefault();

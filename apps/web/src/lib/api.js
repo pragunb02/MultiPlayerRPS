@@ -4,10 +4,31 @@ import { AppRequestError, networkError } from "./errors.js";
  * The HTTP API client — the only place the web app calls `fetch`. Same-origin requests carry the session
  * cookie automatically; errors become AppRequestError with the server's code.
  *
- * @param {{ fetchImpl?: typeof fetch, baseUrl?: string }} [options]  injectable for tests
+ * @param {{
+ *   fetchImpl?: typeof fetch,
+ *   baseUrl?: string,
+ *   onRequest?: () => void,
+ *   onFailure?: (failure: { path: string, status: number, error: AppRequestError }) => void,
+ * }} [options]  `fetchImpl` and `baseUrl` are injectable for tests. Usage counts (CC-174) hear of each request,
+ *   and of each that failed: its path, which they turn into a template, its status (0 for no answer) and the error
  */
-export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseUrl = "" } = {}) {
+export function createApiClient({
+  fetchImpl = (...args) => fetch(...args),
+  baseUrl = "",
+  onRequest = () => undefined,
+  onFailure = () => undefined,
+} = {}) {
   async function request(method, path, body) {
+    onRequest();
+    try {
+      return await answer(method, path, body);
+    } catch (error) {
+      if (error instanceof AppRequestError) onFailure({ path, status: error.status, error });
+      throw error;
+    }
+  }
+
+  async function answer(method, path, body) {
     let res;
     try {
       res = await fetchImpl(`${baseUrl}/api${path}`, {

@@ -24,6 +24,7 @@ describe("createTelemetrySchema", () => {
       "realtime.connections",
       "rooms.open",
       "socket.event.duration",
+      "telemetry.dropped",
       "telemetry.logs.suppressed",
       "telemetry.scrubbed",
     ]);
@@ -42,6 +43,7 @@ describe("createTelemetrySchema", () => {
       [METRICS.PIPELINE_ATTEMPTS]: ["step"],
       [METRICS.PIPELINE_FAILED]: ["step"],
       [METRICS.BOT_THINKING_DURATION]: ["game", "outcome"],
+      [METRICS.TELEMETRY_DROPPED]: ["reason"],
       [METRICS.EVENT_LOOP_P50]: [],
       [METRICS.EVENT_LOOP_P99]: [],
       [METRICS.MEMORY_RSS]: [],
@@ -49,6 +51,15 @@ describe("createTelemetrySchema", () => {
       [METRICS.SCRUBBED]: ["signal", "key"],
       [METRICS.LOGS_SUPPRESSED]: [],
     });
+  });
+
+  it("lets telemetry.dropped carry only a drop reason (CC-175)", () => {
+    const rules = schema.metrics[METRICS.TELEMETRY_DROPPED];
+    ["opted_out", "admin", "invalid", "rate_limited", "cap", "bot", "flag_off"].forEach((reason) =>
+      expect(allows(rules, "reason", reason)).toBe(true),
+    );
+    expect(allows(rules, "reason", "guest_00000000-0000-4000-8000-000000000001")).toBe(false);
+    expect(allows(rules, "route", "/")).toBe(false);
   });
 
   it.each([

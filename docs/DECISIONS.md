@@ -763,6 +763,11 @@ thinking crashed` with `game` only.
   `bots.thinking.duration` (ms, the eleven duration buckets) with `game` (catalogue id) and `outcome` (`ok`,
   `timeout`, `crashed`, `failed`), at most 3 games times 4 outcomes, and two more named warning lines,
   `computer player ran out of time to think` and `computer player's thinking crashed`, with the `game` field only.
+- **Amended 2026-10-20 (CC-175): one counter about usage counts.** `telemetry.dropped`, with the one attribute
+  `reason` (`opted_out`, `admin`, `invalid`, `rate_limited`, `cap`, `bot`, `flag_off`), counts what
+  `POST /api/telemetry` did not store, so the owner can see a flood, a broken build or the daily cap in Grafana. It
+  carries no product data: the usage counts themselves stay in our own database (`telemetry_events`, ADR-034), never
+  in Grafana.
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 
@@ -2112,6 +2117,10 @@ New screens must use tokens and the art registry; a style attribute fails `npm r
   Sockets already check `Origin` at the handshake (CC-013).
 - **Consequences:** No token plumbing in the client; stateless. Revisit if we ever allow cross-origin API clients, embed the
   app in other sites, or add classic HTML form posts.
+- **Amended · 2026-10-20 (CC-175).** One narrow exception to the JSON rule: `POST /api/telemetry` also takes
+  `text/plain`, because `navigator.sendBeacon` sends that when a page is closed. That route changes nothing a player
+  owns, the `Origin` rule and SameSite still apply to it, and a test pins that every other route still refuses
+  text/plain (`telemetryRoutes.test.js`).
 
 ### ADR-009 — Web app conventions: CSS Modules + tokens, injected clients, same-origin dev proxy
 

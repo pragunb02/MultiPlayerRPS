@@ -55,6 +55,7 @@ does not.
 | [`feedback`](#feedback)                               | the message as typed, and a reply email from an adult who gave one                                                | 180 days after it was sent                                                                              | MongoDB TTL index, the owner's Delete in the inbox            |
 | [`feature_flags`](#feature_flags)                     | no: a flag name, its rollout and when it was set                                                                  | until the owner clears it                                                                               | the owner's Use the rollout in code                           |
 | [`feature_flag_counts`](#feature_flag_counts)         | no: per flag, India day and side, two counts                                                                      | 90 days after the day                                                                                   | MongoDB TTL index                                             |
+| [`telemetry_events`](#telemetry_events)               | no: anonymous usage counts, catalogue fields only, the India hour they arrived                                    | 30 days after the hour                                                                                  | MongoDB TTL index, the owner's purge                          |
 | [`daily_puzzle_attempts`](#daily_puzzle_attempts)     | pseudonymous: player id, how each day's puzzle went                                                               | until the account is deleted                                                                            | account deletion, the guest transfer                          |
 | [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)                                                       | until the player deletes the account                                                                    | account deletion (CC-035)                                     |
 | [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                                                                         | 30 days                                                                                                 | MongoDB TTL index                                             |
@@ -62,6 +63,7 @@ does not.
 | [Server memory](#server-memory)                       | yes: IP addresses (rate limits, connections), keyed hashes                                                        | seconds to 30 days, and never past a restart or deploy                                                  | a restart, pruning                                            |
 | [`cc.sid` cookie](#the-ccsid-cookie)                  | pseudonymous: a random session id                                                                                 | 30 days after the last response                                                                         | the browser, logout                                           |
 | [`cc.sound`](#ccsound-in-localstorage)                | no                                                                                                                | until the browser's site data is cleared                                                                | the browser                                                   |
+| [`cc.telemetry`](#cctelemetry-in-localstorage)        | no: only `off`, when the player switched usage counts off                                                         | until the player switches counts back on or clears site data                                            | the browser, the switch                                       |
 | [Server logs](#server-logs)                           | pseudonymous: player ids, room codes; Render's own lines may hold IPs                                             | Render's plan: 7 days on Hobby, 14 on Pro                                                               | Render                                                        |
 | [Backups](#backups)                                   | yes: everything in MongoDB                                                                                        | 30 days                                                                                                 | the bucket's lifecycle rule                                   |
 | [Operations telemetry](#operations-telemetry)         | no: counts, timings and the names of warnings, never an id, name, email, IP address, room code, cookie or session | 14 days (Grafana Cloud free tier)                                                                       | Grafana Cloud                                                 |
@@ -489,6 +491,28 @@ ADR-073, counts as ADR-034)
 5. **Kept for:** 90 days after its day (`COUNTS_KEEP_DAYS`).
 6. **Deleted by:** MongoDB's TTL index on `expiresAt`.
 
+### `telemetry_events`
+
+`apps/server/src/persistence/telemetryEventDao.js`, rules in `apps/server/src/domain/telemetry/` and
+`apps/server/src/service/http/telemetryRoutes.js`, catalogue in `packages/shared/src/telemetry/events.js` (CC-174,
+CC-175, ADR-034 as amended 2026-10-20)
+
+1. **Holds:** one document per anonymous usage event: `name`, the fields its catalogue entry allows (each a value from
+   a closed list, a bucket or a time rounded to 10 ms: the screen as a template, the width class, the kind of player,
+   a control's stable name, an error's type), `build`, `tier: "counts"` and `received_at`, the start of the India
+   hour it arrived in. `_id` is a random UUID, not an ObjectId, which would hold the second. Index: TTL on
+   `received_at`. The schema refuses any other key.
+2. **Not stored:** any player, session, device or page load id, or a hash of one; IP address; User-Agent (read in
+   memory for the bot filter only); cookies; room codes, match ids, names, emails, typed text, URLs or queries; the
+   minute or second. Two events cannot be joined to each other or to a person.
+3. **Personal data:** none. Batches with GPC or DNT, from a console admin, from a known bot, or while
+   `telemetry_ingest` is off are dropped before they are read.
+4. **Who can read it:** nobody directly. The nightly totals (CC-176) read it, and the owner sees totals in the
+   console (CC-177), with any total under 5 shown as `"<5"` (ADR-036.2).
+5. **Kept for:** 30 days after the hour it arrived in (`TELEMETRY_KEEP_DAYS`). At most 100 000 events are stored per
+   India day (`TELEMETRY_LIMITS.storedPerDay`); the rest are dropped and counted.
+6. **Deleted by:** MongoDB's TTL index, or the owner's purge (`DELETE /api/admin/telemetry?before=YYYY-MM-DD`).
+
 ### `daily_puzzle_attempts`
 
 `apps/server/src/persistence/dailyPuzzleAttemptDao.js`, rules in
@@ -638,6 +662,15 @@ the server's own behaviour (a refusal or a wait).
 2. **Personal data:** no. It is never sent to the server.
 3. **Deleted by:** clearing the browser's site data.
 
+### `cc.telemetry` in localStorage
+
+`apps/web/src/lib/telemetry/optOut.js` (CC-174, ADR-034.3)
+
+1. **Holds:** `off`, only when the player turned usage counts off with the switch on the privacy page or the
+   profile. Turning counts back on removes the key. Nothing records Global Privacy Control or Do Not Track.
+2. **Personal data:** no. It is never sent to the server.
+3. **Deleted by:** the switch, or clearing the browser's site data.
+
 No other cookie, localStorage, sessionStorage or IndexedDB key is used in `apps/web/src`.
 
 ## Server logs
@@ -705,10 +738,9 @@ No other cookie, localStorage, sessionStorage or IndexedDB key is used in `apps/
 1. Raw IP addresses in MongoDB or in our log lines.
 2. Emails or addresses in the login throttle's memory. It keeps keyed hashes only (CC-250).
 3. Passwords. Only scrypt hashes, and bcrypt hashes in the legacy `users`.
-4. Analytics, page views, presses or funnels. There is no telemetry yet (CC-173 to CC-178, the catalogue in
-   [analytics/EVENTS.md](analytics/EVENTS.md) is proposed). Operations telemetry (above) is about how the server
-   runs and holds nothing about players. ADR-034 decided it will be anonymous counts only, first
-   party, with an opt out. No third-party analytics.
+4. Analytics with any id. Usage counts (`telemetry_events`, CC-174 and CC-175) are anonymous counts only, first party,
+   with an opt out (ADR-034), and carry no id of anyone. Operations telemetry (above) is about how the server runs
+   and holds nothing about players. No third-party analytics.
 5. Chat or any free text between players. Display names are the only text other players see, and they pass the name
    filter (ADR-022). The only other free text is feedback to the owner (`feedback` above), which no other player
    ever sees.

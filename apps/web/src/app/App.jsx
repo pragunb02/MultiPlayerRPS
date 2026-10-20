@@ -7,6 +7,9 @@ import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { SaveProgressProvider } from "../components/SaveProgress/SaveProgressProvider.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
+import { countRenderErrors } from "../lib/telemetry/errorFields.js";
+import { NO_TELEMETRY } from "../lib/telemetry/facade.js";
+import { TelemetryHost } from "../lib/telemetry/TelemetryHost.jsx";
 import { AdminRoute } from "../pages/AdminPage/AdminRoute.jsx";
 import { CONSOLE_ROUTES } from "../pages/AdminPage/consolePages.js";
 import { DailyPuzzlePage } from "../pages/DailyPuzzlePage/DailyPuzzlePage.jsx";
@@ -36,9 +39,10 @@ import { ServicesProvider } from "./ServicesProvider.jsx";
  */
 export function App({ services }) {
   return (
-    <ErrorBoundary>
+    <ErrorBoundary onError={countRenderErrors(services.telemetry ?? NO_TELEMETRY)}>
       <ServicesProvider services={services}>
         <SessionProvider>
+          <TelemetryHost />
           <ToastProvider>
             <SaveProgressProvider>
               <MatchProgressProvider>

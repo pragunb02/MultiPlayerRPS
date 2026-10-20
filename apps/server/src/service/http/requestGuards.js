@@ -10,11 +10,17 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
  *  3. request bodies must be JSON — a cross-site page cannot send JSON without a CORS preflight we never allow.
  * Requests without Origin come from non-browser clients, which cannot ride a victim's cookies.
  *
- * @param {{ allowedOrigins: ReadonlyArray<string> }} options
+ * One narrow exception to rule 3 (CC-175): a POST to a path in `plainTextPaths` may also be `text/plain`, because
+ * `navigator.sendBeacon` sends that. It is only the telemetry route, which changes nothing a player owns, and rules
+ * 1 and 2 still apply to it. Every other route still refuses text/plain (a test pins it).
+ *
+ * @param {{ allowedOrigins: ReadonlyArray<string>, plainTextPaths?: ReadonlyArray<string> }} options
+ *   `plainTextPaths` are paths under the guard's mount, such as `/telemetry`
  * @returns {import("express").RequestHandler}
  */
-export function createCsrfGuard({ allowedOrigins }) {
+export function createCsrfGuard({ allowedOrigins, plainTextPaths = [] }) {
   const allowed = new Set(allowedOrigins);
+  const plainText = new Set(plainTextPaths);
   return (req, res, next) => {
     if (SAFE_METHODS.has(req.method)) {
       next();
@@ -26,7 +32,9 @@ export function createCsrfGuard({ allowedOrigins }) {
       return;
     }
     const hasBody = Number(req.get("Content-Length") ?? 0) > 0 || req.get("Transfer-Encoding") !== undefined;
-    if (hasBody && !req.is("application/json")) {
+    const plainTextAllowed =
+      req.method === "POST" && plainText.has(req.path) && Boolean(req.is("text/plain"));
+    if (hasBody && !req.is("application/json") && !plainTextAllowed) {
       next(new UnsupportedMediaTypeError("Send JSON (Content-Type: application/json)"));
       return;
     }

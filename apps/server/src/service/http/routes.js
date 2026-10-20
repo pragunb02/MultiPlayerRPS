@@ -16,6 +16,7 @@ import { createProfileRoutes } from "./profileRoutes.js";
 import { createProgressRoutes } from "./progressRoutes.js";
 import { createSafetyRoutes } from "./safetyRoutes.js";
 import { createSessionRoutes } from "./sessionRoutes.js";
+import { createTelemetryRoutes } from "./telemetryRoutes.js";
 
 /**
  * @param {Parameters<typeof createSessionRoutes>[0] & Parameters<typeof createMatchRoutes>[0] & Parameters<typeof createProgressRoutes>[0]
@@ -30,6 +31,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { flagComponent: Parameters<typeof createFlagRoutes>[0]["flagComponent"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { safetyComponent: Parameters<typeof createSafetyRoutes>[0]["safetyComponent"] }
+ *   & { telemetryComponent: Parameters<typeof createTelemetryRoutes>[0]["telemetryComponent"], serverEvents: ReturnType<typeof import("./telemetryRoutes.js").createServerEvents> }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
  */
 export function apiRouter({
@@ -61,6 +63,8 @@ export function apiRouter({
   dailyPuzzleLimit,
   safetyComponent,
   flagComponent,
+  telemetryComponent,
+  serverEvents,
   build,
   ...sessionDeps
 }) {
@@ -74,7 +78,9 @@ export function apiRouter({
     res.json({ games: GAMES });
   });
 
-  router.use(createSessionRoutes({ ...sessionDeps, onIdentityChanged, isAdmin: adminAccess.isAdmin }));
+  router.use(
+    createSessionRoutes({ ...sessionDeps, onIdentityChanged, isAdmin: adminAccess.isAdmin, serverEvents }),
+  );
   router.use(
     createAuthRoutes({
       accountComponent,
@@ -82,6 +88,7 @@ export function apiRouter({
       onOtherSessionsEnded,
       renewals,
       onIdentityChanged,
+      serverEvents,
       now,
       ...(authLimits && { limits: authLimits }),
     }),
@@ -128,6 +135,7 @@ export function apiRouter({
   );
 
   router.use(createFlagRoutes({ flagComponent, adminAccess }));
+  router.use(createTelemetryRoutes({ telemetryComponent, flagComponent, adminAccess }));
 
   router.use(createAdminRoutes({ analyticsComponent, requireAdmin: adminAccess.requireAdmin, now }));
   router.use(createAdminAccountRoutes({ accountComponent, requireAdmin: adminAccess.requireAdmin, now }));

@@ -1,0 +1,23 @@
+/* The usage counts switch (CC-174): a checkbox with its plain words, the hint under it. */
+.switch {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--space-12);
+  font-weight: 600;
+}
+.toggle input {
+  accent-color: var(--color-primary);
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

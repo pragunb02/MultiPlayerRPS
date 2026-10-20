@@ -82,9 +82,14 @@ const FACTS = [
     page: /Render keeps them for 7 to 14 days, depending on the plan/,
   },
   {
-    fact: "there is no analytics yet, and it would be anonymous counts on our own server",
-    data: "There is no telemetry yet",
-    page: /We do not count how you use the site\. If we ever do, it will be anonymous counts on our own server/,
+    fact: "usage counts are anonymous, on our own server, single counts 30 days, off with the switch, GPC or DNT (CC-174)",
+    data: "| [`telemetry_events`](#telemetry_events) | no: anonymous usage counts, catalogue fields only, the India hour they arrived | 30 days after the hour |",
+    page: /These counts go only to our own server and our own database\. They never include your name, email, IP address, what you type, or the code of your room\. The time is kept to the hour only\..*the counts carry no id at all.*The single counts are deleted after 30 days\..*If your browser sends Global Privacy Control or Do Not Track, it is off already/,
+  },
+  {
+    fact: "the usage counts switch keeps only cc.telemetry in this browser (CC-174)",
+    data: "| [`cc.telemetry`](#cctelemetry-in-localstorage) | no: only `off`, when the player switched usage counts off |",
+    page: /cc\.telemetry, only if you switch usage counts off/,
   },
   {
     fact: "profiles start private, only adults can be public, everyone else is Hidden player (CC-034)",
@@ -155,11 +160,12 @@ describe("the privacy page says what docs/DATA.md says (CC-248)", () => {
     expect(flat(screen.getByRole("article").textContent)).not.toMatch(wrong);
   });
 
-  it("names no analytics service and says nothing is counted today", () => {
+  it("names no analytics service, and says the counts are our own", () => {
     renderApp({ path: "/privacy" });
     const text = flat(screen.getByRole("article").textContent);
 
-    expect(text).toMatch(/no third party analytics/);
+    expect(text).toMatch(/no third-party analytics/);
+    expect(text).toMatch(/These counts go only to our own server/);
     expect(text).not.toMatch(/Google Analytics|Plausible|PostHog|Mixpanel/);
   });
 });

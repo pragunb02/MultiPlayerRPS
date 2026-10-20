@@ -2,13 +2,15 @@ import express from "express";
 import helmet from "helmet";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NO_OPERATIONS_METRICS } from "../../utils/operationsMetrics.js";
-import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
+import { countServerErrors, errorHandler, notFoundHandler } from "./errorMiddleware.js";
 import { createApiRateLimit, DEFAULT_API_LIMIT } from "./rateLimits.js";
 import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createAdminAccess } from "./adminAccess.js";
 import { createRequestLogger, keepRoutePrefix } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
 import { createSessionGuard, createSessionRenewals } from "./session.js";
+import { createServerEvents, createTelemetryBodyParser, TELEMETRY_PATH } from "./telemetryRoutes.js";
+import { TELEMETRY_DROP_REASONS } from "../../domain/telemetry/telemetryLimits.js";
 import { createWebAppRouter } from "./webApp.js";
 
 /**
@@ -41,6 +43,8 @@ import { createWebAppRouter } from "./webApp.js";
  *     policy, whose own flags each player can read (CC-152)
  *   flagComponent: ReturnType<typeof import("../../domain/flags/flagComponent.js").createFlagComponent>,  feature
  *     flags (CC-312)
+ *   telemetryComponent: ReturnType<typeof import("../../domain/telemetry/telemetryComponent.js").createTelemetryComponent>,
+ *     anonymous usage counts (CC-175)
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
  *   onOtherSessionsEnded: (which: { playerId: string, fromSessionId: string, toSessionId: string }) => void,  told
@@ -82,6 +86,7 @@ export function createHttpApp({
   dailyPuzzleLimit,
   safetyComponent,
   flagComponent,
+  telemetryComponent,
   authLimits,
   onSessionEnded,
   onOtherSessionsEnded,
@@ -100,9 +105,15 @@ export function createHttpApp({
   assertFunction(isDatabaseUp, "isDatabaseUp");
   assertDefined(logger, "logger");
   assertDefined(sessionMiddleware, "sessionMiddleware");
+  assertDefined(telemetryComponent, "telemetryComponent");
 
   const app = express();
   const adminAccess = createAdminAccess({ adminAccountIds: config.adminAccountIds });
+  const serverEvents = createServerEvents({
+    telemetryComponent,
+    flagComponent,
+    isAdmin: adminAccess.isAdmin,
+  });
 
   app.disable("x-powered-by");
   // Rate limits key on req.ip, and Express finds it by counting this many proxies in from the right of
@@ -129,9 +140,20 @@ export function createHttpApp({
     });
   });
 
+  // A telemetry batch is read first, as text up to its own small limit, so the JSON parser below skips it (CC-175).
+  app.use(
+    `/api${TELEMETRY_PATH}`,
+    createTelemetryBodyParser({
+      maxBytes: telemetryComponent.limits.bodyBytes,
+      onRejected: () => telemetryComponent.dropped(TELEMETRY_DROP_REASONS.INVALID, 1),
+    }),
+  );
   app.use(express.json({ limit: "100kb" }));
   app.use("/api", keepRoutePrefix);
-  app.use("/api", createCsrfGuard({ allowedOrigins: config.allowedOrigins }));
+  app.use(
+    "/api",
+    createCsrfGuard({ allowedOrigins: config.allowedOrigins, plainTextPaths: [TELEMETRY_PATH] }),
+  );
   app.use("/api", sessionMiddleware);
   // After the session, so a signed-in or guest player is counted by session rather than by address.
   app.use("/api", createApiRateLimit(apiLimit));
@@ -174,6 +196,8 @@ export function createHttpApp({
       dailyPuzzleLimit,
       safetyComponent,
       flagComponent,
+      telemetryComponent,
+      serverEvents,
       build: config.build,
     }),
   );
@@ -190,6 +214,7 @@ export function createHttpApp({
   }
 
   app.use(notFoundHandler);
+  app.use(countServerErrors(serverEvents));
   app.use(errorHandler);
 
   return app;
