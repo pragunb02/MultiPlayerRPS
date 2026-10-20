@@ -161,6 +161,18 @@ describe("match history names players by match player ids (CC-297)", () => {
     expect(JSON.stringify(details).match(PLAYER_ID)).toBeNull();
   });
 
+  it("still names a player id in a field nobody listed by a match id, as the last check before it is sent", async () => {
+    const matches = setup();
+    const stranger = "user_0000000000000000000000ff";
+    const log = [{ kind: "note", about: { who: stranger, [stranger]: true }, at: T0 + 1 }];
+    await matches.recordFinished({ room: room({ log }), outcome: aliceWins() });
+
+    const details = await matches.getForPlayer({ matchId: MATCH_ID, playerId: BOB });
+
+    const named = idIn(MATCH_ID, stranger);
+    expect(details.log[0].about).toEqual({ who: named, [named]: true });
+  });
+
   it("leaves the stored match as it was: nothing is written, so nothing is migrated", async () => {
     const matches = setup();
     await matches.recordFinished({ room: room(), outcome: aliceWins() });

@@ -3,6 +3,7 @@ import { renamePlayer } from "@classicade/games";
 import { XP_AWARDS } from "@classicade/shared";
 import { isBotPlayerId } from "../../models/botIdentity.js";
 import { deletedPlayer, earnsNothing } from "../../models/deletedPlayer.js";
+import { renameIdShapes } from "../identity/idShapes.js";
 import { anonymisedMatch } from "./anonymise.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NotFoundError } from "../../utils/errors.js";
@@ -128,14 +129,16 @@ export function createMatchComponent({ matchAccessor, matchPlayerIds, newUuid = 
   /**
    * A view of the match as a player reads it (CC-297). Every player of the match, the viewer too, is named by their
    * match player id instead of their player id, wherever the view names them, as a value or as a key. `you` is the
-   * viewer's own. Player ids are unique strings, so nothing else is changed.
+   * viewer's own. Player ids are unique strings, so nothing else is changed. Last, anything still shaped like a
+   * player id is named by its match player id too, so an id in a field nobody listed is never sent as it is.
    */
   function asSeenBy(match, viewerId, view) {
+    const idIn = (playerId) => matchPlayerIds.playerIdIn(match, playerId);
     const renamed = [...playersNamedIn(match)].reduce(
-      (named, playerId) => renamePlayer(named, playerId, matchPlayerIds.playerIdIn(match, playerId)),
+      (named, playerId) => renamePlayer(named, playerId, idIn(playerId)),
       view,
     );
-    return { ...renamed, you: matchPlayerIds.playerIdIn(match, viewerId) };
+    return { ...renameIdShapes(renamed, idIn), you: idIn(viewerId) };
   }
 
   /** The stored match, for one of its players only. Others get "not found", so match ids cannot be probed. */

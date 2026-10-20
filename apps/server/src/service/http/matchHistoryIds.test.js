@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
+import { DELETED_ID_PREFIX } from "../../models/deletedPlayer.js";
+import { ACCOUNT_ID_PREFIX, GUEST_ID_PREFIX } from "../../models/identity.js";
 import { createSocketClients, send, startRoom } from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
 
@@ -16,8 +18,12 @@ afterEach(async () => {
 });
 
 const PASSWORD = "correct horse battery";
-// A person's player id: a guest's uuid or an account's MongoDB ObjectId.
-const PERSON_ID = /\b(?:guest_[0-9a-f-]{36}|user_[0-9a-f]{24})\b/g;
+// Anything that starts the way a person's player id does (a guest, an account, or a deleted player's stand-in) and
+// is not inside a longer token, so a keyed id that happens to hold the same letters is not counted.
+const PERSON_ID = new RegExp(
+  `(?<![A-Za-z0-9_-])(?:${GUEST_ID_PREFIX}|${ACCOUNT_ID_PREFIX}|${DELETED_ID_PREFIX})[A-Za-z0-9-]+`,
+  "g",
+);
 
 async function call(method, path, { body, cookie } = {}) {
   const res = await fetch(`${server.baseUrl}/api${path}`, {
@@ -57,19 +63,19 @@ async function race(host, guest) {
 
 /**
  * Everything match history and a finished match send this player now: the list, every match's details, the
- * export for an account, and everything their sockets received.
+ * export for an account, every leaderboard the match moved them on with their own standing (`you`), and everything
+ * their sockets received.
  */
 async function crawl(player, answers) {
-  const { body: list } = await call("GET", "/matches", { cookie: player.cookie });
-  const details = await Promise.all(
-    list.matches.map(
-      async ({ matchId }) => (await call("GET", `/matches/${matchId}`, { cookie: player.cookie })).body,
-    ),
-  );
+  const get = async (path) => (await call("GET", path, { cookie: player.cookie })).body;
+  const list = await get("/matches");
+  const details = await Promise.all(list.matches.map(({ matchId }) => get(`/matches/${matchId}`)));
   const exported = player.account
     ? (await call("POST", "/account/export", { body: { password: PASSWORD }, cookie: player.cookie })).body
     : {};
-  return { list, details, exported, wire: JSON.stringify([player.received, answers]) };
+  const { boards } = await get("/leaderboards");
+  const standings = await Promise.all(boards.map(({ id }) => get(`/leaderboards/${id}`)));
+  return { list, details, exported, standings, wire: JSON.stringify([player.received, answers]) };
 }
 
 /** Every person's id in the crawl that is not one of the viewer's own. */
@@ -112,6 +118,12 @@ describe("no match-related answer carries another person's id (CC-297)", () => {
     expect(forAliceAfter.details).toHaveLength(2);
     expect(forBobAfter.exported.matches).toHaveLength(2);
     expect(forAlice.wire).toContain(SOCKET_EVENTS.PROGRESS_UPDATED);
+    // The boards list the guest opponent's row too (ADR-060), and each viewer's own standing.
+    const rows = forAlice.standings.flatMap((standing) => standing.entries.map((entry) => entry.displayName));
+    expect(rows).toContain(bob.identity.displayName);
+    expect(forBob.standings.some((standing) => standing.you?.listed)).toBe(true);
+    // The crawl does find an id that does not belong to the viewer.
+    expect(strangersIn({ planted: bob.identity.id }, alice)).toEqual([bob.identity.id]);
     expect(strangersIn(forAlice, alice)).toEqual([]);
     expect(strangersIn(forBob, bob)).toEqual([]);
     expect(strangersIn(forAliceAfter, alice)).toEqual([]);

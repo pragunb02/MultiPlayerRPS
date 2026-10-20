@@ -134,7 +134,7 @@ the owner may change it.
   `GET /api/matches` and `GET /api/matches/:matchId` name every player of a match, the viewer included, by a match
   player id: HMAC-SHA-256 of `[matchId, playerId]` under a key derived from `SESSION_SECRET` with the label
   "classicade match player ids", 22 base64url characters, as a value and as a key in the players, the winners and
-  every log entry. Each answer has `you`, the viewer's own match player id. Both participants see the same ids for a
+  every log entry, then the last pass of point 5 with match player ids. Each answer has `you`, the viewer's own match player id. Both participants see the same ids for a
   match, and unrelated ids in every other match and in the room the match was played in. The field names stay.
   Nothing is stored or migrated. Room seat ids and match player ids now share one helper, `utils/keyedIds.js`, with
   one label per purpose, so every later keyed id is one more label there; the seat ids it gives are unchanged. The

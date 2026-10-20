@@ -9,6 +9,7 @@ import { createInMemoryMatchDao } from "../../testing/inMemoryMatchDao.js";
 import { createInMemoryPlayerTransferDao } from "../../testing/inMemoryPlayerTransferDao.js";
 import { createInMemoryProgressDao } from "../../testing/inMemoryProgressDao.js";
 import { createMatchComponent } from "../matches/matchComponent.js";
+import { TEST_MATCH_PLAYER_IDS } from "../../testing/matchPlayerIds.js";
 import { NotFoundError } from "../../utils/errors.js";
 import { createLeaderboardComponent } from "./leaderboardComponent.js";
 
@@ -757,7 +758,10 @@ describe("leaderboardComponent", () => {
       await ctx.progressTo(GUEST, 50);
       await ctx.questBonus(GUEST, 20, 50);
       // The matches participant renames the guest's match. The tests then bring the account's progress along.
-      await createMatchComponent({ matchAccessor: ctx.matchAccessor }).transferPlayer({
+      await createMatchComponent({
+        matchAccessor: ctx.matchAccessor,
+        matchPlayerIds: TEST_MATCH_PLAYER_IDS,
+      }).transferPlayer({
         from: GUEST.id,
         to: ALICE,
       });
