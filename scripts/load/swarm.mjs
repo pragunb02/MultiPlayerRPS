@@ -110,10 +110,14 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
    */
   async function arrive(owned) {
     const socket = await connect(await signIn());
+    // A player who arrives after the swarm stopped goes again at once, so no socket outlives the run, and its
+    // games end before its first call (CC-309).
+    if (stopping) {
+      socket.close();
+      throw ENDED;
+    }
     sockets.add(socket);
     owned.push(socket);
-    // A player who arrives after the swarm stopped goes again at once, so no socket outlives the run.
-    if (stopping) socket.close();
     socket.on("disconnect", (reason) => {
       sockets.delete(socket);
       player.gone = true;
