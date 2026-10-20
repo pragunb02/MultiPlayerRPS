@@ -172,6 +172,10 @@ function createOperationsMetrics(meter) {
   const failed = meter.createCounter(METRICS.PIPELINE_FAILED, {
     description: "Match pipeline steps that failed for good, after every retry.",
   });
+  const thinkingDuration = histogram(
+    METRICS.BOT_THINKING_DURATION,
+    "Time a computer player took to choose a move, waiting for a thread included.",
+  );
   const methods = new Set(HTTP_METHODS);
 
   return Object.freeze({
@@ -188,6 +192,9 @@ function createOperationsMetrics(meter) {
     recordPipelineStep({ step, failedForGood }) {
       attempts.add(1, { step });
       if (failedForGood) failed.add(1, { step });
+    },
+    recordBotThinking({ game, outcome, durationMs }) {
+      thinkingDuration.record(durationMs, { game, outcome });
     },
     watch({ rooms, connections }) {
       const open = meter.createObservableGauge(METRICS.ROOMS_OPEN, {

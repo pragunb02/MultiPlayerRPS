@@ -77,8 +77,9 @@ lobby "Play Rocky" ──room:play-computer──► botComponent.playComputer �
   computer games to `BOT_DAILY_XP` a day. The verdict stores it in `credit.botXp`. Computer games never reach a
   leaderboard.
 - Room views carry `revision`, so the web app keeps the newest view when a computer's update overtakes an answer.
-- Limits: at most 3 computer games per player, and `domain/bots/thinkingQueue.js` chooses one computer move at a time
-  on the whole server and then rests as long as the search took.
+- Limits: at most 3 computer games per player. Chess moves are chosen on worker threads
+  (`dependency/thinking/botThinkingClient.js`, one per spare core, at most 4), so the event loop keeps answering, and
+  `domain/bots/thinkingQueue.js` keeps a fair line per room with one think waiting each and a 30 s budget (ADR-067).
 
 ### Sessions and tabs (ADR-030, ADR-033)
 

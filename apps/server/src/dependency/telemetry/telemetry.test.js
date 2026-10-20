@@ -73,6 +73,7 @@ describe("startTelemetry when off", () => {
     ).toBeUndefined();
     expect(metrics.recordSocketEvent({ event: "x", outcome: "ok", durationMs: 1 })).toBeUndefined();
     expect(metrics.recordPipelineStep({ step: "judge", failedForGood: false })).toBeUndefined();
+    expect(metrics.recordBotThinking({ game: "chess", outcome: "ok", durationMs: 1 })).toBeUndefined();
     expect(metrics.watch({ rooms: async () => [], connections: () => 0 })).toBeUndefined();
     await expect(NO_TELEMETRY.flush()).resolves.toBeUndefined();
     await expect(NO_TELEMETRY.shutdown()).resolves.toBeUndefined();
@@ -159,6 +160,25 @@ describe("startTelemetry when on", () => {
     ]);
     expect(pointsOf(exporter, METRICS.PIPELINE_FAILED)).toEqual([
       { attributes: { step: "judge" }, value: 1 },
+    ]);
+  });
+
+  it("times computer players' thinking by game and outcome (ADR-067)", async () => {
+    const { telemetry, metrics: exporter } = await start();
+
+    telemetry.metrics.recordBotThinking({ game: "chess", outcome: "ok", durationMs: 200 });
+    telemetry.metrics.recordBotThinking({ game: "chess", outcome: "timeout", durationMs: 10_000 });
+    await telemetry.flush();
+
+    expect(pointsOf(exporter, METRICS.BOT_THINKING_DURATION)).toEqual([
+      {
+        attributes: { game: "chess", outcome: "ok" },
+        value: expect.objectContaining({ count: 1, sum: 200 }),
+      },
+      {
+        attributes: { game: "chess", outcome: "timeout" },
+        value: expect.objectContaining({ count: 1, sum: 10_000 }),
+      },
     ]);
   });
 

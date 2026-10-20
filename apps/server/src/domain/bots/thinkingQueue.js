@@ -1,51 +1,161 @@
-/**
- * How long the server rests after a computer player's thinking, for each millisecond of thinking. With 1 it rests as
- * long as it thought, so computer players never use more than half of the server's time.
- */
-export const REST_PER_THINKING_MS = 1;
-
-/** Waits `ms` milliseconds on a timer that does not keep the process alive. */
-const restFor = (ms) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms).unref();
-  });
+import { BOT_THINKING_OUTCOMES, NO_OPERATIONS_METRICS } from "../../utils/operationsMetrics.js";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { GoneError } from "../../utils/errors.js";
 
 /**
- * One line for every computer player on the server to think in (CC-138). A strong chess level thinks for up to a
- * quarter of a second, and that thinking holds up everything else the server does: other rooms' moves, chess
- * clocks and every socket. So only one computer player thinks at a time, whichever room and player it plays for.
- * After each one the server rests for as long as the thinking took (see `REST_PER_THINKING_MS`), and in that rest
- * it answers everyone else. A few players starting many games therefore make computer players slower, never the
- * server.
+ * @typedef {import("@classicade/games").ThinkRequest} ThinkRequest
  *
- * @param {{ clock?: () => number, rest?: (ms: number) => Promise<void> }} [deps]  `clock` reads milliseconds and
- *   `rest` waits. Tests give both to see every step
+ * @typedef {{ ok: true, move: unknown }
+ *   | { ok: false, reason: "timeout" | "crashed" | "closed" }
+ *   | { ok: false, reason: "failed", error: Error }} ThinkResult   how a think on a worker ended. `failed` is the
+ *   strategy throwing, `closed` the workers shutting down
+ *
+ * @typedef {Object} ThinkingWorkers   the threads heavy thinking runs on (`dependency/thinking/`)
+ * @property {number} size                                         how many can think at once
+ * @property {(request: Readonly<ThinkRequest>) => Promise<ThinkResult>} run   never rejects, and never runs more
+ *   than `size` at once
  */
-export function createThinkingQueue({ clock = () => performance.now(), rest = restFor } = {}) {
-  let line = Promise.resolve();
+
+/** The named lines (ADR-055) for a think that did not end in a move, by how it ended. */
+const FALLBACK_LINES = Object.freeze({
+  timeout: "computer player ran out of time to think",
+  crashed: "computer player's thinking crashed",
+});
+
+const gone = () => new GoneError("The computer player's turn passed before it was thought about");
+
+/**
+ * The line computer players think in (CC-138, CC-308, ADR-067). Light levels (Rock Paper Scissors, Tic-Tac-Toe)
+ * answer at once on the event loop. Heavy ones (chess) think on worker threads, so the event loop keeps answering
+ * people meanwhile, and as many think at once as there are workers.
+ *
+ * The line is fair per room. Each room has at most one think waiting and one running, and rooms are served in the
+ * order they asked, so no room can crowd out another. A room's next think starts only after its last one ended, so
+ * one room's moves are never chosen out of order. A newer think for a room replaces its waiting one, whose moment
+ * has passed, and the older one ends with a GoneError.
+ *
+ * A think that runs out of time or whose thread fails still gives the room a move: the bot's easiest level chooses
+ * one on the event loop from the same view and seed. A strategy that throws is passed on as before.
+ *
+ * @param {{
+ *   thinker: ReturnType<typeof import("@classicade/games").createBotThinker>,
+ *   workers: Readonly<ThinkingWorkers>,
+ *   logger: Pick<import("../../utils/logger.js").Logger, "warn">,
+ *   recordThinking?: import("../../utils/operationsMetrics.js").OperationsMetrics["recordBotThinking"],
+ *   clock?: () => number,
+ * }} deps  `clock` reads milliseconds, for the metric
+ */
+export function createThinkingQueue({
+  thinker,
+  workers,
+  logger,
+  recordThinking = NO_OPERATIONS_METRICS.recordBotThinking,
+  clock = () => performance.now(),
+}) {
+  assertDefined(thinker, "thinker");
+  assertFunction(workers?.run, "workers.run");
+  assertDefined(logger, "logger");
+  if (!(Number.isInteger(workers.size) && workers.size >= 1)) {
+    throw new RangeError("workers.size must be a whole number of at least 1");
+  }
+
+  /** Per room code: the think waiting for a worker, and whether one is running. */
+  const rooms = new Map();
+  /** Room codes with a think waiting and none running, in the order they asked. */
+  const line = [];
+  let running = 0;
+  let stopped = false;
+
+  const record = (request, outcome, started) =>
+    recordThinking({ game: request.gameId, outcome, durationMs: clock() - started });
+
+  function settle(entry, result) {
+    if (result.ok) {
+      record(entry.request, BOT_THINKING_OUTCOMES.OK, entry.started);
+      entry.resolve(result.move);
+    } else if (result.reason === "failed") {
+      record(entry.request, BOT_THINKING_OUTCOMES.FAILED, entry.started);
+      entry.reject(result.error);
+    } else if (result.reason === "closed") {
+      entry.reject(gone());
+    } else {
+      record(entry.request, result.reason, entry.started);
+      logger.warn({ game: entry.request.gameId }, FALLBACK_LINES[result.reason]);
+      quickly(entry);
+    }
+  }
+
+  /** The easiest level's move for the same turn, or the error it threw. */
+  function quickly(entry) {
+    try {
+      entry.resolve(thinker.quickest(entry.request));
+    } catch (err) {
+      entry.reject(err);
+    }
+  }
+
+  function next() {
+    while (!stopped && running < workers.size && line.length > 0) {
+      const code = line.shift();
+      const room = rooms.get(code);
+      const entry = room.waiting;
+      room.waiting = undefined;
+      room.running = true;
+      running += 1;
+      workers.run(entry.request).then((result) => {
+        running -= 1;
+        room.running = false;
+        if (room.waiting === undefined) rooms.delete(code);
+        else line.push(code);
+        settle(entry, result);
+        next();
+      });
+    }
+  }
 
   return Object.freeze({
     /**
-     * Thinks `work` when it is this caller's turn, and answers what it gave or threw.
+     * The move for a computer player's turn in a room.
      *
-     * @template T
-     * @param {() => T} work  synchronous, such as choosing a chess move
-     * @returns {Promise<T>}
+     * @param {{ room: string, request: Readonly<ThinkRequest> }} input  `room` is the room's code
+     * @returns {Promise<unknown>} the raw move
+     * @throws {GoneError} when a newer turn of the room replaced this one, or the queue stopped
      */
-    think(work) {
-      let spent = 0;
-      const turn = line.then(() => {
+    async think({ room: code, request }) {
+      if (stopped) throw gone();
+      if (!thinker.isHeavy(request)) {
         const started = clock();
         try {
-          return work();
-        } finally {
-          spent = clock() - started;
+          const move = thinker.think(request);
+          record(request, BOT_THINKING_OUTCOMES.OK, started);
+          return move;
+        } catch (err) {
+          record(request, BOT_THINKING_OUTCOMES.FAILED, started);
+          throw err;
         }
+      }
+      return new Promise((resolve, reject) => {
+        const entry = { request, resolve, reject, started: clock() };
+        const room = rooms.get(code) ?? { waiting: undefined, running: false };
+        rooms.set(code, room);
+        if (room.waiting !== undefined) {
+          room.waiting.reject(gone());
+        } else if (!room.running) {
+          line.push(code);
+        }
+        room.waiting = entry;
+        next();
       });
-      // The next caller waits for the rest, whether this work gave a move or threw.
-      const resting = () => rest(spent * REST_PER_THINKING_MS);
-      line = turn.then(resting, resting);
-      return turn;
+    },
+
+    /** Ends every waiting think with a GoneError and takes no more. Called when the server shuts down. */
+    stop() {
+      stopped = true;
+      for (const room of rooms.values()) {
+        room.waiting?.reject(gone());
+        room.waiting = undefined;
+      }
+      line.length = 0;
     },
   });
 }

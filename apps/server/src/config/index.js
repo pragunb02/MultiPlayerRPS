@@ -1,6 +1,8 @@
 import { isIP } from "node:net";
+import { availableParallelism } from "node:os";
 import path from "node:path";
 import { LOG_LEVELS } from "../utils/logger.js";
+import { botThinkingSettings } from "./bots.js";
 import { parseBuild } from "./build.js";
 import { parseTelemetry } from "./telemetry.js";
 
@@ -29,6 +31,7 @@ const MAX_HOSTNAME_LENGTH = 253;
  * @property {number} trustProxyHops  how many proxies in front of the server add to X-Forwarded-For (0 = none, trust no header)
  * @property {ReadonlyArray<string>} adminAccountIds  the player ids (`user_` and 24 hex digits) that may open the owner console. Empty means nobody can (CC-233)
  * @property {Readonly<import("./telemetry.js").TelemetrySettings>} telemetry  operations telemetry to Grafana Cloud, off unless OTEL_EXPORTER_OTLP_ENDPOINT is set (ADR-055)
+ * @property {Readonly<import("./bots.js").BotThinkingSettings>} bots  how many worker threads computer players think on, and for how long (ADR-067, no env var)
  * @property {Readonly<import("./build.js").BuildSettings>} build  the deployed commit and its version, shown on /health (CC-303)
  */
 
@@ -46,11 +49,12 @@ const MAX_HOSTNAME_LENGTH = 253;
  * The deployed commit (RENDER_GIT_COMMIT) and the version the build wrote never stop the boot: see build.js.
  *
  * @param {Record<string, string | undefined>} env
- * @param {{ buildInfoText?: string }} [files]  the build file's text, read by the entry point. "" by contract when
- *   there is none, as on a laptop or in CI
+ * @param {{ buildInfoText?: string, parallelism?: number }} [files]  the build file's text, read by the entry point.
+ *   "" by contract when there is none, as on a laptop or in CI. `parallelism` is `os.availableParallelism()` unless a
+ *   test gives another
  * @returns {Readonly<Config>}
  */
-export function loadConfig(env, { buildInfoText = "" } = {}) {
+export function loadConfig(env, { buildInfoText = "", parallelism = availableParallelism() } = {}) {
   const errors = [];
 
   const nodeEnv = env.NODE_ENV ?? "development";
@@ -113,6 +117,7 @@ export function loadConfig(env, { buildInfoText = "" } = {}) {
     trustProxyHops,
     adminAccountIds,
     telemetry,
+    bots: botThinkingSettings({ parallelism }),
     build: parseBuild({ env, buildInfoText }),
   });
 }
