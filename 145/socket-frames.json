@@ -1,27 +1,27 @@
 {
   "riya": [
-    "42[\"friends:updated\",{\"friends\":[],\"incoming\":[],\"outgoing\":[{\"requestId\":\"98677f18-944b-4d4a-83a9-c72a6b110555\",\"displayName\":\"arjun_1279123306\",\"sentAt\":1792494136540}],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
-    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"jjftp5p8xzps16y4\",\"displayName\":\"arjun_1279123306\",\"presence\":\"online\",\"since\":1792494136953,\"profile\":\"jjftp5p8xzps16y4\"}],\"incoming\":[],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
-    "42[\"friends:presence\",{\"handle\":\"jjftp5p8xzps16y4\",\"presence\":\"offline\"}]",
-    "42[\"friends:presence\",{\"handle\":\"jjftp5p8xzps16y4\",\"presence\":\"online\"}]",
-    "42[\"friends:presence\",{\"handle\":\"jjftp5p8xzps16y4\",\"presence\":\"playing\"}]",
-    "42[\"friends:presence\",{\"handle\":\"jjftp5p8xzps16y4\",\"presence\":\"offline\"}]",
-    "42[\"friends:presence\",{\"handle\":\"jjftp5p8xzps16y4\",\"presence\":\"playing\"}]",
-    "42[\"friends:presence\",{\"handle\":\"jjftp5p8xzps16y4\",\"presence\":\"offline\"}]"
+    "42[\"friends:updated\",{\"friends\":[],\"incoming\":[],\"outgoing\":[{\"requestId\":\"9d96949a-2a39-487b-a539-d0771016aa75\",\"displayName\":\"arjun_5583767663\",\"sentAt\":1792495567002}],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
+    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"3vn691ep1s3t0xs3\",\"displayName\":\"arjun_5583767663\",\"presence\":\"online\",\"since\":1792495567419,\"profile\":\"3vn691ep1s3t0xs3\"}],\"incoming\":[],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
+    "42[\"friends:presence\",{\"handle\":\"3vn691ep1s3t0xs3\",\"presence\":\"offline\"}]",
+    "42[\"friends:presence\",{\"handle\":\"3vn691ep1s3t0xs3\",\"presence\":\"online\"}]",
+    "42[\"friends:presence\",{\"handle\":\"3vn691ep1s3t0xs3\",\"presence\":\"playing\"}]",
+    "42[\"friends:presence\",{\"handle\":\"3vn691ep1s3t0xs3\",\"presence\":\"offline\"}]",
+    "42[\"friends:presence\",{\"handle\":\"3vn691ep1s3t0xs3\",\"presence\":\"playing\"}]",
+    "42[\"friends:presence\",{\"handle\":\"3vn691ep1s3t0xs3\",\"presence\":\"offline\"}]"
   ],
   "arjun": [
-    "42[\"friends:request\",{\"requestId\":\"98677f18-944b-4d4a-83a9-c72a6b110555\",\"displayName\":\"riya_1275617466\",\"via\":\"game\"}]",
-    "42[\"friends:updated\",{\"friends\":[],\"incoming\":[{\"requestId\":\"98677f18-944b-4d4a-83a9-c72a6b110555\",\"displayName\":\"riya_1275617466\",\"via\":\"game\",\"sentAt\":1792494136540}],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
-    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"v1gd6ej05rmhdc46\",\"displayName\":\"riya_1275617466\",\"presence\":\"online\",\"since\":1792494136953,\"profile\":\"v1gd6ej05rmhdc46\"}],\"incoming\":[],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
-    "42[\"friends:presence\",{\"handle\":\"v1gd6ej05rmhdc46\",\"presence\":\"offline\"}]",
-    "42[\"friends:presence\",{\"handle\":\"v1gd6ej05rmhdc46\",\"presence\":\"online\"}]",
-    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"v1gd6ej05rmhdc46\",\"displayName\":\"riya_1275617466\",\"presence\":\"online\",\"since\":1792494136953,\"profile\":\"v1gd6ej05rmhdc46\"}],\"incoming\":[],\"outgoing\":[{\"requestId\":\"c754b395-d78e-4547-8a10-ed42da8cdaf9\",\"displayName\":\"A ClassiCade player\",\"sentAt\":1792494139069}],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
-    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"v1gd6ej05rmhdc46\",\"displayName\":\"riya_1275617466\",\"presence\":\"online\",\"since\":1792494136953,\"profile\":\"v1gd6ej05rmhdc46\"}],\"incoming\":[],\"outgoing\":[{\"requestId\":\"c754b395-d78e-4547-8a10-ed42da8cdaf9\",\"displayName\":\"A ClassiCade player\",\"sentAt\":1792494139069}],\"settings\":{\"appearOffline\":true},\"safetyTips\":false}]",
-    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"v1gd6ej05rmhdc46\",\"displayName\":\"riya_1275617466\",\"presence\":\"online\",\"since\":1792494136953,\"profile\":\"v1gd6ej05rmhdc46\"},{\"handle\":\"bcyganh763d016tc\",\"displayName\":\"kabir_1386225762\",\"presence\":\"online\",\"since\":1792494139259}],\"incoming\":[],\"outgoing\":[],\"settings\":{\"appearOffline\":true},\"safetyTips\":false}]"
+    "42[\"friends:request\",{\"requestId\":\"9d96949a-2a39-487b-a539-d0771016aa75\",\"displayName\":\"riya_0557888200\",\"via\":\"game\"}]",
+    "42[\"friends:updated\",{\"friends\":[],\"incoming\":[{\"requestId\":\"9d96949a-2a39-487b-a539-d0771016aa75\",\"displayName\":\"riya_0557888200\",\"via\":\"game\",\"sentAt\":1792495567002}],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
+    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"tpjkwj9677estqxw\",\"displayName\":\"riya_0557888200\",\"presence\":\"online\",\"since\":1792495567419,\"profile\":\"tpjkwj9677estqxw\"}],\"incoming\":[],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
+    "42[\"friends:presence\",{\"handle\":\"tpjkwj9677estqxw\",\"presence\":\"offline\"}]",
+    "42[\"friends:presence\",{\"handle\":\"tpjkwj9677estqxw\",\"presence\":\"online\"}]",
+    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"tpjkwj9677estqxw\",\"displayName\":\"riya_0557888200\",\"presence\":\"online\",\"since\":1792495567419,\"profile\":\"tpjkwj9677estqxw\"}],\"incoming\":[],\"outgoing\":[{\"requestId\":\"e794f028-577c-43e5-b1f0-54403b64930f\",\"displayName\":\"A ClassiCade player\",\"sentAt\":1792495570344}],\"settings\":{\"appearOffline\":false},\"safetyTips\":false}]",
+    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"tpjkwj9677estqxw\",\"displayName\":\"riya_0557888200\",\"presence\":\"online\",\"since\":1792495567419,\"profile\":\"tpjkwj9677estqxw\"}],\"incoming\":[],\"outgoing\":[{\"requestId\":\"e794f028-577c-43e5-b1f0-54403b64930f\",\"displayName\":\"A ClassiCade player\",\"sentAt\":1792495570344}],\"settings\":{\"appearOffline\":true},\"safetyTips\":false}]",
+    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"tpjkwj9677estqxw\",\"displayName\":\"riya_0557888200\",\"presence\":\"online\",\"since\":1792495567419,\"profile\":\"tpjkwj9677estqxw\"},{\"handle\":\"kyfxkbqqrq0skvvf\",\"displayName\":\"kabir_5698791652\",\"presence\":\"online\",\"since\":1792495570553}],\"incoming\":[],\"outgoing\":[],\"settings\":{\"appearOffline\":true},\"safetyTips\":false}]"
   ],
   "kabir": [
-    "42[\"friends:request\",{\"requestId\":\"c754b395-d78e-4547-8a10-ed42da8cdaf9\",\"displayName\":\"arjun_1279123306\",\"via\":\"link\"}]",
-    "42[\"friends:updated\",{\"friends\":[],\"incoming\":[{\"requestId\":\"c754b395-d78e-4547-8a10-ed42da8cdaf9\",\"displayName\":\"arjun_1279123306\",\"via\":\"link\",\"sentAt\":1792494139069}],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":true}]",
-    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"jjftp5p8xzps16y4\",\"displayName\":\"arjun_1279123306\",\"presence\":\"offline\",\"since\":1792494139259,\"profile\":\"jjftp5p8xzps16y4\"}],\"incoming\":[],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":true}]"
+    "42[\"friends:request\",{\"requestId\":\"e794f028-577c-43e5-b1f0-54403b64930f\",\"displayName\":\"arjun_5583767663\",\"via\":\"link\"}]",
+    "42[\"friends:updated\",{\"friends\":[],\"incoming\":[{\"requestId\":\"e794f028-577c-43e5-b1f0-54403b64930f\",\"displayName\":\"arjun_5583767663\",\"via\":\"link\",\"sentAt\":1792495570344}],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":true}]",
+    "42[\"friends:updated\",{\"friends\":[{\"handle\":\"3vn691ep1s3t0xs3\",\"displayName\":\"arjun_5583767663\",\"presence\":\"offline\",\"since\":1792495570553,\"profile\":\"3vn691ep1s3t0xs3\"}],\"incoming\":[],\"outgoing\":[],\"settings\":{\"appearOffline\":false},\"safetyTips\":true}]"
   ]
 }

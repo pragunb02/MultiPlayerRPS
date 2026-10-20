@@ -9,10 +9,10 @@
   "friends": [],
   "incoming": [
     {
-      "requestId": "98677f18-944b-4d4a-83a9-c72a6b110555",
-      "displayName": "riya_1275617466",
+      "requestId": "9d96949a-2a39-487b-a539-d0771016aa75",
+      "displayName": "riya_0557888200",
       "via": "game",
-      "sentAt": 1792494136540
+      "sentAt": 1792495567002
     }
   ],
   "outgoing": [],
@@ -33,11 +33,11 @@
 {
   "friends": [
     {
-      "handle": "jjftp5p8xzps16y4",
-      "displayName": "arjun_1279123306",
+      "handle": "3vn691ep1s3t0xs3",
+      "displayName": "arjun_5583767663",
       "presence": "playing",
-      "since": 1792494136953,
-      "profile": "jjftp5p8xzps16y4"
+      "since": 1792495567419,
+      "profile": "3vn691ep1s3t0xs3"
     }
   ],
   "incoming": [],
@@ -51,7 +51,7 @@
 
 ### A friend link's page for anyone holding it: a minor maker is not named
 
-`GET /api/friends/links/kCgxtEEEBI45eAsVRpnJsg`
+`GET /api/friends/links/Pa1uSUgWRzBBTlmtZgdUPA`
 
 `200`, `Cache-Control: no-store`
 
@@ -65,7 +65,7 @@
 
 ### A used link: one 404 for used, run out and never made
 
-`POST /api/friends/links/kCgxtEEEBI45eAsVRpnJsg`
+`POST /api/friends/links/Pa1uSUgWRzBBTlmtZgdUPA`
 
 `403`, `Cache-Control: no-store`
 
@@ -74,7 +74,7 @@
   "error": {
     "code": "FORBIDDEN",
     "message": "Save your progress to add friends",
-    "requestId": "fe948c94-1035-4c37-955d-048b42831891"
+    "requestId": "e5f2d96e-9991-48ff-beac-426a5510130f"
   }
 }
 ```
@@ -90,7 +90,7 @@
   "error": {
     "code": "FORBIDDEN",
     "message": "Save your progress to add friends",
-    "requestId": "2c2abcb5-ea67-4e83-8127-40b33e250b81"
+    "requestId": "a0cdc6aa-98e4-4153-8675-20ee36bbb3e6"
   }
 }
 ```
@@ -106,7 +106,7 @@
   "error": {
     "code": "UNAUTHORIZED",
     "message": "No active session",
-    "requestId": "7313b5d7-98c8-40af-bb10-5b336c5db93e"
+    "requestId": "44861f1c-8aed-47de-a27d-51df36da215d"
   }
 }
 ```
@@ -122,7 +122,7 @@
   "error": {
     "code": "NOT_FOUND",
     "message": "This request is no longer open",
-    "requestId": "73e85ffd-5d09-4cf5-81fd-3dfd375a8a84"
+    "requestId": "9570c0bb-657d-441b-9bf7-fe6e95143e51"
   }
 }
 ```
@@ -138,7 +138,7 @@
   "error": {
     "code": "NOT_FOUND",
     "message": "You can only add someone you played with",
-    "requestId": "52dc8925-e0d4-4f78-9d9f-5c2b76818d80"
+    "requestId": "450f876e-7910-4a7d-baec-b894130524cd"
   }
 }
 ```
@@ -157,7 +157,7 @@
     "details": {
       "field": "seatId"
     },
-    "requestId": "5694ce34-cb51-4437-bca2-b0770b3f2df1"
+    "requestId": "7e0a53df-d5d1-4835-a526-7beb22975393"
   }
 }
 ```
@@ -186,11 +186,11 @@
 {
   "friends": [
     {
-      "handle": "jjftp5p8xzps16y4",
-      "displayName": "arjun_1279123306",
+      "handle": "3vn691ep1s3t0xs3",
+      "displayName": "arjun_5583767663",
       "presence": "offline",
-      "since": 1792494136953,
-      "profile": "jjftp5p8xzps16y4"
+      "since": 1792495567419,
+      "profile": "3vn691ep1s3t0xs3"
     }
   ],
   "incoming": [],
@@ -213,10 +213,10 @@
   "friends": [],
   "incoming": [
     {
-      "requestId": "c754b395-d78e-4547-8a10-ed42da8cdaf9",
-      "displayName": "arjun_1279123306",
+      "requestId": "e794f028-577c-43e5-b1f0-54403b64930f",
+      "displayName": "arjun_5583767663",
       "via": "link",
-      "sentAt": 1792494139069
+      "sentAt": 1792495570344
     }
   ],
   "outgoing": [],
@@ -229,7 +229,7 @@
 
 ### The minor accepts the request
 
-`POST /api/friends/requests/c754b395-d78e-4547-8a10-ed42da8cdaf9/answer {"answer":"accept"}`
+`POST /api/friends/requests/e794f028-577c-43e5-b1f0-54403b64930f/answer {"answer":"accept"}`
 
 `200`, `Cache-Control: no-store`
 
@@ -250,7 +250,7 @@
   "error": {
     "code": "RATE_LIMITED",
     "message": "Too many friend requests, try again later",
-    "requestId": "8d14c301-bf65-484b-8d1b-619685899494"
+    "requestId": "d7e17294-99f6-4add-8684-3dab1a39f069"
   }
 }
 ```
