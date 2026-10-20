@@ -47,6 +47,11 @@ const FACTS = [
     page: /counts recent requests and connections per IP address, for 1 minute to 1 day/,
   },
   {
+    fact: "the chess rating keeps its last 200 changes and the room sees it",
+    data: "| [`chess_ratings`](#chess_ratings) | pseudonymous: chess rating and its last 200 changes |",
+    page: /Your chess rating and its last 200 changes.*Your opponent and anyone watching the room see your rating/,
+  },
+  {
     fact: "backups are kept 30 days",
     data: "| [Backups](#backups) | yes: everything in MongoDB | 30 days |",
     page: /Every night GitHub Actions makes an encrypted copy of the whole database.*Each copy is deleted after 30 days/,

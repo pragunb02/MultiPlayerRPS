@@ -129,6 +129,20 @@ export const SOCKET_EVENTS = Object.freeze({
    */
   PROGRESS_UPDATED: "progress:updated",
   /**
+   * Client sends `RoomCodePayload` for a room this tab has open. Answer: `{ ratings: RoomRating[] }`, the chess
+   * rating of each person seated (CC-042), in seat order: `{ seat, rating, deviation, games, provisional, change? }`.
+   * `seat` is the place in `RoomView.seats` (0 first). A rating never carries a player id (CC-253).
+   * `provisional` is true for the first 10 rated games, and `change` is what the room's current game changed. A
+   * game without a rating answers an empty list. A tab that has not joined the room is refused.
+   */
+  RATING_ROOM: "rating:room",
+  /**
+   * Server sends `{ matchId, ratings: RoomRating[] }` to everyone in the room once a rated game changed both
+   * players' chess ratings (CC-042). The ratings are shaped like the answer to `rating:room`. It can come twice for
+   * one game, when the server runs the rating step again.
+   */
+  RATING_UPDATED: "rating:updated",
+  /**
    * Server sends `{ achievements: Achievement[] }` with only the newly unlocked achievements. Each item is shaped
    * like an item of `GET /api/achievements`.
    */

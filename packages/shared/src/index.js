@@ -78,3 +78,4 @@ export {
   SITE_ORIGIN_META,
   SITE_PREVIEW_IMAGE,
 } from "./site.js";
+export { CHESS_RATING_START } from "./ratings.js";

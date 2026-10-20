@@ -58,6 +58,45 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-062 — The chess rating: one game per period, a sixth outbox step, the guest move and the level seed
+
+- **Status:** Accepted · 2026-10-20 by the owner, all points, including the three seed numbers, the guest move
+  rule and withdrawn games keeping their change ([CC-042](tickets/CC-042.md), research with sources there). It fills
+  in ADR-027 and amends ADR-047 point 1.
+- **Context.** ADR-027 says chess only, Glicko-2, provisional for 10 games, seeded by the level pick and never reset.
+  It does not say when a rating period ends, how a rating is written exactly once when it depends on both players,
+  or what happens to a guest's rating on sign up.
+- **Decision.**
+  1. **The algorithm is Glickman's, as published** (glicko2.pdf, 2022): start at 1500, deviation 350, volatility
+     0.06, τ 0.5, the Illinois method with a tolerance of 0.000001. It is a pure module, tested against the paper's
+     worked example.
+  2. **One game is one rating period**, as on Lichess. Before a game the deviation grows with the time since the
+     player's last rated game, 0.21436 periods a day (Lichess's pace, about 60 to 110 in a year), never above 350.
+  3. **Rated games:** chess, two people, counted for both under ADR-021. Computer characters (ADR-025 point 2) and a
+     deleted player's stand-in never take part. A game that counts for only one side rates neither.
+  4. **Provisional** while a player has fewer than 10 rated games, shown as "1500?" (ADR-027 point 3).
+  5. **The level seed.** A counted game against Queen Vee sets the start of a person with no rated game yet:
+     Beginner 1200, Club player 1500, Strong 1800, deviation 350. The latest pick wins. It never moves a rating
+     that has a rated game.
+  6. **A sixth outbox step, "apply chess ratings"**, after judge and independent of progression. Each player's
+     document in `chess_ratings` keeps the last 200 changes as `{ matchId, before, after }` and a `revision`. A
+     retry rates the second player against the first player's stored `before`, and every write is guarded by the
+     revision it read, so a lost race fails the step and the outbox runs it again. No other player's id is stored.
+  7. **Guests are rated, and the rating moves on sign up** (ADR-014). The account keeps whichever rating has more
+     rated games (its own when equal). The other one's changes stay in the list, marked `superseded`, so no game is
+     rated twice. The guest's document stays as a marker naming the account.
+  8. **Withdrawn games keep their rating change.** A guest game that stops counting when it moves to the account
+     (ADR-021 point 6) loses its XP, but a Glicko-2 change cannot be taken out afterwards.
+  9. **Deletion and export** (ADR-048): `chess_ratings` is a participant after progress. Deletion removes the
+     player's document and the markers pointing at it. Export lists the rating, the games and the changes.
+  10. **Who sees a rating:** a socket in a room asks for the room's ratings (`rating:room`), and the step pushes
+      `rating:updated` to the room, again on every run of the step once both changes are written. A rating is never
+      looked up by a player id from the client, and every rating sent names its player by seat (0 for the first),
+      never by player id (CC-253, ADR-057).
+- **Consequences.** One new collection with one unique index. About two more writes per rated game. The profile
+  graph (ADR-027 point 4) can read the stored changes. A second instance (CC-061) works unchanged, because every
+  write is guarded by its revision.
+
 ### ADR-060 — Guests on the leaderboards under their server-given name
 
 - **Status:** Accepted · 2026-10-20 by the owner (points 1 to 3). Points 4 to 8 are how
@@ -596,6 +635,9 @@ would need a session, the integration tests a replica set, and the room DAO alre
 **Consequences.** About five more small writes per finished game and one indexed query every 5 seconds, far below
 M0's 100 operations a second. One new collection with three indexes. A second instance (CC-061) needs a lease in the
 record, because today one process keeps the games it is running in memory.
+
+**Amended · 2026-10-20** (CC-042, ADR-062, accepted by the owner). A sixth step, "apply chess ratings", needs only
+judge. Its writes are guarded by a revision, so a lost race fails the step and the retries above run it again.
 
 ### ADR-044 — Backups: age-encrypted mongodump to an S3-compatible bucket, from GitHub Actions
 

@@ -1,0 +1,346 @@
+{
+  "ticket": "CC-289",
+  "date": "2026-10-19T22:28:37.624Z",
+  "size": {
+    "name": "free",
+    "cpus": "0.1",
+    "memory": "512m",
+    "dollarsPerMonth": 0
+  },
+  "settings": {
+    "steps": [
+      2, 4, 6, 8, 10, 14, 20, 30, 40, 60, 80, 100, 130, 160, 200, 250, 300, 400, 500, 650, 800, 1000, 1300,
+      1600, 2000, 2500, 3000
+    ],
+    "stepSeconds": 60,
+    "warmupSeconds": 15,
+    "idleSeconds": 30,
+    "seed": 289,
+    "stop": "unplayable",
+    "unplayableMs": 1000,
+    "model": {
+      "gameShare": {
+        "rps": 0.4,
+        "tictactoe": 0.3,
+        "chess": 0.3
+      },
+      "computerShare": 0.4,
+      "thinkMs": {
+        "rps": {
+          "min": 1000,
+          "max": 4000
+        },
+        "tictactoe": {
+          "min": 1000,
+          "max": 3000
+        },
+        "chess": {
+          "min": 2000,
+          "max": 10000
+        }
+      },
+      "resultMs": {
+        "min": 2000,
+        "max": 5000
+      },
+      "rematchShare": 0.6,
+      "chessOwnMoves": {
+        "min": 20,
+        "max": 60
+      },
+      "rpsBestOf": 3,
+      "chessTimeControl": "blitz-5+0"
+    }
+  },
+  "machine": {
+    "node": "v24.21.0",
+    "cpus": 14,
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "images": {
+    "app": "built from Dockerfile",
+    "mongo": "mongo:8.2.12@sha256:e0ce8c35124d4a9f9785532d1f268f39e9728ffa1cb38f46fa482436424c4bd3"
+  },
+  "capacity": {
+    "playersAtOnce": 2,
+    "movesPerSecond": 0.4,
+    "gamesPerSecond": 0.07,
+    "brokeAt": 4,
+    "reasons": ["move p95 1003.5 ms is over 150 ms"],
+    "playable": {
+      "limitMs": 1000,
+      "playersAtOnce": 2,
+      "movesPerSecond": 0.4,
+      "brokeAt": 4,
+      "reasons": ["move p95 1003.5 ms is over 1000 ms"]
+    }
+  },
+  "idle": {
+    "seconds": 30,
+    "server": {
+      "loopP99Ms": {
+        "p50": 13.8,
+        "max": 302.3
+      },
+      "loopMaxMs": 302.3,
+      "cpu": {
+        "mean": 0.011,
+        "max": 0.03
+      },
+      "rssMb": 101.8,
+      "heapUsedMb": 30.6
+    },
+    "mongo": {
+      "opsPerSecond": {
+        "insert": 0,
+        "query": 1.4,
+        "update": 0,
+        "delete": 0.1,
+        "getmore": 0,
+        "command": 0.4,
+        "total": 1.9
+      }
+    }
+  },
+  "steps": [
+    {
+      "players": 2,
+      "connected": 2,
+      "seconds": 46,
+      "movesPerSecond": 0.4,
+      "gamesPerSecond": 0.07,
+      "moves": {
+        "count": 20,
+        "p50": 7.8,
+        "p95": 99.7,
+        "p99": 284.5,
+        "max": 284.5
+      },
+      "times": {
+        "computer reply chess": {
+          "count": 8,
+          "p50": 1021.5,
+          "p95": 1797.9,
+          "p99": 1797.9,
+          "max": 1797.9
+        },
+        "computer reply tictactoe": {
+          "count": 11,
+          "p50": 649.5,
+          "p95": 1355.9,
+          "p99": 1355.9,
+          "max": 1355.9
+        },
+        "game:move chess": {
+          "count": 7,
+          "p50": 10.5,
+          "p95": 284.5,
+          "p99": 284.5,
+          "max": 284.5
+        },
+        "game:move tictactoe": {
+          "count": 13,
+          "p50": 4.7,
+          "p95": 78.1,
+          "p99": 78.1,
+          "max": 78.1
+        },
+        "room:leave": {
+          "count": 3,
+          "p50": 48.7,
+          "p95": 262.7,
+          "p99": 262.7,
+          "max": 262.7
+        },
+        "room:play-computer tictactoe": {
+          "count": 3,
+          "p50": 211.6,
+          "p95": 301.8,
+          "p99": 301.8,
+          "max": 301.8
+        }
+      },
+      "failures": {},
+      "counts": {
+        "games tictactoe computer": 3
+      },
+      "server": {
+        "loopP99Ms": {
+          "p50": 56.2,
+          "max": 557.3
+        },
+        "loopMaxMs": 557.3,
+        "cpu": {
+          "mean": 0.027,
+          "max": 0.099
+        },
+        "rssMb": 106.8,
+        "heapUsedMb": 35
+      },
+      "mongo": {
+        "opsPerSecond": {
+          "insert": 0.2,
+          "query": 4.4,
+          "update": 0.9,
+          "delete": 0.1,
+          "getmore": 0,
+          "command": 1.5,
+          "total": 7.1
+        },
+        "connections": 16
+      },
+      "docker": {
+        "cpuPercentOfOneCore": 6.38,
+        "memory": "50.54MiB / 512MiB"
+      },
+      "serverWarnings": {},
+      "harnessLoopP99Ms": 13.1,
+      "verdict": {
+        "broken": false,
+        "reasons": []
+      },
+      "playable": {
+        "broken": false,
+        "reasons": []
+      }
+    },
+    {
+      "players": 4,
+      "connected": 4,
+      "seconds": 46,
+      "movesPerSecond": 0.8,
+      "gamesPerSecond": 0.2,
+      "moves": {
+        "count": 37,
+        "p50": 13.2,
+        "p95": 1003.5,
+        "p99": 1047.8,
+        "max": 1047.8
+      },
+      "times": {
+        "computer reply chess": {
+          "count": 5,
+          "p50": 1836.6,
+          "p95": 2654.1,
+          "p99": 2654.1,
+          "max": 2654.1
+        },
+        "computer reply tictactoe": {
+          "count": 9,
+          "p50": 930.8,
+          "p95": 2208.9,
+          "p99": 2208.9,
+          "max": 2208.9
+        },
+        "game:move chess": {
+          "count": 5,
+          "p50": 257.8,
+          "p95": 655.3,
+          "p99": 655.3,
+          "max": 655.3
+        },
+        "game:move rps": {
+          "count": 22,
+          "p50": 13.1,
+          "p95": 471.1,
+          "p99": 1047.8,
+          "max": 1047.8
+        },
+        "game:move tictactoe": {
+          "count": 10,
+          "p50": 8.6,
+          "p95": 1003.5,
+          "p99": 1003.5,
+          "max": 1003.5
+        },
+        "room:answer": {
+          "count": 2,
+          "p50": 6.2,
+          "p95": 295.3,
+          "p99": 295.3,
+          "max": 295.3
+        },
+        "room:create rps": {
+          "count": 1,
+          "p50": 103.5,
+          "p95": 103.5,
+          "p99": 103.5,
+          "max": 103.5
+        },
+        "room:join": {
+          "count": 1,
+          "p50": 7.1,
+          "p95": 7.1,
+          "p99": 7.1,
+          "max": 7.1
+        },
+        "room:leave": {
+          "count": 3,
+          "p50": 12.6,
+          "p95": 50.2,
+          "p99": 50.2,
+          "max": 50.2
+        },
+        "room:play-computer tictactoe": {
+          "count": 1,
+          "p50": 13.2,
+          "p95": 13.2,
+          "p99": 13.2,
+          "max": 13.2
+        },
+        "room:request": {
+          "count": 4,
+          "p50": 8.2,
+          "p95": 182.5,
+          "p99": 182.5,
+          "max": 182.5
+        }
+      },
+      "failures": {},
+      "counts": {
+        "games rps people": 6,
+        "games tictactoe computer": 3
+      },
+      "server": {
+        "loopP99Ms": {
+          "p50": 20.5,
+          "max": 806.4
+        },
+        "loopMaxMs": 806.4,
+        "cpu": {
+          "mean": 0.038,
+          "max": 0.106
+        },
+        "rssMb": 110.7,
+        "heapUsedMb": 37.9
+      },
+      "mongo": {
+        "opsPerSecond": {
+          "insert": 0.3,
+          "query": 6,
+          "update": 1.8,
+          "delete": 0.1,
+          "getmore": 0,
+          "command": 2.2,
+          "total": 10.4
+        },
+        "connections": 16
+      },
+      "docker": {
+        "cpuPercentOfOneCore": 2.83,
+        "memory": "58.58MiB / 512MiB"
+      },
+      "serverWarnings": {},
+      "harnessLoopP99Ms": 11.4,
+      "verdict": {
+        "broken": true,
+        "reasons": ["move p95 1003.5 ms is over 150 ms"]
+      },
+      "playable": {
+        "broken": true,
+        "reasons": ["move p95 1003.5 ms is over 1000 ms"]
+      }
+    }
+  ]
+}
