@@ -1,5 +1,6 @@
 import { ROOM_STATUS } from "@classicade/shared";
 import { SOUNDS } from "../../lib/sound/sounds.js";
+import { outcomeLine as line } from "../outcomeLine.js";
 
 /**
  * Rock Paper Scissors sounds between two views of the same game (CC-103): the hands opening when a round is
@@ -33,3 +34,26 @@ export function rpsReasonPhrase(reason) {
   const match = /^best-of-(\d+)$/.exec(reason);
   return match === null ? "" : `the best of ${match[1]}`;
 }
+
+/** The words of a best of N, whatever N is. */
+const BEST_OF = Object.freeze({
+  won: () => line("Tumne unki chaal padh li.", "You read them."),
+  lost: () => line("Achha game tha. Ek aur?", "Good game. Want another?"),
+});
+
+/**
+ * What Rock Paper Scissors adds to the outcome moments (CC-163): the words of a best of N, and Rocky's tip after a
+ * loss, from how Rocky plays at that level. The owner accepted these lines on 2026-10-20 (docs/tickets/CC-163.md).
+ *
+ * @type {import("../outcomeLine.js").OutcomeText}
+ */
+export const RPS_OUTCOME_TEXT = Object.freeze({
+  words: (reason) => (/^best-of-\d+$/.test(reason) ? BEST_OF : undefined),
+  hint: ({ character, level }) => {
+    if (character !== "rocky") return undefined;
+    // Hard Rocky learns the player's habits, easy Rocky throws at random (BOT_CHARACTERS).
+    return level === "hard"
+      ? line("Rocky ne tumhari aadat padh li. Mix karo.", "Rocky read that one. Try mixing it up.")
+      : line("Is baar Rocky ki kismat. Ek aur?", "Rocky throws at random. Go again?");
+  },
+});

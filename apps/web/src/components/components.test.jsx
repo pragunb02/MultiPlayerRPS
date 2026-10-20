@@ -91,6 +91,26 @@ describe("ToastProvider", () => {
       expect(shown()).toBe("Connection lost+30 XPBob is back");
     });
 
+    it("tells a toast when it really shows, so what belongs to it waits with it (CC-163)", () => {
+      vi.useFakeTimers({ now: 0 });
+      const toast = capture();
+      const shownNow = vi.fn();
+      const shownLater = vi.fn();
+      let release;
+
+      act(() => toast.show("Link copied", { onShow: shownNow }));
+      expect(shownNow).toHaveBeenCalledOnce();
+
+      act(() => {
+        release = toast.hold("result");
+      });
+      act(() => toast.show("Level up!", { category: "reward", onShow: shownLater }));
+      expect(shownLater).not.toHaveBeenCalled();
+
+      act(() => release());
+      expect(shownLater).toHaveBeenCalledOnce();
+    });
+
     it("keeps holding while another hold of the same kind is still on", () => {
       vi.useFakeTimers({ now: 0 });
       const toast = capture();
@@ -174,6 +194,21 @@ describe("Modal", () => {
 
     await user.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("draws itself on the page's body, so no style of where it is opened can trap or grey it (CC-163)", () => {
+    // A filter (the softened board after a loss) makes an element the frame of any fixed child inside it.
+    render(
+      <div data-testid="softened" className="dimmed">
+        <Modal open title="How we keep it fair" onClose={() => {}} actions={<button>Got it</button>}>
+          <p>Sealed first.</p>
+        </Modal>
+      </div>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "How we keep it fair" });
+    expect(screen.getByTestId("softened")).not.toContainElement(dialog);
+    expect(dialog.parentElement.parentElement).toBe(document.body);
   });
 
   it("renders nothing when closed", () => {

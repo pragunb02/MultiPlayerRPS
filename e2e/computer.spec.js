@@ -8,7 +8,8 @@ import { expect, test } from "./fixtures.js";
 
 const RPS = "/games/rock-paper-scissors";
 const phase = (player) => player.page.locator("[data-cc-phase]");
-const control = (player, id) => player.page.locator(`main [data-cc-control="${id}"]`);
+// Dialogs are drawn on the page's body, outside main (Modal.jsx), so their buttons are looked for there too.
+const control = (player, id) => player.page.locator(`:is(main, [role="dialog"]) [data-cc-control="${id}"]`);
 const hands = (player) => player.page.getByRole("group", { name: "Your choice" });
 const seats = (player) => player.page.getByRole("list", { name: "Players" });
 const roomPath = /^\/games\/[a-z-]+\/rooms\/[A-Z0-9]{6}$/;

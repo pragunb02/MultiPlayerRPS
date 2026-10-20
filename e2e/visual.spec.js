@@ -135,7 +135,9 @@ for (const colorScheme of SCHEMES) {
     await expect(
       toast(alice.page, "Achievement unlocked: First Victory").locator("svg").first(),
     ).toBeAttached();
-    await expect(bob.page.getByText("Defeat")).toBeVisible();
+    // A loss is met gently (CC-163): kind words under the headline, no stamp, no confetti.
+    await expect(bob.page.getByText("Good game. Want another?", { exact: true })).toBeVisible();
+    await expect(bob.page.locator("[data-cc-stamp]")).toHaveCount(0);
     await expect(effect(bob.page, "confetti")).toHaveCount(0);
     await expectChipToFollowProgress(alice.page);
 

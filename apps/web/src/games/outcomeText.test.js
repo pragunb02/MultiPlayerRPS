@@ -27,23 +27,23 @@ describe("the result headline names how the game ended (CC-162)", () => {
     ["chess", draw("agreement"), "Draw by agreement"],
     ["chess", draw("stalemate"), "Draw by stalemate"],
     ["tictactoe", win("a", "three-in-a-row"), "You won with three in a row"],
+    ["tictactoe", win("b", "three-in-a-row"), "You lost to three in a row"],
     ["tictactoe", draw("board-full"), "Draw with a full board"],
     ["rps", win("b", "best-of-3"), "You lost the best of 3"],
     ["rps", win("a", "forfeit"), "You won by forfeit"],
     ["tictactoe", win("a", "idle"), "You won on the move timer"],
     ["rps", win("b", "idle"), "You lost on the move timer"],
     ["rps", draw("idle"), "Draw on the move timer"],
-    [
-      "chess",
-      { result: "aborted", winners: [], reason: "aborted" },
-      "Game aborted: the first move did not come in time",
-    ],
+    ["chess", { result: "aborted", winners: [], reason: "aborted" }, "Game aborted"],
   ])("%s: %o reads %s", (gameId, outcome, text) => {
     expect(resultHeadline(finished(gameId, outcome))).toBe(text);
   });
 
   it("tells a spectator who won and how", () => {
     expect(resultHeadline(finished("chess", win("b", "checkmate"), ""))).toBe("Bob won by checkmate");
+    expect(resultHeadline(finished("tictactoe", win("b", "three-in-a-row"), ""))).toBe(
+      "Bob won with three in a row",
+    );
     expect(resultHeadline(finished("chess", win("gone", "forfeit"), ""))).toBe("Someone won by forfeit");
   });
 

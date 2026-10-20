@@ -1,7 +1,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
 import { chessActions } from "../../games/chess/chessActions.js";
 import { SessionProvider } from "../../hooks/SessionProvider.jsx";
@@ -9,6 +9,7 @@ import { fakeApi, fakeSessionBroadcast, fakeSocket, fakeSound, GUEST } from "../
 import { MatchProgressProvider } from "../Celebrations/MatchProgressProvider.jsx";
 import { SaveProgressProvider } from "../SaveProgress/SaveProgressProvider.jsx";
 import { ToastProvider } from "../Toast/ToastProvider.jsx";
+import { useToast } from "../Toast/toastContext.js";
 import { useAnnounce } from "./announceContext.js";
 import { MatchShell } from "./MatchShell.jsx";
 
@@ -81,6 +82,15 @@ function FakeBoard({ room, onMove, reason }) {
 }
 const BOARD_ONLY = Object.freeze({ Board: FakeBoard });
 
+/** What the toasts can do, caught from inside the providers so a test can show one as a reward would. */
+const caughtToasts = {};
+function GrabToasts() {
+  Object.assign(caughtToasts, useToast());
+  return null;
+}
+const toastsOf = () => caughtToasts;
+const toastRegion = () => document.querySelector("[role='status'][aria-live='polite']");
+
 /** Renders the shell inside the app's providers, with every call it can make as a spy. */
 function mount(room, { game = BOARD_ONLY, reconnecting = false, waiting = <p>Invite here</p> } = {}) {
   const calls = {
@@ -102,6 +112,7 @@ function mount(room, { game = BOARD_ONLY, reconnecting = false, waiting = <p>Inv
       <ServicesProvider services={services}>
         <SessionProvider>
           <ToastProvider>
+            <GrabToasts />
             <SaveProgressProvider>
               <MatchProgressProvider>
                 <MatchShell
@@ -317,6 +328,10 @@ describe("MatchShell action bar", () => {
 });
 
 describe("MatchShell at the end", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("shows the result card with the action bar in it: Rematch first, then New opponent and Leave", () => {
     mount(finished(), { game: { Board: FakeBoard, actions: chessActions } });
 
@@ -337,8 +352,98 @@ describe("MatchShell at the end", () => {
 
     update(finished());
 
-    expect(urgent()).toHaveTextContent("You won by resignation");
+    expect(urgent()).toHaveTextContent(/^You won by resignation\. .+ Bob resigned\.$/);
     expect(board).toHaveFocus();
+  });
+
+  it("puts the outcome's line under the headline, the Hinglish line first and the English one under it (CC-163)", () => {
+    mount(finished());
+
+    const line = slot("result").querySelector("h2 + [data-cc-outcome-line]");
+    expect([...line.children].map((each) => each.textContent)).toEqual([
+      "Bob ne haar maan li.",
+      "Bob resigned.",
+    ]);
+  });
+
+  it.each([
+    ["a win played to the end", WIN, "win"],
+    ["a win by forfeit", { ...WIN, reason: "forfeit" }, "quiet-win"],
+    ["a loss", { ...WIN, winners: [BOB.playerId] }, "gentle-loss"],
+    ["a draw", { status: "finished", result: "draw", winners: [], reason: "agreement" }, "even"],
+  ])("gives the result card the tone of %s", (_case, outcome, tone) => {
+    mount(
+      finished({ game: { view: {}, activePlayers: [], outcome, number: 1, turnEndsAt: 0, matchId: "m1" } }),
+    );
+
+    expect(slot("result")).toHaveAttribute("data-cc-tone", tone);
+  });
+
+  it("dims only the board after a loss, never the save progress card or the buttons", () => {
+    const loss = { ...WIN, winners: [BOB.playerId] };
+    mount(
+      finished({
+        game: { view: {}, activePlayers: [], outcome: loss, number: 1, turnEndsAt: 0, matchId: "m1" },
+      }),
+    );
+
+    const dimmed = slot("stage").querySelectorAll("[data-cc-effect='dim']");
+    expect(dimmed).toHaveLength(1);
+    expect(dimmed[0]).toHaveTextContent("Board for game 1");
+    expect(dimmed[0]).toHaveClass("dimmed");
+    expect(slot("result").querySelector("[data-cc-effect='dim']")).toBeNull();
+  });
+
+  it.each([
+    ["a win", WIN],
+    ["a draw", { status: "finished", result: "draw", winners: [], reason: "agreement" }],
+  ])("leaves the board as it is after %s", (_case, outcome) => {
+    mount(
+      finished({ game: { view: {}, activePlayers: [], outcome, number: 1, turnEndsAt: 0, matchId: "m1" } }),
+    );
+
+    expect(document.querySelector("[data-cc-effect='dim']")).toBeNull();
+  });
+
+  it("lets rewards wait for the moment when the viewer saw the game end, one beat at a time", () => {
+    vi.useFakeTimers();
+    const { update } = mount(roomView());
+    update(finished());
+
+    act(() => toastsOf().show("+30 XP", { category: "reward" }));
+    expect(toastRegion()).toHaveTextContent("");
+
+    act(() => vi.advanceTimersByTime(1_200));
+    expect(toastRegion()).toHaveTextContent("+30 XP");
+  });
+
+  it("does not hold rewards for a game that was over before the page opened", () => {
+    mount(finished());
+
+    act(() => toastsOf().show("+30 XP", { category: "reward" }));
+
+    expect(toastRegion()).toHaveTextContent("+30 XP");
+  });
+
+  it("holds again for the next game of the room when it ends", () => {
+    vi.useFakeTimers();
+    const { update } = mount(finished());
+    update(roomView({ game: { ...roomView().game, number: 2 } }));
+    update(
+      finished({
+        game: { view: {}, activePlayers: [], outcome: WIN, number: 2, turnEndsAt: 0, matchId: "m2" },
+      }),
+    );
+
+    act(() => toastsOf().show("+30 XP", { category: "reward" }));
+
+    expect(toastRegion()).toHaveTextContent("");
+  });
+
+  it("does not dim a board that is still being played", () => {
+    mount(roomView());
+
+    expect(document.querySelector("[data-cc-effect='dim']")).toBeNull();
   });
 
   it("finds a new opponent and leaves without asking", async () => {
