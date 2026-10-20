@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../utils/errors.js";
-import { createIdentity, isAccountId } from "./identity.js";
+import {
+  createIdentity,
+  GUEST_NAME_ALPHABET,
+  GUEST_NAME_SUFFIX_LENGTH,
+  isAccountId,
+  isGuestId,
+  isServerGivenGuestName,
+} from "./identity.js";
 
 describe("isAccountId", () => {
   it.each([
@@ -10,6 +17,44 @@ describe("isAccountId", () => {
     ["user_652f1c2e9b1e8a3d4c5b6a79x", false],
   ])("%s → %s", (id, expected) => {
     expect(isAccountId(id)).toBe(expected);
+  });
+});
+
+describe("isGuestId", () => {
+  it.each([
+    ["guest_123e4567-e89b-12d3-a456-426614174000", true],
+    ["user_652f1c2e9b1e8a3d4c5b6a79", false],
+    ["bot_pip_easy", false],
+    ["guest_", false],
+  ])("%s → %s", (id, expected) => {
+    expect(isGuestId(id)).toBe(expected);
+  });
+});
+
+describe("isServerGivenGuestName (ADR-060)", () => {
+  it.each(["Guest-7K2Q", "Guest-AAAA", "Guest-Z9Z9"])("trusts the shape the server gives: %s", (name) => {
+    expect(isServerGivenGuestName(name)).toBe(true);
+  });
+
+  it.each([
+    "Guest-7K2",
+    "Guest-7K2QX",
+    "guest-7K2Q",
+    "Guest_7K2Q",
+    "Guest-0K2Q",
+    "Guest-1K2Q",
+    "Guest-OK2Q",
+    "Guest-IK2Q",
+    "Guest-7k2q",
+    "Riya",
+    "Guest-7K2Q ",
+  ])("treats any other name as chosen: %s", (name) => {
+    expect(isServerGivenGuestName(name)).toBe(false);
+  });
+
+  it("describes the alphabet the server draws from: no 0, O, 1 or I", () => {
+    expect(GUEST_NAME_ALPHABET).toBe("ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
+    expect(GUEST_NAME_SUFFIX_LENGTH).toBe(4);
   });
 });
 

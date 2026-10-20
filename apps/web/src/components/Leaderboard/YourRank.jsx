@@ -22,7 +22,8 @@ function Standing({ boardId }) {
 }
 
 /**
- * Your place on the XP leaderboards, for the profile. Guests are never ranked, so they get a sign-up nudge instead.
+ * Your place on the XP leaderboards, for the profile. A guest is ranked too, and is asked to sign up to keep its
+ * place (ADR-060).
  *
  * @param {{ identity: { kind: string } }} props
  */
@@ -33,20 +34,18 @@ export function YourRank({ identity }) {
         <AchievementIcon name="trophy" tier="gold" className={styles.trophy} />
         Your rank
       </h2>
-      {identity.kind === "guest" ? (
+      <dl className={styles.stats}>
+        {BOARDS.map((boardId) => (
+          <Standing key={boardId} boardId={boardId} />
+        ))}
+      </dl>
+      {identity.kind === "guest" && (
         <p className={styles.muted}>
-          Guests aren't ranked.{" "}
           <Link to={paths.signup(paths.profile())} data-cc-control="rank.signup">
             Sign up
           </Link>{" "}
-          to get on the leaderboard.
+          to keep your place on the boards.
         </p>
-      ) : (
-        <dl className={styles.stats}>
-          {BOARDS.map((boardId) => (
-            <Standing key={boardId} boardId={boardId} />
-          ))}
-        </dl>
       )}
       <Link to={paths.leaderboards()} data-cc-control="rank.leaderboards">
         See the leaderboards

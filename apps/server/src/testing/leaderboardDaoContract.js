@@ -137,4 +137,139 @@ export function runLeaderboardDaoContract(createDao) {
       expect.objectContaining({ playerId: "user_b", score: 10 }),
     ]);
   });
+
+  it("lists one player's rows of one board with their keys and end, for a guest transfer (CC-291)", async () => {
+    const dao = await createDao();
+    await dao.addOnce({ ...WEEK, ...player("guest_a"), key: "m1", inc: 30, at: at(), expiresAt: at(9) });
+    await dao.addOnce({
+      ...WEEK,
+      ...player("guest_a"),
+      key: "quest:q",
+      inc: 20,
+      at: at(1),
+      expiresAt: at(10),
+    });
+    await dao.raiseScore({ ...XP, ...player("guest_a"), score: 50, at: at(1) });
+    await dao.raiseScore({ board: "wins:rps", period: "all", ...player("guest_a"), score: 1, at: at(1) });
+    await dao.addOnce({ ...WEEK, ...player("user_b"), key: "m2", inc: 10, at: at() });
+
+    const rows = await dao.listWithKeys({ board: "xp", playerId: "guest_a" });
+
+    expect(rows.sort((a, b) => a.period.localeCompare(b.period))).toEqual([
+      { period: "2026-W42", score: 50, updatedAt: at(1), recentKeys: ["m1", "quest:q"], expiresAt: at(10) },
+      { period: "all", score: 50, updatedAt: at(1), recentKeys: [] },
+    ]);
+    expect(await dao.listWithKeys({ board: "xp", playerId: "user_nobody" })).toEqual([]);
+  });
+
+  it("adds a merged guest row once per guest and remembers the keys it came with (CC-291)", async () => {
+    const dao = await createDao();
+    await dao.addOnce({ ...WEEK, ...player("user_a"), key: "m-own", inc: 30, at: at() });
+    const merge = {
+      ...WEEK,
+      ...player("user_a", "alice", 2),
+      from: "guest_g",
+      keys: ["m1", "quest:q"],
+      inc: 50,
+    };
+
+    const first = await dao.mergeOnce({ ...merge, at: at(5), expiresAt: at(100) });
+    const again = await dao.mergeOnce({ ...merge, at: at(6), expiresAt: at(100) });
+    const replayed = await dao.addOnce({ ...WEEK, ...player("user_a"), key: "m1", inc: 30, at: at(7) });
+    const own = await dao.addOnce({ ...WEEK, ...player("user_a"), key: "m-own", inc: 30, at: at(8) });
+
+    expect([first, again, replayed, own]).toEqual([
+      { applied: true },
+      { applied: false },
+      { applied: false },
+      { applied: false },
+    ]);
+    // The account's own keys stay as they were: the guest's keys are kept beside them, not among them.
+    expect(await dao.listWithKeys({ board: "xp", playerId: "user_a" })).toEqual([
+      { period: "2026-W42", score: 80, updatedAt: at(5), recentKeys: ["m-own"], expiresAt: at(100) },
+    ]);
+    expect(await dao.getEntry({ ...WEEK, playerId: "user_a" })).toMatchObject({
+      displayName: "alice",
+      level: 2,
+    });
+  });
+
+  it("creates the row when a merge comes first (CC-291)", async () => {
+    const dao = await createDao();
+
+    const result = await dao.mergeOnce({
+      ...WEEK,
+      ...player("user_a"),
+      from: "guest_g",
+      keys: [],
+      inc: 20,
+      at: at(),
+      expiresAt: at(100),
+    });
+
+    expect(result).toEqual({ applied: true });
+    expect((await dao.getEntry({ ...WEEK, playerId: "user_a" })).score).toBe(20);
+  });
+
+  it("never lets a merge push out a key a replay of the account's own match still needs (CC-291)", async () => {
+    const dao = await createDao();
+    const own = Array.from({ length: 200 }, (_, i) => `own-${i}`);
+    for (const [i, key] of own.entries()) {
+      await dao.addOnce({ ...WEEK, ...player("user_a"), key, inc: 1, at: at(i) });
+    }
+    const guestKeys = Array.from({ length: 200 }, (_, i) => `guest-key-${i}`);
+
+    await dao.mergeOnce({
+      ...WEEK,
+      ...player("user_a"),
+      from: "guest_g",
+      keys: guestKeys,
+      inc: 200,
+      at: at(300),
+    });
+    const replays = [];
+    for (const key of [own[0], own[199], guestKeys[0], guestKeys[199]]) {
+      replays.push(await dao.addOnce({ ...WEEK, ...player("user_a"), key, inc: 1, at: at(400) }));
+    }
+
+    expect(replays).toEqual(Array(4).fill({ applied: false }));
+    expect((await dao.getEntry({ ...WEEK, playerId: "user_a" })).score).toBe(400);
+  });
+
+  it("merges each guest once, and a second guest after it (CC-291)", async () => {
+    const dao = await createDao();
+    const merge = { ...WEEK, ...player("user_a"), keys: [], inc: 10, at: at(), expiresAt: at(100) };
+
+    const results = [
+      await dao.mergeOnce({ ...merge, from: "guest_g" }),
+      await dao.mergeOnce({ ...merge, from: "guest_h" }),
+      await dao.mergeOnce({ ...merge, from: "guest_g" }),
+    ];
+
+    expect(results).toEqual([{ applied: true }, { applied: true }, { applied: false }]);
+    expect((await dao.getEntry({ ...WEEK, playerId: "user_a" })).score).toBe(20);
+  });
+
+  it("moves the end of one player's rows of a period later, never earlier, and nobody else's (CC-291)", async () => {
+    const dao = await createDao();
+    await dao.raiseScore({ ...XP, ...player("guest_a"), score: 50, at: at(), expiresAt: at(10) });
+    const wins = { board: "wins:rps", period: "all" };
+    await dao.raiseScore({ ...wins, ...player("guest_a"), score: 1, at: at(), expiresAt: at(30) });
+    await dao.addOnce({ ...WEEK, ...player("guest_a"), key: "m1", inc: 30, at: at(), expiresAt: at(10) });
+    await dao.raiseScore({ ...XP, ...player("guest_b"), score: 50, at: at(), expiresAt: at(10) });
+
+    const moved = await dao.extendLifetime({ playerId: "guest_a", period: "all", expiresAt: at(20) });
+
+    expect(moved).toBe(1);
+    const endOf = async (board, playerId) =>
+      (await dao.listWithKeys({ board, playerId }))
+        .map(({ period, expiresAt }) => [period, expiresAt])
+        .sort();
+    expect(await endOf("xp", "guest_a")).toEqual([
+      ["2026-W42", at(10)],
+      ["all", at(20)],
+    ]);
+    expect(await endOf("wins:rps", "guest_a")).toEqual([["all", at(30)]]);
+    expect(await endOf("xp", "guest_b")).toEqual([["all", at(10)]]);
+  });
 }

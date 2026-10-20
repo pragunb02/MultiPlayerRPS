@@ -90,6 +90,21 @@ export function runPlayerTransferDaoContract(createDao) {
     expect(await dao.listByFrom([])).toEqual([]);
   });
 
+  it("lists the pending transfers into any of the given accounts (CC-291)", async () => {
+    const dao = await createDao();
+    const other = { ...ACCOUNT, id: "user_ffffffffffffffffffffffff", displayName: "Arjun" };
+    const third = { ...ACCOUNT, id: "user_eeeeeeeeeeeeeeeeeeeeeeee", displayName: "Sam" };
+    await dao.insertPending({ from: "guest_a", to: ACCOUNT, createdAt: T0 });
+    await dao.insertPending({ from: "guest_b", to: other, createdAt: T0 });
+    await dao.markDone({ from: "guest_b", completedAt: at(1), carriedOver: MOVED });
+    await dao.insertPending({ from: "guest_c", to: third, createdAt: T0 });
+
+    const pending = await dao.listPendingTo([ACCOUNT.id, other.id]);
+
+    expect(pending).toEqual([expect.objectContaining({ from: "guest_a", status: "pending", to: ACCOUNT })]);
+    expect(await dao.listPendingTo([])).toEqual([]);
+  });
+
   it("lists and deletes the transfers into one account, nobody else's (CC-035)", async () => {
     const dao = await createDao();
     await dao.insertPending({ from: "guest_a", to: ACCOUNT, createdAt: T0 });

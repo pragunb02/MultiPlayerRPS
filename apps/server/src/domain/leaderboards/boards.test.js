@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { getLeaderboard } from "@classicade/shared";
-import { gamesWithWinsBoards, hasWinsBoard, storageFor, WEEKLY_RETENTION_MS, weekOf } from "./boards.js";
+import {
+  gamesWithWinsBoards,
+  GUEST_ROW_LIFETIME_MS,
+  hasWinsBoard,
+  rowEnds,
+  storageFor,
+  WEEKLY_RETENTION_MS,
+  weekOf,
+} from "./boards.js";
 
 const NOW = Date.parse("2026-10-16T12:00:00Z");
 
@@ -37,5 +45,29 @@ describe("leaderboard storage", () => {
     expect(gamesWithWinsBoards()).toEqual(["rps", "tictactoe", "chess"]);
     expect(hasWinsBoard("chess")).toBe(true);
     expect(hasWinsBoard("race")).toBe(false);
+  });
+});
+
+describe("when rows end (ADR-060)", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const WEEK_ENDS = Date.parse("2026-10-19T00:00:00Z");
+
+  it("keeps a guest's rows 30 days after what put them there", () => {
+    expect(GUEST_ROW_LIFETIME_MS).toBe(30 * DAY_MS);
+    expect(rowEnds({ isGuest: true, at: NOW })).toEqual({
+      allTime: NOW + 30 * DAY_MS,
+      week: NOW + 30 * DAY_MS,
+    });
+  });
+
+  it("never keeps a guest's weekly row past the week's own retention", () => {
+    const lastMinute = WEEK_ENDS - 60_000;
+
+    expect(rowEnds({ isGuest: true, at: lastMinute }).week).toBe(WEEK_ENDS + WEEKLY_RETENTION_MS);
+    expect(rowEnds({ isGuest: true, at: lastMinute }).allTime).toBe(lastMinute + GUEST_ROW_LIFETIME_MS);
+  });
+
+  it("keeps an account's all time rows for ever and its weekly rows 28 days after the week", () => {
+    expect(rowEnds({ isGuest: false, at: NOW })).toEqual({ week: WEEK_ENDS + WEEKLY_RETENTION_MS });
   });
 });

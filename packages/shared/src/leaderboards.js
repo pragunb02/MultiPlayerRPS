@@ -15,8 +15,8 @@ import { GAMES } from "./games.js";
 
 export const LEADERBOARD_METRICS = Object.freeze({ XP: "xp", WINS: "wins" });
 export const LEADERBOARD_PERIODS = Object.freeze({ ALL: "all", WEEK: "week" });
-/** Why the viewer has no rank on a board (`you.reason`). */
-export const LEADERBOARD_UNLISTED = Object.freeze({ GUEST: "guest", UNRANKED: "unranked" });
+/** Why the viewer has no rank on a board (`you.reason`). Guests are ranked like accounts (ADR-060). */
+export const LEADERBOARD_UNLISTED = Object.freeze({ UNRANKED: "unranked" });
 /** The most entries one board response lists. Your own rank is reported even when it is outside them. */
 export const LEADERBOARD_MAX_ENTRIES = 50;
 
