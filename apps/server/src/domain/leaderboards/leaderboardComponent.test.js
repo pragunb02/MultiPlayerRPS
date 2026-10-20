@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { safetyFromAdults, safetyWithNoAdults } from "../../testing/fakeSafety.js";
 import { levelForXp } from "@classicade/shared";
 import { createLeaderboardAccessor } from "../../data/leaderboardAccessor.js";
 import { createMatchAccessor } from "../../data/matchAccessor.js";
@@ -70,12 +71,10 @@ function setup({ adults, transfers, failing = () => false, matchReads, cards } =
     matchAccessor: matchReads ? { ...matchAccessor, getById: matchReads } : matchAccessor,
     progressAccessor,
     transfers: transfers ?? transferAccessor,
-    ages: {
-      adultsAmong: async ({ playerIds, now }) => {
-        asked.push({ playerIds, now });
-        return new Set(adults ?? playerIds);
-      },
-    },
+    safety: safetyFromAdults(({ playerIds, now }) => {
+      asked.push({ playerIds, now });
+      return adults ?? playerIds;
+    }),
     ...(cards !== undefined && { cards }),
   });
   /** Brings a player's stored XP to `xp`, as progression has done by the time the boards step runs. */
@@ -581,7 +580,7 @@ describe("leaderboardComponent", () => {
         matchAccessor: {},
         progressAccessor: {},
         transfers: { listFrom: async () => [], listPendingTo: async () => [] },
-        ages: { adultsAmong: async () => new Set() },
+        safety: safetyFromAdults(async () => new Set()),
       });
 
       await expect(boards.standingFor({ boardId: "overall", viewer: ALICE, now: NOW })).rejects.toBe(failure);
@@ -992,9 +991,14 @@ describe("leaderboardComponent", () => {
   });
 
   it("fails fast on missing dependencies", () => {
-    const ages = { adultsAmong: async () => new Set() };
+    const safety = safetyWithNoAdults();
     expect(() =>
-      createLeaderboardComponent({ leaderboardAccessor: {}, matchAccessor: {}, progressAccessor: {}, ages }),
+      createLeaderboardComponent({
+        leaderboardAccessor: {},
+        matchAccessor: {},
+        progressAccessor: {},
+        safety,
+      }),
     ).toThrow(TypeError);
     expect(() => createLeaderboardComponent({ matchAccessor: {}, progressAccessor: {} })).toThrow(TypeError);
     expect(() => createLeaderboardComponent({ leaderboardAccessor: {}, progressAccessor: {} })).toThrow(
@@ -1124,7 +1128,7 @@ describe("leaderboardComponent: avatars and profile links (CC-034)", () => {
         matchAccessor: {},
         progressAccessor: {},
         transfers: { listFrom: async () => [], listPendingTo: async () => [] },
-        ages: { adultsAmong: async () => new Set() },
+        safety: safetyFromAdults(async () => new Set()),
         cards: {},
       }),
     ).toThrow(/cards.cardsFor/);

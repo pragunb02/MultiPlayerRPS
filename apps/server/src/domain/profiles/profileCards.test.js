@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { safetyFromAdults } from "../../testing/fakeSafety.js";
 import { createProfileAccessor } from "../../data/profileAccessor.js";
 import { createInMemoryProfileDao } from "../../testing/inMemoryProfileDao.js";
 import { createProfileCards } from "./profileCards.js";
@@ -18,13 +19,11 @@ function setup() {
     newHandle: () => `${++n}`.padStart(16, "a"),
   });
   const asked = [];
-  const ages = {
-    adultsAmong: async ({ playerIds }) => {
-      asked.push(playerIds);
-      return new Set(playerIds.filter((id) => id === ADULT));
-    },
-  };
-  return { profileAccessor, dao, asked, cards: createProfileCards({ profileAccessor, ages }) };
+  const safety = safetyFromAdults(({ playerIds }) => {
+    asked.push(playerIds);
+    return playerIds.filter((id) => id === ADULT);
+  });
+  return { profileAccessor, dao, asked, cards: createProfileCards({ profileAccessor, safety }) };
 }
 
 describe("profileCards (CC-034)", () => {

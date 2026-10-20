@@ -928,6 +928,29 @@ stable React. Still the browser's View Transitions, still no added bundle.
   CC-291). An exception to point 10: a guest row on a board shows the guest's server-given `Guest-XXXX` name,
   because the player did not choose it and it carries no personal data. Any other name on a guest row is hidden as
   point 10 says, so if guests can ever choose a name the age rule applies to them.
+- **Amended · 2026-10-20** (CC-152 part 2, accepted by default, owner may change; research with sources in
+  [CC-152](tickets/CC-152.md) §4 to §7). Point 10's "every later social feature reads the same age group" becomes
+  one policy. `apps/server/src/domain/safety/agePolicy.js` turns who a player is (an adult account, a minor, an
+  account of unknown age, a guest; anyone else counts as unknown) into one frozen answer, and
+  `safetyComponent.policiesFor` reads the accounts' years once for a list of players. Features read the answer's
+  fields and never work out an age: `canFollow` and `canBeFollowed` (adults only, ADR-028.5), `friendsMode`
+  (`mutual` for adults, `mutual-known` for minors, so only someone they played with or who has their friend link,
+  `none` for guests), `emotes` (off for minors and guests, CC-169), `quietHours` (no push or email 22:00 to 07:00
+  India time for minors and guests), `shareCardName` (adults only, ADR-028.7), `maxOwnedCircleSize` (10 for minors
+  and guests, 50 for adults, ADR-028.4.4), `publicProfile` and `profileLink` (adults only, ADR-065), `boardName`
+  (`own`, `server-given` for guests per ADR-060, otherwise `hidden`), `replyEmail` (ADR-059) and `personalisation`
+  (off for minors, DPDP section 9(3), ICO standard 12). Today the leaderboards, profiles, the profile cards on
+  boards, rooms and history, feedback, and the result share card read it. A test fails when a server module outside
+  accounts and safety, or a web module, works an age out itself. The browser gets only its own flags
+  (`GET /api/safety`), never the year or the group, and assumes a minor's flags until they arrive. Friends (CC-052),
+  emotes (CC-169), circles (CC-214) and notifications (CC-147) take the safety component when they are built.
+- **Amended · 2026-10-20** (CC-152 part 2, point 9). The owner's corrections path: `PUT
+/api/admin/accounts/birth-year` with the account's email and a year from the picker, or `null` to clear it, behind
+  the console's admin check (404 to anyone else) and a new "Ages" page in the console. The owner checks the request
+  first, for example a message from the account's own email. The under 13 refusal still holds (that account is
+  deleted instead). A correction sets `accounts.birthYearCorrectedAt`, which the player's export shows, and logs the
+  account and the admin, never the year or the email. A cleared year makes the account of unknown age again, so its
+  player can set it once more. Nothing existing is migrated: an account with no year stays unknown, so a minor.
 
 ### ADR-047 — Finished games go through a stored outbox with named steps and retries
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { GAMES } from "@classicade/shared";
 import { createAccountRoutes } from "./accountRoutes.js";
+import { createAdminAccountRoutes } from "./adminAccountRoutes.js";
 import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
@@ -12,6 +13,7 @@ import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
 import { createMatchRoutes } from "./matchRoutes.js";
 import { createProfileRoutes } from "./profileRoutes.js";
 import { createProgressRoutes } from "./progressRoutes.js";
+import { createSafetyRoutes } from "./safetyRoutes.js";
 import { createSessionRoutes } from "./sessionRoutes.js";
 
 /**
@@ -25,6 +27,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
+ *   & { safetyComponent: Parameters<typeof createSafetyRoutes>[0]["safetyComponent"] }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
  */
 export function apiRouter({
@@ -55,6 +58,7 @@ export function apiRouter({
   feedbackLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
+  safetyComponent,
   build,
   ...sessionDeps
 }) {
@@ -101,6 +105,7 @@ export function apiRouter({
       ...(challengeLimits && { limits: challengeLimits }),
     }),
   );
+  router.use(createSafetyRoutes({ safetyComponent, now }));
   router.use(createProgressRoutes({ progressionComponent }));
   router.use(createGamificationRoutes({ gamificationComponent, now }));
   router.use(
@@ -128,6 +133,7 @@ export function apiRouter({
   );
 
   router.use(createAdminRoutes({ analyticsComponent, requireAdmin: adminAccess.requireAdmin, now }));
+  router.use(createAdminAccountRoutes({ accountComponent, requireAdmin: adminAccess.requireAdmin, now }));
 
   return router;
 }

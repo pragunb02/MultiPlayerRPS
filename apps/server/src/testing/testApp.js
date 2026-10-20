@@ -28,6 +28,7 @@ import { createBlockComponent } from "../domain/blocks/blockComponent.js";
 import { createChallengeComponent } from "../domain/challenges/challengeComponent.js";
 import { createProfileCards } from "../domain/profiles/profileCards.js";
 import { createProfileComponent } from "../domain/profiles/profileComponent.js";
+import { createSafetyComponent } from "../domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "../domain/feedback/feedbackComponent.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
@@ -191,7 +192,8 @@ export function createTestApp({
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const profileAccessor = createProfileAccessor({ profileDao: createInMemoryProfileDao() });
-  const profileCards = createProfileCards({ profileAccessor, ages: accountComponent });
+  const safetyComponent = createSafetyComponent({ ages: accountComponent });
+  const profileCards = createProfileCards({ profileAccessor, safety: safetyComponent });
   const matchComponent = createMatchComponent({
     matchAccessor,
     matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
@@ -221,14 +223,14 @@ export function createTestApp({
   });
   const feedbackComponent = createFeedbackComponent({
     feedbackAccessor: createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() }),
-    ages: accountComponent,
+    safety: safetyComponent,
   });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
     matchAccessor,
     progressAccessor,
     transfers: playerTransferAccessor,
-    ages: accountComponent,
+    safety: safetyComponent,
     cards: profileCards,
   });
   const gamificationComponent = createGamificationComponent({
@@ -247,7 +249,7 @@ export function createTestApp({
   });
   const profileComponent = createProfileComponent({
     profileAccessor,
-    ages: accountComponent,
+    safety: safetyComponent,
     accounts: accountComponent,
     progress: progressionComponent,
     ratings: chessRatingComponent,
@@ -433,6 +435,7 @@ export function createTestApp({
     feedbackComponent,
     feedbackLimits,
     dailyPuzzleComponent,
+    safetyComponent,
     dailyPuzzleLimit,
     analyticsComponent: createAnalyticsComponent({
       analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
