@@ -1,0 +1,21 @@
+CC-286, PR #124: production start rehearsal from a fresh clone (git clone of the branch, npm ci, npm start)
+NODE_ENV=production HOST=127.0.0.1 PORT=4994, in-memory MongoDB on 127.0.0.1:24994, WEB_DIST_DIR = the test build.
+
+a) Telemetry off (no OTEL_* set)
+   GET /health -> {"status":"ok","database":"up"}
+   Listening: 127.0.0.1:4994 only
+   Outbound TCP of the server process: 127.0.0.1:24994 (MongoDB) only, 25 pooled connections. No other host.
+   Log messages: database connected, accounts with non-normal email, client addresses read through trusted
+   proxies, server listening, request completed, shutting down, database connection closed, shutdown complete.
+   No "telemetry on": no OpenTelemetry module was loaded.
+
+b) OTEL_EXPORTER_OTLP_ENDPOINT=http://otlp.example.com/otlp with a dummy header, in production
+   Exit 1 at boot: "OTEL_EXPORTER_OTLP_ENDPOINT must start with https:// in production"
+   The header's value appears 0 times in the output.
+
+c) OTEL_EXPORTER_OTLP_ENDPOINT=https://127.0.0.1:9 (nothing listens), OTEL_METRIC_EXPORT_INTERVAL=1000
+   GET /health -> {"status":"ok","database":"up"}: the game is unaffected
+   "telemetry on" at boot, then exactly one "telemetry export failed" warning (signal logs, ECONNREFUSED)
+   SIGTERM: shutting down 00:10:20.824Z, shutdown complete 00:10:29.208Z, exit 0. After this run the last flush
+   was bounded to 5 seconds (commit "bound the last telemetry flush at shutdown to 5 seconds", with a test).
+   The header's value appears 0 times in the output.

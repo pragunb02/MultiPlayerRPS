@@ -1,0 +1,840 @@
+{
+  "__inputs": [],
+  "title": "ClassiCade operations",
+  "uid": "classicade-operations",
+  "description": "Operations telemetry of the ClassiCade server (ADR-055, CC-286). No personal data: route templates, socket event names, games, statuses and pipeline steps only.",
+  "tags": ["classicade", "adr-055"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": true,
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "metrics",
+        "label": "Metrics",
+        "type": "datasource",
+        "query": "prometheus",
+        "regex": "/^grafanacloud-.*-prom$/",
+        "current": {}
+      },
+      {
+        "name": "logs",
+        "label": "Logs",
+        "type": "datasource",
+        "query": "loki",
+        "regex": "/^grafanacloud-.*-logs$/",
+        "current": {}
+      },
+      {
+        "name": "usage",
+        "label": "Usage",
+        "type": "datasource",
+        "query": "prometheus",
+        "regex": "/^grafanacloud-usage$/",
+        "current": {}
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Latency",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Socket events: p50 and p95",
+      "description": "Time from a socket event arriving to its acknowledgement, per event name (ADR-055 point 5).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, socket_event) (rate(socket_event_duration_milliseconds_bucket{job=\"classicade-server\"}[5m])))",
+          "legendFormat": "p50 {{socket_event}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, socket_event) (rate(socket_event_duration_milliseconds_bucket{job=\"classicade-server\"}[5m])))",
+          "legendFormat": "p95 {{socket_event}}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP routes: p50 and p95",
+      "description": "Per route template. unmatched is static files and unknown addresses.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, http_route) (rate(http_server_request_duration_milliseconds_bucket{job=\"classicade-server\"}[5m])))",
+          "legendFormat": "p50 {{http_route}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_milliseconds_bucket{job=\"classicade-server\"}[5m])))",
+          "legendFormat": "p95 {{http_route}}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "row",
+      "title": "Errors",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Error share",
+      "description": "The errors alert fires above 5 % over 10 minutes with at least 20 requests and events.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_milliseconds_count{job=\"classicade-server\",http_response_status_class=\"5xx\"}[5m])) / sum(rate(http_server_request_duration_milliseconds_count{job=\"classicade-server\"}[5m]))",
+          "legendFormat": "5xx share of requests",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        },
+        {
+          "expr": "sum(rate(socket_event_duration_milliseconds_count{job=\"classicade-server\",outcome=\"failed\"}[5m])) / sum(rate(socket_event_duration_milliseconds_count{job=\"classicade-server\"}[5m]))",
+          "legendFormat": "failed share of socket events",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Socket events by outcome",
+      "description": "ok, refused (a typed error the player caused), failed (ours), rate_limited.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(socket_event_duration_milliseconds_count{job=\"classicade-server\"}[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Runtime",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Event-loop delay",
+      "description": "Includes the 10 ms sampling interval, so an idle server shows about 10 ms. The strain alert fires at p99 above 250 ms for 10 minutes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "max(nodejs_eventloop_delay_p50_milliseconds{job=\"classicade-server\"})",
+          "legendFormat": "p50",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        },
+        {
+          "expr": "max(nodejs_eventloop_delay_p99_milliseconds{job=\"classicade-server\"})",
+          "legendFormat": "p99",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 250
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Memory against the 512 MB instance",
+      "description": "Render free has 512 MB. The strain alert fires above 435 MB (85 %) for 10 minutes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "max(process_memory_rss_bytes{job=\"classicade-server\"})",
+          "legendFormat": "RSS",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        },
+        {
+          "expr": "max(process_memory_heap_used_bytes{job=\"classicade-server\"})",
+          "legendFormat": "JS heap in use",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 435000000
+              },
+              {
+                "color": "red",
+                "value": 512000000
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Games",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Open rooms by game and status",
+      "description": "Against the cap of 2 000 rooms (roomLimits.js). The strain alert fires above 1 600.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (game, status) (rooms_open{job=\"classicade-server\"})",
+          "legendFormat": "{{game}} {{status}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        },
+        {
+          "expr": "sum(rooms_open{job=\"classicade-server\"})",
+          "legendFormat": "all open rooms",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1600
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Realtime connections",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(realtime_connections{job=\"classicade-server\"})",
+          "legendFormat": "connections",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Match pipeline: attempts and failures per step (1 h)",
+      "description": "ADR-047 steps. Any failed for good fires the finished game alert at once.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (step) (increase(match_pipeline_attempts_total{job=\"classicade-server\"}[1h]))",
+          "legendFormat": "attempts {{step}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        },
+        {
+          "expr": "sum by (step) (increase(match_pipeline_failed_total{job=\"classicade-server\"}[1h]))",
+          "legendFormat": "failed for good {{step}}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Telemetry health and free tier usage",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Scrubbed values (should stay at zero)",
+      "description": "A scrubbed value is a bug in the server: something tried to send a value off the allowlist (ADR-055 point 7).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${metrics}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (signal, key) (increase(telemetry_scrubbed_total{job=\"classicade-server\"}[1h]))",
+          "legendFormat": "{{signal}} {{key}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        },
+        {
+          "expr": "sum(increase(telemetry_logs_suppressed_total{job=\"classicade-server\"}[1h]))",
+          "legendFormat": "log lines over the per-minute cap",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${metrics}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Active series against the free 10 000",
+      "description": "From the grafanacloud-usage data source. About 1 000 to 1 500 expected per instance (CC-286, cardinality budget). The usage alert fires at 8 000 (80 %).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${usage}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "max(grafanacloud_instance_active_series)",
+          "legendFormat": "active series",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${usage}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 8000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Logs: projected GB a month against the free 50 GB",
+      "description": "The daily average ingest rate times 30 days. The usage alert fires at 40 GB (80 %).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${usage}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(avg_over_time(grafanacloud_logs_instance_bytes_received_per_second[1d])) * 2592000 / 1e9",
+          "legendFormat": "projected GB / 30 days",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${usage}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 40
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "logs",
+      "title": "Forwarded warnings and errors",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "${logs}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "expr": "{service_name=\"classicade-server\"} | detected_level=~\"warn|error|fatal\"",
+          "queryType": "range",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${logs}"
+          }
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

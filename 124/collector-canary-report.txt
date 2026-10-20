@@ -1,0 +1,60 @@
+Collector payloads: 5 OTLP requests captured (31733 bytes)
+
+Canary | value | in server stdout (Render) | in collector payloads (leaves the server)
+email | canary.sam@example.com | yes | no
+legacyEmail | canary.legacy@example.com | no | no
+username | CanarySam | no | no
+legacyUsername | Canary Legacy | no | no
+ip | 203.0.113.77 | no | no
+sessions | s%3A8lyzDs… (local test session, cut) | no | no
+sessions | s%3AcCSp2N… (local test session, cut) | no | no
+sessions | s%3AFADWSz… (local test session, cut) | no | no
+sessions | s%3Aa_G46G… (local test session, cut) | no | no
+sessions | s%3Ap-pXhr… (local test session, cut) | no | no
+playerIds | user_6ad6af0fb52323c9cd05efb9 | yes | no
+playerIds | user_6ad6af0fb52323c9cd05efb9 | yes | no
+playerIds | user_6ad6af10b52323c9cd05efba | yes | no
+playerIds | guest_f49d79d3-9c5c-4d10-80ca-d5d00dab8e35 | yes | no
+playerIds | guest_5ac37e90-92b4-410b-9fb2-b721fff61c83 | yes | no
+socketIds | a8MooHSZgDYRYSwpAAAA | yes | no
+socketIds | hde_8jYWq9168M8UAAAB | yes | no
+roomCodes | J58FYS | yes | no
+matchIds | e0441019-49fc-4ebd-bb27-c3c2fa2ea64a | yes | no
+
+Resource attribute keys seen: ["service.name","service.version","service.instance.id","deployment.environment.name"]
+
+Distinct series seen (30):
+  http.server.request.duration {"http.route":"/api/auth/login","http.request.method":"POST","http.response.status_class":"2xx"}
+  http.server.request.duration {"http.route":"/api/auth/login","http.request.method":"POST","http.response.status_class":"4xx"}
+  http.server.request.duration {"http.route":"/api/auth/signup","http.request.method":"POST","http.response.status_class":"2xx"}
+  http.server.request.duration {"http.route":"/api/matches/:matchId","http.request.method":"GET","http.response.status_class":"2xx"}
+  http.server.request.duration {"http.route":"/api/session/guest","http.request.method":"POST","http.response.status_class":"2xx"}
+  http.server.request.duration {"http.route":"unmatched","http.request.method":"GET","http.response.status_class":"4xx"}
+  match_pipeline.attempts {"step":"apply gamification"}
+  match_pipeline.attempts {"step":"apply leaderboards"}
+  match_pipeline.attempts {"step":"apply progression"}
+  match_pipeline.attempts {"step":"judge"}
+  match_pipeline.attempts {"step":"record match"}
+  match_pipeline.failed {"step":"apply gamification"}
+  nodejs.eventloop.delay.p50 {}
+  nodejs.eventloop.delay.p99 {}
+  process.memory.heap_used {}
+  process.memory.rss {}
+  realtime.connections {}
+  rooms.open {"game":"chess","status":"finished"}
+  rooms.open {"game":"chess","status":"playing"}
+  rooms.open {"game":"chess","status":"waiting"}
+  rooms.open {"game":"rps","status":"finished"}
+  rooms.open {"game":"rps","status":"playing"}
+  rooms.open {"game":"rps","status":"waiting"}
+  rooms.open {"game":"tictactoe","status":"finished"}
+  rooms.open {"game":"tictactoe","status":"playing"}
+  rooms.open {"game":"tictactoe","status":"waiting"}
+  socket.event.duration {"socket.event":"game:move","outcome":"ok"}
+  socket.event.duration {"socket.event":"room:create","outcome":"ok"}
+  socket.event.duration {"socket.event":"room:join","outcome":"ok"}
+  socket.event.duration {"socket.event":"room:join","outcome":"refused"}
+
+Log records exported (2):
+  INFO "server listening" {}
+  ERROR "match pipeline failed" {"step":"apply gamification","attempts":"1","error.type":"Error"}
