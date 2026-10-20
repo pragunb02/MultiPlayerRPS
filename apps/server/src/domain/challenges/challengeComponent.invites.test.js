@@ -350,16 +350,18 @@ describe("challengeComponent: invites to friends (CC-052)", () => {
   });
 
   it("tells nobody about an invite of the group that ended some other way while it was being filled", async () => {
-    let toMeera;
+    const later = {};
     const { invite, accept, emitted } = setup({
       wrap: (accessor) => ({
         ...accessor,
         end: async (end) =>
-          end.challengeId === toMeera.id && end.state === CHALLENGE_STATES.FILLED ? false : accessor.end(end),
+          end.challengeId === later.toMeera.id && end.state === CHALLENGE_STATES.FILLED
+            ? false
+            : accessor.end(end),
       }),
     });
     const toArjun = await invite();
-    toMeera = await invite({ to: "meera", now: T0 + 1 });
+    later.toMeera = await invite({ to: "meera", now: T0 + 1 });
 
     await accept(toArjun.id, ARJUN);
 
