@@ -28,6 +28,7 @@ import { createPlayerDataComponent } from "../domain/accounts/playerDataComponen
 import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
 import { createBlockComponent } from "../domain/blocks/blockComponent.js";
 import { createChallengeComponent } from "../domain/challenges/challengeComponent.js";
+import { createFriendInvites } from "../domain/friends/friendInvites.js";
 import { createProfileCards } from "../domain/profiles/profileCards.js";
 import { createProfileComponent } from "../domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "../domain/safety/safetyComponent.js";
@@ -134,8 +135,8 @@ import { testConfig } from "./testConfig.js";
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
  *   profileLimits?: object,   the limits on profile lookups and changes (CC-034)
  *   challengeLimits?: object,   the rate limits of the challenge routes (CC-139)
- *   challengeRecipients?: { resolve: Function },   who a challenge to one person may name. Nobody unless a test
- *     gives its own, as in production until CC-052
+ *   challengeRecipients?: { resolve: Function },   who a challenge to one person may name. A friend while the
+ *     friend_invites flag is on, as in production (CC-052), unless a test gives its own
  *   friendLimits?: object,   the limits on friend requests, changes and link lookups (CC-052)
  *   friendRules?: object,   the friends rules (FRIEND_LIMITS), such as how many requests may wait (CC-052)
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
@@ -331,14 +332,6 @@ export function createTestApp({
     seatIds,
     avatars: profileCards,
   });
-  const challengeComponent = createChallengeComponent({
-    challengeAccessor: createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() }),
-    rooms: roomComponent,
-    blocks: blockComponent,
-    safety: safetyComponent,
-    events: domainEvents,
-    ...(challengeRecipients && { recipients: challengeRecipients }),
-  });
   const networkOf = createNetworkKey({ now }).networkOf;
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const friends = wireFriends({
@@ -359,6 +352,17 @@ export function createTestApp({
     safety: safetyComponent,
     domainEvents,
     limits: friendRules,
+  });
+  // As in production: a challenge to one person names a friend while the friend_invites flag is on (CC-052).
+  const challengeComponent = createChallengeComponent({
+    challengeAccessor: createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() }),
+    rooms: roomComponent,
+    blocks: blockComponent,
+    safety: safetyComponent,
+    events: domainEvents,
+    recipients:
+      challengeRecipients ??
+      createFriendInvites({ friends: friends.friendComponent, flags: flagComponent, events: domainEvents }),
   });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
   const botDriver = createBotDriver({

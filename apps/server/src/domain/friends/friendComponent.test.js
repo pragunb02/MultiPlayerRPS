@@ -650,6 +650,43 @@ describe("friendComponent: cancelling and removing (CC-052)", () => {
 
     expect(await friends.friendByHandle({ playerId: RIYA, handle: await handleOf(ARJUN) })).toBe(ARJUN);
   });
+
+  it("names the friend a player may invite, by handle or by id, and nobody else (part 2)", async () => {
+    const { ask, friends, handleOf, block } = setup({ rooms: shared(), deleted: [] });
+    await ask(RIYA, ARJUN);
+    await ask(ARJUN, RIYA);
+    await ask(RIYA, KABIR, "ROOM33");
+    await ask(KABIR, RIYA, "ROOM33");
+    const inviteeOf = (playerId, target) => friends.inviteeOf({ playerId, target, now: T0 });
+
+    expect(await inviteeOf(RIYA, { handle: await handleOf(ARJUN) })).toEqual({
+      id: ARJUN,
+      displayName: "ArjunTest",
+    });
+    expect(await inviteeOf(ARJUN, { playerId: RIYA })).toEqual({ id: RIYA, displayName: "RiyaTest" });
+    block(KABIR, RIYA);
+    for (const target of [
+      { handle: await handleOf(KABIR) },
+      { playerId: KABIR },
+      { handle: await handleOf(MEENA) },
+      { playerId: MEENA },
+      { handle: "zzzzzzzzzzzzzzzz" },
+      { playerId: undefined },
+    ]) {
+      await expect(inviteeOf(RIYA, target)).rejects.toThrow(new NotFoundError("No such friend"));
+    }
+    await expect(inviteeOf(GUEST, { playerId: RIYA })).rejects.toThrow(ForbiddenError);
+  });
+
+  it("names nobody to invite whose account is gone (part 2)", async () => {
+    const { ask, friends } = setup({ rooms: shared(), deleted: [ARJUN] });
+    await ask(RIYA, ARJUN);
+    await ask(ARJUN, RIYA);
+
+    await expect(friends.inviteeOf({ playerId: RIYA, target: { playerId: ARJUN }, now: T0 })).rejects.toThrow(
+      NotFoundError,
+    );
+  });
 });
 
 describe("friendComponent: presence (ADR-066.6)", () => {

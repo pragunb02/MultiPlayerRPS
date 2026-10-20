@@ -208,7 +208,7 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
 
     push({ ...asked, state: "declined", expiresAt: undefined });
 
-    expect(await screen.findByText(/Arjun can't play right now\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Not right now: Arjun can't play at the moment\./)).toBeInTheDocument();
   });
 
   it("reads the inbox again whenever the socket connects again", async () => {

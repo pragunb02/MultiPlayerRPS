@@ -87,6 +87,31 @@ export function createInMemoryChallengeDao() {
         acceptedName: "",
       })),
 
+    claimGroup: async ({ groupId, by, from }) =>
+      changeIf(
+        groupId,
+        (doc) => (doc.filledBy ?? "") === from,
+        (doc) => ({ ...doc, filledBy: by }),
+      ),
+
+    releaseGroup: async ({ groupId, by }) =>
+      changeIf(
+        groupId,
+        (doc) => doc.filledBy === by,
+        (doc) => ({ ...doc, filledBy: "" }),
+      ),
+
+    keep: async ({ challengeId, acceptedBy, at }) =>
+      changeIf(
+        challengeId,
+        (doc) =>
+          doc.state === CHALLENGE_STATES.ACCEPTED &&
+          doc.acceptedBy === acceptedBy &&
+          doc.roomCode !== "" &&
+          doc.keptAt === undefined,
+        (doc) => ({ ...doc, keptAt: at }),
+      ),
+
     remove: async (challengeId) => challenges.delete(challengeId),
 
     addLater: async ({ challengeId, playerId }) =>

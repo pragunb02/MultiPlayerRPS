@@ -1,0 +1,18 @@
+/* The room made from an invite, while its sender is not there (CC-052 scenario 4). Like the room's own cards. */
+.card {
+  display: grid;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+.card h2 {
+  margin: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}

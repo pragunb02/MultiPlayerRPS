@@ -55,6 +55,18 @@ export const FLAGS = Object.freeze([
     client: true,
     success: "The owner pressed It works on that line.",
   }),
+  Object.freeze({
+    name: "friend_invites",
+    description:
+      "Invite beside each friend on the friends page: pick a game and the friend gets the invite on any page, or in their inbox. Off means nobody can be invited by name.",
+    ticket: "CC-052",
+    default: false,
+    removeBy: "2027-01-19",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.SIGNED_IN,
+    client: true,
+    success: "A friend accepted an invite.",
+  }),
 ]);
 
 const NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;

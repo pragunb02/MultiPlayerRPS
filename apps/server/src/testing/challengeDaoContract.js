@@ -269,4 +269,49 @@ export function runChallengeDaoContract(createDao) {
     expect(await dao.remove(challengeId)).toBe(false);
     await expect(dao.get(challengeId)).rejects.toThrow(RangeError);
   });
+
+  it("stores an invite's group and who moved it to their inbox from the start (CC-052)", async () => {
+    const dao = await createDao();
+    const record = { ...challengeRecord({ toId: ARJUN }), groupId: "g0000000000000000001", laterBy: [ARJUN] };
+
+    expect(await dao.insert(record)).toMatchObject({ groupId: "g0000000000000000001", laterBy: [ARJUN] });
+  });
+
+  it("gives a group of invites to one invite only, and frees it only for that invite (CC-052)", async () => {
+    const dao = await createDao();
+    const first = await dao.insert(challengeRecord({ toId: ARJUN }));
+    const groupId = first.challengeId;
+
+    const won = await dao.claimGroup({ groupId, by: "a0000000000000000001", from: "" });
+    const lost = await dao.claimGroup({ groupId, by: "b0000000000000000001", from: "" });
+    const wrongRelease = await dao.releaseGroup({ groupId, by: "b0000000000000000001" });
+
+    expect([won, lost, wrongRelease]).toEqual([true, false, false]);
+    expect((await dao.get(groupId)).filledBy).toBe("a0000000000000000001");
+    expect(await dao.claimGroup({ groupId, by: "b0000000000000000001", from: "a0000000000000000001" })).toBe(
+      true,
+    );
+    expect(await dao.releaseGroup({ groupId, by: "b0000000000000000001" })).toBe(true);
+    expect(await dao.claimGroup({ groupId, by: "c0000000000000000001", from: "" })).toBe(true);
+    expect(await dao.claimGroup({ groupId: "nobody00000000000000", by: "x", from: "" })).toBe(false);
+  });
+
+  it("keeps a taken invite for later once, and only once its room is recorded, for the one who took it", async () => {
+    const dao = await createDao();
+    const { challengeId } = await dao.insert(challengeRecord({ toId: ARJUN }));
+    await dao.claim({
+      challengeId,
+      acceptedBy: ARJUN,
+      acceptedName: "Arjun",
+      at: at(5),
+      staleBefore: at(-25),
+    });
+
+    expect(await dao.keep({ challengeId, acceptedBy: ARJUN, at: at(6) })).toBe(false);
+    await dao.setRoom({ challengeId, acceptedBy: ARJUN, roomCode: "ABC123" });
+    expect(await dao.keep({ challengeId, acceptedBy: GUEST, at: at(7) })).toBe(false);
+    expect(await dao.keep({ challengeId, acceptedBy: ARJUN, at: at(8) })).toBe(true);
+    expect(await dao.keep({ challengeId, acceptedBy: ARJUN, at: at(9) })).toBe(false);
+    expect((await dao.get(challengeId)).keptAt).toEqual(at(8));
+  });
 }

@@ -169,6 +169,12 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     /** Moves a challenge from a popup to this player's inbox, on every tab (CC-207). Answers the challenge. */
     challengeLater: async (id) =>
       (await request("POST", `/challenges/${encodeURIComponent(id)}/later`)).challenge,
+    /**
+     * Invites the sender of an invite back (CC-052): after "Game filled", or to keep a waiting invite for later.
+     * Answers the new invite.
+     */
+    inviteAgain: async (id) =>
+      (await request("POST", `/challenges/${encodeURIComponent(id)}/again`)).challenge,
     /** The player's own profile: handle, avatar, visibility and whether it may be public (CC-034). */
     getOwnProfile: async () => (await request("GET", "/profile")).profile,
     /** @param {string} avatar  an id from `AVATARS` */

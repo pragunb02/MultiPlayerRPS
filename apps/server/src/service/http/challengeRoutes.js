@@ -90,9 +90,11 @@ function challengeIdOf(req) {
  * 4. `POST /challenges/:id/accept` takes it and answers `{ challenge, room: { code, gameId } }`. One no longer open
  *    answers 410 with `details.state`, and a block reads as expired.
  * 5. `POST /challenges/:id/decline`, `/withdraw` and `/later` answer `{ challenge }`.
+ * 6. `POST /challenges/:id/again` invites the sender of an invite back (CC-052): after "Game filled", or to keep a
+ *    waiting invite for later. It answers 201 `{ challenge }`, the new invite, and counts as a challenge made.
  *
  * @param {{
- *   challengeComponent: Pick<ReturnType<typeof import("../../domain/challenges/challengeComponent.js").createChallengeComponent>, "create" | "inbox" | "view" | "accept" | "decline" | "withdraw" | "later">,
+ *   challengeComponent: Pick<ReturnType<typeof import("../../domain/challenges/challengeComponent.js").createChallengeComponent>, "create" | "inbox" | "view" | "accept" | "decline" | "withdraw" | "later" | "again">,
  *   networkOf: (address: string) => import("../../utils/networkKey.js").NetworkNames,
  *   now?: () => number,
  *   limits?: Partial<typeof CHALLENGE_LIMITS_HTTP>,   any limit not given keeps its standard value
@@ -189,6 +191,24 @@ export function createChallengeRoutes({ challengeComponent, networkOf, now = Dat
     req.log.info({ playerId: player.id, roomCode: taken.room.code }, "challenge taken");
     res.json(taken);
   });
+
+  // An invite back is a new challenge, so it counts against making them as well as answering.
+  router.post(
+    "/challenges/:challengeId/again",
+    noStore,
+    signedIn,
+    answers,
+    createsPerPlayer,
+    createsPerAddress,
+    async (req, res) => {
+      requireEmpty(req.body);
+      const challengeId = challengeIdOf(req);
+      const player = requireIdentity(req.session);
+      const challenge = await challengeComponent.again({ challengeId, player, now: now() });
+      req.log.info({ playerId: player.id, toOne: true }, "challenge made");
+      res.status(201).json({ challenge });
+    },
+  );
 
   for (const answer of ["decline", "withdraw", "later"]) {
     router.post(`/challenges/:challengeId/${answer}`, noStore, signedIn, answers, async (req, res) => {

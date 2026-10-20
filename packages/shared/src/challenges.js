@@ -9,6 +9,8 @@ import { PROFILE_HANDLE_ALPHABET } from "./profiles.js";
 /**
  * Where a challenge stands. It starts open. It ends accepted when someone took it and a room was made with both
  * players seated, declined by the one person it was for, withdrawn by its creator, or expired when its day is over.
+ * An invite to a friend also ends filled when another friend took the sender's invite to the same game first
+ * (CC-052 scenario 6).
  */
 export const CHALLENGE_STATES = Object.freeze({
   OPEN: "open",
@@ -16,6 +18,7 @@ export const CHALLENGE_STATES = Object.freeze({
   DECLINED: "declined",
   EXPIRED: "expired",
   WITHDRAWN: "withdrawn",
+  FILLED: "filled",
 });
 
 /** How long a challenge stays open: one day (CC-052 scenario 3). */
@@ -26,6 +29,12 @@ export const CHALLENGE_LIFETIME_MS = 24 * 60 * 60 * 1000;
  * first see it (CC-207). Rematch and draw requests end on their own within this time.
  */
 export const CHALLENGE_POPUP_MS = 60 * 1000;
+
+/**
+ * How long the friend who took an invite waits for its sender to come to the room before they may keep it for later
+ * or play Pip meanwhile (CC-052 scenario 4).
+ */
+export const INVITE_KEEP_AFTER_MS = 5 * 60 * 1000;
 
 /** The limits on making challenges (CC-052 rule 2). The server checks them, the page explains them. */
 export const CHALLENGE_LIMITS = Object.freeze({

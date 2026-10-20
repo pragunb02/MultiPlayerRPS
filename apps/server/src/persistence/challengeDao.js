@@ -23,6 +23,10 @@ const DUPLICATE_KEY_CODE = 11000;
  * @property {string} roomCode      the room made for both, "" until it is made
  * @property {string[]} laterBy     the players who moved it from a popup to their inbox
  * @property {Date} deleteAt        when MongoDB deletes the record by itself
+ * @property {string} [groupId]     an invite to a friend (CC-052): the first of its sender's open invites to the same
+ *   game when it was made, whose record decides who plays. Missing on a link, or on a record made before CC-052
+ * @property {string} [filledBy]    on the first of a group: the invite whose friend plays, missing or "" while nobody
+ * @property {Date} [keptAt]        when the friend who took it kept it for later, so its room stops waiting
  */
 
 const challengeSchema = new mongoose.Schema(
@@ -44,6 +48,9 @@ const challengeSchema = new mongoose.Schema(
     roomCode: { type: String, default: "" },
     laterBy: { type: [String], default: [] },
     deleteAt: { type: Date, required: true },
+    groupId: { type: String },
+    filledBy: { type: String },
+    keptAt: { type: Date },
   },
   { collection: "challenges", versionKey: false, minimize: false },
 );
@@ -58,7 +65,7 @@ challengeSchema.index({ acceptedBy: 1 });
 challengeSchema.index({ deleteAt: 1 }, { expireAfterSeconds: 0 });
 
 const FIELDS =
-  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt";
+  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt groupId filledBy keptAt";
 const PLAYER_FIELDS = Object.freeze(["fromId", "toId", "acceptedBy"]);
 const isDuplicate = (err) => err.code === DUPLICATE_KEY_CODE;
 
@@ -167,6 +174,46 @@ export function createChallengeDao({ connection }) {
       changed(stillOpen(challengeId, at, staleBefore), {
         $set: { state, endedAt: at, acceptedBy: "", acceptedName: "" },
       }),
+
+    /**
+     * Gives a group of invites to the invite `by`, only while the group's first record names `from` as its player:
+     * nobody ("" or never written) or a holder that lost its claim. So of two friends accepting at once, one wins.
+     *
+     * @param {{ groupId: string, by: string, from: string }} group
+     * @returns {Promise<boolean>} whether this call gave it
+     */
+    claimGroup: ({ groupId, by, from }) =>
+      changed(
+        { challengeId: groupId, filledBy: from === "" ? { $in: ["", null] } : from },
+        { $set: { filledBy: by } },
+      ),
+
+    /**
+     * Frees a group again, when the room of the invite `by` could not be made.
+     *
+     * @param {{ groupId: string, by: string }} group
+     * @returns {Promise<boolean>}
+     */
+    releaseGroup: ({ groupId, by }) =>
+      changed({ challengeId: groupId, filledBy: by }, { $set: { filledBy: "" } }),
+
+    /**
+     * Notes that the friend who took an invite kept it for later, once, while its room is recorded.
+     *
+     * @param {{ challengeId: string, acceptedBy: string, at: Date }} keep
+     * @returns {Promise<boolean>} whether this call noted it
+     */
+    keep: ({ challengeId, acceptedBy, at }) =>
+      changed(
+        {
+          challengeId,
+          state: CHALLENGE_STATES.ACCEPTED,
+          acceptedBy,
+          roomCode: { $ne: "" },
+          keptAt: { $exists: false },
+        },
+        { $set: { keptAt: at } },
+      ),
 
     /**
      * Deletes one challenge, such as a new one that broke a limit.

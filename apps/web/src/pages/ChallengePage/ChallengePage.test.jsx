@@ -173,7 +173,11 @@ describe("ChallengePage (CC-139)", () => {
     [{ state: "expired" }, "Challenge expired", CHALLENGE_COPY.expired.en],
     [{ state: "withdrawn" }, "Challenge taken back", CHALLENGE_COPY.withdrawn.en],
     [{ state: "declined" }, "Challenge over", CHALLENGE_COPY.over.en],
-    [{ state: "declined", own: true, toName: "Arjun" }, "Challenge over", "Arjun can't play right now."],
+    [
+      { state: "declined", own: true, toName: "Arjun" },
+      "Not right now",
+      "Not right now: Arjun can't play at the moment. Try again later.",
+    ],
   ])(
     "is honest about a challenge that is over (%o), with the way to play anyway",
     async (fields, title, text) => {

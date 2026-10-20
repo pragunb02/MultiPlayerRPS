@@ -363,6 +363,19 @@ export function createFriendComponent({
     return profile.playerId;
   }
 
+  /** The friend with a player id, or not found for anyone who is not the player's friend now. */
+  async function friendById({ playerId, friendId }) {
+    const blocked = await blocks.blockedWith({ playerId });
+    if (
+      typeof friendId !== "string" ||
+      blocked.has(friendId) ||
+      !(await friendAccessor.areFriends({ a: playerId, b: friendId }))
+    ) {
+      throw noSuchFriend();
+    }
+    return friendId;
+  }
+
   return Object.freeze({
     /**
      * The player's friends view: friends with their presence, the requests waiting for them, the requests they sent
@@ -474,6 +487,27 @@ export function createFriendComponent({
      * @throws {NotFoundError} when the handle is not one of the player's friends
      */
     friendByHandle,
+
+    /**
+     * The friend a player may invite to a game (CC-052 part 2): named by their profile handle from the client, or
+     * by player id for an invite back that the server makes. Only someone who is the player's friend now, with an
+     * account and a name, and only for a player whose age policy lets them have friends (friendsMode).
+     *
+     * @param {{ playerId: string, target: Readonly<{ handle: string } | { playerId: string }>, now: number }} query
+     * @returns {Promise<Readonly<{ id: string, displayName: string }>>}
+     * @throws {ForbiddenError} for a guest
+     * @throws {NotFoundError} for anyone who is not their friend now, one message for all
+     */
+    async inviteeOf({ playerId, target, now }) {
+      await requireFriends(playerId, now);
+      const friendId =
+        typeof target.handle === "string"
+          ? await friendByHandle({ playerId, handle: target.handle })
+          : await friendById({ playerId, friendId: target.playerId });
+      const names = await accounts.usernamesOf({ playerIds: [friendId] });
+      if (!names.has(friendId)) throw noSuchFriend();
+      return Object.freeze({ id: friendId, displayName: names.get(friendId) });
+    },
 
     /**
      * Sets the player's Appear offline switch. Their friends see the change at once.

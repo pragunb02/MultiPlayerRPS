@@ -3,8 +3,10 @@ import {
   CHALLENGE_LIMIT_REASONS,
   CHALLENGE_LIMITS,
   CHALLENGE_STATES,
+  INVITE_KEEP_AFTER_MS,
 } from "@classicade/shared";
 import { newChallengeId } from "../../models/challengeId.js";
+import { isQuietTime } from "../safety/agePolicy.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import {
   ConflictError,
@@ -26,6 +28,11 @@ export const CHALLENGE_EVENTS = Object.freeze({
    * them (ADR-053).
    */
   CHANGED: "challenge.changed",
+  /**
+   * `{ challenge }`: someone took a challenge and its room was made, once per challenge. CC-052 counts an invite to
+   * a friend taken as its flag's success.
+   */
+  ACCEPTED: "challenge.accepted",
 });
 
 /**
@@ -62,6 +69,7 @@ const ENDED_MESSAGES = Object.freeze({
   [CHALLENGE_STATES.DECLINED]: "This challenge was turned down",
   [CHALLENGE_STATES.EXPIRED]: "This challenge has expired",
   [CHALLENGE_STATES.WITHDRAWN]: "This challenge was taken back",
+  [CHALLENGE_STATES.FILLED]: "Game filled: they are playing someone else now",
 });
 const ended = (state) => new GoneError(ENDED_MESSAGES[state], { details: { state } });
 
@@ -105,7 +113,10 @@ export function stateAt(challenge, now) {
  * @property {string} [toName]        to its creator, the one person it was sent to
  * @property {string} [acceptedName]  to its creator, who took it
  * @property {{ code: string, gameId: string }} [room]  to its creator and the one who took it, the room made
- * @property {number} [until]         to its creator, how long a taken challenge stays in the inbox
+ * @property {number} [until]         to its creator and the one who took it, how long a taken challenge stays in the
+ *   inbox, cut short when the one who took it kept it for later (CC-052)
+ * @property {number} [acceptedAt]    to the one who took it while its room waits, when they took it (CC-052 scenario 4)
+ * @property {true} [toOne]           it was made for one person, an invite to a friend (CC-052)
  */
 
 /**
@@ -160,17 +171,25 @@ export function createChallengeComponent({
   /** Holds older than this have lost their lease (see `claimLeaseMs`). */
   const staleBefore = (now) => now - CHALLENGE_LIFETIMES.claimLeaseMs;
 
+  /** Until when a taken challenge's room waits for its creator: half an hour, or until the taker kept it for later. */
+  const waitsUntil = (challenge) => challenge.keptAt || challenge.endedAt + lifetimes.acceptedShownMs;
+  /** Whether a taken challenge's room still waits at `now`. */
+  const roomWaits = (challenge, now) =>
+    challenge.state === CHALLENGE_STATES.ACCEPTED && challenge.roomCode !== "" && now < waitsUntil(challenge);
+
   /**
    * What `viewerId` is told about `challenge`. A viewer in a blocked pair with its creator sees exactly what an
    * expired challenge shows them: the same fields with the same values, and nothing that only an open one has.
    */
-  function viewFor(challenge, viewerId, { now, blocked }) {
+  function viewFor(challenge, viewerId, { now, blocked, quiet = false }) {
     const own = viewerId === challenge.fromId;
     const forYou = challenge.toId !== "" && viewerId === challenge.toId;
     const state = blocked && !own ? CHALLENGE_STATES.EXPIRED : stateAt(challenge, now);
     const accepted = state === CHALLENGE_STATES.ACCEPTED;
     const took = accepted && viewerId === challenge.acceptedBy;
     const withRoom = accepted && challenge.roomCode !== "";
+    // In the viewer's quiet hours an invite sent to them is in their inbox already: no popup, no sound (CC-052).
+    const quietly = quiet && forYou && state === CHALLENGE_STATES.OPEN;
     return Object.freeze({
       id: challenge.challengeId,
       gameId: challenge.gameId,
@@ -179,16 +198,71 @@ export function createChallengeComponent({
       own,
       forYou,
       took,
-      later: challenge.laterBy.includes(viewerId),
+      later: challenge.laterBy.includes(viewerId) || quietly,
       state,
+      ...(challenge.toId !== "" && { toOne: true }),
       ...(own && { createdAt: challenge.createdAt }),
       ...(state === CHALLENGE_STATES.OPEN && { expiresAt: challenge.expiresAt }),
       ...(own && challenge.toId !== "" && { toName: challenge.toName }),
       ...(own && accepted && { acceptedName: challenge.acceptedName }),
       ...((own || took) &&
         withRoom && { room: Object.freeze({ code: challenge.roomCode, gameId: challenge.gameId }) }),
-      ...(own && withRoom && { until: challenge.endedAt + lifetimes.acceptedShownMs }),
+      ...((own || took) && withRoom && { until: waitsUntil(challenge) }),
+      ...(took && withRoom && { acceptedAt: challenge.endedAt }),
     });
+  }
+
+  /**
+   * The group a new invite to a friend joins (CC-052 scenario 6): the sender's oldest open invite to the same game,
+   * while nobody plays that group yet. Otherwise the invite starts its own group, named by its own id.
+   */
+  async function groupFor({ fromId, gameId, challengeId, now }) {
+    const mine = await challengeAccessor.listFrom(fromId);
+    const open = mine
+      .filter(
+        (each) => each.toId !== "" && each.gameId === gameId && stateAt(each, now) === CHALLENGE_STATES.OPEN,
+      )
+      .sort(oldestFirst);
+    const first = mine.find((each) => each.challengeId === open[0]?.groupId);
+    return first !== undefined && first.filledBy === "" ? first.challengeId : challengeId;
+  }
+
+  /** Whether a challenge is taken by someone whose room is made, or is being made, at `now`. */
+  async function isTaken(challengeId, now) {
+    if (challengeId === "") return false;
+    const holder = await challengeAccessor
+      .get(challengeId)
+      .catch((err) => (err instanceof NotFoundError ? undefined : Promise.reject(err)));
+    return holder !== undefined && stateAt(holder, now) === CHALLENGE_STATES.ACCEPTED;
+  }
+
+  /**
+   * Claims an invite's group for the invite just taken (CC-052 scenario 6): one conditional update on the group's
+   * first record, so of two friends accepting at the same moment exactly one plays. A group held by an invite whose
+   * hold ran out, or that is no longer taken, can be claimed from it. Answers whether this invite got it.
+   */
+  async function claimGroup(challenge, now) {
+    const group = { groupId: challenge.groupId, by: challenge.challengeId };
+    if (await challengeAccessor.claimGroup({ ...group, from: "" })) return true;
+    const { filledBy } = await challengeAccessor.get(group.groupId);
+    if (filledBy === group.by) return true;
+    return !(await isTaken(filledBy, now)) && challengeAccessor.claimGroup({ ...group, from: filledBy });
+  }
+
+  /** The other open invites of a group someone now plays: each is filled, and its friend hears so. */
+  async function fillGroup(challenge, now) {
+    const others = (await challengeAccessor.listFrom(challenge.fromId)).filter(
+      (each) =>
+        each.groupId === challenge.groupId &&
+        each.challengeId !== challenge.challengeId &&
+        stateAt(each, now) === CHALLENGE_STATES.OPEN,
+    );
+    for (const other of others) {
+      const end = { challengeId: other.challengeId, state: CHALLENGE_STATES.FILLED, at: now };
+      if (await challengeAccessor.end({ ...end, staleBefore: staleBefore(now) })) {
+        await announce(await challengeAccessor.get(other.challengeId));
+      }
+    }
   }
 
   /** Tells the players concerned that the challenge changed: its creator, the one it was sent to and the taker. */
@@ -265,7 +339,7 @@ export function createChallengeComponent({
     });
   }
 
-  return Object.freeze({
+  const component = Object.freeze({
     /**
      * Makes a challenge for the game and options `from` picked, open for a day. Without `to` anyone with its link can
      * take it. With `to` it is for the one person `recipients` names (CC-052).
@@ -280,8 +354,14 @@ export function createChallengeComponent({
       const value = rooms.checkOptions({ gameId, options });
       const recipient = await recipientOf({ from, to, now });
       const policy = await safety.policyFor({ playerId: from.id, now });
+      const challengeId = newId();
+      const invite = recipient.id !== "";
+      // An invite reaching a player in their quiet hours waits in their inbox, without a popup or a sound (CC-052).
+      const quiet = invite && isQuietTime(await safety.policyFor({ playerId: recipient.id, now }), now);
       const challenge = await challengeAccessor.add({
-        challengeId: newId(),
+        challengeId,
+        ...(invite && { groupId: await groupFor({ fromId: from.id, gameId, challengeId, now }) }),
+        ...(quiet && { laterBy: [recipient.id] }),
         fromId: from.id,
         fromName: from.displayName,
         fromPublic: policy.shareCardName,
@@ -355,6 +435,19 @@ export function createChallengeComponent({
       if (!claimed) {
         throw await endedSince(challengeId, now);
       }
+      const invite = challenge.toId !== "";
+      // Another friend took the sender's invite to this game first: this one is filled (CC-052 scenario 6).
+      if (invite && !(await claimGroup(challenge, now))) {
+        await challengeAccessor.release(claim);
+        await challengeAccessor.end({
+          challengeId,
+          state: CHALLENGE_STATES.FILLED,
+          at: now,
+          staleBefore: staleBefore(now),
+        });
+        await announce(await challengeAccessor.get(challengeId));
+        throw ended(CHALLENGE_STATES.FILLED);
+      }
       let recorded;
       try {
         const room = await rooms.createChallengeRoom({
@@ -369,6 +462,9 @@ export function createChallengeComponent({
         recorded = (await challengeAccessor.setRoom({ ...claim, roomCode: room.code })) ? room : undefined;
       } catch (err) {
         await challengeAccessor.release(claim);
+        if (invite) {
+          await challengeAccessor.releaseGroup({ groupId: challenge.groupId, by: challengeId });
+        }
         throw err;
       }
       // The hold ran out and someone else took it meanwhile. The room made here closes by itself.
@@ -376,7 +472,9 @@ export function createChallengeComponent({
         throw await endedSince(challengeId, now);
       }
       const accepted = await challengeAccessor.get(challengeId);
+      events.emit(CHALLENGE_EVENTS.ACCEPTED, { challenge: accepted });
       await announce(accepted);
+      if (invite) await fillGroup(accepted, now);
       return {
         challenge: viewFor(accepted, player.id, { now, blocked: false }),
         room: Object.freeze({ code: recorded.code, gameId: recorded.gameId }),
@@ -432,6 +530,54 @@ export function createChallengeComponent({
     },
 
     /**
+     * Invites the sender of an invite back, to the same game with the same options (CC-052), from the friend it was
+     * sent to:
+     *
+     * 1. after "Game filled": another friend took the sender's invite first (scenario 6), or
+     * 2. to keep it for later: they took it, its room waits, and its sender has not come for INVITE_KEEP_AFTER_MS
+     *    (scenario 4). The old room then stops waiting in both inboxes, so the sender finds the new invite instead.
+     *
+     * The new invite follows every rule of a new one: friends only, both limits and the rate limits.
+     *
+     * @param {{ challengeId: string, player: import("../../models/identity.js").Identity, now: number }} input
+     * @returns {Promise<Readonly<ChallengeView>>} the player's view of the new invite
+     * @throws {ForbiddenError} for anyone it was not sent to
+     * @throws {GoneError} when it is in no state to invite back from, with `details.state`. A block reads as expired
+     * @throws {ConflictError} with `details.retryAt` while the room has waited less than INVITE_KEEP_AFTER_MS
+     */
+    async again({ challengeId, player, now }) {
+      const stored = await challengeAccessor.get(challengeId);
+      if (stored.toId === "" || stored.toId !== player.id) {
+        throw new ForbiddenError("That invite was not sent to you");
+      }
+      if (await blockedBetween(player.id, stored.fromId)) {
+        throw ended(CHALLENGE_STATES.EXPIRED);
+      }
+      const state = stateAt(stored, now);
+      const keeping =
+        state === CHALLENGE_STATES.ACCEPTED && stored.acceptedBy === player.id && roomWaits(stored, now);
+      if (state !== CHALLENGE_STATES.FILLED && !keeping) {
+        throw ended(state);
+      }
+      if (keeping && now < stored.endedAt + INVITE_KEEP_AFTER_MS) {
+        throw new ConflictError("Give them a few more minutes", {
+          details: { retryAt: stored.endedAt + INVITE_KEEP_AFTER_MS },
+        });
+      }
+      const back = await component.create({
+        from: player,
+        gameId: stored.gameId,
+        options: stored.options,
+        to: Object.freeze({ playerId: stored.fromId }),
+        now,
+      });
+      if (keeping && (await challengeAccessor.keep({ challengeId, acceptedBy: player.id, at: now }))) {
+        await announce(await challengeAccessor.get(challengeId));
+      }
+      return back;
+    },
+
+    /**
      * Moves a challenge from the player's popup to their inbox (CC-207): they pressed Not now, or left it for a
      * minute. Their other tabs hear of it, so it never pops up again anywhere. Doing it twice changes nothing.
      *
@@ -459,22 +605,26 @@ export function createChallengeComponent({
      * @returns {Promise<ReadonlyArray<Readonly<ChallengeView>>>}
      */
     async inbox({ playerId, now }) {
-      const [mine, sent, blocked] = await Promise.all([
+      const [mine, sent, blocked, policy] = await Promise.all([
         challengeAccessor.listFrom(playerId),
         challengeAccessor.listTo(playerId),
         blocks.blockedWith({ playerId }),
+        safety.policyFor({ playerId, now }),
       ]);
       const isOpen = (challenge) => stateAt(challenge, now) === CHALLENGE_STATES.OPEN;
-      const waitsForMe = (challenge) =>
-        challenge.state === CHALLENGE_STATES.ACCEPTED &&
-        challenge.roomCode !== "" &&
-        now < challenge.endedAt + lifetimes.acceptedShownMs;
+      // An invite the player took, while its room waits: their room page tells them its sender was told (CC-052).
+      const tookIt = (challenge) => challenge.acceptedBy === playerId && roomWaits(challenge, now);
       const shown = [
-        ...mine.filter((challenge) => isOpen(challenge) || waitsForMe(challenge)),
-        ...sent.filter((challenge) => isOpen(challenge) && !blocked.has(challenge.fromId)),
+        ...mine.filter((challenge) => isOpen(challenge) || roomWaits(challenge, now)),
+        ...sent.filter(
+          (challenge) => (isOpen(challenge) || tookIt(challenge)) && !blocked.has(challenge.fromId),
+        ),
       ];
+      const quiet = isQuietTime(policy, now);
       return Object.freeze(
-        shown.sort(newestFirst).map((challenge) => viewFor(challenge, playerId, { now, blocked: false })),
+        shown
+          .sort(newestFirst)
+          .map((challenge) => viewFor(challenge, playerId, { now, blocked: false, quiet })),
       );
     },
 
@@ -534,4 +684,5 @@ export function createChallengeComponent({
       erased: { challenges: await challengeAccessor.removeInvolving(playerId) },
     }),
   });
+  return component;
 }

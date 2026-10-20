@@ -20,6 +20,7 @@ import { CATEGORIES } from "../../lib/notify/categories.js";
 import { SOUNDS } from "../../lib/sound/sounds.js";
 import { Button } from "../Button/Button.jsx";
 import { CHALLENGE_COPY } from "../Challenges/challengeCopy.js";
+import { INVITE_COPY } from "../Friends/inviteCopy.js";
 import { useChallengeInbox } from "../Challenges/challengesContext.js";
 import { Bilingual } from "../Profile/Bilingual.jsx";
 import { RequestCountdown } from "../RequestBanner/RequestBanner.jsx";
@@ -118,27 +119,47 @@ function useAnswerToasts({ rooms, pathname }) {
 }
 
 /**
- * Tells the creator of a challenge to one person, on any page, that they said no: gently, "can't play right now".
- * A block never shows here, because a blocked pair's challenge is never declined (ADR-053).
+ * How invites to one person end, told on any page (CC-052):
+ *
+ * 1. Its sender, when the friend said no, or when it ran out with no answer: the same gentle "Not right now" for
+ *    both. A block reads as no answer, because a blocked pair's invite is never delivered (scenario 7, ADR-053).
+ * 2. Its friend, when another friend took the sender's invite to the same game first: "Game filled", with the way to
+ *    invite the sender again (scenario 6).
  */
-function useDeclineToasts() {
+function useEndingToasts() {
   const { challenges } = useChallengeInbox();
   const toast = useToast();
   const before = useRef(new Map());
 
   useEffect(() => {
     const previous = before.current;
-    before.current = new Map(challenges.map((challenge) => [challenge.id, challenge.state]));
+    const now = Date.now();
+    before.current = new Map(challenges.map((challenge) => [challenge.id, challenge]));
+    const wasOpen = (id) => previous.get(id)?.state === CHALLENGE_STATES.OPEN;
+    const notRightNow = (name) =>
+      toast.show(both(CHALLENGE_COPY.notRightNow(name)), { tone: "info", category: CATEGORIES.REQUEST });
     for (const challenge of challenges) {
-      if (
-        challenge.own &&
-        challenge.state === CHALLENGE_STATES.DECLINED &&
-        previous.get(challenge.id) === CHALLENGE_STATES.OPEN
-      ) {
-        toast.show(both(CHALLENGE_COPY.declinedYours(challenge.toName)), {
+      if (challenge.own && challenge.state === CHALLENGE_STATES.DECLINED && wasOpen(challenge.id)) {
+        notRightNow(challenge.toName);
+      }
+      if (challenge.forYou && challenge.state === CHALLENGE_STATES.FILLED && wasOpen(challenge.id)) {
+        toast.show(both(INVITE_COPY.gameFilled(challenge.fromName)), {
           tone: "info",
           category: CATEGORIES.REQUEST,
+          action: {
+            label: "Invite again?",
+            to: paths.challenge(challenge.id),
+            dismissLabel: "Close",
+            onDismiss: () => undefined,
+          },
         });
+      }
+    }
+    // The tab lets an open invite go at its end. Its sender hears "Not right now", as for a decline.
+    const current = new Set(challenges.map((challenge) => challenge.id));
+    for (const [id, gone] of previous) {
+      if (!current.has(id) && gone.own && gone.toOne && wasOpen(id) && now >= gone.expiresAt) {
+        notRightNow(gone.toName);
       }
     }
   }, [challenges, toast]);
@@ -304,7 +325,7 @@ export function SiteRequests() {
   const reconnecting = useReconnecting();
   const heard = useRef(new Set());
   useAnswerToasts({ rooms, pathname });
-  useDeclineToasts();
+  useEndingToasts();
   const hidden = useDocumentHidden();
   useMoveToInbox(calls, held || hidden);
   const waiting = !held && asked.length + calls.length > 0;

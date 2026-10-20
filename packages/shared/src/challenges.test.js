@@ -4,6 +4,7 @@ import {
   CHALLENGE_LIFETIME_MS,
   CHALLENGE_LIMITS,
   CHALLENGE_STATES,
+  INVITE_KEEP_AFTER_MS,
   isChallengeId,
 } from "./challenges.js";
 import { isProfileHandle, PROFILE_HANDLE_LENGTH } from "./profiles.js";
@@ -40,8 +41,13 @@ describe("challenge rules", () => {
       "accepted",
       "declined",
       "expired",
+      "filled",
       "open",
       "withdrawn",
     ]);
+  });
+
+  it("give the friend who took an invite 5 minutes before they may keep it for later (CC-052)", () => {
+    expect(INVITE_KEEP_AFTER_MS).toBe(300_000);
   });
 });

@@ -6,12 +6,14 @@ import { siteOrigin } from "../../app/siteOrigin.js";
 import { Avatar } from "../../art/avatars/Avatar.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { FRIENDS_COPY, PRESENCE_LABEL, VIA_LABEL } from "../../components/Friends/friendsCopy.js";
+import { InviteDialog } from "../../components/Friends/InviteDialog.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { Bilingual } from "../../components/Profile/Bilingual.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { WhatsAppLink } from "../../components/WhatsAppLink/WhatsAppLink.jsx";
 import { useAction } from "../../hooks/useAction.js";
+import { useFlag } from "../../hooks/useFlag.js";
 import { useFriends, useMakeFriendLink } from "../../hooks/useFriends.js";
 import { friendLinkText, shareMessage } from "../../lib/shareText.js";
 import styles from "./FriendsPage.module.css";
@@ -105,8 +107,11 @@ function RemoveDialog({ friend, onClose, onRemove }) {
   );
 }
 
-/** One friend: avatar, name, a profile link for an adult (ADR-065.2), presence, and Remove. */
-function Friend({ friend, onAskRemove }) {
+/**
+ * One friend: avatar, name, a profile link for an adult (ADR-065.2), presence, Invite (CC-052 part 2, behind its
+ * flag) and Remove.
+ */
+function Friend({ friend, onAskRemove, onInvite }) {
   return (
     <li className={styles.item}>
       <Avatar avatar={friend.avatar} size={36} />
@@ -122,6 +127,17 @@ function Friend({ friend, onAskRemove }) {
           {PRESENCE_LABEL[friend.presence]}
         </span>
       </span>
+      {onInvite !== undefined && (
+        <Button
+          control="friends.invite"
+          variant="secondary"
+          className={styles.small}
+          aria-label={`Invite ${friend.displayName}`}
+          onClick={() => onInvite(friend)}
+        >
+          Invite
+        </Button>
+      )}
       <Button
         control="friends.remove"
         variant="ghost"
@@ -239,6 +255,8 @@ function AppearOffline({ on, onChange }) {
 function FriendsView({ friends }) {
   const { view } = friends;
   const [removing, setRemoving] = useState(undefined);
+  const [inviting, setInviting] = useState(undefined);
+  const invites = useFlag("friend_invites");
   return (
     <>
       {view.incoming.length > 0 && (
@@ -259,7 +277,12 @@ function FriendsView({ friends }) {
         ) : (
           <ul className={styles.list} aria-label="Friends">
             {view.friends.map((friend) => (
-              <Friend key={friend.handle} friend={friend} onAskRemove={setRemoving} />
+              <Friend
+                key={friend.handle}
+                friend={friend}
+                onAskRemove={setRemoving}
+                onInvite={invites ? setInviting : undefined}
+              />
             ))}
           </ul>
         )}
@@ -276,6 +299,13 @@ function FriendsView({ friends }) {
       )}
       <FriendLink />
       <AppearOffline on={view.settings.appearOffline} onChange={friends.setAppearOffline} />
+      {inviting !== undefined && (
+        <InviteDialog
+          // The dialog follows the friend's presence while it is open.
+          friend={view.friends.find((friend) => friend.handle === inviting.handle) ?? inviting}
+          onClose={() => setInviting(undefined)}
+        />
+      )}
       {removing !== undefined && (
         <RemoveDialog friend={removing} onClose={() => setRemoving(undefined)} onRemove={friends.remove} />
       )}
