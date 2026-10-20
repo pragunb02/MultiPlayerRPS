@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_STEPS, opsPerSecond, parseSteps, RENDER_SIZES, serverSummary, verdict } from "./ramp.mjs";
+import {
+  DEFAULT_STEPS,
+  opsPerSecond,
+  parseSteps,
+  readSettings,
+  RENDER_SIZES,
+  serverSummary,
+  verdict,
+} from "./ramp.mjs";
 
 describe("parseSteps", () => {
   it("answers the default steps when none are given", () => {
@@ -38,6 +46,77 @@ describe("verdict", () => {
       broken: true,
       reasons: ["move p95 40 ms is over 30 ms", "3 failures: room:create SERVER_BUSY, game:move timed out"],
     });
+  });
+});
+
+describe("verdict on what happened before the measured window", () => {
+  const moves = { count: 100, p95: 40 };
+
+  it("breaks a step whose players failed while they arrived and warmed up", () => {
+    expect(verdict({ moves, failures: {}, warmupFailures: { "room:create SERVER_BUSY": 3 } })).toEqual({
+      broken: true,
+      reasons: ["3 failures while warming up: room:create SERVER_BUSY"],
+    });
+  });
+
+  it("breaks a step in which no move was answered", () => {
+    expect(verdict({ moves: { count: 0, p95: 0 }, failures: {} })).toEqual({
+      broken: true,
+      reasons: ["no moves were answered"],
+    });
+  });
+});
+
+describe("readSettings", () => {
+  it("answers the documented defaults", () => {
+    expect(readSettings({})).toEqual({
+      size: "free",
+      steps: DEFAULT_STEPS,
+      stepSeconds: 60,
+      warmupSeconds: 15,
+      idleSeconds: 30,
+      seed: 289,
+      port: 4977,
+      computerShare: 0.4,
+      stop: "nfr3",
+      unplayableMs: 1000,
+    });
+  });
+
+  it("reads every setting it is given", () => {
+    const env = {
+      LOAD_SIZE: "standard",
+      LOAD_STEPS: "5,10",
+      LOAD_STEP_S: "30",
+      LOAD_WARMUP_S: "10",
+      LOAD_IDLE_S: "0",
+      LOAD_SEED: "7",
+      LOAD_PORT: "5000",
+      LOAD_COMPUTER_SHARE: "0",
+      LOAD_STOP: "unplayable",
+      LOAD_UNPLAYABLE_MS: "2000",
+    };
+
+    expect(readSettings(env)).toMatchObject({
+      size: "standard",
+      steps: [5, 10],
+      warmupSeconds: 10,
+      computerShare: 0,
+    });
+  });
+
+  it.each([
+    ["LOAD_SIZE", "huge"],
+    ["LOAD_STOP", "never"],
+    ["LOAD_STEP_S", "abc"],
+    ["LOAD_STEP_S", "5"],
+    ["LOAD_WARMUP_S", "58"],
+    ["LOAD_SEED", "1.5"],
+    ["LOAD_PORT", "80"],
+    ["LOAD_COMPUTER_SHARE", "1.5"],
+    ["LOAD_UNPLAYABLE_MS", "100"],
+  ])("refuses %s=%s", (name, value) => {
+    expect(() => readSettings({ [name]: value })).toThrow(RangeError);
   });
 });
 

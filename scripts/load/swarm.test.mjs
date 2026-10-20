@@ -85,8 +85,12 @@ async function fakeServer({
 
 const waitingRoom = { code: "AAAAAA", status: ROOM_STATUS.WAITING, revision: 1, you: "p1" };
 
-async function until(check) {
-  for (let tries = 0; tries < 1000 && !check(); tries += 1) await sleep(25);
+/** Waits for `check` to hold, and fails the test when it never does, so a wait can never pass by giving up. */
+async function until(check, tries = 1000) {
+  for (let tried = 0; !check(); tried += 1) {
+    if (tried === tries) throw new Error("the condition never held");
+    await sleep(25);
+  }
 }
 
 describe("createSwarm against the real server", () => {
@@ -122,17 +126,36 @@ describe("createSwarm against the real server", () => {
   it("records each kind of call by name", async () => {
     const server = await realServer();
     const { recorder, swarm } = swarmOn(server.baseUrl);
+    const expected = [
+      "computer reply chess",
+      "computer reply tictactoe",
+      "game:move chess",
+      "game:move rps",
+      "game:move tictactoe",
+      "guest sign-in",
+      "room:answer",
+      "room:create chess",
+      "room:create rps",
+      "room:create tictactoe",
+      "room:join",
+      "room:leave",
+      "room:play-computer chess",
+      "room:play-computer rps",
+      "room:play-computer tictactoe",
+      "room:request",
+      "socket connect",
+    ];
 
-    await swarm.grow(12, 0);
+    await swarm.grow(24, 0);
     const names = new Set();
     await until(() => {
       Object.keys(recorder.take().times).forEach((name) => names.add(name));
-      return ["room:answer", "room:leave", "room:join", "computer reply chess", "game:move chess"].every(
-        (name) => names.has(name),
-      );
+      return expected.every((name) => names.has(name));
     });
 
-    expect([...names]).toEqual(expect.arrayContaining(["guest sign-in", "socket connect", "room:request"]));
+    // The computer throws in the same save that starts a Rock Paper Scissors round, so a reply to wait for is rare
+    // and may or may not show up.
+    expect([...names].filter((name) => name !== "computer reply rps").sort()).toEqual(expected);
   }, 30_000);
 
   it("counts a refused room and stops that player's games", async () => {
@@ -197,6 +220,30 @@ describe("createSwarm when the server lets players down", () => {
     });
 
     expect(Object.keys(await failuresOf(base, peopleOnly))).toEqual(["stuck waiting for the server"]);
+  });
+});
+
+describe("createSwarm when a player's games end", () => {
+  it("closes the player's socket and stops counting them as playing", async () => {
+    const refuse = ({ ack }) => ack({ ok: false, error: { code: "SERVER_BUSY" } });
+    const base = await fakeServer({ handlers: { [SOCKET_EVENTS.ROOM_PLAY_COMPUTER]: refuse } });
+    const { recorder, swarm } = swarmOn(base, { model: { ...QUICK, computerShare: 1 } });
+
+    await swarm.grow(1, 0);
+    await until(() => Object.keys(recorder.take().failures).length > 0);
+    await until(() => swarm.players() === 0);
+
+    expect(swarm.playing()).toBe(0);
+  });
+
+  it("counts players as playing while their games go on", async () => {
+    const server = await realServer();
+    const { swarm } = swarmOn(server.baseUrl);
+
+    await swarm.grow(6, 0);
+    await until(() => swarm.players() >= 6);
+
+    expect(swarm.playing()).toBeGreaterThanOrEqual(6);
   });
 });
 
