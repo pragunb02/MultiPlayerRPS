@@ -45,6 +45,14 @@ describe("pickPlan", () => {
     });
   });
 
+  it("starts every computer game at the easiest level when the model asks for it, drawing the same numbers", () => {
+    const rng = sequence(0.95, 0.1, 0.99, 0.42);
+    const model = { ...DEFAULT_MODEL, easiestComputer: true };
+
+    expect(pickPlan(rng, model)).toEqual({ gameId: GAME_IDS.CHESS, computer: true, level: "easy" });
+    expect(rng()).toBe(0.42);
+  });
+
   it("seats the computer share of players in computer games", () => {
     const rng = createSeededRng(7);
     let solo = 0;

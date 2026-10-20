@@ -17,6 +17,8 @@ import { BOT_CHARACTERS, GAME_IDS, RPS_CHOICES } from "../../packages/shared/src
  * @property {Span} chessOwnMoves                     a chess player resigns after this many of their own moves
  * @property {number} rpsBestOf
  * @property {string} chessTimeControl
+ * @property {boolean} [easiestComputer]               every computer player picks its character's easiest level,
+ *   for tests of the harness itself, whose server thinks on its own event loop (unset: levels chosen evenly)
  */
 
 /** The model of research section 2.2. A run may change any of it. */
@@ -48,7 +50,7 @@ export function draw(rng, { min, max }) {
 
 /**
  * Picks what a new player plays: a game by its share, and whether against a computer character, with one of its
- * levels chosen evenly.
+ * levels chosen evenly, or its easiest when `model.easiestComputer` is set.
  *
  * @param {import("../../packages/games/src/rng.js").Rng} rng
  * @param {PlayerModel} model
@@ -71,7 +73,9 @@ export function pickPlan(rng, model) {
     return { gameId, computer, level: "" };
   }
   const { levels } = BOT_CHARACTERS.find((character) => character.gameId === gameId);
-  return { gameId, computer, level: levels[randomIndex(rng, levels.length)].id };
+  const index = randomIndex(rng, levels.length);
+  // Characters list their levels easiest first. The draw is made either way, so the rest of a seeded run is the same.
+  return { gameId, computer, level: levels[model.easiestComputer ? 0 : index].id };
 }
 
 /**
