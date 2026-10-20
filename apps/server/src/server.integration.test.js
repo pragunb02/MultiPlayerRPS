@@ -70,7 +70,7 @@ describe("startServer (integration)", () => {
     const app = await start();
 
     const res = await fetch(`${app.url}/health`);
-    expect(await res.json()).toEqual({ status: "ok", database: "up" });
+    expect(await res.json()).toEqual({ status: "ok", database: "up", commit: "unknown", version: "unknown" });
 
     await app.close();
     expect(app.server.listening).toBe(false);

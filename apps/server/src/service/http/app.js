@@ -106,7 +106,13 @@ export function createHttpApp({
   // never promoted to live. Outside /api: no session, no CSRF guard.
   app.get("/health", (req, res) => {
     const up = isDatabaseUp();
-    res.status(up ? 200 : 503).json({ status: up ? "ok" : "unavailable", database: up ? "up" : "down" });
+    res.status(up ? 200 : 503).json({
+      status: up ? "ok" : "unavailable",
+      database: up ? "up" : "down",
+      // Which deploy is answering, so a merge can be checked live (CC-303). The repository is public, so the sha is too.
+      commit: config.build.commit,
+      version: config.build.version,
+    });
   });
 
   app.use(express.json({ limit: "100kb" }));
@@ -148,6 +154,7 @@ export function createHttpApp({
       feedbackLimits,
       dailyPuzzleComponent,
       dailyPuzzleLimit,
+      build: config.build,
     }),
   );
 

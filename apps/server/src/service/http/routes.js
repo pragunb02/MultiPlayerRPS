@@ -20,7 +20,8 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
- *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }} deps
+ *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
+ *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
  */
 export function apiRouter({
   matchComponent,
@@ -45,12 +46,13 @@ export function apiRouter({
   feedbackLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
+  build,
   ...sessionDeps
 }) {
   const router = Router();
 
   router.get("/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", commit: build.commit, version: build.version });
   });
 
   router.get("/games", (req, res) => {

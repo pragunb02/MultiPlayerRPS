@@ -20,5 +20,8 @@ export const PRODUCTION_ENV = Object.freeze({
   WEB_DIST_DIR: TEST_WEB_BUILD,
 });
 
-/** @param {Record<string, string>} [overrides] */
-export const testConfig = (overrides = {}) => loadConfig({ ...TEST_ENV, ...overrides });
+/**
+ * @param {Record<string, string>} [overrides]
+ * @param {{ buildInfoText?: string }} [files]  the build file's text (CC-303)
+ */
+export const testConfig = (overrides = {}, files = {}) => loadConfig({ ...TEST_ENV, ...overrides }, files);

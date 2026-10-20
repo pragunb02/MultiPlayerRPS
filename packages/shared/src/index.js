@@ -12,6 +12,7 @@ export {
 export { BOT_CHARACTERS, BOT_DAILY_XP, characterForGame } from "./bots.js";
 export { ACHIEVEMENT_METRICS, ACHIEVEMENT_TIERS, ACHIEVEMENTS, winsOfMetric } from "./achievements.js";
 export { ANALYTICS_MAX_RANGE_DAYS, ANALYTICS_NOT_COUNTED, ANALYTICS_NOT_KEPT } from "./analytics.js";
+export { calendarVersion, isCalendarVersionOf, parseCommit, UNKNOWN_BUILD } from "./build.js";
 export { ERROR_CODES } from "./errors.js";
 export {
   FEEDBACK_DEFAULT_TYPE,
