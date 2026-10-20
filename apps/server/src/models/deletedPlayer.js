@@ -1,8 +1,8 @@
 import { DELETED_PLAYER_NAME } from "@classicade/shared";
 import { isBotPlayerId } from "./botIdentity.js";
+import { DELETED_ID_PREFIX } from "./playerIdShape.js";
 
-/** How the id of a deleted player's stand-in starts. People's ids start with `guest_` or `user_`. */
-export const DELETED_ID_PREFIX = "deleted_";
+export { DELETED_ID_PREFIX } from "./playerIdShape.js";
 
 /**
  * The anonymous stand-in that takes a deleted player's place in a shared match or an open room (CC-035). Each

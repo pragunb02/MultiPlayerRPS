@@ -40,6 +40,13 @@ describe("normaliseLegacyUsername with a reserved or rude old name", () => {
     },
   );
 
+  it.each(["user bob", "deleted.player"])(
+    "swaps %j, which would start like a player id, for a neutral player name (CC-304)",
+    (raw) => {
+      expect(normaliseLegacyUsername(raw)).toMatch(/^Player_\d{4}$/);
+    },
+  );
+
   it("gives the same old name the same neutral name every time", () => {
     expect(normaliseLegacyUsername("admin")).toBe(normaliseLegacyUsername("admin"));
     expect(normaliseLegacyUsername("admin")).not.toBe(normaliseLegacyUsername("moderator"));
