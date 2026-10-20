@@ -15,7 +15,12 @@ import {
   previousEmailSpelling,
 } from "../../models/credentials.js";
 import { randomInt } from "node:crypto";
-import { ACCOUNT_ID_PREFIX, createIdentity, GUEST_NAME_ALPHABET, isAccountId } from "../../models/identity.js";
+import {
+  ACCOUNT_ID_PREFIX,
+  createIdentity,
+  GUEST_NAME_ALPHABET,
+  isAccountId,
+} from "../../models/identity.js";
 import { normaliseLegacyUsername, usernameCandidates } from "../../models/legacyUsername.js";
 import { assertDefined } from "../../utils/assert.js";
 import {

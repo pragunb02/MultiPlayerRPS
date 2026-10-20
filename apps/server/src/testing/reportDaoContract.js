@@ -69,9 +69,9 @@ export function runReportDaoContract(createDao) {
     const dao = await createDao();
 
     await expect(dao.getById("00000000-0000-4000-b000-ffffffffffff")).rejects.toBeInstanceOf(RangeError);
-    await expect(dao.getByPairDay({ reporterId: RIYA, reportedId: ARJUN, day: "2026-10-20" })).rejects.toBeInstanceOf(
-      RangeError,
-    );
+    await expect(
+      dao.getByPairDay({ reporterId: RIYA, reportedId: ARJUN, day: "2026-10-20" }),
+    ).rejects.toBeInstanceOf(RangeError);
   });
 
   it("lists the reports of one status newest first, at most `limit`", async () => {
@@ -81,7 +81,10 @@ export function runReportDaoContract(createDao) {
     const closed = reportRecord({ seconds: 3, day: "2026-10-21", status: "dismissed" });
     for (const report of [old, newer, closed]) await dao.insert(report);
 
-    expect(idsOf(await dao.listByStatus({ status: "open", limit: 10 }))).toEqual([newer.reportId, old.reportId]);
+    expect(idsOf(await dao.listByStatus({ status: "open", limit: 10 }))).toEqual([
+      newer.reportId,
+      old.reportId,
+    ]);
     expect(idsOf(await dao.listByStatus({ status: "open", limit: 1 }))).toEqual([newer.reportId]);
     expect(idsOf(await dao.listByStatus({ status: "dismissed", limit: 10 }))).toEqual([closed.reportId]);
   });

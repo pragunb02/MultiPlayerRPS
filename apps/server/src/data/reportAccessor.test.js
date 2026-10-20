@@ -66,9 +66,9 @@ describe("reportAccessor (CC-044, ADR-071)", () => {
       [about.reportId, other.reportId].sort(),
     );
     expect(await reports.listOpenAbout(ARJUN)).toEqual([about]);
-    expect(await reports.closeOpen({ reportedId: ARJUN, status: "dismissed", action: "dismiss", at: T0 + 5 })).toBe(
-      1,
-    );
+    expect(
+      await reports.closeOpen({ reportedId: ARJUN, status: "dismissed", action: "dismiss", at: T0 + 5 }),
+    ).toBe(1);
     expect(await reports.get(about.reportId)).toEqual({
       ...about,
       status: "dismissed",

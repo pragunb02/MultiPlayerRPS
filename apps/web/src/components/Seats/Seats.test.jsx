@@ -44,8 +44,9 @@ function mount(view, sound = fakeSound(), api = fakeApi()) {
   return { ...result, sound, api, toast, update: (next) => result.rerender(ui(next)) };
 }
 
-// The Block button at the end of another player's row has tests of its own (CC-044).
-const chips = () => screen.getAllByRole("listitem").map((item) => item.textContent.replace(/Block$/, ""));
+// The Block and Report buttons at the end of another player's row have tests of their own (CC-044).
+const chips = () =>
+  screen.getAllByRole("listitem").map((item) => item.textContent.replace(/(Block)?(Report)?$/, ""));
 
 describe("Seats (CC-158)", () => {
   afterEach(() => vi.useRealTimers());
@@ -239,6 +240,71 @@ describe("Seats: blocking from a seat (CC-044)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("You can only block someone you played with");
     expect(screen.getByRole("dialog")).toBeVisible();
     expect(toast.show).not.toHaveBeenCalled();
+  });
+});
+
+describe("Seats: reporting from a seat (CC-044, ADR-071)", () => {
+  const reportable = (overrides = {}) => room({ code: "ROOM22", ...overrides });
+  const reportButton = () => screen.queryByRole("button", { name: "Report Alice" });
+
+  it("offers Report next to Block, for other people only, and only to a seated viewer", () => {
+    const rocky = seat({
+      playerId: "bot_rocky_hard",
+      displayName: "Rocky",
+      bot: { character: "rocky", level: "hard" },
+    });
+    const { update } = mount(reportable({ players: { min: 2, max: 3 }, seats: [ALICE, BOB, rocky] }));
+
+    expect(
+      screen.getAllByRole("button", { name: /^Report / }).map((button) => button.getAttribute("aria-label")),
+    ).toEqual(["Report Alice"]);
+    expect(reportButton()).toHaveAttribute("data-cc-control", "room.seat.report");
+
+    update(reportable({ you: "" }));
+    expect(reportButton()).toBeNull();
+  });
+
+  it("reports the seat by its place and the id the page saw there, and offers the one-tap block after", async () => {
+    const api = fakeApi({
+      reportPlayer: vi.fn().mockResolvedValue({ reportId: "r1", createdAt: 1 }),
+      blockPlayer: vi.fn().mockResolvedValue({ blockId: "b1", displayName: "Alice", blockedAt: 1 }),
+    });
+    mount(reportable(), fakeSound(), api);
+
+    await userEvent.click(reportButton());
+    const dialog = screen.getByRole("dialog", { name: /Report Alice/ });
+    await userEvent.click(within(dialog).getByRole("radio", { name: /Offensive name/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Send report" }));
+    await screen.findByRole("dialog", { name: /Thanks, we got it/ });
+    await userEvent.click(screen.getByRole("button", { name: "Block Alice too" }));
+
+    expect(api.reportPlayer).toHaveBeenCalledWith({
+      roomCode: "ROOM22",
+      seat: 0,
+      seatId: "guest_a",
+      reason: "name",
+    });
+    expect(api.blockPlayer).toHaveBeenCalledWith({ reportId: "r1" });
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("blocked");
+  });
+
+  it("sends nothing when the viewer cancels", async () => {
+    const { api } = mount(reportable());
+
+    await userEvent.click(reportButton());
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(api.reportPlayer).not.toHaveBeenCalled();
+  });
+
+  it("closes the report when the seats change under it", async () => {
+    const { update } = mount(reportable());
+
+    await userEvent.click(reportButton());
+    update(reportable({ seats: [BOB, seat({ playerId: "guest_c", displayName: "Carol" })] }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 

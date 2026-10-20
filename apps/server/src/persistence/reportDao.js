@@ -141,12 +141,8 @@ export function createReportDao({ connection }) {
       try {
         await Report.create(report);
       } catch (err) {
-        if (isDuplicate(err)) {
-          throw new DuplicateKey(`${report.reporterId} already reported ${report.reportedId} on ${report.day}`, {
-            cause: err,
-          });
-        }
-        throw err;
+        const pair = `${report.reporterId} already reported ${report.reportedId} on ${report.day}`;
+        throw isDuplicate(err) ? new DuplicateKey(pair, { cause: err }) : err;
       }
       return getById(report.reportId);
     },
@@ -175,7 +171,8 @@ export function createReportDao({ connection }) {
      * @param {{ status: string, limit: number }} query
      * @returns {Promise<ReportDoc[]>} newest first
      */
-    listByStatus: ({ status, limit }) => Report.find({ status }, FIELDS).sort(NEWEST_FIRST).limit(limit).lean(),
+    listByStatus: ({ status, limit }) =>
+      Report.find({ status }, FIELDS).sort(NEWEST_FIRST).limit(limit).lean(),
 
     /** @param {string} reporterId @returns {Promise<ReportDoc[]>} newest first */
     listByReporter: (reporterId) => Report.find({ reporterId }, FIELDS).sort(NEWEST_FIRST).lean(),

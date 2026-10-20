@@ -484,9 +484,9 @@ describe("blockComponent: blocking someone you reported (CC-044, ADR-071)", () =
       reports: fakeReports({ [REPORT_ID]: { reporterId: RIYA.id, person: seat(GUEST) } }),
     });
 
-    await expect(blocks.block({ blocker: RIYA, target: { reportId: REPORT_ID }, now: T0 })).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(
+      blocks.block({ blocker: RIYA, target: { reportId: REPORT_ID }, now: T0 }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("refuses to be built with a reports dependency that cannot find a report", () => {

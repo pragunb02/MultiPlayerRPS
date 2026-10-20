@@ -191,12 +191,11 @@ export function createAccountDao({ connection }) {
             ).lean()
           : null;
       } catch (err) {
-        if (err.code === DUPLICATE_KEY_CODE) {
-          throw Object.assign(new DuplicateKey("username already registered", { cause: err }), {
-            field: "username",
-          });
-        }
-        throw err;
+        throw err.code === DUPLICATE_KEY_CODE
+          ? Object.assign(new DuplicateKey("username already registered", { cause: err }), {
+              field: "username",
+            })
+          : err;
       }
       if (doc === null) {
         throw new RangeError(`No account ${accountId}`);

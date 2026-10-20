@@ -4,12 +4,14 @@ import {
   assertEnginesInCatalog,
   connectLeaderboardBonuses,
   connectMatchPipeline,
+  cutSocketsOnRename,
   handleFatalErrors,
   handleShutdownSignals,
   identityFollowers,
   logPipelineOutcome,
   MATCH_STEPS,
   matchPipelineSteps,
+  reportedNames,
   reportOldEmailSpellings,
   roomErasure,
   startHousekeeping,
@@ -906,5 +908,37 @@ describe("roomErasure (CC-035)", () => {
     expect(roomComponent.erasePlayer).toHaveBeenCalledWith(
       expect.objectContaining({ playerId: "user_x", now: 7 }),
     );
+  });
+});
+
+describe("reportedNames and cutSocketsOnRename (CC-044, ADR-071.6)", () => {
+  it("renames the account, its leaderboard rows and cuts its sockets, in that order", async () => {
+    const calls = [];
+    const domainEvents = new EventEmitter();
+    cutSocketsOnRename({ domainEvents, disconnectPlayer: (playerId) => calls.push(["sockets", playerId]) });
+    const names = reportedNames({
+      accountComponent: {
+        resetName: async ({ playerId }) => {
+          calls.push(["account", playerId]);
+          return "Player_ABCDEF";
+        },
+      },
+      leaderboardComponent: {
+        renamePlayer: async (change) => {
+          calls.push(["boards", change]);
+          return { renamed: { leaderboardEntries: 2 } };
+        },
+      },
+      domainEvents,
+    });
+
+    const name = await names.resetName({ playerId: "user_0123456789abcdef01234567", now: 0 });
+
+    expect(name).toBe("Player_ABCDEF");
+    expect(calls).toEqual([
+      ["account", "user_0123456789abcdef01234567"],
+      ["boards", { playerId: "user_0123456789abcdef01234567", displayName: "Player_ABCDEF" }],
+      ["sockets", "user_0123456789abcdef01234567"],
+    ]);
   });
 });

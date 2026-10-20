@@ -586,6 +586,16 @@ export function reportedNames({ accountComponent, leaderboardComponent, domainEv
 }
 
 /**
+ * Cuts the sockets of an account the owner renamed (CC-044): its sessions ended with the rename, so its open tabs
+ * show it signed out at once, as after a deletion.
+ *
+ * @param {{ domainEvents: import("node:events").EventEmitter, disconnectPlayer: (playerId: string) => void }} deps
+ */
+export function cutSocketsOnRename({ domainEvents, disconnectPlayer }) {
+  domainEvents.on(REPORT_EVENTS.PLAYER_RENAMED, ({ playerId }) => disconnectPlayer(playerId));
+}
+
+/**
  * Composition root: builds every layer bottom-up, wires dependencies, and starts listening.
  * The only module allowed to know about all layers.
  *
@@ -777,6 +787,7 @@ export async function startServer({
     matches: matchComponent,
     transfers: playerTransferAccessor,
     seatIds,
+    reports: reportComponent,
   });
   // Everything stored by player id moves with a guest who signs in (ADR-014), in this order. Leaderboards go
   // last: they are recomputed from the progress and matches that have moved by then.
@@ -911,7 +922,11 @@ export async function startServer({
         exportPlayer: playerTransferComponent.exportPlayer,
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
-      { name: "reports", erasePlayer: reportComponent.erasePlayer, exportPlayer: reportComponent.exportPlayer },
+      {
+        name: "reports",
+        erasePlayer: reportComponent.erasePlayer,
+        exportPlayer: reportComponent.exportPlayer,
+      },
       {
         name: "dailyPuzzles",
         erasePlayer: dailyPuzzleComponent.erasePlayer,
@@ -1008,7 +1023,7 @@ export async function startServer({
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
   sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
   sessionEvents.on(ACCOUNT_DELETED, (playerId) => gateway.disconnectPlayer(playerId));
-  domainEvents.on(REPORT_EVENTS.PLAYER_RENAMED, ({ playerId }) => gateway.disconnectPlayer(playerId));
+  cutSocketsOnRename({ domainEvents, disconnectPlayer: gateway.disconnectPlayer });
 
   const housekeeping = startHousekeeping({
     roomComponent,

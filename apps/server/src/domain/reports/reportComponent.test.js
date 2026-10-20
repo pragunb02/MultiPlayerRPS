@@ -34,7 +34,10 @@ const room = (overrides = {}) => ({
   createdAt: T0 - 60_000,
   status: "finished",
   seats: [seat(RIYA), seat(ARJUN)],
-  game: { matchId: MATCH_ID, log: [move(RIYA, { choice: "rock" }, T0 - 2000), move(ARJUN, "paper", T0 - 1000)] },
+  game: {
+    matchId: MATCH_ID,
+    log: [move(RIYA, { choice: "rock" }, T0 - 2000), move(ARJUN, "paper", T0 - 1000)],
+  },
   requests: [{ type: "rematch", from: ARJUN.id, to: RIYA.id, state: "declined", createdAt: T0 - 500 }],
   ...overrides,
 });
@@ -65,7 +68,8 @@ function fakeMatches(matches) {
 }
 
 const fakeTransfers = (moves = {}) => ({
-  listFrom: async (ids) => ids.filter((id) => Object.hasOwn(moves, id)).map((id) => ({ from: id, to: moves[id] })),
+  listFrom: async (ids) =>
+    ids.filter((id) => Object.hasOwn(moves, id)).map((id) => ({ from: id, to: moves[id] })),
 });
 
 /** Profiles by handle: only an adult account's profile names someone who can be reported. */
@@ -140,7 +144,12 @@ describe("reportComponent.report: who can be reported (CC-044, ADR-071.1)", () =
   it("snapshots the last moves and requests between the two, players named only by role", async () => {
     const { reports, dao, inRoom } = setup();
 
-    const { reportId } = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "cheating", now: T0 });
+    const { reportId } = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "cheating",
+      now: T0,
+    });
 
     const { context } = await dao.getById(reportId);
     expect(context.recent).toEqual([
@@ -161,9 +170,16 @@ describe("reportComponent.report: who can be reported (CC-044, ADR-071.1)", () =
       state: "open",
       createdAt: T0 - 40 + i,
     }));
-    const { reports, dao, inRoom } = setup({ rooms: { ROOM22: room({ game: { matchId: MATCH_ID, log }, requests }) } });
+    const { reports, dao, inRoom } = setup({
+      rooms: { ROOM22: room({ game: { matchId: MATCH_ID, log }, requests }) },
+    });
 
-    const { reportId } = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "cheating", now: T0 });
+    const { reportId } = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "cheating",
+      now: T0,
+    });
 
     const { recent } = (await dao.getById(reportId)).context;
     expect(recent.filter((entry) => entry.kind === "move")).toHaveLength(10);
@@ -184,7 +200,12 @@ describe("reportComponent.report: who can be reported (CC-044, ADR-071.1)", () =
     };
     const { reports, dao, inRoom } = setup({ rooms });
 
-    const { reportId } = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "other", now: T0 });
+    const { reportId } = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "other",
+      now: T0,
+    });
 
     expect((await dao.getById(reportId)).context.recent).toEqual([
       { by: "other", kind: "move", text: "1", at: new Date(T0 - 10) },
@@ -220,7 +241,12 @@ describe("reportComponent.report: who can be reported (CC-044, ADR-071.1)", () =
   it("reports the adult behind a public profile handle, with nothing but the handle's context", async () => {
     const { reports, dao } = setup();
 
-    const { reportId } = await reports.report({ reporter: RIYA, target: { handle: HANDLE }, reason: "name", now: T0 });
+    const { reportId } = await reports.report({
+      reporter: RIYA,
+      target: { handle: HANDLE },
+      reason: "name",
+      now: T0,
+    });
 
     expect(await dao.getById(reportId)).toMatchObject({
       reportedId: MEERA.id,
@@ -248,7 +274,9 @@ describe("reportComponent.report: who can be reported (CC-044, ADR-071.1)", () =
     ];
 
     for (const { reporter, target } of tries) {
-      await expect(reports.report({ reporter, target, reason: "name", now: T0 })).rejects.toMatchObject(NOT_FOUND);
+      await expect(reports.report({ reporter, target, reason: "name", now: T0 })).rejects.toMatchObject(
+        NOT_FOUND,
+      );
     }
   });
 
@@ -283,8 +311,18 @@ describe("reportComponent.report: the note and the limits (CC-044, ADR-071.2, AD
     const { reports, dao, inRoom } = setup();
     const first = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 });
 
-    const again = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "other", now: T0 + 60_000 });
-    const tomorrow = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 + DAY_MS });
+    const again = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "other",
+      now: T0 + 60_000,
+    });
+    const tomorrow = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "name",
+      now: T0 + DAY_MS,
+    });
 
     expect(again).toEqual(first);
     expect(tomorrow.reportId).not.toBe(first.reportId);
@@ -303,7 +341,12 @@ describe("reportComponent.report: the note and the limits (CC-044, ADR-071.2, AD
       await reports.act({ reportId, action: "dismiss", now: T0 + day * DAY_MS + 1 });
     }
 
-    const answer = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 + 9 * DAY_MS });
+    const answer = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "name",
+      now: T0 + 9 * DAY_MS,
+    });
 
     expect(answer).toEqual({ reportId: expect.any(String), createdAt: T0 + 9 * DAY_MS });
     expect((await dao.getById(answer.reportId)).setAside).toBe(true);
@@ -312,13 +355,28 @@ describe("reportComponent.report: the note and the limits (CC-044, ADR-071.2, AD
   it("does not set aside a reporter one of whose reports was acted on", async () => {
     const { reports, dao, inRoom } = setup();
     for (let day = 0; day < REPORTER_TRUST.dismissedAtLeast; day += 1) {
-      const { reportId } = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 + day * DAY_MS });
+      const { reportId } = await reports.report({
+        reporter: RIYA,
+        target: inRoom(1),
+        reason: "name",
+        now: T0 + day * DAY_MS,
+      });
       await reports.act({ reportId, action: "dismiss", now: T0 + day * DAY_MS + 1 });
     }
-    const { reportId } = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 + 5 * DAY_MS });
+    const { reportId } = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "name",
+      now: T0 + 5 * DAY_MS,
+    });
     await reports.act({ reportId, action: "rename", now: T0 + 5 * DAY_MS + 1 });
 
-    const answer = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 + 9 * DAY_MS });
+    const answer = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "name",
+      now: T0 + 9 * DAY_MS,
+    });
 
     expect((await dao.getById(answer.reportId)).setAside).toBe(false);
   });
@@ -333,7 +391,9 @@ describe("reportComponent.reportedBy: the one-tap block after a report (ADR-071.
       playerId: ARJUN.id,
       displayName: "Arjun",
     });
-    await expect(reports.reportedBy({ reportId, reporterId: ARJUN.id })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(reports.reportedBy({ reportId, reporterId: ARJUN.id })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
     await expect(
       reports.reportedBy({ reportId: "00000000-0000-4000-d000-ffffffffffff", reporterId: RIYA.id }),
     ).rejects.toBeInstanceOf(NotFoundError);
@@ -408,9 +468,9 @@ describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
     const after = await reports.queue({ status: "open", limit: 100 });
     expect(after.groups.map((group) => group.kind)).toEqual(["guest"]);
     const dismissed = await reports.queue({ status: "dismissed", limit: 100 });
-    expect(dismissed.groups[0].items.every((item) => item.action === "dismiss" && item.closedAt === T0 + 99)).toBe(
-      true,
-    );
+    expect(
+      dismissed.groups[0].items.every((item) => item.action === "dismiss" && item.closedAt === T0 + 99),
+    ).toBe(true);
   });
 
   it("renames an account to the safe default and closes its reports as acted on", async () => {
@@ -459,13 +519,25 @@ describe("reportComponent: guests who sign in, export and deletion (ADR-071.7)",
 
   it("exports the reports the player made, without the reported player's id or what happened", async () => {
     const { reports, inRoom } = setup();
-    const { reportId } = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", note: "n", now: T0 });
+    const { reportId } = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "name",
+      note: "n",
+      now: T0,
+    });
     await reports.act({ reportId, action: "rename", now: T0 + 1 });
 
     const exported = await reports.exportPlayer({ playerId: RIYA.id });
 
     expect(exported).toEqual([
-      { reason: "name", note: "n", where: "room", displayName: "Arjun", reportedAt: new Date(T0).toISOString() },
+      {
+        reason: "name",
+        note: "n",
+        where: "room",
+        displayName: "Arjun",
+        reportedAt: new Date(T0).toISOString(),
+      },
     ]);
     expect(await reports.exportPlayer({ playerId: ARJUN.id })).toEqual([]);
     expect(stringsIn(exported).filter(hasPlayerIdShape)).toEqual([]);
@@ -474,8 +546,19 @@ describe("reportComponent: guests who sign in, export and deletion (ADR-071.7)",
   it("erases reports about the player, and keeps the reports they made under a stand-in without the note", async () => {
     const rooms = { ROOM22: room(), ROOM33: room({ code: "ROOM33", seats: [seat(ARJUN), seat(RIYA)] }) };
     const { reports, dao, inRoom } = setup({ rooms });
-    const made = await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", note: "n", now: T0 });
-    const about = await reports.report({ reporter: ARJUN, target: inRoom(1, "ROOM33"), reason: "name", now: T0 });
+    const made = await reports.report({
+      reporter: RIYA,
+      target: inRoom(1),
+      reason: "name",
+      note: "n",
+      now: T0,
+    });
+    const about = await reports.report({
+      reporter: ARJUN,
+      target: inRoom(1, "ROOM33"),
+      reason: "name",
+      now: T0,
+    });
 
     const erased = await reports.erasePlayer({ playerId: RIYA.id });
 

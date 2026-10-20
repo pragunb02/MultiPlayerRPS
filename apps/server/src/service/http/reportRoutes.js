@@ -1,5 +1,11 @@
 import { Router } from "express";
-import { REPORT_ACTIONS, REPORT_NOTE_MAX, REPORT_REASONS, REPORT_STATUS, REPORT_STATUSES } from "@classicade/shared";
+import {
+  REPORT_ACTIONS,
+  REPORT_NOTE_MAX,
+  REPORT_REASONS,
+  REPORT_STATUS,
+  REPORT_STATUSES,
+} from "@classicade/shared";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
 import { isPlainObject, parseReference, REFERENCE_KIND, UUID_PATTERN } from "./playerReferenceInput.js";
@@ -56,7 +62,9 @@ function parseReport(body) {
     extra: ["reason", "note"],
     message: "Send who you report (a room seat, a match seat or a profile), a reason and a note",
   });
-  const fields = Object.fromEntries(Object.entries(target).filter(([key]) => key !== "reason" && key !== "note"));
+  const fields = Object.fromEntries(
+    Object.entries(target).filter(([key]) => key !== "reason" && key !== "note"),
+  );
   const note = parseNote(body.note);
   return {
     target: /** @type {import("../../domain/reports/reportComponent.js").ReportTarget} */ (fields),

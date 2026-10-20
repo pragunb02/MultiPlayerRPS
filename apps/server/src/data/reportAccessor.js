@@ -72,7 +72,10 @@ export function createReportAccessor({ reportDao }) {
       } catch (err) {
         if (!(err instanceof DuplicateKey)) throw err;
         const { reporterId, reportedId, day } = fields;
-        return { created: false, report: toReport(await reportDao.getByPairDay({ reporterId, reportedId, day })) };
+        return {
+          created: false,
+          report: toReport(await reportDao.getByPairDay({ reporterId, reportedId, day })),
+        };
       }
     },
 
@@ -85,8 +88,7 @@ export function createReportAccessor({ reportDao }) {
       try {
         return toReport(await reportDao.getById(reportId));
       } catch (err) {
-        if (err instanceof RangeError) throw new NotFoundError("No such report", { cause: err });
-        throw err;
+        throw err instanceof RangeError ? new NotFoundError("No such report", { cause: err }) : err;
       }
     },
 

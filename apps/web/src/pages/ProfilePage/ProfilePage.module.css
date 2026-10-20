@@ -123,7 +123,7 @@
 }
 .match {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-3) var(--space-4);
@@ -165,11 +165,21 @@
     grid-template-columns: repeat(2, 1fr);
   }
   .match {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto 1fr auto;
   }
   .match time {
     grid-column: 1 / -1;
   }
+  /* On a phone the Report button stays on the first row, beside the game, and the time goes under both. */
+  .report {
+    grid-row: 1;
+    grid-column: 3;
+  }
+}
+/* Report a past opponent (CC-044): small, beside the time, so it never reads as the main thing to do. */
+.report {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
 }
 .console {
   display: grid;

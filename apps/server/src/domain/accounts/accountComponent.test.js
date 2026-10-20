@@ -876,7 +876,9 @@ describe("accountComponent", () => {
       expect(parseUsername(name)).toBe(name);
       expect((await accounts.profileOf({ playerId: identity.id, now: NOW })).username).toBe(name);
       expect(await accounts.sessionVersionOf({ playerId: identity.id })).toBe(1);
-      expect((await accounts.login({ email: RIYA.email, password: RIYA.password })).identity.displayName).toBe(name);
+      expect(
+        (await accounts.login({ email: RIYA.email, password: RIYA.password })).identity.displayName,
+      ).toBe(name);
     });
 
     it("tries another name when the first is taken", async () => {

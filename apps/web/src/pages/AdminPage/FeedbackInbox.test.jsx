@@ -314,8 +314,10 @@ describe("the feedback inbox (CC-290)", () => {
       "Conversion",
       "Engagement",
       "Feedback",
+      "Reports",
     ]);
     expect(onInbox.filter(([, current]) => current === "page")).toEqual([["Feedback", "page"]]);
     expect(screen.getByRole("link", { name: "Feedback" })).toHaveAttribute("href", "/admin/feedback");
+    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/admin/reports");
   });
 });

@@ -64,7 +64,11 @@ async function finishedRace(alice, bob) {
   return {
     code,
     matchId: ended.data.game.matchId,
-    bobSeat: { roomCode: code, seat: ended.data.seats.findIndex((s) => s.playerId === bobSeatId), seatId: bobSeatId },
+    bobSeat: {
+      roomCode: code,
+      seat: ended.data.seats.findIndex((s) => s.playerId === bobSeatId),
+      seatId: bobSeatId,
+    },
   };
 }
 
@@ -140,7 +144,12 @@ describe("POST /api/reports (CC-044)", () => {
     server = await startTestServer();
     const [alice, bob, carol] = [await clients.player(), await clients.player(), await clients.player()];
     const { bobSeat, code } = await finishedRace(alice, bob);
-    const self = await report(alice, { roomCode: code, seat: bobSeat.seat === 0 ? 1 : 0, seatId: "A".repeat(22), reason: "name" });
+    const self = await report(alice, {
+      roomCode: code,
+      seat: bobSeat.seat === 0 ? 1 : 0,
+      seatId: "A".repeat(22),
+      reason: "name",
+    });
 
     const answers = [
       await report(carol, { ...bobSeat, reason: "name" }),
@@ -173,14 +182,17 @@ describe("POST /api/reports (CC-044)", () => {
   it("answers 401 to a visitor without a session", async () => {
     server = await startTestServer();
 
-    expect((await call("POST", "/reports", { body: { handle: "zzzzzzzzzzzzzzzz", reason: "name" } })).status).toBe(
-      401,
-    );
+    expect(
+      (await call("POST", "/reports", { body: { handle: "zzzzzzzzzzzzzzzz", reason: "name" } })).status,
+    ).toBe(401);
   });
 
   it(`allows ${REPORT_LIMITS.perPlayer.limit} reports a day per player, then answers 429, and counts the address after the player`, async () => {
     server = await startTestServer({
-      reportLimits: { perPlayer: { ...REPORT_LIMITS.perPlayer, limit: 2 }, perAddress: { ...REPORT_LIMITS.perAddress, limit: 3 } },
+      reportLimits: {
+        perPlayer: { ...REPORT_LIMITS.perPlayer, limit: 2 },
+        perAddress: { ...REPORT_LIMITS.perAddress, limit: 3 },
+      },
     });
     const [alice, bob, carol] = [await clients.player(), await clients.player(), await clients.player()];
     const body = { handle: "zzzzzzzzzzzzzzzz", reason: "name" };
@@ -201,6 +213,8 @@ describe("POST /api/reports (CC-044)", () => {
 
     const blocked = await call("POST", "/blocks", { body: { reportId }, cookie: alice.cookie });
     const theirs = await call("POST", "/blocks", { body: { reportId }, cookie: carol.cookie });
+    const malformed = await call("POST", "/blocks", { body: { reportId: "nope" }, cookie: alice.cookie });
+    expect(malformed.status).toBe(400);
 
     expect(blocked.status).toBe(200);
     expect(blocked.body.block.displayName).toBe(bob.identity.displayName);
@@ -230,7 +244,12 @@ describe("the owner's report queue, /api/admin/reports (CC-044, ADR-071.6)", () 
     expect(asOwner.headers.get("x-robots-tag")).toBe("noindex, nofollow");
     expect(asOwner.headers.get("content-type")).toMatch(/^application\/json/);
     const [group] = asOwner.body.groups;
-    expect(group).toMatchObject({ kind: "guest", names: [bob.identity.displayName], reports: 1, reporters: 1 });
+    expect(group).toMatchObject({
+      kind: "guest",
+      names: [bob.identity.displayName],
+      reports: 1,
+      reporters: 1,
+    });
     // The note is sent as the text it is, for the page to show as text.
     expect(group.items[0].note).toBe("<script>alert(1)</script>");
     expect(stringsIn(asOwner.body).filter(hasPlayerIdShape)).toEqual([]);
@@ -265,7 +284,9 @@ describe("the owner's report queue, /api/admin/reports (CC-044, ADR-071.6)", () 
     });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ result: { closed: 1, displayName: expect.stringMatching(/^Player_[A-Z2-9]{6}$/) } });
+    expect(res.body).toEqual({
+      result: { closed: 1, displayName: expect.stringMatching(/^Player_[A-Z2-9]{6}$/) },
+    });
     await cut;
     expect((await call("GET", "/session", { cookie: rude.cookie })).body.authenticated).toBe(false);
     const again = await logIn("rude@example.com");
@@ -312,15 +333,27 @@ describe("reports in the account export and deletion (CC-044, ADR-071.7)", () =>
       await report(riya, { roomCode: code, seat, seatId: view.data.you, reason: "harassment", note: "kept" })
     ).body.report;
 
-    const exported = await call("POST", "/account/export", { body: { password: PASSWORD }, cookie: riya.cookie });
+    const exported = await call("POST", "/account/export", {
+      body: { password: PASSWORD },
+      cookie: riya.cookie,
+    });
 
     expect(exported.status).toBe(200);
     expect(exported.body.reports).toEqual([
-      { reason: "harassment", note: "kept", where: "room", displayName: bob.identity.displayName, reportedAt: expect.any(String) },
+      {
+        reason: "harassment",
+        note: "kept",
+        where: "room",
+        displayName: bob.identity.displayName,
+        reportedAt: expect.any(String),
+      },
     ]);
     expect(JSON.stringify(exported.body.reports)).not.toContain(bob.identity.id);
 
-    const deleted = await call("POST", "/account/delete", { body: { password: PASSWORD }, cookie: riya.cookie });
+    const deleted = await call("POST", "/account/delete", {
+      body: { password: PASSWORD },
+      cookie: riya.cookie,
+    });
     expect(deleted.status).toBe(204);
     const kept = await reportDao.getById(reportId);
     expect(kept.reporterId).toMatch(/^deleted_/);

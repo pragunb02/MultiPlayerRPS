@@ -385,7 +385,11 @@ export function createTestApp({
         exportPlayer: playerTransferComponent.exportPlayer,
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
-      { name: "reports", erasePlayer: reportComponent.erasePlayer, exportPlayer: reportComponent.exportPlayer },
+      {
+        name: "reports",
+        erasePlayer: reportComponent.erasePlayer,
+        exportPlayer: reportComponent.exportPlayer,
+      },
       {
         name: "dailyPuzzles",
         erasePlayer: dailyPuzzleComponent.erasePlayer,

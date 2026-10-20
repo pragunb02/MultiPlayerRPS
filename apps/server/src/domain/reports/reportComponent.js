@@ -1,10 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-  REPORT_ACTION,
-  REPORT_CONTEXT,
-  REPORT_REASONS,
-  REPORT_STATUS,
-} from "@classicade/shared";
+import { REPORT_ACTION, REPORT_CONTEXT, REPORT_REASONS, REPORT_STATUS } from "@classicade/shared";
 import { deletedPlayer } from "../../models/deletedPlayer.js";
 import { isAccountId } from "../../models/identity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
@@ -90,7 +85,12 @@ export function createReportComponent({
     const moves = log
       .filter((entry) => entry.kind === "move")
       .slice(-REPORT_SNAPSHOT.moves)
-      .map((entry) => ({ by: roleOf(entry.playerId), kind: "move", text: textOf(entry.move, roleOf), at: entry.at }));
+      .map((entry) => ({
+        by: roleOf(entry.playerId),
+        kind: "move",
+        text: textOf(entry.move, roleOf),
+        at: entry.at,
+      }));
     const asked = requests
       .filter((request) => pair.has(request.from) && pair.has(request.to))
       .slice(-REPORT_SNAPSHOT.requests)
@@ -114,11 +114,15 @@ export function createReportComponent({
       const { person, place } = await references.playedWith({ target, callerId: reporter.id });
       const ids = { reporterId: reporter.id, reportedId: person.playerId };
       // The room or match may still name the guest the reported player was when they sat down.
-      const seatedId = (playerId, current) => (current(playerId) === person.playerId ? person.playerId : playerId);
+      const seatedId = (playerId, current) =>
+        current(playerId) === person.playerId ? person.playerId : playerId;
       if (place.kind === "room") {
         const { room } = place;
         const current = await references.accountsOf(room.seats.map((seat) => seat.playerId));
-        const log = (room.game?.log ?? []).map((entry) => ({ ...entry, playerId: seatedId(entry.playerId, current) }));
+        const log = (room.game?.log ?? []).map((entry) => ({
+          ...entry,
+          playerId: seatedId(entry.playerId, current),
+        }));
         const requests = (room.requests ?? []).map((request) => ({
           ...request,
           from: seatedId(request.from, current),
@@ -148,8 +152,7 @@ export function createReportComponent({
         },
       };
     } catch (err) {
-      if (err instanceof NotFoundError) throw notFound(err);
-      throw err;
+      throw err instanceof NotFoundError ? notFound(err) : err;
     }
   }
 
@@ -189,7 +192,10 @@ export function createReportComponent({
       setAside: reports.length - trusted.length,
       reasons: Object.freeze(
         Object.fromEntries(
-          REPORT_REASONS.map((reason) => [reason, reports.filter((report) => report.reason === reason).length]),
+          REPORT_REASONS.map((reason) => [
+            reason,
+            reports.filter((report) => report.reason === reason).length,
+          ]),
         ),
       ),
       lastAt: newest.createdAt,

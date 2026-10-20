@@ -1,12 +1,12 @@
 import { ADMIN_SECTIONS, paths, ROUTES } from "../../app/paths.js";
 
 /**
- * The owner console's pages, written once (CC-233, CC-290). The tab bar, the page titles, the lazily loaded parts and
+ * The owner console's pages, written once (CC-233, CC-290, CC-044). The tab bar, the page titles, the lazily loaded parts and
  * the app's routes all read this list, so a new console page is one entry here and its component.
  */
 
-/** The two parts of the console: the totals with their range, and the feedback inbox. Each loads on its own. */
-export const CONSOLE_VIEWS = Object.freeze({ TOTALS: "totals", FEEDBACK: "feedback" });
+/** The parts of the console: the totals with their range, the feedback inbox and the reports. Each loads on its own. */
+export const CONSOLE_VIEWS = Object.freeze({ TOTALS: "totals", FEEDBACK: "feedback", REPORTS: "reports" });
 
 const titleOf = (word) => word[0].toUpperCase() + word.slice(1);
 
@@ -15,13 +15,14 @@ const titleOf = (word) => word[0].toUpperCase() + word.slice(1);
  *   section in the address, none for the overview
  */
 
-/** Every page in tab order: the overview, each section of the totals, then the feedback inbox. */
+/** Every page in tab order: the overview, each section of the totals, then the feedback inbox and the reports. */
 export const CONSOLE_PAGES = Object.freeze([
   Object.freeze({ id: "overview", name: "Overview", view: CONSOLE_VIEWS.TOTALS }),
   ...ADMIN_SECTIONS.map((section) =>
     Object.freeze({ id: section, name: titleOf(section), view: CONSOLE_VIEWS.TOTALS, section }),
   ),
   Object.freeze({ id: "feedback", name: "Feedback", view: CONSOLE_VIEWS.FEEDBACK }),
+  Object.freeze({ id: "reports", name: "Reports", view: CONSOLE_VIEWS.REPORTS }),
 ]);
 
 /** The routes of the console and the part each one loads. */
@@ -29,6 +30,7 @@ export const CONSOLE_ROUTES = Object.freeze([
   Object.freeze({ path: ROUTES.ADMIN, view: CONSOLE_VIEWS.TOTALS }),
   Object.freeze({ path: ROUTES.ADMIN_SECTION, view: CONSOLE_VIEWS.TOTALS }),
   Object.freeze({ path: ROUTES.ADMIN_FEEDBACK, view: CONSOLE_VIEWS.FEEDBACK }),
+  Object.freeze({ path: ROUTES.ADMIN_REPORTS, view: CONSOLE_VIEWS.REPORTS }),
 ]);
 
 /**
@@ -39,4 +41,8 @@ export const CONSOLE_ROUTES = Object.freeze([
  * @param {{ from?: string, to?: string, bucket?: string }} range
  */
 export const consoleHref = (page, range) =>
-  page.view === CONSOLE_VIEWS.TOTALS ? paths.admin(page.section, range) : paths.adminFeedback();
+  ({
+    [CONSOLE_VIEWS.TOTALS]: () => paths.admin(page.section, range),
+    [CONSOLE_VIEWS.FEEDBACK]: () => paths.adminFeedback(),
+    [CONSOLE_VIEWS.REPORTS]: () => paths.adminReports(),
+  })[page.view]();

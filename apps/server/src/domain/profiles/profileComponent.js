@@ -142,15 +142,14 @@ export function createProfileComponent({ profileAccessor, ages, accounts, progre
      * @throws {NotFoundError} for a handle nobody has, a deleted account's, and anyone not surely an adult account
      */
     async personByHandle({ handle, now }) {
-      let profile;
-      try {
-        profile = await profileAccessor.getByHandle(handle);
-      } catch (err) {
-        if (err instanceof NotFoundError) throw notFound(err);
-        throw err;
-      }
+      const profile = await profileAccessor.getByHandle(handle).catch((err) => {
+        throw err instanceof NotFoundError ? notFound(err) : err;
+      });
       if (!(await isAdult(profile.playerId, now))) throw notFound();
-      return Object.freeze({ playerId: profile.playerId, displayName: await usernameOf(profile.playerId, now) });
+      return Object.freeze({
+        playerId: profile.playerId,
+        displayName: await usernameOf(profile.playerId, now),
+      });
     },
 
     /**

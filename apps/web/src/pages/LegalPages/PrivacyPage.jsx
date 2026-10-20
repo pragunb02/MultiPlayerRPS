@@ -100,6 +100,16 @@ export function PrivacyPage() {
             never told, and only you can see your list.
           </li>
           <li>
+            <strong>Players you report.</strong> When you report a player, we store who you reported (by their
+            player id, which only our server sees), the name they had, the reason you picked, your note if you
+            wrote one, where it happened (a room, a past game or a profile) and the last few moves and
+            requests between you, with nobody named. Before your note is saved, any email address or phone
+            number in it is replaced with a marker. We keep it so the site&apos;s owner can look at it and, if
+            a name breaks the rules, give that account a safe name. The reported player is never told, and
+            never learns who reported them. Reports are deleted 180 days after they were made. If you delete
+            your account, your reports stay without your name or your note, and reports about you are deleted.
+          </li>
+          <li>
             <strong>Feedback.</strong> When you send feedback with the Feedback button, we store its type,
             your message, the page you were on (never a room code or a name), the app version, the kind of
             device (phone, tablet or computer) and whether you were a visitor, a guest or signed in. We keep
@@ -254,15 +264,16 @@ export function PrivacyPage() {
           <li>
             <strong>Download my data</strong> gives you a file (JSON) with your account, your games, progress,
             chess rating, achievements, quests, daily puzzle days, leaderboard places, your profile and avatar
-            and the players you blocked. Other players appear in it by their display name only.
+            the players you blocked and the reports you made. Other players appear in it by their display name
+            only.
           </li>
           <li>
             <strong>Delete my account</strong> deletes it at once, with your progress, chess rating,
-            achievements, quests, daily puzzle days, leaderboard places, profile, blocks and sessions, and
-            signs you out everywhere. Games you played against other people stay in their history with your
-            name replaced by &quot;Deleted player&quot;. A game you are in at that moment ends, and your
-            opponent wins. Games against the computer only are deleted. If your account came from the earlier
-            version of the site, that old record is closed so it can never sign in again.
+            achievements, quests, daily puzzle days, leaderboard places, profile, blocks, reports about you
+            and sessions, and signs you out everywhere. Games you played against other people stay in their
+            history with your name replaced by &quot;Deleted player&quot;. A game you are in at that moment
+            ends, and your opponent wins. Games against the computer only are deleted. If your account came
+            from the earlier version of the site, that old record is closed so it can never sign in again.
           </li>
         </ul>
         <p>

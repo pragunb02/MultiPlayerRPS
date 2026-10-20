@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { paths } from "../../app/paths.js";
 import { Avatar } from "../../art/avatars/Avatar.jsx";
@@ -7,7 +8,9 @@ import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { Bilingual } from "../../components/Profile/Bilingual.jsx";
 import { PROFILE_COPY } from "../../components/Profile/profileCopy.js";
+import { ReportDialog } from "../../components/Report/ReportDialog.jsx";
 import { usePlayerProfile } from "../../hooks/useProfile.js";
+import { useSession } from "../../hooks/useSession.js";
 import styles from "./PublicProfilePage.module.css";
 
 /** "1532", or "1500?" while the rating is provisional (ADR-027.3), or "Unrated" before the first rated game. */
@@ -52,6 +55,39 @@ function Header({ player }) {
       <Avatar avatar={player.avatar} size={96} />
       <h1 className={player.hidden ? styles.hidden : undefined}>{player.displayName}</h1>
     </header>
+  );
+}
+
+/**
+ * Report on a profile (CC-044, ADR-071): for a signed-in viewer (a guest too) looking at someone else's profile that
+ * shows a name. A hidden profile shows nothing to report, and the server refuses it alike. The player is named by the
+ * handle only.
+ */
+function ReportFromProfile({ player }) {
+  const session = useSession();
+  const [open, setOpen] = useState(false);
+  if (session.identity === undefined || player.own === true || player.hidden === true) return null;
+  return (
+    <>
+      <Button
+        control="player.report"
+        variant="ghost"
+        className={styles.report}
+        aria-label={`Report ${player.displayName}`}
+        onClick={() => setOpen(true)}
+      >
+        Report
+      </Button>
+      {open && (
+        <ReportDialog
+          name={player.displayName}
+          target={{ handle: player.handle }}
+          canBlock
+          onBlocked={() => undefined}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -113,6 +149,7 @@ export function PublicProfilePage() {
       {player.hidden && <Bilingual copy={PROFILE_COPY.hidden} />}
       {player.private && <Bilingual copy={PROFILE_COPY.private} />}
       {player.stats !== undefined && <PublicStats player={player} />}
+      <ReportFromProfile player={player} />
     </section>
   );
 }

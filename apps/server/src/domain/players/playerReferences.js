@@ -17,8 +17,7 @@ import { GoneError, NotFoundError } from "../../utils/errors.js";
  */
 
 /** The one error for every reference the server cannot confirm. Each caller answers it in its own words. */
-const unknownReference = (cause) =>
-  new NotFoundError("No such player", cause === undefined ? {} : { cause });
+const unknownReference = (cause) => new NotFoundError("No such player", cause === undefined ? {} : { cause });
 
 /** A seat held by someone another player can act on: not the caller, not a computer, not a deleted stand-in. */
 const isOtherPerson = (playerId, callerId) =>
@@ -56,7 +55,10 @@ export function createPlayerReferences({ rooms, matches, transfers, seatIds }) {
     try {
       if ("roomCode" in target) {
         const room = await rooms.getByCode(target.roomCode);
-        const players = room.seats.map((seat) => ({ ...seat, seatId: seatIds.seatIdOf(room, seat.playerId) }));
+        const players = room.seats.map((seat) => ({
+          ...seat,
+          seatId: seatIds.seatIdOf(room, seat.playerId),
+        }));
         return { players, place: Object.freeze({ kind: "room", room }) };
       }
       const players = await matches.playersFor({ matchId: target.matchId, playerId: callerId });
