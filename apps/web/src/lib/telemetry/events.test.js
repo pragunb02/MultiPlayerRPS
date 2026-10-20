@@ -87,13 +87,22 @@ describe("telemetry payloads (CC-174, ADR-034)", () => {
         .replace(":token", "AbCdEfGhIjKlMnOpQrSt_-")
         .replace(":kind", "chess")
         .replace(":board", "weekly")
-        .replace(":section", "players")}`;
+        .replace(":section", "players")
+        .replace(":id", "c7Q2xY9kLm3NpR8s")}`;
     [
       ...Object.values(ROUTES),
-      ...Object.values(LEGACY_ROUTES).filter((route) => !route.includes(".")),
+      // The old addresses that redirect at once (a username, a file name) are counted at their new one.
+      LEGACY_ROUTES.GAME,
+      LEGACY_ROUTES.ROOM,
     ].forEach((route) => {
       const telemetryRoute = routeOf(filled(route));
-      expect({ route, known: TELEMETRY_ROUTES.includes(telemetryRoute) }).toEqual({ route, known: true });
+      expect({
+        route,
+        known: TELEMETRY_ROUTES.includes(telemetryRoute) && telemetryRoute !== "not_found",
+      }).toEqual({
+        route,
+        known: true,
+      });
       FORBIDDEN.forEach((pattern) => expect(telemetryRoute).not.toMatch(pattern));
     });
     expect(routeOf("/")).toBe("/");
