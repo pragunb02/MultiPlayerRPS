@@ -16,7 +16,7 @@ checks what it can (`npm run lint`), and the design lens of the review (CC-316) 
   and the real components in their states, so it cannot drift from the app. This file holds the rules, the page shows
   them.
 
-Decided by the owner on 2026-10-20 ("Accept all, with stylelint"): the decisions D1 to D7 in
+Recorded as ADR-076. Decided by the owner on 2026-10-20 ("Accept all, with stylelint"): the decisions D1 to D7 in
 [CC-314](../tickets/CC-314.md#open-decisions).
 
 ## 1. Tokens by role
