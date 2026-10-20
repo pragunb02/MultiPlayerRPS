@@ -290,6 +290,137 @@ browser tests, Docker); force pushes and deletion are blocked (admins can overri
 with push protection blocks pushes that contain credentials. Dependabot alerts and security updates, and CodeQL code
 scanning, are on.
 
+## Merge queue (CC-298, ADR-074)
+
+Two pull requests that are each green can still break `main` together (CC-247, CC-257). The merge queue tests each
+pull request on top of the newest `main` and of the pull requests ahead of it, on a temporary branch
+`gh-readonly-queue/main/...`, and merges only when every required check passed there. ci.yml starts on
+`merge_group` for this, and its header has a table of which job runs on which event
+(`scripts/workflows.test.mjs` pins it).
+
+**The trade-off, the owner's choice.** A merge no longer lands when the button is pressed. It waits for CI to run
+again in the queue, about 10 minutes, and longer when runners are busy. In return `main` only ever gets commits
+that passed on exactly the code that lands. The push to `main` then runs CI once more on that same commit, which
+Render waits for (Auto-Deploy, After CI Checks Pass).
+
+### Owner steps (once)
+
+The repository today has classic branch protection on `main` with no required checks (relaxed for the feature
+phase, CLAUDE.md workflow rule 7) and no rulesets. Leave the classic rule as it is: it still blocks force pushes and
+deletion. The ruleset below adds the required checks and the queue.
+
+**1. Allow auto-merge and merge commits** (Settings, General, Pull Requests: "Allow merge commits" and "Allow
+auto-merge" on). Or:
+
+```bash
+gh api -X PATCH repos/pragunb02/MultiPlayerRPS -F allow_auto_merge=true -F allow_merge_commit=true
+```
+
+**2. Create the ruleset** (Settings, Rules, Rulesets, New branch ruleset). Name `main: required checks and merge
+queue`, Enforcement **Active**, no bypass list, target **Default branch**. Turn on:
+
+1. **Restrict deletions** and **Block force pushes**.
+2. **Require status checks to pass**, with "Require branches to be up to date before merging" **off** (the queue
+   tests on the newest `main` itself, so this setting would only add rebases). Add these seven checks, source
+   GitHub Actions, typed exactly:
+   1. `Lint, format, audit, unit + integration (coverage gates)`
+   2. `Docker image builds and serves (docker compose)`
+   3. `Browser persona tests (desktop + mobile)`
+   4. `Browser persona tests (firefox desktop)`
+   5. `Backup round trip (mongodump, age, mongorestore)`
+   6. `Workflow files (actionlint)`
+   7. `Changelog fragments`
+3. **Require merge queue**, with the values for a solo repository on GitHub's free runners (20 jobs at once, and one
+   CI run takes about 15 of them):
+
+   | Setting                              | Value          | Why                                                                                                                       |
+   | ------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+   | Merge method                         | **Merge**      | Keeps the `Merge pull request #N` commits the changelog collector reads the PR number from (CC-299)                       |
+   | Build concurrency                    | **2**          | One group tests while the next waits, more would only queue for runners. At most 5 builders open PRs (rule 9)             |
+   | Minimum group size                   | **1**          | A single PR never waits for company                                                                                       |
+   | Maximum group size                   | **5**          | Up to the five builders' PRs can land together when all pass                                                              |
+   | Wait time to meet minimum group size | **5 minutes**  | Only matters above a minimum of 1                                                                                         |
+   | Status check timeout                 | **30 minutes** | CI takes about 10, its longest job may run 15, plus time waiting for runners. A stuck run leaves the queue, not blocks it |
+   | Only merge non-failing pull requests | **On**         | Every PR passes on its own, never only because a later one in its group did                                               |
+
+Or with the API, the same ruleset in one call (15368 is GitHub Actions' app id, so no other app can report these
+names):
+
+```bash
+cat > /tmp/main-ruleset.json <<'JSON'
+{
+  "name": "main: required checks and merge queue",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          { "context": "Lint, format, audit, unit + integration (coverage gates)", "integration_id": 15368 },
+          { "context": "Docker image builds and serves (docker compose)", "integration_id": 15368 },
+          { "context": "Browser persona tests (desktop + mobile)", "integration_id": 15368 },
+          { "context": "Browser persona tests (firefox desktop)", "integration_id": 15368 },
+          { "context": "Backup round trip (mongodump, age, mongorestore)", "integration_id": 15368 },
+          { "context": "Workflow files (actionlint)", "integration_id": 15368 },
+          { "context": "Changelog fragments", "integration_id": 15368 }
+        ]
+      }
+    },
+    {
+      "type": "merge_queue",
+      "parameters": {
+        "merge_method": "MERGE",
+        "max_entries_to_build": 2,
+        "min_entries_to_merge": 1,
+        "max_entries_to_merge": 5,
+        "min_entries_to_merge_wait_minutes": 5,
+        "check_response_timeout_minutes": 30,
+        "grouping_strategy": "ALLGREEN"
+      }
+    }
+  ]
+}
+JSON
+gh api -X POST repos/pragunb02/MultiPlayerRPS/rulesets --input /tmp/main-ruleset.json
+gh api repos/pragunb02/MultiPlayerRPS/rules/branches/main --jq '.[].type'   # deletion, non_fast_forward, required_status_checks, merge_queue
+```
+
+**3. CodeQL.** It runs from GitHub's default setup, not from a workflow in this repository, so ci.yml cannot add
+`merge_group` to it, and its checks (`Analyze (actions)`, `Analyze (javascript-typescript)`) are **not** in the
+list above: a required check that never reports on the queue's branch holds every PR until the timeout. Require it
+instead with the ruleset rule **Require code scanning results** (tool CodeQL, alerts Errors, security alerts High
+or higher), which reads the pull request's own results. Check this on the first PR through the queue. If the queue
+waits on code scanning, turn that rule off and keep CodeQL as a review item until a CodeQL workflow with
+`merge_group` (advanced setup) replaces the default setup, as its own ticket.
+
+**4. Check it once** with a docs-only PR: `gh pr merge <n> --merge --auto` puts it in the queue (the PR page says
+"Queued to merge"), a CI run appears for `merge_group` on a `gh-readonly-queue/main/...` branch, and the PR merges
+about 10 minutes later. Then `git log -1 --format=%s origin/main` must start with `Merge pull request #<n>`. If it
+does not, tell the coordinator: the collector then needs `pr:` in each fragment.
+
+**To undo it** (an emergency merge): set the ruleset's Enforcement to Disabled (Settings, Rules, Rulesets), or
+`gh api -X PUT repos/pragunb02/MultiPlayerRPS/rulesets/<id> -f enforcement=disabled` (the id is in
+`gh api repos/pragunb02/MultiPlayerRPS/rulesets`). Turn it back on afterwards.
+
+### How the coordinator merges from now on
+
+```bash
+gh pr merge <number> --merge --auto
+```
+
+This enqueues the PR once its own required checks have passed (or turns on auto-merge until they do). Nobody
+merges by hand, rebases a PR onto `main` to make it mergeable, or presses "Update branch": the queue tests on the
+newest `main` itself. A PR the queue removes (a failed check in the group, or the timeout) gets a comment from
+GitHub naming the reason; fix it on the branch and run the command again. `gh pr merge <number> --disable-auto`
+takes a PR out of the queue.
+
 ## The MongoDB image for Docker and CI (CC-288)
 
 Production uses Atlas and is not affected. `docker-compose.yml` (local development and the required CI check
