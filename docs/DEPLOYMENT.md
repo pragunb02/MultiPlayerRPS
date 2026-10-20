@@ -54,8 +54,10 @@ Secrets live only in Render and local `.env` files — never in the repo (it is 
 
 [`render.yaml`](../render.yaml) holds the service settings above and every env var the server reads (ADR-063).
 Plain settings have their value in the file: `NODE_ENV`, `HOST`, `LOG_LEVEL`, `ALLOWED_ORIGINS`, `WEB_DIST_DIR`,
-`TRUST_PROXY_HOPS`. Secrets are `sync: false` with no value: `MONGO_URI`, `SESSION_SECRET`, `ADMIN_ACCOUNT_IDS`.
-`PORT` is not in the file because Render sets it. `scripts/renderBlueprint.test.mjs` fails if a variable the config
+`TRUST_PROXY_HOPS`, and operations telemetry's `OTEL_SDK_DISABLED`, `OTEL_LOGS_EXPORTER` and
+`OTEL_METRIC_EXPORT_INTERVAL` (CC-286). Secrets are `sync: false` with no value: `MONGO_URI`, `SESSION_SECRET`,
+`ADMIN_ACCOUNT_IDS`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`. `PORT` and `RENDER_GIT_COMMIT` are
+not in the file because Render sets them. `scripts/renderBlueprint.test.mjs` fails if a variable the config
 reads is missing from the file, or if a secret has a value. A CI job on pull requests checks the file against
 Render's published schema (`https://render.com/schema/render.yaml.json`).
 
@@ -405,7 +407,8 @@ Secrets go only into Grafana and Render. Never into the repository, a pull reque
 4. **Build the header on your own machine**, without the token landing in your shell history:
    `read -rs TOKEN; printf 'Authorization=Basic%%20%s\n' "$(printf '%s:%s' '<instance id>' "$TOKEN" | base64)"; unset TOKEN`
    (`base64 -w0` on Linux if the output wraps).
-5. **Set the two variables in Render** (Environment): `OTEL_EXPORTER_OTLP_ENDPOINT` = the tile's
+5. **Set the two variables in Render** (Environment, by hand: `render.yaml` lists them as `sync: false`, and Render
+   reads such keys only when a Blueprint is first created): `OTEL_EXPORTER_OTLP_ENDPOINT` = the tile's
    `https://otlp-gateway-prod-ap-south-1.grafana.net/otlp` (your stack's address), and
    `OTEL_EXPORTER_OTLP_HEADERS` = the line from step 4. Save, which redeploys. Only after the code pull request has
    merged, or with it.
@@ -423,8 +426,10 @@ Secrets go only into Grafana and Render. Never into the repository, a pull reque
 
 ### Switching it off
 
-Set `OTEL_SDK_DISABLED=true` or remove `OTEL_EXPORTER_OTLP_ENDPOINT` in Render (it redeploys). In a hurry, delete the
-token in the Cloud Portal: exports fail, the server logs `telemetry export failed` at most once a minute, and the
+At once: delete the value of `OTEL_EXPORTER_OTLP_ENDPOINT` and of `OTEL_EXPORTER_OTLP_HEADERS` in Render's dashboard
+(it redeploys; the two go together or the boot stops). For good, keeping the secrets: a pull request that sets
+`OTEL_SDK_DISABLED` to `"true"` in `render.yaml` (a dashboard edit of a Blueprint value is overwritten on the next
+sync). Without a redeploy, delete the token in the Cloud Portal: exports fail, the server logs `telemetry export failed` at most once a minute, and the
 game is unaffected. Export never runs inside a request, and a failed export never stops the server.
 
 ### If the free tier gets tight (ADR-055, amended 2026-10-20)

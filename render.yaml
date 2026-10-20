@@ -45,7 +45,15 @@ services:
         sync: false
       - key: ADMIN_ACCOUNT_IDS
         sync: false
-      # Operations telemetry (ADR-055, CC-286). Off while unset. The headers hold a write-only token.
+      # Operations telemetry (ADR-055, CC-286). It stays off until the endpoint below has a value in the dashboard.
+      # true turns it off and keeps the two secrets. none sends metrics only.
+      - key: OTEL_SDK_DISABLED
+        value: "false"
+      - key: OTEL_LOGS_EXPORTER
+        value: otlp
+      - key: OTEL_METRIC_EXPORT_INTERVAL
+        value: "60000"
+      # The Grafana Cloud OTLP address, and the header with its write-only token.
       - key: OTEL_EXPORTER_OTLP_ENDPOINT
         sync: false
       - key: OTEL_EXPORTER_OTLP_HEADERS

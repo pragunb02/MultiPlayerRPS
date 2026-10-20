@@ -10,7 +10,14 @@ import { parseBlueprint } from "./render/blueprintSchema.mjs";
 const read = (/** @type {string} */ path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 /** The values that stay in Render's dashboard only. Render keeps them when the file says `sync: false`. */
-const SECRETS = Object.freeze(["MONGO_URI", "SESSION_SECRET", "ADMIN_ACCOUNT_IDS"]);
+const SECRETS = Object.freeze([
+  "MONGO_URI",
+  "SESSION_SECRET",
+  "ADMIN_ACCOUNT_IDS",
+  // Operations telemetry (ADR-055): the endpoint, and the headers that hold its write-only token.
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_HEADERS",
+]);
 
 /** Settings that are not secret, so a change to them is a reviewed pull request. */
 const PLAIN = Object.freeze({
@@ -20,10 +27,14 @@ const PLAIN = Object.freeze({
   ALLOWED_ORIGINS: "https://nocapgaming.onrender.com",
   WEB_DIST_DIR: "apps/web/dist",
   TRUST_PROXY_HOPS: "1",
+  OTEL_SDK_DISABLED: "false",
+  OTEL_LOGS_EXPORTER: "otlp",
+  OTEL_METRIC_EXPORT_INTERVAL: "60000",
 });
 
 /** Render sets these itself. Declaring one would replace Render's own value. */
-const RENDER_OWNED = Object.freeze(["PORT"]);
+// RENDER_GIT_COMMIT is the commit being deployed, the service version in operations telemetry (CC-286).
+const RENDER_OWNED = Object.freeze(["PORT", "RENDER_GIT_COMMIT"]);
 
 /** @returns {Promise<Record<string, any>>} */
 async function blueprint() {
@@ -35,9 +46,12 @@ async function service() {
   return services[0];
 }
 
-/** Every env var name the server's config reads, found in the config module itself so the list cannot drift. */
+/** Every env var name the server's config reads, found in the config modules themselves so the list cannot drift. */
 async function namesConfigReads() {
-  const source = await read("apps/server/src/config/index.js");
+  const source = [
+    await read("apps/server/src/config/index.js"),
+    await read("apps/server/src/config/telemetry.js"),
+  ].join("\n");
   return [...new Set([...source.matchAll(/\benv\.([A-Z][A-Z0-9_]*)\b/g)].map((match) => match[1]))].sort();
 }
 
