@@ -162,6 +162,59 @@ describe("thinkingQueue", () => {
     expect(recorded).toEqual([{ game: "chess", outcome: reason, durationMs: 5 }]);
   });
 
+  it.each([
+    [
+      "throws",
+      () => {
+        throw new Error("ERR_WORKER_INIT_FAILED");
+      },
+    ],
+    ["rejects", () => Promise.reject(new Error("lost"))],
+  ])(
+    "counts a run that %s as a crash, gives the quick move and keeps the room's line going",
+    async (_, run) => {
+      const capture = captureLogger();
+      let calls = 0;
+      const queue = createThinkingQueue({
+        thinker,
+        workers: {
+          size: 1,
+          run: (request) => {
+            calls += 1;
+            return calls === 1 ? run() : Promise.resolve({ ok: true, move: { seed: request.seed } });
+          },
+        },
+        logger: capture.logger,
+      });
+
+      expect(await queue.think({ room: "A", request: chess(1) })).toEqual(thinker.quickest(chess(1)));
+      expect(capture.find("computer player's thinking crashed")).toHaveLength(1);
+      // The same room, and another, still think afterwards.
+      expect(await queue.think({ room: "A", request: chess(2) })).toEqual({ seed: 2 });
+      expect(await queue.think({ room: "B", request: chess(3) })).toEqual({ seed: 3 });
+    },
+  );
+
+  it("ends the think with the error when settling it fails, and the line goes on", async () => {
+    const logger = {
+      warn: () => {
+        throw new Error("log failed");
+      },
+    };
+    const { workers, answer } = heldWorkers(1);
+    const queue = createThinkingQueue({ thinker, workers, logger });
+
+    const failed = queue.think({ room: "A", request: chess(1) });
+    const next = queue.think({ room: "B", request: chess(2) });
+    await settled();
+    answer(1, { ok: false, reason: "timeout" });
+    await expect(failed).rejects.toThrow("log failed");
+    await settled();
+    answer(2);
+
+    expect(await next).toEqual({ seed: 2 });
+  });
+
   it("passes on what the easiest level throws when even the quick move fails", async () => {
     const { queue, answer } = setup();
     const over = { ...chess(9), view: { moves: ["f3", "e5", "g4", "Qh4#"] } };

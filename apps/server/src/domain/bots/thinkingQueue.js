@@ -22,6 +22,8 @@ const FALLBACK_LINES = Object.freeze({
   crashed: "computer player's thinking crashed",
 });
 
+const CRASHED_RESULT = Object.freeze({ ok: false, reason: BOT_THINKING_OUTCOMES.CRASHED });
+
 const gone = () => new GoneError("The computer player's turn passed before it was thought about");
 
 /**
@@ -102,14 +104,30 @@ export function createThinkingQueue({
       room.waiting = undefined;
       room.running = true;
       running += 1;
-      workers.run(entry.request).then((result) => {
-        running -= 1;
-        room.running = false;
-        if (room.waiting === undefined) rooms.delete(code);
-        else line.push(code);
-        settle(entry, result);
-        next();
-      });
+      // A run that throws (a thread that cannot start) or rejects counts as a crash, so the room still gets a
+      // move and its line is never left marked as running.
+      let result = CRASHED_RESULT;
+      Promise.resolve()
+        .then(() => workers.run(entry.request))
+        .then(
+          (answer) => {
+            result = answer;
+          },
+          () => undefined,
+        )
+        .finally(() => {
+          running -= 1;
+          room.running = false;
+          if (room.waiting === undefined) rooms.delete(code);
+          else line.push(code);
+          try {
+            settle(entry, result);
+          } finally {
+            next();
+          }
+        })
+        // Only a fault while settling lands here: the room's think ends with it instead of waiting for ever.
+        .catch((err) => entry.reject(err));
     }
   }
 
