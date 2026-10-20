@@ -251,6 +251,20 @@ anything through (then delete it and lower the ceiling).
 Inline styles stay blocked by the CSP and by the `style` lint rule (ADR-012 point 6), so a raw value cannot hide in
 a `style` attribute.
 
+## Known gaps (from [AUDIT-2026-10](AUDIT-2026-10.md), "Since CC-314")
+
+The contract says what should hold. The code does not hold it yet in these places, each waiting for a ticket:
+
+1. **A click on the backdrop closes every dialog**, destructive confirms included. The dialog row above means a
+   destructive confirm closes only by its own buttons or Escape.
+2. **The check does not refuse a `var()` that names no token.** `--text-base` (`PublicProfilePage.module.css`) and
+   `--space-5` (`AccountSettings.module.css`) are used and never defined, so those declarations do nothing. Fixing
+   them changes what those screens look like, so it needs its own before and after.
+3. **No tokens yet for font weight, letter-spacing or breakpoints** (the audit's RC-9). They join `type.css` and a
+   new role file when the premium redesign needs them, under section 1's rules.
+4. **No shared Card, EmptyState or Button danger variant and link form** (RC-2 to RC-4). The contracts in section 2
+   are written; the components that carry them are the redesign's work.
+
 ## 7. Changing the contract
 
 1. Change this file first, in the same pull request as the code: a new role, a new pop-up row, a new exception.
