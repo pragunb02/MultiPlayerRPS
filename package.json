@@ -15,7 +15,7 @@
     "start": "node apps/server/src/index.js",
     "dev:server": "npm run dev -w @classicade/server",
     "start:server": "npm start -w @classicade/server",
-    "lint": "eslint . && node scripts/check-comments.mjs",
+    "lint": "eslint . && node scripts/check-comments.mjs && node scripts/check-css-tokens.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run --tags-filter=\"not slow\"",
@@ -40,6 +40,7 @@
     "espree": "^11.2.0",
     "globals": "^17.13.0",
     "mongodb": "^7.7.0",
+    "postcss": "^8.5.31",
     "prettier": "^3.9.10",
     "vitest": "^5.0.5",
     "yaml": "^2.9.1"

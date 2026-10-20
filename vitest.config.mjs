@@ -58,7 +58,8 @@ export default defineConfig({
         "e2e/reportSummary.js",
       ],
       // Entry points only wire things together (covered indirectly): server index.js, web main.jsx, scripts/bin and
-      // the two comment scripts, whose logic is tested in eslint-rules/cssComments.mjs and scripts/commentOnly.mjs.
+      // the two comment scripts, whose logic is tested in eslint-rules/cssComments.mjs and scripts/commentOnly.mjs, and
+      // the CSS token check, whose logic is tested in scripts/design/cssTokens.mjs (CC-314).
       exclude: [
         "**/*.test.{js,jsx,mjs}",
         "**/testing/**",
@@ -69,6 +70,7 @@ export default defineConfig({
         "apps/web/src/main.jsx",
         "scripts/bin/**",
         "scripts/check-comments.mjs",
+        "scripts/check-css-tokens.mjs",
         "scripts/comment-only-diff.mjs",
       ],
       reporter: ["text", "html"],
