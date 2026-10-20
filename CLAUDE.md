@@ -121,10 +121,12 @@ Detail in [docs/PROCESS.md](docs/PROCESS.md).
    **Temporary (owner, 2026-10-20):** during the feature phase merges do not wait for CI and branch protection
    requires no checks. CI still runs on every PR and push, and Render deploys only commits whose checks pass. The
    owner restores the required checks after the feature phase.
-   **Merge queue (CC-298, ADR-074):** once the owner turns on the ruleset (DEPLOYMENT.md, Merge queue), the
-   coordinator merges only with `gh pr merge <n> --merge --auto`, which enqueues the PR. The queue runs CI again on
-   the newest `main` plus the PRs ahead (about 10 minutes, the owner's chosen trade-off), so nobody updates a branch
-   by hand to make it mergeable.
+   **Required checks again (owner, 2026-10-20, ruleset "main: required checks, branch up to date"):** seven checks
+   must pass on a branch that is up to date with `main`, which replaces the temporary rule above. GitHub offers merge
+   queues only to organization repositories, so ADR-074's queue is not available here. The coordinator merges with
+   `gh pr update-branch <n>` then `gh pr merge <n> --merge --auto`; GitHub merges once CI passes on the newest
+   `main` (about 10 minutes). Bot PRs opened with `GITHUB_TOKEN` (the visual refresh) start no CI: close and reopen
+   them so the required checks run.
 8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
 9. **Parallel agents (owner, 2026-10-20, from research):** at most 5 builders at once on one machine. Each starts
    from fresh `main` (never another open PR) with the files and APIs it owns listed in its brief. Locally a builder

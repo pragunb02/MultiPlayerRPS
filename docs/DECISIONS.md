@@ -88,6 +88,12 @@ the owner may change it.
 - **Consequences.** Each merge waits for a second CI run, about 10 minutes, the owner's chosen trade-off. The push
   to `main` runs CI a third time on the same commit, which Render waits for. A queue run that hangs leaves the queue
   at the 30 minute timeout. An emergency merge disables the ruleset for the moment.
+- **Amended 2026-10-20 (owner).** GitHub rejected the `merge_queue` rule: merge queues are for organization
+  repositories only, and this one is a personal account's. The owner turned on the same ruleset without the queue and
+  with "require branches to be up to date" (`strict_required_status_checks_policy: true`). That gives the same
+  guarantee, every merge tested on the newest `main`, at the cost of merging one pull request at a time
+  (`gh pr update-branch`, then `gh pr merge --merge --auto`). The `merge_group` triggers stay for a move to an
+  organization.
 
 ### ADR-072 — Decision-first tickets: open decisions answered before build, two templates, a CI gate
 
