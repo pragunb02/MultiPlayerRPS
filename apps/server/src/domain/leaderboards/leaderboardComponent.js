@@ -22,6 +22,8 @@ import {
 } from "./boards.js";
 
 const ALL = "all";
+// Without profiles nobody has an avatar or a profile link. Tests that are not about profiles build boards without.
+const NO_CARDS = Object.freeze({ cardsFor: async () => new Map() });
 const HISTORY_PAGE = 100;
 
 /**
@@ -68,6 +70,8 @@ function shownName({ playerId, displayName }, adults) {
  *     move and are recomputed by the move, so the board step leaves them alone
  *   ages: { adultsAmong: (query: { playerIds: string[], now: number }) => Promise<ReadonlySet<string>> },  which
  *     players are adults. Every other account's name is hidden on the boards (CC-152)
+ *   cards?: Pick<ReturnType<typeof import("../profiles/profileCards.js").createProfileCards>, "cardsFor">,  the
+ *     avatar and profile link beside each name a board shows (CC-034). Without it rows have neither
  * }} deps
  */
 export function createLeaderboardComponent({
@@ -76,8 +80,10 @@ export function createLeaderboardComponent({
   progressAccessor,
   transfers,
   ages,
+  cards = NO_CARDS,
 }) {
   assertFunction(ages?.adultsAmong, "ages.adultsAmong");
+  assertFunction(cards?.cardsFor, "cards.cardsFor");
   assertDefined(leaderboardAccessor, "leaderboardAccessor");
   assertDefined(matchAccessor, "matchAccessor");
   assertDefined(progressAccessor, "progressAccessor");
@@ -306,7 +312,8 @@ export function createLeaderboardComponent({
     /**
      * One board's current period, best first. Entries carry public fields only, never player ids. A guest shows
      * its server-given name (ADR-060). The name of a minor or of an account of unknown age is hidden, with
-     * `hidden: true`. The rank and score stay (ADR-028).
+     * `hidden: true`. The rank and score stay (ADR-028). A row with a name shown also has the player's `avatar`,
+     * and an adult account's row the `profile` handle of their profile (CC-034).
      *
      * @param {{ boardId: string, limit: number, now: number }} query
      * @throws {NotFoundError} for an unknown board
@@ -323,6 +330,10 @@ export function createLeaderboardComponent({
       const top = stored.filter((e) => !gone.has(e.playerId));
       const accounts = top.map((e) => e.playerId).filter(isAccountId);
       const adults = accounts.length === 0 ? new Set() : await ages.adultsAmong({ playerIds: accounts, now });
+      const shown = top.map((entry) => ({ entry, name: shownName(entry, adults) }));
+      // A hidden row gets no avatar and no link, so nothing on a public board joins up a minor's rows (CC-034).
+      const named = shown.filter(({ name }) => name.hidden !== true).map(({ entry }) => entry.playerId);
+      const cardOf = named.length === 0 ? new Map() : await cards.cardsFor({ playerIds: named, now });
       return {
         board: {
           id: info.id,
@@ -332,9 +343,10 @@ export function createLeaderboardComponent({
           periodId: period,
           ...(resetsAt !== undefined && { resetsAt }),
         },
-        entries: top.map((entry, index) => ({
+        entries: shown.map(({ entry, name }, index) => ({
           rank: index + 1,
-          ...shownName(entry, adults),
+          ...name,
+          ...(name.hidden === true ? {} : cardOf.get(entry.playerId)),
           level: entry.level,
           score: entry.score,
         })),

@@ -5,6 +5,8 @@ import { createSocketClients, send, startRoom } from "../../testing/socketClient
 import { startTestServer } from "../../testing/testApp.js";
 
 let server;
+// An adult account's row links to its profile by a random handle (CC-034).
+const HANDLE = expect.stringMatching(/^[0-9a-hjkmnp-tv-z]{16}$/);
 const clients = createSocketClients(() => server.baseUrl);
 
 afterEach(async () => {
@@ -88,8 +90,8 @@ describe("leaderboard routes", () => {
     expect(guestNow.xp).toBeGreaterThanOrEqual(40);
     expect(overall.body.entries.map(({ rank, ...entry }) => entry)).toEqual(
       expect.arrayContaining([
-        { displayName: "riya", level: riyaNow.level, score: riyaNow.xp },
-        { displayName: "sam", level: samNow.level, score: samNow.xp },
+        { displayName: "riya", profile: HANDLE, level: riyaNow.level, score: riyaNow.xp },
+        { displayName: "sam", profile: HANDLE, level: samNow.level, score: samNow.xp },
         { displayName: guest.identity.displayName, level: guestNow.level, score: guestNow.xp },
       ]),
     );
@@ -97,7 +99,7 @@ describe("leaderboard routes", () => {
     expect(scores).toEqual([...scores].sort((a, b) => b - a));
     expect(overall.body.entries.map((entry) => entry.rank)).toEqual([1, 2, 3]);
     expect(wins.body.entries).toEqual([
-      { rank: 1, displayName: "riya", level: riyaNow.level, score: 2 },
+      { rank: 1, displayName: "riya", profile: HANDLE, level: riyaNow.level, score: 2 },
       { rank: 2, displayName: guest.identity.displayName, level: guestNow.level, score: 1 },
     ]);
     expect(overall.body).not.toHaveProperty("you");
@@ -115,7 +117,7 @@ describe("leaderboard routes", () => {
 
     expect((await get("/leaderboards/overall?limit=1", sam.cookie)).body).toEqual(
       expect.objectContaining({
-        entries: [{ rank: 1, displayName: "riya", level: riyaNow.level, score: riyaNow.xp }],
+        entries: [{ rank: 1, displayName: "riya", profile: HANDLE, level: riyaNow.level, score: riyaNow.xp }],
         you: { listed: true, rank: 2, score: samNow.xp },
       }),
     );
@@ -183,7 +185,7 @@ describe("leaderboard routes", () => {
       score: weekBefore + 500,
     });
     expect((await get("/leaderboards/overall?limit=1")).body.entries).toEqual([
-      { rank: 1, displayName: "riya", level: riyaNow.level, score: riyaNow.xp },
+      { rank: 1, displayName: "riya", profile: HANDLE, level: riyaNow.level, score: riyaNow.xp },
     ]);
   });
 
@@ -228,7 +230,7 @@ describe("leaderboard routes", () => {
     expect(overall.entries).toHaveLength(2);
     expect(overall.you).toEqual(expect.objectContaining({ listed: true, score: xp }));
     expect((await get("/leaderboards/rock-paper-scissors")).body.entries).toEqual([
-      { rank: 1, displayName: "riya", level, score: 1 },
+      { rank: 1, displayName: "riya", profile: HANDLE, level, score: 1 },
     ]);
     // This week's board has all of it, the guest's quest XP included, and nothing twice.
     expect((await get("/leaderboards/weekly", riya.cookie)).body.you.score).toBe(xp);

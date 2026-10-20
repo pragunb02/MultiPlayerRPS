@@ -10,6 +10,7 @@ import { createAccountDeletionAccessor, createSessionAccessor } from "./data/acc
 import { createBlockAccessor } from "./data/blockAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
+import { createProfileAccessor } from "./data/profileAccessor.js";
 import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
 import { createGamificationAccessor } from "./data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "./data/leaderboardAccessor.js";
@@ -25,6 +26,8 @@ import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/anal
 import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botComponent.js";
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
 import { createBlockComponent } from "./domain/blocks/blockComponent.js";
+import { createProfileCards } from "./domain/profiles/profileCards.js";
+import { createProfileComponent } from "./domain/profiles/profileComponent.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "./domain/dailyPuzzles/schedule.js";
@@ -59,6 +62,7 @@ import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
 import { createChessRatingDao } from "./persistence/chessRatingDao.js";
+import { createProfileDao } from "./persistence/profileDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
 import { createMatchDao } from "./persistence/matchDao.js";
 import { createPendingMatchDao } from "./persistence/pendingMatchDao.js";
@@ -553,7 +557,7 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object },
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
@@ -611,6 +615,7 @@ export async function startServer({
   const blockDao = createBlockDao({ connection: database.connection });
   const dailyPuzzleAttemptDao = createDailyPuzzleAttemptDao({ connection: database.connection });
   const chessRatingDao = createChessRatingDao({ connection: database.connection });
+  const profileDao = createProfileDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -628,6 +633,7 @@ export async function startServer({
       blockDao,
       dailyPuzzleAttemptDao,
       chessRatingDao,
+      profileDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -652,6 +658,7 @@ export async function startServer({
     catalogues: { [DAILY_PUZZLE_KINDS.CHESS]: chessPuzzles },
   });
   const chessRatingAccessor = createChessRatingAccessor({ chessRatingDao });
+  const profileAccessor = createProfileAccessor({ profileDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -664,9 +671,12 @@ export async function startServer({
     legacyPasswords: createLegacyPasswordChecker(),
     accountDeletionAccessor,
   });
+  // What rooms, boards and history show beside a name: an avatar, and an adult's profile link (CC-034).
+  const profileCards = createProfileCards({ profileAccessor, ages: accountComponent });
   const matchComponent = createMatchComponent({
     matchAccessor,
     matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
+    cards: profileCards,
   });
   // One set of seat ids for rooms and blocks, so a seat id the room view shows is the one a block is checked against.
   const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
@@ -700,8 +710,17 @@ export async function startServer({
     progressAccessor,
     transfers: playerTransferAccessor,
     ages: accountComponent,
+    cards: profileCards,
   });
   const chessRatingComponent = createChessRatingComponent({ chessRatingAccessor, events: domainEvents });
+  const profileComponent = createProfileComponent({
+    profileAccessor,
+    ages: accountComponent,
+    accounts: accountComponent,
+    progress: progressionComponent,
+    ratings: chessRatingComponent,
+    blocks: blockComponent,
+  });
   // Everything stored by player id moves with a guest who signs in (ADR-014), in this order. Leaderboards go
   // last: they are recomputed from the progress and matches that have moved by then.
   const playerTransferComponent = createPlayerTransferComponent({
@@ -713,6 +732,7 @@ export async function startServer({
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
+      { name: "profiles", transferPlayer: profileComponent.transferPlayer },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ],
     matches: matchComponent,
@@ -755,6 +775,7 @@ export async function startServer({
     keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
     blocks: blockComponent,
     seatIds,
+    avatars: profileCards,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const botDriver = createBotDriver({
@@ -827,6 +848,11 @@ export async function startServer({
         erasePlayer: dailyPuzzleComponent.erasePlayer,
         exportPlayer: dailyPuzzleComponent.exportPlayer,
       },
+      {
+        name: "profiles",
+        erasePlayer: profileComponent.erasePlayer,
+        exportPlayer: profileComponent.exportPlayer,
+      },
     ],
   });
 
@@ -865,6 +891,8 @@ export async function startServer({
     apiLimit: limits.api,
     blockLimits: limits.blocks,
     blockComponent,
+    profileLimits: limits.profiles,
+    profileComponent,
     dailyPuzzleComponent,
     leaderboardComponent,
     analyticsComponent,

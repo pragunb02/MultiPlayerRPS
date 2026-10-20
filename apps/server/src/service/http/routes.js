@@ -8,6 +8,7 @@ import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
 import { createMatchRoutes } from "./matchRoutes.js";
+import { createProfileRoutes } from "./profileRoutes.js";
 import { createProgressRoutes } from "./progressRoutes.js";
 import { createSessionRoutes } from "./sessionRoutes.js";
 
@@ -18,6 +19,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
+ *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }} deps
  */
 export function apiRouter({
@@ -39,6 +41,8 @@ export function apiRouter({
   accountLimits,
   blockComponent,
   blockLimits,
+  profileComponent,
+  profileLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   ...sessionDeps
@@ -75,8 +79,9 @@ export function apiRouter({
       ...(accountLimits && { limits: accountLimits }),
     }),
   );
-  router.use(createMatchRoutes({ matchComponent }));
+  router.use(createMatchRoutes({ matchComponent, now }));
   router.use(createBlockRoutes({ blockComponent, now, ...(blockLimits && { limits: blockLimits }) }));
+  router.use(createProfileRoutes({ profileComponent, now, ...(profileLimits && { limits: profileLimits }) }));
   router.use(createProgressRoutes({ progressionComponent }));
   router.use(createGamificationRoutes({ gamificationComponent, now }));
   router.use(

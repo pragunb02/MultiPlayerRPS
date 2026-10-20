@@ -11,6 +11,7 @@ import {
   ROOM_LIMIT_REASONS,
   ROOM_REQUEST_TYPES,
   ROOM_STATUS,
+  isAvatarId,
 } from "@classicade/shared";
 import { createSeededRng, renamePlayer } from "@classicade/games";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
@@ -91,6 +92,10 @@ const NOBODY_BLOCKED = Object.freeze({
   blockedWith: async () => NOBODY,
   relationsOf: async () => NO_RELATIONS,
 });
+// Without a profile store nobody has picked an avatar. Tests that are not about avatars build rooms without one.
+const NO_AVATARS = Object.freeze({ avatarOf: async () => undefined });
+/** The avatar a person picked, kept on their seat so every view can show it (CC-034). None is kept when there is none. */
+const avatarField = (avatar) => (avatar === undefined ? {} : { avatar });
 // A blocked pair is refused a seat with exactly the answer a full room gets, so the refusal never tells a player
 // that they were blocked (ADR-053).
 const FULL = "This room is full";
@@ -140,13 +145,15 @@ const isGone = (err) => err instanceof NotFoundError || err instanceof GoneError
  *     relationsOf: (query: { playerId: string }) => Promise<Readonly<{ blocked: ReadonlySet<string>, blockedBy: ReadonlySet<string> }>>,
  *   },
  *   seatIds: Pick<ReturnType<typeof import("./seatIds.js").createSeatIds>, "seatIdOf">,
+ *   avatars?: { avatarOf: (query: { playerId: string }) => Promise<string | undefined> },
  * }} deps  lifetimes, limits and generators can be given so tests are short and exact. `botTurns` are the rules for
  *   computer players (CC-138, CC-225). Without them no room ever seats one. `keepFinishedGame` stores a finished
  *   game for the match pipeline (CC-111). It runs before every change to a finished room, so a game is never
  *   replaced by a rematch or closed with its room before it is safe. Without it nothing is kept. `blocks` answers
  *   the players on either side of a block with someone (CC-044): they are never seated together or rematched.
  *   `seatIds` names the players in every view (CC-253). It has no default, so a view can never fall back to
- *   showing player ids
+ *   showing player ids. `avatars` answers the avatar a person picked (CC-034), read when they sit down. Without it
+ *   nobody has one
  */
 export function createRoomComponent({
   roomAccessor,
@@ -161,6 +168,7 @@ export function createRoomComponent({
   keepFinishedGame = async () => {},
   blocks = NOBODY_BLOCKED,
   seatIds,
+  avatars = NO_AVATARS,
 }) {
   assertDefined(roomAccessor, "roomAccessor");
   assertDefined(engines, "engines");
@@ -174,6 +182,7 @@ export function createRoomComponent({
   assertFunction(blocks?.blockedWith, "blocks.blockedWith");
   assertFunction(blocks?.relationsOf, "blocks.relationsOf");
   assertFunction(seatIds?.seatIdOf, "seatIds.seatIdOf");
+  assertFunction(avatars?.avatarOf, "avatars.avatarOf");
 
   const engineFor = (room) => engines.get(room.gameId);
   const seatOf = (room, playerId) => room.seats.find((seat) => seat.playerId === playerId);
@@ -564,7 +573,15 @@ export function createRoomComponent({
    */
   function handedOver(room, from, to, now) {
     const seats = room.seats.map((seat) =>
-      seat.playerId === from ? { playerId: to.id, displayName: to.displayName, connected: false } : seat,
+      seat.playerId === from
+        ? {
+            playerId: to.id,
+            displayName: to.displayName,
+            // A guest who signed in keeps the avatar on their seat. A deleted player's stand-in keeps nothing.
+            ...(isDeletedPlayerId(to.id) ? {} : avatarField(seat.avatar)),
+            connected: false,
+          }
+        : seat,
     );
     return {
       ...withSeats(room, seats, now),
@@ -684,6 +701,7 @@ export function createRoomComponent({
         throw new ValidationError(validated.message, { details: { field: "options" } });
       }
       await checkRoomLimits(host, [network, ...earlierNetworks], now);
+      const hostAvatar = avatarField(await avatars.avatarOf({ playerId: host.id }));
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
         const code = generateCode();
         if ((await roomAccessor.exists(code)) || (await roomAccessor.wasClosed(code))) {
@@ -697,7 +715,14 @@ export function createRoomComponent({
           hostId: host.id,
           network,
           seats: [
-            { playerId: host.id, displayName: host.displayName, connected: true, away: false, since: now },
+            {
+              playerId: host.id,
+              displayName: host.displayName,
+              ...hostAvatar,
+              connected: true,
+              away: false,
+              since: now,
+            },
           ],
           createdAt: now,
           lastActivityAt: now,
@@ -725,6 +750,8 @@ export function createRoomComponent({
      */
     joinRoom: async ({ code, player, now }) => {
       const blocked = await blocks.blockedWith({ playerId: player.id });
+      // A computer character is drawn from its own art, never from a profile.
+      const avatar = "bot" in player ? {} : avatarField(await avatars.avatarOf({ playerId: player.id }));
       return changedRoom({
         code,
         now,
@@ -751,6 +778,7 @@ export function createRoomComponent({
               {
                 playerId: player.id,
                 displayName: player.displayName,
+                ...avatar,
                 connected: true,
                 away: false,
                 since: now,
@@ -1226,6 +1254,8 @@ export function createRoomComponent({
         seats: room.seats.map((seat) => ({
           playerId: seatIdOf(seat.playerId),
           displayName: seat.displayName,
+          // Only an avatar still in the catalogue, so a stored value can never be anything else.
+          ...(isAvatarId(seat.avatar) && { avatar: seat.avatar }),
           // The page needs to know a deleted player's stand-in cannot be blocked, without reading its id.
           ...(isDeletedPlayerId(seat.playerId) && { deleted: true }),
           connected: seat.connected,

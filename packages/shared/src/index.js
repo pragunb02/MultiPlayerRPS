@@ -75,3 +75,12 @@ export {
   isDailyPuzzleEnded,
 } from "./dailyPuzzles.js";
 export { CHESS_RATING_START } from "./ratings.js";
+export { AVATAR_UNLOCKS, AVATARS, getAvatar, isAvatarId } from "./avatars.js";
+export {
+  DEFAULT_PROFILE_VISIBILITY,
+  isProfileHandle,
+  PROFILE_HANDLE_ALPHABET,
+  PROFILE_HANDLE_LENGTH,
+  PROFILE_HANDLE_PATTERN,
+  PROFILE_VISIBILITY,
+} from "./profiles.js";

@@ -8,6 +8,7 @@ import { createAccountDeletionAccessor, createSessionAccessor } from "../data/ac
 import { createBlockAccessor } from "../data/blockAccessor.js";
 import { createDailyPuzzleAccessor } from "../data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "../data/chessRatingAccessor.js";
+import { createProfileAccessor } from "../data/profileAccessor.js";
 import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
 import { createLeaderboardAccessor } from "../data/leaderboardAccessor.js";
@@ -22,6 +23,8 @@ import { createAccountComponent } from "../domain/accounts/accountComponent.js";
 import { createPlayerDataComponent } from "../domain/accounts/playerDataComponent.js";
 import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
 import { createBlockComponent } from "../domain/blocks/blockComponent.js";
+import { createProfileCards } from "../domain/profiles/profileCards.js";
+import { createProfileComponent } from "../domain/profiles/profileComponent.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "../domain/dailyPuzzles/schedule.js";
@@ -63,6 +66,7 @@ import { captureLogger } from "./captureLogger.js";
 import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.js";
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
+import { createInMemoryProfileDao } from "./inMemoryProfileDao.js";
 import { TEST_CHESS_PUZZLES } from "./dailyPuzzleSet.js";
 import { createInMemoryDailyPuzzleAttemptDao } from "./inMemoryDailyPuzzleAttemptDao.js";
 import { createInMemoryChessRatingDao } from "./inMemoryChessRatingDao.js";
@@ -106,6 +110,7 @@ import { testConfig } from "./testConfig.js";
  *   dataParticipants?: (participants: ReadonlyArray<object>) => ReadonlyArray<object>,  lets a test change who takes
  *     part in deleting an account (e.g. one that fails, CC-035)
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
+ *   profileLimits?: object,   the limits on profile lookups and changes (CC-034)
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   daily puzzle moves and hints per player (CC-144)
  *   chessPuzzles?: ReadonlyArray<object>,   the daily chess puzzles, two known ones unless a test gives its own
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
@@ -131,6 +136,7 @@ export function createTestApp({
   accountLimits,
   dataParticipants = (participants) => participants,
   blockLimits,
+  profileLimits,
   dailyPuzzleLimit,
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
@@ -168,9 +174,12 @@ export function createTestApp({
   const domainEvents = new EventEmitter();
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
+  const profileAccessor = createProfileAccessor({ profileDao: createInMemoryProfileDao() });
+  const profileCards = createProfileCards({ profileAccessor, ages: accountComponent });
   const matchComponent = createMatchComponent({
     matchAccessor,
     matchPlayerIds: createMatchPlayerIds({ secret: matchPlayerSecretFrom(config.sessionSecret) }),
+    cards: profileCards,
   });
   const roomAccessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const playerTransferAccessor = createPlayerTransferAccessor({
@@ -200,6 +209,7 @@ export function createTestApp({
     progressAccessor,
     transfers: playerTransferAccessor,
     ages: accountComponent,
+    cards: profileCards,
   });
   const gamificationComponent = createGamificationComponent({
     gamificationAccessor: createGamificationAccessor({
@@ -215,6 +225,14 @@ export function createTestApp({
     chessRatingAccessor: createChessRatingAccessor({ chessRatingDao: createInMemoryChessRatingDao() }),
     events: domainEvents,
   });
+  const profileComponent = createProfileComponent({
+    profileAccessor,
+    ages: accountComponent,
+    accounts: accountComponent,
+    progress: progressionComponent,
+    ratings: chessRatingComponent,
+    blocks: blockComponent,
+  });
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,
     participants: transferParticipants([
@@ -224,6 +242,7 @@ export function createTestApp({
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
+      { name: "profiles", transferPlayer: profileComponent.transferPlayer },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ]),
     matches: matchComponent,
@@ -258,6 +277,7 @@ export function createTestApp({
     keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
     blocks: blockComponent,
     seatIds,
+    avatars: profileCards,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.
@@ -330,6 +350,11 @@ export function createTestApp({
         erasePlayer: dailyPuzzleComponent.erasePlayer,
         exportPlayer: dailyPuzzleComponent.exportPlayer,
       },
+      {
+        name: "profiles",
+        erasePlayer: profileComponent.erasePlayer,
+        exportPlayer: profileComponent.exportPlayer,
+      },
     ]),
   });
   const endedSessions = [];
@@ -360,6 +385,8 @@ export function createTestApp({
     apiLimit,
     blockComponent,
     blockLimits,
+    profileComponent,
+    profileLimits,
     dailyPuzzleComponent,
     dailyPuzzleLimit,
     analyticsComponent: createAnalyticsComponent({
@@ -399,6 +426,7 @@ export function createTestApp({
     leaderboardComponent,
     chessRatingComponent,
     blockComponent,
+    profileComponent,
     dailyPuzzleComponent,
     matchPipeline,
     playerDataComponent,

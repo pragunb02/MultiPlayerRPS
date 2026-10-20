@@ -2,6 +2,7 @@ import { DAILY_PUZZLES, getDailyPuzzle } from "./dailyPuzzles.js";
 import { GAMES, getGame, getGameBySlug } from "./games.js";
 import { getLeaderboard, LEADERBOARDS } from "./leaderboards.js";
 import { PREVIEW_IMAGE_FILES } from "./previewImages.js";
+import { isProfileHandle } from "./profiles.js";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "./rooms.js";
 
 /**
@@ -166,6 +167,17 @@ const leaderboard = (board) =>
     indexable: true,
   });
 
+/**
+ * A player's public profile (CC-034). The head never names the player: it is written without asking whose handle
+ * it is, so a link preview or a crawler learns nothing, and the page is never listed.
+ */
+const player = (handle) =>
+  page({
+    title: `A player on ${SITE_NAME}`,
+    description: `A player's profile on ${SITE_NAME}. Play Rock Paper Scissors, Tic Tac Toe and Chess with a friend.`,
+    path: `/players/${handle}`,
+  });
+
 /** Pages at one fixed URL, by their lower case path segment. */
 const FIXED = Object.freeze({
   privacy: page({
@@ -255,6 +267,9 @@ function match(segments) {
   if (head === "daily" && rest.length === 1) {
     const puzzle = getDailyPuzzle(rest[0].toLowerCase());
     return puzzle === undefined ? NOT_FOUND : daily(puzzle);
+  }
+  if (head === "players" && rest.length === 1) {
+    return isProfileHandle(rest[0]) ? player(rest[0]) : NOT_FOUND;
   }
   if (head === "u" && rest.length === 2 && rest[1].toLowerCase() === "userprofile") return FIXED.profile;
   return NOT_FOUND;
