@@ -578,7 +578,7 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
  *   profileAccessor: ReturnType<typeof createProfileAccessor>,
  *   roomAccessor: ReturnType<typeof createRoomAccessor>,
  *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "seatedRooms">,
- *   matchComponent: Pick<ReturnType<typeof createMatchComponent>, "playersFor">,
+ *   matchComponent: Pick<ReturnType<typeof createMatchComponent>, "meetingFor">,
  *   transfers: ReturnType<typeof createPlayerTransferAccessor>,
  *   seatIds: ReturnType<typeof createSeatIds>,
  *   blocks: Pick<ReturnType<typeof createBlockComponent>, "blockedWith">,

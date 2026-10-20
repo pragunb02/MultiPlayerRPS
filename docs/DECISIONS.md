@@ -218,12 +218,14 @@ thinking crashed` with `game` only.
      a request, which the maker accepts. So a forwarded link asks once, and its maker always sees who asked.
   4. **Silent answers.** Declining ("Not now") tells the sender nothing: they see "Request sent" until the request
      runs out after 30 days. A request into a block is stored and shown to its sender the same way, and is never
-     shown to the other player. Removing a friend tells nobody, both lose the friendship, and a block does exactly
+     shown to the other player, and a block declines every pending request between the pair. A declined request stays
+     declined until it runs out, even when its sender cancels it and sends it again. Removing a friend tells nobody, both lose the friendship, and a block does exactly
      that. So a block looks like a decline or a removal, never like anything of its own (ADR-053).
   5. **Minors** (not surely 18, ADR-048.8): mutual only, nobody is ever suggested, nobody sees anyone else's friends
      (Ofcom ICU F1.2 and F1.3), a minor sees "Only add people you know" beside every request they could accept
      (F2.3), and a minor befriends only someone met in a room joined by a link or through a friend link, never a
-     quick match stranger (ADR-051.7). Every room today is joined by a link. Quick match (CC-051) marks its rooms and
+     quick match stranger (ADR-051.7). Every room today is joined by a link. A stored match does not say how its players met yet, so a
+     request from match history counts as quick match for a pair with a minor. Quick match (CC-051) marks its rooms and
      matches, and `friendRules.js` already refuses them for a pair with a minor.
   6. **Presence**, worked out in memory and never stored: `online`, `playing` (seated in a room whose game is on) or
      `offline`. Only friends see it, never which room or game, never a last seen. **Appear offline** shows the player
@@ -238,8 +240,8 @@ thinking crashed` with `game` only.
      player, then 150 per address. The address counts only what the player's own limit let through (ADR-053.5). A
      request that is cancelled and sent again rings at most once in 15 minutes (ADR-031.1).
   9. **Data.** `friendships` (`low`, `high`, `createdAt`: the two player ids in order), `friend_requests`
-     (`requestId`, `senderId`, `recipientId`, `via`, `status` pending, declined or withdrawn, `createdAt`,
-     `notifiedAt`, `expiresAt`, a TTL index), `friend_links` (`tokenHash`, `creatorId`, `createdAt`, `expiresAt`, a
+     (`requestId`, `senderId`, `recipientId`, `via`, `status` pending, declined, withdrawn or accepted, `createdAt`,
+     `notifiedAt`, `expiresAt`, `declinedAt`, a TTL index), `friend_links` (`tokenHash`, `creatorId`, `createdAt`, `expiresAt`, a
      TTL index) and `player_privacy` (`playerId`, `appearOffline`, `updatedAt`). All four are new. Nothing existing
      changes. Account deletion erases all four on either side. The export lists the player's friends and requests
      by name and date, their open links by date, and their switch.

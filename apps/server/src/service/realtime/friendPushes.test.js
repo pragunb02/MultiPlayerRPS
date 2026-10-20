@@ -87,6 +87,23 @@ describe("friend pushes (CC-052)", () => {
     ]);
   });
 
+  it("never pushes what friends already see, so a player who appears offline shows nothing (ADR-066.6)", async () => {
+    let shown = "offline";
+    const { io, domainEvents } = setup({
+      friendComponent: {
+        presenceAudience: async () => ({ handle: "hhhhhhhhhhhhhhh1", presence: shown, friendIds: [ARJUN] }),
+      },
+    });
+
+    for (const next of ["offline", "offline", "online", "online", "offline"]) {
+      shown = next;
+      domainEvents.emit(PRESENCE_EVENTS.CHANGED, { playerId: RIYA });
+      await settled();
+    }
+
+    expect(io.sent.map((sent) => sent.payload.presence)).toEqual(["offline", "online", "offline"]);
+  });
+
   it("logs a push that fails and sends nothing", async () => {
     const down = async () => Promise.reject(new Error("database down"));
     const { io, domainEvents, entries } = setup({

@@ -31,11 +31,13 @@ function setup({ rooms = {}, closed = [], matches = {}, moves = {}, failing } = 
       },
     },
     matches: {
-      async playersFor({ matchId, playerId }) {
-        const players = matches[matchId];
+      async meetingFor({ matchId, playerId }) {
+        const { players, quickMatch } = Array.isArray(matches[matchId])
+          ? { players: matches[matchId] }
+          : (matches[matchId] ?? { players: undefined });
         if (players === undefined || !players.some((p) => p.playerId === playerId))
           throw new NotFoundError("no");
-        return players;
+        return { players, ...(quickMatch !== undefined && { quickMatch }) };
       },
     },
     transfers: {
@@ -102,8 +104,27 @@ describe("co-players: only people you played with (ADR-053.3, CC-052)", () => {
     ).toEqual({
       playerId: ARJUN,
       displayName: "Guest-T001",
-      quickMatch: false,
     });
+  });
+
+  it("passes a stored match's quick match mark through, and leaves it out when the match has none (CC-052)", async () => {
+    const players = [
+      { playerId: ARJUN, displayName: "Arjun" },
+      { playerId: RIYA, displayName: "Riya" },
+    ];
+    const OTHER = "22222222-2222-4333-8444-555555555555";
+    const coPlayers = setup({ matches: { [MATCH_ID]: { players, quickMatch: false }, [OTHER]: players } });
+
+    expect(
+      (await coPlayers.personAt({ target: { matchId: MATCH_ID, seat: 0 }, askerId: RIYA, refusal }))
+        .quickMatch,
+    ).toBe(false);
+    expect(await coPlayers.personAt({ target: { matchId: OTHER, seat: 0 }, askerId: RIYA, refusal })).toEqual(
+      {
+        playerId: ARJUN,
+        displayName: "Arjun",
+      },
+    );
   });
 
   it.each([

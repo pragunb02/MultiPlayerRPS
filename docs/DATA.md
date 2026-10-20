@@ -386,9 +386,8 @@ ADR-053)
 `apps/server/src/persistence/friendRequestDao.js` (CC-052, ADR-066)
 
 1. **Holds:** one document per sender and recipient: `requestId` (random), `senderId`, `recipientId`, `via`
-   (`game` or `link`), `status` (`pending`, `declined` or `withdrawn`), `createdAt` (when last sent),
-   `notifiedAt` (when the recipient was last told) and `expiresAt`. A request into a block, or one the minors' rule
-   keeps from its recipient, is stored as `declined` from the start. Indexes: unique on `senderId` and
+   (`game` or `link`), `status` (`pending`, `declined`, `withdrawn`, or `accepted` for the moment before it is deleted), `createdAt` (when last sent),
+   `notifiedAt` (when the recipient was last told), `expiresAt` and `declinedAt`. A request into a block, or one the minors' rule keeps from its recipient, is stored as `declined` from the start, and a block declines every pending request between the pair. A declined request stays declined until it runs out, even when its sender cancels it and sends it again. Indexes: unique on `senderId` and
    `recipientId`, on `recipientId` and `createdAt`, unique on `requestId`, a TTL index on `expiresAt`.
 2. **Personal data:** pseudonymous. It says that one player asked another.
 3. **Who can read it:** the sender sees their waiting requests as "Request sent" whatever happened to them. The
@@ -407,7 +406,8 @@ ADR-053)
 2. **Personal data:** pseudonymous.
 3. **Who can read it:** whoever holds the link sees its maker's avatar and an adult's username (else "A
    ClassiCade player"). Its maker, in their export, by dates only. The owner, who cannot rebuild a link from its
-   hash.
+   hash. Our access log writes a link's path as `/friends/add/:token` and `/api/friends/links/:token`, never the
+   token. Render's own request log may still hold the full address for its retention (7 or 14 days).
 4. **Kept for:** 7 days, or until it is used (it is taken out as it is used, so it works once).
 5. **Deleted by:** the TTL index, using it, making a sixth, account deletion.
 

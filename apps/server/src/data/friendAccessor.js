@@ -16,6 +16,8 @@ import { NotFoundError } from "../utils/errors.js";
  * @property {number} createdAt        when it was last sent
  * @property {number} notifiedAt       when the recipient was last told about it
  * @property {number} expiresAt
+ * @property {number} [declinedAt]     when it was declined, or kept from its recipient. It stays declined until it
+ *   runs out, even when its sender cancels it and sends it again
  *
  * @typedef {Object} FriendLink   domain model (frozen, times in ms): a link a player made, known by its token's hash
  * @property {string} tokenHash
@@ -29,12 +31,14 @@ export const FRIEND_REQUEST_STATUS = Object.freeze({
   PENDING: "pending",
   DECLINED: "declined",
   WITHDRAWN: "withdrawn",
+  /** Claimed by its recipient's accept, for the moment before the pair's requests are deleted. */
+  ACCEPTED: "accepted",
 });
 
 /** The two ids of a pair in the order they are stored, so each pair has one record whoever asked. */
 const ordered = (a, b) => (a < b ? { low: a, high: b } : { low: b, high: a });
 
-const DATE_FIELDS = Object.freeze(["createdAt", "notifiedAt", "expiresAt"]);
+const DATE_FIELDS = Object.freeze(["createdAt", "notifiedAt", "expiresAt", "declinedAt"]);
 
 /** A persistence object with its dates as times in ms, frozen. */
 const timed = (doc) =>
@@ -174,6 +178,14 @@ export function createFriendAccessor({ friendshipDao, friendRequestDao, friendLi
      */
     sentTo: async ({ recipientId, statuses, now, limit }) =>
       timedAll(await friendRequestDao.listSentTo({ recipientId, statuses, now: new Date(now), limit })),
+
+    /**
+     * Declines every pending request between two players, either way, as a block does.
+     *
+     * @param {{ a: string, b: string, at: number }} pair
+     * @returns {Promise<number>} requests declined
+     */
+    declineRequestsBetween: ({ a, b, at }) => friendRequestDao.declineBetween({ a, b, at: new Date(at) }),
 
     /** @param {{ a: string, b: string }} pair @returns {Promise<number>} requests removed, either way */
     removeRequestsBetween: (pair) => friendRequestDao.deleteBetween(pair),

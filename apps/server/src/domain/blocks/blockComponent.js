@@ -27,12 +27,12 @@ const viewOf = (block) =>
  * @param {{
  *   blockAccessor: ReturnType<typeof import("../../data/blockAccessor.js").createBlockAccessor>,
  *   rooms: { getByCode: (code: string) => Promise<Readonly<{ code: string, createdAt: number, seats: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
- *   matches: { playersFor: (query: { matchId: string, playerId: string }) => Promise<ReadonlyArray<Readonly<{ playerId: string, displayName: string }>>> },
+ *   matches: Parameters<typeof createCoPlayers>[0]["matches"],
  *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom" | "listTo">,
  *   seatIds: Pick<ReturnType<typeof import("../rooms/seatIds.js").createSeatIds>, "seatIdOf">,
  *   newBlockId?: () => string,
  *   limit?: number,
- *   followers?: ReadonlyArray<{ name: string, playersBlocked: (pair: { blockerId: string, blockedId: string }) => Promise<unknown> }>,
+ *   followers?: ReadonlyArray<{ name: string, playersBlocked: (pair: { blockerId: string, blockedId: string, now: number }) => Promise<unknown> }>,
  * }} deps  `rooms` is the room accessor: the room component reads blocks itself, so it cannot be read here. A
  *   room that has closed is gone from it. `matches` is the match component, read for the real players of a match
  *   (CC-297). `transfers` are the guests who signed
@@ -53,7 +53,7 @@ export function createBlockComponent({
 }) {
   assertDefined(blockAccessor, "blockAccessor");
   assertFunction(rooms?.getByCode, "rooms.getByCode");
-  assertFunction(matches?.playersFor, "matches.playersFor");
+  assertFunction(matches?.meetingFor, "matches.meetingFor");
   assertFunction(transfers?.listFrom, "transfers.listFrom");
   assertFunction(transfers?.listTo, "transfers.listTo");
   assertFunction(seatIds?.seatIdOf, "seatIds.seatIdOf");
@@ -120,7 +120,7 @@ export function createBlockComponent({
         await blockAccessor.keepNewest({ blockerId: blocker.id, keep: limit });
       }
       for (const follower of followers) {
-        await follower.playersBlocked({ blockerId: blocker.id, blockedId });
+        await follower.playersBlocked({ blockerId: blocker.id, blockedId, now });
       }
       return viewOf(block);
     },

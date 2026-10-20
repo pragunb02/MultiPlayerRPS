@@ -38,6 +38,16 @@ export function createPresenceTracker({ rooms, events }) {
   const playing = new Map();
   /** @type {Map<string, Set<string>>} the same, by player */
   const roomsOf = new Map();
+  // While a first tab's rooms are being read, the rooms that change meanwhile, by the count of changes then. A read
+  // answers what the database held when it started, so a room that changed since is left to its own change.
+  let changes = 0;
+  let reading = 0;
+  /** @type {Map<string, number>} */
+  const changedAt = new Map();
+  const noteChange = (code) => {
+    changes += 1;
+    if (reading > 0) changedAt.set(code, changes);
+  };
 
   function statusOf(playerId) {
     if ((tabs.get(playerId) ?? 0) === 0) return FRIEND_PRESENCE.OFFLINE;
@@ -82,8 +92,18 @@ export function createPresenceTracker({ rooms, events }) {
       const first = (tabs.get(playerId) ?? 0) === 0;
       changing([playerId], () => tabs.set(playerId, (tabs.get(playerId) ?? 0) + 1));
       if (!first) return;
-      const seated = await rooms.seatedRooms({ playerId });
-      const on = seated.filter((room) => playingIn(room).includes(playerId));
+      const startedAt = changes;
+      reading += 1;
+      let seated;
+      try {
+        seated = await rooms.seatedRooms({ playerId });
+      } finally {
+        reading -= 1;
+      }
+      const on = seated.filter(
+        (room) => playingIn(room).includes(playerId) && (changedAt.get(room.code) ?? 0) <= startedAt,
+      );
+      if (reading === 0) changedAt.clear();
       changing([playerId], () =>
         on.forEach((room) => setPlaying(room.code, [...(playing.get(room.code) ?? []), playerId])),
       );
@@ -108,6 +128,7 @@ export function createPresenceTracker({ rooms, events }) {
      * @param {Readonly<{ code: string, status: string, seats: ReadonlyArray<{ playerId: string, bot?: object }> }>} room
      */
     roomChanged(room) {
+      noteChange(room.code);
       const people = playingIn(room);
       const affected = [...new Set([...(playing.get(room.code) ?? []), ...people])];
       changing(affected, () => setPlaying(room.code, people));
@@ -119,6 +140,7 @@ export function createPresenceTracker({ rooms, events }) {
      * @param {{ code: string }} room
      */
     roomClosed({ code }) {
+      noteChange(code);
       changing([...(playing.get(code) ?? [])], () => setPlaying(code, []));
     },
 

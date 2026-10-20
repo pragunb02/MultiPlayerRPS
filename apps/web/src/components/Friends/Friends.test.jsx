@@ -77,10 +77,9 @@ describe("Add friend in match history (CC-052)", () => {
 
     expect(await screen.findByRole("list", { name: "Match history" })).toHaveTextContent("Arjun");
     expect(screen.queryByRole("button", { name: "Add friend Arjun" })).toBeNull();
-    // In the phone's menu only: a guest's wide row holds Log in and Sign up instead.
-    expect(screen.getAllByRole("link", { name: "Friends" }).map((link) => link.getAttribute("href"))).toEqual(
-      ["/friends"],
-    );
+    // In the phone's menu, and on the profile for every screen size.
+    expect(screen.getByRole("link", { name: "Friends" })).toHaveAttribute("href", "/friends");
+    expect(screen.getByRole("link", { name: "Your friends" })).toHaveAttribute("href", "/friends");
   });
 });
 

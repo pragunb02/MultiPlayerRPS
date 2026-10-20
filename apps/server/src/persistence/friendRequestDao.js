@@ -9,10 +9,12 @@ const DUPLICATE_KEY_CODE = 11000;
  * @property {string} senderId
  * @property {string} recipientId
  * @property {string} via                "game" or "link", how the request came about
- * @property {string} status             "pending", "declined" or "withdrawn"
+ * @property {string} status             "pending", "declined", "withdrawn" or "accepted" (for a moment)
  * @property {Date} createdAt            when it was last sent
  * @property {Date} notifiedAt           when the recipient was last told about it
  * @property {Date} expiresAt            when it runs out. MongoDB removes it soon after
+ * @property {Date} [declinedAt]         when it was declined, or kept from its recipient. A request sent again by
+ *   its sender stays declined until it runs out
  */
 
 const requestSchema = new mongoose.Schema(
@@ -25,6 +27,7 @@ const requestSchema = new mongoose.Schema(
     createdAt: { type: Date, required: true },
     notifiedAt: { type: Date, required: true },
     expiresAt: { type: Date, required: true },
+    declinedAt: { type: Date },
   },
   { collection: "friend_requests", versionKey: false },
 );
@@ -36,7 +39,7 @@ requestSchema.index({ requestId: 1 }, { unique: true });
 // MongoDB deletes a request soon after it runs out. Reads also skip one that ran out a moment ago.
 requestSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-const FIELDS = "-_id requestId senderId recipientId via status createdAt notifiedAt expiresAt";
+const FIELDS = "-_id requestId senderId recipientId via status createdAt notifiedAt expiresAt declinedAt";
 const live = (now) => ({ expiresAt: { $gt: now } });
 
 /**
@@ -125,6 +128,26 @@ export function createFriendRequestDao({ connection }) {
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean(),
+
+    /**
+     * Declines every pending request between two players, either way, as a block does (CC-052).
+     *
+     * @param {{ a: string, b: string, at: Date }} pair
+     * @returns {Promise<number>} requests declined
+     */
+    async declineBetween({ a, b, at }) {
+      const { modifiedCount } = await Request.updateMany(
+        {
+          status: "pending",
+          $or: [
+            { senderId: a, recipientId: b },
+            { senderId: b, recipientId: a },
+          ],
+        },
+        { $set: { status: "declined", declinedAt: at } },
+      );
+      return modifiedCount;
+    },
 
     /** @param {{ a: string, b: string }} pair @returns {Promise<number>} requests deleted, either way */
     async deleteBetween({ a, b }) {

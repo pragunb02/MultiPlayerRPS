@@ -98,6 +98,58 @@ describe("presence tracker (CC-052, ADR-066.6)", () => {
     expect(tracker.statusOf(RIYA)).toBe(FRIEND_PRESENCE.PLAYING);
   });
 
+  it("leaves a room that changed while the first tab's rooms were being read to its own change", async () => {
+    let answer;
+    const announced = [];
+    const tracker = createPresenceTracker({
+      rooms: { seatedRooms: () => new Promise((resolve) => (answer = resolve)) },
+      events: { emit: (name, payload) => announced.push(payload.playerId) },
+    });
+
+    const connecting = tracker.connected({ playerId: RIYA });
+    tracker.roomChanged(room("ROOM22", ROOM_STATUS.FINISHED, RIYA, ARJUN));
+    tracker.roomClosed({ code: "ROOM33" });
+    answer([
+      room("ROOM22", ROOM_STATUS.PLAYING, RIYA, ARJUN),
+      room("ROOM33", ROOM_STATUS.PLAYING, RIYA, ARJUN),
+    ]);
+    await connecting;
+
+    expect(tracker.statusOf(RIYA)).toBe(FRIEND_PRESENCE.ONLINE);
+    tracker.roomChanged(room("ROOM44", ROOM_STATUS.PLAYING, RIYA, ARJUN));
+    expect(tracker.statusOf(RIYA)).toBe(FRIEND_PRESENCE.PLAYING);
+  });
+
+  it("keeps the changes it noted while another first tab's rooms are still being read", async () => {
+    const answers = {};
+    const tracker = createPresenceTracker({
+      rooms: { seatedRooms: ({ playerId }) => new Promise((resolve) => (answers[playerId] = resolve)) },
+      events: { emit: () => undefined },
+    });
+
+    const riya = tracker.connected({ playerId: RIYA });
+    const arjun = tracker.connected({ playerId: ARJUN });
+    tracker.roomChanged(room("ROOM22", ROOM_STATUS.FINISHED, RIYA, ARJUN));
+    answers[RIYA]([]);
+    await riya;
+    answers[ARJUN]([room("ROOM22", ROOM_STATUS.PLAYING, RIYA, ARJUN)]);
+    await arjun;
+
+    expect(tracker.statusOf(ARJUN)).toBe(FRIEND_PRESENCE.ONLINE);
+  });
+
+  it("forgets a first tab whose rooms could not be read, and the next change still counts", async () => {
+    const tracker = createPresenceTracker({
+      rooms: { seatedRooms: async () => Promise.reject(new Error("database down")) },
+      events: { emit: () => undefined },
+    });
+
+    await expect(tracker.connected({ playerId: RIYA })).rejects.toThrow("database down");
+    tracker.roomChanged(room("ROOM22", ROOM_STATUS.PLAYING, RIYA, ARJUN));
+
+    expect(tracker.statusOf(RIYA)).toBe(FRIEND_PRESENCE.PLAYING);
+  });
+
   it("reads the rooms of a player's first tab, so a game from before a restart shows", async () => {
     const { tracker, changes } = setup({
       [RIYA]: [

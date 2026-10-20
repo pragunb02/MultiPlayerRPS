@@ -12,7 +12,8 @@ import { GoneError, NotFoundError } from "../../utils/errors.js";
  * @typedef {Object} CoPlayer   the other person, once the server checked the two played together
  * @property {string} playerId     who they are now: a guest who signed in since is their account (ADR-014)
  * @property {string} displayName  the name the seat showed
- * @property {boolean} quickMatch  whether they met in quick match (CC-051), which marks its rooms and matches
+ * @property {boolean} [quickMatch]  whether they met in quick match (CC-051), which marks its rooms and matches.
+ *   Left out for a stored match without the mark, which says nothing either way
  */
 
 /** A seat held by a person: not the asker, not a computer, not a deleted player's stand-in. */
@@ -28,7 +29,7 @@ const isOtherPerson = (playerId, askerId) =>
  *
  * @param {{
  *   rooms: { getByCode: (code: string) => Promise<Readonly<{ code: string, createdAt: number, quickMatch?: boolean, seats: ReadonlyArray<{ playerId: string, displayName: string }> }>> },
- *   matches: { playersFor: (query: { matchId: string, playerId: string }) => Promise<ReadonlyArray<Readonly<{ playerId: string, displayName: string }>>> },
+ *   matches: { meetingFor: (query: { matchId: string, playerId: string }) => Promise<Readonly<{ players: ReadonlyArray<Readonly<{ playerId: string, displayName: string }>>, quickMatch?: boolean }>> },
  *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom">,
  *   seatIds: Pick<ReturnType<typeof import("../rooms/seatIds.js").createSeatIds>, "seatIdOf">,
  * }} deps  `rooms` is the room accessor (a room that closed is gone from it), `matches` the match component, read
@@ -37,7 +38,7 @@ const isOtherPerson = (playerId, askerId) =>
  */
 export function createCoPlayers({ rooms, matches, transfers, seatIds }) {
   assertFunction(rooms?.getByCode, "rooms.getByCode");
-  assertFunction(matches?.playersFor, "matches.playersFor");
+  assertFunction(matches?.meetingFor, "matches.meetingFor");
   assertFunction(transfers?.listFrom, "transfers.listFrom");
   assertFunction(seatIds?.seatIdOf, "seatIds.seatIdOf");
 
@@ -54,10 +55,7 @@ export function createCoPlayers({ rooms, matches, transfers, seatIds }) {
           players: room.seats.map((seat) => ({ ...seat, seatId: seatIds.seatIdOf(room, seat.playerId) })),
         };
       }
-      return {
-        quickMatch: false,
-        players: await matches.playersFor({ matchId: target.matchId, playerId: askerId }),
-      };
+      return await matches.meetingFor({ matchId: target.matchId, playerId: askerId });
     } catch (err) {
       // A closed room or a missing one is a stranger's room as far as the asker is concerned.
       if (err instanceof NotFoundError || err instanceof GoneError) throw refusal(err);
@@ -89,7 +87,11 @@ export function createCoPlayers({ rooms, matches, transfers, seatIds }) {
       const [transfer] = await transfers.listFrom([person.playerId]);
       const playerId = transfer === undefined ? person.playerId : transfer.to.id;
       if (playerId === askerId) throw refusal();
-      return Object.freeze({ playerId, displayName: person.displayName, quickMatch });
+      return Object.freeze({
+        playerId,
+        displayName: person.displayName,
+        ...(quickMatch !== undefined && { quickMatch }),
+      });
     },
   });
 }

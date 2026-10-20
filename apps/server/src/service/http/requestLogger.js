@@ -5,6 +5,17 @@ import { NO_OPERATIONS_METRICS, ROUTE_PATTERN, ROUTE_UNMATCHED } from "../../uti
 export const REQUEST_ID_HEADER = "X-Request-Id";
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
 
+// A friend link's token is the key to the link (CC-052, ADR-066.3), so its path is logged without it.
+const SECRET_SEGMENTS = /(\/friends\/(?:links|add)\/)[^/]+/;
+
+/**
+ * The path as the access log writes it: a friend link's token is replaced by `:token`, so whoever reads the logs
+ * cannot use a link. Every other path is written as it is.
+ *
+ * @param {string} path
+ */
+export const loggedPath = (path) => path.replace(SECRET_SEGMENTS, "$1:token");
+
 /** @param {number} status */
 const levelFor = (status) => (status >= 500 ? "error" : status >= 400 ? "warn" : "info");
 
@@ -68,7 +79,7 @@ export function createRequestLogger({
     const requestId = incomingId && REQUEST_ID_PATTERN.test(incomingId) ? incomingId : generateId();
     const startedAt = now();
     // Captured now: routers rewrite req.path/req.url while the request is being handled.
-    const path = req.path;
+    const path = loggedPath(req.path);
 
     req.id = requestId;
     req.log = logger.child({ requestId });

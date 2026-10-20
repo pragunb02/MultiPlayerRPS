@@ -328,6 +328,17 @@ export function createMatchComponent({
     playersFor: async (query) => (await participantsMatch(query)).players,
 
     /**
+     * How the players of a match met: the players, as `playersFor` answers them, and `quickMatch` once matches record
+     * it. No match records it yet: quick match (CC-051) adds the mark to its matches and here. Until then the answer
+     * leaves it out, and the caller decides what an unknown means (CC-052 treats it as quick match for a pair with a
+     * minor). For participants only.
+     *
+     * @param {{ matchId: string, playerId: string }} query
+     * @returns {Promise<Readonly<{ players: ReadonlyArray<Readonly<{ playerId: string, displayName: string }>>, quickMatch?: boolean }>>}
+     */
+    meetingFor: async (query) => Object.freeze({ players: (await participantsMatch(query)).players }),
+
+    /**
      * The full record, for the server's own pipeline (never for a client: see `getForPlayer`).
      *
      * @param {string} matchId

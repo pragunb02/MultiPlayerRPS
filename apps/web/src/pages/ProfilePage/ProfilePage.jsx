@@ -235,6 +235,12 @@ export function ProfilePage() {
           to keep your name.
         </p>
       )}
+      <p className={styles.muted}>
+        <Link to={paths.friends()} data-cc-control="profile.friends">
+          Your friends
+        </Link>
+        : who is online, your friend requests and your friend link.
+      </p>
       <ProgressCard />
       <YourRank identity={session.identity} />
       <PlayerConsole guest={session.identity.kind === "guest"} />

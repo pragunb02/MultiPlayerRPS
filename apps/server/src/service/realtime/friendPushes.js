@@ -26,6 +26,10 @@ import { playerChannel } from "./roomHandlers.js";
  */
 export function connectFriendPushes({ io, domainEvents, friendComponent, presence, logger, now }) {
   const failed = (what) => (err) => logger.error({ err }, `pushing ${what} failed`);
+  // What friends were last told of each player, so a change they cannot see is never pushed: while a player appears
+  // offline, their tabs and games come and go without a word to anyone (ADR-066.6).
+  /** @type {Map<string, string>} */
+  const lastShown = new Map();
 
   async function pushView(playerId) {
     if ((await io.in(playerChannel(playerId)).fetchSockets()).length === 0) return;
@@ -47,6 +51,8 @@ export function connectFriendPushes({ io, domainEvents, friendComponent, presenc
     friendComponent
       .presenceAudience({ playerId, now: now() })
       .then(({ handle, presence: shown, friendIds }) => {
+        if (lastShown.get(playerId) === shown) return;
+        lastShown.set(playerId, shown);
         for (const friendId of friendIds) {
           io.to(playerChannel(friendId)).emit(SOCKET_EVENTS.FRIEND_PRESENCE_CHANGED, {
             handle,

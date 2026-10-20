@@ -96,6 +96,18 @@ export function createInMemoryFriendRequestDao() {
         .slice(0, limit)
         .map(copy),
 
+    async declineBetween({ a, b, at }) {
+      const pending = find(
+        (doc) =>
+          doc.status === "pending" &&
+          ((doc.senderId === a && doc.recipientId === b) || (doc.senderId === b && doc.recipientId === a)),
+      );
+      pending.forEach((doc) =>
+        requests.set(doc.requestId, { ...doc, status: "declined", declinedAt: copy(at) }),
+      );
+      return pending.length;
+    },
+
     deleteBetween: async ({ a, b }) =>
       remove(
         find(

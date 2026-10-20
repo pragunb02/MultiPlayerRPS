@@ -38,16 +38,16 @@ function fakeRooms(rooms = {}, closed = []) {
 
 /**
  * Stored matches by id. Only their players may read them, and by their real player ids, as
- * `matchComponent.playersFor` answers them (CC-297).
+ * `matchComponent.meetingFor` answers them (CC-297, CC-052).
  */
 function fakeMatches(matches = {}) {
   return {
-    async playersFor({ matchId, playerId }) {
+    async meetingFor({ matchId, playerId }) {
       const match = matches[matchId];
       if (match === undefined || !match.players.some((p) => p.playerId === playerId)) {
         throw new NotFoundError("Match not found");
       }
-      return match.players;
+      return { players: match.players };
     },
   };
 }
@@ -111,8 +111,8 @@ describe("blockComponent: followers (CC-052)", () => {
     await blocks.block({ blocker: RIYA, target: at("ROOM22", 1), now: T0 + 1 });
 
     expect(told).toEqual([
-      { blockerId: RIYA.id, blockedId: GUEST.id },
-      { blockerId: RIYA.id, blockedId: GUEST.id },
+      { blockerId: RIYA.id, blockedId: GUEST.id, now: T0 },
+      { blockerId: RIYA.id, blockedId: GUEST.id, now: T0 + 1 },
     ]);
   });
 

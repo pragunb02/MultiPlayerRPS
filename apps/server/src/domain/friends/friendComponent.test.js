@@ -60,7 +60,7 @@ const stringsIn = (value) =>
       ? [...Object.keys(value), ...Object.values(value)].flatMap(stringsIn)
       : [];
 
-function setup({ rooms = [], blocked = [], limits, deleted = [], failing = [] } = {}) {
+function setup({ rooms = [], blocked = [], limits, deleted = [], failing = [], matchMark } = {}) {
   const byCode = new Map(rooms.map((room) => [room.code, room]));
   let handles = 0;
   let requests = 0;
@@ -95,9 +95,12 @@ function setup({ rooms = [], blocked = [], limits, deleted = [], failing = [] } 
         },
       },
       matches: {
-        async playersFor({ matchId, playerId }) {
+        async meetingFor({ matchId, playerId }) {
           if (matchId !== MATCH_ID || ![RIYA, MEENA].includes(playerId)) throw new NotFoundError("no match");
-          return [RIYA, MEENA].map((id) => ({ playerId: id, displayName: NAMES.get(id) }));
+          return {
+            players: [RIYA, MEENA].map((id) => ({ playerId: id, displayName: NAMES.get(id) })),
+            ...(matchMark !== undefined && { quickMatch: matchMark }),
+          };
         },
       },
       transfers: { listFrom: async () => [] },
@@ -139,8 +142,21 @@ function setup({ rooms = [], blocked = [], limits, deleted = [], failing = [] } 
   const handleOf = async (playerId) =>
     (await profileAccessor.getOrCreateMany({ playerIds: [playerId], at: T0 })).get(playerId).handle;
   const block = (a, b) => blocks.add(`${a} ${b}`);
+  const unblock = (a, b) => blocks.delete(`${a} ${b}`);
   const events = (name) => announced.filter((event) => event.name === name);
-  return { friends, ask, view, handleOf, statuses, block, events, announced, seatIn, profileAccessor };
+  return {
+    friends,
+    ask,
+    view,
+    handleOf,
+    statuses,
+    block,
+    unblock,
+    events,
+    announced,
+    seatIn,
+    profileAccessor,
+  };
 }
 
 const shared = (...extra) => [roomOf("ROOM22", [RIYA, ARJUN]), roomOf("ROOM33", [RIYA, KABIR]), ...extra];
@@ -219,12 +235,24 @@ describe("friendComponent: asking and answering (CC-052)", () => {
     ]);
   });
 
-  it("sends a request from match history, to the other player of a match", async () => {
-    const { friends, view } = setup();
+  it("sends a request from match history, to the other player of a match marked as met by a link", async () => {
+    const { friends, view } = setup({ matchMark: false });
 
     await friends.sendRequest({ playerId: RIYA, target: { matchId: MATCH_ID, seat: 1 }, now: T0 });
 
     expect((await view(MEENA)).incoming.map((request) => request.displayName)).toEqual(["RiyaTest"]);
+  });
+
+  it("treats a match that does not say how the two met as quick match, for a pair with a minor (ADR-051.7)", async () => {
+    const { friends, view, events } = setup();
+
+    expect(
+      await friends.sendRequest({ playerId: RIYA, target: { matchId: MATCH_ID, seat: 1 }, now: T0 }),
+    ).toEqual({ result: FRIEND_REQUEST_RESULTS.SENT });
+
+    expect((await view(MEENA)).incoming).toEqual([]);
+    expect((await view(RIYA)).outgoing.map((request) => request.displayName)).toEqual(["MeenaTest"]);
+    expect(events(FRIEND_EVENTS.REQUESTED)).toEqual([]);
   });
 
   it("answers the same when asked again, and tells the recipient only once", async () => {
@@ -294,6 +322,40 @@ describe("friendComponent: asking and answering (CC-052)", () => {
     expect(events(FRIEND_EVENTS.CHANGED).at(-1).playerIds).toEqual([ARJUN]);
     expect(await ask(RIYA, ARJUN, "ROOM22", T0 + 2)).toEqual({ result: FRIEND_REQUEST_RESULTS.SENT });
     expect((await view(ARJUN)).incoming).toEqual([]);
+  });
+
+  it("keeps a declined request declined when its sender cancels and sends it again: no ring, nothing shown", async () => {
+    const { ask, view, friends, events } = setup({ rooms: shared() });
+    await ask(RIYA, ARJUN);
+    const [{ requestId }] = (await view(ARJUN)).incoming;
+    await friends.answerRequest({ playerId: ARJUN, requestId, answer: FRIEND_ANSWERS.DECLINE, now: T0 + 1 });
+
+    await friends.cancelRequest({ playerId: RIYA, requestId, now: T0 + 2 });
+    expect(await ask(RIYA, ARJUN, "ROOM22", T0 + 20 * MINUTE)).toEqual({
+      result: FRIEND_REQUEST_RESULTS.SENT,
+    });
+
+    expect((await view(ARJUN, T0 + 20 * MINUTE)).incoming).toEqual([]);
+    expect((await view(RIYA, T0 + 20 * MINUTE)).outgoing.map((request) => request.displayName)).toEqual([
+      "ArjunTest",
+    ]);
+    expect(events(FRIEND_EVENTS.REQUESTED)).toHaveLength(1);
+  });
+
+  it("lets only one of two answers at the same moment win", async () => {
+    const { ask, view, friends } = setup({ rooms: shared() });
+    await ask(RIYA, ARJUN);
+    const [{ requestId }] = (await view(ARJUN)).incoming;
+
+    const answers = await Promise.allSettled([
+      friends.answerRequest({ playerId: ARJUN, requestId, answer: FRIEND_ANSWERS.ACCEPT, now: T0 }),
+      friends.answerRequest({ playerId: ARJUN, requestId, answer: FRIEND_ANSWERS.DECLINE, now: T0 }),
+    ]);
+
+    expect(answers.map((answer) => answer.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(answers.find((answer) => answer.status === "rejected").reason).toEqual(
+      new NotFoundError("This request is no longer open"),
+    );
   });
 
   it("refuses an answer that is neither accept nor decline", async () => {
@@ -378,6 +440,18 @@ describe("friendComponent: blocks and the minors' rule are silent (ADR-053, ADR-
     expect((await view(ARJUN)).friends).toEqual([]);
   });
 
+  it("declines the pending requests of a pair one blocks, so they never come back after an unblock", async () => {
+    const { ask, view, block, unblock, friends } = setup({ rooms: shared() });
+    await ask(RIYA, ARJUN);
+
+    block(ARJUN, RIYA);
+    await friends.playersBlocked({ blockerId: ARJUN, blockedId: RIYA, now: T0 + 1 });
+    unblock(ARJUN, RIYA);
+
+    expect((await view(ARJUN)).incoming).toEqual([]);
+    expect((await view(RIYA)).outgoing.map((request) => request.displayName)).toEqual(["ArjunTest"]);
+  });
+
   it("ends the friendship both ways when one blocks the other, and says so only to their own views", async () => {
     const { ask, view, block, friends, events } = setup({ rooms: shared() });
     await ask(RIYA, ARJUN);
@@ -385,8 +459,8 @@ describe("friendComponent: blocks and the minors' rule are silent (ADR-053, ADR-
 
     block(RIYA, ARJUN);
     expect((await view(ARJUN)).friends).toEqual([]);
-    await friends.playersBlocked({ blockerId: RIYA, blockedId: ARJUN });
-    await friends.playersBlocked({ blockerId: RIYA, blockedId: ARJUN });
+    await friends.playersBlocked({ blockerId: RIYA, blockedId: ARJUN, now: T0 });
+    await friends.playersBlocked({ blockerId: RIYA, blockedId: ARJUN, now: T0 });
 
     expect(events(FRIEND_EVENTS.CHANGED).at(-1).playerIds).toEqual([RIYA, ARJUN]);
     expect(events(FRIEND_EVENTS.CHANGED).filter((event) => event.playerIds.length === 2)).toHaveLength(3);
@@ -702,6 +776,20 @@ describe("friendComponent: friend links (ADR-066.3)", () => {
     await expect(friends.linkInvite({ token, viewerId: "", now: T0 })).rejects.toThrow(NotFoundError);
   });
 
+  it("keeps the link for a player at a limit: it is used up only once the request can go", async () => {
+    const rooms = [roomOf("ROOM22", [MEENA, ARJUN])];
+    const { friends, ask } = setup({ rooms, limits: { maxWaiting: 1 } });
+    await ask(MEENA, ARJUN);
+    const { token } = await friends.makeLink({ playerId: RIYA, now: T0 });
+
+    await expect(friends.useLink({ playerId: MEENA, token, now: T0 })).rejects.toThrow(ConflictError);
+
+    expect(await friends.linkInvite({ token, viewerId: "", now: T0 })).toEqual({ displayName: "RiyaTest" });
+    expect(await friends.useLink({ playerId: KABIR, token, now: T0 })).toEqual({
+      result: FRIEND_REQUEST_RESULTS.SENT,
+    });
+  });
+
   it("keeps a player's newest links only, and a deleted maker's link leads nowhere", async () => {
     const { friends } = setup({ limits: { linksKept: 1 }, deleted: [ARJUN] });
     const first = await friends.makeLink({ playerId: RIYA, now: T0 });
@@ -741,6 +829,19 @@ describe("friendComponent: deletion and export (CC-035)", () => {
       appearOffline: true,
     });
     expect(stringsIn(exported).filter(hasPlayerIdShape)).toEqual([]);
+  });
+
+  it("never exports the name of a link maker not surely an adult who has not accepted yet (ADR-028.7)", async () => {
+    const { friends } = setup();
+    const { token } = await friends.makeLink({ playerId: KABIR, now: T0 });
+    await friends.useLink({ playerId: ARJUN, token, now: T0 });
+
+    const exported = await friends.exportPlayer({ playerId: ARJUN, now: T0 });
+
+    expect(exported.requestsSent).toEqual([
+      { displayName: FRIEND_LINK_MAKER_NAME, sentAt: new Date(T0).toISOString() },
+    ]);
+    expect(JSON.stringify(exported)).not.toContain("KabirTest");
   });
 
   it("erases everything of the player on either side, and their friends see them gone", async () => {

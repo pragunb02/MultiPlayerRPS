@@ -132,6 +132,44 @@ export function runFriendRequestDaoContract(createDao) {
     ).toEqual([fromArjun]);
   });
 
+  it("declines the pending requests between two players either way, and keeps the others as they are", async () => {
+    const dao = await createDao();
+    const toArjun = await dao.insert(request({ senderId: RIYA, recipientId: ARJUN }));
+    const fromArjun = await dao.insert(request({ senderId: ARJUN, recipientId: RIYA }));
+    const withdrawn = await dao.insert(request({ senderId: RIYA, recipientId: MEERA, status: "withdrawn" }));
+    const toMeera = await dao.insert(request({ senderId: KABIR, recipientId: MEERA }));
+
+    expect(await dao.declineBetween({ a: ARJUN, b: RIYA, at: at(9) })).toBe(2);
+    expect(await dao.declineBetween({ a: RIYA, b: MEERA, at: at(9) })).toBe(0);
+
+    expect(await dao.getByPair({ senderId: RIYA, recipientId: ARJUN })).toEqual({
+      ...toArjun,
+      status: "declined",
+      declinedAt: at(9),
+    });
+    expect((await dao.getByPair({ senderId: ARJUN, recipientId: RIYA })).requestId).toBe(fromArjun.requestId);
+    expect(await dao.getByPair({ senderId: RIYA, recipientId: MEERA })).toEqual(withdrawn);
+    expect(await dao.getByPair({ senderId: KABIR, recipientId: MEERA })).toEqual(toMeera);
+  });
+
+  it("keeps when a request was declined, through a later change of status", async () => {
+    const dao = await createDao();
+    const sent = await dao.insert(request({ senderId: RIYA, recipientId: ARJUN }));
+
+    await dao.update({
+      requestId: sent.requestId,
+      statuses: ["pending"],
+      set: { status: "declined", declinedAt: at(5) },
+    });
+    await dao.update({ requestId: sent.requestId, statuses: ["declined"], set: { status: "withdrawn" } });
+
+    expect(await dao.getByPair({ senderId: RIYA, recipientId: ARJUN })).toEqual({
+      ...sent,
+      status: "withdrawn",
+      declinedAt: at(5),
+    });
+  });
+
   it("deletes the requests between two players either way, and every request of a player", async () => {
     const dao = await createDao();
     await dao.insert(request({ senderId: RIYA, recipientId: ARJUN }));

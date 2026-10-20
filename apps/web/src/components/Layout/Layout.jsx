@@ -104,14 +104,6 @@ export function Layout() {
               Profile
             </NavLink>
           )}
-          {/* Friends are for accounts (CC-052), whose row has room for it: a guest's row holds Log in and Sign up.
-              A phone has no room for a fourth link in its row, so there it is in the menu, for guests too, who
-              find there how to save their progress to add friends. */}
-          {identity?.kind === "user" && (
-            <NavLink to={paths.friends()} className={styles.wideOnly} data-cc-control="header.friends">
-              Friends
-            </NavLink>
-          )}
           {/* Shown to admins only. Everyone else never sees a sign of the console (CC-233). */}
           {adminAccess === ADMIN_ACCESS.ADMIN && (
             <NavLink to={paths.admin()} data-cc-control="header.admin">
@@ -135,6 +127,8 @@ export function Layout() {
           {hasProgress && <span className={styles.menuDot} aria-hidden="true" />}
         </button>
         <div id="header-menu" ref={panelRef} className={`${styles.player} ${menuOpen ? styles.open : ""}`}>
+          {/* The laptop's row has no room for a fourth link, so Friends is on the profile there, and in the phone's
+              menu here (CC-052). A guest finds there how to save their progress to add friends. */}
           {identity && (
             <NavLink to={paths.friends()} className={styles.menuOnly} data-cc-control="header.menu_friends">
               Friends

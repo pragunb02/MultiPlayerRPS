@@ -146,6 +146,18 @@ describe("friend accessor (CC-052)", () => {
     expect(await friends.removeRequestsBetween({ a: ARJUN, b: RIYA })).toBe(1);
   });
 
+  it("declines the pending requests between two players, keeping when, in ms", async () => {
+    const friends = accessor();
+    await friends.addRequest(request(RIYA, ARJUN));
+
+    expect(await friends.declineRequestsBetween({ a: ARJUN, b: RIYA, at: T0 + 7 })).toBe(1);
+    expect(await friends.getRequest({ senderId: RIYA, recipientId: ARJUN })).toEqual({
+      ...request(RIYA, ARJUN),
+      status: FRIEND_REQUEST_STATUS.DECLINED,
+      declinedAt: T0 + 7,
+    });
+  });
+
   it("keeps links by their token's hash, takes each once, and keeps the newest few", async () => {
     const friends = accessor();
     const link = (hash, at) => ({

@@ -41,6 +41,18 @@ const avatarField = (profile) => (isAvatarId(profile.avatar) ? { avatar: profile
 /** For a failed read: the caller's own refusal when nothing was found, and any other failure as it is. */
 const missingAs = (refusal) => (err) => Promise.reject(err instanceof NotFoundError ? refusal(err) : err);
 
+/**
+ * The name a sender sees for the recipient of their request. Whoever opened a friend link of a player not surely an
+ * adult does not learn their name until they accept, because the link may have been forwarded (ADR-028.7). The
+ * friends view and the data export both name requests through this one rule.
+ *
+ * @param {{ request: Readonly<{ via: string, recipientId: string }>, names: ReadonlyMap<string, string>, adults: ReadonlySet<string> }} people
+ */
+export const outgoingNameOf = ({ request, names, adults }) =>
+  request.via === FRIEND_REQUEST_VIA.LINK && !adults.has(request.recipientId)
+    ? FRIEND_LINK_MAKER_NAME
+    : names.get(request.recipientId);
+
 /** Friends need an account (owner, ADR-066.1). Guests are told to save their progress. */
 function requireAccount(playerId) {
   if (!isAccountId(playerId)) throw guestsCannot();
@@ -179,12 +191,7 @@ export function createFriendComponent({
           .map((request) =>
             Object.freeze({
               requestId: request.requestId,
-              // Whoever opened a friend link of a player not surely an adult does not learn their name until
-              // they accept, because the link may have been forwarded (ADR-028.7).
-              displayName:
-                request.via === FRIEND_REQUEST_VIA.LINK && !adults.has(request.recipientId)
-                  ? FRIEND_LINK_MAKER_NAME
-                  : names.get(request.recipientId),
+              displayName: outgoingNameOf({ request, names, adults }),
               ...avatarField(card(request.recipientId)),
               sentAt: request.createdAt,
             }),
@@ -225,6 +232,43 @@ export function createFriendComponent({
     }
   }
 
+  /** Whether a request may reach its recipient: no block either way, and the minors' rule (ADR-051.7). */
+  async function reachOf({ senderId, recipientId, met, now }) {
+    const [blocked, adults] = await Promise.all([
+      blocks.blockedWith({ playerId: senderId }),
+      ages.adultsAmong({ playerIds: [senderId, recipientId], now }),
+    ]);
+    return (
+      !blocked.has(recipientId) &&
+      mayReach({ met, bothAdults: adults.has(senderId) && adults.has(recipientId) })
+    );
+  }
+
+  /**
+   * The sender's limits, checked before anything is stored or used up: room for one more friend, and for one more
+   * waiting request unless one to them waits already. Answers whether the recipient asked first, so the two become
+   * friends, and whether the sender's own request to them waits already.
+   */
+  async function roomToAsk({ senderId, recipientId, reaches, now }) {
+    await requireRoomForFriend(senderId);
+    if (reaches) {
+      const theirs = await friendAccessor
+        .getRequest({ senderId: recipientId, recipientId: senderId })
+        .catch((err) => (err instanceof NotFoundError ? undefined : Promise.reject(err)));
+      if (theirs !== undefined && WAITING.includes(theirs.status) && theirs.expiresAt > now) {
+        return { mutual: true, waiting: false };
+      }
+    }
+    const sent = await friendAccessor.sentBy({ senderId, statuses: WAITING, now });
+    const waiting = sent.some((request) => request.recipientId === recipientId);
+    if (!waiting && sent.length >= rules.maxWaiting) {
+      throw new ConflictError(
+        `You have ${rules.maxWaiting} requests waiting. Cancel one, or wait for an answer.`,
+      );
+    }
+    return { mutual: false, waiting };
+  }
+
   /**
    * Sends a request from one account to another, after every rule:
    *
@@ -240,57 +284,37 @@ export function createFriendComponent({
     if (await friendAccessor.areFriends({ a: senderId, b: recipientId })) {
       return { result: FRIEND_REQUEST_RESULTS.FRIENDS };
     }
-    const [blocked, adults] = await Promise.all([
-      blocks.blockedWith({ playerId: senderId }),
-      ages.adultsAmong({ playerIds: [senderId, recipientId], now }),
-    ]);
-    const reaches =
-      !blocked.has(recipientId) &&
-      mayReach({ met, bothAdults: adults.has(senderId) && adults.has(recipientId) });
-    await requireRoomForFriend(senderId);
-    if (reaches) {
-      const theirs = await friendAccessor
-        .getRequest({ senderId: recipientId, recipientId: senderId })
-        .catch((err) => (err instanceof NotFoundError ? undefined : Promise.reject(err)));
-      if (theirs !== undefined && WAITING.includes(theirs.status) && theirs.expiresAt > now) {
-        return befriend({ a: senderId, b: recipientId, now });
-      }
-    }
-    const sent = await friendAccessor.sentBy({ senderId, statuses: WAITING, now });
-    if (sent.some((request) => request.recipientId === recipientId)) {
-      return { result: FRIEND_REQUEST_RESULTS.SENT };
-    }
-    if (sent.length >= rules.maxWaiting) {
-      throw new ConflictError(
-        `You have ${rules.maxWaiting} requests waiting. Cancel one, or wait for an answer.`,
-      );
-    }
-    const fresh = {
-      via,
-      status: reaches ? FRIEND_REQUEST_STATUS.PENDING : FRIEND_REQUEST_STATUS.DECLINED,
-      createdAt: now,
-      expiresAt: now + rules.requestLifetimeMs,
-    };
+    const reaches = await reachOf({ senderId, recipientId, met, now });
+    const { mutual, waiting } = await roomToAsk({ senderId, recipientId, reaches, now });
+    if (mutual) return befriend({ a: senderId, b: recipientId, now });
+    if (waiting) return { result: FRIEND_REQUEST_RESULTS.SENT };
+    const status = (shown) => (shown ? FRIEND_REQUEST_STATUS.PENDING : FRIEND_REQUEST_STATUS.DECLINED);
+    const fresh = { via, createdAt: now, expiresAt: now + rules.requestLifetimeMs };
     const { created, request } = await friendAccessor.addRequest({
       requestId: newRequestId(),
       senderId,
       recipientId,
       notifiedAt: now,
+      status: status(reaches),
+      ...(!reaches && { declinedAt: now }),
       ...fresh,
     });
-    // An old request of the sender's to them: one they cancelled, or one that ran out and is not deleted yet.
-    const rings = created ? reaches : reaches && request.notifiedAt + rules.ringAgainAfterMs <= now;
+    // An old request of the sender's to them: one they cancelled, or one that ran out and is not deleted yet. One
+    // that was declined, or kept from them, stays so until it runs out: cancelling and sending it again never
+    // asks a second time (ADR-066.4).
+    const shown = created ? reaches : reaches && request.declinedAt === undefined;
+    const rings = created ? reaches : shown && request.notifiedAt + rules.ringAgainAfterMs <= now;
     if (!created) {
       await friendAccessor.updateRequest({
         requestId: request.requestId,
         statuses: [request.status],
-        set: { ...fresh, ...(rings && { notifiedAt: now }) },
+        set: { ...fresh, status: status(shown), ...(rings && { notifiedAt: now }) },
       });
     }
     if (rings) {
       await ring({ ...request, via }, now);
     }
-    changed(...(reaches ? [senderId, recipientId] : [senderId]));
+    changed(...(shown ? [senderId, recipientId] : [senderId]));
     return { result: FRIEND_REQUEST_RESULTS.SENT };
   }
 
@@ -351,7 +375,8 @@ export function createFriendComponent({
         senderId: playerId,
         recipientId: person.playerId,
         via: FRIEND_REQUEST_VIA.GAME,
-        met: person.quickMatch ? MET_THROUGH.QUICK_MATCH : MET_THROUGH.LINK_ROOM,
+        // A match that does not say how the two met counts as quick match, the safer side for a minor (ADR-051.7).
+        met: person.quickMatch === false ? MET_THROUGH.LINK_ROOM : MET_THROUGH.QUICK_MATCH,
         now,
       });
     },
@@ -373,15 +398,18 @@ export function createFriendComponent({
         throw new ValidationError("Answer accept or decline", { details: { field: "answer" } });
       }
       const request = await answerable({ recipientId: playerId, requestId, now });
-      if (answer === FRIEND_ANSWERS.ACCEPT) {
-        await requireRoomForFriend(playerId);
-        return befriend({ a: request.senderId, b: playerId, now });
-      }
-      await friendAccessor.updateRequest({
+      const accepting = answer === FRIEND_ANSWERS.ACCEPT;
+      if (accepting) await requireRoomForFriend(playerId);
+      // The answer claims the request while it is still pending, so two answers at once cannot both win.
+      const claimed = await friendAccessor.updateRequest({
         requestId,
         statuses: PENDING,
-        set: { status: FRIEND_REQUEST_STATUS.DECLINED },
+        set: accepting
+          ? { status: FRIEND_REQUEST_STATUS.ACCEPTED }
+          : { status: FRIEND_REQUEST_STATUS.DECLINED, declinedAt: now },
       });
+      if (!claimed) throw noSuchRequest();
+      if (accepting) return befriend({ a: request.senderId, b: playerId, now });
       changed(playerId);
       return { result: FRIEND_REQUEST_STATUS.DECLINED };
     },
@@ -507,14 +535,11 @@ export function createFriendComponent({
       if (await friendAccessor.areFriends({ a: playerId, b: link.creatorId })) {
         return { result: FRIEND_REQUEST_RESULTS.FRIENDS };
       }
+      const asking = { senderId: playerId, recipientId: link.creatorId, met: MET_THROUGH.FRIEND_LINK, now };
+      // A player at a limit keeps the link: it is used up only once the request can go.
+      await roomToAsk({ ...asking, reaches: await reachOf(asking) });
       await friendAccessor.takeLink({ tokenHash, now }).catch(missingAs(noSuchLink));
-      return ask({
-        senderId: playerId,
-        recipientId: link.creatorId,
-        via: FRIEND_REQUEST_VIA.LINK,
-        met: MET_THROUGH.FRIEND_LINK,
-        now,
-      });
+      return ask({ ...asking, via: FRIEND_REQUEST_VIA.LINK });
     },
 
     /**
@@ -541,15 +566,16 @@ export function createFriendComponent({
     },
 
     /**
-     * A block was made (the block component's follower): the pair stop being friends, both ways, without a word.
-     * Requests between them stay as they are, so their sender still sees them waiting (ADR-053, ADR-066.4).
+     * A block was made (the block component's follower): the pair stop being friends, both ways, without a word,
+     * and every pending request between them is declined, so neither ever sees it again, even after an unblock.
+     * Each sender still sees their request waiting, as for any decline (ADR-053, ADR-066.4).
      *
-     * @param {{ blockerId: string, blockedId: string }} pair
+     * @param {{ blockerId: string, blockedId: string, now: number }} pair
      */
-    async playersBlocked({ blockerId, blockedId }) {
-      if (await friendAccessor.unfriend({ a: blockerId, b: blockedId })) {
-        changed(blockerId, blockedId);
-      }
+    async playersBlocked({ blockerId, blockedId, now }) {
+      const ended = await friendAccessor.unfriend({ a: blockerId, b: blockedId });
+      const declined = await friendAccessor.declineRequestsBetween({ a: blockerId, b: blockedId, at: now });
+      if (ended || declined > 0) changed(blockerId, blockedId);
     },
 
     /**
@@ -565,12 +591,11 @@ export function createFriendComponent({
         friendAccessor.linksBy({ creatorId: playerId, now }),
         privacyAccessor.appearingOffline([playerId]),
       ]);
-      const names = await accounts.usernamesOf({
-        playerIds: [
-          ...friends.map((friend) => friend.friendId),
-          ...sent.map((request) => request.recipientId),
-        ],
-      });
+      const recipients = sent.map((request) => request.recipientId);
+      const [names, adults] = await Promise.all([
+        accounts.usernamesOf({ playerIds: [...friends.map((friend) => friend.friendId), ...recipients] }),
+        ages.adultsAmong({ playerIds: recipients, now }),
+      ]);
       const iso = (ms) => new Date(ms).toISOString();
       return {
         friends: friends
@@ -579,7 +604,7 @@ export function createFriendComponent({
         requestsSent: sent
           .filter((request) => names.has(request.recipientId))
           .map((request) => ({
-            displayName: names.get(request.recipientId),
+            displayName: outgoingNameOf({ request, names, adults }),
             sentAt: iso(request.createdAt),
           })),
         friendLinks: links.map((link) => ({ madeAt: iso(link.createdAt), worksUntil: iso(link.expiresAt) })),
