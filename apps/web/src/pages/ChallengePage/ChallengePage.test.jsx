@@ -50,7 +50,9 @@ describe("ChallengePage (CC-139)", () => {
       },
     });
 
-    expect(await screen.findByRole("heading", { name: "You've been challenged to Chess" })).toHaveFocus();
+    const heading = await screen.findByRole("heading", { name: "You've been challenged to Chess" });
+    // The heading takes the focus in an effect, a moment after it is drawn, later still on a busy runner.
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText("Riya challenges you to Chess.")).toBeInTheDocument();
     expect(screen.getByText("Open for 24 more hours.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Accept and play" }));
