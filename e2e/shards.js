@@ -52,6 +52,7 @@ export const SHARDS = Object.freeze([
     "match-shell-presses-rps.spec.js", // 846
     "chess.spec.js", // 260
     "flags.spec.js", // new (CC-312), not measured yet
+    "invites.spec.js", // new (CC-052 part 2), about 20 s locally
   ]),
   // 1107 s
   Object.freeze([

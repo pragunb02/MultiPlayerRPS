@@ -120,7 +120,9 @@ export function PrivacyPage() {
             <strong>Challenges.</strong> When you make a challenge link, we store the game and its options,
             your name, who took it and the room made for you both. Anyone with the link sees the game, and
             your name only if you are an adult account. A challenge is open for 24 hours, and we delete it a
-            day after that.
+            day after that. An invite to a friend is a challenge only that friend can take: we can send it
+            only to someone who is your friend now, and between 22:00 and 07:00 India time it waits quietly in
+            the inbox of anyone under 18.
           </li>
           <li>
             <strong>Feedback.</strong> When you send feedback with the Feedback button, we store its type,
