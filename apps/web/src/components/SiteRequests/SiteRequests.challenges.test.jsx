@@ -206,6 +206,10 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     const { push } = await open();
     const asked = sentToYou({ id: "c0000000000000000003", own: true, forYou: false, toName: "Arjun" });
     push(asked);
+    // The page must have seen the challenge open before it hears it was declined, or there is no change to tell
+    // of. A busy runner can still be on the first push when the second arrives (CI, 2026-10-21).
+    await act(async () => {});
+    await act(async () => {});
 
     push({ ...asked, state: "declined", expiresAt: undefined });
 
