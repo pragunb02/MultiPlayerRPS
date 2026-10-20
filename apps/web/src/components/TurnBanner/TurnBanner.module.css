@@ -1,4 +1,7 @@
 .banner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-full);
@@ -8,12 +11,26 @@
   font-weight: 800;
   justify-self: start;
 }
-/* Your turn: lit up, with one springy pop when it becomes yours. */
-.yours {
-  background: var(--color-primary);
-  color: var(--color-primary-contrast);
-  box-shadow: var(--glow-primary);
+/* The seat marker's dot, in the text's colour, so the word and the shape carry the meaning as well as the colour. */
+.banner::before {
+  content: "";
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+/* Your turn: lit up in the player colour "you", with one springy pop when it becomes yours (CC-314). */
+.you {
+  background: var(--color-you);
+  color: var(--color-on-you);
+  box-shadow: var(--glow-you);
   animation: turn-pop var(--duration-slow) var(--ease-spring);
+}
+/* Waiting for someone else: quiet, in the player colour "opponent". */
+.opponent {
+  background: var(--color-opponent-soft);
+  color: var(--color-opponent);
 }
 @keyframes turn-pop {
   from {
