@@ -78,7 +78,11 @@ These rules come first. Where they differ from anything below, they win.
    `.github/workflows/ci.yml`); and CodeQL for JavaScript and for Actions (GitHub's CodeQL setup, not ci.yml). WebKit
    runs nightly, on demand and on PRs that change `apps/web`, `packages/shared` or `e2e`; it is advisory until its
    open flakes (CC-273) are fixed. `Visual baselines (advisory)` (CC-155) runs on every PR and is not required
-   during its first week; the owner decides whether to require it. **Merging to `main` deploys to
+   during its first week; the owner decides whether to require it. A PR need not regenerate the baselines: after each
+   merge that changes `apps`, `packages`, `e2e` or the lockfile, `visual-refresh.yml` opens or updates one bot PR,
+   `visual-baselines/refresh`, with main's changed images for a person to review and merge (CC-300). A PR that
+   touches none of those files passes the visual check with "baselines on main are stale; a refresh PR is pending".
+   A PR may still make its own images (`npm run test:visual:update` or the update workflow). **Merging to `main` deploys to
    production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
    dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging (DEPLOYMENT.md).
    **Temporary (owner, 2026-10-20):** during the feature phase merges do not wait for CI and branch protection
@@ -124,7 +128,7 @@ npm run test:all       # every test incl. the slow-tagged bot games, as the nigh
 npm run test:e2e       # browser persona tests (first time: npx playwright install chromium)
 E2E_BROWSER=webkit npm run test:e2e   # the same on firefox or webkit (npx playwright install webkit, CC-184)
 npm run test:visual    # screenshot baselines, in the pinned Playwright image through Docker (CC-155)
-npm run test:visual:update  # rewrite the baselines that changed, then review the images in the PR
+npm run test:visual:update  # optional: rewrite the baselines that changed (main's are refreshed after merge, CC-300)
 npm audit              # must be 0 high/critical
 ./scripts/issue-counts.sh  # issue counts for PROGRESS.md (never hand-edit them)
 ```

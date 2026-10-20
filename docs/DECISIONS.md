@@ -297,6 +297,22 @@ the owner may change it.
      checks for its first week.
 - **Not chosen.** Chromatic, Percy or Argos (an account and a secret in a public repository, per-snapshot pricing
   over a free tier), baselines per platform (three sets to keep in step), a trace of every passing test.
+- **Amended · 2026-10-20** (CC-300, builder; accepted by default). Pull requests that merged in a row each made their
+  images against an older `main`, so `main`'s baselines went stale and every open pull request's check failed
+  (after #121, #123 and #124). Now:
+  1. `visual-refresh.yml` runs on each push to `main` that changes `apps/**`, `packages/**`, `e2e/**`,
+     `package.json` or `package-lock.json`. Job `render` makes the images in the pinned image from `main`'s own
+     commit with a read-only token. Job `propose` (contents and pull requests write, runs no project code) commits
+     only changed PNGs to `visual-baselines/refresh`, force pushed to that branch only, and opens or updates one
+     pull request with a comment listing them. A person reviews and merges it. Nothing pushes to `main`. One run at a
+     time (`concurrency: visual-refresh`, never cancelled halfway).
+  2. The pull request check compares with `main`'s baselines as before. When it fails on a pull request whose diff
+     changes none of those paths, it passes with "baselines on main are stale; a refresh PR is pending". A pull
+     request that changes them still fails on a difference, which may be its own.
+  3. Item 4 changes: a pull request need not make its images. It may, with the update workflow or
+     `npm run test:visual:update`.
+  4. The owner allows Actions to create pull requests (repository setting). CI does not start on the bot pull
+     request by itself (`GITHUB_TOKEN` rule): close and reopen it to run CI.
 
 ### ADR-063 — Render's settings live in `render.yaml`, secrets stay in Render
 

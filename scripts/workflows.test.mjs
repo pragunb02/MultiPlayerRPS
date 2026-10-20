@@ -1,8 +1,13 @@
-import { readdir, readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 import { BACKUP_SECRETS } from "./backup/backupConfig.mjs";
+import { VISUAL_IMAGE } from "./visual/docker.mjs";
 import { DOWN_STEP_NAME } from "./uptime/incident.mjs";
 import { GAMES } from "../e2e/matchStates.js";
 import { RESTARTS, SHARDS } from "../e2e/shards.js";
@@ -231,7 +236,9 @@ describe("visual baselines (CC-155)", () => {
     // Advisory on main too: a push to main never runs it, so a visual diff can never turn main red.
     expect(visual).toContain("    if: github.event_name == 'pull_request'\n");
     expect(visual).toContain("        run: npx playwright test -c playwright.visual.config.js --workers=2\n");
-    expect(visual).toContain("        if: failure()\n        uses: actions/upload-artifact@v7");
+    expect(visual).toContain(
+      "        if: steps.compare.outcome == 'failure'\n        uses: actions/upload-artifact@v7",
+    );
     expect(visual).toContain("          path: e2e/visual-results/\n          retention-days: 14\n");
   });
 
@@ -267,6 +274,177 @@ describe("visual baselines (CC-155)", () => {
     expect(commit).toContain('git commit --quiet --message "$TICKET: ');
     // Inputs reach shell scripts only through the environment, never pasted into the script.
     expect(workflow).not.toMatch(/run: .*\$\{\{ inputs\./);
+  });
+});
+
+// After a merge, main's baselines are made again and proposed in one bot pull request (CC-300). A pull request's
+// visual check fails only when the pull request itself changes a file the screens are drawn from.
+describe("visual baselines refresh after merge (CC-300)", () => {
+  /** What the screens are drawn from. Both workflows must use exactly this list. */
+  const SCREEN_INPUTS = ["apps/**", "packages/**", "e2e/**", "package.json", "package-lock.json"];
+  const refreshWorkflow = () => read(".github/workflows/visual-refresh.yml");
+  const parsed = async (/** @type {string} */ path) => parse(await read(path));
+  /** The shell script of one step, as GitHub runs it. */
+  const script = async (
+    /** @type {string} */ path,
+    /** @type {string} */ jobId,
+    /** @type {string} */ name,
+  ) =>
+    (await parsed(path)).jobs[jobId].steps.find((/** @type {{ name?: string }} */ step) => step.name === name)
+      .run;
+
+  it("runs on a push to main that changes the screens' files, or by hand, and on nothing a pull request starts", async () => {
+    const { on } = await parsed(".github/workflows/visual-refresh.yml");
+
+    expect(Object.keys(on).sort()).toEqual(["push", "workflow_dispatch"]);
+    expect(on.push).toEqual({
+      branches: ["main"],
+      paths: [...SCREEN_INPUTS, ".github/workflows/visual-refresh.yml"],
+    });
+    expect(await refreshWorkflow()).not.toMatch(/pull_request_target|workflow_run|pull_request:/);
+  });
+
+  it("runs one refresh at a time and never cancels one halfway", async () => {
+    const { concurrency } = await parsed(".github/workflows/visual-refresh.yml");
+
+    expect(concurrency).toEqual({ group: "visual-refresh", "cancel-in-progress": false });
+  });
+
+  it("renders with a read-only token on main's own commit, and only the job that runs no project code can write", async () => {
+    const workflow = await parsed(".github/workflows/visual-refresh.yml");
+    const { render, propose } = workflow.jobs;
+
+    expect(workflow.permissions).toEqual({ contents: "read" });
+    expect(Object.keys(workflow.jobs).sort()).toEqual(["propose", "render"]);
+    for (const each of [render, propose]) expect(each.if).toBe("github.ref == 'refs/heads/main'");
+    expect(render.permissions).toBeUndefined();
+    expect(render.container.image).toBe(VISUAL_IMAGE);
+    expect(render.steps[0]).toEqual({ uses: "actions/checkout@v7", with: { "persist-credentials": false } });
+    expect(
+      render.steps.find((/** @type {{ name?: string }} */ step) => step.name === "Make the baselines").run,
+    ).toBe("npx playwright test -c playwright.visual.config.js --workers=2 --update-snapshots=changed");
+    expect(propose.needs).toBe("render");
+    expect(propose.permissions).toEqual({ contents: "write", "pull-requests": "write" });
+    // No other ref is ever checked out, so no unreviewed code runs here or with main's caches (CodeQL, #104).
+    expect(await refreshWorkflow()).not.toMatch(/\n\s+ref:/);
+    const proposeText = JSON.stringify(propose);
+    expect(proposeText).not.toMatch(/npm|npx|node |actions\/cache|setup-node/);
+  });
+
+  it("never pushes to main: its one push goes to the refresh branch, and it never merges", async () => {
+    const workflow = await refreshWorkflow();
+    const { propose } = (await parsed(".github/workflows/visual-refresh.yml")).jobs;
+    const step = propose.steps.find((/** @type {{ run?: string }} */ each) => each.run?.includes("git push"));
+
+    expect(workflow.match(/git push[^\n]*/g)).toEqual(['git push --force origin "HEAD:refs/heads/$BRANCH"']);
+    expect(step.env.BRANCH).toBe("visual-baselines/refresh");
+    expect(step.run).toContain('[[ "$BRANCH" == visual-baselines/refresh ]] || {');
+    expect(step.run.indexOf('[[ "$BRANCH" == visual-baselines/refresh ]]')).toBeLessThan(
+      step.run.indexOf("git push"),
+    );
+    expect(workflow).not.toMatch(/gh pr merge|--admin|HEAD:main|refs\/heads\/main"|git push origin main/);
+    expect(step.run).toContain('--base main --head "$BRANCH"');
+  });
+
+  it("commits only changed screen images, never removes one, and lists them in a comment", async () => {
+    const run = await script(
+      ".github/workflows/visual-refresh.yml",
+      "propose",
+      "Commit, push the refresh branch, and open or update its pull request",
+    );
+
+    expect(run).toContain("grep -Ev '^e2e/visual-baselines/[a-z0-9-]+\\.png$'");
+    expect(run).toContain("--diff-filter=D");
+    expect(run).toContain('gh pr comment "$open" --repo "$GITHUB_REPOSITORY" --body-file "$comment"');
+    // Nothing changed: a refresh still open is out of date, so it is closed, and nothing is pushed.
+    expect(run.indexOf("gh pr close")).toBeLessThan(run.indexOf("git push"));
+  });
+
+  it("decides whether a pull request changes the screens from the same list as the refresh", async () => {
+    const run = await script(".github/workflows/ci.yml", "visual-scope", "Files this pull request changes");
+    const pattern = new RegExp(/grep -Eq '([^']+)'/.exec(run)?.[1] ?? "never");
+    const changesScreens = (/** @type {string[]} */ files) => files.some((file) => pattern.test(file));
+
+    expect(run).toContain("git diff --name-only HEAD^1 HEAD");
+    expect(run).toContain("screens=true\n");
+    for (const input of SCREEN_INPUTS) {
+      expect(changesScreens([input.replace("**", "some/file.js")])).toBe(true);
+    }
+    expect(changesScreens(["e2e/visual-baselines/home-guest-dark-desktop.png"])).toBe(true);
+    expect(
+      changesScreens(["docs/tickets/CC-300.md", "scripts/workflows.test.mjs", ".github/workflows/ci.yml"]),
+    ).toBe(false);
+    expect(changesScreens(["docs/apps/note.md", "package.json.bak", "scripts/package.json"])).toBe(false);
+  });
+
+  it("looks at the pull request with a read-only token and keeps no credentials", async () => {
+    const { jobs } = await parsed(".github/workflows/ci.yml");
+
+    expect(jobs["visual-scope"].if).toBe("github.event_name == 'pull_request'");
+    expect(jobs["visual-scope"].permissions).toEqual({ contents: "read", "pull-requests": "read" });
+    expect(jobs["visual-scope"].steps[0].with).toEqual({ "fetch-depth": 2, "persist-credentials": false });
+    expect(jobs.visual.needs).toBe("visual-scope");
+    expect(
+      jobs.visual.steps.find((/** @type {{ id?: string }} */ step) => step.id === "compare"),
+    ).toMatchObject({
+      "continue-on-error": true,
+    });
+  });
+
+  describe("the pull request's verdict", () => {
+    /** Runs the verdict step as GitHub would, with the given outcome. */
+    const verdict = async (/** @type {Record<string, string>} */ env) => {
+      const run = await script(".github/workflows/ci.yml", "visual", "Verdict");
+      const directory = await mkdtemp(join(tmpdir(), "cc300-"));
+      const summary = join(directory, "summary.md");
+      await writeFile(summary, "");
+      try {
+        const result = spawnSync("bash", ["-e", "-c", run], {
+          encoding: "utf8",
+          env: { PATH: process.env.PATH, GITHUB_STEP_SUMMARY: summary, REFRESH: "", ...env },
+        });
+        return { status: result.status, output: result.stdout, summary: await readFile(summary, "utf8") };
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    };
+
+    it("passes when every screen matches", async () => {
+      expect((await verdict({ COMPARE: "success", SCREENS: "true" })).status).toBe(0);
+    });
+
+    it("passes with a notice when the pull request changes no screen file, naming the open refresh", async () => {
+      const result = await verdict({
+        COMPARE: "failure",
+        SCREENS: "false",
+        REFRESH: "https://github.com/pragunb02/MultiPlayerRPS/pull/1",
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.output).toContain(
+        "::notice title=Visual baselines::baselines on main are stale; a refresh PR is pending: https://github.com/pragunb02/MultiPlayerRPS/pull/1",
+      );
+      expect(result.summary).toContain("Baselines on main are stale; a refresh PR is pending");
+    });
+
+    it("fails when the pull request changes a screen file, and points at the open refresh", async () => {
+      const result = await verdict({
+        COMPARE: "failure",
+        SCREENS: "true",
+        REFRESH: "https://example.test/pull/2",
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.output).toContain(
+        "::error title=Visual baselines::a screen differs from main's baselines.",
+      );
+      expect(result.summary).toContain("its refresh pull request is open: https://example.test/pull/2");
+    });
+
+    it("fails when it cannot tell, or when the comparison did not run", async () => {
+      expect((await verdict({ COMPARE: "failure", SCREENS: "" })).status).toBe(1);
+      expect((await verdict({ COMPARE: "skipped", SCREENS: "false" })).status).toBe(1);
+    });
   });
 });
 
