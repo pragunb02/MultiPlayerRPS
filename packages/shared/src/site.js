@@ -2,6 +2,7 @@ import { DAILY_PUZZLES, getDailyPuzzle } from "./dailyPuzzles.js";
 import { GAMES, getGame, getGameBySlug } from "./games.js";
 import { getLeaderboard, LEADERBOARDS } from "./leaderboards.js";
 import { PREVIEW_IMAGE_FILES } from "./previewImages.js";
+import { isFriendLinkToken } from "./friends.js";
 import { isProfileHandle } from "./profiles.js";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "./rooms.js";
 
@@ -178,6 +179,17 @@ const player = (handle) =>
     path: `/players/${handle}`,
   });
 
+/**
+ * A friend link (CC-052). The head is the same for every link, written without asking whose it is, so a link
+ * preview names nobody and the token is never looked up for it. Fetching it never uses the link up (ADR-066.3).
+ */
+const friendLink = (token) =>
+  page({
+    title: `Be my friend on ${SITE_NAME}`,
+    description: `Open the link to add a friend on ${SITE_NAME}, then play Rock Paper Scissors, Tic Tac Toe and Chess together.`,
+    path: `/friends/add/${token}`,
+  });
+
 /** Pages at one fixed URL, by their lower case path segment. */
 const FIXED = Object.freeze({
   privacy: page({
@@ -201,6 +213,11 @@ const FIXED = Object.freeze({
     title: `Sign up · ${SITE_NAME}`,
     description: `Make a free ${SITE_NAME} account to keep your progress on every device and appear on the leaderboards.`,
     path: "/signup",
+  }),
+  friends: page({
+    title: `Your friends · ${SITE_NAME}`,
+    description: `Your friends on ${SITE_NAME}, who is online, and the requests waiting for you.`,
+    path: "/friends",
   }),
   profile: page({
     title: `Your profile · ${SITE_NAME}`,
@@ -270,6 +287,9 @@ function match(segments) {
   }
   if (head === "players" && rest.length === 1) {
     return isProfileHandle(rest[0]) ? player(rest[0]) : NOT_FOUND;
+  }
+  if (head === "friends" && rest.length === 2 && rest[0].toLowerCase() === "add") {
+    return isFriendLinkToken(rest[1]) ? friendLink(rest[1]) : NOT_FOUND;
   }
   if (head === "u" && rest.length === 2 && rest[1].toLowerCase() === "userprofile") return FIXED.profile;
   return NOT_FOUND;

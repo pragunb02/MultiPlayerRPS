@@ -98,6 +98,62 @@ thinking crashed` with `game` only.
   move. On a 0.1 CPU plan the thread still shares the one CPU quota, so the search itself is as slow as before. A
   second server (CC-061) still needs one owner per room for the line.
 
+### ADR-066 — Friends: mutual, accounts only, asked from a game or a one-use link, silent declines, presence for friends only
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-052](tickets/CC-052.md) part 1, research
+  with sources there). The design itself was agreed with the owner on 2026-10-20. The points under "Open" are the
+  owner's to decide. Part 2 (invites) adds to this record.
+- **Context.** Retention comes from people you know (ADR-028). Friends must be mutual, safe for children (unknown
+  age is a minor), silent about blocks (ADR-053), and must never hand a client another person's player id (ADR-057).
+- **Decision.**
+  1. **Accounts only.** Guests cannot send, accept or receive a request, or make or use a friend link (owner). They
+     are told "Save your progress to add friends". A guest has no friend data, so nothing moves on sign up.
+  2. **Mutual, by request and accept.** A request names the other person only as someone the sender played with:
+     `{ roomCode, seat, seatId }` or `{ matchId, seat }`, checked as a block is (ADR-053.3) by one shared helper,
+     `domain/players/coPlayers.js`. Or it comes from a friend link. A request to someone who already asked the
+     sender makes them friends at once. Friendship is one record per pair.
+  3. **The friend link** is `/friends/add/<token>`: 128 random bits in base64url, stored only as its SHA-256 hash in
+     `friend_links`, never a player id. It lasts 7 days and works once, and a player keeps at most 5 (the oldest
+     goes). Opening it shows the maker's avatar and an adult's username, or "A ClassiCade player" for anyone else
+     (ADR-028.7). A GET never uses it up: link previews fetch it. Pressing Add friend uses it up and sends the maker
+     a request, which the maker accepts. So a forwarded link asks once, and its maker always sees who asked.
+  4. **Silent answers.** Declining ("Not now") tells the sender nothing: they see "Request sent" until the request
+     runs out after 30 days. A request into a block is stored and shown to its sender the same way, and is never
+     shown to the other player. Removing a friend tells nobody, both lose the friendship, and a block does exactly
+     that. So a block looks like a decline or a removal, never like anything of its own (ADR-053).
+  5. **Minors** (not surely 18, ADR-048.8): mutual only, nobody is ever suggested, nobody sees anyone else's friends
+     (Ofcom ICU F1.2 and F1.3), a minor sees "Only add people you know" beside every request they could accept
+     (F2.3), and a minor befriends only someone met in a room joined by a link or through a friend link, never a
+     quick match stranger (ADR-051.7). Every room today is joined by a link. Quick match (CC-051) marks its rooms and
+     matches, and `friendRules.js` already refuses them for a pair with a minor.
+  6. **Presence**, worked out in memory and never stored: `online`, `playing` (seated in a room whose game is on) or
+     `offline`. Only friends see it, never which room or game, never a last seen. **Appear offline** shows the player
+     offline to everyone, and is kept in `player_privacy` (the store CC-278 plans for every privacy switch). A block
+     hides presence both ways at once.
+  7. **Addresses.** A friend is named by their profile handle (ADR-065), the one id that is the same for a person
+     everywhere and is not a player id. A profile link is still shown for adults only (ADR-065.2). Requests are
+     named by a random UUID, `requestId`.
+  8. **Limits.** 10 requests waiting per sender (Chess.com's number), 200 friends per player, 50 waiting requests
+     shown to a recipient (newest first). Sending and using links: 20 an hour per player, then 100 an hour per
+     address. Other changes: 60 in 10 minutes per player, then 300 per address. Link lookups: 30 a minute per
+     player, then 150 per address. The address counts only what the player's own limit let through (ADR-053.5). A
+     request that is cancelled and sent again rings at most once in 15 minutes (ADR-031.1).
+  9. **Data.** `friendships` (`low`, `high`, `createdAt`: the two player ids in order), `friend_requests`
+     (`requestId`, `senderId`, `recipientId`, `via`, `status` pending, declined or withdrawn, `createdAt`,
+     `notifiedAt`, `expiresAt`, a TTL index), `friend_links` (`tokenHash`, `creatorId`, `createdAt`, `expiresAt`, a
+     TTL index) and `player_privacy` (`playerId`, `appearOffline`, `updatedAt`). All four are new. Nothing existing
+     changes. Account deletion erases all four on either side. The export lists the player's friends and requests
+     by name and date, their open links by date, and their switch.
+  10. **Live.** `friends:updated` (the whole list) to the player's own tabs after any change, `friends:request` to the
+      recipient of a new request that is not into a block, `friends:presence` `{ handle, presence }` to friends when
+      a player's presence changes. A test crawls every friends answer and push for anything shaped like a player id.
+- **Open (owner).** (1) Whether players not surely adults start with Appear offline on (ICO standard 7). Built: off,
+  because a friend is someone both chose. (2) The numbers in point 8, the 30 days and the 7 days. (3) The Hinglish
+  lines. (4) "Friends" in the header.
+- **Consequences.** Four new collections with their indexes, built at boot (DEPLOYMENT.md). Presence lives in the
+  process like socket admission: a restart shows friends offline until their tabs reconnect, and a second server
+  (CC-061) needs shared presence. Part 2 adds invites by handle and reads the same presence.
+
 ### ADR-065 — Public profiles by a random handle, adults only, private by default, and a curated avatar set
 
 - **Status:** Accepted · 2026-10-20 by the owner ([CC-034](tickets/CC-034.md), research with sources there),
