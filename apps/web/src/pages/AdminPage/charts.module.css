@@ -39,7 +39,7 @@
 }
 .tick {
   fill: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--type-svg-chart-tick);
   font-family: var(--font-sans);
 }
 .primary {
