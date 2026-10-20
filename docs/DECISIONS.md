@@ -1441,6 +1441,20 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
   (counted as `invalid`), stores at most 100 000 events per India day, keeps them 30 days by a TTL index, stores the
   arrival time to the India hour only, and drops known bots by a short User-Agent list read in memory and never
   stored or logged. The hour and the 30 days are one-way for stored history and were accepted knowingly.
+- **Amended · 2026-10-20 (owner: "Accept all", the recommended defaults of CC-313).** Interruptions and friction.
+  (1) Only `optional` surfaces the system opened count against the budget; essential ones (connection, waking up,
+  this room's requests, errors, confirms the player asked for) are counted but not budgeted. (2) The budget is
+  CC-313's recommended column: 0.5 optional interruptions per visit, 5 % of visits with 3 or more, 0.05 per game
+  during play, none blocking during play. (3) A surface is amber over 50 % dismissed and red over 70 %, amber over 2 %
+  covered and red over 5 %, each with at least 50 shown in 7 days; a share of fewer than 5 gets no colour. (4) Alerts
+  show in the console only; email when CC-293 ships, as its own ticket; Grafana stays ops only (ADR-055). (5) Text is
+  measured both ways: a CI budget that blocks a PR, and runtime word buckets. (6) The text budgets (visible words in
+  `main` at 390 by 844): home above the fold 80, a game's page 120, room waiting 60, room playing 30 outside the
+  board, the result 60, sign-up 80; desktop the same, and all of `main` twice that. (7) The friction guardrail is a
+  CI check on full feature tickets from Ready, and a PR template line, for tickets started on or after the merge day.
+  (8) Measure only, plus a test that no optional blocking surface opens during play; queueing is a follow-up after
+  two weeks of numbers. (9) At most one flag side on friction events: the one ramping flag with a friction
+  guardrail. (10) The week is the India week, Monday to Sunday, and the Week view opens by default on Mondays.
 
 ### ADR-033 — Every tab follows the session: server disconnects and a message without identity
 
