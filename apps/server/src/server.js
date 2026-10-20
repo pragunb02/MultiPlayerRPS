@@ -9,6 +9,8 @@ import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "./data/blockAccessor.js";
 import { createChallengeAccessor } from "./data/challengeAccessor.js";
+import { createFriendAccessor } from "./data/friendAccessor.js";
+import { createPrivacyAccessor } from "./data/privacyAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
@@ -29,6 +31,9 @@ import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botC
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
 import { createBlockComponent } from "./domain/blocks/blockComponent.js";
 import { createChallengeComponent } from "./domain/challenges/challengeComponent.js";
+import { createFriendComponent } from "./domain/friends/friendComponent.js";
+import { createPresenceTracker } from "./domain/friends/presenceTracker.js";
+import { createCoPlayers } from "./domain/players/coPlayers.js";
 import { createProfileCards } from "./domain/profiles/profileCards.js";
 import { createProfileComponent } from "./domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "./domain/safety/safetyComponent.js";
@@ -65,6 +70,10 @@ import { createAnalyticsDao } from "./persistence/analyticsDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createBlockDao } from "./persistence/blockDao.js";
 import { createChallengeDao } from "./persistence/challengeDao.js";
+import { createFriendLinkDao } from "./persistence/friendLinkDao.js";
+import { createFriendRequestDao } from "./persistence/friendRequestDao.js";
+import { createFriendshipDao } from "./persistence/friendshipDao.js";
+import { createPrivacyDao } from "./persistence/privacyDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
@@ -563,13 +572,67 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
 }
 
 /**
+ * Friends and their presence (CC-052, ADR-066). The presence tracker hears about every room change, so friends see
+ * "in a game" while a game is on, and the friend component reads it. The gateway tells the tracker about tabs and
+ * pushes what the friend component announces.
+ *
+ * @param {{
+ *   friendAccessor: ReturnType<typeof createFriendAccessor>,
+ *   privacyAccessor: ReturnType<typeof createPrivacyAccessor>,
+ *   profileAccessor: ReturnType<typeof createProfileAccessor>,
+ *   roomAccessor: ReturnType<typeof createRoomAccessor>,
+ *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "seatedRooms">,
+ *   matchComponent: Pick<ReturnType<typeof createMatchComponent>, "meetingFor">,
+ *   transfers: ReturnType<typeof createPlayerTransferAccessor>,
+ *   seatIds: ReturnType<typeof createSeatIds>,
+ *   blocks: Pick<ReturnType<typeof createBlockComponent>, "blockedWith">,
+ *   accountComponent: Pick<ReturnType<typeof createAccountComponent>, "usernamesOf">,
+ *   safety: Pick<ReturnType<typeof createSafetyComponent>, "policiesFor">,
+ *   domainEvents: import("node:events").EventEmitter,
+ *   limits?: Parameters<typeof createFriendComponent>[0]["limits"],
+ * }} deps  `limits` is for tests only
+ */
+export function wireFriends({
+  friendAccessor,
+  privacyAccessor,
+  profileAccessor,
+  roomAccessor,
+  roomComponent,
+  matchComponent,
+  transfers,
+  seatIds,
+  blocks,
+  accountComponent,
+  safety,
+  domainEvents,
+  limits,
+}) {
+  const presence = createPresenceTracker({ rooms: roomComponent, events: domainEvents });
+  domainEvents.on(ROOM_EVENTS.CHANGED, ({ room }) => presence.roomChanged(room));
+  domainEvents.on(ROOM_EVENTS.CLOSED, (closed) => presence.roomClosed(closed));
+  const friendComponent = createFriendComponent({
+    friendAccessor,
+    privacyAccessor,
+    profiles: profileAccessor,
+    coPlayers: createCoPlayers({ rooms: roomAccessor, matches: matchComponent, transfers, seatIds }),
+    blocks,
+    accounts: accountComponent,
+    safety,
+    presence,
+    events: domainEvents,
+    ...(limits !== undefined && { limits }),
+  });
+  return Object.freeze({ presence, friendComponent });
+}
+
+/**
  * Composition root: builds every layer bottom-up, wires dependencies, and starts listening.
  * The only module allowed to know about all layers.
  *
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object, feedback?: object, challenges?: object },
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object, friends?: object, feedback?: object, challenges?: object },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
@@ -633,6 +696,10 @@ export async function startServer({
   const chessRatingDao = createChessRatingDao({ connection: database.connection });
   const profileDao = createProfileDao({ connection: database.connection });
   const challengeDao = createChallengeDao({ connection: database.connection });
+  const friendshipDao = createFriendshipDao({ connection: database.connection });
+  const friendRequestDao = createFriendRequestDao({ connection: database.connection });
+  const friendLinkDao = createFriendLinkDao({ connection: database.connection });
+  const privacyDao = createPrivacyDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -653,6 +720,10 @@ export async function startServer({
       chessRatingDao,
       profileDao,
       challengeDao,
+      friendshipDao,
+      friendRequestDao,
+      friendLinkDao,
+      privacyDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -680,6 +751,8 @@ export async function startServer({
   const chessRatingAccessor = createChessRatingAccessor({ chessRatingDao });
   const profileAccessor = createProfileAccessor({ profileDao });
   const challengeAccessor = createChallengeAccessor({ challengeDao });
+  const friendAccessor = createFriendAccessor({ friendshipDao, friendRequestDao, friendLinkDao });
+  const privacyAccessor = createPrivacyAccessor({ privacyDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -710,6 +783,9 @@ export async function startServer({
     matches: matchComponent,
     transfers: playerTransferAccessor,
     seatIds,
+    // A block ends a friendship before it answers (CC-052). Friends are made further down, after the rooms they
+    // read, and nobody can block before the server listens.
+    followers: [{ name: "friends", playersBlocked: (pair) => friends.friendComponent.playersBlocked(pair) }],
   });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -811,6 +887,20 @@ export async function startServer({
     events: domainEvents,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  const friends = wireFriends({
+    friendAccessor,
+    privacyAccessor,
+    profileAccessor,
+    roomAccessor,
+    roomComponent,
+    matchComponent,
+    transfers: playerTransferAccessor,
+    seatIds,
+    blocks: blockComponent,
+    accountComponent,
+    safety: safetyComponent,
+    domainEvents,
+  });
   // Heavy computer thinking runs on worker threads, off the event loop (ADR-067).
   const thinkingWorkers = (bots.thinkingWorkers ?? createBotThinkingClient)({
     size: config.bots.workers,
@@ -887,6 +977,11 @@ export async function startServer({
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
       {
+        name: "friends",
+        erasePlayer: friends.friendComponent.erasePlayer,
+        exportPlayer: friends.friendComponent.exportPlayer,
+      },
+      {
         name: "dailyPuzzles",
         erasePlayer: dailyPuzzleComponent.erasePlayer,
         exportPlayer: dailyPuzzleComponent.exportPlayer,
@@ -946,6 +1041,8 @@ export async function startServer({
     challengeLimits: limits.challenges,
     challengeComponent,
     networkOf: networkKey.networkOf,
+    friendLimits: limits.friends,
+    friendComponent: friends.friendComponent,
     feedbackLimits: limits.feedback,
     feedbackComponent,
     dailyPuzzleComponent,
@@ -984,6 +1081,7 @@ export async function startServer({
     chessRatingComponent,
     challengeComponent,
     recordSocketEvent: metrics.recordSocketEvent,
+    friends,
   });
   // Read only when telemetry takes a reading, once a minute in production.
   metrics.watch({ rooms: roomComponent.countRoomsByGame, connections: () => gateway.counts().connections });

@@ -91,6 +91,15 @@ export const OWN_PROFILE = Object.freeze({
   canBePublic: false,
 });
 
+/** An account's friends view with nobody in it yet, as GET /api/friends returns it (CC-052). */
+export const NO_FRIENDS = Object.freeze({
+  friends: [],
+  incoming: [],
+  outgoing: [],
+  settings: { appearOffline: false },
+  safetyTips: true,
+});
+
 /** The safety flags of a player who is not surely an adult (GET /api/safety, CC-152). */
 export const MINOR_SAFETY = Object.freeze({
   canFollow: false,
@@ -143,6 +152,16 @@ export function fakeApi(overrides = {}) {
     challengeLater: vi.fn().mockResolvedValue({}),
     blockPlayer: vi.fn(),
     unblockPlayer: vi.fn().mockResolvedValue(undefined),
+    // An empty friends view, so a page that shows friends draws instead of failing on a missing answer (CC-052).
+    getFriends: vi.fn().mockResolvedValue(NO_FRIENDS),
+    sendFriendRequest: vi.fn().mockResolvedValue("sent"),
+    answerFriendRequest: vi.fn().mockResolvedValue("friends"),
+    cancelFriendRequest: vi.fn().mockResolvedValue(undefined),
+    removeFriend: vi.fn().mockResolvedValue(undefined),
+    setAppearOffline: vi.fn(async (appearOffline) => ({ appearOffline })),
+    makeFriendLink: vi.fn().mockResolvedValue({ token: "AbCdEfGhIjKlMnOpQrSt_-", expiresAt: 0 }),
+    getFriendLink: vi.fn(() => new Promise(() => {})),
+    useFriendLink: vi.fn().mockResolvedValue("sent"),
     getOwnProfile: vi.fn().mockResolvedValue(OWN_PROFILE),
     setAvatar: vi.fn(async (avatar) => ({ ...OWN_PROFILE, avatar })),
     setProfileVisibility: vi.fn(async (visibility) => ({ ...OWN_PROFILE, visibility })),

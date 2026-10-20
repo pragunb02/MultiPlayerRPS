@@ -3,6 +3,7 @@ import { DAILY_PUZZLES, getDailyPuzzle } from "./dailyPuzzles.js";
 import { GAMES, getGame, getGameBySlug } from "./games.js";
 import { getLeaderboard, LEADERBOARDS } from "./leaderboards.js";
 import { PREVIEW_IMAGE_FILES } from "./previewImages.js";
+import { isFriendLinkToken } from "./friends.js";
 import { isProfileHandle } from "./profiles.js";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "./rooms.js";
 
@@ -180,6 +181,17 @@ const player = (handle) =>
   });
 
 /**
+ * A friend link (CC-052). The head is the same for every link, written without asking whose it is, so a link
+ * preview names nobody and the token is never looked up for it. Fetching it never uses the link up (ADR-066.3).
+ */
+const friendLink = (token) =>
+  page({
+    title: `Be my friend on ${SITE_NAME}`,
+    description: `Open the link to add a friend on ${SITE_NAME}, then play Rock Paper Scissors, Tic Tac Toe and Chess together.`,
+    path: `/friends/add/${token}`,
+  });
+
+/**
  * A challenge's own page (CC-139), the link sent on WhatsApp. Like a profile's, the head is written without asking
  * whose challenge it is or which game, so a link preview never names a player (ADR-028.7) and says nothing about
  * whether the challenge is still open. The page is never listed.
@@ -214,6 +226,11 @@ const FIXED = Object.freeze({
     title: `Sign up · ${SITE_NAME}`,
     description: `Make a free ${SITE_NAME} account to keep your progress on every device and appear on the leaderboards.`,
     path: "/signup",
+  }),
+  friends: page({
+    title: `Your friends · ${SITE_NAME}`,
+    description: `Your friends on ${SITE_NAME}, who is online, and the requests waiting for you.`,
+    path: "/friends",
   }),
   profile: page({
     title: `Your profile · ${SITE_NAME}`,
@@ -283,6 +300,9 @@ function match(segments) {
   }
   if (head === "players" && rest.length === 1) {
     return isProfileHandle(rest[0]) ? player(rest[0]) : NOT_FOUND;
+  }
+  if (head === "friends" && rest.length === 2 && rest[0].toLowerCase() === "add") {
+    return isFriendLinkToken(rest[1]) ? friendLink(rest[1]) : NOT_FOUND;
   }
   if (head === "challenge" && rest.length === 1) {
     return isChallengeId(rest[0]) ? challenge(rest[0]) : NOT_FOUND;

@@ -7,6 +7,7 @@ import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
 import { createChallengeRoutes } from "./challengeRoutes.js";
 import { createFeedbackRoutes } from "./feedbackRoutes.js";
+import { createFriendRoutes } from "./friendRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
@@ -25,6 +26,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
  *   & { challengeComponent: Parameters<typeof createChallengeRoutes>[0]["challengeComponent"], challengeLimits?: Parameters<typeof createChallengeRoutes>[0]["limits"], networkOf: Parameters<typeof createChallengeRoutes>[0]["networkOf"] }
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
+ *   & { friendComponent: Parameters<typeof createFriendRoutes>[0]["friendComponent"], friendLimits?: Parameters<typeof createFriendRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { safetyComponent: Parameters<typeof createSafetyRoutes>[0]["safetyComponent"] }
@@ -54,6 +56,8 @@ export function apiRouter({
   challengeComponent,
   challengeLimits,
   networkOf,
+  friendComponent,
+  friendLimits,
   feedbackComponent,
   feedbackLimits,
   dailyPuzzleComponent,
@@ -105,6 +109,7 @@ export function apiRouter({
       ...(challengeLimits && { limits: challengeLimits }),
     }),
   );
+  router.use(createFriendRoutes({ friendComponent, now, ...(friendLimits && { limits: friendLimits }) }));
   router.use(createSafetyRoutes({ safetyComponent, now }));
   router.use(createProgressRoutes({ progressionComponent }));
   router.use(createGamificationRoutes({ gamificationComponent, now }));

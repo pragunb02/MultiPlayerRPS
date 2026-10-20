@@ -157,4 +157,19 @@ export const SOCKET_EVENTS = Object.freeze({
   QUESTS_UPDATED: "quests:updated",
   /** Server sends `{ streaks: StreaksView }` after a counted match (shaped like `GET /api/streaks`). */
   STREAKS_UPDATED: "streaks:updated",
+  /**
+   * Server sends the player's whole friends view, shaped like `GET /api/friends`, to every tab of theirs after
+   * anything in it changed: a request came, was answered or ran out, a friend was added or removed (CC-052).
+   */
+  FRIENDS_UPDATED: "friends:updated",
+  /**
+   * Server sends `{ requestId, displayName, avatar?, via }` to every tab of a player who was just sent a friend
+   * request, so a toast tells them on any page. A request into a block is never pushed (ADR-053, ADR-066).
+   */
+  FRIEND_REQUESTED: "friends:request",
+  /**
+   * Server sends `{ handle, presence }` to every tab of a player's friends when the player's presence changes:
+   * `presence` is a FRIEND_PRESENCE value and `handle` the player's profile handle. Never which room or game.
+   */
+  FRIEND_PRESENCE_CHANGED: "friends:presence",
 });

@@ -33,6 +33,7 @@ export const SHARDS = Object.freeze([
     "blocks.spec.js", // new (CC-044), not measured yet
     "profiles.spec.js", // new (CC-034), not measured yet
     "feedback.spec.js", // new (CC-290), not measured yet
+    "friends.spec.js", // new (CC-052), not measured yet
   ]),
   // 1078 s
   Object.freeze([

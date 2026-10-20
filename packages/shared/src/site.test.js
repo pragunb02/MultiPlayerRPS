@@ -149,6 +149,28 @@ describe("describePage", () => {
     }
   });
 
+  it("describes the friends pages without naming anyone, never listed, and nothing for a malformed token (CC-052)", () => {
+    expect(describePage("/friends")).toMatchObject({ found: true, indexable: false, path: "/friends" });
+    expect(describePage("/Friends/")).toMatchObject({ found: true, path: "/friends" });
+    const link = describePage("/friends/add/AbCdEfGhIjKlMnOpQrSt_-");
+    expect(link).toMatchObject({
+      found: true,
+      indexable: false,
+      title: "Be my friend on ClassiCade",
+      path: "/friends/add/AbCdEfGhIjKlMnOpQrSt_-",
+    });
+    expect(`${link.title} ${link.description}`).not.toMatch(/AbCdEf/);
+    for (const path of [
+      "/friends/add",
+      "/friends/add/short",
+      "/friends/add/user_0123456789abcdef01234567",
+      "/friends/add/AbCdEfGhIjKlMnOpQrSt_-/x",
+      "/friends/other",
+    ]) {
+      expect(describePage(path).found, path).toBe(false);
+    }
+  });
+
   it("describes a challenge without naming anyone or its game, never listed, nothing for a malformed id (CC-139)", () => {
     const head = describePage("/challenge/0123456789abcdefghjk");
     expect(head).toMatchObject({

@@ -109,6 +109,44 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
       await request("DELETE", `/blocks/${encodeURIComponent(blockId)}`);
     },
     /**
+     * The player's friends view (CC-052): friends with their presence, the requests waiting for them and the ones
+     * they sent, their Appear offline switch, and whether to show safety tips. A guest is refused with FORBIDDEN.
+     */
+    getFriends: () => request("GET", "/friends"),
+    /**
+     * Asks someone the player played with to be friends, by their seat in a room or a match. Never by player id.
+     *
+     * @param {{ roomCode: string, seat: number, seatId: string } | { matchId: string, seat: number }} target
+     * @returns {Promise<"sent" | "friends">}
+     */
+    sendFriendRequest: async (target) => (await request("POST", "/friends/requests", target)).result,
+    /**
+     * @param {string} requestId
+     * @param {"accept" | "decline"} answer
+     * @returns {Promise<"friends" | "declined">}
+     */
+    answerFriendRequest: async (requestId, answer) =>
+      (await request("POST", `/friends/requests/${encodeURIComponent(requestId)}/answer`, { answer })).result,
+    /** Takes back a request the player sent. */
+    cancelFriendRequest: async (requestId) => {
+      await request("DELETE", `/friends/requests/${encodeURIComponent(requestId)}`);
+    },
+    /** Removes a friend, by their profile handle. */
+    removeFriend: async (handle) => {
+      await request("DELETE", `/friends/${encodeURIComponent(handle)}`);
+    },
+    /** @param {boolean} appearOffline @returns {Promise<{ appearOffline: boolean }>} */
+    setAppearOffline: async (appearOffline) =>
+      (await request("PUT", "/friends/settings", { appearOffline })).settings,
+    /** A new one-use friend link: `{ token, expiresAt }`. The token is shown once. */
+    makeFriendLink: async () => (await request("POST", "/friends/links")).link,
+    /** What a friend link's page shows: `{ displayName, avatar?, own? }`. Reading it never uses the link up. */
+    getFriendLink: async (token) =>
+      (await request("GET", `/friends/links/${encodeURIComponent(token)}`)).invite,
+    /** Uses a friend link: its maker gets a request. @returns {Promise<"sent" | "friends">} */
+    useFriendLink: async (token) =>
+      (await request("POST", `/friends/links/${encodeURIComponent(token)}`)).result,
+    /**
      * Makes a challenge for a game and its options, open for a day (CC-139). Answers the creator's view of it.
      * @param {{ gameId: string, options: object }} challenge
      */

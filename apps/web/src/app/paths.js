@@ -18,6 +18,8 @@ import {
  *   /profile                           your progress and match history (guests and accounts)
  *   /players/:handle                   a player's public profile, by its random handle (CC-034), never by id or name
  *   /challenge/:id                     a challenge's own link, by its random id (CC-139), lasts a day
+ *   /friends                           your friends, their presence and your friend requests (CC-052)
+ *   /friends/add/:token                a "be my friend" link, by a random one-use token (CC-052), never by id or name
  *   /daily/:kind                       today's daily puzzle of a kind, such as /daily/chess (CC-144)
  *   /leaderboards/:board               a leaderboard (`overall`, `weekly`, a game's slug); /leaderboards → overall
  *   /privacy  /terms                   the privacy policy and the terms of use
@@ -39,6 +41,8 @@ export const ROUTES = Object.freeze({
   PROFILE: "profile",
   PLAYER: "players/:handle",
   CHALLENGE: "challenge/:id",
+  FRIENDS: "friends",
+  FRIEND_LINK: "friends/add/:token",
   DAILY: "daily/:kind",
   LEADERBOARDS: "leaderboards",
   LEADERBOARD: "leaderboards/:board",
@@ -159,6 +163,9 @@ export const paths = Object.freeze({
   player: (handle) => `/players/${encodeURIComponent(handle)}`,
   /** @param {string} id  a challenge id the server gave (CC-139) */
   challenge: (id) => `/challenge/${encodeURIComponent(id)}`,
+  friends: () => "/friends",
+  /** @param {string} token  a friend link token the server gave (CC-052) */
+  friendLink: (token) => `/friends/add/${encodeURIComponent(token)}`,
   /** @param {string} kind  a DAILY_PUZZLE_KINDS value */
   daily: (kind) => `/daily/${encodeURIComponent(kind)}`,
   /** @param {string} [boardId]  a leaderboard id (default: overall XP) */

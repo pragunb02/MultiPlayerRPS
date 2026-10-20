@@ -102,6 +102,21 @@ export function PrivacyPage() {
             never told, and only you can see your list.
           </li>
           <li>
+            <strong>Friends.</strong> With an account you can ask someone you played with to be friends, or
+            send a friend link. We store who is friends with whom and when, until either of you removes the
+            other, blocks the other or deletes the account. A friend request is kept for 30 days, and a friend
+            link works once, for 7 days: we store only a scrambled copy of the link, never the link itself.
+            Saying no to a request tells the other player nothing. Nobody can see anyone else&apos;s friends,
+            and we never suggest anyone to you.
+          </li>
+          <li>
+            <strong>Online, in a game or offline.</strong> Only your friends see whether you are online or in
+            a game, never which game or room, and never when you were last here. We work it out while you are
+            connected and never store it. You can turn on Appear offline on the Friends page, and then your
+            friends always see you as offline. We store that choice until you change it or delete your
+            account.
+          </li>
+          <li>
             <strong>Challenges.</strong> When you make a challenge link, we store the game and its options,
             your name, who took it and the room made for you both. Anyone with the link sees the game, and
             your name only if you are an adult account. A challenge is open for 24 hours, and we delete it a
@@ -262,16 +277,18 @@ export function PrivacyPage() {
           <li>
             <strong>Download my data</strong> gives you a file (JSON) with your account, your games, progress,
             chess rating, achievements, quests, daily puzzle days, leaderboard places, your profile and
-            avatar, the players you blocked and your challenges. Other players appear in it by their display
+            avatar, the players you blocked, your friends, the friend requests you sent, your open friend
+            links, your Appear offline choice and your challenges. Other players appear in it by their display
             name only.
           </li>
           <li>
             <strong>Delete my account</strong> deletes it at once, with your progress, chess rating,
-            achievements, quests, daily puzzle days, leaderboard places, profile, blocks, challenges and
-            sessions, and signs you out everywhere. Games you played against other people stay in their
-            history with your name replaced by &quot;Deleted player&quot;. A game you are in at that moment
-            ends, and your opponent wins. Games against the computer only are deleted. If your account came
-            from the earlier version of the site, that old record is closed so it can never sign in again.
+            achievements, quests, daily puzzle days, leaderboard places, profile, blocks, friends, friend
+            requests, friend links, challenges and sessions, and signs you out everywhere. Games you played
+            against other people stay in their history with your name replaced by &quot;Deleted player&quot;.
+            A game you are in at that moment ends, and your opponent wins. Games against the computer only are
+            deleted. If your account came from the earlier version of the site, that old record is closed so
+            it can never sign in again.
           </li>
         </ul>
         <p>

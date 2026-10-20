@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router";
 import { MatchProgressProvider } from "../components/Celebrations/MatchProgressProvider.jsx";
+import { FriendRequestToasts } from "../components/Friends/FriendRequestToasts.jsx";
 import { Layout } from "../components/Layout/Layout.jsx";
 import { GamificationToasts } from "../components/GamificationToasts.jsx";
 import { ProgressToasts } from "../components/ProgressToasts.jsx";
@@ -10,6 +11,8 @@ import { AdminRoute } from "../pages/AdminPage/AdminRoute.jsx";
 import { CONSOLE_ROUTES } from "../pages/AdminPage/consolePages.js";
 import { ChallengePage } from "../pages/ChallengePage/ChallengePage.jsx";
 import { DailyPuzzlePage } from "../pages/DailyPuzzlePage/DailyPuzzlePage.jsx";
+import { FriendLinkPage } from "../pages/FriendLinkPage/FriendLinkPage.jsx";
+import { FriendsPage } from "../pages/FriendsPage/FriendsPage.jsx";
 import { HomePage } from "../pages/HomePage/HomePage.jsx";
 import { LeaderboardPage } from "../pages/LeaderboardPage/LeaderboardPage.jsx";
 import { PrivacyPage } from "../pages/LegalPages/PrivacyPage.jsx";
@@ -42,6 +45,7 @@ export function App({ services }) {
               <MatchProgressProvider>
                 <ProgressToasts />
                 <GamificationToasts />
+                <FriendRequestToasts />
                 <Routes>
                   <Route element={<Layout />}>
                     <Route index element={<HomePage />} />
@@ -53,6 +57,8 @@ export function App({ services }) {
                     <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
                     <Route path={ROUTES.PLAYER} element={<PublicProfilePage />} />
                     <Route path={ROUTES.CHALLENGE} element={<ChallengePage />} />
+                    <Route path={ROUTES.FRIENDS} element={<FriendsPage />} />
+                    <Route path={ROUTES.FRIEND_LINK} element={<FriendLinkPage />} />
                     <Route path={ROUTES.DAILY} element={<DailyPuzzlePage />} />
                     <Route path={ROUTES.LEADERBOARD} element={<LeaderboardPage />} />
                     <Route

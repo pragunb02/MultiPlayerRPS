@@ -35,6 +35,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   challengeLimits?: Parameters<typeof import("./challengeRoutes.js").createChallengeRoutes>[0]["limits"],
  *   networkOf: (address: string) => import("../../utils/networkKey.js").NetworkNames,  names a player's address
  *     without being it, for the rooms made when a challenge is taken (CC-139)
+ *   friendComponent: Parameters<typeof import("./friendRoutes.js").createFriendRoutes>[0]["friendComponent"],
+ *   friendLimits?: Parameters<typeof import("./friendRoutes.js").createFriendRoutes>[0]["limits"],
  *   feedbackComponent: ReturnType<typeof import("../../domain/feedback/feedbackComponent.js").createFeedbackComponent>,
  *   feedbackLimits?: Parameters<typeof import("./feedbackRoutes.js").createFeedbackRoutes>[0]["limits"],
  *   dailyPuzzleComponent: ReturnType<typeof import("../../domain/dailyPuzzles/dailyPuzzleComponent.js").createDailyPuzzleComponent>,
@@ -77,6 +79,8 @@ export function createHttpApp({
   challengeComponent,
   challengeLimits,
   networkOf,
+  friendComponent,
+  friendLimits,
   feedbackComponent,
   feedbackLimits,
   dailyPuzzleComponent,
@@ -169,6 +173,8 @@ export function createHttpApp({
       challengeComponent,
       challengeLimits,
       networkOf,
+      friendComponent,
+      friendLimits,
       feedbackComponent,
       feedbackLimits,
       dailyPuzzleComponent,
