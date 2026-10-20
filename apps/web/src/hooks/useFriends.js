@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { useServices } from "../app/servicesContext.js";
 import { useSession } from "./useSession.js";
@@ -13,10 +13,41 @@ const withPresence = (view, { handle, presence }) => ({
 });
 
 /**
+ * Reads the friends view and hands it on, then reads it again while a push came during the read (see useFriends).
+ *
+ * @param {{
+ *   getFriends: () => Promise<object>,
+ *   reading: { current: number },
+ *   missed: { current: boolean },
+ *   stillFor: () => boolean,
+ *   onView: (view: object) => void,
+ * }} options  `reading` counts the reads on their way, `missed` says a push came meanwhile
+ */
+async function readAgainAfterPushes({ getFriends, reading, missed, stillFor, onView }) {
+  let again = true;
+  while (again) {
+    reading.current += 1;
+    let view;
+    try {
+      view = await getFriends();
+    } finally {
+      reading.current -= 1;
+    }
+    if (!stillFor()) return;
+    onView(view);
+    again = missed.current && reading.current === 0;
+    if (again) missed.current = false;
+  }
+}
+
+/**
  * The player's friends (CC-052): the view from `GET /api/friends`, kept current by the server's pushes, and the
  * things a player does with it. Each change also comes back as a push to every tab, so a second tab follows along.
  * A guest gets `status: "guest"` and nothing is asked of the server. Loads again whenever the player becomes
  * someone else.
+ *
+ * A push can overtake an answer the server wrote a moment before it, which would then show the older state. So a
+ * push that arrives while the view is being read makes the hook read it once more after.
  *
  * @returns {{
  *   status: "loading" | "guest" | "ready" | "error",
@@ -36,28 +67,47 @@ export function useFriends() {
   const who = identity?.id ?? "";
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState({ who: "", status: "loading", view: undefined, error: undefined });
+  // Reads of the view still on their way, and whether a push came while one was.
+  const reading = useRef(0);
+  const missed = useRef(false);
+
+  /** Reads the view for `who`, and once more when a push came meanwhile. Stops when it is for someone else now. */
+  const read = useCallback(
+    (stillFor) =>
+      readAgainAfterPushes({
+        getFriends: api.getFriends,
+        reading,
+        missed,
+        stillFor,
+        onView: (view) => setState({ who, status: "ready", view, error: undefined }),
+      }),
+    [api, who],
+  );
 
   useEffect(() => {
     if (!account) return undefined;
     let cancelled = false;
-    api.getFriends().then(
-      (view) => !cancelled && setState({ who, status: "ready", view, error: undefined }),
+    read(() => !cancelled).catch(
       (error) => !cancelled && setState({ who, status: "error", view: undefined, error }),
     );
     return () => {
       cancelled = true;
     };
-  }, [api, who, account, attempt]);
+  }, [read, who, account, attempt]);
 
   useEffect(() => {
-    const ready = (change) => (current) =>
-      current.who === who && current.status === "ready"
-        ? { ...current, view: change(current.view) }
-        : current;
+    const pushed = (change) => {
+      if (reading.current > 0) missed.current = true;
+      setState((current) =>
+        current.who === who && current.status === "ready"
+          ? { ...current, view: change(current.view) }
+          : current,
+      );
+    };
     const unsubscribers = [
-      socket.on(SOCKET_EVENTS.FRIENDS_UPDATED, (view) => setState(ready(() => view))),
+      socket.on(SOCKET_EVENTS.FRIENDS_UPDATED, (view) => pushed(() => view)),
       socket.on(SOCKET_EVENTS.FRIEND_PRESENCE_CHANGED, (change) =>
-        setState(ready((view) => withPresence(view, change))),
+        pushed((view) => withPresence(view, change)),
       ),
     ];
     return () => unsubscribers.forEach((off) => off());
@@ -68,10 +118,9 @@ export function useFriends() {
     (change) =>
       async (...args) => {
         await change(...args);
-        const view = await api.getFriends();
-        setState({ who, status: "ready", view, error: undefined });
+        await read(() => true);
       },
-    [api, who],
+    [read],
   );
   const retry = useCallback(() => {
     setState({ who, status: "loading", view: undefined, error: undefined });

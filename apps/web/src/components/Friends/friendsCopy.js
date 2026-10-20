@@ -1,4 +1,9 @@
-import { FRIEND_PRESENCE, FRIEND_REQUEST_VIA, FRIEND_RULES } from "@classicade/shared";
+import {
+  FRIEND_LINK_MAKER_NAME,
+  FRIEND_PRESENCE,
+  FRIEND_REQUEST_VIA,
+  FRIEND_RULES,
+} from "@classicade/shared";
 
 /**
  * The words of the friends pages (CC-052), each in Hinglish first and English under it, as the profile's are
@@ -58,7 +63,10 @@ export const FRIENDS_COPY = Object.freeze({
  */
 export const linkInviteCopy = (name) =>
   Object.freeze({
-    hi: `ClassiCade pe ${name} ke friend bano.`,
+    hi:
+      name === FRIEND_LINK_MAKER_NAME
+        ? "Ek ClassiCade player ne tumhe friend banne ke liye bulaya hai."
+        : `ClassiCade pe ${name} ke friend bano.`,
     en: `${name} wants to be friends on ClassiCade.`,
   });
 

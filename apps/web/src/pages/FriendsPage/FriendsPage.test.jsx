@@ -193,20 +193,41 @@ describe("the friends page (CC-052)", () => {
     expect(box.selectionEnd).toBe(box.value.length);
   });
 
-  it("drops a push that arrives before the view has loaded, which already holds it", async () => {
+  it("reads the view again after a push that came while it was being read, so an older answer never stays", async () => {
     const socket = fakeSocket();
     let answer;
-    const api = friendsApi({ getFriends: vi.fn(() => new Promise((resolve) => (answer = resolve))) });
+    const api = friendsApi({
+      getFriends: vi
+        .fn()
+        .mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+        .mockResolvedValue({ ...VIEW, friends: [{ ...ARJUN, presence: "offline" }] }),
+    });
     renderApp({ path: "/friends", api, socket });
     await waitFor(() => expect(api.getFriends).toHaveBeenCalled());
 
-    act(() => socket.push(SOCKET_EVENTS.FRIENDS_UPDATED, { ...VIEW, friends: [KABIR] }));
+    act(() =>
+      socket.push(SOCKET_EVENTS.FRIEND_PRESENCE_CHANGED, { handle: ARJUN.handle, presence: "offline" }),
+    );
     expect(screen.getByText("Loading…")).toBeVisible();
     await act(async () => answer(VIEW));
 
-    expect(
-      within(await screen.findByRole("list", { name: "Friends" })).getAllByRole("listitem"),
-    ).toHaveLength(2);
+    const list = await screen.findByRole("list", { name: "Friends" });
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(1));
+    expect(within(list).getByText("Offline")).toBeVisible();
+    expect(api.getFriends).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops an answer that arrives after the player left the page", async () => {
+    let answer;
+    const api = friendsApi({ getFriends: vi.fn(() => new Promise((resolve) => (answer = resolve))) });
+    const app = renderApp({ path: "/friends", api });
+    await waitFor(() => expect(api.getFriends).toHaveBeenCalled());
+
+    await userEvent.click(screen.getByRole("link", { name: "Leaderboards" }));
+    await act(async () => answer(VIEW));
+
+    expect(app.url()).toBe("/leaderboards/overall");
+    expect(screen.queryByRole("list", { name: "Friends" })).toBeNull();
   });
 
   it("says when the link could not be copied", async () => {

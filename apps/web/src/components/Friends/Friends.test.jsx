@@ -1,7 +1,7 @@
 import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { FRIEND_LINK_MAKER_NAME, SOCKET_EVENTS } from "@classicade/shared";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
@@ -100,7 +100,11 @@ describe("the toast for a new friend request (CC-052)", () => {
 });
 
 describe("the words of the friends pages (CC-052)", () => {
-  const lines = [...Object.values(FRIENDS_COPY), linkInviteCopy("Riya")];
+  const lines = [
+    ...Object.values(FRIENDS_COPY),
+    linkInviteCopy("Riya"),
+    linkInviteCopy(FRIEND_LINK_MAKER_NAME),
+  ];
 
   it('speaks to the player with "tum", never "aap" (owner, 2026-10-20)', () => {
     expect(lines.map((line) => line.hi).filter((line) => /\baap(ka|ke|ki)?\b/i.test(line))).toEqual([]);

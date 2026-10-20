@@ -56,6 +56,7 @@ describe("the friend link page (CC-052)", () => {
     expect(
       await screen.findByText(`${FRIEND_LINK_MAKER_NAME} wants to be friends on ClassiCade.`),
     ).toBeVisible();
+    expect(screen.getByText("Ek ClassiCade player ne tumhe friend banne ke liye bulaya hai.")).toBeVisible();
   });
 
   it("tells the maker it is their own link, with nothing to press", async () => {
