@@ -1,0 +1,166 @@
+# Makes main's screenshot baselines again after a merge and proposes the changed images in one pull request (CC-300).
+# When several pull requests that change the look merge in a row, each was compared with the baselines of the main
+# it started from, so main's images go stale and every open pull request's visual check fails. This workflow runs
+# after each merge that changes a file the screens are drawn from. If any image changed, it opens or updates the
+# pull request from `visual-baselines/refresh` with only the changed images and a comment listing them. A person
+# reviews the images in its Files tab and merges it. Nothing here ever pushes to main.
+#
+# Two jobs, as in visual-update.yml. `render` runs main's own code, already reviewed and merged, with a read-only
+# token and no stored credentials. `propose` holds the only token that can push or open a pull request, and runs no
+# project code at all: it copies image files into a commit. No ref other than main's own commit is ever checked out,
+# so no unreviewed code runs here or writes to main's caches (the CodeQL cache poisoning finding of #104).
+#
+# The owner must allow it once: Settings, Actions, General, "Allow GitHub Actions to create and approve pull
+# requests". GitHub starts no workflow for a pull request opened by this token, so CI does not run on the refresh
+# pull request by itself. Close and reopen it, or push to it, to run CI there.
+name: Visual baselines (refresh)
+
+on:
+  # The same list as the `visual-scope` job in ci.yml: the app, the packages it is built from, the tests and the
+  # installed versions. A merge that changes none of them cannot change a screen.
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "e2e/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/visual-refresh.yml"
+  # Run it by hand from the Actions tab, on main only, for example when a run was cancelled.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One refresh at a time across the repository. A run in progress is never cancelled, so it never stops halfway
+# through a push. While one runs, GitHub keeps only the newest waiting run, which renders the newest main.
+concurrency:
+  group: visual-refresh
+  cancel-in-progress: false
+
+jobs:
+  render:
+    name: Make main's baselines in the CI image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host --init
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-visual-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      # Writes the images that differ and the missing ones. The others stay as they were. A test that fails for any
+      # other reason fails the job, so a half finished set of images is never proposed.
+      - name: Make the baselines
+        working-directory: e2e
+        run: npx playwright test -c playwright.visual.config.js --workers=2 --update-snapshots=changed
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines
+          path: e2e/visual-baselines/
+          retention-days: 7
+      - name: Visual report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-refresh-report
+          path: e2e/visual-report/
+          retention-days: 14
+
+  propose:
+    name: Open or update the refresh pull request
+    needs: render
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # The commit the images were made from, the same one `render` checked out.
+      - uses: actions/checkout@v7
+      - name: Replace the baselines with the new ones
+        run: rm -rf e2e/visual-baselines
+      - uses: actions/download-artifact@v8
+        with:
+          name: visual-baselines
+          path: e2e/visual-baselines
+      - name: Commit, push the refresh branch, and open or update its pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: visual-baselines/refresh
+        run: |
+          set -euo pipefail
+          # The one branch this job may push to. Never main.
+          [[ "$BRANCH" == visual-baselines/refresh ]] || { echo "::error::pushes only to visual-baselines/refresh"; exit 1; }
+          git add --all e2e/visual-baselines
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          if git diff --cached --quiet; then
+            echo "Main's baselines match its screens at \`$GITHUB_SHA\`. Nothing to propose." >> "$GITHUB_STEP_SUMMARY"
+            # A refresh still open is out of date now, for example after a pull request made the images itself.
+            if [[ -n "$open" ]]; then
+              gh pr close "$open" --repo "$GITHUB_REPOSITORY" --comment "Main's baselines match its screens again at $GITHUB_SHA, so this refresh is no longer needed."
+            fi
+            exit 0
+          fi
+          # Only screen images may change, and none may disappear. Anything else in the artifact stops the job.
+          if git diff --cached --name-only | grep -Ev '^e2e/visual-baselines/[a-z0-9-]+\.png$'; then
+            echo "::error::the refresh may change only e2e/visual-baselines/*.png"; exit 1
+          fi
+          if [[ -n "$(git diff --cached --name-only --diff-filter=D)" ]]; then
+            echo "::error::the refresh never removes a baseline"; exit 1
+          fi
+          list=$(mktemp)
+          git diff --cached --name-status | while IFS=$'\t' read -r status path; do
+            if [[ "$status" == A ]]; then echo "1. new: \`${path##*/}\`"; else echo "1. changed: \`${path##*/}\`"; fi
+          done > "$list"
+          count=$(wc -l < "$list" | tr -d ' ')
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet --message "CC-300: refresh the visual baselines for main at ${GITHUB_SHA:0:7} (workflow run $GITHUB_RUN_ID)"
+          # Rebuilt from main's newest commit each time, so it is force pushed, to this branch only.
+          git push --force origin "HEAD:refs/heads/$BRANCH"
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          comment=$(mktemp)
+          {
+            echo "Main at \`$GITHUB_SHA\` draws $count screen images differently from its baselines ([workflow run]($run))."
+            echo
+            cat "$list"
+            echo
+            echo "Compare each image in the Files tab (2-up, swipe or onion skin). Merge only if every change is meant."
+          } > "$comment"
+          if [[ -z "$open" ]]; then
+            body=$(mktemp)
+            {
+              echo "Main's screenshot baselines are out of date after recent merges (CC-300, ADR-056)."
+              echo "This pull request holds only the images that changed, made in the pinned Playwright image from main's own code."
+              echo
+              echo "1. Review every image in the Files tab. Merge if each change is meant. Close it if one is not, and fix that screen on main."
+              echo "2. Each later merge to main that changes the screens updates this pull request and adds a comment."
+              echo "3. CI does not start by itself on a pull request opened by GitHub Actions. Close and reopen it to run CI."
+            } > "$body"
+            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --title "Visual baselines: refresh for main (CC-300)" --body-file "$body")
+            open="${url##*/}"
+          fi
+          gh pr comment "$open" --repo "$GITHUB_REPOSITORY" --body-file "$comment"
+          {
+            echo "Refresh pull request #$open, $count images:"
+            echo
+            cat "$list"
+          } >> "$GITHUB_STEP_SUMMARY"

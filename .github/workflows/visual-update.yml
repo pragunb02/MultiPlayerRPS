@@ -1,4 +1,6 @@
 # Regenerates the screenshot baselines on a pull request's branch and commits them there for review (CC-155).
+# Optional since CC-300: after each merge, visual-refresh.yml proposes main's new images in one pull request. Use this
+# to show a change of look to the pull request's own reviewers before it merges.
 # Run it from the Actions tab: "Run workflow", "Use workflow from" the ticket branch, and the ticket ID. Or:
 #   gh workflow run visual-update.yml --ref cc-153-arcade-polish -f ticket=CC-153
 # A person then reviews the image diffs in the pull request's Files tab. A commit pushed by this workflow does not

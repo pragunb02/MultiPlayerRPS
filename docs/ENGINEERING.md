@@ -202,10 +202,15 @@ Rules:
     narrow as the words allow and unit tested.
 15. **Screenshot baselines** (CC-155, ADR-056). `e2e/baselines.visual.js` compares the main screens at 1280×720 and
     390×844, light and dark, with the PNGs in `e2e/visual-baselines/`. They are made and compared only in the pinned
-    Playwright image, never on a laptop's own browser: `npm run test:visual` (Docker) compares, and after a change to
-    the look made on purpose `npm run test:visual:update` or the `Visual baselines (update)` workflow (Actions tab,
-    "Use workflow from" the ticket branch, and the ticket ID) writes the changed images. Review every changed image in the pull request before
-    approving it. New screens get a baseline there. Anything that changes between runs is given a stand-in or painted
+    Playwright image, never on a laptop's own browser: `npm run test:visual` (Docker) compares. **After each merge**
+    that changes `apps/`, `packages/`, `e2e/` or the lockfile, `visual-refresh.yml` makes `main`'s images again and
+    opens or updates one bot pull request, `visual-baselines/refresh`, with only the changed PNGs and a comment
+    listing them (CC-300). A person reviews the images in its Files tab and merges it. It never pushes to `main`.
+    So a pull request **need not** make its own images. It may, to show a change of look to its reviewers:
+    `npm run test:visual:update`, or the `Visual baselines (update)` workflow (Actions tab, "Use workflow from" the
+    ticket branch, and the ticket ID). The PR check compares with `main`'s baselines. If it fails on a pull request
+    that changes none of those files, it passes with "baselines on main are stale; a refresh PR is pending".
+    Review every changed image before approving. New screens get a baseline the same way. Anything that changes between runs is given a stand-in or painted
     from script in that spec (Playwright's own `mask` is blocked by the CSP), never accepted by a looser threshold.
     On failure the CI job keeps the expected, actual and diff images, a video and a trace for 14 days.
 
