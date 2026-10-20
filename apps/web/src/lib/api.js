@@ -105,6 +105,22 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     getStreaks: async () => (await request("GET", "/streaks")).streaks,
     /** Today's quests (UTC day), the sweep bonus and when they reset (CC-089). */
     getQuests: async () => (await request("GET", "/quests")).quests,
+    /** Today's daily puzzle of a kind, with your attempt and streak once you have a session (CC-144). */
+    getDailyPuzzle: async (kind) => (await request("GET", `/daily/${encodeURIComponent(kind)}`)).puzzle,
+    /**
+     * Plays a move in today's puzzle.
+     * @param {string} kind
+     * @param {{ day: string, from: string, to: string, promotion?: string }} move
+     * @returns {Promise<{ outcome: string, played: { san: string }, reply?: { from: string, to: string, san: string }, puzzle: object }>}
+     */
+    playDailyMove: (kind, move) => request("POST", `/daily/${encodeURIComponent(kind)}/moves`, move),
+    /**
+     * Takes the next hint for the move you are looking for.
+     * @param {string} kind
+     * @param {{ day: string }} body
+     * @returns {Promise<{ hint: string, puzzle: object }>}
+     */
+    takeDailyHint: (kind, body) => request("POST", `/daily/${encodeURIComponent(kind)}/hints`, body),
     getLeaderboards: async () => (await request("GET", "/leaderboards")).boards,
     /** @returns {Promise<{ board: object, entries: object[], you?: object }>} */
     getLeaderboard: (boardId, query = {}) =>

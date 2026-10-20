@@ -43,6 +43,13 @@ recorded, and a faithful render adds no new copyright.
 | `apps/web/public/pieces/bN.png` | Black knight, PNG | Colin M.L. Burnett | BSD-3-Clause | https://commons.wikimedia.org/wiki/File:Chess_ndt45.svg (2006) | 2024-06-27 |
 | `apps/web/public/pieces/bP.png` | Black pawn, PNG   | Colin M.L. Burnett | BSD-3-Clause | https://commons.wikimedia.org/wiki/File:Chess_pdt45.svg (2006) | 2024-06-27 |
 
+## Third party data
+
+The daily chess puzzles (CC-144, ADR-061) are 406 puzzles from the Lichess puzzle database,
+https://database.lichess.org/#puzzles, released by Lichess under **CC0-1.0**. They are kept on the server in
+`apps/server/src/persistence/puzzles/chessPuzzles.json`, with the source and licence beside them in `LICENSE.md`.
+The puzzle page credits Lichess. They are data, not art, so the table check above does not cover them.
+
 ## Our own image files
 
 | File                                                  | What                                                                       | Author     | Licence               | Source                                                         | Added      |

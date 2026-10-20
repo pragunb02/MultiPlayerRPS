@@ -5,6 +5,7 @@ import { createAdminRoutes } from "./adminRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
 import { createFeedbackRoutes } from "./feedbackRoutes.js";
+import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
 import { createMatchRoutes } from "./matchRoutes.js";
@@ -18,7 +19,8 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
- *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }} deps
+ *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
+ *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }} deps
  */
 export function apiRouter({
   matchComponent,
@@ -41,6 +43,8 @@ export function apiRouter({
   blockLimits,
   feedbackComponent,
   feedbackLimits,
+  dailyPuzzleComponent,
+  dailyPuzzleLimit,
   ...sessionDeps
 }) {
   const router = Router();
@@ -79,6 +83,13 @@ export function apiRouter({
   router.use(createBlockRoutes({ blockComponent, now, ...(blockLimits && { limits: blockLimits }) }));
   router.use(createProgressRoutes({ progressionComponent }));
   router.use(createGamificationRoutes({ gamificationComponent, now }));
+  router.use(
+    createDailyPuzzleRoutes({
+      dailyPuzzleComponent,
+      now,
+      ...(dailyPuzzleLimit && { limit: dailyPuzzleLimit }),
+    }),
+  );
   router.use(
     createLeaderboardRoutes({
       leaderboardComponent,

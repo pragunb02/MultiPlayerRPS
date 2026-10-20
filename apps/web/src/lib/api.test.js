@@ -183,6 +183,40 @@ describe("api client", () => {
     expect(fetchImpl.mock.calls[0][0]).toBe(path);
   });
 
+  it("reads today's daily puzzle, plays a move and takes a hint (CC-144)", async () => {
+    const read = respond(200, { puzzle: { day: "2026-10-20" } });
+    const moved = respond(200, { outcome: "correct", puzzle: { day: "2026-10-20" } });
+    const hinted = respond(200, { hint: "Look for a fork.", puzzle: { day: "2026-10-20" } });
+
+    expect(await createApiClient({ fetchImpl: read }).getDailyPuzzle("chess")).toEqual({ day: "2026-10-20" });
+    expect(
+      await createApiClient({ fetchImpl: moved }).playDailyMove("chess", {
+        day: "2026-10-20",
+        from: "f8",
+        to: "d8",
+      }),
+    ).toEqual({ outcome: "correct", puzzle: { day: "2026-10-20" } });
+    expect(
+      await createApiClient({ fetchImpl: hinted }).takeDailyHint("chess", { day: "2026-10-20" }),
+    ).toEqual({
+      hint: "Look for a fork.",
+      puzzle: { day: "2026-10-20" },
+    });
+
+    expect(read.mock.calls[0][0]).toBe("/api/daily/chess");
+    expect(moved.mock.calls[0]).toEqual([
+      "/api/daily/chess/moves",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ day: "2026-10-20", from: "f8", to: "d8" }),
+      }),
+    ]);
+    expect(hinted.mock.calls[0]).toEqual([
+      "/api/daily/chess/hints",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ day: "2026-10-20" }) }),
+    ]);
+  });
+
   it("lists, adds and removes blocks, never with a player id (CC-044)", async () => {
     const listed = respond(200, { blocks: [{ blockId: "b1", displayName: "Bob", blockedAt: 1 }] });
     const added = respond(200, { block: { blockId: "b2", displayName: "Bob", blockedAt: 2 } });

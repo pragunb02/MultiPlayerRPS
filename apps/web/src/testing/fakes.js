@@ -109,6 +109,10 @@ export function fakeApi(overrides = {}) {
     getAchievements: vi.fn().mockResolvedValue([]),
     getStreaks: vi.fn().mockResolvedValue(NO_STREAKS),
     getQuests: vi.fn().mockResolvedValue(QUESTS),
+    // Like a puzzle the server has not sent yet. Tests of the daily puzzle page give their own (CC-144).
+    getDailyPuzzle: vi.fn(() => new Promise(() => {})),
+    playDailyMove: vi.fn(),
+    takeDailyHint: vi.fn(),
     getLeaderboards: vi.fn(),
     getLeaderboard: vi.fn().mockResolvedValue({
       board: { id: "overall", name: "Overall XP", metric: "xp", period: "all", periodId: "all" },

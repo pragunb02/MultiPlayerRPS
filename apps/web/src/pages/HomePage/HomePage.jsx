@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { Link } from "react-router";
+import { DAILY_PUZZLES } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { GameArt } from "../../art/games/GameArt.jsx";
 import { gameArtFor } from "../../art/games/gameArt.js";
@@ -80,6 +81,27 @@ export function HomePage() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="daily-heading" className={styles.daily}>
+        <h2 id="daily-heading">Daily puzzle</h2>
+        <ul className={styles.games}>
+          {DAILY_PUZZLES.map((puzzle) => (
+            <li key={puzzle.id} className={`${styles.card} ${styles[gameArtFor(puzzle.gameId).tone]}`}>
+              <h3>
+                <Link to={paths.daily(puzzle.id)} className={styles.cardLink} data-cc-control="home.daily">
+                  Today&apos;s puzzle
+                </Link>
+              </h3>
+              <p className={styles.meta}>
+                A new chess puzzle every day, the same for everyone. Keep your streak going.
+              </p>
+              <span className={styles.play} aria-hidden="true">
+                Solve
+              </span>
+            </li>
+          ))}
+        </ul>
       </section>
     </>
   );

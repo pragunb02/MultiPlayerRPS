@@ -17,6 +17,11 @@ const DATA_MD = flat(readFileSync(path.join(import.meta.dirname, "../../../../..
  */
 const FACTS = [
   {
+    fact: "a daily puzzle day is stored from the first move or hint until the account is deleted (CC-144)",
+    data: "| [`daily_puzzle_attempts`](#daily_puzzle_attempts) | pseudonymous: player id, how each day's puzzle went | until the account is deleted |",
+    page: /When you make a move or take a hint in a daily puzzle, we store how that day's puzzle went for you.*until you delete your account\. Just looking at a puzzle stores nothing/,
+  },
+  {
     fact: "rooms are stored in MongoDB for 30 minutes to 24 hours",
     data: "| [`rooms`](#rooms) | pseudonymous: ids, names, every move, network hash | 30 minutes to 24 hours after the last activity",
     page: /While a room is open we store it in our database.*30 minutes to 24 hours after the last activity/,

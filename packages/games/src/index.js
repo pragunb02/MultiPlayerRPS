@@ -11,3 +11,12 @@ export { renamePlayer } from "./renamePlayer.js";
 export { replayGame } from "./replay.js";
 export { ok, reject } from "./result.js";
 export { createSeededRng, randomIndex } from "./rng.js";
+export {
+  assertChessPuzzle,
+  CHESS_HINT_LEVELS,
+  chessHint,
+  chessPuzzlePosition,
+  chessPuzzleSteps,
+  chessSolution,
+  judgeChessMove,
+} from "./puzzles/chessPuzzle.js";

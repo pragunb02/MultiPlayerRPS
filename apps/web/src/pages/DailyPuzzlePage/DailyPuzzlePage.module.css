@@ -1,0 +1,144 @@
+/* The board on the left and the panel beside it, as in a chess room. On a phone the panel goes under the board. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 36rem) minmax(14rem, 20rem);
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 48rem) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+.boardColumn {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.header h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+}
+.day {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.task {
+  margin: var(--space-1) 0 0;
+  font-weight: 700;
+}
+.rating {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.problem {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-bottom-width: 6px;
+  border-bottom-color: var(--color-game-chess);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Tries left: one dot per try, full while it is left, hollow once used. The words say the same. */
+.mistakes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-weight: 700;
+}
+.marks {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.markLeft,
+.markUsed {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-primary);
+}
+.markLeft {
+  background: var(--color-primary);
+}
+.markUsed {
+  background: transparent;
+  border-color: var(--color-text-muted);
+}
+
+.hints {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+.hintList {
+  margin: 0;
+  padding-left: var(--space-6);
+}
+
+.result {
+  display: grid;
+  gap: var(--space-3);
+}
+.result h2 {
+  margin: 0;
+}
+.result p {
+  margin: 0;
+}
+.solution {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.next {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.streak p {
+  margin: 0;
+}
+.streakLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.best {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+.atRisk {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.credit {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.failed {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}

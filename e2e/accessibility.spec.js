@@ -62,6 +62,7 @@ test.describe("pages", () => {
       "/games/rock-paper-scissors",
       "/games/tic-tac-toe",
       "/games/chess",
+      "/daily/chess",
       "/login",
       "/signup",
       "/leaderboards/overall",

@@ -8,6 +8,7 @@ import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { AdminRoute } from "../pages/AdminPage/AdminRoute.jsx";
 import { CONSOLE_ROUTES } from "../pages/AdminPage/consolePages.js";
+import { DailyPuzzlePage } from "../pages/DailyPuzzlePage/DailyPuzzlePage.jsx";
 import { HomePage } from "../pages/HomePage/HomePage.jsx";
 import { LeaderboardPage } from "../pages/LeaderboardPage/LeaderboardPage.jsx";
 import { PrivacyPage } from "../pages/LegalPages/PrivacyPage.jsx";
@@ -48,6 +49,7 @@ export function App({ services }) {
                     <Route path={ROUTES.LOGIN} element={<LoginPage />} />
                     <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
                     <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                    <Route path={ROUTES.DAILY} element={<DailyPuzzlePage />} />
                     <Route path={ROUTES.LEADERBOARD} element={<LeaderboardPage />} />
                     <Route
                       path={ROUTES.LEADERBOARDS}

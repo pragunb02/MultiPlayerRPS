@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describePage, GAMES, LEADERBOARDS, PUBLIC_PAGE_PATHS } from "@classicade/shared";
+import { DAILY_PUZZLES, describePage, GAMES, LEADERBOARDS, PUBLIC_PAGE_PATHS } from "@classicade/shared";
 import {
   gameForSlug,
   normaliseRoomCode,
@@ -178,6 +178,7 @@ describe("the shared page list", () => {
     const linked = [
       paths.home(),
       ...GAMES.map((game) => paths.game(game.id)),
+      ...DAILY_PUZZLES.map((puzzle) => paths.daily(puzzle.id)),
       ...LEADERBOARDS.map((board) => paths.leaderboards(board.id)),
       paths.privacy(),
       paths.terms(),

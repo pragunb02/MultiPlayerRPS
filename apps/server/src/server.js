@@ -4,11 +4,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { BOTS, createBotRegistry, createEngineRegistry, ENGINES } from "@classicade/games";
-import { getGame, IDENTITY_KINDS } from "@classicade/shared";
+import { DAILY_PUZZLE_KINDS, getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "./data/blockAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
+import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
 import { createAnalyticsAccessor } from "./data/analyticsAccessor.js";
 import { createGamificationAccessor } from "./data/gamificationAccessor.js";
@@ -26,6 +27,9 @@ import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botC
 import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/botDriver.js";
 import { createBlockComponent } from "./domain/blocks/blockComponent.js";
 import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
+import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
+import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
+import { INDIA_CALENDAR } from "./domain/dailyPuzzles/schedule.js";
 import { createBotTurns } from "./domain/bots/botTurns.js";
 import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
 import { createThinkingQueue } from "./domain/bots/thinkingQueue.js";
@@ -54,6 +58,8 @@ import { createAnalyticsDao } from "./persistence/analyticsDao.js";
 import { connectDatabase } from "./persistence/database.js";
 import { createBlockDao } from "./persistence/blockDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
+import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
+import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
 import { createChessRatingDao } from "./persistence/chessRatingDao.js";
 import { createLegacyUserDao } from "./persistence/legacyUserDao.js";
@@ -607,6 +613,7 @@ export async function startServer({
   const accountDeletionDao = createAccountDeletionDao({ connection: database.connection });
   const blockDao = createBlockDao({ connection: database.connection });
   const feedbackDao = createFeedbackDao({ connection: database.connection });
+  const dailyPuzzleAttemptDao = createDailyPuzzleAttemptDao({ connection: database.connection });
   const chessRatingDao = createChessRatingDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
@@ -624,6 +631,7 @@ export async function startServer({
       accountDeletionDao,
       blockDao,
       feedbackDao,
+      dailyPuzzleAttemptDao,
       chessRatingDao,
     ].map((dao) => dao.ensureIndexes()),
   );
@@ -644,6 +652,11 @@ export async function startServer({
   const sessionAccessor = createSessionAccessor({ sessionDao });
   const blockAccessor = createBlockAccessor({ blockDao });
   const feedbackAccessor = createFeedbackAccessor({ feedbackDao });
+  const chessPuzzles = loadChessPuzzles();
+  const dailyPuzzleAccessor = createDailyPuzzleAccessor({
+    attemptDao: dailyPuzzleAttemptDao,
+    catalogues: { [DAILY_PUZZLE_KINDS.CHESS]: chessPuzzles },
+  });
   const chessRatingAccessor = createChessRatingAccessor({ chessRatingDao });
 
   // 2. domain
@@ -676,6 +689,12 @@ export async function startServer({
     matchAccessor,
     events: domainEvents,
   });
+  // The daily puzzles follow India days until CC-146 gives each player their own (ADR-061).
+  const dailyPuzzleComponent = createDailyPuzzleComponent({
+    dailyPuzzleAccessor,
+    kinds: [createChessKind({ puzzles: dailyPuzzleAccessor.puzzlesOf(DAILY_PUZZLE_KINDS.CHESS) })],
+    calendar: INDIA_CALENDAR,
+  });
   const gamificationComponent = createGamificationComponent({
     gamificationAccessor,
     matchAccessor,
@@ -700,6 +719,7 @@ export async function startServer({
       { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
+      { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ],
     matches: matchComponent,
@@ -809,6 +829,11 @@ export async function startServer({
         exportPlayer: playerTransferComponent.exportPlayer,
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
+      {
+        name: "dailyPuzzles",
+        erasePlayer: dailyPuzzleComponent.erasePlayer,
+        exportPlayer: dailyPuzzleComponent.exportPlayer,
+      },
     ],
   });
 
@@ -849,6 +874,7 @@ export async function startServer({
     blockComponent,
     feedbackLimits: limits.feedback,
     feedbackComponent,
+    dailyPuzzleComponent,
     leaderboardComponent,
     analyticsComponent,
     sessionMiddleware,

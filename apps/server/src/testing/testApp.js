@@ -7,6 +7,7 @@ import { createAccountAccessor } from "../data/accountAccessor.js";
 import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
 import { createBlockAccessor } from "../data/blockAccessor.js";
 import { createFeedbackAccessor } from "../data/feedbackAccessor.js";
+import { createDailyPuzzleAccessor } from "../data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "../data/chessRatingAccessor.js";
 import { createAnalyticsAccessor } from "../data/analyticsAccessor.js";
 import { createGamificationAccessor } from "../data/gamificationAccessor.js";
@@ -23,6 +24,9 @@ import { createPlayerDataComponent } from "../domain/accounts/playerDataComponen
 import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
 import { createBlockComponent } from "../domain/blocks/blockComponent.js";
 import { createFeedbackComponent } from "../domain/feedback/feedbackComponent.js";
+import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
+import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
+import { INDIA_CALENDAR } from "../domain/dailyPuzzles/schedule.js";
 import { createBotComponent } from "../domain/bots/botComponent.js";
 import { createBotDriver } from "../domain/bots/botDriver.js";
 import { createBotTurns } from "../domain/bots/botTurns.js";
@@ -62,6 +66,8 @@ import { createInMemoryAccountDao } from "./inMemoryAccountDao.js";
 import { createInMemoryAccountDeletionDao } from "./inMemoryAccountDeletionDao.js";
 import { createInMemoryBlockDao } from "./inMemoryBlockDao.js";
 import { createInMemoryFeedbackDao } from "./inMemoryFeedbackDao.js";
+import { TEST_CHESS_PUZZLES } from "./dailyPuzzleSet.js";
+import { createInMemoryDailyPuzzleAttemptDao } from "./inMemoryDailyPuzzleAttemptDao.js";
 import { createInMemoryChessRatingDao } from "./inMemoryChessRatingDao.js";
 import { createMemoryStoreSessionDao } from "./memoryStoreSessionDao.js";
 import {
@@ -104,6 +110,9 @@ import { testConfig } from "./testConfig.js";
  *     part in deleting an account (e.g. one that fails, CC-035)
  *   blockLimits?: object,   the limits on blocking and unblocking (CC-044)
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
+ *   dailyPuzzleLimit?: { windowMs: number, limit: number },   daily puzzle moves and hints per player (CC-144)
+ *   chessPuzzles?: ReadonlyArray<object>,   the daily chess puzzles, two known ones unless a test gives its own
+ *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
  *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
  *     to see what the service layer records (ADR-055)
  * }} [options]
@@ -127,6 +136,9 @@ export function createTestApp({
   dataParticipants = (participants) => participants,
   blockLimits,
   feedbackLimits,
+  dailyPuzzleLimit,
+  chessPuzzles = TEST_CHESS_PUZZLES,
+  dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
   metrics = {},
 } = {}) {
   const config = testConfig(env);
@@ -177,6 +189,11 @@ export function createTestApp({
     transfers: playerTransferAccessor,
     seatIds,
   });
+  const dailyPuzzleComponent = createDailyPuzzleComponent({
+    dailyPuzzleAccessor: createDailyPuzzleAccessor({ attemptDao: dailyPuzzleAttemptDao, catalogues: {} }),
+    kinds: [createChessKind({ puzzles: chessPuzzles })],
+    calendar: INDIA_CALENDAR,
+  });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
     matchAccessor,
@@ -215,6 +232,7 @@ export function createTestApp({
       { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
+      { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
       { name: "leaderboards", transferPlayer: leaderboardComponent.transferPlayer },
     ]),
     matches: matchComponent,
@@ -316,6 +334,11 @@ export function createTestApp({
         exportPlayer: playerTransferComponent.exportPlayer,
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
+      {
+        name: "dailyPuzzles",
+        erasePlayer: dailyPuzzleComponent.erasePlayer,
+        exportPlayer: dailyPuzzleComponent.exportPlayer,
+      },
     ]),
   });
   const endedSessions = [];
@@ -348,6 +371,8 @@ export function createTestApp({
     blockLimits,
     feedbackComponent,
     feedbackLimits,
+    dailyPuzzleComponent,
+    dailyPuzzleLimit,
     analyticsComponent: createAnalyticsComponent({
       analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
       cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }),
@@ -386,6 +411,7 @@ export function createTestApp({
     chessRatingComponent,
     blockComponent,
     feedbackComponent,
+    dailyPuzzleComponent,
     matchPipeline,
     playerDataComponent,
     tasks,
