@@ -27,6 +27,7 @@ import {
  *   /admin/feedback?type=…&status=…    the console's feedback inbox (CC-290)
  *   /admin/reports?status=…            the console's report queue (CC-044)
  *   /admin/flags                       the console's feature flags (CC-312)
+ *   /admin/design                      the console's living design contract (CC-314)
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
@@ -56,6 +57,7 @@ export const ROUTES = Object.freeze({
   ADMIN_REPORTS: "admin/reports",
   ADMIN_AGES: "admin/ages",
   ADMIN_FLAGS: "admin/flags",
+  ADMIN_DESIGN: "admin/design",
 });
 
 /** The owner console's pages after its overview, in tab order (CC-233). Each is the URL segment after /admin. */
@@ -199,6 +201,8 @@ export const paths = Object.freeze({
   adminAges: () => "/admin/ages",
   /** The console's feature flags (CC-312). */
   adminFlags: () => "/admin/flags",
+  /** The console's living design contract (CC-314). */
+  adminDesign: () => "/admin/design",
 });
 
 /**

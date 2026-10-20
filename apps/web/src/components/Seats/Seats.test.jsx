@@ -65,6 +65,22 @@ describe("Seats (CC-158)", () => {
     expect(chips()).toEqual(["Alicehostconnected", "Bobyouconnected", "Waiting for a player…"]);
   });
 
+  it("marks the viewer's seat with the player colour you and the others with opponent (CC-314)", () => {
+    mount(room());
+    const [alice, bob] = screen.getAllByRole("listitem");
+    expect(bob).toHaveClass("mine");
+    expect(alice).toHaveClass("theirs");
+    expect(within(bob).getByText("you")).toHaveClass("tagYou");
+  });
+
+  it("keeps the seat colours for a spectator, who has no seat of their own", () => {
+    mount(room({ you: "" }));
+    for (const item of screen.getAllByRole("listitem")) {
+      expect(item).not.toHaveClass("mine");
+      expect(item).not.toHaveClass("theirs");
+    }
+  });
+
   it("shows who is thinking, with the time left to move", () => {
     vi.useFakeTimers({ now: 0 });
     mount(room({ game: { activePlayers: ["guest_a"], turnEndsAt: T + 24_000, outcome: {} } }));

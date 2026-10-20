@@ -156,6 +156,13 @@ export function Seats({ room }) {
   // The seat the viewer pressed Block or Report on (`kind`), and who sat where at that moment, while it is open.
   const [asking, setAsking] = useState(undefined);
   const seating = room.seats.map((seat) => seat.playerId).join(" ");
+  // The design contract's player colours (CC-314): a seated viewer sees their own seat as "you" and every other
+  // seat as "opponent". A spectator has no seat, so the seats keep their own colours.
+  const seated = room.seats.some((seat) => seat.playerId === room.you);
+  const playerClass = (seat) => {
+    if (!seated) return "";
+    return seat.playerId === room.you ? styles.mine : styles.theirs;
+  };
   // Someone left, joined or the seats swapped (a rematch) while the question was open. The question may now be about
   // someone else's seat, so it closes and the player can press Block or Report again on the seat they mean.
   if (asking !== undefined && asking.seating !== seating) {
@@ -165,11 +172,11 @@ export function Seats({ room }) {
     <>
       <ul className={styles.seats} aria-label="Players">
         {room.seats.map((seat, index) => (
-          <li key={seat.playerId} className={styles.seat}>
+          <li key={seat.playerId} className={`${styles.seat} ${playerClass(seat)}`}>
             <span className={seat.connected ? styles.online : styles.offline} aria-hidden="true" />
             {!isComputer(seat) && <Avatar avatar={seat.avatar} size={28} />}
             <span className={styles.name}>{seat.displayName}</span>
-            {seat.playerId === room.you && <span className={styles.tag}>you</span>}
+            {seat.playerId === room.you && <span className={`${styles.tag} ${styles.tagYou}`}>you</span>}
             {isComputer(seat) && <span className={styles.tag}>computer · {levelNameOf(seat)}</span>}
             {seat.playerId === room.hostId && <span className={styles.tag}>host</span>}
             <PresenceChip room={room} seat={seat} />

@@ -169,4 +169,10 @@ module.exports = [
     },
   },
   ...commentStyle,
+  {
+    // A new kind of pop-up (a portal, a dialog role, a live region) needs the design contract first (CC-314).
+    files: ["apps/web/src/**/*.{js,jsx}"],
+    ignores: TESTS,
+    rules: { "classicade/popup-contract": "error" },
+  },
 ];

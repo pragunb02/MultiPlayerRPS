@@ -1,0 +1,129 @@
+/*
+ * Colours (CC-314): the base palette, then the roles components use (docs/design/CONTRACT.md). Every text colour
+ * is at least 4.5:1 against --color-bg and --color-surface in its theme (CC-087, tokens.test.js). A palette refresh
+ * changes values here and nothing else.
+ */
+:root {
+  --color-bg: #f4f3ff;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ebe9ff;
+  --color-border: #dcdff0;
+  --color-text: #161827;
+  --color-text-muted: #5c6077;
+  --color-primary: #5b4cf0;
+  --color-primary-contrast: #ffffff;
+  --color-primary-soft: #e6e3ff;
+  --color-success: #13795b;
+  --color-danger: #c4314b;
+  --color-warning: #a35b00;
+  --color-focus: #b45309;
+  /* On the hero gradient (both themes) the focus ring is a pale gold. */
+  --color-focus-on-hero: #ffe08a;
+  /*
+   * Colour roles (CC-314, docs/design/CONTRACT.md): components pick a role, never a hue. Each role has its solid
+   * colour, a pale "-soft" background and the "on" colour for text on the solid one, every pair at least 4.5:1.
+   * Status: danger means the player may lose something they made, never a lost game (ADR-050).
+   */
+  --color-success-soft: #e3f4ec;
+  --color-on-success: #ffffff;
+  --color-warning-soft: #fbf0de;
+  --color-on-warning: #ffffff;
+  --color-danger-soft: #fde7eb;
+  --color-on-danger: #ffffff;
+  /* Info is the primary colour (owner, D3). Its pale background is lighter than primary-soft, for 4.5:1. */
+  --color-info: var(--color-primary);
+  --color-info-soft: #efedff;
+  --color-on-info: var(--color-primary-contrast);
+  /* Players (owner, D2): "you" is XP blue and "opponent" accent magenta. Never the only signal, always with a word. */
+  --color-you: var(--color-xp);
+  --color-you-soft: #e2eff9;
+  --color-on-you: #ffffff;
+  --color-opponent: var(--color-accent);
+  --color-opponent-soft: #fce6ef;
+  --color-on-opponent: #ffffff;
+  --color-accent: #c2255c;
+  --color-xp: #0a66a8;
+  --color-gold: #8a5a00;
+  --color-streak: #b23c0a;
+  --color-game-rps: #b4410f;
+  --color-game-tictactoe: #0f766e;
+  --color-game-chess: #6d28d9;
+  --color-tier-bronze: #8f5426;
+  --color-tier-silver: #556170;
+  --color-tier-gold: #8a5a00;
+  --color-tier-platinum: #0e7490;
+  /* Decorative only: always shown next to text that carries the meaning. */
+  --color-locked: #8a8fa8;
+  /* Text on --gradient-hero and other always-dark panels (5.6:1 or better on every stop). */
+  --color-on-hero: #ffffff;
+  /* Chess squares: fixed in both themes so the board looks the same everywhere. */
+  --color-board-light: #eeeed2;
+  --color-board-dark: #769656;
+  --color-board-last: rgb(255 220 0 / 35%);
+  --color-board-selected: rgb(91 76 240 / 45%);
+  --color-board-check: rgb(220 30 60 / 55%);
+  --color-board-hint: rgb(20 20 50 / 35%);
+  --color-board-drop: rgb(255 255 255 / 75%);
+  --color-board-dim: rgb(10 10 25 / 45%);
+  --color-board-lift-shadow: rgb(0 0 0 / 45%);
+  --color-backdrop: rgb(10 10 25 / 55%);
+  /* Art (apps/web/src/art): fixed inks that read on every background, and the glyph colour on tier medals. */
+  --color-art-ink: #0b0c1d;
+  --color-art-white: #ffffff;
+  --color-on-tier: #ffffff;
+  --color-glow-white: rgb(255 255 255 / 25%);
+  /* Neon inks for art on the always-dark hero gradient: the same in both themes. */
+  --color-neon-rps: #ff9f43;
+  --color-neon-tictactoe: #2ee6c9;
+  --color-neon-accent: #ff5fa2;
+  --color-neon-gold: #ffd34d;
+  --color-neon-xp: #3ad7ff;
+  --gradient-hero: linear-gradient(135deg, #5b4cf0 0%, #c2255c 100%);
+  --gradient-xp: linear-gradient(90deg, var(--color-xp), var(--color-primary));
+  --grid-line: rgb(91 76 240 / 6%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0b0c1d;
+    --color-surface: #161834;
+    --color-surface-raised: #20234a;
+    --color-border: #2f3363;
+    --color-text: #eceefa;
+    --color-text-muted: #a3a7c2;
+    --color-primary: #8a7dff;
+    --color-primary-contrast: #0b0c1d;
+    --color-primary-soft: #2b2752;
+    --color-success: #4fd1a5;
+    --color-danger: #ff7a90;
+    --color-warning: #ffb547;
+    --color-focus: #f0a400;
+    --color-success-soft: #12302f;
+    --color-on-success: #0b0c1d;
+    --color-warning-soft: #33281a;
+    --color-on-warning: #0b0c1d;
+    --color-danger-soft: #3a1a2a;
+    --color-on-danger: #0b0c1d;
+    --color-info-soft: #211e44;
+    --color-you-soft: #0f2f45;
+    --color-on-you: #0b0c1d;
+    --color-opponent-soft: #3a1838;
+    --color-on-opponent: #0b0c1d;
+    --color-accent: #ff5fa2;
+    --color-xp: #3ad7ff;
+    --color-gold: #ffd34d;
+    --color-streak: #ff8a3d;
+    --color-game-rps: #ff9f43;
+    --color-game-tictactoe: #2ee6c9;
+    --color-game-chess: #b18cff;
+    --color-tier-bronze: #e0995e;
+    --color-tier-silver: #c9d3df;
+    --color-tier-gold: #ffd34d;
+    --color-tier-platinum: #7ef0ff;
+    --color-locked: #4a4f75;
+    --color-backdrop: rgb(3 3 12 / 70%);
+    --color-on-tier: #0b0c1d;
+    --gradient-hero: linear-gradient(135deg, #2a1b6e 0%, #6b1b5a 100%);
+    --grid-line: rgb(138 125 255 / 8%);
+  }
+}

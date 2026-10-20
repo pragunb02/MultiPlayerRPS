@@ -39,7 +39,7 @@
   background: var(--color-surface);
   font: inherit;
   font-family: var(--font-display);
-  font-size: 3rem;
+  font-size: var(--type-board-mark);
   font-weight: 800;
   color: var(--color-text);
   cursor: pointer;

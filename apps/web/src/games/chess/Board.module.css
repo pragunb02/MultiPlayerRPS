@@ -89,7 +89,7 @@
 }
 .piece {
   position: relative;
-  z-index: 1;
+  z-index: var(--layer-board-piece);
   width: 100%;
   height: 100%;
   padding: 6%;
@@ -97,7 +97,7 @@
   pointer-events: none;
 }
 .sliding {
-  z-index: 3;
+  z-index: var(--layer-board-slide);
 }
 /* The piece left behind on its square while its copy follows the pointer. */
 .lifted {
@@ -107,7 +107,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 5;
+  z-index: var(--layer-board-ghost);
   width: 12.5%;
   height: 12.5%;
   pointer-events: none;
@@ -140,7 +140,7 @@
   grid-template-columns: repeat(8, 1fr);
 }
 .coord {
-  font-size: clamp(0.55rem, 1.6vw, 0.75rem);
+  font-size: var(--type-board-coord);
   font-weight: 700;
   line-height: 1;
 }
@@ -165,7 +165,7 @@
 .promotionBackdrop {
   position: absolute;
   inset: 6px;
-  z-index: 10;
+  z-index: var(--layer-board-promotion);
   background: var(--color-board-dim);
   border-radius: var(--radius-sm);
 }
