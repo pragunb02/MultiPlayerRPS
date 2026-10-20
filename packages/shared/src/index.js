@@ -64,6 +64,7 @@ export {
   SITE_PREVIEW_IMAGE,
 } from "./site.js";
 export {
+  DAILY_PUZZLE_ENDED,
   DAILY_PUZZLE_KINDS,
   DAILY_PUZZLE_MARKS,
   DAILY_PUZZLE_OUTCOMES,
@@ -71,4 +72,5 @@ export {
   DAILY_PUZZLE_STATUS,
   DAILY_PUZZLES,
   getDailyPuzzle,
+  isDailyPuzzleEnded,
 } from "./dailyPuzzles.js";

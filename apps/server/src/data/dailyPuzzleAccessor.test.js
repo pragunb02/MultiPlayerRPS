@@ -44,18 +44,19 @@ describe("the daily puzzle accessor", () => {
   it("starts an attempt and reads it back with times in milliseconds", async () => {
     const { accessor } = setup();
 
-    const started = await accessor.start(attempt());
+    const { created, attempt: started } = await accessor.add(attempt());
 
+    expect(created).toBe(true);
     expect(started).toEqual(attempt());
     expect(Object.isFrozen(started.marks)).toBe(true);
     expect(await accessor.findDay({ playerId: RIYA, kind: "chess", day: "2026-10-20" })).toEqual([attempt()]);
   });
 
-  it("answers the attempt the player already has when one is started twice", async () => {
+  it("answers the attempt the player already has when one is added twice, and says it made none", async () => {
     const { accessor } = setup();
-    await accessor.start(attempt({ hints: [1] }));
+    await accessor.add(attempt({ hints: [1] }));
 
-    expect(await accessor.start(attempt())).toMatchObject({ hints: [1] });
+    expect(await accessor.add(attempt())).toMatchObject({ created: false, attempt: { hints: [1] } });
   });
 
   it("passes other storage failures through when starting", async () => {
@@ -65,12 +66,12 @@ describe("the daily puzzle accessor", () => {
     };
     const accessor = createDailyPuzzleAccessor({ attemptDao, catalogues: {} });
 
-    await expect(accessor.start(attempt())).rejects.toThrow("down");
+    await expect(accessor.add(attempt())).rejects.toThrow("down");
   });
 
   it("saves a change at the version it was read at and keeps the finish time", async () => {
     const { accessor } = setup();
-    const started = await accessor.start(attempt());
+    const { attempt: started } = await accessor.add(attempt());
 
     const saved = await accessor.save({ ...started, status: "solved", finishedAt: T0 + 5000 });
 
@@ -85,7 +86,7 @@ describe("the daily puzzle accessor", () => {
 
   it("calls a change made in between a conflict", async () => {
     const { accessor, attemptDao } = setup();
-    const started = await accessor.start(attempt());
+    const { attempt: started } = await accessor.add(attempt());
     attemptDao.failNextUpdate();
 
     const error = await accessor.save({ ...started, hints: [1] }).catch((err) => err);
@@ -104,17 +105,39 @@ describe("the daily puzzle accessor", () => {
     await expect(accessor.save(attempt())).rejects.toThrow("down");
   });
 
+  it("passes other storage failures through when moving a day", async () => {
+    const attemptDao = {
+      ...createInMemoryDailyPuzzleAttemptDao(),
+      reassign: async () => Promise.reject(new Error("down")),
+    };
+    const accessor = createDailyPuzzleAccessor({ attemptDao, catalogues: {} });
+
+    await expect(accessor.reassign({ from: "a", to: "b", kind: "chess", day: "2026-10-20" })).rejects.toThrow(
+      "down",
+    );
+  });
+
   it("lists, moves and removes a player's days", async () => {
     const { accessor } = setup();
     const GUEST = "guest_00000000-0000-4000-8000-000000000001";
-    await accessor.start(attempt({ playerId: GUEST, day: "2026-10-19" }));
-    await accessor.start(attempt({ playerId: GUEST }));
+    await accessor.add(attempt({ playerId: GUEST, day: "2026-10-19" }));
+    await accessor.add(attempt({ playerId: GUEST }));
+    await accessor.add(attempt({ playerId: GUEST, day: "2026-10-18" }));
+    await accessor.add(attempt({ day: "2026-10-18" }));
 
-    expect(await accessor.reassign({ from: GUEST, to: RIYA, kind: "chess", day: "2026-10-19" })).toBe(1);
+    expect(await accessor.reassign({ from: GUEST, to: RIYA, kind: "chess", day: "2026-10-19" })).toEqual({
+      moved: 1,
+      collided: false,
+    });
+    expect(await accessor.reassign({ from: GUEST, to: RIYA, kind: "chess", day: "2026-10-18" })).toEqual({
+      moved: 0,
+      collided: true,
+    });
+    expect(await accessor.removeDay({ playerId: GUEST, kind: "chess", day: "2026-10-18" })).toBe(1);
     expect(await accessor.removeDay({ playerId: GUEST, kind: "chess", day: "2026-10-20", extra: 1 })).toBe(1);
 
-    expect((await accessor.listByPlayer(RIYA)).map(({ day }) => day)).toEqual(["2026-10-19"]);
-    expect(await accessor.removePlayer(RIYA)).toBe(1);
+    expect((await accessor.listByPlayer(RIYA)).map(({ day }) => day)).toEqual(["2026-10-18", "2026-10-19"]);
+    expect(await accessor.removePlayer(RIYA)).toBe(2);
     expect(await accessor.listByPlayer(RIYA)).toEqual([]);
   });
 });

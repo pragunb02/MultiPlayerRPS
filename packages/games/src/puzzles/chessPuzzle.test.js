@@ -129,6 +129,28 @@ describe("the chess puzzle referee", () => {
     expect(chessHint({ puzzle: TWO_STEPS, found: ["f8d8"], level: 2 })).toBe("Move your bishop on f6.");
   });
 
+  it("counts the mate from the moves still to find", () => {
+    // Lichess 02hB2 (CC0): after Kb1, Black mates in two with Rb2+ Kc1 Ra1#.
+    const mateInTwo = {
+      id: "02hB2",
+      fen: "r7/5p2/7p/3R2p1/6P1/2k1P2P/5r2/K2B3R w - - 1 37",
+      moves: ["a1b1", "f2b2", "b1c1", "a8a1"],
+      rating: 1068,
+      themes: ["endgame", "mate", "mateIn2", "short"],
+    };
+
+    expect(chessHint({ puzzle: mateInTwo, found: [], level: 1 })).toBe("Look for checkmate in two moves.");
+    expect(chessHint({ puzzle: mateInTwo, found: ["f2b2"], level: 1 })).toBe(
+      "Look for checkmate in one move.",
+    );
+  });
+
+  it("says only checkmate when many moves are still to find", () => {
+    const long = { ...TWO_STEPS, moves: Array(12).fill("a1a2"), themes: ["mateIn5"] };
+
+    expect(chessHint({ puzzle: long, found: [], level: 1 })).toBe("Look for checkmate.");
+  });
+
   it("names the main tactic before the goal", () => {
     const fork = { ...TWO_STEPS, themes: ["advantage", "fork", "middlegame"] };
     const plain = { ...TWO_STEPS, themes: ["middlegame"] };

@@ -42,6 +42,17 @@ describe("MongoDB daily puzzle attempt DAO honours the contract (integration)", 
     expect(error).not.toBeInstanceOf(DuplicateKey);
   });
 
+  it("passes other database errors through when giving a day to another player", async () => {
+    const dao = await createDao();
+
+    const error = await dao
+      .reassign({ from: "a", to: { not: "an id" }, kind: "chess", day: "2026-10-20" })
+      .catch((err) => err);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(DuplicateKey);
+  });
+
   it("has one unique index on player, kind and day, and no other besides _id", async () => {
     await createDao();
 

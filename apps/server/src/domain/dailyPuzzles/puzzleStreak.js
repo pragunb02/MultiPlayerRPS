@@ -1,4 +1,4 @@
-import { DAILY_PUZZLE_STATUS } from "@classicade/shared";
+import { DAILY_PUZZLE_STATUS, isDailyPuzzleEnded } from "@classicade/shared";
 import { addDays } from "../../utils/indiaTime.js";
 
 /**
@@ -8,9 +8,6 @@ import { addDays } from "../../utils/indiaTime.js";
  * @typedef {{ day: string, status: string, streak: number, best: number }} EndedDay
  * @typedef {{ streak: number, best: number }} StreakAfter
  */
-
-const isEnded = ({ status }) =>
-  status === DAILY_PUZZLE_STATUS.SOLVED || status === DAILY_PUZZLE_STATUS.FAILED;
 
 /**
  * The streak once a day ends. A solved day adds one when yesterday was solved too and starts again at 1 otherwise.
@@ -59,7 +56,7 @@ export function rebuildStreaks(days) {
   const rebuilt = [];
   let previous = [];
   for (const day of days) {
-    if (!isEnded(day)) {
+    if (!isDailyPuzzleEnded(day.status)) {
       rebuilt.push({ streak: 0, best: 0 });
       continue;
     }

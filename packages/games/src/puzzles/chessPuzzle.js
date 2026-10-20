@@ -32,11 +32,6 @@ export const PIECE_WORDS = Object.freeze({
  * order. The names are Lichess' own theme names (https://lichess.org/training/themes).
  */
 const TACTIC_HINTS = Object.freeze([
-  ["mateIn1", "Look for checkmate in one move."],
-  ["mateIn2", "Look for checkmate in two moves."],
-  ["mateIn3", "Look for checkmate in three moves."],
-  ["mateIn4", "Look for checkmate in four moves."],
-  ["mateIn5", "Look for checkmate."],
   ["backRankMate", "Look at the back rank."],
   ["smotheredMate", "Look for a smothered mate."],
   ["fork", "Look for a fork."],
@@ -60,6 +55,12 @@ const TACTIC_HINTS = Object.freeze([
   ["equality", "Find the move that saves the game."],
 ]);
 const NO_THEME_HINT = "Look for the strongest move.";
+
+/** A mate in N theme names the mate from the start, so the hint counts the moves still to find instead. */
+const MATE_IN = /^mateIn\d$/;
+const MOVE_COUNTS = Object.freeze(["", "one move", "two moves", "three moves", "four moves"]);
+const mateHint = (left) =>
+  left < MOVE_COUNTS.length ? `Look for checkmate in ${MOVE_COUNTS[left]}.` : "Look for checkmate.";
 
 /** The highest hint level: the idea, then the piece to move. */
 export const CHESS_HINT_LEVELS = 2;
@@ -175,6 +176,9 @@ export function judgeChessMove({ puzzle, found, move }) {
  */
 export function chessHint({ puzzle, found, level }) {
   if (level === 1) {
+    if (puzzle.themes.some((theme) => MATE_IN.test(theme))) {
+      return mateHint(chessPuzzleSteps(puzzle) - found.length);
+    }
     return TACTIC_HINTS.find(([theme]) => puzzle.themes.includes(theme))?.[1] ?? NO_THEME_HINT;
   }
   if (level === 2) {

@@ -277,17 +277,18 @@ ADR-053)
 `apps/server/src/persistence/dailyPuzzleAttemptDao.js`, rules in
 `apps/server/src/domain/dailyPuzzles/dailyPuzzleComponent.js` (CC-144, ADR-061)
 
-1. **Holds:** one document per player, puzzle kind and day, made by the player's first move or hint that day:
+1. **Holds:** one document per player, puzzle kind and day, made by the player's first legal move or hint that day:
    `playerId`, `kind`, `day`, `puzzleId`, `status`, the moves found, mistakes and hints at each move, the streak and
    best streak once the day ended, a `version`, and when it started, changed and ended. Guests and accounts alike.
    Index: unique on `playerId`, `kind` and `day`. A visitor who only looks stores nothing.
 2. **Personal data:** pseudonymous. It says on which days a player did the puzzle and how it went.
 3. **Who can read it:** the player, as today's attempt and their puzzle streak (`GET /api/daily/:kind`, the data
-   export). Nobody else: the share card the player may send names nobody and shows no move. The owner.
-4. **Kept for:** until the account is deleted. A guest's days move to the account they sign in to, except a day the
-   account played itself, whose guest copy is deleted (ADR-014). A guest who never signs in keeps them as long as other
+   export, which leaves out the puzzle of a day still being played). Nobody else: the share card the player may send names nobody and shows no move. The owner.
+4. **Kept for:** until the account is deleted. A guest's days move to the account they sign in to. Where both have
+   a day, the one that went further stays (failed, then solved, then still being played) and the other is deleted
+   (ADR-014, ADR-061.8). A guest who never signs in keeps them as long as other
    guest data (CC-098).
-5. **Deleted by:** account deletion, and the guest transfer for days the account already has.
+5. **Deleted by:** account deletion, and the guest transfer for the copy of a day that does not stay.
 
 ### `accounts.birthYear`
 

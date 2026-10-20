@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
+import { DAILY_PUZZLE_ENDED } from "@classicade/shared";
 import { DuplicateKey, VersionConflict } from "./errors.js";
 
 const DUPLICATE_KEY_CODE = 11000;
-const FINISHED = ["solved", "failed"];
 
 /**
  * @typedef {Object} DailyPuzzleAttemptDoc  persistence object: one player's attempt at one day's puzzle (CC-144)
@@ -93,7 +93,7 @@ export function createDailyPuzzleAttemptDao({ connection }) {
      * @returns {Promise<DailyPuzzleAttemptDoc[]>} the latest solved or failed attempt before that day, or nothing
      */
     findLatestFinished: async ({ playerId, kind, beforeDay }) =>
-      Attempt.find({ playerId, kind, day: { $lt: beforeDay }, status: { $in: FINISHED } }, FIELDS)
+      Attempt.find({ playerId, kind, day: { $lt: beforeDay }, status: { $in: DAILY_PUZZLE_ENDED } }, FIELDS)
         .sort({ day: -1 })
         .limit(1)
         .lean(),
@@ -129,13 +129,21 @@ export function createDailyPuzzleAttemptDao({ connection }) {
      *
      * @param {{ from: string, to: string, kind: string, day: string }} move
      * @returns {Promise<number>} attempts moved: 0 when `from` has none that day
+     * @throws {DuplicateKey} when `to` already has that day. Neither attempt changes
      */
     async reassign({ from, to, kind, day }) {
-      const { modifiedCount } = await Attempt.updateOne(
-        { playerId: from, kind, day },
-        { $set: { playerId: to } },
-      );
-      return modifiedCount;
+      try {
+        const { modifiedCount } = await Attempt.updateOne(
+          { playerId: from, kind, day },
+          { $set: { playerId: to } },
+        );
+        return modifiedCount;
+      } catch (err) {
+        if (isDuplicate(err)) {
+          throw new DuplicateKey(`${to} already has the ${kind} puzzle of ${day}`, { cause: err });
+        }
+        throw err;
+      }
     },
 
     /**

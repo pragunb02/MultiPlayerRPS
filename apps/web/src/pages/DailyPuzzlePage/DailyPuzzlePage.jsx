@@ -1,6 +1,6 @@
 import { Suspense, useState } from "react";
 import { useParams } from "react-router";
-import { DAILY_PUZZLE_STATUS, getDailyPuzzle } from "@classicade/shared";
+import { DAILY_PUZZLE_STATUS, getDailyPuzzle, isDailyPuzzleEnded } from "@classicade/shared";
 import { Button } from "../../components/Button/Button.jsx";
 import { DailyShare } from "../../components/DailyShare/DailyShare.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
@@ -23,8 +23,6 @@ const dayInWords = (day) =>
 
 /** When the next puzzle comes, in the player's own time, such as "12:00 am" in India. */
 const timeInWords = (ms) => new Date(ms).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-
-const isEnded = (status) => status === DAILY_PUZZLE_STATUS.SOLVED || status === DAILY_PUZZLE_STATUS.FAILED;
 
 /** Mistakes as marks, with the words beside them for anyone who cannot see the marks. */
 function Mistakes({ puzzle }) {
@@ -141,7 +139,7 @@ function DailyPuzzle({ kind, info, view }) {
   }
 
   const { puzzle } = daily;
-  const ended = isEnded(puzzle.status);
+  const ended = isDailyPuzzleEnded(puzzle.status);
   const reason = ended ? "Today's puzzle is over. Come back tomorrow" : move.busy ? "Sending your move" : "";
   const { Board } = view;
   return (

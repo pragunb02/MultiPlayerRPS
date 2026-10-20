@@ -1,4 +1,9 @@
-import { DAILY_PUZZLE_MARKS, DAILY_PUZZLE_OUTCOMES, DAILY_PUZZLE_STATUS } from "@classicade/shared";
+import {
+  DAILY_PUZZLE_MARKS,
+  DAILY_PUZZLE_OUTCOMES,
+  DAILY_PUZZLE_STATUS,
+  isDailyPuzzleEnded,
+} from "@classicade/shared";
 
 /**
  * How a day's attempt at a puzzle changes, as pure functions (CC-144, ADR-061). They work for every kind: the
@@ -19,8 +24,7 @@ export const BLANK_ATTEMPT = Object.freeze({
 });
 
 /** Whether the attempt has ended, solved or failed. */
-export const isEnded = ({ status }) =>
-  status === DAILY_PUZZLE_STATUS.SOLVED || status === DAILY_PUZZLE_STATUS.FAILED;
+export const isEnded = ({ status }) => isDailyPuzzleEnded(status);
 
 /** Hints taken at the move the player is looking for now. */
 export const hintsAt = ({ hints, found }) => hints[found.length] ?? 0;

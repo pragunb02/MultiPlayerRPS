@@ -1,6 +1,6 @@
+import { isDailyPuzzleEnded } from "@classicade/shared";
 import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
 
-const FINISHED = new Set(["solved", "failed"]);
 const keyOf = ({ playerId, kind, day }) => `${playerId}|${kind}|${day}`;
 const copy = (doc) => structuredClone(doc);
 
@@ -34,7 +34,7 @@ export function createInMemoryDailyPuzzleAttemptDao() {
 
     async findLatestFinished({ playerId, kind, beforeDay }) {
       const latest = ofPlayer(playerId)
-        .filter((doc) => doc.kind === kind && doc.day < beforeDay && FINISHED.has(doc.status))
+        .filter((doc) => doc.kind === kind && doc.day < beforeDay && isDailyPuzzleEnded(doc.status))
         .sort((a, b) => b.day.localeCompare(a.day))
         .slice(0, 1);
       return latest.map(copy);
@@ -59,6 +59,9 @@ export function createInMemoryDailyPuzzleAttemptDao() {
     async reassign({ from, to, kind, day }) {
       const doc = docs.get(keyOf({ playerId: from, kind, day }));
       if (doc === undefined) return 0;
+      if (docs.has(keyOf({ playerId: to, kind, day }))) {
+        throw new DuplicateKey(`${to} already has the ${kind} puzzle of ${day}`);
+      }
       docs.delete(keyOf(doc));
       docs.set(keyOf({ playerId: to, kind, day }), { ...doc, playerId: to });
       return 1;

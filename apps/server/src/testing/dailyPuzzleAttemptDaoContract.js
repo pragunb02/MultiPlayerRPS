@@ -115,6 +115,18 @@ export function runDailyPuzzleAttemptDaoContract(createDao) {
     expect(await dao.listByPlayer(GUEST)).toEqual([]);
   });
 
+  it("refuses to give a day to a player who already has that day, and changes neither", async () => {
+    const dao = await createDao();
+    await dao.insert(attempt({ playerId: GUEST, status: "failed" }));
+    await dao.insert(attempt({ status: "playing" }));
+
+    await expect(dao.reassign({ from: GUEST, to: RIYA, kind: "chess", day: "2026-10-20" })).rejects.toThrow(
+      DuplicateKey,
+    );
+    expect((await dao.listByPlayer(GUEST))[0]).toMatchObject({ status: "failed" });
+    expect((await dao.listByPlayer(RIYA))[0]).toMatchObject({ status: "playing" });
+  });
+
   it("deletes every attempt of a player and nobody else's", async () => {
     const dao = await createDao();
     await dao.insert(attempt({ day: "2026-10-19" }));

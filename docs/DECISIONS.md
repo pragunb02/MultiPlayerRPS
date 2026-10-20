@@ -88,8 +88,12 @@ the owner may change it.
      it never feeds the daily play streak, quests, achievements or leaderboards (ADR-013).
   7. **No XP in part 1.** A guest who solves and then signs in to an account that solved the same day would bring a
      second award for that day (ADR-014.5 adds totals), and the leaderboards take bonus XP only from quests.
-  8. **Guests play, and their days follow them** (ADR-014): an account keeps its own day where both played,
-     otherwise the guest's day moves, then the streak is rebuilt. Export and deletion include the days (ADR-048).
+  8. **Guests play, and their days follow them** (ADR-014): a guest's day moves to the account, then the streak is
+     rebuilt. Where both have the day, the one that went further stays: failed over solved over still being played,
+     the account's own on a tie. So failing as a guest to see the solution and then solving on the account leaves the
+     account's day failed. A day is stored only once a legal move or a hint is accepted. Export and deletion include
+     the days (ADR-048), and the export leaves out the puzzle of a day still being played, whose id leads to its
+     solution.
   9. **The share grid names nobody** (ADR-028.7): the kind, the number, one square per move to find, hints, the
      streak, and CC-217's Hinglish and English lines. The Hinglish speaks to the friend with "tum", never "aap",
      as all the app's copy does (owner, 2026-10-20), and a test checks it.

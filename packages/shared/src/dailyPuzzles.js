@@ -40,6 +40,16 @@ export const DAILY_PUZZLE_STATUS = Object.freeze({
   FAILED: "failed",
 });
 
+/** The statuses of a day that has ended. Once ended, the day takes no more moves and shows its solution. */
+export const DAILY_PUZZLE_ENDED = Object.freeze([DAILY_PUZZLE_STATUS.SOLVED, DAILY_PUZZLE_STATUS.FAILED]);
+
+/**
+ * Whether a day's attempt has ended, solved or failed.
+ *
+ * @param {string} status  a DAILY_PUZZLE_STATUS value
+ */
+export const isDailyPuzzleEnded = (status) => DAILY_PUZZLE_ENDED.includes(status);
+
 /**
  * One mark per move the player had to find, for the share grid. It says how a move went and never which move it
  * was, so the grid gives nothing away.

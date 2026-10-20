@@ -39,8 +39,7 @@ const FIRST = { from: "f8", to: "d8" };
 const SECOND = { from: "f6", to: "d8" };
 const MATE = { from: "f1", to: "f8" };
 
-function setup() {
-  const attemptDao = createInMemoryDailyPuzzleAttemptDao();
+function setup({ attemptDao = createInMemoryDailyPuzzleAttemptDao() } = {}) {
   const dailyPuzzleAccessor = createDailyPuzzleAccessor({ attemptDao, catalogues: {} });
   const component = createDailyPuzzleComponent({
     dailyPuzzleAccessor,
@@ -178,8 +177,17 @@ describe("playing the daily puzzle", () => {
     });
   });
 
+  it("stores nothing for an illegal first move", async () => {
+    const { play, component } = setup();
+
+    await play({ from: "f8", to: "f1" }).catch(() => {});
+
+    expect(await component.exportPlayer({ playerId: RIYA })).toEqual([]);
+  });
+
   it("refuses an illegal move without counting a mistake", async () => {
     const { play, component } = setup();
+    await play(WRONG);
 
     const error = await play({ from: "f8", to: "f1" }).catch((err) => err);
 
@@ -187,7 +195,7 @@ describe("playing the daily puzzle", () => {
     expect(error.details).toEqual({ reason: "illegalMove" });
     expect(await component.todayFor({ kind: "chess", playerId: RIYA, now: noon(TUESDAY) })).toMatchObject({
       status: "playing",
-      mistakes: 0,
+      mistakes: 1,
     });
   });
 
@@ -359,7 +367,133 @@ describe("a guest who signs in", () => {
   });
 });
 
+describe("a guest whose day collides with the account's", () => {
+  const solveAsAccount = async (play) => {
+    await play(FIRST);
+    await play(SECOND);
+  };
+  const failAsGuest = async (play) => {
+    for (let i = 0; i < 3; i += 1) await play(WRONG, { playerId: GUEST });
+  };
+
+  it("makes the account's day failed when the guest failed it, so a guest cannot be used to see the solution", async () => {
+    const { component, play } = setup();
+    await play(WRONG);
+    await failAsGuest(play);
+
+    await component.transferPlayer({ from: GUEST, to: RIYA_IDENTITY, now: noon(TUESDAY) });
+
+    const today = await component.todayFor({ kind: "chess", playerId: RIYA, now: noon(TUESDAY) });
+    expect(today).toMatchObject({ status: "failed", mistakes: 3, streak: { current: 0 } });
+  });
+
+  it("keeps a failed guest day over a day the account solved", async () => {
+    const { component, play } = setup();
+    await failAsGuest(play);
+    await solveAsAccount(play);
+
+    await component.transferPlayer({ from: GUEST, to: RIYA_IDENTITY, now: noon(TUESDAY) });
+
+    expect(await component.todayFor({ kind: "chess", playerId: RIYA, now: noon(TUESDAY) })).toMatchObject({
+      status: "failed",
+    });
+  });
+
+  it("keeps the account's day when the guest's day is still being played", async () => {
+    const { component, play } = setup();
+    await play(WRONG, { playerId: GUEST });
+    await play(WRONG);
+    await play(WRONG);
+
+    await component.transferPlayer({ from: GUEST, to: RIYA_IDENTITY, now: noon(TUESDAY) });
+
+    expect(await component.todayFor({ kind: "chess", playerId: RIYA, now: noon(TUESDAY) })).toMatchObject({
+      status: "playing",
+      mistakes: 2,
+    });
+    expect(await component.exportPlayer({ playerId: GUEST })).toEqual([]);
+  });
+
+  it("settles a day the account started while the guest's was being moved", async () => {
+    const attemptDao = createInMemoryDailyPuzzleAttemptDao();
+    // The account's day appears between reading the account's day and moving the guest's one: the first read of
+    // it finds nothing.
+    let hidden = false;
+    const racing = {
+      ...attemptDao,
+      async findDay(key) {
+        if (key.playerId === RIYA && hidden) {
+          hidden = false;
+          return [];
+        }
+        return attemptDao.findDay(key);
+      },
+    };
+    const { component, play } = setup({ attemptDao: racing });
+    await failAsGuest(play);
+    await play(WRONG);
+    hidden = true;
+
+    const result = await component.transferPlayer({ from: GUEST, to: RIYA_IDENTITY, now: noon(TUESDAY) });
+
+    expect(result).toEqual({ moved: { dailyPuzzles: 1 } });
+    expect((await attemptDao.listByPlayer(RIYA))[0]).toMatchObject({ status: "failed" });
+  });
+});
+
+describe("two things at once", () => {
+  it("calls it a change in another tab when another tab stored the first move of the day at the same moment", async () => {
+    const attemptDao = createInMemoryDailyPuzzleAttemptDao();
+    let hidden = false;
+    // The other tab's first move is stored after this one read the day and before it stores its own.
+    const racing = {
+      ...attemptDao,
+      async findDay(key) {
+        if (hidden) {
+          hidden = false;
+          return [];
+        }
+        return attemptDao.findDay(key);
+      },
+    };
+    const { play } = setup({ attemptDao: racing });
+    await play(WRONG);
+    hidden = true;
+
+    const error = await play(WRONG).catch((err) => err);
+
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error.details).toEqual({ reason: "changed" });
+  });
+
+  it("fails the move of a guest's day when the account's day comes back while it moves, so it runs again later", async () => {
+    const attemptDao = createInMemoryDailyPuzzleAttemptDao();
+    // The account's day is deleted, but another tab stores it again before the guest's day moves in.
+    const racing = {
+      ...attemptDao,
+      deleteDay: async (key) => (key.playerId === RIYA ? 1 : attemptDao.deleteDay(key)),
+    };
+    const { component, play } = setup({ attemptDao: racing });
+    for (let i = 0; i < 3; i += 1) await play(WRONG, { playerId: GUEST });
+    await play(WRONG);
+
+    await expect(
+      component.transferPlayer({ from: GUEST, to: RIYA_IDENTITY, now: noon(TUESDAY) }),
+    ).rejects.toThrow(ConflictError);
+  });
+});
+
 describe("a player's data", () => {
+  it("leaves out the puzzle of a day still being played, which would lead to its solution", async () => {
+    const { component, play } = setup();
+    await play(WRONG);
+
+    const [day] = await component.exportPlayer({ playerId: RIYA });
+
+    expect(day).not.toHaveProperty("puzzleId");
+    expect(day).toMatchObject({ status: "playing", mistakes: 1 });
+  });
+
   it("is exported day by day without the moves", async () => {
     const { component, play } = setup();
     await play(FIRST);

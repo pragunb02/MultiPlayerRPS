@@ -10,6 +10,12 @@ import { scheduleOn } from "./schedule.js";
  * @typedef {import("./chessKind.js").PuzzleKind} PuzzleKind
  */
 
+/** Which of two attempts at one day went further, for a guest's day that meets the account's. */
+const DAY_RANK = Object.freeze({
+  [DAILY_PUZZLE_STATUS.PLAYING]: 1,
+  [DAILY_PUZZLE_STATUS.SOLVED]: 2,
+  [DAILY_PUZZLE_STATUS.FAILED]: 3,
+});
 const sum = (counts) => counts.reduce((total, count) => total + count, 0);
 const isoOrEmpty = (ms) => (ms > 0 ? new Date(ms).toISOString() : "");
 
@@ -100,8 +106,8 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
   }
 
   /**
-   * The player's attempt, stored if this is their first move or hint today. Refuses a day that is over and an
-   * attempt that has ended.
+   * The player's attempt today, or a new one that is not stored yet. Nothing is stored until a legal move or a hint
+   * is accepted (see `store`). Refuses a day that is over and an attempt that has ended.
    */
   async function openAttempt({ kind, playerId, day, now }) {
     const today = calendar.dayOf(now);
@@ -111,22 +117,66 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
     const state = await stateFor({ kind, playerId, today });
     const attempt = state.stored
       ? state.attempt
-      : await dailyPuzzleAccessor.start(
-          newAttempt({
-            playerId,
-            kind: kind.id,
-            day: today,
-            puzzleId: state.puzzle.id,
-            steps: kind.steps(state.puzzle),
-            now,
-          }),
-        );
+      : newAttempt({
+          playerId,
+          kind: kind.id,
+          day: today,
+          puzzleId: state.puzzle.id,
+          steps: kind.steps(state.puzzle),
+          now,
+        });
     if (isEnded(attempt)) {
       throw new ConflictError("Today's puzzle is over for you", {
         details: { reason: DAILY_PUZZLE_REFUSALS.FINISHED },
       });
     }
     return { ...state, today, attempt };
+  }
+
+  /**
+   * Saves the attempt after an accepted move or hint. The first one of the day stores it. Another tab that stored
+   * the day at the same moment makes it a conflict, as a change in another tab does.
+   */
+  async function store({ attempt, stored }) {
+    if (stored) {
+      return dailyPuzzleAccessor.save(attempt);
+    }
+    const { created, attempt: added } = await dailyPuzzleAccessor.add(attempt);
+    if (!created) {
+      throw new ConflictError("The puzzle changed in another tab", {
+        details: { reason: DAILY_PUZZLE_REFUSALS.CHANGED },
+      });
+    }
+    return added;
+  }
+
+  /**
+   * Moves one of a guest's days to the account (ADR-014). Where the account has that day too, the day that went
+   * further wins: failed over solved over still being played, the account's own on a tie. So failing as a guest to
+   * see the solution and then solving on the account leaves the account's day failed. Answers how many days moved.
+   */
+  async function moveDay({ day, from, to }) {
+    const key = { playerId: to, kind: day.kind, day: day.day };
+    const move = { from, to, kind: day.kind, day: day.day };
+    let [own] = await dailyPuzzleAccessor.findDay(key);
+    if (own === undefined) {
+      const first = await dailyPuzzleAccessor.reassign(move);
+      if (!first.collided) {
+        return first.moved;
+      }
+      // The account started that day while the guest's was being moved.
+      [own] = await dailyPuzzleAccessor.findDay(key);
+    }
+    if (DAY_RANK[day.status] <= DAY_RANK[own.status]) {
+      await dailyPuzzleAccessor.removeDay(day);
+      return 0;
+    }
+    await dailyPuzzleAccessor.removeDay(own);
+    const { moved, collided } = await dailyPuzzleAccessor.reassign(move);
+    if (collided) {
+      throw new ConflictError("The account's day changed while a guest's day was moving to it");
+    }
+    return moved;
   }
 
   return Object.freeze({
@@ -171,7 +221,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
      */
     async play({ kind: kindId, playerId, day, move, now }) {
       const kind = kindOf(kindId);
-      const { today, number, puzzle, attempt } = await openAttempt({ kind, playerId, day, now });
+      const { today, number, puzzle, attempt, stored } = await openAttempt({ kind, playerId, day, now });
       const judged = kind.judge({ puzzle, found: attempt.found, move });
       if (!judged.legal) {
         throw new ValidationError("That move is not possible here", {
@@ -193,7 +243,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
             }),
           }
         : next.attempt;
-      const saved = await dailyPuzzleAccessor.save(ended);
+      const saved = await store({ attempt: ended, stored });
       const { reply } = judged;
       return {
         outcome: next.outcome,
@@ -214,13 +264,13 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
      */
     async takeHint({ kind: kindId, playerId, day, now }) {
       const kind = kindOf(kindId);
-      const { today, number, puzzle, attempt } = await openAttempt({ kind, playerId, day, now });
+      const { today, number, puzzle, attempt, stored } = await openAttempt({ kind, playerId, day, now });
       if (sum(attempt.hints) >= kind.maxHints) {
         throw new ConflictError("No hints left today", {
           details: { reason: DAILY_PUZZLE_REFUSALS.NO_HINTS_LEFT },
         });
       }
-      const saved = await dailyPuzzleAccessor.save(afterHint({ attempt, now }));
+      const saved = await store({ attempt: afterHint({ attempt, now }), stored });
       return {
         hint: kind.hint({ puzzle, found: saved.found, level: hintsAt(saved) }),
         puzzle: await playerView({ kind, playerId, today, number, puzzle, attempt: saved, now }),
@@ -228,23 +278,17 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
     },
 
     /**
-     * A guest just signed in (ADR-014): each of their days moves to the account, unless the account played that
-     * day itself, and then the account's streaks are counted again from the start. Running it twice moves nothing
-     * more. A change in another tab at the same moment fails it, and the transfer runs again later.
+     * A guest just signed in (ADR-014): each of their days moves to the account (see `moveDay` for a day both
+     * have), and then the account's streaks are counted again from the start. Running it twice moves nothing more.
+     * A change in another tab at the same moment fails it, and the transfer runs again later.
      *
      * @param {{ from: string, to: Readonly<import("../../models/identity.js").Identity>, now: number }} transfer
      * @returns {Promise<{ moved: { dailyPuzzles: number } }>}
      */
     async transferPlayer({ from, to }) {
-      const key = ({ kind, day }) => `${kind}|${day}`;
-      const own = new Set((await dailyPuzzleAccessor.listByPlayer(to.id)).map(key));
       let moved = 0;
       for (const day of await dailyPuzzleAccessor.listByPlayer(from)) {
-        if (own.has(key(day))) {
-          await dailyPuzzleAccessor.removeDay(day);
-        } else {
-          moved += await dailyPuzzleAccessor.reassign({ from, to: to.id, kind: day.kind, day: day.day });
-        }
+        moved += await moveDay({ day, from, to: to.id });
       }
       const days = await dailyPuzzleAccessor.listByPlayer(to.id);
       for (const kind of new Set(days.map((day) => day.kind))) {
@@ -262,7 +306,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
 
     /**
      * The player's days, for their data export (CC-035). The moves are left out: they are the puzzle's, not the
-     * player's.
+     * player's. So is the puzzle of a day still being played, because its id leads to the solution.
      *
      * @param {{ playerId: string }} query
      */
@@ -270,7 +314,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
       (await dailyPuzzleAccessor.listByPlayer(playerId)).map((day) => ({
         kind: day.kind,
         day: day.day,
-        puzzleId: day.puzzleId,
+        ...(isEnded(day) && { puzzleId: day.puzzleId }),
         status: day.status,
         mistakes: day.mistakes,
         hintsTaken: sum(day.hints),

@@ -85,16 +85,17 @@ export function createDailyPuzzleAccessor({ attemptDao, catalogues }) {
      * Stores a new attempt, or answers the one the player already has that day.
      *
      * @param {Readonly<DailyPuzzleAttempt>} attempt
-     * @returns {Promise<Readonly<DailyPuzzleAttempt>>}
+     * @returns {Promise<{ created: boolean, attempt: Readonly<DailyPuzzleAttempt> }>}  created: false when the player
+     *   already had that day, which then is the attempt answered
      */
-    async start(attempt) {
+    async add(attempt) {
       try {
         await attemptDao.insert(toDoc(attempt));
-        return toAttempt(toDoc(attempt));
+        return { created: true, attempt: toAttempt(toDoc(attempt)) };
       } catch (err) {
         if (!(err instanceof DuplicateKey)) throw err;
         const [existing] = await attemptDao.findDay(keyOf(attempt));
-        return toAttempt(existing);
+        return { created: false, attempt: toAttempt(existing) };
       }
     },
 
@@ -134,8 +135,20 @@ export function createDailyPuzzleAccessor({ attemptDao, catalogues }) {
     /** @param {string} playerId @returns {Promise<ReadonlyArray<Readonly<DailyPuzzleAttempt>>>} by kind, oldest first */
     listByPlayer: async (playerId) => Object.freeze((await attemptDao.listByPlayer(playerId)).map(toAttempt)),
 
-    /** @param {{ from: string, to: string, kind: string, day: string }} move @returns {Promise<number>} */
-    reassign: (move) => attemptDao.reassign(move),
+    /**
+     * Gives one day of `from` to `to`, unless `to` has that day already.
+     *
+     * @param {{ from: string, to: string, kind: string, day: string }} move
+     * @returns {Promise<{ moved: number, collided: boolean }>}  collided: `to` has that day, and nothing moved
+     */
+    async reassign(move) {
+      try {
+        return { moved: await attemptDao.reassign(move), collided: false };
+      } catch (err) {
+        if (!(err instanceof DuplicateKey)) throw err;
+        return { moved: 0, collided: true };
+      }
+    },
 
     /** @param {{ playerId: string, kind: string, day: string }} key @returns {Promise<number>} */
     removeDay: (key) => attemptDao.deleteDay(keyOf(key)),
