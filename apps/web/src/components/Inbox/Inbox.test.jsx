@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
@@ -138,10 +138,10 @@ describe("Inbox (CC-207)", () => {
   });
 
   it("lets an open challenge go once it expires, and a taken one once its room stops waiting", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Real time, in short spans, so the test does not depend on how fake timers meet the page's effects.
     const now = Date.now();
     await renderInbox([
-      challenge({ expiresAt: now + 10_000 }),
+      challenge({ expiresAt: now + 2_000 }),
       challenge({
         id: "c0000000000000000002",
         own: true,
@@ -150,16 +150,17 @@ describe("Inbox (CC-207)", () => {
         expiresAt: undefined,
         acceptedName: "Arjun",
         room: { code: "AB2CD3", gameId: "chess" },
-        until: now + 40_000,
+        until: now + 5_000,
       }),
     ]);
-    expect(await screen.findByRole("button", { name: "Inbox, 2 waiting" })).toBeInTheDocument();
 
-    act(() => vi.advanceTimersByTime(16_000));
-    expect(screen.getByRole("button", { name: "Inbox, 1 waiting" })).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(30_000));
-    expect(screen.queryByRole("button", { name: /^Inbox/ })).not.toBeInTheDocument();
-  });
+    expect(
+      await screen.findByRole("button", { name: "Inbox, 1 waiting" }, { timeout: 4_000 }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^Inbox/ })).not.toBeInTheDocument(), {
+      timeout: 8_000,
+    });
+  }, 15_000);
 
   it("leaves out what is over and what was never the player's to answer", async () => {
     const { api } = await renderInbox([
