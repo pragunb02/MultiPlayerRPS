@@ -314,6 +314,7 @@ describe("the feedback inbox (CC-290)", () => {
       "Conversion",
       "Engagement",
       "Feedback",
+      "Ages",
     ]);
     expect(onInbox.filter(([, current]) => current === "page")).toEqual([["Feedback", "page"]]);
     expect(screen.getByRole("link", { name: "Feedback" })).toHaveAttribute("href", "/admin/feedback");

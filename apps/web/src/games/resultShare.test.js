@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GAMES, ROOM_END_REASONS } from "@classicade/shared";
 import { resultText, withFreeLine } from "../lib/shareText.js";
+import { ADULT_SAFETY, MINOR_SAFETY } from "../testing/fakes.js";
 import { resultShare, resultShareOf } from "./resultShare.js";
 
 const ORIGIN = "https://classicade.example";
@@ -23,6 +24,8 @@ const AUDIENCES = Object.freeze({
     birthYear: 1990,
   },
 });
+// The safety flags each kind of viewer gets from the age policy (CC-152): only the adult's allow a name.
+const FLAGS = Object.freeze({ guest: MINOR_SAFETY, minor: MINOR_SAFETY, adult: ADULT_SAFETY });
 const OPPONENT = Object.freeze({
   playerId: "u_64f0bbbbbb02",
   displayName: "Bob The Builder",
@@ -94,7 +97,7 @@ describe("resultShare", () => {
         series: { games: 3, wins: { [viewer.playerId]: 2 } },
       });
 
-      const share = resultShare(room, { origin: ORIGIN });
+      const share = resultShare(room, { origin: ORIGIN, safety: FLAGS[audience] });
 
       for (const secret of secretsOf(room)) {
         expect(share.message).not.toContain(secret);
@@ -112,7 +115,7 @@ describe("resultShare", () => {
       outcome: "win",
     });
 
-    const share = resultShare(room, { origin: ORIGIN });
+    const share = resultShare(room, { origin: ORIGIN, safety: MINOR_SAFETY });
 
     const page = `${ORIGIN}/games/${game.slug}`;
     expect(share.shareUrl).toBe(`${page}?via=share`);
@@ -128,7 +131,7 @@ describe("resultShare", () => {
       outcome: "win",
     });
 
-    const share = resultShare(room, { origin: ORIGIN });
+    const share = resultShare(room, { origin: ORIGIN, safety: MINOR_SAFETY });
 
     const lastLine = (text) => new URL(text.split("\n").at(-1));
     const links = [
@@ -142,14 +145,22 @@ describe("resultShare", () => {
   });
 
   it("is the same text for a guest, a minor and an adult in the same game", () => {
-    const texts = Object.values(AUDIENCES).map(
-      (viewer) =>
+    const texts = Object.entries(AUDIENCES).map(
+      ([audience, viewer]) =>
         resultShare(finishedRoom({ gameId: "rps", viewer, against: "character", outcome: "win" }), {
           origin: ORIGIN,
+          safety: FLAGS[audience],
         }).message,
     );
 
     expect(new Set(texts).size).toBe(1);
+  });
+
+  it("cannot be made without the player's safety flags from the age policy (CC-152)", () => {
+    const room = finishedRoom({ gameId: "rps", viewer: AUDIENCES.minor, against: "person", outcome: "win" });
+
+    expect(() => resultShare(room, { origin: ORIGIN })).toThrow(/safety/);
+    expect(() => resultShare(room, { origin: ORIGIN, safety: {} })).toThrow(/safety/);
   });
 });
 
@@ -196,7 +207,7 @@ describe("resultShareOf", () => {
     const room = finishedRoom({ gameId: "chess", viewer, against: "person", outcome: "win", series });
 
     expect(resultShareOf(room).score).toBe("");
-    expect(resultShare(room, { origin: ORIGIN }).line).toBe(
+    expect(resultShare(room, { origin: ORIGIN, safety: MINOR_SAFETY }).line).toBe(
       "🏆 Maine Chess jeeta! Ab tumhari baari:\nI won a game of Chess on ClassiCade. Your turn!",
     );
   });
@@ -206,7 +217,9 @@ describe("resultShareOf", () => {
     const series = { games: 4, wins: { [viewer.playerId]: 1, [room.seats[1].playerId]: 3 } };
 
     expect(resultShareOf({ ...room, series }).score).toBe("");
-    expect(resultShare({ ...room, series }, { origin: ORIGIN }).message).not.toMatch(/\d-\d/);
+    expect(resultShare({ ...room, series }, { origin: ORIGIN, safety: MINOR_SAFETY }).message).not.toMatch(
+      /\d-\d/,
+    );
   });
 
   it("gives no rounds score to a winner by forfeit who was behind on rounds", () => {
@@ -217,7 +230,7 @@ describe("resultShareOf", () => {
     };
 
     expect(resultShareOf(behind)).toMatchObject({ outcome: "win", forfeit: true, score: "" });
-    expect(resultShare(behind, { origin: ORIGIN }).line).toContain(
+    expect(resultShare(behind, { origin: ORIGIN, safety: MINOR_SAFETY }).line).toContain(
       "I won a game of Rock Paper Scissors on ClassiCade (my opponent left)",
     );
   });

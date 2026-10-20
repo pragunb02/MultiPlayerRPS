@@ -31,3 +31,7 @@
   font-weight: 700;
   color: var(--color-danger);
 }
+/* A Hinglish line and its English line, one under the other (ADR-051). */
+.line {
+  display: block;
+}

@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ServicesProvider } from "../../app/ServicesProvider.jsx";
+import { ADULT_SAFETY, fakeApi, MINOR_SAFETY } from "../../testing/fakes.js";
 import { ToastProvider } from "../Toast/ToastProvider.jsx";
 import { ShareResult } from "./ShareResult.jsx";
 
@@ -28,11 +30,13 @@ const FREE = "Free hai, login nahi chahiye.\nFree, no login needed.";
 const URL_ = `${ORIGIN}/games/rock-paper-scissors`;
 const messageVia = (via) => `${TEXT}\n${FREE}\n${URL_}?via=${via}`;
 
-const show = (props = {}) =>
+const show = (props = {}, api = fakeApi()) =>
   render(
-    <ToastProvider>
-      <ShareResult room={room()} origin={ORIGIN} {...props} />
-    </ToastProvider>,
+    <ServicesProvider services={{ api }}>
+      <ToastProvider>
+        <ShareResult room={room()} origin={ORIGIN} {...props} />
+      </ToastProvider>
+    </ServicesProvider>,
   );
 
 describe("ShareResult", () => {
@@ -134,6 +138,19 @@ describe("ShareResult", () => {
     expect(document.body.textContent).not.toContain("AB2CD3");
   });
 
+  it("reads the player's own safety flags from the age policy, and names nobody with any of them (CC-152)", async () => {
+    for (const safety of [MINOR_SAFETY, ADULT_SAFETY]) {
+      const api = fakeApi({ getSafety: vi.fn().mockResolvedValue(safety) });
+      const { unmount } = show({}, api);
+
+      await waitFor(() => expect(api.getSafety).toHaveBeenCalledTimes(1));
+      const text = new URL(screen.getByRole("link", { name: /WhatsApp/ }).href).searchParams.get("text");
+      expect(text).toBe(messageVia("wa"));
+      expect(text).not.toContain(ME.displayName);
+      unmount();
+    }
+  });
+
   it("is not offered to a spectator, who played nothing", () => {
     show({ room: room({ you: "" }) });
 
@@ -146,9 +163,11 @@ describe("ShareResult", () => {
     meta.setAttribute("content", "https://canonical.example");
     document.head.append(meta);
     render(
-      <ToastProvider>
-        <ShareResult room={room()} />
-      </ToastProvider>,
+      <ServicesProvider services={{ api: fakeApi() }}>
+        <ToastProvider>
+          <ShareResult room={room()} />
+        </ToastProvider>
+      </ServicesProvider>,
     );
     meta.remove();
 

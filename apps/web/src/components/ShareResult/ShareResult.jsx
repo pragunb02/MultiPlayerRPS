@@ -1,6 +1,7 @@
 import { siteOrigin } from "../../app/siteOrigin.js";
 import { resultShare } from "../../games/resultShare.js";
 import { useAction } from "../../hooks/useAction.js";
+import { useSafety } from "../../hooks/useSafety.js";
 import { shareWasCancelled } from "../../lib/shareText.js";
 import { Button } from "../Button/Button.jsx";
 import { useToast } from "../Toast/toastContext.js";
@@ -10,14 +11,16 @@ import styles from "./ShareResult.module.css";
 /**
  * Share the result of a finished game (CC-217): the text it sends, WhatsApp, and the device's share sheet, or a copy
  * of the message where the device has none. The link is the game's page, because the room closes soon after the
- * game. The text names no player, so it is safe for a guest or a minor to send (ADR-028.7). A spectator played
- * nothing and gets nothing to share.
+ * game. It reads the player's own safety flags from the age policy (CC-152), whose `shareCardName` is the most a
+ * card may carry. The text names no player at all, so it is safe for a guest or a minor to send (ADR-028.7). A
+ * spectator played nothing and gets nothing to share.
  *
  * @param {{ room: any, origin?: string }} props  room: the finished RoomView. origin: the site's own address
  */
 export function ShareResult({ room, origin = siteOrigin() }) {
   const toast = useToast();
-  const share = resultShare(room, { origin });
+  const { safety } = useSafety();
+  const share = resultShare(room, { origin, safety });
 
   const send = useAction(
     async () => {

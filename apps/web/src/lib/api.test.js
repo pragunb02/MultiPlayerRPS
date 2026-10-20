@@ -320,6 +320,31 @@ describe("api client, the account's data and age (CC-035, CC-152)", () => {
     ]);
   });
 
+  it("reads the player's own safety flags (CC-152)", async () => {
+    const fetchImpl = respond(200, { safety: { shareCardName: false, boardName: "hidden" } });
+    const api = createApiClient({ fetchImpl });
+
+    expect(await api.getSafety()).toEqual({ shareCardName: false, boardName: "hidden" });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/safety", expect.objectContaining({ method: "GET" }));
+  });
+
+  it("sends the owner's correction of a birth year, or null to clear it (CC-152)", async () => {
+    const fetchImpl = respond(200, { account: { username: "sam", ageGroup: "unknown" } });
+    const api = createApiClient({ fetchImpl });
+
+    expect(await api.correctBirthYear({ email: "sam@example.com", birthYear: null })).toEqual({
+      username: "sam",
+      ageGroup: "unknown",
+    });
+    expect(fetchImpl.mock.calls.map(([url, init]) => [url, init.method, init.body])).toEqual([
+      [
+        "/api/admin/accounts/birth-year",
+        "PUT",
+        JSON.stringify({ email: "sam@example.com", birthYear: null }),
+      ],
+    ]);
+  });
+
   it("asks for the data export and the deletion with the password", async () => {
     const fetchImpl = vi
       .fn()

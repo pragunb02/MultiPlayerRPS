@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
-import { fakeApi, GUEST } from "../../testing/fakes.js";
+import { ADULT_SAFETY, fakeApi, GUEST, MINOR_SAFETY } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
 
 const USER = { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "Riya" };
@@ -29,6 +29,8 @@ describe("year of birth on the profile (CC-152)", () => {
   it("lets an account without a year choose one once, and then shows it", async () => {
     const api = profileApi({
       setBirthYear: vi.fn(async (birthYear) => ({ ...UNKNOWN, birthYear, ageGroup: "adult" })),
+      // The board name comes from the age policy, read again once the year is saved (CC-152).
+      getSafety: vi.fn().mockResolvedValueOnce(MINOR_SAFETY).mockResolvedValue(ADULT_SAFETY),
     });
     const { privacy } = await openPrivacy({ api });
     expect(
@@ -41,6 +43,7 @@ describe("year of birth on the profile (CC-152)", () => {
     expect(await within(privacy).findByText(/1990\. It can be set once/)).toBeInTheDocument();
     expect(api.setBirthYear).toHaveBeenCalledWith(1990);
     expect(within(privacy).queryByText(/Hidden player/)).toBeNull();
+    expect(api.getSafety).toHaveBeenCalledTimes(2);
     expect(within(privacy).queryByLabelText("Year of birth")).toBeNull();
   });
 
