@@ -29,6 +29,8 @@ const QUICK = Object.freeze({
   resultMs: { min: 120, max: 200 },
   rematchShare: 0.5,
   chessOwnMoves: { min: 1, max: 4 },
+  // The test server thinks on its own event loop, where a Strong chess search would hold up every player (CC-309).
+  easiestComputer: true,
 });
 
 const cleanups = [];
@@ -123,9 +125,13 @@ describe("createSwarm against the real server", () => {
     expect(swarm.players()).toBe(0);
   }, 30_000);
 
+  // Each kind of call comes from one small swarm whose model makes it happen: friends who always rematch, friends
+  // who leave after one game, and one player against each game's computer at its easiest level. The test waits
+  // for the recorder to see the names, not on a timer. It used to grow 24 players with random plans, one of them
+  // against the Strong chess computer, whose searches (up to 0.5 s each with coverage) ran on the test server's
+  // own event loop and held up every other player: about 3.5 s here, over the 30 s limit on a busy runner (CC-309).
   it("records each kind of call by name", async () => {
     const server = await realServer();
-    const { recorder, swarm } = swarmOn(server.baseUrl);
     const expected = [
       "computer reply chess",
       "computer reply tictactoe",
@@ -145,18 +151,48 @@ describe("createSwarm against the real server", () => {
       "room:request",
       "socket connect",
     ];
-
-    await swarm.grow(24, 0);
     const names = new Set();
-    await until(() => {
-      Object.keys(recorder.take().times).forEach((name) => names.add(name));
-      return expected.every((name) => names.has(name));
-    });
+    const failures = new Set();
+    let wake = () => {};
+    const inner = createRecorder();
+    const recorder = {
+      ...inner,
+      time(name, ms) {
+        inner.time(name, ms);
+        names.add(name);
+        wake();
+      },
+      fail(name) {
+        inner.fail(name);
+        failures.add(name);
+        wake();
+      },
+    };
+    const only = (gameId) => ({ [gameId]: 1 });
+    const plans = [
+      { ...QUICK, computerShare: 0, gameShare: only(GAME_IDS.RPS), rematchShare: 1 },
+      { ...QUICK, computerShare: 0, gameShare: only(GAME_IDS.TIC_TAC_TOE), rematchShare: 0 },
+      { ...QUICK, computerShare: 0, gameShare: only(GAME_IDS.CHESS), rematchShare: 0 },
+      { ...QUICK, computerShare: 1, gameShare: only(GAME_IDS.RPS), rematchShare: 0 },
+      { ...QUICK, computerShare: 1, gameShare: only(GAME_IDS.TIC_TAC_TOE), rematchShare: 0 },
+      { ...QUICK, computerShare: 1, gameShare: only(GAME_IDS.CHESS), rematchShare: 0 },
+    ];
+    const swarms = plans.map((model) => swarmOn(server.baseUrl, { model, recorder }).swarm);
 
+    // One pair of friends or one player each.
+    await Promise.all(swarms.map((swarm, index) => swarm.grow(plans[index].computerShare === 1 ? 1 : 2, 0)));
+    while (failures.size === 0 && !expected.every((name) => names.has(name))) {
+      await new Promise((resolve) => {
+        wake = resolve;
+      });
+    }
+    await Promise.all(swarms.map((swarm) => swarm.stop()));
+
+    expect([...failures]).toEqual([]);
     // The computer throws in the same save that starts a Rock Paper Scissors round, so a reply to wait for is rare
     // and may or may not show up.
     expect([...names].filter((name) => name !== "computer reply rps").sort()).toEqual(expected);
-  }, 30_000);
+  });
 
   it("counts a refused room and stops that player's games", async () => {
     const server = await realServer({ openRoomsMax: 1 });
