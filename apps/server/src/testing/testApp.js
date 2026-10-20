@@ -34,6 +34,7 @@ import { createMatchOutboxComponent } from "../domain/matches/matchOutboxCompone
 import { createProgressionComponent } from "../domain/progression/progressionComponent.js";
 import { createChessRatingComponent } from "../domain/ratings/chessRatingComponent.js";
 import { createRoomComponent, ROOM_EVENTS } from "../domain/rooms/roomComponent.js";
+import { createSeatIds, seatSecretFrom } from "../domain/rooms/seatIds.js";
 import { createInMemoryRoomDao } from "./inMemoryRoomDao.js";
 import {
   connectLeaderboardBonuses,
@@ -153,11 +154,13 @@ export function createTestApp({
   const playerTransferAccessor = createPlayerTransferAccessor({
     playerTransferDao: createInMemoryPlayerTransferDao(),
   });
+  const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
   const blockComponent = createBlockComponent({
     blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
     rooms: roomAccessor,
     matches: matchComponent,
     transfers: playerTransferAccessor,
+    seatIds,
   });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -225,6 +228,7 @@ export function createTestApp({
     botTurns,
     keepFinishedGame: keepFinishedGameIn({ outbox, matchComponent, now }),
     blocks: blockComponent,
+    seatIds,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.

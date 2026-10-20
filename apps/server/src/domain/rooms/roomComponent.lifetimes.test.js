@@ -6,6 +6,7 @@ import { createInMemoryRoomDao } from "../../testing/inMemoryRoomDao.js";
 import { GoneError } from "../../utils/errors.js";
 import { createRoomComponent, ROOM_EVENTS } from "./roomComponent.js";
 import { ROOM_LIFETIMES, roomLifetimes } from "./roomLifetimes.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 // Every boundary of every room lifetime (CC-101), with the clock passed in so each test can say exactly when.
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
@@ -18,6 +19,7 @@ function setup({ lifetimes, wrap = (a) => a } = {}) {
   const published = [];
   const accessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: wrap(accessor),
     engines: createEngineRegistry([raceEngine]),
     events: { emit: (event, payload) => published.push({ event, payload }) },
@@ -277,6 +279,7 @@ describe("room lifetimes in the room component (CC-101)", () => {
     it("leave a room alone whose game ended in the meantime", async () => {
       let stale = [];
       const rooms = createRoomComponent({
+        seatIds: TEST_SEAT_IDS,
         roomAccessor: ((accessor) => ({ ...accessor, listDue: async () => stale }))(
           createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
         ),
@@ -299,6 +302,7 @@ describe("room lifetimes in the room component (CC-101)", () => {
 
     it("leave a room alone whose deadline moved later in the meantime", async () => {
       const rooms = createRoomComponent({
+        seatIds: TEST_SEAT_IDS,
         roomAccessor: ((accessor) => ({ ...accessor, listDue: accessor.listAll }))(
           createRoomAccessor({ roomDao: createInMemoryRoomDao() }),
         ),

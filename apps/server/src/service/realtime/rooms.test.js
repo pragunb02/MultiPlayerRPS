@@ -31,7 +31,9 @@ async function startedRace() {
   const code = created.data.code;
   const aliceSeesStart = nextUpdate(alice.socket);
   const joined = await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
-  return { alice, bob, code, created, joined, aliceStart: await aliceSeesStart };
+  // Each player's seat id, as their own view tells them: views name players by seat id only (CC-253).
+  const seat = { alice: created.data.you, bob: joined.data.you };
+  return { alice, bob, code, created, joined, seat, aliceStart: await aliceSeesStart };
 }
 
 describe("rooms over sockets", () => {
@@ -45,15 +47,17 @@ describe("rooms over sockets", () => {
     });
 
     expect(ack.ok).toBe(true);
+    const you = ack.data.you;
+    expect(you).toMatch(/^[A-Za-z0-9_-]{22}$/);
     expect(ack.data).toEqual(
       expect.objectContaining({
         gameId: "race",
         status: "waiting",
-        hostId: alice.identity.id,
-        you: alice.identity.id,
+        hostId: you,
+        you,
         seats: [
           expect.objectContaining({
-            playerId: alice.identity.id,
+            playerId: you,
             displayName: alice.identity.displayName,
             connected: true,
             presence: "here",
@@ -67,23 +71,23 @@ describe("rooms over sockets", () => {
   it("starts the game when the second player joins and tells the first", async () => {
     server = await startTestServer();
 
-    const { alice, bob, joined, aliceStart } = await startedRace();
+    const { seat, joined, aliceStart } = await startedRace();
 
     expect(joined.data.status).toBe("playing");
-    expect(joined.data.you).toBe(bob.identity.id);
+    expect(joined.data.you).toBe(seat.bob);
     expect(aliceStart.status).toBe("playing");
-    expect(aliceStart.you).toBe(alice.identity.id);
-    expect(aliceStart.game.activePlayers).toEqual([bob.identity.id]);
+    expect(aliceStart.you).toBe(seat.alice);
+    expect(aliceStart.game.activePlayers).toEqual([seat.bob]);
   });
 
   it("plays a full game: moves are validated by the engine and both sides see every move", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await startedRace();
+    const { seat, alice, bob, code } = await startedRace();
 
     const aliceSeesMove = nextUpdate(alice.socket);
     const afterBob = await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
     expect(afterBob.data.game.view.count).toBe(1);
-    expect((await aliceSeesMove).game.activePlayers).toEqual([alice.identity.id]);
+    expect((await aliceSeesMove).game.activePlayers).toEqual([seat.alice]);
 
     const bobSeesEnd = nextUpdate(bob.socket);
     const final = await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 2 } });
@@ -91,7 +95,7 @@ describe("rooms over sockets", () => {
     const outcome = {
       status: "finished",
       result: "win",
-      winners: [alice.identity.id],
+      winners: [seat.alice],
       reason: "reached-target",
     };
     expect(final.data.status).toBe("finished");
@@ -162,7 +166,7 @@ describe("rooms over sockets", () => {
 
   it("forfeits the game when a player leaves, and tells the opponent", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await startedRace();
+    const { seat, alice, bob, code } = await startedRace();
     const aliceSeesForfeit = nextUpdate(alice.socket);
 
     const ack = await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code });
@@ -171,7 +175,7 @@ describe("rooms over sockets", () => {
     expect((await aliceSeesForfeit).game.outcome).toEqual({
       status: "finished",
       result: "win",
-      winners: [alice.identity.id],
+      winners: [seat.alice],
       reason: "forfeit",
     });
   });
@@ -205,12 +209,12 @@ describe("rooms over sockets", () => {
 
   it("shows the opponent as disconnected, and reconnected after they rejoin", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await startedRace();
+    const { seat, alice, bob, code } = await startedRace();
     const aliceSeesDrop = nextUpdate(alice.socket);
 
     bob.socket.disconnect();
     const dropped = await aliceSeesDrop;
-    expect(dropped.seats.find((s) => s.playerId === bob.identity.id)).toEqual(
+    expect(dropped.seats.find((s) => s.playerId === seat.bob)).toEqual(
       expect.objectContaining({ connected: false, presence: "offline" }),
     );
 
@@ -224,8 +228,8 @@ describe("rooms over sockets", () => {
 
   it("shows a player who went to another page as away at once, and offline once their last tab closes (CC-207)", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await startedRace();
-    const bobOf = (view) => view.seats.find((s) => s.playerId === bob.identity.id);
+    const { seat, alice, bob, code } = await startedRace();
+    const bobOf = (view) => view.seats.find((s) => s.playerId === seat.bob);
     const aliceSeesAway = nextUpdate(alice.socket);
 
     const ack = await send(bob.socket, SOCKET_EVENTS.ROOM_AWAY, { code });
@@ -242,7 +246,7 @@ describe("rooms over sockets", () => {
 
   it("keeps a player here while another of their tabs still shows the room, and away once a tab elsewhere is all that is left", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await startedRace();
+    const { seat, alice, bob, code } = await startedRace();
     const secondTab = await openSocket(bob.cookie);
     await send(secondTab, SOCKET_EVENTS.ROOM_JOIN, { code });
     const homeTab = await openSocket(bob.cookie);
@@ -253,13 +257,13 @@ describe("rooms over sockets", () => {
     secondTab.disconnect();
 
     const seen = await aliceSeesAway;
-    expect(seen.seats.find((s) => s.playerId === bob.identity.id).presence).toBe("away");
+    expect(seen.seats.find((s) => s.playerId === seat.bob).presence).toBe("away");
     expect(homeTab.connected).toBe(true);
   });
 
   it("counts a closing room page as away when its game started a moment before, instead of leaving it (CC-112, CC-207)", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await startedRace();
+    const { seat, alice, bob, code } = await startedRace();
     const aliceSeesAway = nextUpdate(alice.socket);
 
     const ack = await send(bob.socket, SOCKET_EVENTS.ROOM_LEAVE, { code, waitingOnly: true });
@@ -267,7 +271,7 @@ describe("rooms over sockets", () => {
     expect(ack).toEqual({ ok: true, data: { left: false } });
     const seen = await aliceSeesAway;
     expect(seen.status).toBe("playing");
-    expect(seen.seats.find((s) => s.playerId === bob.identity.id).presence).toBe("away");
+    expect(seen.seats.find((s) => s.playerId === seat.bob).presence).toBe("away");
   });
 
   it("refuses away for a room the player has no seat in", async () => {
@@ -282,7 +286,7 @@ describe("rooms over sockets", () => {
 
   it("tells a player who connects about the requests still open in their rooms (CC-207)", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await startedRace();
+    const { seat, alice, bob, code } = await startedRace();
     await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
     await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 2 } });
     await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
@@ -298,7 +302,7 @@ describe("rooms over sockets", () => {
     expect(pushed).toEqual(
       expect.objectContaining({
         code,
-        requests: [expect.objectContaining({ from: bob.identity.id, to: alice.identity.id, state: "open" })],
+        requests: [expect.objectContaining({ from: seat.bob, to: seat.alice, state: "open" })],
       }),
     );
   });
@@ -306,7 +310,7 @@ describe("rooms over sockets", () => {
   it("lets the player still there claim the win once the opponent stayed offline too long (CC-036)", async () => {
     let now = 1_700_000_000_000;
     server = await startTestServer({ now: () => now });
-    const { alice, bob, code } = await startedRace();
+    const { seat, alice, bob, code } = await startedRace();
     const aliceSeesDrop = nextUpdate(alice.socket);
     bob.socket.disconnect();
     await aliceSeesDrop;
@@ -319,7 +323,7 @@ describe("rooms over sockets", () => {
     expect(claimed.data.game.outcome).toEqual({
       status: "finished",
       result: "win",
-      winners: [alice.identity.id],
+      winners: [seat.alice],
       reason: "forfeit",
     });
   });

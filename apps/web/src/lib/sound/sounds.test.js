@@ -23,6 +23,8 @@ describe("sound catalogue (CC-103)", () => {
         "win",
         "loss",
         "draw",
+        "win-quiet",
+        "game-void",
         "low-time",
         "notify",
         "achievement",
@@ -42,6 +44,19 @@ describe("sound catalogue (CC-103)", () => {
       expect(note.at + note.dur).toBeLessThanOrEqual(0.7);
       expect(note.dur).toBeGreaterThan(0.01);
     }
+  });
+
+  it("keeps the quiet win and the void note under a second, softer than a win and never a buzz (CC-163)", () => {
+    const length = (name) => Math.max(...RECIPES[name].map((note) => note.at + note.dur));
+    const peak = (name) => Math.max(...RECIPES[name].map((note) => note.gain));
+
+    for (const name of [SOUNDS.WIN_QUIET, SOUNDS.GAME_VOID]) {
+      expect(length(name)).toBeLessThan(length(SOUNDS.WIN));
+      expect(peak(name)).toBeLessThanOrEqual(peak(SOUNDS.WIN));
+      expect(RECIPES[name].every((note) => note.wave === "sine")).toBe(true);
+    }
+    expect(RECIPES[SOUNDS.WIN_QUIET].map((note) => note.freq)).toEqual([523.25, 783.99]);
+    expect(RECIPES[SOUNDS.GAME_VOID]).toHaveLength(1);
   });
 
   it("makes the sounds that happen all the time the quietest", () => {

@@ -135,9 +135,11 @@ of every nightly backup.
    close. Rooms stored before CC-249 hold a hash keyed with `SESSION_SECRET`. They keep working, stop counting for
    the cap, and are gone within 24 hours, but backups taken before CC-249 keep them for up to 30 days.
 3. **Personal data:** pseudonymous.
-4. **Who can read it:** everyone who opens the room's link while it is open gets the room view: every seat's player id
-   and display name, the host id, and the game view (seated players see their own view, others the spectator view).
-   `network` and hidden game state never leave the server. The owner.
+4. **Who can read it:** everyone who opens the room's link while it is open gets the room view: every seat's display
+   name and seat id, which seat is the host, and the game view (seated players see their own view, others the
+   spectator view). A seat id is a keyed hash of the room and the player (ADR-057, CC-253), so no player id, and no
+   account's creation time, reaches anyone through a room. The seat ids are worked out for each view and never
+   stored. Player ids, `network` and hidden game state never leave the server. The owner.
 5. **Kept for:**
 
    | Room state                           | Closes                                           | Constant          |

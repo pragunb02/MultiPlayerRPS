@@ -238,7 +238,9 @@ describe("games through the real composition root (integration)", () => {
       });
 
       expect(final.data.status).toBe("finished");
-      expect(final.data.game.outcome.winners).toEqual([alice.identity.id]);
+      // Views name players by seat id (CC-253): Alice's is the `you` of her own view.
+      expect(final.data.game.outcome.winners).toEqual([room.you]);
+      expect(JSON.stringify(final.data)).not.toContain(alice.identity.id);
 
       // The match is stored in MongoDB and replays to exactly the same result.
       const summary = await eventually(async () => {
@@ -296,7 +298,7 @@ describe("games through the real composition root (integration)", () => {
       const update = await aliceHears;
 
       expect(left).toEqual({ ok: true, data: { left: true } });
-      expect(update.seats.map((seat) => seat.playerId)).toEqual([alice.identity.id]);
+      expect(update.seats.map((seat) => seat.playerId)).toEqual([room.you]);
       expect(update.rematch).toEqual(
         expect.objectContaining({ available: false, leftName: bob.identity.displayName }),
       );
@@ -826,12 +828,14 @@ describe("leaderboards and rematches through the real composition root (integrat
 
       const code = await newRoom(riya, sam);
       await playRound(code, riya, sam);
-      await send(sam.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+      const asked = await send(sam.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
       const rematch = await send(riya.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "rematch" });
+      // Views name players by seat id (CC-253): each player's is the `you` of their own view.
+      const seat = { riya: rematch.data.you, sam: asked.data.you };
       expect(rematch.data.status).toBe("playing");
-      expect(rematch.data.seats.map((seat) => seat.playerId)).toEqual([sam.identity.id, riya.identity.id]);
+      expect(rematch.data.seats.map((each) => each.playerId)).toEqual([seat.sam, seat.riya]);
       const second = await playRound(code, sam, riya);
-      expect(second.data.series).toEqual({ games: 2, wins: { [riya.identity.id]: 1, [sam.identity.id]: 1 } });
+      expect(second.data.series).toEqual({ games: 2, wins: { [seat.riya]: 1, [seat.sam]: 1 } });
       await playRound(await newRoom(visitor, riya), visitor, riya);
 
       const board = await eventually(async () => {

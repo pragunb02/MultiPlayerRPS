@@ -19,23 +19,23 @@ async function tttGame() {
   const alice = await clients.player();
   const bob = await clients.player();
   const room = await startRoom(alice, bob, { gameId: "tictactoe" });
-  return { alice, bob, ...room };
+  return { alice, bob, ...room, seat: { alice: room.seat.host, bob: room.seat.guest } };
 }
 
 describe("Tic-Tac-Toe over sockets", () => {
   it("starts with an empty board and the seeded starter as X", async () => {
-    const { alice, bob, hostStart } = await tttGame();
+    const { seat, hostStart } = await tttGame();
 
     expect(hostStart.game.view).toEqual({
       board: ["", "", "", "", "", "", "", "", ""],
-      marks: { [bob.identity.id]: "X", [alice.identity.id]: "O" },
-      turn: bob.identity.id,
+      marks: { [seat.bob]: "X", [seat.alice]: "O" },
+      turn: seat.bob,
       winningLine: [],
     });
   });
 
   it("plays to a win decided by the server, seen by both players", async () => {
-    const { alice, bob, code } = await tttGame();
+    const { seat, alice, bob, code } = await tttGame();
     const moves = [
       [bob, 0],
       [alice, 3],
@@ -53,7 +53,7 @@ describe("Tic-Tac-Toe over sockets", () => {
     const outcome = {
       status: "finished",
       result: "win",
-      winners: [bob.identity.id],
+      winners: [seat.bob],
       reason: "three-in-a-row",
     };
     expect(final.data.status).toBe("finished");

@@ -1,12 +1,11 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { ROOM_STATUS } from "@classicade/shared";
-import { resultHeadline } from "../../games/outcomeText.js";
+import { outcomeMoment } from "../../games/outcomeMoment.js";
 import { forWhomLine } from "../../games/passAndPlay/forWhomLine.js";
 import { textsFor } from "../../games/roomUpdates.js";
 import { nameOf } from "../../games/roomView.js";
 import { useLocalMatch } from "../../hooks/useLocalMatch.js";
 import { Button } from "../Button/Button.jsx";
-import { outcomeFor } from "../Celebrations/outcome.js";
 import { Modal } from "../Modal/Modal.jsx";
 import { useAnnounce } from "./announceContext.js";
 import { ConfirmDialog } from "./ConfirmDialog.jsx";
@@ -257,8 +256,7 @@ export function PassAndPlayShell({ gameId, gameName, game, engine, names, option
       result={
         finished
           ? {
-              tone: outcomeFor(room),
-              headline: resultHeadline(room),
+              moment: outcomeMoment(room),
               note: (
                 <p className={passStyles.notCounted} data-cc-slot="not-counted">
                   {NOT_COUNTED_NOTE}

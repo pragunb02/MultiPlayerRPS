@@ -29,13 +29,14 @@ async function finishedRace() {
   });
   const code = created.data.code;
   const aliceSeesStart = nextUpdate(alice.socket);
-  await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
+  const joined = await send(bob.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
   await aliceSeesStart;
   await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
   const bobSeesEnd = nextUpdate(bob.socket);
   await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 2 } });
   await bobSeesEnd;
-  return { alice, bob, code };
+  // Each player's seat id, as their own view tells them (CC-253).
+  return { alice, bob, code, seat: { alice: created.data.you, bob: joined.data.you } };
 }
 
 const ask = (player, code) => send(player.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: REMATCH });
@@ -45,14 +46,14 @@ const answer = (player, code, reply) =>
 describe("rematch over sockets (CC-037, CC-159)", () => {
   it("tells the opponent about a request, and starts a new game in the same room once accepted", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await finishedRace();
+    const { seat, alice, bob, code } = await finishedRace();
 
     const aliceSeesRequest = nextUpdate(alice.socket);
     const asked = await ask(bob, code);
     const request = expect.objectContaining({
       type: REMATCH,
-      from: bob.identity.id,
-      to: alice.identity.id,
+      from: seat.bob,
+      to: seat.alice,
       state: "open",
     });
     expect(asked.data.requests).toEqual([request]);
@@ -65,10 +66,10 @@ describe("rematch over sockets (CC-037, CC-159)", () => {
       expect.objectContaining({
         code,
         status: "playing",
-        series: { games: 1, wins: { [alice.identity.id]: 1 } },
+        series: { games: 1, wins: { [seat.alice]: 1 } },
       }),
     );
-    expect(accepted.data.seats.map((seat) => seat.playerId)).toEqual([bob.identity.id, alice.identity.id]);
+    expect(accepted.data.seats.map((seat) => seat.playerId)).toEqual([seat.bob, seat.alice]);
     expect(accepted.data).not.toHaveProperty("rematch");
     const started = await bobSeesStart;
     expect(started.status).toBe("playing");
@@ -77,7 +78,7 @@ describe("rematch over sockets (CC-037, CC-159)", () => {
 
   it("pushes the request to every tab of both players, whatever page they are on (CC-207)", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await finishedRace();
+    const { seat, alice, bob, code } = await finishedRace();
     const homeTab = await clients.openSocket(alice.cookie);
     // Connecting tells the tab about the room first, with no request yet.
     const homeTabHears = eventWhere(
@@ -93,11 +94,15 @@ describe("rematch over sockets (CC-037, CC-159)", () => {
     expect(pushed).toEqual({
       code,
       gameId: "race",
-      names: { [alice.identity.id]: alice.identity.displayName, [bob.identity.id]: bob.identity.displayName },
-      requests: [expect.objectContaining({ from: bob.identity.id, state: "open" })],
+      // Each player is told which seat is theirs (CC-253).
+      you: seat.alice,
+      names: { [seat.alice]: alice.identity.displayName, [seat.bob]: bob.identity.displayName },
+      requests: [expect.objectContaining({ from: seat.bob, state: "open" })],
       serverTime: expect.any(Number),
     });
-    expect((await bobHears).requests).toEqual(pushed.requests);
+    const toBob = await bobHears;
+    expect(toBob.requests).toEqual(pushed.requests);
+    expect(toBob.you).toBe(seat.bob);
   });
 
   it("records the rematch as a second match", async () => {
@@ -130,13 +135,13 @@ describe("rematch over sockets (CC-037, CC-159)", () => {
 
   it("tells the asker who declined, and refuses asking again at once (CC-104)", async () => {
     server = await startTestServer();
-    const { alice, bob, code } = await finishedRace();
+    const { seat, alice, bob, code } = await finishedRace();
     await ask(alice, code);
     const aliceSeesDecline = nextUpdate(alice.socket);
 
     const declined = await answer(bob, code, "decline");
 
-    const ended = [expect.objectContaining({ from: alice.identity.id, state: "declined" })];
+    const ended = [expect.objectContaining({ from: seat.alice, state: "declined" })];
     expect(declined.data.requests).toEqual(ended);
     expect((await aliceSeesDecline).requests).toEqual(ended);
     const again = await ask(alice, code);

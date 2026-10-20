@@ -13,10 +13,13 @@ import {
 } from "../../utils/errors.js";
 import { createRoomComponent, ROOM_EVENTS } from "./roomComponent.js";
 import { ROOM_LIFETIMES } from "./roomLifetimes.js";
+import { TEST_SEAT_IDS } from "../../testing/seatIds.js";
 
 const ALICE = Object.freeze({ kind: "guest", id: "guest_a", displayName: "Alice" });
 const BOB = Object.freeze({ kind: "guest", id: "guest_b", displayName: "Bob" });
 const CAROL = Object.freeze({ kind: "guest", id: "guest_c", displayName: "Carol" });
+/** The seat id a room view shows for a player (CC-253). */
+const seatOf = (room, player) => TEST_SEAT_IDS.seatIdOf(room, player.id);
 const T0 = 1_000_000;
 
 // A 4-seat variant, so a waiting room can hold several players before it starts.
@@ -39,6 +42,7 @@ function setup({
   const queue = [...codes];
   const accessor = createRoomAccessor({ roomDao: createInMemoryRoomDao() });
   const rooms = createRoomComponent({
+    seatIds: TEST_SEAT_IDS,
     roomAccessor: wrap(accessor),
     engines: createEngineRegistry(engines),
     events: {
@@ -427,7 +431,7 @@ describe("roomComponent", () => {
       expect(room.series.wins).toEqual({ [RIYA.id]: 1 });
       expect(room.requests).toEqual([expect.objectContaining({ from: RIYA.id, to: BOB.id, state: "open" })]);
       // The account sees the result as its own win, and can play again with the same opponent.
-      expect(rooms.viewFor(room, RIYA.id).game.outcome.winners).toEqual([RIYA.id]);
+      expect(rooms.viewFor(room, RIYA.id).game.outcome.winners).toEqual([seatOf(room, RIYA)]);
       const again = await rooms.askRequest({ code, playerId: BOB.id, type: "rematch", now: T0 + 6 });
       expect(again.status).toBe("playing");
       expect((await rooms.getRoom(other.code)).seats[0].playerId).toBe(CAROL.id);
@@ -467,11 +471,11 @@ describe("roomComponent", () => {
         code: room.code,
         gameId: "race",
         status: "waiting",
-        hostId: ALICE.id,
+        hostId: seatOf(room, ALICE),
         players: { min: 2, max: 2 },
         seats: [
           {
-            playerId: ALICE.id,
+            playerId: seatOf(room, ALICE),
             displayName: "Alice",
             connected: true,
             presence: "here",
@@ -479,7 +483,7 @@ describe("roomComponent", () => {
             graceUntil: 0,
           },
         ],
-        you: ALICE.id,
+        you: seatOf(room, ALICE),
         requests: [],
         requestsLeft: {},
         askAgainAt: {},
@@ -494,8 +498,8 @@ describe("roomComponent", () => {
 
       expect(view.game).toEqual({
         matchId: room.game.matchId,
-        view: { count: 0, target: 3, toMove: BOB.id },
-        activePlayers: [BOB.id],
+        view: { count: 0, target: 3, toMove: seatOf(room, BOB) },
+        activePlayers: [seatOf(room, BOB)],
         outcome: { status: "ongoing" },
         number: 1,
         // Bob has not made a first move yet, so the first move limit runs from the start (CC-036).
@@ -516,6 +520,7 @@ describe("roomComponent", () => {
       const { rooms, code } = await startedGame();
       const seen = [];
       const spying = createRoomComponent({
+        seatIds: TEST_SEAT_IDS,
         roomAccessor: {},
         engines: createEngineRegistry([
           defineEngine({ ...raceEngine, viewFor: (state, viewer) => (seen.push(viewer), {}) }),
@@ -538,7 +543,7 @@ describe("roomComponent", () => {
       expect(game.outcome).toEqual({
         status: "finished",
         result: "win",
-        winners: [ALICE.id],
+        winners: [seatOf(room, ALICE)],
         reason: "forfeit",
       });
       expect(game.activePlayers).toEqual([]);

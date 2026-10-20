@@ -133,10 +133,12 @@ describe("auth routes", () => {
     const rejoined = await send(userSocket, SOCKET_EVENTS.ROOM_JOIN, { code });
     const joined = await send(friend.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
 
-    expect(rejoined.data.you).toBe(signedUp.body.identity.id);
+    // The seat is named by the account's seat id in this room, never by a player id (CC-253).
+    expect(rejoined.data.you).not.toBe(created.data.you);
     expect(rejoined.data.seats).toEqual([
-      expect.objectContaining({ playerId: signedUp.body.identity.id, displayName: "Riya", connected: true }),
+      expect.objectContaining({ playerId: rejoined.data.you, displayName: "Riya", connected: true }),
     ]);
+    expect(JSON.stringify(joined.data)).not.toContain(signedUp.body.identity.id);
     expect(joined.data.status).toBe("playing"); // the account against the friend, not against the old guest seat
     expect(joined.data.seats.map((seat) => seat.displayName)).toEqual(["Riya", friend.identity.displayName]);
   });

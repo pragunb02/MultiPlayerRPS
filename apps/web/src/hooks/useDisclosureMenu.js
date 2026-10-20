@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
 const OPEN_DIALOG = '[role="dialog"][aria-modal="true"]';
+const MODAL_BACKDROP = "[data-cc-modal-backdrop]";
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]";
 
 /**
@@ -39,14 +40,17 @@ export function useDisclosureMenu() {
     panelRef.current.querySelector(FOCUSABLE)?.focus();
     const onKeyDown = (event) => {
       if (event.key !== "Escape") return;
-      // A dialog opened from the menu, such as the sound settings, takes this Escape for itself.
-      if (panelRef.current.querySelector(OPEN_DIALOG) !== null) return;
+      // A dialog opened from the menu, such as the sound settings, takes this Escape for itself. Dialogs are drawn
+      // on the page's body, not inside the menu (Modal.jsx), so any open one counts.
+      if (document.querySelector(OPEN_DIALOG) !== null) return;
       close();
       buttonRef.current.focus();
     };
     // On click, not on press: the target gets the whole click first, and only then does the menu close.
     const onClickOutside = (event) => {
       if (panelRef.current.contains(event.target) || buttonRef.current.contains(event.target)) return;
+      // A click beside a dialog closes the dialog only, as when the dialog was drawn inside the menu.
+      if (event.target.closest(MODAL_BACKDROP) !== null) return;
       close();
     };
     document.addEventListener("keydown", onKeyDown);
