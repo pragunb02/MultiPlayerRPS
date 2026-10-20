@@ -256,9 +256,9 @@ describe("Seats: avatars (CC-034)", () => {
     mount(room(), fakeSound(), api, ACCOUNT);
 
     expect(
-      screen.getAllByRole("button", { name: /as a friend$/ }).map((b) => b.getAttribute("aria-label")),
-    ).toEqual(["Add Alice as a friend"]);
-    await userEvent.click(screen.getByRole("button", { name: "Add Alice as a friend" }));
+      screen.getAllByRole("button", { name: /^Add friend / }).map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Add friend Alice"]);
+    await userEvent.click(screen.getByRole("button", { name: "Add friend Alice" }));
 
     expect(api.sendFriendRequest).toHaveBeenCalledWith({ roomCode: undefined, seat: 0, seatId: "guest_a" });
     expect(await screen.findByText("request sent")).toBeVisible();
@@ -266,11 +266,14 @@ describe("Seats: avatars (CC-034)", () => {
 
   it("tells a guest viewer to save their progress instead of adding a friend (CC-052)", async () => {
     const api = fakeApi();
-    mount(room(), fakeSound(), api, GUEST);
+    const { toast } = mount(room(), fakeSound(), api, GUEST);
 
-    await userEvent.click(screen.getByRole("button", { name: "Add Alice as a friend" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add friend Alice" }));
 
-    expect(screen.getAllByText("Save your progress to add friends").length).toBeGreaterThan(0);
+    expect(toast.show).toHaveBeenCalledWith("Save your progress to add friends", {
+      tone: "info",
+      action: expect.objectContaining({ label: "Save progress", to: "/signup?next=%2Ffriends" }),
+    });
     expect(api.sendFriendRequest).not.toHaveBeenCalled();
   });
 

@@ -104,9 +104,10 @@ export function Layout() {
               Profile
             </NavLink>
           )}
-          {/* A guest sees it too, and finds there how to save their progress to add friends (CC-052). */}
+          {/* A guest sees it too, and finds there how to save their progress to add friends (CC-052). A phone has
+              no room for a fourth link in its row, so there it is in the menu instead. */}
           {identity && (
-            <NavLink to={paths.friends()} data-cc-control="header.friends">
+            <NavLink to={paths.friends()} className={styles.wideOnly} data-cc-control="header.friends">
               Friends
             </NavLink>
           )}
@@ -133,6 +134,11 @@ export function Layout() {
           {hasProgress && <span className={styles.menuDot} aria-hidden="true" />}
         </button>
         <div id="header-menu" ref={panelRef} className={`${styles.player} ${menuOpen ? styles.open : ""}`}>
+          {identity && (
+            <NavLink to={paths.friends()} className={styles.menuOnly} data-cc-control="header.menu_friends">
+              Friends
+            </NavLink>
+          )}
           <SoundControl />
           {identity && <LevelChip key={identity.id} />}
           <div className={styles.identity}>

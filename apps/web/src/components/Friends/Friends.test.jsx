@@ -36,9 +36,9 @@ describe("Add friend in match history (CC-052)", () => {
     const api = historyApi();
     renderApp({ path: "/profile", api });
 
-    const add = await screen.findByRole("button", { name: "Add Arjun as a friend" });
-    expect(screen.queryByRole("button", { name: "Add Pip as a friend" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Add Deleted player as a friend" })).toBeNull();
+    const add = await screen.findByRole("button", { name: "Add friend Arjun" });
+    expect(screen.queryByRole("button", { name: "Add friend Pip" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add friend Deleted player" })).toBeNull();
     await userEvent.click(add);
 
     expect(api.sendFriendRequest).toHaveBeenCalledWith({ matchId: MATCH.matchId, seat: 0 });
@@ -51,7 +51,7 @@ describe("Add friend in match history (CC-052)", () => {
       api: historyApi({ sendFriendRequest: vi.fn().mockResolvedValue("friends") }),
     });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Add Arjun as a friend" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add friend Arjun" }));
 
     expect(await screen.findByText("friends")).toBeVisible();
   });
@@ -67,7 +67,7 @@ describe("Add friend in match history (CC-052)", () => {
       api: historyApi({ sendFriendRequest: vi.fn().mockRejectedValue(refused) }),
     });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Add Arjun as a friend" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add friend Arjun" }));
 
     expect(await screen.findByText("You have 10 requests waiting.")).toBeVisible();
   });
@@ -76,8 +76,11 @@ describe("Add friend in match history (CC-052)", () => {
     renderApp({ path: "/profile", api: historyApi({ getSession: vi.fn(async () => GUEST) }) });
 
     expect(await screen.findByRole("list", { name: "Match history" })).toHaveTextContent("Arjun");
-    expect(screen.queryByRole("button", { name: "Add Arjun as a friend" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Friends" })).toHaveAttribute("href", "/friends");
+    expect(screen.queryByRole("button", { name: "Add friend Arjun" })).toBeNull();
+    // In the row on a wide screen and in the menu on a phone.
+    expect(screen.getAllByRole("link", { name: "Friends" }).map((link) => link.getAttribute("href"))).toEqual(
+      ["/friends", "/friends"],
+    );
   });
 });
 

@@ -60,7 +60,7 @@ test.describe("friends", () => {
     await arjun.page.goto("/leaderboards");
 
     // Riya adds Arjun from his seat on the result screen. Arjun hears about it on the page he is on.
-    await riya.page.getByRole("button", { name: `Add ${arjunName} as a friend` }).click();
+    await riya.page.getByRole("button", { name: `Add friend ${arjunName}` }).click();
     await expect(riya.page.getByRole("list", { name: "Players" }).getByText("request sent")).toBeVisible();
     await expect(arjun.page.getByText(`${riyaName} wants to be your friend`)).toBeVisible();
     await arjun.page.getByRole("link", { name: "See request" }).click();
@@ -94,11 +94,9 @@ test.describe("friends", () => {
     await asGuest(guest);
     await playOneGame(riya, guest);
 
-    // The button says why it cannot act, so it is pressed as a player would, though it is marked disabled.
-    const add = guest.page.getByRole("button", { name: `Add ${riyaName} as a friend` });
-    await expect(add).toHaveAttribute("aria-disabled", "true");
-    await add.click({ force: true });
-    await expect(guest.page.getByText("Save your progress to add friends").first()).toBeVisible();
+    await guest.page.getByRole("button", { name: `Add friend ${riyaName}` }).click();
+    await expect(guest.page.getByText("Save your progress to add friends")).toBeVisible();
+    await expect(guest.page.getByRole("link", { name: "Save progress" }).first()).toBeVisible();
 
     await guest.page.goto("/friends");
     await expect(guest.page.getByText("Friends banane ke liye apni progress save karo.")).toBeVisible();

@@ -73,6 +73,10 @@
   color: var(--color-text);
   box-shadow: inset 0 -3px 0 var(--color-primary);
 }
+/* The Friends link sits in the row on a wide screen and in the menu on a phone (CC-052). */
+.menuOnly {
+  display: none;
+}
 .player {
   margin-left: auto;
   display: flex;
@@ -214,6 +218,14 @@
   }
   .identity {
     flex-wrap: wrap;
+  }
+  .wideOnly {
+    display: none;
+  }
+  .menuOnly {
+    display: inline;
+    font-family: var(--font-display);
+    font-weight: 800;
   }
 }
 /*
