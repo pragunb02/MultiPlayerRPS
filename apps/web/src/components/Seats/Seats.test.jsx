@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServicesProvider } from "../../app/ServicesProvider.jsx";
@@ -251,9 +251,9 @@ describe("Seats: blocking from a seat (CC-044)", () => {
 });
 
 describe("Seats: avatars (CC-034)", () => {
-  it("offers Add friend beside Block, by the seat's place and seat id, and says once it is sent (CC-052)", async () => {
+  it("offers an account Add friend beside Block once the game is over, by the seat's place and seat id (CC-052)", async () => {
     const api = fakeApi();
-    mount(room(), fakeSound(), api, ACCOUNT);
+    mount(room({ status: "finished" }), fakeSound(), api, ACCOUNT);
 
     expect(
       screen.getAllByRole("button", { name: /^Add friend / }).map((b) => b.getAttribute("aria-label")),
@@ -264,17 +264,14 @@ describe("Seats: avatars (CC-034)", () => {
     expect(await screen.findByText("request sent")).toBeVisible();
   });
 
-  it("tells a guest viewer to save their progress instead of adding a friend (CC-052)", async () => {
-    const api = fakeApi();
-    const { toast } = mount(room(), fakeSound(), api, GUEST);
+  it("offers Add friend to nobody while a game is on, and never to a guest (CC-052)", () => {
+    mount(room(), fakeSound(), fakeApi(), ACCOUNT);
+    expect(screen.queryByRole("button", { name: /^Add friend / })).toBeNull();
+    cleanup();
 
-    await userEvent.click(screen.getByRole("button", { name: "Add friend Alice" }));
-
-    expect(toast.show).toHaveBeenCalledWith("Save your progress to add friends", {
-      tone: "info",
-      action: expect.objectContaining({ label: "Save progress", to: "/signup?next=%2Ffriends" }),
-    });
-    expect(api.sendFriendRequest).not.toHaveBeenCalled();
+    mount(room({ status: "finished" }), fakeSound(), fakeApi(), GUEST);
+    expect(screen.queryByRole("button", { name: /^Add friend / })).toBeNull();
+    expect(screen.getByRole("button", { name: "Block Alice" })).toBeVisible();
   });
 
   it("draws each person's avatar beside their name, the silhouette for none, and nothing for a computer", () => {

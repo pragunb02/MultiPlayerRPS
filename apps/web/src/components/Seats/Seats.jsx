@@ -4,6 +4,7 @@ import { Avatar } from "../../art/avatars/Avatar.jsx";
 import { usePresenceNotice } from "../../games/usePresenceNotice.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useBlockPlayer } from "../../hooks/useBlocks.js";
+import { useSession } from "../../hooks/useSession.js";
 import { formatCountdown, useServerCountdown } from "../../hooks/useServerCountdown.js";
 import { Button } from "../Button/Button.jsx";
 import { isComputer, levelNameOf } from "../computer.js";
@@ -77,6 +78,14 @@ const canBlock = (room, seat) =>
   room.you !== "" && seat.playerId !== room.you && !isComputer(seat) && seat.deleted !== true;
 
 /**
+ * Whether the viewer is offered Add friend for this seat (CC-052): an account, once the game is not on, for anyone
+ * they could block. Not while a game is on, so a move is never one tap from a request, and the seat keeps its size
+ * beside the board. A guest finds how to save their progress on the Friends page.
+ */
+const canAddFriend = (room, seat, identity) =>
+  identity?.kind === "user" && room.status !== ROOM_STATUS.PLAYING && canBlock(room, seat);
+
+/**
  * The question asked before a block, and the block itself (CC-044, ADR-053). The block is silent: the other player
  * is told nothing, and the toast is for the viewer only. It is drawn after the list of seats, not inside a seat: a
  * seat slides in with an animation, and a dialog inside it would be held to the seat's box instead of covering the
@@ -131,12 +140,13 @@ function BlockDialog({ room, seat, index, onClose, onBlocked }) {
 /**
  * Who is in the room: avatars and names (CC-034), host, you, and where each player is (CC-158). A computer character is always
  * labelled as one, with its level (ADR-025). Changes to the other players are read
- * out once they settle, with a soft sound. A seated viewer can add another person as a friend (CC-052) or block them
- * from their seat (CC-044). The result screen shows these seats too, so both are there after a game.
+ * out once they settle, with a soft sound. A seated viewer can block another person from their seat (CC-044), and an
+ * account can add them as a friend once the game is not on, which is the result screen (CC-052).
  *
  * @param {{ room: { code: string, seats: Array<{ playerId: string, displayName: string, avatar?: string, connected: boolean, presence: string, graceUntil: number, bot?: { character: string, level: string }, deleted?: true }>, hostId: string, you: string, players: { max: number }, status: string, serverTime: number, game?: object } }} props  every id in a room view is a seat id (CC-253)
  */
 export function Seats({ room }) {
+  const { identity } = useSession();
   const open = Math.max(0, room.players.max - room.seats.length);
   const notice = usePresenceNotice(room);
   // Blocked from this page. The server keeps the block. This only changes what the seat shows until the page goes.
@@ -166,11 +176,13 @@ export function Seats({ room }) {
             ) : (
               canBlock(room, seat) && (
                 <>
-                  <AddFriendButton
-                    target={{ roomCode: room.code, seat: index, seatId: seat.playerId }}
-                    name={seat.displayName}
-                    control="room.seat.friend"
-                  />
+                  {canAddFriend(room, seat, identity) && (
+                    <AddFriendButton
+                      target={{ roomCode: room.code, seat: index, seatId: seat.playerId }}
+                      name={seat.displayName}
+                      control="room.seat.friend"
+                    />
+                  )}
                   <Button
                     control="room.seat.block"
                     variant="ghost"

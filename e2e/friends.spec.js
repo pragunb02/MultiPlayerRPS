@@ -87,16 +87,18 @@ test.describe("friends", () => {
     }
   });
 
-  test("a guest is told to save their progress, in the room and on the friends page", async ({ players }) => {
+  test("a guest is offered no Add friend, and the friends page tells them to save their progress", async ({
+    players,
+  }) => {
     const riya = await players.open("riya");
     const guest = await players.open("guest");
     const riyaName = await signUp(riya, "1990");
     await asGuest(guest);
     await playOneGame(riya, guest);
 
-    await guest.page.getByRole("button", { name: `Add friend ${riyaName}` }).click();
-    await expect(guest.page.getByText("Save your progress to add friends")).toBeVisible();
-    await expect(guest.page.getByRole("link", { name: "Save progress" }).first()).toBeVisible();
+    // A guest is offered no Add friend on the result screen, and the Friends page says why.
+    await expect(guest.page.getByRole("button", { name: `Block ${riyaName}` })).toBeVisible();
+    await expect(guest.page.getByRole("button", { name: /^Add friend / })).toHaveCount(0);
 
     await guest.page.goto("/friends");
     await expect(guest.page.getByText("Friends banane ke liye apni progress save karo.")).toBeVisible();
