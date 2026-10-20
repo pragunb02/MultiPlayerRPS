@@ -30,6 +30,10 @@ import { createProfileCards } from "../domain/profiles/profileCards.js";
 import { createProfileComponent } from "../domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "../domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "../domain/feedback/feedbackComponent.js";
+import { createFlagComponent } from "../domain/flags/flagComponent.js";
+import { createFeatureFlagAccessor } from "../data/featureFlagAccessor.js";
+import { createInMemoryFeatureFlagDao } from "./inMemoryFeatureFlagDao.js";
+import { createKeyedIds, KEYED_ID_LABELS, keyedIdSecretFrom } from "../utils/keyedIds.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "../domain/dailyPuzzles/schedule.js";
@@ -231,6 +235,15 @@ export function createTestApp({
   const feedbackComponent = createFeedbackComponent({
     feedbackAccessor: createFeedbackAccessor({ feedbackDao: createInMemoryFeedbackDao() }),
     safety: safetyComponent,
+  });
+  const flagComponent = createFlagComponent({
+    flagAccessor: createFeatureFlagAccessor({ featureFlagDao: createInMemoryFeatureFlagDao() }),
+    keyedIds: createKeyedIds({
+      secret: keyedIdSecretFrom({ sessionSecret: config.sessionSecret, label: KEYED_ID_LABELS.FLAG_BUCKETS }),
+    }),
+    safety: safetyComponent,
+    logger: capture.logger,
+    now,
   });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
@@ -451,6 +464,7 @@ export function createTestApp({
     dailyPuzzleComponent,
     safetyComponent,
     dailyPuzzleLimit,
+    flagComponent,
     analyticsComponent: createAnalyticsComponent({
       analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
       cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }),
@@ -492,6 +506,7 @@ export function createTestApp({
     friends,
     feedbackComponent,
     dailyPuzzleComponent,
+    flagComponent,
     matchPipeline,
     playerDataComponent,
     tasks,

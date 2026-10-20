@@ -6,10 +6,15 @@ import { ADMIN_SECTIONS, paths, ROUTES } from "../../app/paths.js";
  */
 
 /**
- * The parts of the console: the totals with their range, the feedback inbox and the year of birth corrections
- * (CC-152). Each loads on its own.
+ * The parts of the console: the totals with their range, the feedback inbox, the year of birth corrections
+ * (CC-152) and the flags (CC-312). Each loads on its own.
  */
-export const CONSOLE_VIEWS = Object.freeze({ TOTALS: "totals", FEEDBACK: "feedback", AGES: "ages" });
+export const CONSOLE_VIEWS = Object.freeze({
+  TOTALS: "totals",
+  FEEDBACK: "feedback",
+  AGES: "ages",
+  FLAGS: "flags",
+});
 
 const titleOf = (word) => word[0].toUpperCase() + word.slice(1);
 
@@ -18,7 +23,7 @@ const titleOf = (word) => word[0].toUpperCase() + word.slice(1);
  *   section in the address, none for the overview
  */
 
-/** Every page in tab order: the overview, each section of the totals, the feedback inbox, then the ages. */
+/** Every page in tab order: the overview, each section of the totals, the feedback inbox, the ages, then the flags. */
 export const CONSOLE_PAGES = Object.freeze([
   Object.freeze({ id: "overview", name: "Overview", view: CONSOLE_VIEWS.TOTALS }),
   ...ADMIN_SECTIONS.map((section) =>
@@ -26,6 +31,7 @@ export const CONSOLE_PAGES = Object.freeze([
   ),
   Object.freeze({ id: "feedback", name: "Feedback", view: CONSOLE_VIEWS.FEEDBACK }),
   Object.freeze({ id: "ages", name: "Ages", view: CONSOLE_VIEWS.AGES }),
+  Object.freeze({ id: "flags", name: "Flags", view: CONSOLE_VIEWS.FLAGS }),
 ]);
 
 /** The routes of the console and the part each one loads. */
@@ -34,6 +40,7 @@ export const CONSOLE_ROUTES = Object.freeze([
   Object.freeze({ path: ROUTES.ADMIN_SECTION, view: CONSOLE_VIEWS.TOTALS }),
   Object.freeze({ path: ROUTES.ADMIN_FEEDBACK, view: CONSOLE_VIEWS.FEEDBACK }),
   Object.freeze({ path: ROUTES.ADMIN_AGES, view: CONSOLE_VIEWS.AGES }),
+  Object.freeze({ path: ROUTES.ADMIN_FLAGS, view: CONSOLE_VIEWS.FLAGS }),
 ]);
 
 /**
@@ -46,6 +53,7 @@ export const CONSOLE_ROUTES = Object.freeze([
 const HREFS = Object.freeze({
   [CONSOLE_VIEWS.FEEDBACK]: () => paths.adminFeedback(),
   [CONSOLE_VIEWS.AGES]: () => paths.adminAges(),
+  [CONSOLE_VIEWS.FLAGS]: () => paths.adminFlags(),
 });
 
 export const consoleHref = (page, range) =>

@@ -87,9 +87,36 @@ areas at once (CLAUDE.md workflow rule 9).
 
 ## 7. Flags
 
-New player-facing features ship behind a flag (CC-312, coming), off by default, with a ramp, a rollback trigger
+New player-facing features ship behind a flag (CC-312, how below), off by default, with a ramp, a rollback trigger
 and a removal date in the ticket's Rollout section. The flag is removed by its removal date, as its own small
 ticket if needed.
+
+## How a feature ships behind a flag
+
+The flags are our own (CC-312, ADR-073). The registry is `packages/shared/src/flags.js`, and the owner changes a
+rollout in the console's Flags tab, `/admin/flags`, without a deploy.
+
+1. **Add the flag** in the feature's pull request: a snake case `name`, a `description` in plain words, the owning
+   `ticket`, `default: false`, `rollout: "off"`, the `audience` (everyone, signed-in, adults or admins), `client`
+   (true only if the web app reads it), the one `success` event, and `removeBy`, at most about 90 days ahead.
+2. **Read it by name, written out in full.** On the server `await flags.isOn("name", player)`, in the web app
+   `useFlag("name")`. A name not in the registry throws, and a test that reads the source fails.
+3. **Test both paths.** Wrap the feature's tests in `flagPaths("name", (on) => …)` (server or web
+   `testing/flagPaths.js`), so the tests run once on and once off. A flag without such a suite fails CI.
+4. **Count its success.** The web app sends `api.sendFlagSuccess("name")` once when the feature did its job; server
+   code calls `flags.recordSuccess("name", player)`. Counts are anonymous (ADR-034).
+5. **Merge with the flag off.** Production does not change. The ticket's Status becomes Rolling out.
+6. **Ramp.** In the console: admins only first (or On for an admins audience), then 5 %, 25 %, 50 % and On, a day
+   or more apart. Compare successes per time shown on the on and off sides at each step. A ramp only adds players:
+   everyone who had it at 5 % still has it at 25 %.
+7. **Roll back** by setting Off in the console. It applies at once on that server and within 30 seconds anywhere
+   else. If the database is unreachable, each server keeps the last overrides for 5 minutes, then uses the code's
+   rollout, which is off.
+8. **Remove the flag** by its `removeBy` day. First, in the console, press "Use the rollout in code" so no override
+   is left. Then, in its own small pull request, delete the old path, the `isOn` or `useFlag` call, the `flagPaths`
+   wrapper and the registry entry. An override left behind is listed in the Flags tab under "Overrides of removed
+   flags", with a Clear button. A flag past its day fails CI, so this is never forgotten. Moving the day is a
+   reviewed change with a reason.
 
 ## 8. After launch
 

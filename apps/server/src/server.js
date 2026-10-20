@@ -10,6 +10,7 @@ import { createAccountDeletionAccessor, createSessionAccessor } from "./data/acc
 import { createBlockAccessor } from "./data/blockAccessor.js";
 import { createFriendAccessor } from "./data/friendAccessor.js";
 import { createPrivacyAccessor } from "./data/privacyAccessor.js";
+import { createFeatureFlagAccessor } from "./data/featureFlagAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
@@ -36,6 +37,7 @@ import { createProfileCards } from "./domain/profiles/profileCards.js";
 import { createProfileComponent } from "./domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "./domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
+import { createFlagComponent } from "./domain/flags/flagComponent.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "./domain/dailyPuzzles/schedule.js";
@@ -71,6 +73,7 @@ import { createFriendLinkDao } from "./persistence/friendLinkDao.js";
 import { createFriendRequestDao } from "./persistence/friendRequestDao.js";
 import { createFriendshipDao } from "./persistence/friendshipDao.js";
 import { createPrivacyDao } from "./persistence/privacyDao.js";
+import { createFeatureFlagDao } from "./persistence/featureFlagDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
@@ -92,6 +95,7 @@ import { createSessionCheck, createSessionMiddleware, SESSION_TTL_SECONDS } from
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
 import { assertFunction } from "./utils/assert.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
+import { createKeyedIds, KEYED_ID_LABELS, keyedIdSecretFrom } from "./utils/keyedIds.js";
 import { createLegacyPasswordChecker } from "./utils/legacyPassword.js";
 import { createNetworkKey, dropOldNetworkKeysEveryMidnight } from "./utils/networkKey.js";
 import { createPasswordHasher } from "./utils/passwordHasher.js";
@@ -696,6 +700,7 @@ export async function startServer({
   const friendRequestDao = createFriendRequestDao({ connection: database.connection });
   const friendLinkDao = createFriendLinkDao({ connection: database.connection });
   const privacyDao = createPrivacyDao({ connection: database.connection });
+  const featureFlagDao = createFeatureFlagDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -719,6 +724,7 @@ export async function startServer({
       friendRequestDao,
       friendLinkDao,
       privacyDao,
+      featureFlagDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -747,6 +753,7 @@ export async function startServer({
   const profileAccessor = createProfileAccessor({ profileDao });
   const friendAccessor = createFriendAccessor({ friendshipDao, friendRequestDao, friendLinkDao });
   const privacyAccessor = createPrivacyAccessor({ privacyDao });
+  const featureFlagAccessor = createFeatureFlagAccessor({ featureFlagDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -771,6 +778,17 @@ export async function startServer({
   // One set of seat ids for rooms and blocks, so a seat id the room view shows is the one a block is checked against.
   const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
   const feedbackComponent = createFeedbackComponent({ feedbackAccessor, safety: safetyComponent });
+  // Feature flags (CC-312). Making the component checks the registry, so a broken one stops the boot.
+  const flagComponent = createFlagComponent({
+    flagAccessor: featureFlagAccessor,
+    keyedIds: createKeyedIds({
+      secret: keyedIdSecretFrom({ sessionSecret: config.sessionSecret, label: KEYED_ID_LABELS.FLAG_BUCKETS }),
+    }),
+    safety: safetyComponent,
+    logger,
+    now,
+  });
+  await flagComponent.refresh();
   const blockComponent = createBlockComponent({
     blockAccessor,
     rooms: roomAccessor,
@@ -1022,6 +1040,7 @@ export async function startServer({
     feedbackComponent,
     dailyPuzzleComponent,
     safetyComponent,
+    flagComponent,
     leaderboardComponent,
     analyticsComponent,
     sessionMiddleware,
@@ -1080,6 +1099,7 @@ export async function startServer({
   matchPipeline.runDue();
 
   const keyRotation = dropOldNetworkKeysEveryMidnight({ networkKey, now });
+  const flagRefresh = flagComponent.start();
 
   const close = async () => {
     keyRotation.stop();
@@ -1088,6 +1108,8 @@ export async function startServer({
     await thinkingWorkers.close();
     await gateway.close();
     await tasks.drain();
+    // The last counts go in before the database closes.
+    await flagRefresh.stop();
     await database.close();
   };
 
@@ -1097,6 +1119,7 @@ export async function startServer({
     return { server, host, port, close };
   } catch (err) {
     keyRotation.stop();
+    await flagRefresh.stop();
     botDriver.stop();
     await thinkingWorkers.close();
     await database.close();
