@@ -60,8 +60,9 @@ the owner may change it.
 
 ### ADR-061 — Daily puzzles: a curated CC0 set in the repo, checked on the server, their own streak, no XP yet
 
-- **Status:** Accepted by default (owner may change) · 2026-10-20 (CC-144 part 1, research in
-  [tickets/CC-144.md](tickets/CC-144.md))
+- **Status:** Accepted · 2026-10-20 by the owner (CC-144 part 1, research in [tickets/CC-144.md](tickets/CC-144.md)).
+  The owner confirmed three points on 2026-10-20: no XP in part 1 (point 7), puzzle #1 stays Monday 2026-10-19
+  (point 3), and the solution shows after a failed attempt as well as after a solved one (point 4).
 - **Context.** CC-144 is a daily set where each puzzle has its own streak and a spoiler-free share grid. Part 1 is
   the chess puzzle from the Lichess puzzle database (CC0, 6 million puzzles, about 270 MB compressed). Later parts
   add Ultimate Tic Tac Toe and RPS puzzles.
@@ -90,7 +91,8 @@ the owner may change it.
   8. **Guests play, and their days follow them** (ADR-014): an account keeps its own day where both played,
      otherwise the guest's day moves, then the streak is rebuilt. Export and deletion include the days (ADR-048).
   9. **The share grid names nobody** (ADR-028.7): the kind, the number, one square per move to find, hints, the
-     streak, and CC-217's Hinglish and English lines.
+     streak, and CC-217's Hinglish and English lines. The Hinglish speaks to the friend with "tum", never "aap",
+     as all the app's copy does (owner, 2026-10-20), and a test checks it.
 - **Consequences.** A new collection, `daily_puzzle_attempts`, with one unique index, kept until the account is
   deleted. About 108 KB of JSON in the server. A new kind is a referee, a catalogue, a board and two registry lines.
 
