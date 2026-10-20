@@ -13,11 +13,22 @@ describe("App", () => {
 
     const daily = screen.getByRole("region", { name: "Daily puzzle" });
 
-    expect(within(daily).getByRole("link", { name: "Daily chess puzzle" })).toHaveAttribute(
+    expect(within(daily).getByRole("link", { name: "Today's puzzle" })).toHaveAttribute(
       "href",
       "/daily/chess",
     );
     expect(within(daily).getByRole("listitem")).toHaveClass("chess");
+  });
+
+  it("names the daily puzzle's link so it is never taken for a game's own link", async () => {
+    renderApp();
+
+    const daily = screen.getByRole("region", { name: "Daily puzzle" });
+
+    // Browser tests find a link by a part of its name, so "Daily chess puzzle" would also answer to "Chess".
+    for (const game of ["Chess", "Rock Paper Scissors", "Tic Tac Toe"]) {
+      expect(within(daily).queryByRole("link", { name: new RegExp(game, "i") })).toBeNull();
+    }
   });
 
   it("shows the pitch and the game catalog", async () => {

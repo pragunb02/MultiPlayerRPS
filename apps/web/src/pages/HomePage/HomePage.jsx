@@ -90,11 +90,11 @@ export function HomePage() {
             <li key={puzzle.id} className={`${styles.card} ${styles[gameArtFor(puzzle.gameId).tone]}`}>
               <h3>
                 <Link to={paths.daily(puzzle.id)} className={styles.cardLink} data-cc-control="home.daily">
-                  {puzzle.name}
+                  Today&apos;s puzzle
                 </Link>
               </h3>
               <p className={styles.meta}>
-                A new one every day, the same for everyone. Keep your streak going.
+                A new chess puzzle every day, the same for everyone. Keep your streak going.
               </p>
               <span className={styles.play} aria-hidden="true">
                 Solve

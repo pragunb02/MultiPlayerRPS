@@ -143,7 +143,7 @@ test.describe("the daily chess puzzle", () => {
     await page.getByLabel("Password").fill(account.password);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page).toHaveURL("/");
-    await page.getByRole("link", { name: "Daily chess puzzle" }).click();
+    await page.getByRole("link", { name: "Today's puzzle" }).click();
 
     await expect(page).toHaveURL(PAGE);
     await expect(page.getByRole("heading", { name: "Solved!" })).toBeVisible();
