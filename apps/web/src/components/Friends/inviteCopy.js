@@ -33,6 +33,12 @@ export const INVITE_COPY = Object.freeze({
       `Game bhar gaya: ${name} kisi aur ke saath khel rahe hain. Unhe phir se invite karo?`,
       `Game filled: ${name} is playing someone else now. Invite them again?`,
     ),
+  /** The same, short enough for a toast on a phone. Its button asks "Invite again?". */
+  gameFilledShort: (name) =>
+    both(
+      `Game bhar gaya: ${name} kisi aur ke saath khel rahe hain.`,
+      `Game filled: ${name} is playing someone else now.`,
+    ),
   /** The friend who took an invite, waiting in the room for its sender (scenario 4). */
   isntHere: (name) =>
     both(

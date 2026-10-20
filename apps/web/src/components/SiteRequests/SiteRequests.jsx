@@ -143,7 +143,7 @@ function useEndingToasts() {
         notRightNow(challenge.toName);
       }
       if (challenge.forYou && challenge.state === CHALLENGE_STATES.FILLED && wasOpen(challenge.id)) {
-        toast.show(both(INVITE_COPY.gameFilled(challenge.fromName)), {
+        toast.show(both(INVITE_COPY.gameFilledShort(challenge.fromName)), {
           tone: "info",
           category: CATEGORIES.REQUEST,
           action: {
