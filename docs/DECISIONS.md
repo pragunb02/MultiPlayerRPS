@@ -59,6 +59,54 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-071 — Reports: by reference, closed reasons, a masked note, grouped for one moderator, 180 days
+
+- **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-044](tickets/CC-044.md) research §6, the
+  second pull request of CC-044). Amends ADR-053.3 and ADR-059's last sentence (below).
+- **Context.** Players can meet people they do not know (links today, quick match next), the name filter lets some
+  names through "and reports cover it" (ADR-022.2), and the IT Rules expect a way to complain. Every player counts as
+  a minor until they give a year (ADR-028.1), no client may get another person's player id (ADR-057), and the
+  owner is the only moderator (ADR-051).
+- **Decision.**
+  1. **By reference only.** `POST /api/reports` takes `{ roomCode, seat, seatId }`, `{ matchId, seat }` or
+     `{ handle }`, a reason and an optional note. The server resolves the person (`domain/players/playerReferences.js`,
+     shared with blocks): the other person of an open room both sit in or a match both played, or the adult
+     account behind a public profile handle. Anyone else, the caller, a computer, a deleted player or a hidden
+     profile gets one 404 "We couldn't find that player". Only the server stores the reported player's id.
+  2. **Reasons** are a closed list in `@classicade/shared` (`REPORT_REASONS`): `name` (offensive name), `cheating`
+     (cheating or stalling), `harassment` (through emotes or requests), `other`. **The note** is optional plain
+     text of at most 500 characters (`REPORT_NOTE_MAX`), with emails and phone numbers masked as in ADR-059.2. This
+     reverses the owner's answer 11 of ADR-051 on the coordinator's brief, for the owner to confirm.
+  3. **Context is a snapshot** made at report time: the game, the room code or match id, the reported name then,
+     and for a room or a match the last 10 moves and the last 5 requests between the pair, players named only
+     `reported`, `reporter` or `other`.
+  4. **Silence.** The reporter gets a neutral thank-you and may block in one tap through `POST /api/blocks` with
+     `{ reportId }` (their own report only). The reported player is never told: no event, no view, no log line
+     names them. Counts never act by themselves.
+  5. **Limits.** One report per reporter per reported player per India day (unique index; a repeat answers the same
+     report). 10 a day per player, then 30 a day per address counting only what the player's limit let through.
+     **Set aside:** a reporter with at least 3 dismissed reports and none acted on, within the kept period, still
+     gets the same thank-you, but their new reports are marked `setAside` and sorted last.
+  6. **The console's Reports page** (`/admin/reports`, ADR-036.1 allowlist and 404) lists open reports grouped by
+     reported player, named by the newest report's id, never a player id: names at the time, counts by reason,
+     distinct reporters, each report's context and note, shown as text. Actions on a group: **dismiss**, and
+     **rename** an account to `Player_` and six letters (passes ADR-022), which also renames its leaderboard rows,
+     ends its sessions and cuts its sockets. Guests' names are server-given and are not renamed. Both close the
+     group's open reports with the action and the time. Each action logs the admin's id, the report id and the
+     action. **Suspension** does not exist and is a follow-up ticket.
+  7. **Data.** `player_reports`, kept **180 days** from the report (`REPORT_KEEP_DAYS`, TTL). Moves with a guest who
+     signs in (ADR-014). Deletion (ADR-048.2) removes reports about the player, and on reports the player made
+     replaces their id with a `deleted_` stand-in and drops the note. Export lists the player's own reports
+     (reason, note, where, the name reported, when), never the reported id or the outcome.
+- **Amends ADR-053.3.** A player can also block someone they reported, by the report's id.
+- **Amends ADR-059** ("a later view of per-person content needs its own decision"): this is that decision. The
+  reports page shows content about one person to the owner only, for the reasons ADR-059 gives, plus: no reporter
+  is shown, and nothing is shown to players.
+- **Consequences.** One new collection with its indexes, nothing existing changed or migrated; `accounts` gets one
+  new write (the rename), the legacy `users` is never touched. The name filter does not learn words from renames
+  (a person adds them with a test, ADR-022). Follow-ups: account suspension; the reporter's status list (ICO
+  standard 15); urgent reports. A restart forgets the in-memory limits, as every other limit.
+
 ### ADR-068 — Changelog fragments, folded by the coordinator, and numbers assigned at dispatch
 
 - **Status:** Accepted by default (owner may change) · 2026-10-20 ([CC-299](tickets/CC-299.md), research there)
