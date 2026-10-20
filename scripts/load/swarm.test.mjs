@@ -247,6 +247,31 @@ describe("createSwarm when a player's games end", () => {
   });
 });
 
+describe("createSwarm when a player plays the computer", () => {
+  // The run above mixes people and computers, so whether a computer player ever turned a rematch down before the
+  // run ended was up to the timing, and with it the coverage of leaving the room (CC-309).
+  it("leaves the room when it does not ask for a rematch, and starts a new game", async () => {
+    const server = await realServer();
+    const model = { ...QUICK, computerShare: 1, rematchShare: 0, gameShare: { [GAME_IDS.RPS]: 1 } };
+    const { recorder, swarm } = swarmOn(server.baseUrl, { model });
+    const calls = {};
+    const failures = {};
+
+    await swarm.grow(1, 0);
+    await until(() => {
+      const step = recorder.take();
+      Object.entries(step.times).forEach(([name, { count }]) => (calls[name] = (calls[name] ?? 0) + count));
+      Object.assign(failures, step.failures);
+      return (calls["room:play-computer rps"] ?? 0) >= 2;
+    });
+    await swarm.stop();
+
+    expect(failures).toEqual({});
+    expect(calls["room:leave"]).toBeGreaterThanOrEqual(1);
+    expect(calls["room:request"]).toBeUndefined();
+  });
+});
+
 describe("createSwarm when it stops", () => {
   it("stops players who have not arrived yet, so nobody connects after the end", async () => {
     const server = await realServer();
