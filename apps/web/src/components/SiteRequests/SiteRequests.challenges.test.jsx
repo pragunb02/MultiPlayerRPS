@@ -7,7 +7,8 @@ import { installVisibility } from "../../testing/visibility.js";
 
 // CC-139 and CC-207: challenges reach a player on any page as a popup with Accept and go and Not now, move to the
 // inbox after about a minute or on Not now, and never interrupt a game on the room page.
-const T = Date.UTC(2026, 9, 20, 12);
+// Relative to today, so a challenge made "now" in a test is still open on any day the tests run.
+const T = Date.now();
 const sentToYou = (overrides = {}) => ({
   id: "c0000000000000000001",
   gameId: "chess",
@@ -38,14 +39,19 @@ const yoursTaken = (overrides = {}) =>
 async function open({ path = "/", api: apiOverrides = {}, joined } = {}) {
   const socket = fakeSocket();
   socket.connect();
-  socket.request.mockImplementation(async (event) => {
-    if (event === "room:join") return joined;
-    return {};
-  });
+  // A room the test does not describe is still joining, as a real server that has not answered yet.
+  socket.request.mockImplementation((event) =>
+    event === "room:join" && joined === undefined ? new Promise(() => {}) : Promise.resolve(joined ?? {}),
+  );
   const sound = fakeSound();
   const api = fakeApi({ getSession: async () => GUEST, ...apiOverrides });
   const view = renderApp({ path, socket, sound, api });
   await screen.findByText(GUEST.displayName);
+  // The first read of the inbox has answered, so nothing it says can arrive in the middle of a test.
+  await waitFor(() => expect(api.getChallenges).toHaveBeenCalled());
+  await act(async () => {
+    await api.getChallenges.mock.results[0].value.catch(() => undefined);
+  });
   const push = (challenge) => act(() => socket.push("challenge:updated", { challenge }));
   return { ...view, socket, sound, api, push };
 }
@@ -173,6 +179,24 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     act(() => vi.advanceTimersByTime(1_000));
     expect(popup()).not.toBeInTheDocument();
     expect(api.challengeLater).toHaveBeenCalledWith("c0000000000000000001");
+  });
+
+  it("keeps a challenge pushed while the inbox was still being read", async () => {
+    let answer;
+    const reading = new Promise((resolve) => {
+      answer = resolve;
+    });
+    const socket = fakeSocket();
+    socket.connect();
+    const api = fakeApi({ getSession: async () => GUEST, getChallenges: vi.fn(() => reading) });
+    renderApp({ socket, api });
+    await screen.findByText(GUEST.displayName);
+    await waitFor(() => expect(api.getChallenges).toHaveBeenCalled());
+
+    act(() => socket.push("challenge:updated", { challenge: sentToYou() }));
+    await act(async () => answer([]));
+
+    expect(popup()).toBeInTheDocument();
   });
 
   it("tells the creator on any page that someone took their challenge, and Go and play opens the room", async () => {
