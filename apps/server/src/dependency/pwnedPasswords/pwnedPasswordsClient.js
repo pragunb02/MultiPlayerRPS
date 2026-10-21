@@ -6,7 +6,10 @@ export const PWNED_PASSWORDS_RANGE_URL = "https://api.pwnedpasswords.com/range/"
 /** How long one range request may take, reading the answer included (ADR-080). */
 export const PWNED_PASSWORDS_TIMEOUT_MS = 1500;
 
-const PREFIX = /^[0-9A-F]{5}$/;
+/** How many hex characters of a password's SHA-1 are sent, the k-anonymity prefix of the range API (ADR-080). */
+export const PWNED_PASSWORDS_PREFIX_LENGTH = 5;
+
+const PREFIX = new RegExp(`^[0-9A-F]{${PWNED_PASSWORDS_PREFIX_LENGTH}}$`);
 const LINE = /^([0-9A-F]{35}):(\d+)$/;
 
 /**

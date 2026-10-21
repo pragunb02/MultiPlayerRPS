@@ -244,6 +244,39 @@ describe("accountComponent", () => {
       expect((await weak.accountDao.getByEmail("riya@example.com")).passwordHash).toBe(before);
     });
 
+    it("never brings an old password back when it changes between the check and the upgrade (CC-260)", async () => {
+      const NEW = "a brand new password";
+      const weak = setup({ params: { N: 2 ** 9, r: 8, p: 1 } });
+      const { identity } = await weak.accounts.signup({ ...RIYA, now: NOW });
+      const accessor = createAccountAccessor({ accountDao: weak.accountDao });
+      const current = createAccountComponent({
+        accountAccessor: {
+          ...accessor,
+          // A password change from another device commits just before the upgraded hash is saved.
+          updatePasswordHash: async (accountId, change) => {
+            await current.changePassword({
+              playerId: identity.id,
+              currentPassword: RIYA.password,
+              newPassword: NEW,
+            });
+            return accessor.updatePasswordHash(accountId, change);
+          },
+        },
+        legacyUserAccessor: legacyAccessor(),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
+        accountDeletionAccessor: noDeletions(),
+      });
+
+      await current.login({ email: RIYA.email, password: RIYA.password });
+
+      expect((await current.login({ email: RIYA.email, password: NEW })).identity.id).toBe(identity.id);
+      await expect(current.login({ email: RIYA.email, password: RIYA.password })).rejects.toThrow(
+        UnauthorizedError,
+      );
+    });
+
     it("does not check the password against the known passwords at login (CC-261)", async () => {
       const screen = refusingPasswords([RIYA.password]);
       const { accounts, accountDao } = setup();

@@ -255,16 +255,19 @@ export function createAccountComponent({
   }
 
   /**
-   * Saves a stronger hash of the password when the stored one was made with weaker parameters (CC-260). Best
-   * effort: the player has proved the password, so a failure here never fails the login. It is passed up to be
-   * logged, and the next login tries again.
+   * Saves the stronger hash made during the login of an account whose stored hash is outdated (CC-260). It
+   * replaces the hash only while it is still the one that was checked, so a password change that landed meanwhile
+   * is kept. Best effort: the player has proved the password, so a failure here never fails the login. It is passed
+   * up to be logged, and the next login tries again.
    *
    * @returns {Promise<{ rehashFailure?: unknown }>}
    */
-  async function upgradeHash(account, password) {
-    if (!passwordHasher.needsRehash(account.passwordHash)) return {};
+  async function saveUpgradedHash(account, upgraded) {
     try {
-      await accountAccessor.updatePasswordHash(account.accountId, await passwordHasher.hash(password));
+      await accountAccessor.updatePasswordHash(account.accountId, {
+        from: account.passwordHash,
+        to: upgraded,
+      });
       return {};
     } catch (err) {
       return { rehashFailure: err };
@@ -316,8 +319,10 @@ export function createAccountComponent({
     /**
      * Same answer, and the same work, whether the email is unknown, belongs to an account or to a player of the old
      * app, or the password is wrong. Every login reads both stores and runs one scrypt and one bcrypt, so neither
-     * the answer nor the time it takes shows who has an account (CC-245). Upgrades the stored hash when its
-     * parameters are outdated, without ever failing the login for it (CC-260).
+     * the answer nor the time it takes shows who has an account (CC-245). An account with an outdated hash also
+     * runs a hash at today's parameters alongside the check, whatever the password, so it is never quicker than an
+     * unknown email. On success that hash is saved, best effort and only over the hash that was checked, so the
+     * login never fails for it and a password changed meanwhile is kept (CC-260).
      *
      * @param {{ email: unknown, password: unknown, now: number }} input
      * @returns {Promise<Readonly<SignIn>>}
@@ -339,9 +344,14 @@ export function createAccountComponent({
         const typed = String(email).normalize("NFKC").trim();
         return signInOf(await loginLegacyUser(normalised, legacy, typed, now));
       }
-      const [matches] = await Promise.all([
+      // An outdated hash is cheaper to check than a current one. The hash at today's parameters is made at the same
+      // time, right password or wrong, so such an account costs at least what an unknown email costs and the time
+      // does not show which accounts have not signed in since the change (CC-260, CC-245).
+      const outdated = passwordHasher.needsRehash(account.passwordHash);
+      const [matches, , upgraded] = await Promise.all([
         passwordHasher.verify(normalised.password, account.passwordHash),
         legacyPasswords.verifyAgainstDummy(normalised.password),
+        outdated ? passwordHasher.hash(normalised.password) : undefined,
       ]);
       if (!matches) {
         throw new UnauthorizedError(INVALID_LOGIN, legacy.failure);
@@ -350,7 +360,7 @@ export function createAccountComponent({
       const signedIn = Object.freeze({
         ...signInOf(account),
         ...(legacy.failure !== undefined && { legacyFailure: legacy.failure.cause }),
-        ...(await upgradeHash(account, normalised.password)),
+        ...(outdated && (await saveUpgradedHash(account, upgraded))),
       });
       if (account.email !== normalised.email) {
         const outcome = await accountAccessor.healEmail({

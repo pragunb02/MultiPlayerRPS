@@ -73,11 +73,15 @@ the owner may change it.
      once. Measured on the owner's laptop (Apple M4 Pro, Node 24.21): a hash takes about 40 ms at p=1 and about
      127 ms at p=3 (median of 30, CC-260 has the numbers). The stop line was about 300 ms.
   2. **Old hashes keep working.** Each hash stores its own parameters and still verifies. After a successful login,
-     a hash with other parameters is made again and saved. That is best effort: a failed save never fails the login,
-     it is logged as "saving the upgraded password hash failed" (warning, forwarded to telemetry), and the next login
-     tries again.
-  3. **The dummy hash** that gives an unknown email the same work as a real one is made with the same new
-     parameters, so timing still says nothing about which emails have accounts.
+     a hash with other parameters is replaced by the new one. That save is a compare and set: it replaces the hash
+     only while it is still the one that was checked, so a password change that landed meanwhile is kept. It is
+     best effort: a failed save never fails the login, it is logged as "saving the upgraded password hash failed"
+     (warning, forwarded to telemetry), and the next login tries again.
+  3. **Equal work for every email.** The dummy hash that gives an unknown email the same work as a real one is made
+     with the new parameters. An account with an old hash is cheaper to check (about 40 ms against 127 ms), which
+     would show which accounts have not signed in since the change. So its login also runs a hash at the new
+     parameters, in the same `Promise.all` as the check, right password or wrong, and on success that hash is the
+     one saved, so it is made only once. Such a login costs at least what an unknown email costs (CC-245).
   4. **New passwords are screened** at sign-up and on a password change, never at login, after the length rules:
      1. first against the bundled SecLists `10k-most-common.txt` (MIT, credited in CREDITS.md), compared in lower
         case,

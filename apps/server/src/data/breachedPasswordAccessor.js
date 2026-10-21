@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
+import { PWNED_PASSWORDS_PREFIX_LENGTH as PREFIX_LENGTH } from "../dependency/pwnedPasswords/pwnedPasswordsClient.js";
 import { assertDefined } from "../utils/assert.js";
-
-const PREFIX_LENGTH = 5;
 
 /**
  * Whether a password is known to attackers (CC-261, ADR-080), from two sources: the bundled common password list,
