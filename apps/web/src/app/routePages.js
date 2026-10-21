@@ -37,10 +37,7 @@ export const LeaderboardPage = lazyRoute(
 );
 export const PrivacyPage = lazyRoute(() => import("../pages/LegalPages/PrivacyPage.jsx"), "PrivacyPage");
 export const TermsPage = lazyRoute(() => import("../pages/LegalPages/TermsPage.jsx"), "TermsPage");
-export const NotFoundPage = lazyRoute(
-  () => import("../pages/NotFoundPage/NotFoundPage.jsx"),
-  "NotFoundPage",
-);
+export const NotFoundPage = lazyRoute(() => import("../pages/NotFoundPage/NotFoundPage.jsx"), "NotFoundPage");
 export const AdminRoute = lazyRoute(() => import("../pages/AdminPage/AdminRoute.jsx"), "AdminRoute");
 
 /** Home's address. It is in the first download, so there is nothing to fetch for it. */

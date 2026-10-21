@@ -119,7 +119,9 @@ export function checkBundle({ html, report, gzipOf, effectBudgets = new Map(), b
     .filter((module) => module.name === EFFECT_REGISTRY)
     .reduce((sum, module) => sum + module.gzip, 0);
   if (kB(registry) > budgets.registryKB) {
-    failures.push(`FAIL the effect registry is ${show(registry)} on the first route, budget ${budgets.registryKB} kB`);
+    failures.push(
+      `FAIL the effect registry is ${show(registry)} on the first route, budget ${budgets.registryKB} kB`,
+    );
   } else if (registry > 0) {
     notes.push(`effect registry on the first route: ${show(registry)}, budget ${budgets.registryKB} kB`);
   }
