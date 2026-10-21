@@ -2,16 +2,22 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import { exampleTelemetryEvent } from "@classicade/shared/testing";
+
+/** The web client's batch rhythm (apps/web/src/lib/telemetry/client.js TELEMETRY_BATCH): one every 10 seconds. */
+const TELEMETRY_BATCH = { everyMs: 10_000 };
 import { createTelemetryAccessor } from "../../data/telemetryAccessor.js";
+import { TELEMETRY_LIMITS } from "../../domain/telemetry/telemetryLimits.js";
 import { createTelemetryComponent } from "../../domain/telemetry/telemetryComponent.js";
 import { hasPlayerIdShape } from "../../models/playerIdShape.js";
 import { flagPaths } from "../../testing/flagPaths.js";
-import { createInMemoryTelemetryEventDao } from "../../testing/inMemoryTelemetryEventDao.js";
+import { eventsOf } from "../../testing/telemetryCountDaoContract.js";
+import { createInMemoryTelemetryCountDao } from "../../testing/inMemoryTelemetryCountDao.js";
 import { createTestApp } from "../../testing/testApp.js";
 import { createAdminAccess } from "./adminAccess.js";
 import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
 import { countServerErrors } from "./errorMiddleware.js";
 import {
+  createNetworkBudget,
   createServerEvents,
   createTelemetryBodyParser,
   createTelemetryRoutes,
@@ -38,7 +44,8 @@ async function wholeApp({ on = true, limits = {} } = {}) {
     metrics: { recordTelemetryDropped: (drop) => drops.push(drop) },
   });
   if (on) await testApp.flagComponent.setRollout({ name: "telemetry_ingest", rollout: "on" });
-  const stored = () => createTelemetryAccessor({ telemetryEventDao: testApp.telemetryEventDao }).list(ALL);
+  const stored = async () =>
+    eventsOf(await createTelemetryAccessor({ telemetryCountDao: testApp.telemetryCountDao }).list(ALL));
   const post = (body, headers = {}) =>
     request(testApp.app)
       .post("/api/telemetry")
@@ -49,9 +56,9 @@ async function wholeApp({ on = true, limits = {} } = {}) {
 
 /** The routes behind a fake session, for who is asking: the test says so with a header, as JSON. */
 function withSession() {
-  const dao = createInMemoryTelemetryEventDao();
+  const dao = createInMemoryTelemetryCountDao();
   const telemetryComponent = createTelemetryComponent({
-    telemetryAccessor: createTelemetryAccessor({ telemetryEventDao: dao }),
+    telemetryAccessor: createTelemetryAccessor({ telemetryCountDao: dao }),
     serverBuild: "unknown",
   });
   const flagComponent = { isOn: async () => true, recordSuccess: async () => undefined };
@@ -73,7 +80,7 @@ function withSession() {
       "User-Agent",
       BROWSER,
     );
-  const stored = () => createTelemetryAccessor({ telemetryEventDao: dao }).list(ALL);
+  const stored = async () => eventsOf(await createTelemetryAccessor({ telemetryCountDao: dao }).list(ALL));
   return { app, as, stored, telemetryComponent };
 }
 
@@ -132,6 +139,46 @@ describe("POST /api/telemetry (CC-175)", () => {
     ]);
   });
 
+  it("counts batches per session when there is one, and allows far more than a client ever sends", async () => {
+    expect(TELEMETRY_LIMITS.batches.limit).toBeGreaterThanOrEqual(
+      5 * (TELEMETRY_LIMITS.batches.windowMs / TELEMETRY_BATCH.everyMs),
+    );
+    const { app, stored, post } = await wholeApp({ limits: { batches: { windowMs: 60_000, limit: 1 } } });
+    const riya = request.agent(app);
+    const arjun = request.agent(app);
+    await riya.post("/api/session/guest").expect(201);
+    await arjun.post("/api/session/guest").expect(201);
+    const send = (agent) => agent.post("/api/telemetry").set("User-Agent", BROWSER).send(batch());
+
+    // Two players behind one network address each have their own budget.
+    await send(riya);
+    await send(arjun);
+    await send(riya);
+    // A visitor with no session is counted by the network.
+    await post(batch());
+    await post(batch());
+
+    await vi.waitFor(async () =>
+      expect((await stored()).filter(({ name }) => name === "page_viewed")).toHaveLength(3),
+    );
+  });
+
+  it("gives one network only a small share of the site's day, and drops the rest as rate_limited", async () => {
+    expect(TELEMETRY_LIMITS.perNetworkDaily).toBeLessThanOrEqual(TELEMETRY_LIMITS.storedPerDay / 20);
+    const { stored, post, drops } = await wholeApp({ limits: { perNetworkDaily: 3 } });
+    const two = batch([exampleTelemetryEvent("page_viewed"), exampleTelemetryEvent("visit_ended")]);
+
+    await post(two);
+    await post(two);
+    await post(two, { "X-Forwarded-For": "198.51.100.9" });
+
+    expect(await stored()).toHaveLength(3);
+    expect(drops).toEqual([
+      { reason: "rate_limited", count: 1 },
+      { reason: "rate_limited", count: 2 },
+    ]);
+  });
+
   flagPaths("telemetry_ingest", (on) => {
     // AC-7 (CC-175)
     it(on ? "stores a batch when the flag is on" : "stores nothing when the flag is off", async () => {
@@ -152,8 +199,15 @@ describe("POST /api/telemetry (CC-175)", () => {
 
     expect(res.status).toBe(204);
     const kept = await stored();
-    expect(kept.map(({ receivedAt, ...event }) => event)).toEqual(
-      events.map((event) => ({ ...event, build: BUILD, tier: "counts" })),
+    // Counters keep no order, so the events are compared as a set.
+    expect(
+      kept
+        .map(({ receivedAt, ...event }) => event)
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    ).toEqual(
+      events
+        .map((event) => ({ ...event, build: BUILD, tier: "counts" }))
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
     );
   });
 
@@ -205,9 +259,9 @@ describe("the telemetry route's edges (CC-175)", () => {
   });
 
   it("answers 204 even when the database cannot store the batch, and logs it without the batch", async () => {
-    const dao = createInMemoryTelemetryEventDao();
-    const failing = { ...dao, insertMany: async () => Promise.reject(new Error("database down")) };
-    const testApp = createTestApp({ telemetryEventDao: failing });
+    const dao = createInMemoryTelemetryCountDao();
+    const failing = { ...dao, addCounts: async () => Promise.reject(new Error("database down")) };
+    const testApp = createTestApp({ telemetryCountDao: failing });
     await testApp.flagComponent.setRollout({ name: "telemetry_ingest", rollout: "on" });
 
     const res = await request(testApp.app).post("/api/telemetry").set("User-Agent", BROWSER).send(batch());
@@ -310,19 +364,46 @@ describe("events the server records itself (CC-175, EVENTS.md 3.3 and 3.5)", () 
     await vi.waitFor(async () => expect(await stored()).toHaveLength(5));
     const kept = await names(stored);
     expect(
-      kept.map(([name, kind, rest]) => [name, kind, rest.from_guest ?? rest.cause ?? rest.reason ?? ""]),
-    ).toEqual([
-      ["guest_started", "guest", ""],
-      ["account_created", "account", true],
-      ["session_ended", "account", "logout"],
-      ["login_failed", "visitor", "wrong_credentials"],
-      ["login_succeeded", "account", false],
-    ]);
+      kept
+        .map(([name, kind, rest]) => [name, kind, rest.from_guest ?? rest.cause ?? rest.reason ?? ""])
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    ).toEqual(
+      [
+        ["guest_started", "guest", ""],
+        ["account_created", "account", true],
+        ["session_ended", "account", "logout"],
+        ["login_failed", "visitor", "wrong_credentials"],
+        ["login_succeeded", "account", false],
+      ].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    );
     const values = (await stored())
       .flatMap((event) => Object.values(event))
       .filter((v) => typeof v === "string");
     expect(values.filter(hasPlayerIdShape)).toEqual([]);
     expect(values.filter((value) => value.includes("@"))).toEqual([]);
+  });
+
+  it("records nothing for a browser whose usage counts switch is off (the X-CC-Counts header)", async () => {
+    const { app, stored, post, drops } = await wholeApp();
+    const agent = request.agent(app);
+
+    await agent.post("/api/session/guest").set("X-CC-Counts", "off").expect(201);
+    await agent
+      .post("/api/auth/signup")
+      .set("X-CC-Counts", "off")
+      .send({ username: "riya_plays", email: "riya@example.com", password: "a long enough password" })
+      .expect(201);
+    await agent.delete("/api/session").set("X-CC-Counts", "off").expect(204);
+    await agent
+      .post("/api/auth/login")
+      .set("X-CC-Counts", "off")
+      .send({ email: "x@example.com", password: "nope nope" });
+    expect((await post(batch(), { "X-CC-Counts": "off" })).status).toBe(204);
+
+    // Give a stray write the time to land before saying there is none.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(await stored()).toEqual([]);
+    expect(drops).toEqual([{ reason: "opted_out", count: 1 }]);
   });
 
   it("records nothing with GPC, or while the flag is off", async () => {
@@ -357,11 +438,13 @@ describe("more events the server records (CC-175)", () => {
     await agent.post("/api/auth/sign-out-others").expect(204);
 
     await vi.waitFor(async () => expect(await stored()).toHaveLength(3));
-    expect((await stored()).map(({ name, cause }) => [name, cause])).toEqual([
-      ["account_created", undefined],
-      ["session_ended", "password_changed"],
-      ["session_ended", "signed_out_elsewhere"],
-    ]);
+    expect((await stored()).map(({ name, cause }) => [name, cause ?? ""]).sort()).toEqual(
+      [
+        ["account_created", ""],
+        ["session_ended", "password_changed"],
+        ["session_ended", "signed_out_elsewhere"],
+      ].sort(),
+    );
   });
 
   it("names why a login failed: a field missing, or too many wrong passwords, never which email", async () => {
@@ -379,9 +462,9 @@ describe("more events the server records (CC-175)", () => {
 
     await vi.waitFor(async () => expect(await stored()).toHaveLength(7));
     const reasons = (await stored()).map(({ reason }) => reason);
-    expect(reasons[0]).toBe("validation");
+    expect(reasons.filter((reason) => reason === "validation")).toHaveLength(1);
     expect(reasons).toContain("wrong_credentials");
-    expect(reasons.at(-1)).toBe("throttled");
+    expect(reasons).toContain("throttled");
   });
 
   it("counts a server fault by its API template and code, never the path", async () => {
@@ -393,7 +476,8 @@ describe("more events the server records (CC-175)", () => {
     };
     const testApp = createTestApp({ accountDao });
     await testApp.flagComponent.setRollout({ name: "telemetry_ingest", rollout: "on" });
-    const stored = () => createTelemetryAccessor({ telemetryEventDao: testApp.telemetryEventDao }).list(ALL);
+    const stored = async () =>
+      eventsOf(await createTelemetryAccessor({ telemetryCountDao: testApp.telemetryCountDao }).list(ALL));
 
     await request(testApp.app).post("/api/auth/signup").send(credentials).expect(500);
 
@@ -429,5 +513,20 @@ describe("more events the server records (CC-175)", () => {
     events.record(req, "guest_started");
 
     await vi.waitFor(() => expect(errors).toEqual(["recording a telemetry event failed"]));
+  });
+});
+
+describe("the per-network budget (owner review 2026-10-21)", () => {
+  it("lets each network take up to its share of an India day, and starts again the next day", () => {
+    let clock = Date.UTC(2026, 9, 20, 10);
+    const budget = createNetworkBudget({ limit: 5, now: () => clock });
+
+    expect(budget.take("ip:a", 3)).toBe(3);
+    expect(budget.take("ip:a", 3)).toBe(2);
+    expect(budget.take("ip:a", 1)).toBe(0);
+    expect(budget.take("ip:b", 5)).toBe(5);
+    // 18:30 UTC is midnight in India.
+    clock = Date.UTC(2026, 9, 20, 18, 31);
+    expect(budget.take("ip:a", 4)).toBe(4);
   });
 });

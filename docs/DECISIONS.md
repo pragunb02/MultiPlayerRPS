@@ -998,7 +998,7 @@ thinking crashed` with `game` only.
 - **Amended 2026-10-20 (CC-175): one counter about usage counts.** `telemetry.dropped`, with the one attribute
   `reason` (`opted_out`, `admin`, `invalid`, `rate_limited`, `cap`, `bot`, `flag_off`), counts what
   `POST /api/telemetry` did not store, so the owner can see a flood, a broken build or the daily cap in Grafana. It
-  carries no product data: the usage counts themselves stay in our own database (`telemetry_events`, ADR-034), never
+  carries no product data: the usage counts themselves stay in our own database (`telemetry_counts`, ADR-034), never
   in Grafana.
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
@@ -1602,6 +1602,14 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
   (counted as `invalid`), stores at most 100 000 events per India day, keeps them 30 days by a TTL index, stores the
   arrival time to the India hour only, and drops known bots by a short User-Agent list read in memory and never
   stored or logged. The hour and the 30 days are one-way for stored history and were accepted knowingly.
+- **Amended · 2026-10-21 (review of #161, the coordinator as design and privacy lead).** No single event is stored:
+  the server adds each event to an **hourly counter**, one per tuple of catalogue fields and India hour
+  (`telemetry_counts`, `$inc` on upsert), so the order of events and which ones came in one batch are never kept, and
+  events of one visit cannot be linked to each other (the privacy page's promise). The batch limit is per session (per
+  network for a visitor) and ten times the client's rhythm, one network may have at most 2 000 events counted per India
+  day (in memory, like CC-110), and the privacy switch reaches the server too: while it is off, every API request
+  carries `X-CC-Counts: off`, and the server records no event of its own about it. The header is never stored or
+  logged.
 - **Amended · 2026-10-20 (owner: "Accept all", the recommended defaults of CC-313).** Interruptions and friction.
   (1) Only `optional` surfaces the system opened count against the budget; essential ones (connection, waking up,
   this room's requests, errors, confirms the player asked for) are counted but not budgeted. (2) The budget is

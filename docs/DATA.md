@@ -56,7 +56,7 @@ does not.
 | [`player_reports`](#player_reports)                   | pseudonymous: both player ids, the reported name then, the reason, where, the last moves, no free text            | 180 days after it was made                                                                              | MongoDB TTL index, account deletion (about the player; the player's own lose their id) |
 | [`feature_flags`](#feature_flags)                     | no: a flag name, its rollout and when it was set                                                                  | until the owner clears it                                                                               | the owner's Use the rollout in code                                                    |
 | [`feature_flag_counts`](#feature_flag_counts)         | no: per flag, India day and side, two counts                                                                      | 90 days after the day                                                                                   | MongoDB TTL index                                                                      |
-| [`telemetry_events`](#telemetry_events)               | no: anonymous usage counts, catalogue fields only, the India hour they arrived                                    | 30 days after the hour                                                                                  | MongoDB TTL index, the owner's purge                                                   |
+| [`telemetry_counts`](#telemetry_counts)               | no: anonymous hourly counters, one per tuple of catalogue fields and India hour                                   | 30 days after the hour                                                                                  | MongoDB TTL index, the owner's purge                                                   |
 | [`daily_puzzle_attempts`](#daily_puzzle_attempts)     | pseudonymous: player id, how each day's puzzle went                                                               | until the account is deleted                                                                            | account deletion, the guest transfer                                                   |
 | [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)                                                       | until the player deletes the account                                                                    | account deletion (CC-035)                                                              |
 | [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                                                                         | 30 days                                                                                                 | MongoDB TTL index                                                                      |
@@ -541,26 +541,30 @@ ADR-073, counts as ADR-034)
 5. **Kept for:** 90 days after its day (`COUNTS_KEEP_DAYS`).
 6. **Deleted by:** MongoDB's TTL index on `expiresAt`.
 
-### `telemetry_events`
+### `telemetry_counts`
 
-`apps/server/src/persistence/telemetryEventDao.js`, rules in `apps/server/src/domain/telemetry/` and
+`apps/server/src/persistence/telemetryCountDao.js`, rules in `apps/server/src/domain/telemetry/` and
 `apps/server/src/service/http/telemetryRoutes.js`, catalogue in `packages/shared/src/telemetry/events.js` (CC-174,
-CC-175, ADR-034 as amended 2026-10-20)
+CC-175, ADR-034 as amended 2026-10-20 and 2026-10-21)
 
-1. **Holds:** one document per anonymous usage event: `name`, the fields its catalogue entry allows (each a value from
-   a closed list, a bucket or a time rounded to 10 ms: the screen as a template, the width class, the kind of player,
-   a control's stable name, an error's type), `build`, `tier: "counts"` and `received_at`, the start of the India
-   hour it arrived in. `_id` is a random UUID, not an ObjectId, which would hold the second. Index: TTL on
-   `received_at`. The schema refuses any other key.
-2. **Not stored:** any player, session, device or page load id, or a hash of one; IP address; User-Agent (read in
-   memory for the bot filter only); cookies; room codes, match ids, names, emails, typed text, URLs or queries; the
-   minute or second. Two events cannot be joined to each other or to a person.
-3. **Personal data:** none. Batches with GPC or DNT, from a console admin, from a known bot, or while
-   `telemetry_ingest` is off are dropped before they are read.
+1. **Holds:** counters, not events (owner review 2026-10-21). One document per tuple of catalogue fields and India
+   hour: the fields (`name`, the screen as a template, the width class, the kind of player, a control's stable name, an
+   error's type, a bucket or a time rounded to 10 ms), `build`, `tier: "counts"`, `hour` (the start of the India hour)
+   and `count`, how many such events arrived in that hour. `key` is the tuple as text, for the unique index on `hour`
+   and `key`. `_id` is a random UUID, not an ObjectId, which would hold the second. TTL on `hour`. The schema refuses
+   any other key.
+2. **Not stored:** any single event, its order or the batch it came in, so events of one visit cannot be told from
+   any others; any player, session, device or page load id, or a hash of one; IP address; User-Agent (read in memory
+   for the bot filter only); cookies; room codes, match ids, names, emails, typed text, URLs or queries; the minute or
+   second.
+3. **Personal data:** none. Batches with GPC, DNT or the switch's `X-CC-Counts: off`, from a console admin, from a known
+   bot, or while `telemetry_ingest` is off are dropped before they are read, and the server records no event of its own
+   about such a request.
 4. **Who can read it:** nobody directly. The nightly totals (CC-176) read it, and the owner sees totals in the
    console (CC-177), with any total under 5 shown as `"<5"` (ADR-036.2).
-5. **Kept for:** 30 days after the hour it arrived in (`TELEMETRY_KEEP_DAYS`). At most 100 000 events are stored per
-   India day (`TELEMETRY_LIMITS.storedPerDay`); the rest are dropped and counted.
+5. **Kept for:** 30 days after its hour (`TELEMETRY_KEEP_DAYS`). At most 100 000 events are counted per India day
+   (`TELEMETRY_LIMITS.storedPerDay`) and 2 000 per network (`perNetworkDaily`, counted in memory only); the rest are
+   dropped and counted.
 6. **Deleted by:** MongoDB's TTL index, or the owner's purge (`DELETE /api/admin/telemetry?before=YYYY-MM-DD`).
 
 ### `daily_puzzle_attempts`
@@ -789,7 +793,7 @@ No other cookie, localStorage, sessionStorage or IndexedDB key is used in `apps/
 1. Raw IP addresses in MongoDB or in our log lines.
 2. Emails or addresses in the login throttle's memory. It keeps keyed hashes only (CC-250).
 3. Passwords. Only scrypt hashes, and bcrypt hashes in the legacy `users`.
-4. Analytics with any id. Usage counts (`telemetry_events`, CC-174 and CC-175) are anonymous counts only, first party,
+4. Analytics with any id. Usage counts (`telemetry_counts`, CC-174 and CC-175) are anonymous counts only, first party,
    with an opt out (ADR-034), and carry no id of anyone. Operations telemetry (above) is about how the server runs
    and holds nothing about players. No third-party analytics.
 5. Chat or any free text between players. Display names are the only text other players see, and they pass the name
@@ -802,7 +806,7 @@ No other cookie, localStorage, sessionStorage or IndexedDB key is used in `apps/
    `player_achievements`, `player_stats`, `player_quests` and `leaderboard_entries`, and shows aggregates only, with
    groups under 5 hidden. Its `ADMIN_ACCOUNT_IDS` allowlist decides who sees it.
 2. Room event history (CC-242), 30 days.
-3. Telemetry (CC-173 to CC-178): raw events 30 days, daily totals 13 months. Catalogue in
+3. Telemetry (CC-173 to CC-178): hourly counters 30 days, daily totals 13 months. Catalogue in
    [analytics/EVENTS.md](analytics/EVENTS.md).
 4. Error tracking (CC-049): warning and error names already go to Grafana Cloud as
    [operations telemetry](#operations-telemetry). Stack traces stay in Render only. A tool that sends stacks would be

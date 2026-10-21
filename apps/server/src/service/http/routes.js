@@ -161,7 +161,7 @@ export function apiRouter({
   );
 
   router.use(createFlagRoutes({ flagComponent, adminAccess }));
-  router.use(createTelemetryRoutes({ telemetryComponent, flagComponent, adminAccess }));
+  router.use(createTelemetryRoutes({ telemetryComponent, flagComponent, adminAccess, now }));
 
   router.use(createAdminRoutes({ analyticsComponent, requireAdmin: adminAccess.requireAdmin, now }));
   router.use(createAdminAccountRoutes({ accountComponent, requireAdmin: adminAccess.requireAdmin, now }));

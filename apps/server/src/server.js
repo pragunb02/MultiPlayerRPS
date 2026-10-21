@@ -82,7 +82,7 @@ import { createFriendshipDao } from "./persistence/friendshipDao.js";
 import { createPrivacyDao } from "./persistence/privacyDao.js";
 import { createFeatureFlagDao } from "./persistence/featureFlagDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
-import { createTelemetryEventDao } from "./persistence/telemetryEventDao.js";
+import { createTelemetryCountDao } from "./persistence/telemetryCountDao.js";
 import { createReportDao } from "./persistence/reportDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
@@ -748,7 +748,7 @@ export async function startServer({
   const friendLinkDao = createFriendLinkDao({ connection: database.connection });
   const privacyDao = createPrivacyDao({ connection: database.connection });
   const featureFlagDao = createFeatureFlagDao({ connection: database.connection });
-  const telemetryEventDao = createTelemetryEventDao({ connection: database.connection });
+  const telemetryCountDao = createTelemetryCountDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -775,7 +775,7 @@ export async function startServer({
       friendLinkDao,
       privacyDao,
       featureFlagDao,
-      telemetryEventDao,
+      telemetryCountDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -807,7 +807,7 @@ export async function startServer({
   const friendAccessor = createFriendAccessor({ friendshipDao, friendRequestDao, friendLinkDao });
   const privacyAccessor = createPrivacyAccessor({ privacyDao });
   const featureFlagAccessor = createFeatureFlagAccessor({ featureFlagDao });
-  const telemetryAccessor = createTelemetryAccessor({ telemetryEventDao });
+  const telemetryAccessor = createTelemetryAccessor({ telemetryCountDao });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);

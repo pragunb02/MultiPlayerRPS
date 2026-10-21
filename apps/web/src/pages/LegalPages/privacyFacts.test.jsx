@@ -82,9 +82,9 @@ const FACTS = [
     page: /Render keeps them for 7 to 14 days, depending on the plan/,
   },
   {
-    fact: "usage counts are anonymous, on our own server, single counts 30 days, off with the switch, GPC or DNT (CC-174)",
-    data: "| [`telemetry_events`](#telemetry_events) | no: anonymous usage counts, catalogue fields only, the India hour they arrived | 30 days after the hour |",
-    page: /These counts go only to our own server and our own database\. They never include your name, email, IP address, what you type, or the code of your room\. The time is kept to the hour only\..*the counts carry no id at all.*The single counts are deleted after 30 days\..*If your browser sends Global Privacy Control or Do Not Track, it is off already/,
+    fact: "usage counts are anonymous, on our own server, kept per hour never as single events, 30 days, off with the switch, GPC or DNT (CC-174)",
+    data: "| [`telemetry_counts`](#telemetry_counts) | no: anonymous hourly counters, one per tuple of catalogue fields and India hour | 30 days after the hour |",
+    page: /These counts go only to our own server and our own database\. They never include your name, email, IP address, what you type, or the code of your room\. The time is kept to the hour only\..*the counts carry no id at all.*never a single press or page on its own, so nothing says which counts came from one visit or in which order\. These hourly counts are deleted after 30 days\..*If your browser sends Global Privacy Control or Do Not Track, it is off already/,
   },
   {
     fact: "the usage counts switch keeps only cc.telemetry in this browser (CC-174)",

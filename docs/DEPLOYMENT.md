@@ -588,12 +588,11 @@ Collector and Grafana. Either way only the two variables change, not the code.
 ## Usage counts (CC-174, CC-175, ADR-034)
 
 Anonymous usage counts: the browser client (`telemetry_client`) and `POST /api/telemetry` (`telemetry_ingest`), both
-CC-312 flags that merge **off**. No env var, no new dependency. The server makes the `telemetry_events` collection and
+CC-312 flags that merge **off**. No env var, no new dependency. The server makes the `telemetry_counts` collection and
 its 30 day TTL index at boot (`syncIndexes`), so the merge itself changes nothing players see except the privacy page
 section 4a and the footer's "no third-party trackers".
 
-1. **The limits** (`apps/server/src/domain/telemetry/telemetryLimits.js`): 8 KB and 30 events a batch, 30 batches per
-   10 minutes per network, 100 000 stored events per India day, each kept 30 days. Every batch is answered `204`,
+1. **The limits** (`apps/server/src/domain/telemetry/telemetryLimits.js`): 8 KB and 30 events a batch, 600 batches per 10 minutes per session (per network for a visitor), 2 000 events per network and 100 000 for the site per India day, counted per hour and kept 30 days. Only hourly counters are stored, never single events (owner review 2026-10-21). Every batch is answered `204`,
    whatever was kept. What was not stored is counted in Grafana as `telemetry.dropped` by `reason` (`opted_out`,
    `admin`, `invalid`, `rate_limited`, `cap`, `bot`, `flag_off`): the first five and `flag_off` count batches,
    `invalid` and `cap` count events.
@@ -605,12 +604,12 @@ section 4a and the footer's "no third-party trackers".
       stored. Check `telemetry.dropped{reason="admin"}` rises in Grafana.
    4. **Before 10 %, measure the storage** on a copy (CC-175 Rabbit holes): insert 100 000 events shaped like
       `apps/server/src/testing/telemetryEventDaoContract.js`'s `storedEvent` into a scratch database and read
-      `db.telemetry_events.stats().storageSize`. Thirty days of that must stay under the 150 MB guardrail. If it does
+      `db.telemetry_counts.stats().storageSize`. Thirty days of that must stay under the 150 MB guardrail. If it does
       not, lower `storedPerDay`, never raise the 30 days.
    5. Then 10 %, 50 % and 100 %, at least two days apart, comparing the guardrails of CC-174 (time to first move and
       page speed, flag on against off) at each step.
 3. **Rollback:** set either flag Off. The next page load sends nothing, and the server drops every batch at once.
-4. **Purge** raw events, for a mistake found in a field: signed in as an admin, in the browser console on the site,
+4. **Purge** the hourly counts, for a mistake found in a field: signed in as an admin, in the browser console on the site,
    `await fetch("/api/admin/telemetry?before=2026-11-01", { method: "DELETE" }).then((r) => r.json())` deletes
    everything that arrived before that India day and answers `{ deleted }`. Anyone else gets the console's 404.
 5. **Flag removal:** both flags by 2027-01-31 (their own small PR, PROCESS.md).

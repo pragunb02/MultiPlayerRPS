@@ -378,6 +378,45 @@ describe("the host (CC-174)", () => {
   });
 });
 
+describe("the host when the flag turns off while the client loads (owner review 2026-10-21)", () => {
+  it("never starts a client whose flag went off before its file arrived", async () => {
+    vi.useRealTimers();
+    let arrive;
+    const load = vi.fn(() => new Promise((resolve) => (arrive = resolve)));
+    const api = fakeApi({
+      getFlags: vi.fn(async () => ({ telemetry_client: true })),
+    });
+    const telemetry = createTelemetryFacade({ isOff: () => false });
+    const tree = (identity, flags) =>
+      h(
+        MemoryRouter,
+        { initialEntries: ["/"] },
+        h(
+          ServicesContext.Provider,
+          { value: { api: { ...api, getFlags: flags }, telemetry } },
+          h(
+            SessionContext.Provider,
+            { value: { status: identity ? "ready" : "anonymous", identity } },
+            h(TelemetryHost, { load }),
+          ),
+        ),
+      );
+    const view = render(tree(undefined, api.getFlags));
+    await waitFor(() => expect(load).toHaveBeenCalledOnce());
+
+    // A new session, for whom the flag is off, while the file is still on its way.
+    const off = vi.fn(async () => ({ telemetry_client: false }));
+    view.rerender(tree({ kind: "guest", id: "guest_x", displayName: "Guest-T001" }, off));
+    await waitFor(() => expect(off).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    arrive(await import("./index.js"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(telemetry.isAttached()).toBe(false);
+    view.unmount();
+  });
+});
+
 describe("the telemetry_client flag (CC-174)", () => {
   // AC-8 (CC-174)
   flagPaths("telemetry_client", (on) => {

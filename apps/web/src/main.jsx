@@ -16,7 +16,7 @@ import { entryOf } from "./lib/telemetry/entry.js";
 import { codeOf, socketCodeOf } from "./lib/telemetry/errorFields.js";
 import { createTelemetryFacade } from "./lib/telemetry/facade.js";
 import { createInterruptionTracker } from "./lib/telemetry/interruptions.js";
-import { isTelemetryOff } from "./lib/telemetry/optOut.js";
+import { isSwitchedOff, isTelemetryOff } from "./lib/telemetry/optOut.js";
 import { routeOf } from "./lib/telemetry/routeOf.js";
 import { endpointOf, roundMs, TELEMETRY_MAX_SINCE_LOAD_MS } from "@classicade/shared";
 import "./styles/global.css";
@@ -61,6 +61,8 @@ const services = {
   telemetry,
   interruptions,
   api: createApiClient({
+    // The server hears the switch too, so it records no sign-up, login or error about this browser (CC-174).
+    countsOff: () => isSwitchedOff(() => window.localStorage),
     onRequest: () => telemetry.noteRequest("http"),
     onFailure: ({ path, status, error }) =>
       telemetry.track("request_failed", { endpoint: endpointOf(`/api${path}`), status, code: codeOf(error) }),

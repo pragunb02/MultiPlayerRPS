@@ -3,10 +3,10 @@ import { IDENTITY_KINDS, TELEMETRY_PLAYER_KINDS } from "@classicade/shared";
 import { isBotAgent } from "../../domain/telemetry/botAgents.js";
 import { TELEMETRY_DROP_REASONS } from "../../domain/telemetry/telemetryLimits.js";
 import { checkBatch } from "../../domain/telemetry/telemetryValidator.js";
-import { isDay } from "../../utils/indiaTime.js";
+import { dayOf, isDay } from "../../utils/indiaTime.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
-import { clientIpKey, createRateLimit } from "./rateLimits.js";
+import { clientIpKey, createRateLimit, sessionOrIpKey } from "./rateLimits.js";
 import { requireIdentity } from "./session.js";
 
 /** Where browsers send their batches, under `/api` (CC-175). */
@@ -18,12 +18,20 @@ export const TELEMETRY_BODY_TYPES = Object.freeze(["application/json", "text/pla
 const REASONS = TELEMETRY_DROP_REASONS;
 
 /**
- * Whether the browser asks not to be counted: Global Privacy Control (`Sec-GPC: 1`) or Do Not Track (`DNT: 1`).
- * Such a request is dropped before its body is read (EVENTS.md 1.6).
+ * The header the web app sends on every request while this browser's usage counts switch is off (CC-174, owner review
+ * 2026-10-21), so the server records nothing about it either. Read here only: never stored or logged.
+ */
+export const COUNTS_OFF_HEADER = "X-CC-Counts";
+
+/**
+ * Whether the browser asks not to be counted: Global Privacy Control (`Sec-GPC: 1`), Do Not Track (`DNT: 1`) or the
+ * switch (`X-CC-Counts: off`). Such a request is dropped before its body is read, and the server records no event
+ * about it (EVENTS.md 1.6).
  *
  * @param {import("express").Request} req
  */
-export const optsOut = (req) => req.get("Sec-GPC") === "1" || req.get("DNT") === "1";
+export const optsOut = (req) =>
+  req.get("Sec-GPC") === "1" || req.get("DNT") === "1" || req.get(COUNTS_OFF_HEADER) === "off";
 
 /**
  * The kind of player a session holds, as telemetry names it. Never the id.
@@ -73,6 +81,37 @@ export function createTelemetryBodyParser({ maxBytes, onRejected }) {
       next();
     });
   };
+}
+
+/**
+ * How many events each network has had stored today (owner review 2026-10-21), in memory only, like the CC-110
+ * limits, and forgotten when the India day changes. The key is the rate limit key of the address, never stored.
+ *
+ * @param {{ limit: number, now: () => number }} options
+ */
+export function createNetworkBudget({ limit, now }) {
+  let day = "";
+  let used = new Map();
+  return Object.freeze({
+    /**
+     * Takes up to `count` events from a network's day.
+     *
+     * @param {string} network
+     * @param {number} count
+     * @returns {number} how many it may store
+     */
+    take(network, count) {
+      const today = dayOf(now());
+      if (today !== day) {
+        day = today;
+        used = new Map();
+      }
+      const spent = used.get(network) ?? 0;
+      const allowed = Math.max(0, Math.min(count, limit - spent));
+      if (allowed > 0) used.set(network, spent + allowed);
+      return allowed;
+    },
+  });
 }
 
 /** The parsed JSON of a body read as text, or undefined when it is not JSON. */
@@ -145,9 +184,10 @@ export const NO_SERVER_EVENTS = Object.freeze({ record: () => undefined });
  *   telemetryComponent: ReturnType<typeof import("../../domain/telemetry/telemetryComponent.js").createTelemetryComponent>,
  *   flagComponent: Pick<ReturnType<typeof import("../../domain/flags/flagComponent.js").createFlagComponent>, "isOn" | "recordSuccess">,
  *   adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess>,
+ *   now?: () => number,
  * }} deps
  */
-export function createTelemetryRoutes({ telemetryComponent, flagComponent, adminAccess }) {
+export function createTelemetryRoutes({ telemetryComponent, flagComponent, adminAccess, now = Date.now }) {
   assertDefined(telemetryComponent, "telemetryComponent");
   assertFunction(flagComponent?.isOn, "flagComponent.isOn");
   assertFunction(adminAccess?.isAdmin, "adminAccess.isAdmin");
@@ -171,10 +211,10 @@ export function createTelemetryRoutes({ telemetryComponent, flagComponent, admin
     return next();
   }
 
-  const perNetwork = createRateLimit({
+  const perKey = createRateLimit({
     ...limits.batches,
     message: "",
-    keyGenerator: clientIpKey,
+    keyGenerator: sessionOrIpKey,
     headers: false,
     onLimited: (req, res) => {
       telemetryComponent.dropped(REASONS.RATE_LIMITED, 1);
@@ -182,12 +222,19 @@ export function createTelemetryRoutes({ telemetryComponent, flagComponent, admin
     },
   });
 
-  router.post(TELEMETRY_PATH, dropUnwanted, perNetwork, async (req, res) => {
+  const networkBudget = createNetworkBudget({ limit: limits.perNetworkDaily, now });
+
+  router.post(TELEMETRY_PATH, dropUnwanted, perKey, async (req, res) => {
     const batch = checkBatch(parsed(req.body), { maxEvents: limits.eventsPerBatch });
     telemetryComponent.dropped(REASONS.INVALID, batch.invalid);
-    if (batch.build !== undefined && batch.events.length > 0) {
+    const allowed = networkBudget.take(clientIpKey(req), batch.events.length);
+    telemetryComponent.dropped(REASONS.RATE_LIMITED, batch.events.length - allowed);
+    if (batch.build !== undefined && allowed > 0) {
       try {
-        const stored = await telemetryComponent.storeBatch({ build: batch.build, events: batch.events });
+        const stored = await telemetryComponent.storeBatch({
+          build: batch.build,
+          events: batch.events.slice(0, allowed),
+        });
         if (stored > 0) {
           await flagComponent.recordSuccess("telemetry_ingest", flagPlayerOf(req, adminAccess.isAdmin));
         }

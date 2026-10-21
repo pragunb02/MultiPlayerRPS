@@ -8,14 +8,17 @@ import { ERROR_CODES, TELEMETRY_ERROR_TYPES, TELEMETRY_SOCKET_CODES } from "@cla
 const KNOWN_CODES = new Set(Object.values(ERROR_CODES));
 
 /**
- * The constructor name of an error when it is on the list, otherwise `other`. Anything thrown that is not an error
+ * The name of an error when it is on the list, otherwise `other`. Anything thrown that is not an error
  * (a string, an object) is `other` too, so a message can never be sent as a name.
  *
  * @param {unknown} error
  * @returns {string}
  */
 export function errorTypeOf(error) {
-  const name = error instanceof Error ? error.constructor?.name : undefined;
+  // The error's own name, not its class's: a production build renames classes, and DOM errors share one class.
+  const isError =
+    error instanceof Error || (typeof DOMException !== "undefined" && error instanceof DOMException);
+  const name = isError ? error.name : undefined;
   return typeof name === "string" && TELEMETRY_ERROR_TYPES.includes(name) ? name : "other";
 }
 
