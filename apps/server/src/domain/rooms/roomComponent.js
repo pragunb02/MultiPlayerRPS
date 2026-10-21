@@ -1268,6 +1268,28 @@ export function createRoomComponent({
     },
 
     /**
+     * The owner suspended the player's account (CC-334, ADR-078 decision 4). They leave every open room they sit in
+     * as themselves, exactly as a player who presses Leave: a running game is forfeited to the others, a waiting
+     * room they are alone in closes, and a finished room keeps their name for its rematch line. No stand-in takes
+     * the seat, so the room shows nothing a leave would not. Each changed room that stays open is told.
+     *
+     * @param {{ playerId: string, now: number }} input
+     * @returns {Promise<Array<Readonly<import("../../data/roomAccessor.js").Room>>>} rooms that changed and are still open
+     */
+    async removePlayer({ playerId, now }) {
+      const results = await eachRoom(await roomAccessor.listBySeat(playerId), (stored) =>
+        change({
+          code: stored.code,
+          now,
+          decide: (room) => (seatOf(room, playerId) === undefined ? room : leaving(room, playerId, now)),
+        }),
+      );
+      return announce(
+        results.filter((result) => !result.closed && result.changed).map((result) => result.room),
+      );
+    },
+
+    /**
      * The player deleted their account (CC-035). In every room they sit in, an anonymous stand-in takes their place
      * first and then leaves: a running game is forfeited, so the other player wins and the match is recorded with
      * the stand-in, a waiting seat is given up, and a finished room loses its rematch. Nothing in a room names the

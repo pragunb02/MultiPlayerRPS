@@ -479,6 +479,34 @@ export function createChallengeComponent({
     },
 
     /**
+     * The owner suspended the player's account (CC-334, ADR-078 decision 5): every challenge they made that is still
+     * open ends as withdrawn, so nobody can take a link into a room with them, and whoever it was for sees an
+     * ordinary take-back. Challenges sent to them are left to run out, as for anyone who does not answer.
+     *
+     * @param {{ playerId: string, now: number }} input
+     * @returns {Promise<number>} challenges withdrawn
+     */
+    async playerSuspended({ playerId, now }) {
+      const open = (await challengeAccessor.listFrom(playerId)).filter(
+        (challenge) => stateAt(challenge, now) === CHALLENGE_STATES.OPEN,
+      );
+      let withdrawn = 0;
+      for (const { challengeId } of open) {
+        const end = {
+          challengeId,
+          state: CHALLENGE_STATES.WITHDRAWN,
+          at: now,
+          staleBefore: staleBefore(now),
+        };
+        if (await challengeAccessor.end(end)) {
+          withdrawn += 1;
+          await announce(await challengeAccessor.get(challengeId));
+        }
+      }
+      return withdrawn;
+    },
+
+    /**
      * A guest just signed in (ADR-014): every challenge they made, were sent or took becomes their account's.
      *
      * @param {{ from: string, to: Readonly<{ id: string }> }} transfer

@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { REPORT_ACTION, REPORT_CONTEXT, REPORT_REASONS, REPORT_STATUS } from "@classicade/shared";
+import {
+  REPORT_ACTION,
+  REPORT_CONTEXT,
+  REPORT_REASONS,
+  REPORT_STATUS,
+  SUSPENSION_REPORT_ACTION,
+} from "@classicade/shared";
 import { deletedPlayer } from "../../models/deletedPlayer.js";
 import { isAccountId } from "../../models/identity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
@@ -57,13 +63,15 @@ const ROLE = Object.freeze({ REPORTED: "reported", REPORTER: "reporter", OTHER: 
  *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom">,
  *   profiles: { personByHandle: (query: { handle: string, viewerId: string, now: number }) => Promise<Person> },
  *   names: { resetName: (query: { playerId: string, now: number }) => Promise<string> },
+ *   suspensions: Pick<ReturnType<typeof import("../suspensions/suspensionComponent.js").createSuspensionComponent>, "suspend" | "historyOf">,
  *   newReportId?: () => string,
  *   newUuid?: () => string,
  * }} deps  `coPlayers` checks that the two played together (ADR-053.3), the same check blocks and friends use.
  *   `rooms` is the room accessor and `matches` the match component's server-only full record, read for the last
  *   moves and requests. `transfers` are the guests who signed in, so a report follows them to their account.
  *   `profiles` finds the adult account behind a handle, and nobody else. `names` gives an account a safe default name
- *   and makes it show everywhere (composed in server.js). `newUuid` makes deleted reporters' stand-ins
+ *   and makes it show everywhere (composed in server.js). `suspensions` takes an account off the site for a while
+ *   (CC-334, ADR-078). `newUuid` makes deleted reporters' stand-ins
  */
 export function createReportComponent({
   reportAccessor,
@@ -73,6 +81,7 @@ export function createReportComponent({
   transfers,
   profiles,
   names,
+  suspensions,
   newReportId = randomUUID,
   newUuid = randomUUID,
 }) {
@@ -83,6 +92,8 @@ export function createReportComponent({
   assertFunction(transfers?.listFrom, "transfers.listFrom");
   assertFunction(profiles?.personByHandle, "profiles.personByHandle");
   assertFunction(names?.resetName, "names.resetName");
+  assertFunction(suspensions?.suspend, "suspensions.suspend");
+  assertFunction(suspensions?.historyOf, "suspensions.historyOf");
   assertFunction(newReportId, "newReportId");
 
   /** A snapshot's text: plain JSON with every player id replaced by a role, cut to REPORT_SNAPSHOT.textMax. */
@@ -208,6 +219,8 @@ export function createReportComponent({
       groupId: counted.newestId,
       kind,
       canRename: kind === "account" && reports[0]?.status === REPORT_STATUS.OPEN,
+      // Any account can be suspended, from a closed group too: a rename may not have been enough (ADR-078).
+      canSuspend: kind === "account",
       names: Object.freeze([...new Set(reports.map((report) => report.reportedName))]),
       reports: counted.reports,
       reporters: counted.reporters,
@@ -342,6 +355,53 @@ export function createReportComponent({
         at: now,
       });
       return Object.freeze({ closed });
+    },
+
+    /**
+     * Suspends the account a report is about (CC-334, ADR-078), by the report's id so no player id leaves the
+     * server, and closes the group's open reports up to this one as acted on, so their reporters keep their trust
+     * (ADR-071.5). A group that is closed already can be suspended too. Nobody who reported is told.
+     *
+     * @param {{ reportId: string, duration: string, reason: string, by: import("../../data/suspensionAccessor.js").Actor, now: number }} input
+     *   `duration` and `reason` are already checked by the service layer
+     * @returns {Promise<Readonly<{ suspension: object, failed: ReadonlyArray<{ name: string, err: unknown }>, closed: number }>>}
+     * @throws {NotFoundError} for an unknown report
+     * @throws {ConflictError} for a guest, an admin account or an account suspended already
+     */
+    async suspend({ reportId, duration, reason, by, now }) {
+      const report = await reportAccessor.get(reportId);
+      const playerId = (await accountsOf([report.reportedId]))(report.reportedId);
+      if (!isAccountId(playerId)) {
+        throw new ConflictError("Only an account can be suspended: a guest has no account to pause");
+      }
+      const { suspension, failed } = await suspensions.suspend({
+        playerId,
+        nameThen: report.reportedName,
+        duration,
+        reason,
+        by,
+        now,
+      });
+      const closed = await reportAccessor.closeOpen({
+        reportedId: report.reportedId,
+        upTo: { createdAt: report.createdAt, reportId },
+        status: REPORT_STATUS.ACTIONED,
+        action: SUSPENSION_REPORT_ACTION,
+        at: now,
+      });
+      return Object.freeze({ suspension, failed, closed });
+    },
+
+    /**
+     * The suspensions of the account a report is about, newest first, for the console's history.
+     *
+     * @param {{ reportId: string, now: number }} query
+     * @throws {NotFoundError} for an unknown report
+     */
+    async suspensionsOf({ reportId, now }) {
+      const report = await reportAccessor.get(reportId);
+      const playerId = (await accountsOf([report.reportedId]))(report.reportedId);
+      return suspensions.historyOf({ playerId, now });
     },
 
     /**

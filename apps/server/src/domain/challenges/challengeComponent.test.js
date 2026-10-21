@@ -660,3 +660,33 @@ describe("challengeComponent: a player's data", () => {
     expect(await challenges.erasePlayer({ playerId: RIYA.id })).toEqual({ erased: { challenges: 0 } });
   });
 });
+
+describe("challengeComponent.playerSuspended (CC-334, ADR-078 decision 5)", () => {
+  it("withdraws every open challenge a suspended player made, and leaves the ones sent to them", async () => {
+    const { make, challenges, accessor, emitted } = setup();
+    const link = await make();
+    const toArjun = await make({ to: "Arjun", now: T0 + 1 });
+    const taken = await make({ now: T0 + 2 });
+    await challenges.accept({ challengeId: taken.id, player: GUEST, network: "net-g", now: T0 + 3 });
+    const fromArjun = await challenges.create({
+      from: ARJUN,
+      gameId: "chess",
+      options: CHESS,
+      to: "Riya",
+      now: T0 + 4,
+    });
+    emitted.length = 0;
+
+    const ended = await challenges.playerSuspended({ playerId: RIYA.id, now: T0 + 5 });
+
+    expect(ended).toBe(2);
+    const stateOf = async (id) => stateAt(await accessor.get(id), T0 + 6);
+    expect(await stateOf(link.id)).toBe(CHALLENGE_STATES.WITHDRAWN);
+    expect(await stateOf(toArjun.id)).toBe(CHALLENGE_STATES.WITHDRAWN);
+    expect(await stateOf(taken.id)).toBe(CHALLENGE_STATES.ACCEPTED);
+    // Sent to the suspended player: it waits and expires, as for anyone who does not answer.
+    expect(await stateOf(fromArjun.id)).toBe(CHALLENGE_STATES.OPEN);
+    // Arjun sees the challenge for him end as a take-back, the same as any withdrawal.
+    expect(emitted.map((event) => event.challenge.challengeId).sort()).toEqual([link.id, toArjun.id].sort());
+  });
+});

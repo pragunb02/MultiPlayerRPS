@@ -967,3 +967,23 @@ describe("friendComponent: no player id ever leaves (ADR-057, CC-297)", () => {
     expect(stringsIn([answers, pushed]).filter(hasPlayerIdShape)).toEqual([]);
   });
 });
+
+describe("friendComponent.playerSuspended (CC-334, ADR-078 decision 5)", () => {
+  it("withdraws the requests a suspended player sent and their friend links, and keeps their friendships", async () => {
+    const { friends, ask, view } = setup({ rooms: shared() });
+    await ask(RIYA, KABIR, "ROOM33");
+    const [{ requestId }] = (await view(KABIR)).incoming;
+    await friends.answerRequest({ playerId: KABIR, requestId, answer: FRIEND_ANSWERS.ACCEPT, now: T0 + 1 });
+    await ask(RIYA, ARJUN, "ROOM22", T0 + 2);
+    const { token } = await friends.makeLink({ playerId: RIYA, now: T0 + 3 });
+    expect((await view(ARJUN, T0 + 4)).incoming).toHaveLength(1);
+
+    const ended = await friends.playerSuspended({ playerId: RIYA, now: T0 + 5 });
+
+    expect(ended).toEqual({ requests: 1, links: 1 });
+    expect((await view(ARJUN, T0 + 6)).incoming).toEqual([]);
+    expect((await view(RIYA, T0 + 6)).outgoing).toEqual([]);
+    await expect(friends.linkInvite({ token, viewerId: "", now: T0 + 6 })).rejects.toThrow(NotFoundError);
+    expect((await view(KABIR, T0 + 6)).friends.map((friend) => friend.displayName)).toEqual(["RiyaTest"]);
+  });
+});
