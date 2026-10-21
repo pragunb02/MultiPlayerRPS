@@ -32,18 +32,23 @@ export function WakingUpCabinet() {
  * While the server has not yet said who the player is, tells them why they wait. The usual reason for a slow
  * answer is a free server that is still waking up (ADR-005). The styles keep it hidden for a short delay, so a
  * fast answer never flashes it. It goes as soon as the answer arrives, whatever the answer is.
+ *
+ * It lies over the top of the page and takes no room in it, so the page does not jump up when it goes (CC-322).
+ * Taking room, even while hidden, moved the whole page by about 340 px on a phone, a layout shift of 0.37.
  */
 export function WakingUp() {
   const session = useSession();
   if (session.status !== "loading") return null;
   return (
-    <div className="wake wake--inline" role="status" data-wake="app">
-      <WakingUpCabinet />
-      <p className="wake-title">Waking up the arcade…</p>
-      <p className="wake-detail">Free servers take a moment to wake up.</p>
-      <p className="wake-later">
-        Still waking up. This can take up to a minute, and the page carries on by itself.
-      </p>
+    <div className="wake-holder">
+      <div className="wake wake--inline" role="status" data-wake="app">
+        <WakingUpCabinet />
+        <p className="wake-title">Waking up the arcade…</p>
+        <p className="wake-detail">Free servers take a moment to wake up.</p>
+        <p className="wake-later">
+          Still waking up. This can take up to a minute, and the page carries on by itself.
+        </p>
+      </div>
     </div>
   );
 }

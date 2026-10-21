@@ -82,6 +82,9 @@ describe("isEngineOwnMessage", () => {
     expect(isEngineOwnMessage("chromium", hint("https://localhost:4960/assets/RpsBoard-CqMSpa6U.js"))).toBe(
       false,
     );
+    expect(
+      isEngineOwnMessage("webkit", hint("https://localhost:4960/assets/illustrations.module-B9eTxlRk.js")),
+    ).toBe(true);
     expect(isEngineOwnMessage("webkit", hint("https://evil.example/x.js"))).toBe(false);
   });
 

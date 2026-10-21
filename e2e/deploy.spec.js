@@ -89,3 +89,48 @@ test.describe("a tab from before a deploy", () => {
     await expect(alice.page).toHaveURL("/games/rock-paper-scissors");
   });
 });
+
+// Pointing at a link only hints the browser to fetch the page's files (CC-322). When they are gone, as in a tab from
+// before a deploy, or the connection drops, that hint fails quietly: the page must not reload under a player who has
+// only moved the mouse. Opening the page is what reloads a stale tab, as above.
+const LOBBY_FILE = "**/assets/PlayPage-*.js";
+
+test.describe("pointing at a link", () => {
+  for (const failure of ["file gone after a deploy", "connection dropped"]) {
+    test(`does nothing when the page's files fail to arrive (${failure})`, async ({ players }) => {
+      const visitor = await players.open("visitor");
+      await visitor.page.goto("/");
+      const chess = visitor.page.getByRole("region", { name: "Games" }).getByRole("link", { name: "Chess" });
+      await expect(chess).toBeVisible();
+      const pageLoads = [];
+      visitor.page.on("request", (request) => {
+        if (request.isNavigationRequest()) pageLoads.push(request.url());
+      });
+      const asked = [];
+      await visitor.page.route(LOBBY_FILE, async (route) => {
+        const url = new URL(route.request().url());
+        asked.push(url.pathname);
+        if (failure === "connection dropped") {
+          // Aborted, which the check for failed requests every test makes leaves out, as a dropped connection.
+          await route.abort("aborted");
+          return;
+        }
+        visitor.expect(404, url.pathname);
+        const response = await route.fetch({
+          url: `${url.origin}/assets/PlayPage-from-the-previous-deploy.js`,
+        });
+        await route.fulfill({ response });
+      });
+
+      await chess.hover();
+      await expect.poll(() => asked.length).toBeGreaterThan(0);
+      // Long enough for a reload to have started, had the failure reached the stale tab's recovery.
+      await visitor.page.waitForTimeout(1_000);
+
+      expect(pageLoads).toEqual([]);
+      expect(visitor.url()).toBe("/");
+      await expect(visitor.page.getByText("Something went wrong")).toHaveCount(0);
+      await expect(visitor.page.getByRole("heading", { level: 1 })).toBeVisible();
+    });
+  }
+});
