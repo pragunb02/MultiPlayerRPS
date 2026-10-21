@@ -67,6 +67,21 @@ describe("Inbox (CC-207)", () => {
     expect(screen.queryByRole("button", { name: /^Inbox/ })).not.toBeInTheDocument();
   });
 
+  // CC-324, the audit's bug 4 (axe label-content-name-mismatch): the name was "Inbox, 1 waiting" while the button
+  // showed "Inbox 1", so a voice user saying "Inbox 1" pressed nothing.
+  it("has a name that starts with the words on the button (label in name)", async () => {
+    const { button } = await openInbox([challenge()]);
+    const shown = [...button.childNodes]
+      .filter((node) => !(node instanceof Element && node.classList.contains("visually-hidden")))
+      .map((node) => node.textContent.trim())
+      .filter(Boolean)
+      .join(" ");
+
+    expect(shown).toBe("Inbox 1");
+    expect(button).not.toHaveAttribute("aria-label");
+    expect(button).toHaveAccessibleName("Inbox 1 waiting");
+  });
+
   it("names a challenge of the player's that only waits without a count", async () => {
     const { button } = await openInbox([challenge({ own: true, forYou: false })]);
 
@@ -81,7 +96,7 @@ describe("Inbox (CC-207)", () => {
       }),
     });
 
-    expect(button).toHaveAccessibleName("Inbox, 1 waiting");
+    expect(button).toHaveAccessibleName("Inbox 1 waiting");
     expect(panel).toHaveTextContent("Riya challenges you to Chess.");
     await user.click(within(panel).getByRole("button", { name: "Accept and go" }));
 

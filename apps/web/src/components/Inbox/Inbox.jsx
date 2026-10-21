@@ -100,6 +100,8 @@ export function Inbox() {
   const { open, toggle, buttonRef, panelRef } = useDisclosureMenu();
   const listed = challenges.filter((challenge) => placeOf(challenge) !== "");
   const asks = listed.filter((challenge) => placeOf(challenge) === "asks").length;
+  // The name is the button's own words, "Inbox 1", with "waiting" after them for a screen reader, so a voice user
+  // who says what they see presses it (WCAG 2.5.3, CC-324). The title says the same to a mouse.
   const label = asks === 0 ? "Inbox" : `Inbox, ${asks} waiting`;
 
   if (listed.length === 0) {
@@ -111,7 +113,7 @@ export function Inbox() {
         type="button"
         ref={buttonRef}
         className={styles.button}
-        aria-label={label}
+        title={label}
         aria-expanded={open}
         aria-controls="header-inbox"
         data-cc-control="header.inbox"
@@ -119,9 +121,11 @@ export function Inbox() {
       >
         Inbox
         {asks > 0 && (
-          <span className={styles.count} aria-hidden="true">
-            {asks}
-          </span>
+          <>
+            {" "}
+            <span className={styles.count}>{asks}</span>{" "}
+            <span className="visually-hidden">waiting</span>
+          </>
         )}
       </button>
       <section

@@ -75,7 +75,7 @@ test.describe("challenge links (CC-139)", () => {
 
     await takenPopup(alice).getByRole("button", { name: "Not now" }).click();
     await expect(takenPopup(alice)).toHaveCount(0);
-    await alice.page.getByRole("button", { name: "Inbox, 1 waiting" }).click();
+    await alice.page.getByRole("button", { name: "Inbox 1 waiting" }).click();
     await alice.page
       .getByRole("region", { name: "Inbox" })
       .getByRole("link", { name: "Go and play" })

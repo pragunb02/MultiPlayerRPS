@@ -107,7 +107,7 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     expect(popup()).not.toBeInTheDocument();
     expect(api.challengeLater).toHaveBeenCalledWith("c0000000000000000001");
     expect(api.declineChallenge).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Inbox, 1 waiting" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Inbox 1 waiting" })).toBeInTheDocument();
   });
 
   it("moves it to the inbox by itself once it has been on screen for a minute", async () => {
