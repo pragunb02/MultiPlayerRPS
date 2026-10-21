@@ -99,6 +99,14 @@ describe("lazyRoute: a page that downloads on demand (CC-322)", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Loading the page");
   });
 
+  it("hints the page's files without downloading its code (routeFiles.test.js has the hints)", () => {
+    const load = vi.fn(async () => ({ TestPage: () => null }));
+
+    lazyRoute(load, "TestPage").prefetch();
+
+    expect(load).not.toHaveBeenCalled();
+  });
+
   it("is named after its page in React's developer tools", () => {
     expect(lazyRoute(async () => ({}), "TestPage").displayName).toBe("LazyRoute(TestPage)");
   });

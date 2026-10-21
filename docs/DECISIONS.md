@@ -165,8 +165,10 @@ the owner may change it.
   holding `effects/particles.js` at most 1.5 kB. Sizes come from a build report the Vite plugin
   `scripts/build/bundleReport.mjs` writes outside `dist`, with each source file's share of the minified chunk
   split by its source map, so a module's size is a real one and not its unminified source. Until the registry
-  lands (CC-099) the effect rules have nothing to check. Point 5's "prefetch at idle" is unchanged; pages, unlike
-  effects, are prefetched on link intent (pointer, focus, touch), as CC-322 records.
+  lands (CC-099) the effect rules have nothing to check. Point 5's "prefetch at idle" is unchanged. Pages, unlike
+  effects, are prefetched on link intent (pointer, focus, touch) as a hint only: `<link rel="modulepreload">` and
+  `<link rel="prefetch">` from a file list the build writes into index.html. Nothing runs, so a failed hint never
+  reaches the stale-build reload of CC-181. CC-322 records this.
 
 ### ADR-074 — A merge queue on main: CI on `merge_group`, merges through the queue
 

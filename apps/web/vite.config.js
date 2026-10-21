@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { bundleReport } from "../../scripts/build/bundleReport.mjs";
+import { routeFiles } from "../../scripts/build/routeFiles.mjs";
 import { buildStamp } from "./src/app/buildStamp.js";
 
 // In development the API server runs on :4000 (npm run dev:server). Proxying keeps the app same-origin, exactly
@@ -18,7 +19,8 @@ const APP_BUILD = buildStamp({ version, commit: process.env.RENDER_GIT_COMMIT })
 const BUNDLE_REPORT = fileURLToPath(new URL("./bundle-report.json", import.meta.url));
 
 export default defineConfig({
-  plugins: [react(), bundleReport({ file: BUNDLE_REPORT })],
+  // routeFiles: each page's files in index.html, for the link hints of app/routeFiles.js (CC-322).
+  plugins: [react(), bundleReport({ file: BUNDLE_REPORT }), routeFiles()],
   define: { "import.meta.env.VITE_APP_BUILD": JSON.stringify(APP_BUILD) },
   server: {
     port: 5173,

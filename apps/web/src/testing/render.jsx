@@ -2,14 +2,14 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { expect } from "vitest";
 import { MemoryRouter } from "react-router";
 import { App } from "../app/App.jsx";
-import { LAZY_ROUTES } from "../app/routePages.js";
+import { APP_ROUTES } from "../app/routePages.js";
 import { fakeApi, fakeDownload, fakeSessionBroadcast, fakeSocket, fakeSound } from "./fakes.js";
 import { LocationProbe } from "./LocationProbe.jsx";
 
 // Every page that downloads on demand is fetched once before the tests, as a browser does for the page it opens
 // (main.jsx) or a link it is about to follow, so tests see the page and not its skeleton (CC-322). The skeleton's
 // own tests are in app/lazyRoute.test.jsx.
-await Promise.all(LAZY_ROUTES.map(({ page }) => page?.preload()));
+await Promise.all(APP_ROUTES.map(({ page }) => page?.preload?.()));
 
 /**
  * Renders the real app at a URL with fake clients. `url()` is the address bar: path and query. `history` lists

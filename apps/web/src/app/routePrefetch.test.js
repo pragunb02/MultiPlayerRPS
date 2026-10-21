@@ -13,39 +13,45 @@ function page() {
     <a href="/games/chess?level=easy#top"><span>Chess</span></a>
     <a href="https://example.com/games/chess">Elsewhere</a>
     <p>Just words</p>`;
-  const preload = vi.fn();
-  const stop = prefetchOnIntent({ document, origin: ORIGIN, preload });
+  const prefetch = vi.fn();
+  const stop = prefetchOnIntent({ document, origin: ORIGIN, prefetch });
   const [inside, outside] = document.querySelectorAll("a");
-  return { preload, stop, inside: inside.querySelector("span"), outside, words: document.querySelector("p") };
+  return {
+    prefetch,
+    stop,
+    inside: inside.querySelector("span"),
+    outside,
+    words: document.querySelector("p"),
+  };
 }
 
 describe("prefetchOnIntent: a page's code, fetched when a player is about to open it (CC-322)", () => {
   it.each(INTENT_EVENTS)("passes on the path of this site's link on %s, from anywhere inside it", (type) => {
-    const { preload, inside } = page();
+    const { prefetch, inside } = page();
 
     inside.dispatchEvent(new Event(type, { bubbles: true }));
 
-    expect(preload).toHaveBeenCalledExactlyOnceWith("/games/chess");
+    expect(prefetch).toHaveBeenCalledExactlyOnceWith("/games/chess");
   });
 
   it("ignores links to other sites, and anything that is not a link", () => {
-    const { preload, outside, words } = page();
+    const { prefetch, outside, words } = page();
 
     outside.dispatchEvent(new Event("pointerover", { bubbles: true }));
     words.dispatchEvent(new Event("pointerover", { bubbles: true }));
     document.dispatchEvent(new Event("focusin"));
 
-    expect(preload).not.toHaveBeenCalled();
+    expect(prefetch).not.toHaveBeenCalled();
   });
 
   it("stops listening when asked", () => {
-    const { preload, stop, inside } = page();
+    const { prefetch, stop, inside } = page();
 
     stop();
     for (const type of INTENT_EVENTS) {
       inside.dispatchEvent(new Event(type, { bubbles: true }));
     }
 
-    expect(preload).not.toHaveBeenCalled();
+    expect(prefetch).not.toHaveBeenCalled();
   });
 });

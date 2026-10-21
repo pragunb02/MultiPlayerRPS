@@ -5,19 +5,19 @@
 export const INTENT_EVENTS = Object.freeze(["pointerover", "focusin", "touchstart"]);
 
 /**
- * Starts downloading a page as soon as a player shows they are about to open a link to it (CC-322), so the page is
- * usually here by the time the click lands and its skeleton never shows. One listener on the document covers every
- * link in the app, including links added later. Only links to this site count, and only the address's path is
- * passed on. Downloading twice changes nothing, because each page remembers its download.
+ * Hints the browser to fetch a page's files as soon as a player shows they are about to open a link to it (CC-322),
+ * so they are usually here by the time the click lands. One listener on the document covers every link in the app,
+ * including links added later. Only links to this site count, and only the address's path is passed on. Asking
+ * twice changes nothing, because a file already hinted is not hinted again.
  *
  * @param {{
  *   document: Pick<Document, "addEventListener" | "removeEventListener">,
  *   origin: string,
- *   preload: (pathname: string) => unknown,
+ *   prefetch: (pathname: string) => unknown,
  * }} deps  `origin` is the site's own, such as `window.location.origin`
  * @returns {() => void} stops listening
  */
-export function prefetchOnIntent({ document, origin, preload }) {
+export function prefetchOnIntent({ document, origin, prefetch }) {
   /** @param {Event} event */
   function onIntent(event) {
     const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
@@ -27,7 +27,7 @@ export function prefetchOnIntent({ document, origin, preload }) {
     // The browser has already resolved `href` against the page's address.
     const url = new URL(link.href);
     if (url.origin === origin) {
-      preload(url.pathname);
+      prefetch(url.pathname);
     }
   }
   const options = { passive: true, capture: true };

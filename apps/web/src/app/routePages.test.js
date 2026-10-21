@@ -1,11 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CONSOLE_ROUTES } from "../pages/AdminPage/consolePages.js";
+import { HomePage } from "../pages/HomePage/HomePage.jsx";
+import { LEGACY_ROUTES, ROUTES } from "./paths.js";
 import {
   AdminRoute,
-  LAZY_ROUTES,
+  APP_ROUTES,
+  LeaderboardPage,
+  LoginPage,
   NotFoundPage,
+  pageFor,
   PlayPage,
+  prefetchRouteFor,
   preloadRouteFor,
-  PrivacyPage,
+  ProfilePage,
   RoomPage,
 } from "./routePages.js";
 
@@ -13,51 +20,82 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Watches every page's download without starting any. */
-function watchDownloads() {
-  const asked = [];
-  for (const { page } of LAZY_ROUTES) {
-    if (page !== null) {
-      vi.spyOn(page, "preload").mockImplementation(async () => {
-        asked.push(page);
-      });
-    }
-  }
-  return asked;
-}
+/** An address for a route pattern, with every `:param` filled in. */
+const addressOf = (path) => `/${path.replace(/:\w+/g, "x1")}`;
 
-describe("preloadRouteFor: the page an address opens, fetched before it is needed (CC-322)", () => {
-  it("fetches the page the router would show, by the router's own ranking", async () => {
-    const asked = watchDownloads();
+describe("APP_ROUTES: the one route table App.jsx draws and the early downloads read (CC-322)", () => {
+  it("lists every route the app has, each once", () => {
+    const paths = APP_ROUTES.map(({ path, index }) => (index ? "(home)" : path));
 
-    await preloadRouteFor("/games/chess");
-    await preloadRouteFor("/games/chess/rooms/AB2CD3");
-    await preloadRouteFor("/privacy");
-    await preloadRouteFor("/play/chess");
-
-    expect(asked).toEqual([PlayPage, RoomPage, PrivacyPage, PlayPage]);
+    expect(new Set(paths).size).toBe(paths.length);
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        "(home)",
+        ...Object.values(ROUTES).filter((path) => !path.startsWith("admin")),
+        ...Object.values(LEGACY_ROUTES),
+        ...CONSOLE_ROUTES.map(({ path }) => path),
+        "*",
+      ]),
+    );
   });
 
-  it("fetches the console's gate for the console, and the not-found page for an unknown address", async () => {
-    const asked = watchDownloads();
+  it("gives every address the page its own entry draws, by the router's ranking", () => {
+    for (const route of APP_ROUTES.filter((each) => each.page !== undefined && each.path !== "*")) {
+      const address = route.index ? "/" : addressOf(route.path);
+      expect(pageFor(address), address).toBe(route.page);
+    }
+  });
 
-    await preloadRouteFor("/admin/flags");
-    await preloadRouteFor("/nope/at/all");
+  it("follows a redirect to the page it lands on, so a direct visit fetches that page and not the 404", () => {
+    expect(pageFor("/leaderboards")).toBe(LeaderboardPage);
+    expect(pageFor("/u/someone/userprofile")).toBe(ProfilePage);
+    expect(pageFor("/login-signup.html")).toBe(LoginPage);
+  });
 
-    expect(asked).toEqual([AdminRoute, NotFoundPage]);
+  it("ranks like the router: a room is not its lobby, and an unknown address is the not-found page", () => {
+    expect(pageFor("/games/chess")).toBe(PlayPage);
+    expect(pageFor("/games/chess/rooms/AB2CD3")).toBe(RoomPage);
+    expect(pageFor("/admin/flags")).toBe(AdminRoute);
+    expect(pageFor("/nope/at/all")).toBe(NotFoundPage);
+    expect(pageFor("/")).toBe(HomePage);
+  });
+});
+
+describe("preloadRouteFor: the page of a direct visit, fetched before the first render", () => {
+  it("downloads the page's code, through a redirect too", async () => {
+    const play = vi.spyOn(PlayPage, "preload").mockResolvedValue({});
+    const board = vi.spyOn(LeaderboardPage, "preload").mockResolvedValue({});
+
+    await preloadRouteFor("/play/chess");
+    await preloadRouteFor("/leaderboards");
+
+    expect(play).toHaveBeenCalledOnce();
+    expect(board).toHaveBeenCalledOnce();
   });
 
   it("fetches nothing for home, which is in the first download", async () => {
-    const asked = watchDownloads();
-
-    await preloadRouteFor("/");
-
-    expect(asked).toEqual([]);
+    await expect(preloadRouteFor("/")).resolves.toBeUndefined();
   });
 
   it("settles even when the download fails, so the first render is never held back by it", async () => {
     vi.spyOn(PlayPage, "preload").mockRejectedValue(new TypeError("Failed to fetch"));
 
     await expect(preloadRouteFor("/games/chess")).resolves.toBeUndefined();
+  });
+});
+
+describe("prefetchRouteFor: the hint when a link is pointed at", () => {
+  it("hints the page's files and never downloads its code", () => {
+    const hint = vi.spyOn(PlayPage, "prefetch").mockImplementation(() => {});
+    const run = vi.spyOn(PlayPage, "preload");
+
+    prefetchRouteFor("/games/chess");
+
+    expect(hint).toHaveBeenCalledOnce();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("does nothing for home", () => {
+    expect(() => prefetchRouteFor("/")).not.toThrow();
   });
 });
