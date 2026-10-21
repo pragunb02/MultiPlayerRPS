@@ -110,6 +110,12 @@ export function createInMemoryLeaderboardDao() {
         .map((entry) => ({ board: entry.board, period: entry.period, ...publicFields(entry) }));
     },
 
+    async renamePlayer({ playerId, displayName }) {
+      const renamed = [...entries.entries()].filter(([, entry]) => entry.playerId === playerId);
+      renamed.forEach(([key, entry]) => entries.set(key, { ...entry, displayName }));
+      return renamed.length;
+    },
+
     async deleteByPlayer(playerId) {
       const gone = [...entries.entries()].filter(([, entry]) => entry.playerId === playerId);
       gone.forEach(([key]) => entries.delete(key));

@@ -120,15 +120,34 @@ export function createApiClient({
     /** The players this player blocked, newest first: `{ blockId, displayName, blockedAt }` each (CC-044). */
     getBlocks: async () => (await request("GET", "/blocks")).blocks,
     /**
-     * Blocks the player in a seat of a room both sit in (CC-044). The server never takes a player id.
+     * Blocks the player in a seat of a room both sit in or of a match both played, or the player of one of this
+     * player's reports (CC-044, ADR-071.4). The server never takes a player id.
      *
-     * @param {{ roomCode: string, seat: number, seatId: string }} target
+     * @param {{ roomCode: string, seat: number, seatId: string } | { matchId: string, seat: number } | { reportId: string }} target
      */
     blockPlayer: async (target) => (await request("POST", "/blocks", target)).block,
     /** Removes one of this player's blocks (CC-044). */
     unblockPlayer: async (blockId) => {
       await request("DELETE", `/blocks/${encodeURIComponent(blockId)}`);
     },
+    /**
+     * Reports a player by where the two met, with a closed reason and nothing else (CC-044, ADR-071). The answer
+     * is the same every time: the report's id, for the one-tap block, and its time.
+     *
+     * @param {({ roomCode: string, seat: number, seatId: string } | { matchId: string, seat: number } | { handle: string }) & { reason: string }} report
+     * @returns {Promise<{ reportId: string, createdAt: number }>}
+     */
+    reportPlayer: async (report) => (await request("POST", "/reports", report)).report,
+    /**
+     * One page of the owner console's report queue, grouped by reported player (CC-044).
+     *
+     * @param {{ status?: string, page?: string }} [query]
+     * @returns {Promise<{ groups: object[], total: number, page: number, more: boolean }>}
+     */
+    getReportQueue: (query = {}) => request("GET", `/admin/reports${toQuery(query)}`),
+    /** Dismisses the reports of one group, or renames its account to a safe default (CC-044). */
+    actOnReports: async (reportId, action) =>
+      (await request("POST", `/admin/reports/${encodeURIComponent(reportId)}/actions`, { action })).result,
     /**
      * The player's friends view (CC-052): friends with their presence, the requests waiting for them and the ones
      * they sent, their Appear offline switch, and whether to show safety tips. A guest is refused with FORBIDDEN.
