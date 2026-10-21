@@ -90,16 +90,32 @@ export function createInMemoryChallengeDao() {
     claimGroup: async ({ groupId, by, from }) =>
       changeIf(
         groupId,
-        (doc) => (doc.filledBy ?? "") === from,
+        (doc) => (doc.filledBy ?? "") === from && doc.filledDone !== true,
         (doc) => ({ ...doc, filledBy: by }),
+      ),
+
+    confirmGroup: async ({ groupId, by }) =>
+      changeIf(
+        groupId,
+        (doc) => doc.filledBy === by && doc.filledDone !== true,
+        (doc) => ({ ...doc, filledDone: true }),
       ),
 
     releaseGroup: async ({ groupId, by }) =>
       changeIf(
         groupId,
-        (doc) => doc.filledBy === by,
+        (doc) => doc.filledBy === by && doc.filledDone !== true,
         (doc) => ({ ...doc, filledBy: "" }),
       ),
+
+    expireNow: async ({ challengeId, at, staleBefore }) =>
+      changeIf(challengeId, stillOpen(at, staleBefore), ({ endedAt, ...doc }) => ({
+        ...doc,
+        state: CHALLENGE_STATES.OPEN,
+        expiresAt: at,
+        acceptedBy: "",
+        acceptedName: "",
+      })),
 
     keep: async ({ challengeId, acceptedBy, at }) =>
       changeIf(

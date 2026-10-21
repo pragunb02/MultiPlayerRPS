@@ -227,21 +227,87 @@ export function createChallengeComponent({
     return first !== undefined && first.filledBy === "" ? first.challengeId : challengeId;
   }
 
+  /** A challenge's record, or undefined when storage no longer has it. */
+  const recordOf = (challengeId) =>
+    challengeAccessor
+      .get(challengeId)
+      .catch((err) => (err instanceof NotFoundError ? undefined : Promise.reject(err)));
+
   /** Whether a challenge is taken by someone whose room is made, or is being made, at `now`. */
-  const isTaken = async (challengeId, now) =>
-    stateAt(await challengeAccessor.get(challengeId), now) === CHALLENGE_STATES.ACCEPTED;
+  async function isTaken(challengeId, now) {
+    const holder = await recordOf(challengeId);
+    return holder !== undefined && stateAt(holder, now) === CHALLENGE_STATES.ACCEPTED;
+  }
+
+  /**
+   * The record that decides who plays an invite's group: the group's first record, or, once that one is gone (its
+   * sender's data was erased, or it broke a limit and was removed), the oldest invite of the group still stored,
+   * which every invite of the group finds alike.
+   */
+  async function anchorOf(challenge) {
+    if ((await recordOf(challenge.groupId)) !== undefined) return challenge.groupId;
+    const members = (await challengeAccessor.listFrom(challenge.fromId))
+      .filter((each) => each.groupId === challenge.groupId)
+      .sort(oldestFirst);
+    return members[0].challengeId;
+  }
 
   /**
    * Claims an invite's group for the invite just taken (CC-052 scenario 6): one conditional update on the group's
-   * first record, so of two friends accepting at the same moment exactly one plays. A group held by an invite whose
-   * hold ran out, or that is no longer taken, can be claimed from it. Answers whether this invite got it.
+   * record, so of two friends accepting at the same moment exactly one plays. A group held by an invite whose hold
+   * ran out, or that is no longer taken, can be claimed from it, until its room is made. Answers whether this invite
+   * got it, and if not, whether the group is filled (a room is made) or only busy (a room is being made).
+   *
+   * @returns {Promise<{ won: boolean, filled: boolean, anchor: string }>}
    */
   async function claimGroup(challenge, now) {
-    const group = { groupId: challenge.groupId, by: challenge.challengeId };
-    if (await challengeAccessor.claimGroup({ ...group, from: "" })) return true;
-    const { filledBy } = await challengeAccessor.get(group.groupId);
-    if (filledBy === group.by) return true;
-    return !(await isTaken(filledBy, now)) && challengeAccessor.claimGroup({ ...group, from: filledBy });
+    const anchor = await anchorOf(challenge);
+    const group = { groupId: anchor, by: challenge.challengeId };
+    if (await challengeAccessor.claimGroup({ ...group, from: "" }))
+      return { won: true, filled: false, anchor };
+    const { filledBy, filledDone } = await challengeAccessor.get(anchor);
+    if (filledDone) return { won: false, filled: true, anchor };
+    // This invite's own earlier take was cut off after it claimed the group: the group is still its own.
+    if (filledBy === group.by) return { won: true, filled: false, anchor };
+    if (await isTaken(filledBy, now)) return { won: false, filled: false, anchor };
+    const won = await challengeAccessor.claimGroup({ ...group, from: filledBy });
+    return { won, filled: false, anchor };
+  }
+
+  /** An invite whose group another friend plays: it is filled, and its friend and sender hear so. */
+  async function filled(challengeId, claim, now) {
+    await challengeAccessor.release(claim);
+    await challengeAccessor.end({
+      challengeId,
+      state: CHALLENGE_STATES.FILLED,
+      at: now,
+      staleBefore: staleBefore(now),
+    });
+    await announce(await challengeAccessor.get(challengeId));
+    return ended(CHALLENGE_STATES.FILLED);
+  }
+
+  /**
+   * Ends every open invite between two players whose friendship just ended (CC-052): removed or blocked. Each reads
+   * as expired from now on, exactly as an invite nobody answered, so nothing shows why.
+   */
+  async function endInvitesBetween({ a, b, now }) {
+    const between = [
+      ...(await challengeAccessor.listFrom(a)).filter((each) => each.toId === b),
+      ...(await challengeAccessor.listFrom(b)).filter((each) => each.toId === a),
+    ].filter((each) => stateAt(each, now) === CHALLENGE_STATES.OPEN);
+    for (const each of between) {
+      if (
+        await challengeAccessor.expireNow({
+          challengeId: each.challengeId,
+          at: now,
+          staleBefore: staleBefore(now),
+        })
+      ) {
+        await announce(await challengeAccessor.get(each.challengeId));
+      }
+    }
+    return between.length;
   }
 
   /** The other open invites of a group someone now plays: each is filled, and its friend hears so. */
@@ -398,7 +464,23 @@ export function createChallengeComponent({
      * @param {string} viewerId
      * @param {number} now
      */
-    viewFor: (challenge, viewerId, now) => viewFor(challenge, viewerId, { now, blocked: false }),
+    viewFor: async (challenge, viewerId, now) => {
+      // An open invite pushed to its friend in their quiet hours goes to their inbox, without a popup (CC-052).
+      const quiet =
+        challenge.toId === viewerId &&
+        stateAt(challenge, now) === CHALLENGE_STATES.OPEN &&
+        isQuietTime(await safety.policyFor({ playerId: viewerId, now }), now);
+      return viewFor(challenge, viewerId, { now, blocked: false, quiet });
+    },
+
+    /**
+     * Ends the open invites between two players whose friendship ended (CC-052): they read as expired, as an invite
+     * nobody answered.
+     *
+     * @param {{ a: string, b: string, now: number }} pair
+     * @returns {Promise<number>} how many there were
+     */
+    endInvitesBetween,
 
     /**
      * Takes a challenge: a room is made with both players seated, and the challenge is accepted. Only one person can
@@ -431,19 +513,25 @@ export function createChallengeComponent({
         throw await endedSince(challengeId, now);
       }
       const invite = challenge.toId !== "";
-      // Another friend took the sender's invite to this game first: this one is filled (CC-052 scenario 6).
-      if (invite && !(await claimGroup(challenge, now))) {
-        await challengeAccessor.release(claim);
-        await challengeAccessor.end({
-          challengeId,
-          state: CHALLENGE_STATES.FILLED,
-          at: now,
-          staleBefore: staleBefore(now),
+      let anchor = "";
+      if (invite) {
+        const group = await claimGroup(challenge, now).catch(async (err) => {
+          await challengeAccessor.release(claim);
+          throw err;
         });
-        await announce(await challengeAccessor.get(challengeId));
-        throw ended(CHALLENGE_STATES.FILLED);
+        if (!group.won && group.filled) {
+          // Another friend took the sender's invite to this game first: this one is filled (CC-052 scenario 6).
+          throw await filled(challengeId, claim, now);
+        }
+        if (!group.won) {
+          // Another friend's room is being made. It may still fail, so this invite stays open to try again.
+          await challengeAccessor.release(claim);
+          throw new ConflictError("Another friend is taking this game just now. Try again in a moment");
+        }
+        anchor = group.anchor;
       }
       let recorded;
+      let lostGroup;
       try {
         const room = await rooms.createChallengeRoom({
           challenger: { id: challenge.fromId, displayName: challenge.fromName },
@@ -454,13 +542,22 @@ export function createChallengeComponent({
           options: challenge.options,
           now,
         });
-        recorded = (await challengeAccessor.setRoom({ ...claim, roomCode: room.code })) ? room : undefined;
+        // A room slower than the claim lease may have lost the group to another friend meanwhile. The group must
+        // still be this invite's: one conditional write decides, so only one room of a group ever counts.
+        lostGroup = invite && !(await challengeAccessor.confirmGroup({ groupId: anchor, by: challengeId }));
+        if (!lostGroup) {
+          recorded = (await challengeAccessor.setRoom({ ...claim, roomCode: room.code })) ? room : undefined;
+        }
       } catch (err) {
         await challengeAccessor.release(claim);
         if (invite) {
-          await challengeAccessor.releaseGroup({ groupId: challenge.groupId, by: challengeId });
+          await challengeAccessor.releaseGroup({ groupId: anchor, by: challengeId });
         }
         throw err;
+      }
+      // The room made here is not the group's, and closes by itself.
+      if (lostGroup) {
+        throw await filled(challengeId, claim, now);
       }
       // The hold ran out and someone else took it meanwhile. The room made here closes by itself.
       if (recorded === undefined) {

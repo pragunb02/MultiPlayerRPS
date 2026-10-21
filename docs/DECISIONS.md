@@ -367,7 +367,12 @@ the owner may change it.
   inbox marks every open invite as moved for a viewer in quiet hours, so no popup or sound reaches them. (6) A
   decline and an invite that ran out read the same to the sender, "Not right now", and a blocked invite reads as
   one nobody answered (point 5), so all three look the same. (7) `CHALLENGE_EVENTS.ACCEPTED` is published once
-  per challenge taken, and counts the flag's success for an invite. Data: three optional fields on `challenges`
+  per challenge taken, and counts the flag's success for an invite. (8) **Review of #167:** a group whose first record is
+  gone is decided on its oldest invite left; a friend whose room is still being made holds the group, so the others
+  get 409 "try again" and are filled only once that room is made (`filledDone`, confirmed by one conditional write
+  after the room is made, so a room slower than the claim lease never makes two); pushes apply the viewer's quiet
+  hours too, and a tab reads the inbox again when a game that held its popups ends; and when a friendship ends (a
+  removal or a block, `FRIEND_EVENTS.ENDED`), the open invites between the two end at once and read as expired. Data: three optional fields on `challenges`
   and one new state value, no new index, nothing migrated; older records read as their own group.
 - **Consequences.** One new collection with five indexes, nothing existing changed or migrated. A challenger who
   is offline when someone takes their challenge leaves the taker in a waiting room that closes after 30 minutes;

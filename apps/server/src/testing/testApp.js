@@ -402,6 +402,7 @@ export function createTestApp({
         flags: flagComponent,
         events: domainEvents,
         logger: capture.logger,
+        challenges: () => challengeComponent,
       }),
   });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.

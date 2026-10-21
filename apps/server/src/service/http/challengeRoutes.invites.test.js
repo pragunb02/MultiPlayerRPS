@@ -163,6 +163,34 @@ describe("invites to friends over HTTP (CC-052 part 2)", () => {
       });
     });
 
+    it("ends an invite when its friendship ends, so an ex-friend cannot take it (review of #167)", async () => {
+      await start(on);
+      const riya = await account("RiyaTest");
+      const arjun = await account("ArjunTest");
+      await befriend(riya, arjun);
+      const [friend] = (await call("GET", "/friends", { cookie: riya.cookie })).body.friends;
+      const made = await invite(riya, friend.handle);
+      if (!on) {
+        expect(made.status).toBe(404);
+        return;
+      }
+      const [riyaAsFriend] = (await call("GET", "/friends", { cookie: arjun.cookie })).body.friends;
+
+      expect((await call("DELETE", `/friends/${riyaAsFriend.handle}`, { cookie: arjun.cookie })).status).toBe(
+        204,
+      );
+      const viewOf = async () =>
+        (await call("GET", `/challenges/${made.body.challenge.id}`, { cookie: arjun.cookie })).body.challenge
+          .state;
+      for (let tries = 0; tries < 100 && (await viewOf()) !== CHALLENGE_STATES.EXPIRED; tries += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      const taken = await answer(arjun, made.body.challenge.id, "accept");
+
+      expect(taken.status).toBe(410);
+      expect(taken.body.error.details).toEqual({ state: CHALLENGE_STATES.EXPIRED });
+    });
+
     it("sends no player id in any invite answer or push", async () => {
       await start(on);
       const riya = await account("RiyaTest");

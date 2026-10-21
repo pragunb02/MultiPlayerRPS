@@ -259,7 +259,7 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
       you: "seatOfMe",
       game: { view: {}, activePlayers: ["seatOfBob"], outcome: { status: "ongoing" } },
     };
-    const { push, sound, socket } = await open({ path: "/games/ludo/rooms/AB2CD3", joined: room });
+    const { push, sound, socket, api } = await open({ path: "/games/ludo/rooms/AB2CD3", joined: room });
     await screen.findByRole("list", { name: "Players" });
     const title = document.title;
 
@@ -267,6 +267,8 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     expect(popup()).not.toBeInTheDocument();
     expect(sound.played).not.toContain("notify");
     expect(document.title).toBe(title);
+    // When the game ends the inbox is read again (CC-052), and the server still has the challenge.
+    api.getChallenges.mockResolvedValue([sentToYou()]);
 
     act(() =>
       socket.push("room:updated", {

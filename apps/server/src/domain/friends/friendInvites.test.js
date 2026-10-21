@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { flagPaths } from "../../testing/flagPaths.js";
 import { ForbiddenError, NotFoundError } from "../../utils/errors.js";
 import { CHALLENGE_EVENTS } from "../challenges/challengeComponent.js";
+import { FRIEND_EVENTS } from "./friendComponent.js";
 import { createFriendInvites } from "./friendInvites.js";
 
 const RIYA = Object.freeze({ kind: "user", id: "user_0123456789abcdef01234567", displayName: "Riya" });
@@ -14,6 +15,7 @@ function setup(on) {
   const asked = [];
   const successes = [];
   const warnings = [];
+  const ended = [];
   const events = new EventEmitter();
   const invites = createFriendInvites({
     friends: {
@@ -38,8 +40,15 @@ function setup(on) {
     },
     events,
     logger: { warn: ({ err }, message) => warnings.push([err.message, message]) },
+    challenges: () => ({
+      endInvitesBetween: async (pair) => {
+        if (pair.a === "user_failing000000000000000") throw new Error("database down");
+        ended.push(pair);
+        return 1;
+      },
+    }),
   });
-  return { invites, events, asked, successes, warnings };
+  return { invites, events, asked, successes, warnings, ended };
 }
 
 describe("friend invites (CC-052 part 2)", () => {
@@ -95,5 +104,16 @@ describe("friend invites (CC-052 part 2)", () => {
       expect(successes).toEqual([["friend_invites", { id: RIYA.id, kind: "user", admin: false }]]);
       expect(warnings).toEqual([["counts down", "counting an invite's success failed"]]);
     });
+  });
+
+  it("ends the open invites between two players whose friendship ended (review of #167)", async () => {
+    const { events, ended, warnings } = setup(true);
+
+    events.emit(FRIEND_EVENTS.ENDED, { a: RIYA.id, b: ARJUN_ID, now: T0 });
+    events.emit(FRIEND_EVENTS.ENDED, { a: "user_failing000000000000000", b: ARJUN_ID, now: T0 });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(ended).toEqual([{ a: RIYA.id, b: ARJUN_ID, now: T0 }]);
+    expect(warnings).toEqual([["database down", "ending the invites of a friendship failed"]]);
   });
 });

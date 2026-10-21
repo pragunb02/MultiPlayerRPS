@@ -314,4 +314,45 @@ export function runChallengeDaoContract(createDao) {
     expect(await dao.keep({ challengeId, acceptedBy: ARJUN, at: at(9) })).toBe(false);
     expect((await dao.get(challengeId)).keptAt).toEqual(at(8));
   });
+  it("lets nobody take over a group once its invite's room is made, and confirms only for the group's player", async () => {
+    const dao = await createDao();
+    const { challengeId: groupId } = await dao.insert(challengeRecord({ toId: ARJUN }));
+    await dao.claimGroup({ groupId, by: "a0000000000000000001", from: "" });
+
+    expect(await dao.confirmGroup({ groupId, by: "b0000000000000000001" })).toBe(false);
+    expect(await dao.confirmGroup({ groupId, by: "a0000000000000000001" })).toBe(true);
+    expect(await dao.confirmGroup({ groupId, by: "a0000000000000000001" })).toBe(false);
+    expect(await dao.claimGroup({ groupId, by: "b0000000000000000001", from: "a0000000000000000001" })).toBe(
+      false,
+    );
+    expect(await dao.releaseGroup({ groupId, by: "a0000000000000000001" })).toBe(false);
+    expect(await dao.get(groupId)).toMatchObject({ filledBy: "a0000000000000000001", filledDone: true });
+  });
+
+  it("ends an open challenge now, so it reads as expired, and never one already taken", async () => {
+    const dao = await createDao();
+    const open = await dao.insert(challengeRecord({ toId: ARJUN }));
+    const taken = await dao.insert(challengeRecord({ toId: ARJUN }));
+    await dao.claim({
+      challengeId: taken.challengeId,
+      acceptedBy: ARJUN,
+      acceptedName: "Arjun",
+      at: at(5),
+      staleBefore: at(-25),
+    });
+
+    expect(await dao.expireNow({ challengeId: open.challengeId, at: at(10), staleBefore: at(-20) })).toBe(
+      true,
+    );
+    expect(await dao.expireNow({ challengeId: taken.challengeId, at: at(10), staleBefore: at(-20) })).toBe(
+      false,
+    );
+    expect(await dao.get(open.challengeId)).toMatchObject({
+      state: CHALLENGE_STATES.OPEN,
+      expiresAt: at(10),
+    });
+    expect(await dao.expireNow({ challengeId: open.challengeId, at: at(11), staleBefore: at(-19) })).toBe(
+      false,
+    );
+  });
 }

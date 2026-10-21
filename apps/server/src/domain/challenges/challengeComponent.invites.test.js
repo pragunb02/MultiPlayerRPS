@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CHALLENGE_LIMIT_REASONS, CHALLENGE_STATES, INVITE_KEEP_AFTER_MS } from "@classicade/shared";
 import { createChallengeAccessor } from "../../data/challengeAccessor.js";
 import { safetyFromAdults } from "../../testing/fakeSafety.js";
@@ -150,9 +150,11 @@ describe("challengeComponent: invites to friends (CC-052)", () => {
     release();
     await arjunTakes;
 
+    // While Arjun's room is being made, Meera is told to try again: his room may still fail.
     expect(made).toEqual([ARJUN.id]);
-    expect(meeraAnswer).toBeInstanceOf(GoneError);
-    expect(meeraAnswer.details).toEqual({ state: CHALLENGE_STATES.FILLED });
+    expect(meeraAnswer).toBeInstanceOf(ConflictError);
+    expect(meeraAnswer.message).toMatch(/Try again/);
+    // Once his room is made, her invite is filled.
     expect((await view(toMeera.id, MEERA)).state).toBe(CHALLENGE_STATES.FILLED);
     expect((await view(toArjun.id, ARJUN)).state).toBe(CHALLENGE_STATES.ACCEPTED);
   });
@@ -366,5 +368,160 @@ describe("challengeComponent: invites to friends (CC-052)", () => {
     await accept(toArjun.id, ARJUN);
 
     expect(emitted.filter(({ playerIds }) => playerIds?.includes(MEERA.id))).toHaveLength(1);
+  });
+  it("lets the others try again while the winner's room is made, and play if it fails (review of #167)", async () => {
+    let fail;
+    const pending = new Promise((resolve, reject) => {
+      fail = () => reject(new ConflictError("You are in too many rooms"));
+    });
+    let first = true;
+    const { invite, accept, view } = setup({
+      rooms: {
+        createChallengeRoom: async (input) => {
+          if (first) {
+            first = false;
+            await pending;
+          }
+          return { code: "ROOM02", gameId: input.gameId };
+        },
+      },
+    });
+    const toArjun = await invite({ to: "arjun" });
+    const toMeera = await invite({ to: "meera", now: T0 + 1 });
+
+    const arjunTakes = accept(toArjun.id, ARJUN).catch((err) => err);
+    const busy = await accept(toMeera.id, MEERA).catch((err) => err);
+    expect(busy).toBeInstanceOf(ConflictError);
+    expect((await view(toMeera.id, MEERA)).state).toBe(CHALLENGE_STATES.OPEN);
+    fail();
+    expect(await arjunTakes).toBeInstanceOf(ConflictError);
+
+    await expect(accept(toMeera.id, MEERA, T0 + 2 * MINUTE)).resolves.toMatchObject({
+      room: { code: "ROOM02" },
+    });
+  });
+
+  it("gives one room per group even when a room takes longer than the claim lease (review of #167)", async () => {
+    const waits = new Map();
+    const made = [];
+    const { invite, accept, view } = setup({
+      rooms: {
+        createChallengeRoom: async (input) => {
+          await new Promise((resolve) => waits.set(input.accepter.id, resolve));
+          made.push(input.accepter.id);
+          return { code: `ROOM${made.length}`, gameId: input.gameId };
+        },
+      },
+    });
+    const toArjun = await invite({ to: "arjun" });
+    const toMeera = await invite({ to: "meera", now: T0 + 1 });
+    const arjunTakes = accept(toArjun.id, ARJUN, T0 + MINUTE).catch((err) => err);
+    await vi.waitFor(() => expect(waits.has(ARJUN.id)).toBe(true));
+    // Arjun's hold has run out by the time Meera accepts, so she takes the group over while his room is still made.
+    const meeraTakes = accept(toMeera.id, MEERA, T0 + 2 * MINUTE).catch((err) => err);
+    await vi.waitFor(() => expect(waits.has(MEERA.id)).toBe(true));
+
+    // Arjun's slow room is made first, then Meera's: only the group's player gets a room that counts.
+    waits.get(ARJUN.id)();
+    const arjuns = await arjunTakes;
+    waits.get(MEERA.id)();
+    const meeras = await meeraTakes;
+
+    expect(arjuns).toBeInstanceOf(GoneError);
+    expect(arjuns.details).toEqual({ state: CHALLENGE_STATES.FILLED });
+    expect(meeras).toMatchObject({ room: { code: "ROOM2" } });
+    expect((await view(toArjun.id, ARJUN, T0 + 3 * MINUTE)).state).toBe(CHALLENGE_STATES.FILLED);
+    expect((await view(toMeera.id, MEERA, T0 + 3 * MINUTE)).state).toBe(CHALLENGE_STATES.ACCEPTED);
+  });
+
+  it("lets a group be played once its first record is gone, and releases the hold on a failure (review of #167)", async () => {
+    const { invite, accept, accessor, challenges } = setup();
+    const toArjun = await invite({ to: "arjun" });
+    const toMeera = await invite({ to: "meera", now: T0 + 1 });
+    const toKabir = await invite({ to: "kabir", now: T0 + 2 });
+    await accessor.remove(toArjun.id);
+
+    await expect(accept(toMeera.id, MEERA)).resolves.toMatchObject({ room: { code: "ROOM01" } });
+    expect(
+      (await challenges.view({ challengeId: toKabir.id, viewerId: KABIR.id, now: T0 + 2 * MINUTE })).state,
+    ).toBe(CHALLENGE_STATES.FILLED);
+  });
+
+  it("opens the invite again when the group cannot be read", async () => {
+    const { invite, accept, view } = setup({
+      wrap: (accessor) => ({
+        ...accessor,
+        claimGroup: async () => Promise.reject(new Error("database down")),
+      }),
+    });
+    const { id } = await invite();
+
+    await expect(accept(id, ARJUN)).rejects.toThrow("database down");
+    // At once, within the claim lease: the hold was released, not left to run out.
+    expect((await view(id, ARJUN, T0 + MINUTE)).state).toBe(CHALLENGE_STATES.OPEN);
+  });
+
+  it("lets a friend take over a group whose holder was removed", async () => {
+    const { invite, accept, accessor } = setup();
+    const toArjun = await invite({ to: "arjun" });
+    await accessor.claimGroup({ groupId: toArjun.id, by: "gone0000000000000000", from: "" });
+
+    await expect(accept(toArjun.id, ARJUN)).resolves.toMatchObject({ room: { code: "ROOM01" } });
+  });
+
+  it("pushes an open invite to a friend in their quiet hours as already in the inbox (review of #167)", async () => {
+    const { invite, challenges, accessor } = setup();
+    const byDay = await invite({ to: "kabir", now: T0 });
+    const stored = await accessor.get(byDay.id);
+
+    const atNight = await challenges.viewFor(stored, KABIR.id, NIGHT);
+    const atDay = await challenges.viewFor(stored, KABIR.id, T0 + 1);
+    const forRiya = await challenges.viewFor(stored, RIYA.id, NIGHT);
+
+    expect([atNight.later, atDay.later, forRiya.later]).toEqual([true, false, false]);
+  });
+
+  it("ends the open invites between two players whose friendship ended, as invites nobody answered (review of #167)", async () => {
+    const { invite, accept, challenges, view } = setup();
+    const toArjun = await invite({ to: "arjun" });
+    const fromArjun = await invite({ from: ARJUN, to: "riya", gameId: "rps" });
+    const toMeera = await invite({ to: "meera", gameId: "rps" });
+    const taken = await invite({ to: "kabir", gameId: "tictactoe" });
+    await accept(taken.id, KABIR);
+
+    expect(await challenges.endInvitesBetween({ a: RIYA.id, b: ARJUN.id, now: T0 + 2 * MINUTE })).toBe(2);
+    expect(await challenges.endInvitesBetween({ a: RIYA.id, b: KABIR.id, now: T0 + 2 * MINUTE })).toBe(0);
+
+    const later = T0 + 3 * MINUTE;
+    expect((await view(toArjun.id, ARJUN, later)).state).toBe(CHALLENGE_STATES.EXPIRED);
+    expect((await view(fromArjun.id, RIYA, later)).state).toBe(CHALLENGE_STATES.EXPIRED);
+    expect((await view(toMeera.id, MEERA, later)).state).toBe(CHALLENGE_STATES.OPEN);
+    expect((await view(taken.id, KABIR, later)).state).toBe(CHALLENGE_STATES.ACCEPTED);
+    await expect(accept(toArjun.id, ARJUN, later)).rejects.toThrow(GoneError);
+  });
+
+  it("tells nobody of an invite between ex-friends that ended some other way at that moment", async () => {
+    const { invite, challenges, emitted } = setup({
+      wrap: (accessor) => ({ ...accessor, expireNow: async () => false }),
+    });
+    await invite({ to: "arjun" });
+    const before = emitted.length;
+
+    await challenges.endInvitesBetween({ a: RIYA.id, b: ARJUN.id, now: T0 + MINUTE });
+
+    expect(emitted.length).toBe(before);
+  });
+
+  it("fills an invite still open whose group's room is made already, as when its filling was cut off", async () => {
+    const { invite, accept, accessor } = setup();
+    const toArjun = await invite({ to: "arjun" });
+    const toMeera = await invite({ to: "meera", now: T0 + 1 });
+    await accessor.claimGroup({ groupId: toArjun.id, by: toArjun.id, from: "" });
+    await accessor.confirmGroup({ groupId: toArjun.id, by: toArjun.id });
+
+    const late = await accept(toMeera.id, MEERA).catch((err) => err);
+
+    expect(late).toBeInstanceOf(GoneError);
+    expect(late.details).toEqual({ state: CHALLENGE_STATES.FILLED });
   });
 });

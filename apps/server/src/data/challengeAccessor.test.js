@@ -53,6 +53,7 @@ describe("challenge accessor", () => {
       laterBy: [],
       groupId: "0123456789abcdefghjk",
       filledBy: "",
+      filledDone: false,
       keptAt: 0,
     });
     expect(
@@ -139,5 +140,18 @@ describe("challenge accessor", () => {
       true,
     );
     expect((await challenges.get(second.challengeId)).keptAt).toBe(T0 + 5);
+  });
+  it("confirms an invite's group and ends a challenge now, in milliseconds (CC-052)", async () => {
+    const challenges = accessor();
+    const first = await challenges.add(fresh({ toId: GUEST, toName: "G" }));
+    await challenges.claimGroup({ groupId: first.challengeId, by: first.challengeId, from: "" });
+
+    expect(await challenges.confirmGroup({ groupId: first.challengeId, by: first.challengeId })).toBe(true);
+    expect((await challenges.get(first.challengeId)).filledDone).toBe(true);
+    const second = await challenges.add(fresh({ challengeId: "1123456789abcdefghjk" }));
+    expect(
+      await challenges.expireNow({ challengeId: second.challengeId, at: T0 + 10, staleBefore: T0 }),
+    ).toBe(true);
+    expect((await challenges.get(second.challengeId)).expiresAt).toBe(T0 + 10);
   });
 });

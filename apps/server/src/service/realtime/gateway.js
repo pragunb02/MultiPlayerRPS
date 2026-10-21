@@ -306,11 +306,23 @@ export function createRealtimeGateway({
   // Domain to transport: a challenge changed, so every tab of the players it names hears about it on any page, each
   // with their own view (CC-139). The challenger of a room just made from their challenge sits in it as offline. If
   // a tab of theirs is open on the site, they are away instead, so the one who took it sees them as on the site.
+  // A view may wait for the player's quiet hours to be read (CC-052), so each player's pushes go out in one line,
+  // in the order the changes happened.
+  /** @type {Map<string, Promise<void>>} */
+  const challengePushes = new Map();
   domainEvents.on(CHALLENGE_EVENTS.CHANGED, ({ challenge, playerIds }) => {
+    const at = now();
     for (const playerId of playerIds) {
-      io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.CHALLENGE_UPDATED, {
-        challenge: challengeComponent.viewFor(challenge, playerId, now()),
-      });
+      const next = (challengePushes.get(playerId) ?? Promise.resolve())
+        .then(() => challengeComponent.viewFor(challenge, playerId, at))
+        .then((view) => {
+          io.to(playerRoom(playerId)).emit(SOCKET_EVENTS.CHALLENGE_UPDATED, { challenge: view });
+        })
+        .catch((err) => logger.error({ err, playerId }, "pushing a challenge failed"))
+        .finally(() => {
+          if (challengePushes.get(playerId) === next) challengePushes.delete(playerId);
+        });
+      challengePushes.set(playerId, next);
     }
     if (challenge.state === CHALLENGE_STATES.ACCEPTED && challenge.roomCode !== "") {
       markOnSite({ io, roomComponent, playerId: challenge.fromId, now, logger });

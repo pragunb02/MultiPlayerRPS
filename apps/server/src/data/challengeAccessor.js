@@ -23,6 +23,7 @@ import { NotFoundError } from "../utils/errors.js";
  * @property {string} groupId       an invite's group (CC-052): the challenge whose record decides who plays. Its own id
  *   for a link, and for a record made before CC-052
  * @property {string} filledBy      on the first of a group, the invite whose friend plays, "" while nobody
+ * @property {boolean} filledDone   on the first of a group, that invite's room is made
  * @property {number} keptAt        when the friend who took it kept it for later, 0 if never
  */
 
@@ -36,6 +37,7 @@ const toChallenge = ({
   laterBy,
   groupId,
   filledBy,
+  filledDone,
   keptAt,
   ...doc
 }) =>
@@ -43,6 +45,7 @@ const toChallenge = ({
     ...doc,
     groupId: groupId || doc.challengeId,
     filledBy: filledBy ?? "",
+    filledDone: filledDone === true,
     keptAt: keptAt === undefined || keptAt === null ? 0 : keptAt.getTime(),
     options: Object.freeze({ ...options }),
     createdAt: createdAt.getTime(),
@@ -128,6 +131,13 @@ export function createChallengeAccessor({ challengeDao }) {
 
     /** @param {{ groupId: string, by: string }} group @returns {Promise<boolean>} */
     releaseGroup: (group) => challengeDao.releaseGroup(group),
+
+    /** @param {{ groupId: string, by: string }} group @returns {Promise<boolean>} whether it was still `by`'s */
+    confirmGroup: (group) => challengeDao.confirmGroup(group),
+
+    /** @param {{ challengeId: string, at: number, staleBefore: number }} expiry @returns {Promise<boolean>} */
+    expireNow: ({ at, staleBefore, ...expiry }) =>
+      challengeDao.expireNow({ ...expiry, at: new Date(at), staleBefore: new Date(staleBefore) }),
 
     /** @param {{ challengeId: string, acceptedBy: string, at: number }} keep @returns {Promise<boolean>} */
     keep: ({ at, ...keep }) => challengeDao.keep({ ...keep, at: new Date(at) }),

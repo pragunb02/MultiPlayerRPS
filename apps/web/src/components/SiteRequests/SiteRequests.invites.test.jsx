@@ -25,14 +25,16 @@ const invite = (overrides = {}) => ({
   ...overrides,
 });
 
-async function open() {
+async function open({ path = "/", joined } = {}) {
   const socket = fakeSocket();
   socket.connect();
+  socket.request.mockImplementation(async (event) => (event === "room:join" ? joined : {}));
+  const sound = fakeSound();
   const api = fakeApi({ getSession: async () => USER });
-  const view = renderApp({ path: "/", socket, sound: fakeSound(), api });
+  const view = renderApp({ path, socket, sound, api });
   await screen.findByText(USER.displayName);
   const push = (challenge) => act(() => socket.push("challenge:updated", { challenge }));
-  return { ...view, push };
+  return { ...view, push, socket, sound, api };
 }
 
 const NOT_RIGHT_NOW = /Not right now: Arjun can't play at the moment\. Try again later\./;
@@ -85,5 +87,43 @@ describe("SiteRequests: how invites end (CC-052 part 2)", () => {
     expect(screen.queryByText(/Game filled/)).toBeNull();
     // The popup of the invite is gone: it can no longer be accepted.
     expect(screen.queryByRole("region", { name: "Challenge" })).toBeNull();
+  });
+
+  it("shows no popup and plays no sound for an invite that came during a game which ended in quiet hours", async () => {
+    const me = { playerId: "seatOfMe", displayName: USER.displayName, connected: true };
+    const bob = { playerId: "seatOfBob", displayName: "Bob", connected: true };
+    const room = {
+      code: "AB2CD3",
+      gameId: "ludo",
+      status: "playing",
+      hostId: "seatOfMe",
+      players: { min: 2, max: 2 },
+      seats: [me, bob],
+      you: "seatOfMe",
+      game: { view: {}, activePlayers: ["seatOfBob"], outcome: { status: "ongoing" } },
+    };
+    const { push, socket, sound, api } = await open({ path: "/games/ludo/rooms/AB2CD3", joined: room });
+    await screen.findByRole("list", { name: "Players" });
+    // Arjun's invite came at 21:55, during the game: held back. The game ends after 22:00, when the server's inbox
+    // has the invite moved to the inbox already.
+    const toMe = invite({ own: false, forYou: true, toName: undefined, fromName: "Arjun" });
+    push(toMe);
+    api.getChallenges.mockResolvedValue([{ ...toMe, later: true }]);
+
+    act(() =>
+      socket.push("room:updated", {
+        ...room,
+        status: "finished",
+        game: {
+          ...room.game,
+          activePlayers: [],
+          outcome: { status: "finished", result: "draw", winners: [] },
+        },
+      }),
+    );
+
+    expect(await screen.findByRole("button", { name: /^Inbox/ })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Challenge" })).toBeNull();
+    expect(sound.played).not.toContain("notify");
   });
 });

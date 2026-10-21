@@ -22,6 +22,8 @@ export const FRIEND_EVENTS = Object.freeze({
   CHANGED: "friends.changed",
   /** `{ recipientId, request }`: someone was sent a request they can see. `request` is shaped as in their view */
   REQUESTED: "friends.requested",
+  /** `{ a, b, now }`: two players stopped being friends, by a removal or a block. Nobody is told (CC-052) */
+  ENDED: "friends.ended",
 });
 
 /** Requests their sender sees as waiting. A declined one looks the same to them as one nobody answered yet. */
@@ -476,6 +478,7 @@ export function createFriendComponent({
       await requireFriends(playerId, now);
       const friendId = await friendByHandle({ playerId, handle });
       await friendAccessor.unfriend({ a: playerId, b: friendId });
+      events.emit(FRIEND_EVENTS.ENDED, { a: playerId, b: friendId, now });
       changed(playerId, friendId);
     },
 
@@ -627,6 +630,7 @@ export function createFriendComponent({
      */
     async playersBlocked({ blockerId, blockedId, now }) {
       const ended = await friendAccessor.unfriend({ a: blockerId, b: blockedId });
+      if (ended) events.emit(FRIEND_EVENTS.ENDED, { a: blockerId, b: blockedId, now });
       const declined = await friendAccessor.declineRequestsBetween({ a: blockerId, b: blockedId, at: now });
       if (ended || declined > 0) changed(blockerId, blockedId);
     },

@@ -260,7 +260,9 @@ describe("challengeComponent: what a challenge shows over its day", () => {
     await make({ to: "Arjun" });
     const { challenge, playerIds } = emitted.at(-1);
 
-    const views = playerIds.map((playerId) => challenges.viewFor(challenge, playerId, T0 + 1));
+    const views = await Promise.all(
+      playerIds.map((playerId) => challenges.viewFor(challenge, playerId, T0 + 1)),
+    );
 
     expect(views.map(({ own, forYou }) => ({ own, forYou }))).toEqual([
       { own: true, forYou: false },

@@ -991,6 +991,7 @@ export async function startServer({
       flags: flagComponent,
       events: domainEvents,
       logger,
+      challenges: () => challengeComponent,
     }),
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });

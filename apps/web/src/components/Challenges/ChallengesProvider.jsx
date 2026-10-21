@@ -44,6 +44,8 @@ export function ChallengesProvider({ children }) {
   const [now, setNow] = useState(() => Date.now());
   // The views this tab got since the last read of the inbox began. They are newer than what that read answers.
   const sinceRead = useRef(new Map());
+  // Reads the inbox again on demand, while a player is known.
+  const loadNow = useRef(undefined);
   const known = knownFor(state, who);
   // The tab looks again the moment the next challenge's time is up, so the inbox never offers one that has gone.
   const nextEnd = Math.min(
@@ -87,15 +89,23 @@ export function ChallengesProvider({ children }) {
       );
     };
     load();
+    loadNow.current = load;
     const unsubscribers = [
       socket.on("connect", load),
       socket.on(SOCKET_EVENTS.CHALLENGE_UPDATED, ({ challenge }) => remember(challenge)),
     ];
     return () => {
       cancelled = true;
+      loadNow.current = undefined;
       unsubscribers.forEach((off) => off());
     };
   }, [api, socket, who, remember]);
+
+  /**
+   * Reads the inbox again, such as when a game that held the popups back ends: the server knows whether it is the
+   * player's quiet hours now, and moves an invite to the inbox if so (CC-052).
+   */
+  const reload = useCallback(async () => loadNow.current?.(), []);
 
   // Only ever called for a challenge the tab shows, so it is always known here.
   const later = useCallback(
@@ -119,8 +129,9 @@ export function ChallengesProvider({ children }) {
       ),
       later,
       remember,
+      reload,
     }),
-    [known, now, later, remember],
+    [known, now, later, remember, reload],
   );
 
   return <ChallengesContext.Provider value={value}>{children}</ChallengesContext.Provider>;

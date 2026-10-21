@@ -2,6 +2,7 @@ import { IDENTITY_KINDS } from "@classicade/shared";
 import { assertFunction } from "../../utils/assert.js";
 import { ForbiddenError, NotFoundError } from "../../utils/errors.js";
 import { CHALLENGE_EVENTS } from "../challenges/challengeComponent.js";
+import { FRIEND_EVENTS } from "./friendComponent.js";
 
 /** The one answer for anyone who may not be invited, so nothing tells a friend from a stranger or a block. */
 const nobody = (cause) => new NotFoundError("We couldn't find that player", { cause });
@@ -16,21 +17,31 @@ const flagPlayerOf = ({ id, kind }) => ({ id, kind, admin: false });
  * the flag all get the same 404.
  *
  * It also counts the flag's one success: a friend took an invite, on the sender's side of the flag, because the
- * sender is the one who was shown the Invite button.
+ * sender is the one who was shown the Invite button. And when a friendship ends (a removal or a block), the open
+ * invites between the two end too, so an ex-friend can no longer take one.
  *
  * @param {{
  *   friends: Pick<ReturnType<typeof import("./friendComponent.js").createFriendComponent>, "inviteeOf">,
  *   flags: Pick<ReturnType<typeof import("../flags/flagComponent.js").createFlagComponent>, "isOn" | "recordSuccess">,
  *   events: import("node:events").EventEmitter,
  *   logger: Pick<import("../../utils/logger.js").Logger, "warn">,
- * }} deps  `events` carries the challenge component's events. `logger` hears a success that could not be counted
+ *   challenges: () => Pick<ReturnType<typeof import("../challenges/challengeComponent.js").createChallengeComponent>, "endInvitesBetween">,
+ * }} deps  `events` carries the challenge and friend components' events. `logger` hears what could not be done.
+ *   `challenges` answers the challenge component, which is made with this policy, so it is asked for only later
  */
-export function createFriendInvites({ friends, flags, events, logger }) {
+export function createFriendInvites({ friends, flags, events, logger, challenges }) {
   assertFunction(friends?.inviteeOf, "friends.inviteeOf");
   assertFunction(flags?.isOn, "flags.isOn");
   assertFunction(flags?.recordSuccess, "flags.recordSuccess");
   assertFunction(events?.on, "events.on");
   assertFunction(logger?.warn, "logger.warn");
+  assertFunction(challenges, "challenges");
+
+  events.on(FRIEND_EVENTS.ENDED, ({ a, b, now }) => {
+    Promise.resolve()
+      .then(() => challenges().endInvitesBetween({ a, b, now }))
+      .catch((err) => logger.warn({ err }, "ending the invites of a friendship failed"));
+  });
 
   events.on(CHALLENGE_EVENTS.ACCEPTED, ({ challenge }) => {
     if (challenge.toId === "") return;

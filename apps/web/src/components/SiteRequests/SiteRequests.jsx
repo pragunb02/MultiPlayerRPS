@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useId, useRef } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
   CHALLENGE_POPUP_MS,
@@ -310,6 +310,30 @@ function ChallengePopup({ challenge, reason }) {
 }
 
 /**
+ * Whether popups wait: while a game on the room page is on, and once it ends until the inbox has been read again.
+ * The game may have lasted into the player's quiet hours (CC-052), and only the server's inbox says so: an invite
+ * that came during the game then waits in the inbox, with no popup and no sound.
+ */
+function useHeldUntilRead(playing) {
+  const { reload } = useChallengeInbox();
+  const [wasPlaying, setWasPlaying] = useState(playing);
+  const [reading, setReading] = useState(false);
+  if (wasPlaying !== playing) {
+    setWasPlaying(playing);
+    if (!playing) setReading(true);
+  }
+  useEffect(() => {
+    if (!reading) return undefined;
+    let current = true;
+    reload().finally(() => current && setReading(false));
+    return () => {
+      current = false;
+    };
+  }, [reading, reload]);
+  return playing || reading;
+}
+
+/**
  * Requests that reach a player on any page of the site (CC-207): a rematch or a draw offer from another room ("Bob
  * wants a rematch at Chess"), a challenge sent to them, or one of theirs that someone took (CC-139). Each has Accept
  * and go and Not now, a chime, the tab title calling them back, and an urgent announcement. It sits at the top of the
@@ -320,7 +344,8 @@ function ChallengePopup({ challenge, reason }) {
 export function SiteRequests() {
   const { rooms, pathname, asked } = useElsewhere();
   const calls = useChallengeCalls(pathname);
-  const held = useInGame();
+  const playing = useInGame();
+  const held = useHeldUntilRead(playing);
   const sound = useSound();
   const reconnecting = useReconnecting();
   const heard = useRef(new Set());
