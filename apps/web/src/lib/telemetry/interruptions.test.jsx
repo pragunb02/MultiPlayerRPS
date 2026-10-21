@@ -376,6 +376,34 @@ describe("the host's other duties (CC-313)", () => {
   });
 });
 
+describe("the flag's success (CC-313)", () => {
+  it("is sent once at the first interruption counted, and a failed send changes nothing", async () => {
+    const telemetry = recordingTelemetry();
+    const tracker = createInterruptionTracker({ telemetry, now: () => 0 });
+    const api = fakeApi({
+      getFlags: vi.fn(async () => ({ interruption_counts: true })),
+      sendFlagSuccess: vi.fn().mockRejectedValue(new Error("offline")),
+    });
+    const view = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <ServicesContext.Provider value={{ api, telemetry, interruptions: tracker }}>
+          <SessionContext.Provider value={{ status: "anonymous", identity: undefined }}>
+            <InterruptionHost />
+          </SessionContext.Provider>
+        </ServicesContext.Provider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(tracker.isEnabled()).toBe(true));
+
+    tracker.open("toast.xp").end();
+    tracker.open("toast.quest").end();
+    view.unmount();
+
+    await waitFor(() => expect(api.sendFlagSuccess).toHaveBeenCalledOnce());
+    expect(telemetry.named("interruption_ended")).toHaveLength(2);
+  });
+});
+
 describe("the interruption_counts flag (CC-313)", () => {
   afterEach(() => vi.useRealTimers());
 
