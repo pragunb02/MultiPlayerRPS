@@ -23,8 +23,18 @@ import { ConflictError, NotFoundError } from "../utils/errors.js";
  * @property {ReadonlyArray<string>} laterBy  the players who moved it to their inbox
  */
 
-/** @returns {Readonly<Challenge>} The place it holds (`openSlot`) stays in storage. */
-const toChallenge = ({ createdAt, expiresAt, endedAt, deleteAt, openSlot, options, laterBy, ...doc }) =>
+/** @returns {Readonly<Challenge>} The place and mark it holds (`openSlot`, `recentTo`) stay in storage. */
+const toChallenge = ({
+  createdAt,
+  expiresAt,
+  endedAt,
+  deleteAt,
+  openSlot,
+  recentTo,
+  options,
+  laterBy,
+  ...doc
+}) =>
   Object.freeze({
     ...doc,
     options: Object.freeze({ ...options }),
@@ -45,18 +55,24 @@ export function createChallengeAccessor({ challengeDao }) {
 
   return Object.freeze({
     /**
-     * Stores a new open challenge in one of the sender's `openSlots` places for open challenges, so the sender
-     * never has more open at once, however many are made at the same moment (CC-337). Places held by challenges
-     * that can never be open again are let go first.
+     * Stores a new open challenge in one of the sender's `openSlots` places for open challenges, and, for one to a
+     * person, as the sender's one recent challenge to them for `recentMs`. Both hold however many are made at the
+     * same moment (CC-337). Places of challenges that can never be open again, and marks older than `recentMs`, are
+     * let go first.
      *
      * @param {Omit<Challenge, "state" | "endedAt" | "acceptedBy" | "acceptedName" | "roomCode" | "laterBy"> & { deleteAt: number }} challenge
      *   `deleteAt` is when storage forgets it by itself
-     * @param {{ openSlots: number }} limit
+     * @param {{ openSlots: number, recentMs: number }} limits
      * @returns {Promise<Readonly<Challenge>>}
-     * @throws {ConflictError} with `details.openSlots` when every place is held
+     * @throws {ConflictError} with `details.field` "openSlot" when every place is held, or "recentTo" when the
+     *   sender challenged the same person less than `recentMs` ago
      */
-    async add({ createdAt, expiresAt, deleteAt, ...challenge }, { openSlots }) {
-      await challengeDao.freeSlots({ fromId: challenge.fromId, at: new Date(createdAt) });
+    async add({ createdAt, expiresAt, deleteAt, ...challenge }, { openSlots, recentMs }) {
+      await challengeDao.freeSlots({
+        fromId: challenge.fromId,
+        at: new Date(createdAt),
+        recentBefore: new Date(createdAt - recentMs),
+      });
       for (let openSlot = 0; openSlot < openSlots; openSlot += 1) {
         try {
           return toChallenge(
@@ -67,13 +83,22 @@ export function createChallengeAccessor({ challengeDao }) {
               expiresAt: new Date(expiresAt),
               deleteAt: new Date(deleteAt),
               openSlot,
+              ...(challenge.toId !== "" && { recentTo: true }),
             }),
           );
         } catch (err) {
-          if (!(err instanceof DuplicateKey && err.field === "openSlot")) throw err;
+          if (!(err instanceof DuplicateKey) || err.field === "challengeId") throw err;
+          if (err.field === "recentTo") {
+            throw new ConflictError("A challenge to them is recent", {
+              details: { field: "recentTo" },
+              cause: err,
+            });
+          }
         }
       }
-      throw new ConflictError("Every place for an open challenge is taken", { details: { openSlots } });
+      throw new ConflictError("Every place for an open challenge is taken", {
+        details: { field: "openSlot", openSlots },
+      });
     },
 
     /**

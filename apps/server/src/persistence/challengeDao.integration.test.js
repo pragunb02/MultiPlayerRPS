@@ -67,6 +67,11 @@ describe("MongoDB challenge DAO honours the challenge DAO contract (integration)
           unique: true,
           partialFilterExpression: { openSlot: { $exists: true } },
         }),
+        expect.objectContaining({
+          key: { fromId: 1, toId: 1 },
+          unique: true,
+          partialFilterExpression: { recentTo: { $exists: true } },
+        }),
         expect.objectContaining({ key: { deleteAt: 1 }, expireAfterSeconds: 0 }),
       ]),
     );

@@ -9,11 +9,13 @@ import { safetyFromAdults } from "./testing/fakeSafety.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
 import { ConflictError } from "./utils/errors.js";
 
-// CC-337: the limit of open challenges per sender holds on the real MongoDB DAO, for challenges made in the same
-// millisecond, one after another or all at once.
+// CC-337: the limit of open challenges per sender, and of one challenge to the same person every ten minutes, hold on
+// the real MongoDB DAO, for challenges made in the same millisecond, one after another or all at once.
 const RIYA = Object.freeze({ kind: "user", id: "user_0123456789abcdef01234567", displayName: "Riya" });
+const ARJUN = Object.freeze({ kind: "user", id: "user_ffffffffffffffffffffffff", displayName: "Arjun" });
 const T0 = Date.UTC(2026, 9, 20, 12);
 const LIMIT = CHALLENGE_LIMITS.openPerSender;
+const TEN_MINUTES = CHALLENGE_LIMITS.samePersonEveryMs;
 
 let mongo;
 const databases = [];
@@ -50,14 +52,18 @@ async function setup() {
     blocks: { blockedWith: async () => new Set() },
     safety: safetyFromAdults(() => [RIYA.id]),
     events: { emit: () => {} },
+    recipients: { resolve: async () => ({ id: ARJUN.id, displayName: ARJUN.displayName }) },
     newId: () => `c${String(ids--).padStart(19, "0")}`,
   });
   const make = (now = T0) => challenges.create({ from: RIYA, gameId: "chess", options: {}, now });
+  const challengeArjun = (now = T0) =>
+    challenges.create({ from: RIYA, gameId: "chess", options: {}, to: "Arjun", now });
+  const sentToArjun = async (now) => (await challenges.inbox({ playerId: ARJUN.id, now })).length;
   const openCount = async (now) =>
     (await challenges.inbox({ playerId: RIYA.id, now })).filter(
       (challenge) => challenge.state === CHALLENGE_STATES.OPEN,
     ).length;
-  return { challenges, make, openCount };
+  return { challenges, make, openCount, challengeArjun, sentToArjun };
 }
 
 describe("the limit of open challenges on MongoDB (integration, CC-337)", () => {
@@ -102,5 +108,42 @@ describe("the limit of open challenges on MongoDB (integration, CC-337)", () => 
     expect(await openCount(dayLater)).toBe(LIMIT);
     await expect(make(dayLater)).rejects.toThrow(ConflictError);
     expect(await openCount(dayLater)).toBe(LIMIT);
+  });
+
+  it("refuses a second challenge to the same person in the same millisecond", async () => {
+    const { challengeArjun, sentToArjun } = await setup();
+    await challengeArjun();
+
+    const second = await challengeArjun().catch((err) => err);
+
+    expect(second).toBeInstanceOf(ConflictError);
+    expect(second.details).toEqual({
+      reason: CHALLENGE_LIMIT_REASONS.SAME_PERSON,
+      retryAt: T0 + TEN_MINUTES,
+    });
+    expect(await sentToArjun(T0 + 1)).toBe(1);
+  });
+
+  it("makes one of many challenges to the same person made at once", async () => {
+    const { challengeArjun, sentToArjun } = await setup();
+
+    const results = await Promise.allSettled(Array.from({ length: 6 }, () => challengeArjun()));
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    for (const { reason } of results.filter((result) => result.status === "rejected")) {
+      expect(reason.details.reason).toBe(CHALLENGE_LIMIT_REASONS.SAME_PERSON);
+    }
+    expect(await sentToArjun(T0 + 1)).toBe(1);
+  });
+
+  it("lets the same person be challenged again ten minutes on, even if the first was taken back", async () => {
+    const { challenges, challengeArjun, sentToArjun } = await setup();
+    const first = await challengeArjun();
+    await challenges.withdraw({ challengeId: first.id, playerId: RIYA.id, now: T0 + 1 });
+    await expect(challengeArjun(T0 + TEN_MINUTES - 1)).rejects.toThrow(ConflictError);
+
+    await challengeArjun(T0 + TEN_MINUTES);
+
+    expect(await sentToArjun(T0 + TEN_MINUTES)).toBe(1);
   });
 });

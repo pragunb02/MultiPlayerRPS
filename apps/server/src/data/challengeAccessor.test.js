@@ -8,7 +8,7 @@ import { createChallengeAccessor } from "./challengeAccessor.js";
 const RIYA = "user_0123456789abcdef01234567";
 const GUEST = "guest_00000000-0000-4000-8000-000000000001";
 const T0 = Date.UTC(2026, 9, 20, 12);
-const SLOTS = Object.freeze({ openSlots: 3 });
+const SLOTS = Object.freeze({ openSlots: 3, recentMs: 600_000 });
 
 const accessor = () => createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() });
 const fresh = (fields = {}) => ({
@@ -118,12 +118,12 @@ describe("challenge accessor", () => {
     const ids = ["0123456789abcdefghj0", "0123456789abcdefghj1", "0123456789abcdefghj2"];
 
     const made = await Promise.allSettled(
-      ids.map((challengeId) => challenges.add(fresh({ challengeId }), { openSlots: 2 })),
+      ids.map((challengeId) => challenges.add(fresh({ challengeId }), { openSlots: 2, recentMs: 600_000 })),
     );
 
     expect(made.map((result) => result.status)).toEqual(["fulfilled", "fulfilled", "rejected"]);
     expect(made[2].reason).toBeInstanceOf(ConflictError);
-    expect(made[2].reason.details).toEqual({ openSlots: 2 });
+    expect(made[2].reason.details).toEqual({ field: "openSlot", openSlots: 2 });
     expect(made[0].value).not.toHaveProperty("openSlot");
     // Withdrawn, the first lets go of its place for the next one.
     await challenges.end({
@@ -133,7 +133,12 @@ describe("challenge accessor", () => {
       staleBefore: T0,
     });
     expect(
-      (await challenges.add(fresh({ challengeId: ids[2], createdAt: T0 + 2 }), { openSlots: 2 })).challengeId,
+      (
+        await challenges.add(fresh({ challengeId: ids[2], createdAt: T0 + 2 }), {
+          openSlots: 2,
+          recentMs: 600_000,
+        })
+      ).challengeId,
     ).toBe(ids[2]);
   });
 
@@ -145,5 +150,20 @@ describe("challenge accessor", () => {
       constructor: DuplicateKey,
       field: "challengeId",
     });
+  });
+
+  it("keeps one recent challenge to each person, and lets go of its mark once it is old (CC-337)", async () => {
+    const challenges = accessor();
+    const toArjun = (challengeId, createdAt) =>
+      fresh({ challengeId, toId: "user_ffffffffffffffffffffffff", toName: "Arjun", createdAt });
+    await challenges.add(toArjun("0123456789abcdefghj0", T0), SLOTS);
+
+    const refused = await challenges.add(toArjun("0123456789abcdefghj1", T0 + 1), SLOTS).catch((err) => err);
+
+    expect(refused).toBeInstanceOf(ConflictError);
+    expect(refused.details).toEqual({ field: "recentTo" });
+    expect(refused.cause).toMatchObject({ constructor: DuplicateKey, field: "recentTo" });
+    const later = await challenges.add(toArjun("0123456789abcdefghj1", T0 + 600_000), SLOTS);
+    expect(later).not.toHaveProperty("recentTo");
   });
 });

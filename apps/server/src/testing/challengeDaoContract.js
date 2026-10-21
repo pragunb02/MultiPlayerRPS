@@ -323,8 +323,8 @@ export function runChallengeDaoContract(createDao) {
     }
     await dao.setRoom({ challengeId: roomMade.challengeId, acceptedBy: GUEST, roomCode: "AB2CD3" });
 
-    expect(await dao.freeSlots({ fromId: RIYA, at: at(2) })).toBe(4);
-    expect(await dao.freeSlots({ fromId: RIYA, at: at(2) })).toBe(0);
+    expect(await dao.freeSlots({ fromId: RIYA, at: at(2), recentBefore: at(-DAY_SECONDS * 2) })).toBe(4);
+    expect(await dao.freeSlots({ fromId: RIYA, at: at(2), recentBefore: at(-DAY_SECONDS * 2) })).toBe(0);
 
     const slotOf = async ({ challengeId }) => (await dao.get(challengeId)).openSlot;
     expect(
@@ -345,5 +345,50 @@ export function runChallengeDaoContract(createDao) {
     expect(await dao.get(clash.challengeId)).toMatchObject({ fromId: ARJUN });
     expect((await dao.get(clash.challengeId)).openSlot).toBeUndefined();
     expect((await dao.get(own.challengeId)).openSlot).toBe(0);
+  });
+
+  it("keeps one recent challenge from a sender to each person, and lets go of marks made before a moment", async () => {
+    const dao = await createDao();
+    const first = await dao.insert({ ...challengeRecord({ toId: ARJUN }), recentTo: true });
+
+    const results = await Promise.allSettled([
+      dao.insert({ ...challengeRecord({ toId: ARJUN, seconds: 1 }), recentTo: true }),
+      dao.insert({ ...challengeRecord({ toId: ARJUN, seconds: 1 }), recentTo: true }),
+    ]);
+
+    expect(results.map((result) => result.reason?.field)).toEqual(["recentTo", "recentTo"]);
+    expect((await dao.insert(challengeRecord({ toId: ARJUN, seconds: 2 }))).recentTo).toBeUndefined();
+    expect((await dao.insert({ ...challengeRecord({ toId: GUEST }), recentTo: true })).recentTo).toBe(true);
+    expect(
+      (await dao.insert({ ...challengeRecord({ fromId: GUEST, toId: ARJUN }), recentTo: true })).recentTo,
+    ).toBe(true);
+    expect(await dao.freeSlots({ fromId: RIYA, at: at(3), recentBefore: at(-1) })).toBe(0);
+    expect(await dao.freeSlots({ fromId: RIYA, at: at(3), recentBefore: at(0) })).toBe(2);
+    expect((await dao.get(first.challengeId)).recentTo).toBeUndefined();
+    expect(
+      (await dao.insert({ ...challengeRecord({ toId: ARJUN, seconds: 3 }), recentTo: true })).recentTo,
+    ).toBe(true);
+  });
+
+  it("moves a guest's marks to their account, except a mark the account holds already", async () => {
+    const dao = await createDao();
+    const fromGuest = await dao.insert({ ...challengeRecord({ fromId: GUEST, toId: RIYA }), recentTo: true });
+    const clash = await dao.insert({ ...challengeRecord({ fromId: GUEST, toId: ARJUN }), recentTo: true });
+    await dao.insert({
+      ...challengeRecord({ fromId: "user_aaaaaaaaaaaaaaaaaaaaaaaa", toId: ARJUN }),
+      recentTo: true,
+    });
+    const toGuest = await dao.insert({ ...challengeRecord({ toId: GUEST }), recentTo: true });
+    await dao.insert({ ...challengeRecord({ toId: "user_aaaaaaaaaaaaaaaaaaaaaaaa" }), recentTo: true });
+
+    expect(await dao.movePlayer({ from: GUEST, to: "user_aaaaaaaaaaaaaaaaaaaaaaaa" })).toBe(3);
+
+    expect(await dao.get(fromGuest.challengeId)).toMatchObject({ recentTo: true });
+    const moved = await dao.get(clash.challengeId);
+    expect(moved.recentTo).toBeUndefined();
+    expect(moved.openSlot).toBe(clash.openSlot);
+    const sent = await dao.get(toGuest.challengeId);
+    expect(sent).toMatchObject({ toId: "user_aaaaaaaaaaaaaaaaaaaaaaaa" });
+    expect(sent.recentTo).toBeUndefined();
   });
 }
