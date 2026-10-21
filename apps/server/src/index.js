@@ -37,5 +37,6 @@ if (config.telemetry.enabled) {
   logger.info({ logs: config.telemetry.logs, intervalMs: config.telemetry.exportIntervalMs }, "telemetry on");
 }
 
-const server = await startServer({ config, logger, metrics: telemetry.metrics });
+// The real network for the breached password check at sign-up and password change (CC-261, ADR-080).
+const server = await startServer({ config, logger, metrics: telemetry.metrics, pwnedPasswordsFetch: fetch });
 handleShutdownSignals({ close: server.close, flush: telemetry.shutdown, logger });
