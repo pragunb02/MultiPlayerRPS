@@ -21,10 +21,25 @@
   animation: wake-appear 1ms linear 600ms backwards;
 }
 
-/* Inside the app it sits above the page instead of filling the window. */
+/*
+ * Inside the app it lies over the top of the page instead of filling the window. Its holder has no height, so the
+ * page never makes room for it and does not jump when it goes (CC-322). While it waits to appear it is hidden, and
+ * a hidden element takes no clicks, so the page under it works.
+ */
+.wake-holder {
+  position: relative;
+  height: 0;
+  z-index: var(--layer-raised);
+}
+
 .wake--inline {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
   min-height: auto;
   padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg);
 }
 
 /* The page already showed the screen while the app loaded, so the app shows it at once, without a gap. */

@@ -188,6 +188,19 @@ system }`. It is the only name the browser gets for a session. A session id is n
   a flag and a removal day, switched from the console. Revisit: `lottie_light` only for real After Effects art
   (ADR-016 amendment point 2), Rive only for an interactive story character with its own ADR adding
   `'wasm-unsafe-eval'` and self-hosted wasm, OGL only if a ticket shows a hero scene helps players.
+- **Amended 2026-10-21 ([CC-322](tickets/CC-322.md), builder, owner-delegated).** CC-135's bundle check exists:
+  the step "Bundle size budget" of the required `checks` job runs `node scripts/bin/check-bundle.mjs` after
+  `npm run build:web`. Its rules, in `scripts/build/bundleBudget.mjs`: the first route (index.html's entry and
+  its `modulepreload`s) at most 150 kB gzip; chess.js and Motion never on it; no file under `effects/scenes/` or
+  `effects/themes/` on it; `effects/registry.js` at most 0.5 kB of its own code there; each effect's chunk with
+  its CSS at most 6 kB, or its entry's smaller `budgetKB` (read from the loader's `import()` path); the chunk
+  holding `effects/particles.js` at most 1.5 kB. Sizes come from a build report the Vite plugin
+  `scripts/build/bundleReport.mjs` writes outside `dist`, with each source file's share of the minified chunk
+  split by its source map, so a module's size is a real one and not its unminified source. Until the registry
+  lands (CC-099) the effect rules have nothing to check. Point 5's "prefetch at idle" is unchanged. Pages, unlike
+  effects, are prefetched on link intent (pointer, focus, touch) as a hint only: `<link rel="modulepreload">` and
+  `<link rel="prefetch">` from a file list the build writes into index.html. Nothing runs, so a failed hint never
+  reaches the stale-build reload of CC-181. CC-322 records this.
 
 ### ADR-074 — A merge queue on main: CI on `merge_group`, merges through the queue
 
