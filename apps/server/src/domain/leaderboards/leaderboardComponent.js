@@ -76,6 +76,8 @@ function shownName({ displayName }, policy) {
  *     row's age policy, whose `boardName` says which name it shows (CC-152)
  *   cards?: Pick<ReturnType<typeof import("../profiles/profileCards.js").createProfileCards>, "cardsFor">,  the
  *     avatar and profile link beside each name a board shows (CC-034). Without it rows have neither
+ *   weekOffset?: () => Promise<number>,  the weekly boards' clock as an offset from UTC: India time once
+ *     `local_days` is fully on (CC-146, ADR-015 amended). Without it, UTC weeks
  * }} deps
  */
 export function createLeaderboardComponent({
@@ -85,6 +87,7 @@ export function createLeaderboardComponent({
   transfers,
   safety,
   cards = NO_CARDS,
+  weekOffset = async () => 0,
 }) {
   assertFunction(safety?.policiesFor, "safety.policiesFor");
   assertFunction(cards?.cardsFor, "cards.cardsFor");
@@ -178,7 +181,7 @@ export function createLeaderboardComponent({
   };
 
   /** Overall XP follows the player's total; this week's XP adds what was earned, once per key. */
-  const addXp = async ({ player, xp, gained, key, at, ends }) => {
+  const addXp = async ({ player, xp, gained, key, at, ends, offsetMs }) => {
     if (xp > 0) {
       await leaderboardAccessor.raiseScore({
         ...player,
@@ -193,7 +196,7 @@ export function createLeaderboardComponent({
       await leaderboardAccessor.addOnce({
         ...player,
         board: XP_BOARD,
-        period: weekOf(at).period,
+        period: weekOf(at, offsetMs).period,
         key,
         inc: gained,
         at,
@@ -225,11 +228,11 @@ export function createLeaderboardComponent({
    *
    * @returns {Promise<Map<string, number>>} week id to XP
    */
-  async function withdrawnXpByWeek({ from, to }) {
+  async function withdrawnXpByWeek({ from, to, offsetMs }) {
     const byWeek = new Map();
     const withdrawn = await matchAccessor.listWithdrawn({ playerId: to, from });
     for (const match of withdrawn.filter((m) => !hasComputerPlayer(m) && !creditFor(m, to).counted)) {
-      const { period } = weekOf(match.endedAt);
+      const { period } = weekOf(match.endedAt, offsetMs);
       byWeek.set(period, (byWeek.get(period) ?? 0) + XP_AWARDS[resultFor(match, to)]);
     }
     return byWeek;
@@ -272,14 +275,14 @@ export function createLeaderboardComponent({
    *
    * @returns {Promise<number>} the account's rows that changed now
    */
-  async function mergeGuestWeeks({ from, player, now }) {
+  async function mergeGuestWeeks({ from, player, now, offsetMs }) {
     const weeks = (await leaderboardAccessor.listWithKeys({ board: XP_BOARD, playerId: from })).filter(
       ({ period }) => period !== ALL,
     );
     if (weeks.length === 0) {
       return 0;
     }
-    const withdrawn = await withdrawnXpByWeek({ from, to: player.playerId });
+    const withdrawn = await withdrawnXpByWeek({ from, to: player.playerId, offsetMs });
     const accountWeeks = new Map(
       (await leaderboardAccessor.listWithKeys({ board: XP_BOARD, playerId: player.playerId })).map((row) => [
         row.period,
@@ -302,7 +305,7 @@ export function createLeaderboardComponent({
         inc: Math.max(0, score - (withdrawn.get(period) ?? 0) - counted),
         at: now,
         // The row was last written inside its week, so that moment names the week's end for the account.
-        expiresAt: weekOf(updatedAt).expiresAt,
+        expiresAt: weekOf(updatedAt, offsetMs).expiresAt,
       });
       merged += applied ? 1 : 0;
     }
@@ -324,7 +327,7 @@ export function createLeaderboardComponent({
      */
     async getBoard({ boardId, limit, now }) {
       const info = requireBoard(boardId);
-      const { board, period, resetsAt } = storageFor(info, now);
+      const { board, period, resetsAt } = storageFor(info, now, await weekOffset());
       const stored = await leaderboardAccessor.listTop({ board, period, limit });
       // A guest whose move to an account is done is never shown, even when a row of it was left behind (#118).
       const gone = await movedGuestsAmong(
@@ -368,7 +371,7 @@ export function createLeaderboardComponent({
      * @throws {NotFoundError} for an unknown board
      */
     async standingFor({ boardId, viewer, now }) {
-      const { board, period } = storageFor(requireBoard(boardId), now);
+      const { board, period } = storageFor(requireBoard(boardId), now, await weekOffset());
       if ((await movedGuestsAmong([viewer.id], { doneOnly: true })).has(viewer.id)) {
         return { listed: false, reason: LEADERBOARD_UNLISTED.UNRANKED };
       }
@@ -402,15 +405,16 @@ export function createLeaderboardComponent({
       const beingMovedInto = await accountsBeingMovedInto(counted);
       const listed = counted.filter((playerId) => !beingMovedInto.has(playerId));
       const at = match.endedAt;
+      const offsetMs = await weekOffset();
       await writeRowsOf(listed, async (playerId) => {
         const { displayName } = match.players.find((p) => p.playerId === playerId);
         const result = resultFor(match, playerId);
-        const ends = rowEnds({ isGuest: isGuestId(playerId), at });
+        const ends = rowEnds({ isGuest: isGuestId(playerId), at, offsetMs });
         // Progression already added this match, and any quest bonus it earned (CC-089), to the stored total.
         const stored = await progressAccessor.get(playerId);
         const latest = rankedEntry({ xp: stored.xp, level: levelForXp(stored.xp) }, stored);
         const player = { playerId, displayName, level: latest.level };
-        await addXp({ player, xp: latest.xp, gained: XP_AWARDS[result], key: match.matchId, at, ends });
+        await addXp({ player, xp: latest.xp, gained: XP_AWARDS[result], key: match.matchId, at, ends, offsetMs });
         if (result === "win" && hasWinsBoard(match.gameId)) {
           await raiseWins({ player, gameId: match.gameId, at, ends });
         }
@@ -428,11 +432,12 @@ export function createLeaderboardComponent({
       if (!hasRows(playerId) || !ranked) {
         return;
       }
+      const offsetMs = await weekOffset();
       await writeRowsOf([playerId], async () => {
-        const ends = rowEnds({ isGuest: isGuestId(playerId), at });
+        const ends = rowEnds({ isGuest: isGuestId(playerId), at, offsetMs });
         const latest = rankedEntry(progress, await progressAccessor.get(playerId));
         const player = { playerId, displayName, level: latest.level };
-        await addXp({ player, xp: latest.xp, gained: xpGained, key, at, ends });
+        await addXp({ player, xp: latest.xp, gained: xpGained, key, at, ends, offsetMs });
         await keepGuestRows({ playerId, ends });
       });
     },
@@ -449,8 +454,9 @@ export function createLeaderboardComponent({
       const stored = await progressAccessor.get(to.id);
       const { xp, level } = rankedEntry({ xp: stored.xp, level: levelForXp(stored.xp) }, stored);
       const player = { playerId: to.id, displayName: to.displayName, level };
-      let raised = await mergeGuestWeeks({ from, player, now });
-      const { period, startsAt, expiresAt } = weekOf(now);
+      const offsetMs = await weekOffset();
+      let raised = await mergeGuestWeeks({ from, player, now, offsetMs });
+      const { period, startsAt, expiresAt } = weekOf(now, offsetMs);
       // This week's XP from matches, for games from before guests had rows. It only ever raises the score, so it
       // never adds again what the guest's weekly row brought.
       const weekXp = await matchXpSince(to.id, startsAt);

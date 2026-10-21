@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isoWeek } from "./isoWeek.js";
+import { INDIA_WEEK_OFFSET_MS, isoWeek } from "./isoWeek.js";
 
 const at = (iso) => Date.parse(iso);
 
@@ -29,6 +29,21 @@ describe("isoWeek", () => {
   it("rolls over at Monday midnight UTC", () => {
     expect(isoWeek(at("2026-10-18T23:59:59.999Z")).id).toBe("2026-W42");
     expect(isoWeek(at("2026-10-19T00:00:00Z")).id).toBe("2026-W43");
+  });
+
+  it("turns at Monday 00:00 India time with the India offset (CC-146, ADR-015 amended)", () => {
+    // Monday 19 October 2026 starts at 18:30 UTC on Sunday the 18th in India.
+    expect(isoWeek(at("2026-10-18T18:29:59.999Z"), INDIA_WEEK_OFFSET_MS).id).toBe("2026-W42");
+    const week = isoWeek(at("2026-10-18T18:30:00Z"), INDIA_WEEK_OFFSET_MS);
+    expect(week).toEqual({
+      id: "2026-W43",
+      startsAt: at("2026-10-18T18:30:00Z"),
+      endsAt: at("2026-10-25T18:30:00Z"),
+    });
+    // Without the offset the same moment is still the UTC week before.
+    expect(isoWeek(at("2026-10-18T18:30:00Z")).id).toBe("2026-W42");
+    // The year's edge follows India's Thursday too.
+    expect(isoWeek(at("2026-12-27T18:30:00Z"), INDIA_WEEK_OFFSET_MS).id).toBe("2026-W53");
   });
 
   it.each([[NaN], [Infinity], ["2026"]])("refuses %o", (value) => {

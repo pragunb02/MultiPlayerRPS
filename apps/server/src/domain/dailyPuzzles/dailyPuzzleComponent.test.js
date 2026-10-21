@@ -4,6 +4,7 @@ import { createInMemoryDailyPuzzleAttemptDao } from "../../testing/inMemoryDaily
 import { ConflictError, NotFoundError, ValidationError } from "../../utils/errors.js";
 import { createChessKind } from "./chessKind.js";
 import { createDailyPuzzleComponent } from "./dailyPuzzleComponent.js";
+import { zoneCalendar } from "../playerDays/zoneCalendar.js";
 import { INDIA_CALENDAR } from "./schedule.js";
 
 /** Lichess 0000D (CC0): White plays Qd6, Black finds Rd8, White takes Qxd8+, Black finds Bxd8. */
@@ -531,5 +532,36 @@ describe("a player's data", () => {
 
     expect(await component.erasePlayer({ playerId: RIYA })).toEqual({ erased: { dailyPuzzles: 1 } });
     expect(await component.erasePlayer({ playerId: RIYA })).toEqual({ erased: { dailyPuzzles: 0 } });
+  });
+});
+
+describe("the daily puzzle on local days (CC-146)", () => {
+  it("follows the player's own day when a calendar is given per player", async () => {
+    const newYork = zoneCalendar({
+      zone: "America/New_York",
+      previousZone: "UTC",
+      changedAt: 0,
+      effectiveAt: 0,
+      floorDay: "1970-01-01",
+    });
+    const component = createDailyPuzzleComponent({
+      dailyPuzzleAccessor: createDailyPuzzleAccessor({
+        attemptDao: createInMemoryDailyPuzzleAttemptDao(),
+        catalogues: {},
+      }),
+      kinds: [createChessKind({ puzzles: SET })],
+      calendar: INDIA_CALENDAR,
+      calendarFor: async ({ playerId, fallback }) => (playerId === RIYA ? newYork : fallback),
+    });
+    // 22:00 on Tuesday in New York is already Wednesday 07:30 in India.
+    const now = Date.parse("2026-10-21T02:00:00Z");
+    const riya = await component.todayFor({ kind: "chess", playerId: RIYA, now });
+    expect(riya).toMatchObject({ day: TUESDAY, number: 2, nextAt: Date.parse("2026-10-21T04:00:00Z") });
+    const guest = await component.todayFor({ kind: "chess", playerId: GUEST, now });
+    expect(guest).toMatchObject({ day: WEDNESDAY, number: 3, nextAt: Date.parse("2026-10-21T18:30:00Z") });
+    expect((await component.today({ kind: "chess", now })).day).toBe(WEDNESDAY);
+    // A move on the page's day is played on Riya's own Tuesday.
+    const played = await component.play({ kind: "chess", playerId: RIYA, day: TUESDAY, move: FIRST, now });
+    expect(played.puzzle.day).toBe(TUESDAY);
   });
 });

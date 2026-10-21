@@ -37,6 +37,10 @@ import { createReportAccessor } from "../data/reportAccessor.js";
 import { createFlagComponent } from "../domain/flags/flagComponent.js";
 import { createFeatureFlagAccessor } from "../data/featureFlagAccessor.js";
 import { createInMemoryFeatureFlagDao } from "./inMemoryFeatureFlagDao.js";
+import { createTimeZoneAccessor } from "../data/timeZoneAccessor.js";
+import { createPlayerDaysComponent } from "../domain/playerDays/playerDaysComponent.js";
+import { INDIA_WEEK_OFFSET_MS } from "../domain/leaderboards/isoWeek.js";
+import { createInMemoryTimeZoneDao } from "./inMemoryTimeZoneDao.js";
 import { createKeyedIds, KEYED_ID_LABELS, keyedIdSecretFrom } from "../utils/keyedIds.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
@@ -234,6 +238,8 @@ export function createTestApp({
     dailyPuzzleAccessor: createDailyPuzzleAccessor({ attemptDao: dailyPuzzleAttemptDao, catalogues: {} }),
     kinds: [createChessKind({ puzzles: chessPuzzles })],
     calendar: INDIA_CALENDAR,
+    // Made below, with the flags it reads; asked only once a request comes.
+    calendarFor: (query) => playerDaysComponent.calendarFor(query),
   });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -253,6 +259,11 @@ export function createTestApp({
     logger: capture.logger,
     now,
   });
+  // As in the composition root (CC-146, CC-145).
+  const playerDaysComponent = createPlayerDaysComponent({
+    timeZoneAccessor: createTimeZoneAccessor({ timeZoneDao: createInMemoryTimeZoneDao() }),
+    flags: flagComponent,
+  });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
     matchAccessor,
@@ -260,6 +271,7 @@ export function createTestApp({
     transfers: playerTransferAccessor,
     safety: safetyComponent,
     cards: profileCards,
+    weekOffset: async () => ((await flagComponent.isOn("local_days", undefined)) ? INDIA_WEEK_OFFSET_MS : 0),
   });
   const gamificationComponent = createGamificationComponent({
     gamificationAccessor: createGamificationAccessor({
@@ -270,6 +282,7 @@ export function createTestApp({
     matchAccessor,
     progressionComponent,
     events: domainEvents,
+    days: playerDaysComponent,
   });
   const chessRatingComponent = createChessRatingComponent({
     chessRatingAccessor: createChessRatingAccessor({ chessRatingDao: createInMemoryChessRatingDao() }),
@@ -321,6 +334,8 @@ export function createTestApp({
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
       { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
+      // The zone first, so the streak rebuilt from the history uses the account's days (CC-146).
+      { name: "timeZone", transferPlayer: playerDaysComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "reports", transferPlayer: reportComponent.transferPlayer },
@@ -454,6 +469,11 @@ export function createTestApp({
         exportPlayer: gamificationComponent.exportPlayer,
       },
       {
+        name: "timeZone",
+        erasePlayer: playerDaysComponent.erasePlayer,
+        exportPlayer: playerDaysComponent.exportPlayer,
+      },
+      {
         name: "leaderboards",
         erasePlayer: leaderboardComponent.erasePlayer,
         exportPlayer: leaderboardComponent.exportPlayer,
@@ -534,6 +554,7 @@ export function createTestApp({
     safetyComponent,
     dailyPuzzleLimit,
     flagComponent,
+    playerDaysComponent,
     analyticsComponent: createAnalyticsComponent({
       analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
       cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }),
@@ -579,6 +600,7 @@ export function createTestApp({
     reportComponent,
     dailyPuzzleComponent,
     flagComponent,
+    playerDaysComponent,
     matchPipeline,
     playerDataComponent,
     tasks,

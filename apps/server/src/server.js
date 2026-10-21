@@ -12,6 +12,7 @@ import { createChallengeAccessor } from "./data/challengeAccessor.js";
 import { createFriendAccessor } from "./data/friendAccessor.js";
 import { createPrivacyAccessor } from "./data/privacyAccessor.js";
 import { createFeatureFlagAccessor } from "./data/featureFlagAccessor.js";
+import { createTimeZoneAccessor } from "./data/timeZoneAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
 import { createReportAccessor } from "./data/reportAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
@@ -50,6 +51,8 @@ import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
 import { createThinkingQueue } from "./domain/bots/thinkingQueue.js";
 import { createBotThinkingClient } from "./dependency/thinking/botThinkingClient.js";
 import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
+import { INDIA_WEEK_OFFSET_MS } from "./domain/leaderboards/isoWeek.js";
+import { createPlayerDaysComponent } from "./domain/playerDays/playerDaysComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
 import { createLeaderboardComponent } from "./domain/leaderboards/leaderboardComponent.js";
@@ -79,6 +82,7 @@ import { createFriendRequestDao } from "./persistence/friendRequestDao.js";
 import { createFriendshipDao } from "./persistence/friendshipDao.js";
 import { createPrivacyDao } from "./persistence/privacyDao.js";
 import { createFeatureFlagDao } from "./persistence/featureFlagDao.js";
+import { createTimeZoneDao } from "./persistence/timeZoneDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
 import { createReportDao } from "./persistence/reportDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
@@ -745,6 +749,7 @@ export async function startServer({
   const friendLinkDao = createFriendLinkDao({ connection: database.connection });
   const privacyDao = createPrivacyDao({ connection: database.connection });
   const featureFlagDao = createFeatureFlagDao({ connection: database.connection });
+  const timeZoneDao = createTimeZoneDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -771,6 +776,7 @@ export async function startServer({
       friendLinkDao,
       privacyDao,
       featureFlagDao,
+      timeZoneDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -842,17 +848,25 @@ export async function startServer({
     matchAccessor,
     events: domainEvents,
   });
-  // The daily puzzles follow India days until CC-146 gives each player their own (ADR-061).
+  // Each player's days and time zone, behind local_days, and the streak freezes, behind streak_freezes (CC-146,
+  // CC-145, ADR-077).
+  const playerDaysComponent = createPlayerDaysComponent({
+    timeZoneAccessor: createTimeZoneAccessor({ timeZoneDao }),
+    flags: flagComponent,
+  });
+  // The daily puzzles follow India days, or each player's own with local_days on (ADR-061, ADR-077).
   const dailyPuzzleComponent = createDailyPuzzleComponent({
     dailyPuzzleAccessor,
     kinds: [createChessKind({ puzzles: dailyPuzzleAccessor.puzzlesOf(DAILY_PUZZLE_KINDS.CHESS) })],
     calendar: INDIA_CALENDAR,
+    calendarFor: playerDaysComponent.calendarFor,
   });
   const gamificationComponent = createGamificationComponent({
     gamificationAccessor,
     matchAccessor,
     progressionComponent,
     events: domainEvents,
+    days: playerDaysComponent,
   });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor,
@@ -861,6 +875,8 @@ export async function startServer({
     transfers: playerTransferAccessor,
     safety: safetyComponent,
     cards: profileCards,
+    // Monday 00:00 India time once local_days is on for everyone; a visitor's answer is on only then (ADR-015).
+    weekOffset: async () => ((await flagComponent.isOn("local_days", undefined)) ? INDIA_WEEK_OFFSET_MS : 0),
   });
   const chessRatingComponent = createChessRatingComponent({ chessRatingAccessor, events: domainEvents });
   const profileComponent = createProfileComponent({
@@ -912,6 +928,8 @@ export async function startServer({
       { name: "matches", transferPlayer: matchComponent.transferPlayer },
       { name: "progress", transferPlayer: progressionComponent.transferPlayer },
       { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
+      // The zone first, so the streak rebuilt from the history uses the account's days (CC-146).
+      { name: "timeZone", transferPlayer: playerDaysComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
       { name: "reports", transferPlayer: reportComponent.transferPlayer },
@@ -1052,6 +1070,11 @@ export async function startServer({
         exportPlayer: gamificationComponent.exportPlayer,
       },
       {
+        name: "timeZone",
+        erasePlayer: playerDaysComponent.erasePlayer,
+        exportPlayer: playerDaysComponent.exportPlayer,
+      },
+      {
         name: "leaderboards",
         erasePlayer: leaderboardComponent.erasePlayer,
         exportPlayer: leaderboardComponent.exportPlayer,
@@ -1141,6 +1164,7 @@ export async function startServer({
     dailyPuzzleComponent,
     safetyComponent,
     flagComponent,
+    playerDaysComponent,
     leaderboardComponent,
     analyticsComponent,
     sessionMiddleware,

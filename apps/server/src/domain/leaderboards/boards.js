@@ -20,12 +20,13 @@ export const winsBoard = (gameId) => `wins:${gameId}`;
  *
  * @param {Readonly<import("@classicade/shared").LeaderboardInfo>} info
  * @param {number} now
+ * @param {number} [offsetMs]  the week's clock (see isoWeek): 0 is UTC
  * @returns {{ board: string, period: string, resetsAt?: number }}
  */
-export function storageFor(info, now) {
+export function storageFor(info, now, offsetMs = 0) {
   const board = info.metric === LEADERBOARD_METRICS.XP ? XP_BOARD : winsBoard(info.gameId);
   if (info.period === LEADERBOARD_PERIODS.WEEK) {
-    const week = isoWeek(now);
+    const week = isoWeek(now, offsetMs);
     return { board, period: week.id, resetsAt: week.endsAt };
   }
   return { board, period: LEADERBOARD_PERIODS.ALL };
@@ -35,9 +36,10 @@ export function storageFor(info, now) {
  * The weekly XP period a moment falls in, and when its entries may be removed.
  *
  * @param {number} at
+ * @param {number} [offsetMs]  the week's clock (see isoWeek): 0 is UTC
  */
-export function weekOf(at) {
-  const week = isoWeek(at);
+export function weekOf(at, offsetMs = 0) {
+  const week = isoWeek(at, offsetMs);
   return { period: week.id, startsAt: week.startsAt, expiresAt: week.endsAt + WEEKLY_RETENTION_MS };
 }
 
@@ -57,11 +59,11 @@ export const gamesWithWinsBoards = () =>
  * When a player's rows should end after a write at `at`. An account's all time rows never end, so they have no
  * `allTime`. A guest's rows end `GUEST_ROW_LIFETIME_MS` later, and a weekly row never later than its week's own end.
  *
- * @param {{ isGuest: boolean, at: number }} write
+ * @param {{ isGuest: boolean, at: number, offsetMs?: number }} write
  * @returns {Readonly<{ week: number, allTime?: number }>}
  */
-export function rowEnds({ isGuest, at }) {
-  const week = weekOf(at).expiresAt;
+export function rowEnds({ isGuest, at, offsetMs = 0 }) {
+  const week = weekOf(at, offsetMs).expiresAt;
   if (!isGuest) {
     return Object.freeze({ week });
   }

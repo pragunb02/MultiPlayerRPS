@@ -47,6 +47,8 @@ import { createWebAppRouter } from "./webApp.js";
  *     policy, whose own flags each player can read (CC-152)
  *   flagComponent: ReturnType<typeof import("../../domain/flags/flagComponent.js").createFlagComponent>,  feature
  *     flags (CC-312)
+ *   playerDaysComponent?: ReturnType<typeof import("../../domain/playerDays/playerDaysComponent.js").createPlayerDaysComponent>,
+ *     the player's time zone (CC-146)
  *   authLimits?: Parameters<typeof import("./authRoutes.js").createAuthRoutes>[0]["limits"],
  *   onSessionEnded: (sessionId: string) => void,
  *   onOtherSessionsEnded: (which: { playerId: string, fromSessionId: string, toSessionId: string }) => void,  told
@@ -93,6 +95,7 @@ export function createHttpApp({
   dailyPuzzleLimit,
   safetyComponent,
   flagComponent,
+  playerDaysComponent,
   authLimits,
   onSessionEnded,
   onOtherSessionsEnded,
@@ -192,6 +195,7 @@ export function createHttpApp({
       dailyPuzzleLimit,
       safetyComponent,
       flagComponent,
+      playerDaysComponent,
       build: config.build,
     }),
   );
