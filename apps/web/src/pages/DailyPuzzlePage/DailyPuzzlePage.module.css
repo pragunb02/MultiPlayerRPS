@@ -15,6 +15,18 @@
   gap: var(--space-3);
   min-width: 0;
 }
+/* The board's place while it downloads: the same square the puzzle board fills (CC-322). */
+.boardWaiting {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 36rem;
+  aspect-ratio: 1;
+  margin: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+}
 .header h1 {
   margin: 0;
   font-family: var(--font-display);
