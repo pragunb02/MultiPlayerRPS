@@ -136,6 +136,11 @@ export const test = base.extend({
         expectRestart: () => {
           record.restarting = true;
         },
+        /**
+         * Hands over what was recorded as a problem so far and forgets it. Only for a test of this check itself,
+         * which provokes a failure to show that the check sees it (CC-335).
+         */
+        takeProblems: () => record.problems.splice(0),
         /** The person closes their browser: checks run now, while it can still be inspected. */
         leave: async () => {
           await checkClean(player);
