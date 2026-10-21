@@ -13,6 +13,7 @@ describe("createTelemetrySchema", () => {
   it("lists every metric ADR-055 names and nothing else", () => {
     expect(Object.keys(schema.metrics).sort()).toEqual(Object.values(METRICS).sort());
     expect(Object.values(METRICS).sort()).toEqual([
+      "accounts.password_checks",
       "bots.thinking.duration",
       "http.server.request.duration",
       "match_pipeline.attempts",
@@ -42,6 +43,7 @@ describe("createTelemetrySchema", () => {
       [METRICS.PIPELINE_ATTEMPTS]: ["step"],
       [METRICS.PIPELINE_FAILED]: ["step"],
       [METRICS.BOT_THINKING_DURATION]: ["game", "outcome"],
+      [METRICS.PASSWORD_CHECKS]: ["outcome"],
       [METRICS.EVENT_LOOP_P50]: [],
       [METRICS.EVENT_LOOP_P99]: [],
       [METRICS.MEMORY_RSS]: [],
@@ -117,6 +119,16 @@ describe("createTelemetrySchema", () => {
     expect(rules.game("bot_queenvee_strong")).toBe(false);
     expect(schema.logs.lines["computer player ran out of time to think"]).toBe(40);
     expect(schema.logs.lines["computer player's thinking crashed"]).toBe(40);
+  });
+
+  it("allows new password checks by their four outcomes only, with nothing about the player (CC-261)", () => {
+    const rules = schema.metrics[METRICS.PASSWORD_CHECKS];
+
+    expect(METRICS.PASSWORD_CHECKS).toBe("accounts.password_checks");
+    expect(["clear", "common", "breached", "unavailable"].every(rules.outcome)).toBe(true);
+    expect(rules.outcome("riya@example.com")).toBe(false);
+    expect(rules.outcome("ok")).toBe(false);
+    expect(schema.logs.lines["saving the upgraded password hash failed"]).toBe(40);
   });
 
   it("allows a scrubbed key only when it is a known key, or the word unknown", () => {

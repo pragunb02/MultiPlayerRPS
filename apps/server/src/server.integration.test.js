@@ -10,6 +10,7 @@ import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
 import { testConfig } from "./testing/testConfig.js";
+import { NO_OPERATIONS_METRICS } from "./utils/operationsMetrics.js";
 
 // Real MongoDB (in-memory), real composition root, real HTTP + WebSocket.
 let mongo;
@@ -62,7 +63,7 @@ async function eventually(probe, timeoutMs = 5_000) {
 
 const freshConfig = () => testConfig({ MONGO_URI: mongo.uri(DB) });
 
-async function start(config = freshConfig(), { now, rooms } = {}) {
+async function start(config = freshConfig(), { now, rooms, ...deps } = {}) {
   const capture = captureLogger();
   // A failing test shows what the server saw (refused sockets, session lookups) — rare flakes explain themselves.
   onTestFailed(() => {
@@ -72,6 +73,7 @@ async function start(config = freshConfig(), { now, rooms } = {}) {
   const app = await startServer({
     config,
     logger: capture.logger,
+    ...deps,
     ...(now === undefined ? {} : { now }),
     ...(rooms === undefined ? {} : { rooms }),
   });
@@ -461,10 +463,47 @@ describe("accounts through the real composition root (integration)", () => {
       expect(signup.status).toBe(201);
       expect(identity).toEqual({ kind: "user", id: `user_${stored._id.toHexString()}`, displayName: "Riya" });
       expect(ack.data).toEqual(identity);
-      expect(stored.passwordHash).toMatch(/^scrypt\$32768\$8\$1\$/);
+      expect(stored.passwordHash).toMatch(/^scrypt\$32768\$8\$3\$/);
       expect(JSON.stringify(stored)).not.toContain("correct horse battery");
     } finally {
       socket?.disconnect();
+      await app.close();
+    }
+  });
+
+  it("refuses known passwords at sign-up, asking the breach service only through the fetch it is given (CC-261)", async () => {
+    const asked = [];
+    const pwnedPasswordsFetch = async (url, init) => {
+      asked.push({ url: String(url), padding: new Headers(init.headers).get("Add-Padding") });
+      return new Response(`${"0".repeat(35)}:0\r\n`);
+    };
+    const checks = [];
+    const app = await start(freshConfig(), {
+      pwnedPasswordsFetch,
+      metrics: { ...NO_OPERATIONS_METRICS, recordPasswordCheck: (check) => checks.push(check) },
+    });
+    try {
+      const signup = (password, n) =>
+        fetch(`${app.url}/api/auth/signup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: `Riya${n}`, email: `riya${n}@example.com`, password }),
+        });
+
+      const common = await signup("Password1", 1);
+      const fine = await signup("correct horse battery", 2);
+
+      expect(common.status).toBe(400);
+      expect((await common.json()).error.details).toEqual({ field: "password" });
+      expect(fine.status).toBe(201);
+      expect(asked).toEqual([
+        {
+          url: expect.stringMatching(/^https:\/\/api\.pwnedpasswords\.com\/range\/[0-9A-F]{5}$/),
+          padding: "true",
+        },
+      ]);
+      expect(checks).toEqual([{ outcome: "common" }, { outcome: "clear" }]);
+    } finally {
       await app.close();
     }
   });
