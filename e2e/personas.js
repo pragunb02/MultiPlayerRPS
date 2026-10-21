@@ -51,3 +51,17 @@ export function longNameAccount(options) {
   const tag = account.username.slice("riya_".length);
   return { ...account, username: `${"W".repeat(10)}${tag}`, email: `w.${tag}@example.com` };
 }
+
+/**
+ * Stress data for the layout probe (CC-154), for fixture pages and for text a test puts on a screen itself. The
+ * longest name is the sign-up maximum in the widest letter, with no space to break at (a real account with such a
+ * name comes from `longNameAccount`). The Hinglish line is long, as a player's line or our two-language copy can be
+ * (CC-332). The big number is six digits, as an XP total or a rank reaches (`inflateNumbers` in layoutProbe.js puts
+ * it on a real screen). All made up.
+ */
+export const STRESS = Object.freeze({
+  longestName: "W".repeat(20),
+  hinglish:
+    "Arre yaar, kal raat wala match toh ekdum zabardast tha, chalo ek aur round khelte hain, is baar main hi jeetunga, pakka!",
+  bigNumber: "888,888",
+});
