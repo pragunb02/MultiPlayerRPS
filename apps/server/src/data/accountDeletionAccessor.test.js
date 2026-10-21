@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInMemoryAccountDeletionDao } from "../testing/inMemoryAccountDeletionDao.js";
-import { createMemoryStoreSessionDao } from "../testing/memoryStoreSessionDao.js";
-import { createAccountDeletionAccessor, createSessionAccessor } from "./accountDeletionAccessor.js";
+import { createAccountDeletionAccessor } from "./accountDeletionAccessor.js";
 
 const AT = Date.UTC(2026, 9, 18, 10);
 const PLAYER = "user_0123456789abcdef01234567";
@@ -47,29 +46,5 @@ describe("accountDeletionAccessor", () => {
 
   it("fails fast without its DAO", () => {
     expect(() => createAccountDeletionAccessor({})).toThrow(TypeError);
-  });
-});
-
-describe("sessionAccessor", () => {
-  it("removes every session of a player", async () => {
-    const removed = [];
-    const sessions = createSessionAccessor({
-      sessionDao: { deleteByPlayer: async (playerId) => removed.push(playerId) },
-    });
-
-    await sessions.removePlayer(PLAYER);
-
-    expect(removed).toEqual([PLAYER]);
-  });
-
-  it("works over the memory store double", async () => {
-    const store = { all: (done) => done(null, {}), destroy: (sid, done) => done() };
-    const sessions = createSessionAccessor({ sessionDao: createMemoryStoreSessionDao({ store }) });
-
-    expect(await sessions.removePlayer(PLAYER)).toBe(0);
-  });
-
-  it("fails fast without its DAO", () => {
-    expect(() => createSessionAccessor({})).toThrow(TypeError);
   });
 });

@@ -135,6 +135,8 @@ export function fakeApi(overrides = {}) {
     login: vi.fn(),
     changePassword: vi.fn().mockResolvedValue(undefined),
     signOutOtherDevices: vi.fn().mockResolvedValue(undefined),
+    getDevices: vi.fn().mockResolvedValue([]),
+    signOutDevice: vi.fn().mockResolvedValue(undefined),
     getAccount: vi.fn().mockResolvedValue({ username: "Riya", createdAt: 0, ageGroup: "unknown" }),
     setBirthYear: vi.fn(),
     // A minor's flags, as an account of unknown age gets them (CC-152). Tests of an adult give their own.

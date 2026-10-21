@@ -86,6 +86,28 @@ describe("api client", () => {
     ]);
   });
 
+  it("lists the signed-in devices and signs one out by its device id (CC-262)", async () => {
+    const device = {
+      id: "AAAAAAAAAAAAAAAAAAAAAA",
+      browser: "Chrome",
+      system: "Android",
+      signedInDay: "2026-10-21",
+      lastSeenDay: "2026-10-21",
+      current: false,
+    };
+    const listed = respond(200, { devices: [device] });
+    const removed = vi.fn().mockResolvedValue({ status: 204, ok: true });
+
+    expect(await createApiClient({ fetchImpl: listed }).getDevices()).toEqual([device]);
+    expect(await createApiClient({ fetchImpl: removed }).signOutDevice("a/b")).toBeUndefined();
+
+    expect(listed.mock.calls[0][0]).toBe("/api/auth/devices");
+    expect(removed.mock.calls[0]).toEqual([
+      "/api/auth/devices/a%2Fb",
+      expect.objectContaining({ method: "DELETE" }),
+    ]);
+  });
+
   it("sends JSON bodies", async () => {
     const fetchImpl = respond(200, { identity: { id: "user_x" } });
 

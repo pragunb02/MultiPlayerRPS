@@ -72,6 +72,15 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
       await request("POST", "/auth/sign-out-others");
     },
     /**
+     * The account's signed-in devices, this one first: `{ id, browser, system, signedInDay, lastSeenDay, current }`
+     * each, with India days (CC-262). The id is a device id, never a session id.
+     */
+    getDevices: async () => (await request("GET", "/auth/devices")).devices,
+    /** Signs one other device of the account out at once (CC-262). */
+    signOutDevice: async (deviceId) => {
+      await request("DELETE", `/auth/devices/${encodeURIComponent(deviceId)}`);
+    },
+    /**
      * The signed-in player's own account: username, when it was made, the birth year if stated, and the age group
      * it gives (CC-152).
      */

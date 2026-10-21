@@ -4,7 +4,7 @@ import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { AppError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
 import { createLoginThrottle, LOGIN_THROTTLE } from "./loginThrottle.js";
 import { clientIpKey, createRateLimit } from "./rateLimits.js";
-import { establishAccountSession, requireIdentity } from "./session.js";
+import { establishAccountSession, newDevice, requireIdentity, userAgentOf } from "./session.js";
 
 const MINUTE_MS = 60 * 1000;
 
@@ -113,7 +113,12 @@ export function createAuthRoutes({
   async function signIn(req, res, { identity, sessionVersion }, status) {
     const previous = req.session.identity;
     const previousSessionId = previous === undefined ? "" : req.sessionID;
-    await establishAccountSession(req, { identity, sessionVersion, signedInAt: now() });
+    await establishAccountSession(req, {
+      identity,
+      sessionVersion,
+      signedInAt: now(),
+      device: newDevice(userAgentOf(req)),
+    });
     const { carriedOver } = await followIdentity(req, { previous, identity });
     if (previousSessionId !== "") {
       onSessionEnded(previousSessionId);
@@ -141,10 +146,13 @@ export function createAuthRoutes({
    */
   async function keepOnlyThisSession(req, { bump, signedInAt }) {
     const identity = requireIdentity(req.session);
+    // The same browser keeps its device under the new id, so it stays "This device" in the list (CC-262). The
+    // session guard gave every signed-in session one before any route runs.
+    const { device } = req.session;
     const fromSessionId = req.sessionID;
     renewals.begin(fromSessionId);
     const sessionVersion = await bump();
-    await establishAccountSession(req, { identity, sessionVersion, signedInAt });
+    await establishAccountSession(req, { identity, sessionVersion, signedInAt, device });
     onOtherSessionsEnded({ playerId: identity.id, fromSessionId, toSessionId: req.sessionID });
   }
 

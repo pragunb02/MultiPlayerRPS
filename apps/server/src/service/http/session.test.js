@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { hasPlayerIdShape } from "../../models/playerIdShape.js";
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
 import {
   createSessionCheck,
@@ -9,6 +10,8 @@ import {
   requireIdentity,
   createSessionRenewals,
   createRenewedSessionRelease,
+  newDevice,
+  userAgentOf,
   SESSION_ABSOLUTE_LIFETIME_MS,
   SESSION_END_REASONS,
 } from "./session.js";
@@ -17,6 +20,9 @@ const GUEST = { kind: "guest", id: "guest_123e4567-e89b-12d3-a456-426614174000",
 const USER = { kind: "user", id: "user_0123456789abcdef01234567", displayName: "Riya" };
 const DAY = 24 * 60 * 60 * 1000;
 const T0 = Date.UTC(2026, 9, 17);
+const ANDROID_CHROME =
+  "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36";
+const PHONE = Object.freeze({ id: "AAAAAAAAAAAAAAAAAAAAAA", browser: "Chrome", system: "Android" });
 
 describe("requireIdentity", () => {
   it("returns a validated, frozen copy of the stored identity", () => {
@@ -74,9 +80,32 @@ describe("establishAccountSession (CC-116)", () => {
   it("stores the identity with the account's session version and the moment of signing in", async () => {
     const req = requestWithStore();
 
-    await establishAccountSession(req, { identity: USER, sessionVersion: 3, signedInAt: T0 });
+    await establishAccountSession(req, { identity: USER, sessionVersion: 3, signedInAt: T0, device: PHONE });
 
-    expect(req.session).toMatchObject({ identity: USER, sessionVersion: 3, signedInAt: T0 });
+    expect(req.session).toMatchObject({ identity: USER, sessionVersion: 3, signedInAt: T0, device: PHONE });
+  });
+});
+
+describe("newDevice (CC-262)", () => {
+  it("gives a random id and the coarse browser and system of the user agent, nothing else", () => {
+    const first = newDevice(ANDROID_CHROME);
+    const second = newDevice(ANDROID_CHROME);
+
+    expect(first).toEqual({
+      id: expect.stringMatching(/^[A-Za-z0-9_-]{22}$/),
+      browser: "Chrome",
+      system: "Android",
+    });
+    expect(second.id).not.toBe(first.id);
+    expect(hasPlayerIdShape(first.id)).toBe(false);
+    expect(Object.isFrozen(first)).toBe(true);
+  });
+});
+
+describe("userAgentOf (CC-262)", () => {
+  it("reads the user agent, and is empty when the request sent none", () => {
+    expect(userAgentOf({ headers: { "user-agent": ANDROID_CHROME } })).toBe(ANDROID_CHROME);
+    expect(userAgentOf({ headers: {} })).toBe("");
   });
 });
 
@@ -248,6 +277,7 @@ describe("createSessionGuard (CC-116)", () => {
           done();
         },
       },
+      headers: { "user-agent": ANDROID_CHROME },
       log: { info: vi.fn() },
     };
     return req;
@@ -289,7 +319,7 @@ describe("createSessionGuard (CC-116)", () => {
 
   it("lets a session that may be used through unchanged", async () => {
     const { middleware, onSessionEnded } = guard(async () => {});
-    const req = request({ identity: USER, sessionVersion: 0, signedInAt: T0 - DAY });
+    const req = request({ identity: USER, sessionVersion: 0, signedInAt: T0 - DAY, device: PHONE });
     const next = vi.fn();
 
     await middleware(req, {}, next);
@@ -297,7 +327,40 @@ describe("createSessionGuard (CC-116)", () => {
     expect(next).toHaveBeenCalledWith();
     expect(req.session.identity).toEqual(USER);
     expect(req.session.signedInAt).toBe(T0 - DAY);
+    expect(req.session.device).toBe(PHONE);
     expect(onSessionEnded).not.toHaveBeenCalled();
+  });
+
+  it("gives a signed-in session from before CC-262 its device, from this request's user agent", async () => {
+    const { middleware } = guard(async () => {});
+    const req = request({ identity: USER, sessionVersion: 0, signedInAt: T0 - DAY });
+
+    await middleware(req, {}, vi.fn());
+
+    expect(req.session.device).toEqual({ id: expect.any(String), browser: "Chrome", system: "Android" });
+  });
+
+  it("gives no device to a guest, or to a session it is about to end", async () => {
+    const { middleware: lets } = guard(async () => {});
+    const { middleware: ends } = guard(signedOutCheck);
+    const asGuest = request({ identity: GUEST });
+    const signedOut = request({ identity: USER, sessionVersion: 0 });
+
+    await lets(asGuest, {}, vi.fn());
+    await ends(signedOut, {}, vi.fn());
+
+    expect(asGuest.session.device).toBeUndefined();
+    expect(signedOut.session.device).toBeUndefined();
+  });
+
+  it("gives no device to a renewing session let through by its grace", async () => {
+    const { middleware, renewals } = guard(signedOutCheck);
+    renewals.begin("old-session");
+    const req = request({ identity: USER, sessionVersion: 0, signedInAt: T0 });
+
+    await middleware(req, {}, vi.fn());
+
+    expect(req.session.device).toBeUndefined();
   });
 
   it("stamps a signed-in session from before CC-116 with now, so its 90 days start today", async () => {

@@ -58,6 +58,38 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-081 — Signed-in devices: a random device id per session, a coarse browser and system, no place, and sign out by deleting the session
+
+- **Status:** Accepted · 2026-10-21 ([CC-262](tickets/CC-262.md), research there). Decided by the coordinator in the
+  build brief. Extends ADR-030 (session lifetime and revocation).
+- **Context.** "Sign out other devices" (CC-116) ends every other session at once. A player who lost one phone could
+  not see where they were signed in or end only that one. lichess, GitHub and Google list sessions with a place and
+  end them one by one.
+- **Decision.**
+  1. **What a row shows.** A coarse browser and system from closed lists ("Chrome on Android"), read from the user
+     agent at sign-in by our own small reader (`service/http/userAgentDevice.js`, no dependency), the sign-in day,
+     the last-seen day (India days) and "This device". No version is kept.
+  2. **No place and no IP address**, for privacy (ADR-034 spirit). The board's "rough place" is dropped: it needs the
+     address and a lookup database, and it says where the player was.
+  3. **A random device id per session**, 16 bytes in base64url, stored in the session as `device: { id, browser,
+system }`. It is the only name the browser gets for a session. A session id is never sent. Sign-in makes a new
+     one. A password change or "sign out other devices" keeps it under the new session id, so the browser stays
+     "This device". A session signed in before this gets its device on its next request.
+  4. **Last seen** is read from the store's expiry minus the cookie's lifetime, which the store rewrites at most once
+     an hour. Nothing new is written on a visit.
+  5. **Signing one out** (`DELETE /api/auth/devices/:deviceId`) deletes only that session from the store, at once,
+     and cuts its sockets (`gateway.disconnectSession`). Only the owner's own sessions that may still be used are
+     listed or removed: another account's device id, or one already signed out, answers 404. The device in use is
+     refused (400): the normal log out signs it out. Deleting is safe because nothing writes to a signed-in session
+     after it has its device, so a request of that device still on its way only touches the session, which never
+     puts it back. Code that changes a signed-in session later must keep that true or record the device instead.
+  6. **Listing** reads the player's sessions by a new index on `session.identity.id`, and leaves out sessions whose
+     version is no longer the account's (signed out by CC-116, ADR-030) or older than 90 days.
+- **Consequences.** A device can be ended alone and at once, with no new collection and no new dependency. The store
+  now holds a coarse browser and system for each signed-in session (DATA.md). A socket handshake that read a session
+  just before it was deleted can still connect, and is cut at its next reconnect. No feature flag: like CC-116's
+  buttons this is a security control (raised with the coordinator).
+
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 
 - **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner

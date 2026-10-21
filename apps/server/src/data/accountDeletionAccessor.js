@@ -60,17 +60,3 @@ export function createAccountDeletionAccessor({ accountDeletionDao }) {
     isLegacyClosed: (legacyId) => accountDeletionDao.isLegacyClosed(legacyId),
   });
 }
-
-/**
- * Stored sessions, by who they belong to (CC-035).
- *
- * @param {{ sessionDao: { deleteByPlayer: (playerId: string) => Promise<number> } }} deps
- */
-export function createSessionAccessor({ sessionDao }) {
-  assertDefined(sessionDao, "sessionDao");
-
-  return Object.freeze({
-    /** @param {string} playerId @returns {Promise<number>} sessions removed */
-    removePlayer: (playerId) => sessionDao.deleteByPlayer(playerId),
-  });
-}
