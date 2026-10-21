@@ -89,6 +89,7 @@ function ForWhomDialog({ room, action, outcomeIf, onClose, onMoveAs }) {
     <Modal
       surface="dialog.pass_and_play"
       open
+      destructive
       title={confirm.title}
       onClose={onClose}
       actions={
@@ -100,6 +101,7 @@ function ForWhomDialog({ room, action, outcomeIf, onClose, onMoveAs }) {
             <Button
               key={seat.playerId}
               control={`${action.control}.as_${index + 1}`}
+              variant="danger"
               onClick={() => {
                 onClose();
                 onMoveAs(seat.playerId, intent.move);

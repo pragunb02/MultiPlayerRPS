@@ -1,41 +1,18 @@
 /* Achievements in the arcade look (CC-087): medals by tier, a tier-coloured edge once unlocked, XP-gradient meters. */
-.card {
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-6);
-  display: grid;
-  gap: var(--space-3);
-}
-.heading {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 800;
-}
 .summary {
   margin: 0;
-  justify-self: start;
+  align-self: flex-start;
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
   background: var(--color-surface-raised);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
 }
 .muted {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
-}
-.problem {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: start;
-}
-.problem p {
-  margin: 0;
 }
 .grid {
   list-style: none;
@@ -78,11 +55,11 @@
 }
 .name {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 .tier {
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--tier);
@@ -97,11 +74,11 @@
 }
 .unlockedAt {
   color: var(--color-success);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .count {
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 /* Locked: a dashed, untinted card and a grey medal; the words ("Locked.", the count) carry the meaning. */
 .locked {

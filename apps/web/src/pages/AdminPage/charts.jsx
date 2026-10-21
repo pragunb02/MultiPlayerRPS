@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
 import { downloadCsv, toCsv } from "../../lib/csv.js";
 import { csvValue, drawable, FEWER_THAN_MIN, FORMATS, formatCount, WEEKDAYS } from "./format.js";
 import styles from "./charts.module.css";
@@ -59,21 +60,34 @@ export function DataTable({ caption, columns, rows }) {
 }
 
 /**
- * One chart or table of the console: a heading, an optional note, the picture, the numbers as a table (open
- * from the start when `tableOnly`) and a button that saves them as CSV.
+ * One chart or table of the console, a titled section of its page (CC-323): a heading, what is counted and over
+ * which days, an optional note, the picture, the numbers as a table (open from the start when `tableOnly`) and a
+ * button that saves them as CSV. A table with no rows says so instead of drawing an empty table. A chart's own
+ * summary says when it has nothing to show.
  *
  * @param {{
  *   id: string,
  *   title: string,
+ *   unit: string,
  *   note?: string,
  *   columns: ReadonlyArray<Column>,
  *   rows: ReadonlyArray<any>,
  *   range: { from: string, to: string },
  *   tableOnly?: boolean,
  *   children?: import("react").ReactNode,
- * }} props  `id` names the CSV file and the export button
+ * }} props  `id` names the CSV file and the export button. `unit`: what each number counts, such as "players"
  */
-export function ChartFigure({ id, title, note = "", columns, rows, range, tableOnly = false, children }) {
+export function ChartFigure({
+  id,
+  title,
+  unit,
+  note = "",
+  columns,
+  rows,
+  range,
+  tableOnly = false,
+  children,
+}) {
   const titleId = useId();
   const exportCsv = () =>
     downloadCsv({
@@ -87,11 +101,11 @@ export function ChartFigure({ id, title, note = "", columns, rows, range, tableO
       }),
     });
   return (
-    <figure className={styles.figure} aria-labelledby={titleId}>
+    <Card as="figure" className={styles.figure} aria-labelledby={titleId}>
       <div className={styles.head}>
-        <h3 id={titleId} className={styles.title}>
+        <h2 id={titleId} className={styles.title}>
           {title}
-        </h3>
+        </h2>
         {/* The name starts with the words on screen and says which numbers it saves. */}
         <Button
           control={`admin.export.${id}`}
@@ -102,8 +116,13 @@ export function ChartFigure({ id, title, note = "", columns, rows, range, tableO
           Export CSV
         </Button>
       </div>
+      <p className={styles.window}>
+        In {unit}, from {range.from} to {range.to}, India time.
+      </p>
       {note !== "" && <p className={styles.note}>{note}</p>}
-      {tableOnly ? (
+      {tableOnly && rows.length === 0 ? (
+        <p className={styles.empty}>Nothing yet in this period.</p>
+      ) : tableOnly ? (
         <DataTable caption={title} columns={columns} rows={rows} />
       ) : (
         <>
@@ -114,7 +133,7 @@ export function ChartFigure({ id, title, note = "", columns, rows, range, tableO
           </details>
         </>
       )}
-    </figure>
+    </Card>
   );
 }
 

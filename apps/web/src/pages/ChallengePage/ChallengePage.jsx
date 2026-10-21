@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { CHALLENGE_STATES, getGame, SHARE_CHANNELS } from "@classicade/shared";
 import { paths, withShareChannel } from "../../app/paths.js";
 import { useServices } from "../../app/servicesContext.js";
@@ -7,10 +7,14 @@ import { siteOrigin } from "../../app/siteOrigin.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardMedia } from "../../components/Card/Card.jsx";
 import { CHALLENGE_COPY } from "../../components/Challenges/challengeCopy.js";
 import { useChallengeInbox } from "../../components/Challenges/challengesContext.js";
+import { Field } from "../../components/Field/Field.jsx";
+import { PageHeader } from "../../components/Page/Page.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { Bilingual } from "../../components/Profile/Bilingual.jsx";
+import { EmptyState, ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { WhatsAppLink } from "../../components/WhatsAppLink/WhatsAppLink.jsx";
 import { useAction } from "../../hooks/useAction.js";
@@ -29,31 +33,44 @@ const hoursLeft = (expiresAt) => {
   return `Open for ${hours} more ${hours === 1 ? "hour" : "hours"}.`;
 };
 
+/** The invitation art across the top of a challenge's card, edge to edge. */
+function InviteMedia() {
+  return (
+    <CardMedia className={styles.media}>
+      <InviteArt className={styles.art} />
+    </CardMedia>
+  );
+}
+
 /**
- * A challenge that is over, or a link that leads nowhere: honest about why, with the quickest ways to play anyway.
- * A block is never told apart: the server shows it as expired (ADR-053).
+ * A challenge that is over, or a link that leads nowhere: the shared dead end (CC-323), honest about why, with the
+ * quickest way to play anyway. A block is never told apart: the server shows it as expired (ADR-053).
  */
 function Ended({ title, copy, gameId }) {
   return (
     <section className={styles.page}>
       <PageTitle>{title}</PageTitle>
-      <div className={styles.card}>
-        <h1 className={styles.heading}>{title}</h1>
-        <Bilingual copy={copy} />
-        <Bilingual copy={CHALLENGE_COPY.makeYourOwn} />
-        <div className={styles.actions}>
-          <Link
-            className={styles.primaryLink}
+      <EmptyState
+        title={title}
+        headingLevel={1}
+        art={<InviteArt />}
+        action={
+          <Button
+            as="link"
             to={gameId === undefined ? paths.home() : paths.game(gameId)}
-            data-cc-control="challenge.new"
+            control="challenge.new"
           >
             {gameId === undefined ? "Pick a game" : `Play ${gameName(gameId)}`}
-          </Link>
-          <Link to={paths.home()} data-cc-control="challenge.home">
+          </Button>
+        }
+        secondary={
+          <Button as="link" to={paths.home()} control="challenge.home" variant="ghost">
             Back to the games
-          </Link>
-        </div>
-      </div>
+          </Button>
+        }
+      >
+        <Bilingual copy={copy} as="span" /> <Bilingual copy={CHALLENGE_COPY.makeYourOwn} as="span" />
+      </EmptyState>
     </section>
   );
 }
@@ -65,25 +82,14 @@ function Yours({ challenge, onChange }) {
   const page = `${siteOrigin()}${paths.challenge(challenge.id)}`;
   const copied = withShareChannel(page, SHARE_CHANNELS.COPY);
   const game = gameName(challenge.gameId);
-  const copy = useAction(
-    async () => {
-      try {
-        await navigator.clipboard.writeText(copied);
-      } catch (cause) {
-        throw new Error("Couldn't copy. Select the link and copy it", { cause });
-      }
-      toast.show("Link copied", { surface: "toast.copied", tone: "success" });
-    },
-    { id: "challenge.copy" },
-  );
   const withdraw = useAction(async () => onChange(await api.withdrawChallenge(challenge.id)), {
     id: "challenge.withdraw",
   });
   return (
     <section className={styles.page}>
       <PageTitle>{`Your ${game} challenge`}</PageTitle>
-      <div className={styles.card}>
-        <InviteArt className={styles.art} />
+      <Card as="div" variant="accent" tone="primary">
+        <InviteMedia />
         <h1 className={styles.heading}>
           <GameIcon gameId={challenge.gameId} className={styles.icon} />
           Your {game} challenge
@@ -91,10 +97,15 @@ function Yours({ challenge, onChange }) {
         <Bilingual copy={CHALLENGE_COPY.yoursIsOpen(game)} />
         <Bilingual copy={CHALLENGE_COPY.lasts} />
         <p className={styles.time}>{hoursLeft(challenge.expiresAt)}</p>
-        <label className={styles.label}>
-          <span>Challenge link</span>
-          <input readOnly value={copied} onFocus={(event) => event.target.select()} />
-        </label>
+        <Field
+          label="Challenge link"
+          kind="copy"
+          value={copied}
+          control="challenge.copy"
+          copyLabel="Copy link"
+          copyFailure="Couldn't copy. Select the link and copy it"
+          onCopied={() => toast.show("Link copied", { surface: "toast.copied", tone: "success" })}
+        />
         <div className={styles.actions}>
           <WhatsAppLink
             message={shareMessage({
@@ -103,14 +114,11 @@ function Yours({ challenge, onChange }) {
             })}
             control="challenge.whatsapp"
           />
-          <Button control="challenge.copy" variant="secondary" action={copy} doneLabel="Copied">
-            Copy link
-          </Button>
           <Button control="challenge.withdraw" variant="ghost" action={withdraw}>
             Take back
           </Button>
         </div>
-      </div>
+      </Card>
     </section>
   );
 }
@@ -118,7 +126,7 @@ function Yours({ challenge, onChange }) {
 /**
  * Someone else's open challenge: who sent it (by name only for an adult account, ADR-028.7) and Accept and play.
  * A visitor first chooses to play as a guest or to log in, as on a room link (CC-086), and nothing is made for them
- * until they choose.
+ * until they choose. The heading takes the focus for a screen reader, and as it is not a control it draws no ring.
  */
 function Theirs({ challenge }) {
   const { api, interruptions = NO_INTERRUPTIONS } = useServices();
@@ -148,8 +156,8 @@ function Theirs({ challenge }) {
   return (
     <section className={styles.page}>
       <PageTitle>{`${game} challenge`}</PageTitle>
-      <div className={styles.card}>
-        <InviteArt className={styles.art} />
+      <Card as="div" variant="accent" tone="primary">
+        <InviteMedia />
         <h1 ref={heading} tabIndex={-1} className={styles.heading}>
           <GameIcon gameId={challenge.gameId} className={styles.icon} />
           You've been challenged to {game}
@@ -159,30 +167,39 @@ function Theirs({ challenge }) {
         {visitor && <Bilingual copy={CHALLENGE_COPY.signInFirst} />}
         <div className={styles.actions}>
           {visitor ? (
-            <Button control="challenge.guest" size="lg" action={join}>
-              Play as guest
-            </Button>
-          ) : (
-            <Button control="challenge.accept" size="lg" action={accept}>
-              Accept and play
-            </Button>
-          )}
-          {visitor ? (
             <>
-              <Link to={paths.login(location.pathname)} data-cc-control="challenge.login">
+              <Button control="challenge.guest" size="lg" action={join}>
+                Play as guest
+              </Button>
+              <Button
+                as="link"
+                to={paths.login(location.pathname)}
+                control="challenge.login"
+                variant="secondary"
+              >
                 Log in
-              </Link>
-              <Link to={paths.signup(location.pathname)} data-cc-control="challenge.signup">
+              </Button>
+              <Button
+                as="link"
+                to={paths.signup(location.pathname)}
+                control="challenge.signup"
+                variant="ghost"
+              >
                 Sign up
-              </Link>
+              </Button>
             </>
           ) : (
-            <Link to={paths.home()} data-cc-control="challenge.not_now">
-              Not now
-            </Link>
+            <>
+              <Button control="challenge.accept" size="lg" action={accept}>
+                Accept and play
+              </Button>
+              <Button as="link" to={paths.home()} control="challenge.not_now" variant="ghost">
+                Not now
+              </Button>
+            </>
           )}
         </div>
-      </div>
+      </Card>
     </section>
   );
 }
@@ -196,7 +213,7 @@ function Taken({ challenge }) {
   return (
     <section className={styles.page}>
       <PageTitle>Challenge taken</PageTitle>
-      <div className={styles.card}>
+      <Card as="div" variant="accent" tone="primary">
         <h1 className={styles.heading}>Challenge taken</h1>
         <Bilingual
           copy={
@@ -204,15 +221,16 @@ function Taken({ challenge }) {
           }
         />
         <div className={styles.actions}>
-          <Link
-            className={styles.primaryLink}
+          <Button
+            as="link"
             to={paths.room(challenge.room.gameId, challenge.room.code)}
-            data-cc-control="challenge.play"
+            control="challenge.play"
+            size="lg"
           >
             Go to the game
-          </Link>
+          </Button>
         </div>
-      </div>
+      </Card>
     </section>
   );
 }
@@ -230,7 +248,7 @@ export function ChallengePage() {
     return (
       <section className={styles.page}>
         <PageTitle>Challenge</PageTitle>
-        <p aria-busy="true">Opening the challenge…</p>
+        <Skeleton label="Opening the challenge…" shape="card" />
       </section>
     );
   }
@@ -241,11 +259,8 @@ export function ChallengePage() {
     return (
       <section className={styles.page}>
         <PageTitle>Challenge</PageTitle>
-        <h1>Couldn't open this challenge</h1>
-        <p>{view.error.message}</p>
-        <Button control="challenge.retry" onClick={view.retry}>
-          Try again
-        </Button>
+        <PageHeader title="Couldn't open this challenge" />
+        <ErrorState title={view.error.message} control="challenge" onRetry={view.retry} />
       </section>
     );
   }

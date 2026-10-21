@@ -1,11 +1,14 @@
 import { useCallback } from "react";
-import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS, ROOM_STATUS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
+import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardHeader, CardMedia } from "../../components/Card/Card.jsx";
 import { MatchShell } from "../../components/MatchShell/MatchShell.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
+import { EmptyState, Skeleton } from "../../components/States/States.jsx";
 import { useMarkInGame } from "../../components/SiteRequests/inGameContext.js";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { gameView } from "../../games/registry.js";
@@ -34,19 +37,43 @@ function RoomClosed({ reason, game }) {
   return (
     <section>
       <PageTitle>Room closed</PageTitle>
-      <h1>Room closed</h1>
-      <p>{CLOSED_REASONS[reason] ?? "This room has been closed."}</p>
-      {game && (
-        <p>
-          <Link to={paths.game(game.id)} data-cc-control="room.closed.new_game">
-            Start a new {game.name} game
-          </Link>
-        </p>
-      )}
-      <Link to={paths.home()} data-cc-control="room.closed.home">
-        Back to the games
-      </Link>
+      <DeadEnd
+        title="Room closed"
+        line={CLOSED_REASONS[reason] ?? "This room has been closed."}
+        game={game}
+        controls="room.closed"
+      />
     </section>
+  );
+}
+
+/**
+ * A room the player cannot get into: the shared empty state as the page's title, why in one line, then the one way
+ * on (a new game of the same kind, when the game is known) and a quieter way back to the games (CC-323).
+ *
+ * @param {{ title: string, line: string, game: { id: string, name: string } | undefined, controls: string }} props
+ *   `controls`: the start of the two links' control names
+ */
+function DeadEnd({ title, line, game, controls }) {
+  return (
+    <EmptyState
+      title={title}
+      headingLevel={1}
+      action={
+        game && (
+          <Button as="link" to={paths.game(game.id)} control={`${controls}.new_game`}>
+            Start a new {game.name} game
+          </Button>
+        )
+      }
+      secondary={
+        <Button as="link" to={paths.home()} control={`${controls}.home`} variant={game ? "ghost" : "primary"}>
+          Back to the games
+        </Button>
+      }
+    >
+      {line}
+    </EmptyState>
   );
 }
 
@@ -121,11 +148,7 @@ export function RoomPage() {
     return (
       <section>
         <PageTitle>Can't join this room</PageTitle>
-        <h1>Can't join this room</h1>
-        <p>{session.error.message}</p>
-        <Link to={paths.home()} data-cc-control="room.error.home">
-          Back to the games
-        </Link>
+        <DeadEnd title="Can't join this room" line={session.error.message} controls="room.error" />
       </section>
     );
   }
@@ -133,7 +156,7 @@ export function RoomPage() {
     return (
       <>
         <PageTitle>{`Room ${code}`}</PageTitle>
-        <p aria-busy="true">Joining room {code}…</p>
+        <Skeleton label={`Joining room ${code}…`} shape="block" />
       </>
     );
   }
@@ -148,18 +171,12 @@ export function RoomPage() {
     return (
       <section>
         <PageTitle>{notFound ? "Room not found" : "Can't join this room"}</PageTitle>
-        <h1>{notFound ? "Room not found" : "Can't join this room"}</h1>
-        <p>{notFound ? `There is no room with the code ${code}.` : room.error.message}</p>
-        {urlGame && (
-          <p>
-            <Link to={paths.game(urlGame.id)} data-cc-control="room.error.new_game">
-              Start a new {urlGame.name} game
-            </Link>
-          </p>
-        )}
-        <Link to={paths.home()} data-cc-control="room.error.home">
-          Back to the games
-        </Link>
+        <DeadEnd
+          title={notFound ? "Room not found" : "Can't join this room"}
+          line={notFound ? `There is no room with the code ${code}.` : room.error.message}
+          game={urlGame}
+          controls="room.error"
+        />
       </section>
     );
   }
@@ -171,16 +188,21 @@ export function RoomPage() {
   const away = awayFromFullRoom(view);
   const waiting =
     away === "" ? (
-      <div className={`${styles.card} ${styles.invite}`}>
-        <InviteArt className={styles.inviteArt} />
-        <h2>Invite a friend</h2>
+      <Card as="div" variant="raised">
+        <CardMedia className={styles.inviteMedia}>
+          <InviteArt className={styles.inviteArt} />
+        </CardMedia>
+        <CardHeader title="Invite a friend" titleAs="h2" />
         <ShareRoom code={view.code} gameId={view.gameId} />
-      </div>
+      </Card>
     ) : (
-      <div className={styles.card} role="status">
-        <h2>Waiting for {away}</h2>
-        <p>{away} is away. The game starts as soon as they are back.</p>
-      </div>
+      <Card as="div" role="status">
+        <CardHeader
+          title={`Waiting for ${away}`}
+          titleAs="h2"
+          description={`${away} is away. The game starts as soon as they are back.`}
+        />
+      </Card>
     );
 
   return (

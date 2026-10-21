@@ -253,6 +253,13 @@ describe("ShareRoom", () => {
     expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3?via=copy");
     // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Link copied"));
+    // The link and its button are the shared copy field (CC-323).
+    expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveAttribute("readonly");
+    expect(screen.getByRole("textbox", { name: "Invite link" }).closest("[data-cc-field]")).toHaveAttribute(
+      "data-cc-field",
+      "copy",
+    );
+    expect(document.querySelector('[data-cc-control="invite.copy"]')).toHaveTextContent("Copy link");
   });
 
   it("offers WhatsApp with the invite and the room's link, in a new tab (CC-217)", () => {
@@ -266,6 +273,7 @@ describe("ShareRoom", () => {
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link).toHaveAttribute("data-cc-control", "invite.whatsapp");
+    expect(link).toHaveClass("button", "secondary");
   });
 
   it("builds the invite on the site's own address, not the one this page was opened at (CC-217)", () => {
@@ -361,6 +369,20 @@ describe("ShareRoom", () => {
     expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3?via=copy");
     // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Link copied"));
+  });
+
+  it("says how to copy by hand when the share sheet and the clipboard both refuse", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      share: vi.fn().mockRejectedValue(new DOMException("not allowed", "NotAllowedError")),
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+    withToasts(<ShareRoom code="AB2CD3" gameId="chess" origin="https://classicade.app" />);
+
+    await user.click(screen.getByRole("button", { name: "Share…" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't copy. Select the link and copy it");
   });
 
   it("closing the share sheet without sharing is not an error", async () => {

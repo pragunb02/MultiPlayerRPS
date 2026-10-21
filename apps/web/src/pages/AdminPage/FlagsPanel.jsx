@@ -2,6 +2,10 @@ import { useId, useState } from "react";
 import { FLAG_ROLLOUT, SITE_NAME } from "@classicade/shared";
 import { useServices } from "../../app/servicesContext.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardBody, CardHeader } from "../../components/Card/Card.jsx";
+import { Field } from "../../components/Field/Field.jsx";
+import { PageHeader, Section } from "../../components/Page/Page.jsx";
+import { ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { useAdminFlags } from "../../hooks/useAdminFlags.js";
 import { useFlag } from "../../hooks/useFlag.js";
@@ -55,33 +59,30 @@ function RolloutForm({ flag, setRollout, clearRollout }) {
 
   return (
     <form className={styles.form} onSubmit={submit} noValidate aria-label={`Rollout of ${flag.name}`}>
-      <label className={consoleStyles.rangeField}>
-        Rollout
-        <select
-          value={kind}
-          onChange={(event) => setKind(event.target.value)}
-          data-cc-control="admin.flags.kind"
-        >
-          <option value={FLAG_ROLLOUT.OFF}>Off</option>
-          <option value={FLAG_ROLLOUT.ON}>On</option>
-          <option value={SHARE}>A share of the audience</option>
-        </select>
-      </label>
+      <Field
+        label="Rollout"
+        kind="select"
+        value={kind}
+        onChange={(event) => setKind(event.target.value)}
+        data-cc-control="admin.flags.kind"
+      >
+        <option value={FLAG_ROLLOUT.OFF}>Off</option>
+        <option value={FLAG_ROLLOUT.ON}>On</option>
+        <option value={SHARE}>A share of the audience</option>
+      </Field>
       {kind === SHARE && (
-        <label className={consoleStyles.rangeField}>
-          Percentage
-          <input
-            type="number"
-            inputMode="numeric"
-            min="0"
-            max="100"
-            step="1"
-            value={percent}
-            onChange={(event) => setPercent(event.target.value)}
-            aria-invalid={problem === "" ? undefined : "true"}
-            aria-describedby={problem === "" ? undefined : `${id}-problem`}
-          />
-        </label>
+        <Field
+          label="Percentage"
+          type="number"
+          inputMode="numeric"
+          min="0"
+          max="100"
+          step="1"
+          value={percent}
+          onChange={(event) => setPercent(event.target.value)}
+          aria-invalid={problem === "" ? undefined : "true"}
+          aria-describedby={problem === "" ? undefined : `${id}-problem`}
+        />
       )}
       <Button control="admin.flags.save" type="submit" action={save} doneLabel="Saved">
         Save
@@ -133,51 +134,52 @@ function Counts({ flag, days }) {
 function Flag({ flag, days, setRollout, clearRollout }) {
   const titleId = useId();
   return (
-    <article className={styles.flag} aria-labelledby={titleId}>
-      <header className={styles.flagHeader}>
-        <h2 id={titleId} className={styles.name}>
-          {flag.name}
-        </h2>
-        {flag.overdue && <span className={styles.overdue}>Past its removal date</span>}
-      </header>
-      <p className={styles.description}>{flag.description}</p>
-      <dl className={styles.facts}>
-        <div>
-          <dt>Ticket</dt>
-          <dd>{flag.ticket}</dd>
-        </div>
-        <div>
-          <dt>For</dt>
-          <dd>{AUDIENCE_TEXT[flag.audience]}</dd>
-        </div>
-        <div>
-          <dt>Remove by</dt>
-          <dd>{flag.removeBy}</dd>
-        </div>
-        <div>
-          <dt>In code</dt>
-          <dd>{rolloutText(flag.codeRollout)}</dd>
-        </div>
-        <div>
-          <dt>Now</dt>
-          <dd>
-            {rolloutText(flag.rollout)}
-            {flag.override !== undefined && ` (set ${setAt(flag.override.updatedAt)})`}
-          </dd>
-        </div>
-        <div>
-          <dt>Success</dt>
-          <dd>{flag.success}</dd>
-        </div>
-      </dl>
-      <Counts flag={flag} days={days} />
-      <RolloutForm
-        key={JSON.stringify(flag.rollout)}
-        flag={flag}
-        setRollout={setRollout}
-        clearRollout={clearRollout}
+    <Card aria-labelledby={titleId}>
+      <CardHeader
+        id={titleId}
+        title={<span className={styles.name}>{flag.name}</span>}
+        description={flag.description}
+        aside={flag.overdue ? <span className={styles.overdue}>Past its removal date</span> : undefined}
       />
-    </article>
+      <CardBody>
+        <dl className={styles.facts}>
+          <div>
+            <dt>Ticket</dt>
+            <dd>{flag.ticket}</dd>
+          </div>
+          <div>
+            <dt>For</dt>
+            <dd>{AUDIENCE_TEXT[flag.audience]}</dd>
+          </div>
+          <div>
+            <dt>Remove by</dt>
+            <dd>{flag.removeBy}</dd>
+          </div>
+          <div>
+            <dt>In code</dt>
+            <dd>{rolloutText(flag.codeRollout)}</dd>
+          </div>
+          <div>
+            <dt>Now</dt>
+            <dd>
+              {rolloutText(flag.rollout)}
+              {flag.override !== undefined && ` (set ${setAt(flag.override.updatedAt)})`}
+            </dd>
+          </div>
+          <div>
+            <dt>Success</dt>
+            <dd>{flag.success}</dd>
+          </div>
+        </dl>
+        <Counts flag={flag} days={days} />
+        <RolloutForm
+          key={JSON.stringify(flag.rollout)}
+          flag={flag}
+          setRollout={setRollout}
+          clearRollout={clearRollout}
+        />
+      </CardBody>
+    </Card>
   );
 }
 
@@ -191,6 +193,7 @@ function Orphan({ orphan, clearRollout }) {
       <Button
         control="admin.flags.clear_orphan"
         variant="secondary"
+        size="sm"
         action={clear}
         aria-label={`Clear ${orphan.name}`}
       >
@@ -206,19 +209,16 @@ function Orphan({ orphan, clearRollout }) {
  */
 function Orphans({ orphans, clearRollout }) {
   return (
-    <section className={styles.flag} aria-labelledby="orphans-title">
-      <h2 id="orphans-title" className={styles.orphansTitle}>
-        Overrides of removed flags
-      </h2>
-      <p className={styles.description}>
-        These flags are no longer in the code, so their overrides do nothing. Clear each one.
-      </p>
+    <Section
+      title="Overrides of removed flags"
+      description="These flags are no longer in the code, so their overrides do nothing. Clear each one."
+    >
       <ul className={styles.list}>
         {orphans.map((orphan) => (
           <Orphan key={orphan.name} orphan={orphan} clearRollout={clearRollout} />
         ))}
       </ul>
-    </section>
+    </Section>
   );
 }
 
@@ -232,12 +232,14 @@ function FlagCheck() {
   const works = useAction(() => api.sendFlagSuccess("console_flag_check"), { id: "admin.flags.check" });
   if (!on) return null;
   return (
-    <div className={styles.check} role="status">
-      <p>The console_flag_check flag is on for you, so a rollout reaches this page.</p>
-      <Button control="admin.flags.check" variant="secondary" action={works} doneLabel="Counted">
-        It works
-      </Button>
-    </div>
+    <Card as="div" variant="notice" tone="info" role="status">
+      <div className={styles.check}>
+        <p>The console_flag_check flag is on for you, so a rollout reaches this page.</p>
+        <Button control="admin.flags.check" variant="secondary" action={works} doneLabel="Counted">
+          It works
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -255,55 +257,54 @@ export function FlagsPanel() {
     <section className={consoleStyles.page} aria-labelledby="flags-title">
       <title>{`Flags · Owner console · ${SITE_NAME}`}</title>
       <meta name="robots" content="noindex, nofollow" />
-      <header className={consoleStyles.header}>
-        <h1 id="flags-title">Flags</h1>
-        <p className={consoleStyles.lede}>
-          New features ship behind a flag, off at first. Turn one on for a share of players, watch its counts,
-          then turn it on for everyone and remove the flag by its date. Counts are anonymous: no player ids
-          are kept.
-        </p>
-      </header>
+      <PageHeader
+        id="flags-title"
+        title="Flags"
+        lede="New features ship behind a flag, off at first. Turn one on for a share of players, watch its counts, then turn it on for everyone and remove the flag by its date. Counts are anonymous: no player ids are kept."
+      />
       <ConsoleTabs current="flags" />
       <FlagCheck />
-      {flags.status === "loading" && (
-        <p className={consoleStyles.status} role="status">
-          Loading…
-        </p>
-      )}
+      {flags.status === "loading" && <Skeleton label="Loading the flags" shape="card" count={2} />}
       {flags.status === "error" && (
-        <div className={consoleStyles.status} role="alert">
-          <p>{flags.error.message}</p>
-          {isRetryable(flags.error) && (
-            <Button control="admin.flags.retry" variant="secondary" onClick={flags.retry}>
-              Try again
-            </Button>
-          )}
-        </div>
+        <ErrorState
+          title={flags.error.message}
+          control="admin.flags"
+          onRetry={isRetryable(flags.error) ? flags.retry : undefined}
+        />
       )}
       {flags.status === "ready" && (
         <>
           {flags.view.source === "code" && (
-            <p className={styles.warning} role="alert">
-              The database could not be read for a while, so every flag uses its rollout in code.
-            </p>
+            <Card as="div" variant="notice" tone="warning" role="alert">
+              <p className={styles.warning}>
+                The database could not be read for a while, so every flag uses its rollout in code.
+              </p>
+            </Card>
           )}
           {!flags.view.countsRead && (
-            <p className={styles.warning} role="alert">
-              The stored counts could not be read. Only counts since the last write are shown.
-            </p>
+            <Card as="div" variant="notice" tone="warning" role="alert">
+              <p className={styles.warning}>
+                The stored counts could not be read. Only counts since the last write are shown.
+              </p>
+            </Card>
           )}
-          <ol className={styles.list}>
-            {flags.view.flags.map((flag) => (
-              <li key={flag.name}>
-                <Flag
-                  flag={flag}
-                  days={flags.view.days}
-                  setRollout={flags.setRollout}
-                  clearRollout={flags.clearRollout}
-                />
-              </li>
-            ))}
-          </ol>
+          <Section
+            title="Flags in code"
+            description={`Each flag's rollout, who it is for, and its counts over the last ${flags.view.days} days.`}
+          >
+            <ol className={styles.list}>
+              {flags.view.flags.map((flag) => (
+                <li key={flag.name}>
+                  <Flag
+                    flag={flag}
+                    days={flags.view.days}
+                    setRollout={flags.setRollout}
+                    clearRollout={flags.clearRollout}
+                  />
+                </li>
+              ))}
+            </ol>
+          </Section>
           {flags.view.orphans.length > 0 && (
             <Orphans orphans={flags.view.orphans} clearRollout={flags.clearRollout} />
           )}

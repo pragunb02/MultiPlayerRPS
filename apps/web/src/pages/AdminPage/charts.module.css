@@ -1,13 +1,6 @@
 /* Owner console charts (CC-233): arcade colours from the tokens, kept calm so the numbers stay readable. */
+/* A chart is a Card (CC-323). Only its own layout lives here. */
 .figure {
-  margin: 0;
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
   min-width: 0;
 }
 .head {
@@ -19,14 +12,27 @@
 }
 .title {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 800;
+  font-size: var(--type-section-title);
 }
 .note {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
+}
+/* What each number counts and the days it covers: always said, so a number never stands alone. */
+.window {
+  margin: 0;
+  font-size: var(--type-label);
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
+}
+.empty {
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  text-align: center;
 }
 .chart {
   width: 100%;
@@ -98,7 +104,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
 }
 .legend li {
   display: inline-flex;
@@ -138,7 +144,7 @@
 }
 .details summary {
   cursor: pointer;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-primary);
 }
 .details summary:focus-visible,
@@ -153,7 +159,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
   font-variant-numeric: tabular-nums;
 }
 .table th,
@@ -166,9 +172,12 @@
 .table th:first-child {
   text-align: left;
 }
+/* A clear header row: bold, on its own surface, above a heavier line. */
 .table thead th {
-  color: var(--color-text-muted);
-  font-weight: 700;
+  background: var(--color-surface-raised);
+  border-bottom: 2px solid var(--color-border);
+  color: var(--color-text);
+  font-weight: var(--weight-bold);
 }
 .ranks {
   list-style: none;
@@ -182,7 +191,7 @@
   grid-template-columns: minmax(6rem, 12rem) 1fr auto;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
 }
 .rankLabel {
   overflow: hidden;
@@ -196,5 +205,5 @@
 }
 .rankValue {
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }

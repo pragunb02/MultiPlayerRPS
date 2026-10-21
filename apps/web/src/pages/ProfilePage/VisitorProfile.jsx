@@ -1,4 +1,3 @@
-import { Link } from "react-router";
 import { ACHIEVEMENTS } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
@@ -7,6 +6,7 @@ import { rankForLevel } from "../../art/badges/ranks.js";
 import { StreakFlame } from "../../art/effects/StreakFlame.jsx";
 import { EmptyMatches } from "../../art/illustrations/EmptyMatches.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardHeader } from "../../components/Card/Card.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -22,7 +22,13 @@ const FIRST_LEVEL = 1;
  */
 function PreviewCard() {
   return (
-    <div className={styles.card}>
+    <Card as="div" aria-labelledby="visitor-preview">
+      <CardHeader
+        id="visitor-preview"
+        titleAs="h2"
+        title="Your arcade card"
+        description="What it will show once you play. Nothing on it is earned yet."
+      />
       <div className={styles.levelRow}>
         <span className={styles.ghost} aria-hidden="true">
           <LevelBadge level={FIRST_LEVEL} size="lg" decorative />
@@ -49,7 +55,7 @@ function PreviewCard() {
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }
 
@@ -70,12 +76,18 @@ export function VisitorProfile() {
         <p className={styles.lead}>Your arcade card starts with your first game.</p>
         <p className={styles.muted}>No sign-up needed. A guest earns XP, streaks and medals too.</p>
         <div className={styles.actions}>
-          <Button control="profile.play_guest" variant="accent" size="lg" action={start}>
+          <Button control="profile.play_guest" size="lg" action={start}>
             Play as a guest
           </Button>
-          <Link to={paths.login(paths.profile())} className={styles.login} data-cc-control="profile.login">
+          <Button
+            as="link"
+            to={paths.login(paths.profile())}
+            control="profile.login"
+            variant="secondary"
+            size="lg"
+          >
             Log in
-          </Link>
+          </Button>
         </div>
       </div>
       <PreviewCard />

@@ -153,6 +153,26 @@ const tokenFor = (tokens, value, family) => {
 
 const SEE = `(${CONTRACT_FILE})`;
 
+const VAR_NAME = /var\(\s*(--[\w-]+)/g;
+
+/**
+ * The custom properties a stylesheet declares, in any rule, so a `var()` can be told apart from a typo.
+ *
+ * @param {string} css  the text of a stylesheet
+ * @returns {ReadonlySet<string>}
+ */
+export function customPropertiesIn(css) {
+  const names = new Set();
+  postcss.parse(css).walkDecls(/^--/, (decl) => names.add(decl.prop));
+  return names;
+}
+
+/** Every token name the token map holds. */
+const tokenNames = (tokens) => new Set([...tokens.values()].flat());
+
+// A width in a media query: `(max-width: 30rem)`, `(min-width: 64rem)` or the range form `(width <= 40rem)`.
+const MEDIA_WIDTH = /(?<![\w-])(?:min-|max-)?width\s*(?::|[<>]=?)\s*(-?[\d.]+[a-z]+)/gi;
+
 /**
  * The rules, in the order they are reported. Each gets `{ decl, file, tokens, report }`: one declaration, the file's
  * path from the repository root, the token values, and a function that takes a message.
@@ -200,6 +220,18 @@ export const RULES = Object.freeze([
     },
   }),
   Object.freeze({
+    name: "classicade/known-custom-properties",
+    check({ decl, known, report }) {
+      for (const [, name] of decl.value.matchAll(VAR_NAME)) {
+        if (known.has(name)) continue;
+        report(
+          `var(${name}) in ${decl.prop} names a custom property that no stylesheet declares, so the declaration ` +
+            `does nothing. Use a token from tokens.css or declare it ${SEE}.`,
+        );
+      }
+    },
+  }),
+  Object.freeze({
     name: "classicade/popup-position",
     check({ decl, file, report }) {
       if (decl.prop !== "position" || decl.value.trim() !== "fixed" || isPopupComponent(file)) return;
@@ -207,6 +239,25 @@ export const RULES = Object.freeze([
         `position: fixed draws over the page, which makes a new pop-up. Use the contract's Modal, a toast or a ` +
           `banner, or change ${CONTRACT_FILE} first and add this file to POPUP_COMPONENTS.`,
       );
+    },
+  }),
+]);
+
+/**
+ * The rules over at-rules, in the order they are reported. Each gets `{ atRule, tokens, report }`.
+ */
+export const AT_RULES = Object.freeze([
+  Object.freeze({
+    name: "classicade/breakpoint-tokens",
+    check({ atRule, tokens, report }) {
+      if (atRule.name !== "media") return;
+      for (const [, width] of atRule.params.matchAll(MEDIA_WIDTH)) {
+        if (tokenFor(tokens, width, "--breakpoint-") !== "") continue;
+        report(
+          `@media width ${width} is not a breakpoint. Use the width of a --breakpoint-* token from tokens.css ` +
+            `(a media query cannot read var()) ${SEE}.`,
+        );
+      }
     },
   }),
 ]);
@@ -230,23 +281,30 @@ const excepted = (exceptions, file, property) =>
  *   file: string,
  *   tokens: ReadonlyMap<string, ReadonlyArray<string>>,
  *   exceptions?: ReadonlyArray<{ file: string, property: string }>,
- * }} options The file's text, its path from the repository root, the token values from `readTokens`, and the
- *   exceptions to let through, TOKEN_EXCEPTIONS unless given.
+ *   known?: ReadonlySet<string>,
+ * }} options The file's text, its path from the repository root, the token values from `readTokens`, the
+ *   exceptions to let through (TOKEN_EXCEPTIONS unless given), and every custom property any stylesheet declares
+ *   (unless given, the tokens and the ones this file declares).
  * @returns {ReadonlyArray<CssTokenProblem>} Every problem, in order. Empty when the file follows the contract.
  */
-export function checkCss({ css, file, tokens, exceptions = TOKEN_EXCEPTIONS }) {
+export function checkCss({ css, file, tokens, exceptions = TOKEN_EXCEPTIONS, known }) {
   if (isTokenFile(file)) return Object.freeze([]);
+  const declared = known ?? new Set([...tokenNames(tokens), ...customPropertiesIn(css)]);
   const problems = [];
-  postcss.parse(css, { from: file }).walkDecls((decl) => {
-    if (excepted(exceptions, file, decl.prop) || isThemeOverride(file, decl.prop)) return;
+  const reporter = (node, name) => {
+    const { line, column } = node.source.start;
+    return (message) => problems.push({ line, column, rule: name, message });
+  };
+  const root = postcss.parse(css, { from: file });
+  root.walk((node) => {
+    if (node.type === "atrule") {
+      for (const rule of AT_RULES) rule.check({ atRule: node, tokens, report: reporter(node, rule.name) });
+      return;
+    }
+    if (node.type !== "decl" || excepted(exceptions, file, node.prop) || isThemeOverride(file, node.prop))
+      return;
     for (const rule of RULES) {
-      const { line, column } = decl.source.start;
-      rule.check({
-        decl,
-        file,
-        tokens,
-        report: (message) => problems.push({ line, column, rule: rule.name, message }),
-      });
+      rule.check({ decl: node, file, tokens, known: declared, report: reporter(node, rule.name) });
     }
   });
   return Object.freeze(problems);
@@ -259,15 +317,19 @@ export function checkCss({ css, file, tokens, exceptions = TOKEN_EXCEPTIONS }) {
  * @returns {number} How many problems were found, so the caller can fail the lint run.
  */
 export function checkCssFiles({ root, log }) {
-  const tokens = readTokens(readTokenFiles(root));
+  const tokenCss = readTokenFiles(root);
+  const tokens = readTokens(tokenCss);
   const files = globSync(CSS_FILES, { cwd: root, exclude: (name) => name === "node_modules" });
+  const sorted = [...files].map((name) => name.replaceAll("\\", "/")).sort();
+  const texts = new Map(sorted.map((file) => [file, readFileSync(join(root, file), "utf8")]));
+  // A custom property declared in one stylesheet may be read in another, such as a theme set on a parent.
+  const known = new Set([
+    ...customPropertiesIn(tokenCss),
+    ...[...texts.values()].flatMap((css) => [...customPropertiesIn(css)]),
+  ]);
   let count = 0;
-  for (const file of [...files].map((name) => name.replaceAll("\\", "/")).sort()) {
-    for (const { line, column, rule, message } of checkCss({
-      css: readFileSync(join(root, file), "utf8"),
-      file,
-      tokens,
-    })) {
+  for (const file of sorted) {
+    for (const { line, column, rule, message } of checkCss({ css: texts.get(file), file, tokens, known })) {
       log(`${file}:${line}:${column}  ${message}  ${rule}`);
       count += 1;
     }

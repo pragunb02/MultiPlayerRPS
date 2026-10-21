@@ -3,7 +3,9 @@ import { useParams } from "react-router";
 import { DAILY_PUZZLE_STATUS, getDailyPuzzle, isDailyPuzzleEnded } from "@classicade/shared";
 import { Button } from "../../components/Button/Button.jsx";
 import { DailyShare } from "../../components/DailyShare/DailyShare.jsx";
+import { Card } from "../../components/Card/Card.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { DAILY_KINDS } from "../../games/daily/dailyKinds.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useDailyPuzzle } from "../../hooks/useDailyPuzzle.js";
@@ -125,16 +127,18 @@ function DailyPuzzle({ kind, info, view }) {
   );
 
   if (daily.status === "loading") {
-    return <p role="status">Loading today's puzzle…</p>;
+    // The board's room is kept while the puzzle loads, so the panel beside it does not jump (CC-323).
+    return (
+      <div className={styles.layout}>
+        <Skeleton label="Loading today's puzzle" shape="board" />
+      </div>
+    );
   }
   if (daily.status === "error") {
     return (
-      <div role="alert" className={styles.failed}>
-        <p>Couldn't load today's puzzle. {daily.error.message}</p>
-        <Button control="daily.reload" variant="secondary" onClick={daily.reload}>
-          Try again
-        </Button>
-      </div>
+      <ErrorState title="Couldn't load today's puzzle." control="daily" onRetry={daily.reload}>
+        {daily.error.message}
+      </ErrorState>
     );
   }
 
@@ -154,7 +158,7 @@ function DailyPuzzle({ kind, info, view }) {
             {view.task(puzzle)} <span className={styles.rating}>Rated {puzzle.rating}</span>
           </p>
         </header>
-        <Suspense fallback={<p role="status">Loading the board…</p>}>
+        <Suspense fallback={<Skeleton label="Loading the board" shape="board" />}>
           <Board puzzle={puzzle} interactive={reason === ""} reason={reason} onMove={move.run} />
         </Suspense>
         {move.error !== undefined && (
@@ -166,7 +170,7 @@ function DailyPuzzle({ kind, info, view }) {
           {said}
         </p>
       </section>
-      <aside className={styles.panel} aria-label="Today's puzzle">
+      <Card as="aside" variant="accent" tone="chess" aria-label="Today's puzzle">
         {ended ? (
           <Result puzzle={puzzle} />
         ) : (
@@ -183,7 +187,7 @@ function DailyPuzzle({ kind, info, view }) {
           </a>
           , free for all under CC0.
         </p>
-      </aside>
+      </Card>
     </div>
   );
 }

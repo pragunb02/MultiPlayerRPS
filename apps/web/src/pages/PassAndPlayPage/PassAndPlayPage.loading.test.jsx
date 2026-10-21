@@ -34,10 +34,12 @@ describe("PassAndPlayPage when the game's engine does not load", () => {
     renderApp({ path: "/games/tic-tac-toe/pass-and-play" });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The game could not load. Check your connection and try again.",
+      "The game could not load.Check your connection and try again.",
     );
     expect(screen.getByRole("button", { name: "Start game" })).toHaveAttribute("aria-disabled", "true");
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    const retry = screen.getByRole("button", { name: "Retry" });
+    expect(retry).toHaveAttribute("data-cc-control", "pass.retry");
+    await user.click(retry);
 
     const start = screen.getByRole("button", { name: "Start game" });
     await vi.waitFor(() => expect(start).not.toHaveAttribute("aria-disabled"));

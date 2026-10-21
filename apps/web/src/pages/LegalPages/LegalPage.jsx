@@ -1,3 +1,4 @@
+import { Card } from "../../components/Card/Card.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import styles from "./LegalPage.module.css";
 
@@ -18,10 +19,12 @@ export function LegalPage({ title, intro, children }) {
     <article className={styles.page}>
       <PageTitle>{title}</PageTitle>
       <h1>{title}</h1>
-      <p role="note" className={styles.draft}>
-        <strong>Draft.</strong> This text describes how ClassiCade works today and is waiting for review by a
-        lawyer. It is not legal advice and may change before launch.
-      </p>
+      <Card as="p" variant="notice" tone="warning" role="note" className={styles.draft}>
+        <span>
+          <strong>Draft.</strong> This text describes how ClassiCade works today and is waiting for review by
+          a lawyer. It is not legal advice and may change before launch.
+        </span>
+      </Card>
       <p className={styles.updated}>Last updated {LEGAL_TEXT_DATE}</p>
       <p className={styles.intro}>{intro}</p>
       {children}

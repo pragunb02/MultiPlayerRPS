@@ -1,5 +1,4 @@
 import { useCallback, useId, useState } from "react";
-import { Link } from "react-router";
 import { PRESENCE, ROOM_REQUEST_TYPES } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
@@ -59,9 +58,9 @@ function NoAnswerChoices({ room, onNewOpponent, reason }) {
       <Button control="request.new_opponent" variant="secondary" action={onNewOpponent} reason={reason}>
         New opponent
       </Button>
-      <Link to={paths.game(room.gameId)} className={styles.link} data-cc-control="request.play_computer">
+      <Button as="link" to={paths.game(room.gameId)} control="request.play_computer" variant="ghost">
         Play vs computer
-      </Link>
+      </Button>
     </div>
   );
 }

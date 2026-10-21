@@ -86,7 +86,10 @@ describe("the friend link page (CC-052)", () => {
   it("says a link that ran out or was used is gone, and offers a game", async () => {
     renderApp({ path: PATH, api: linkApi(undefined, { getFriendLink: vi.fn().mockRejectedValue(gone()) }) });
 
-    expect(await screen.findByText("Yeh link ab nahi chalta.")).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "This friend link has ended" }),
+    ).toBeVisible();
+    expect(screen.getByText("Yeh link ab nahi chalta.")).toBeVisible();
     expect(screen.getByRole("link", { name: "Play a game" })).toHaveAttribute("href", "/");
   });
 
@@ -94,12 +97,12 @@ describe("the friend link page (CC-052)", () => {
     const down = new AppRequestError({ code: "UNKNOWN", message: "Server down", status: 500 });
     renderApp({ path: PATH, api: linkApi(undefined, { getFriendLink: vi.fn().mockRejectedValue(down) }) });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't open this friend link. Server down");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn.t open this friend link\.Server down/);
   });
 
   it("shows loading until the link's page arrives", async () => {
     renderApp({ path: PATH, api: linkApi(undefined, { getFriendLink: vi.fn(() => new Promise(() => {})) }) });
 
-    expect(await screen.findByText("Loading…")).toBeVisible();
+    expect(await screen.findByText("Loading the friend link…")).toBeVisible();
   });
 });

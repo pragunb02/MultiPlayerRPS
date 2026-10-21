@@ -61,8 +61,8 @@ the owner may change it.
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 
 - **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner
-  answered on 2026-10-20: "Accept all, with stylelint". **Point 6 (how the check runs) is pending the owner's
-  confirmation.** Amends ADR-009 (styling) and ADR-012 point 1 (tokens).
+  answered on 2026-10-20: "Accept all, with stylelint". **Point 6 (how the check runs, D4) is confirmed by the
+  owner, 2026-10-21.** Amends ADR-009 (styling) and ADR-012 point 1 (tokens).
 - **Context.** Every feature picked its own colours, pop-ups and stacking order. There were 13 raw `z-index` values,
   no `info` or player colours, and nothing written for a reviewer to point at. The shared `Modal` let Tab reach the
   page behind it (WCAG 2.4.3). The owner's premium redesign (2026-10-21) builds on this contract, so its values must
@@ -108,6 +108,31 @@ the owner may change it.
   and `--layer-menu` (CC-139's inbox panel). It moved the SVG and board font sizes to `--type-svg-*` and
   `--type-board-*` tokens instead of exceptions. The pop-up list has 18 files, seven of them announcers. "Escape waits
   while a destructive action runs" is not built.
+
+**Amended 2026-10-21 (CC-323, design lead, owner-delegated 2026-10-21).** The contract gets its components and
+the app moves onto them, outside the header (CC-324), the match stage and `App.jsx` (CC-322).
+
+1. **D4 confirmed by the owner (2026-10-21).** The check stays as stylelint-shaped rules run on PostCSS by our own
+   script until stylelint 18 drops `braces`; then each rule is wrapped with `stylelint.createPlugin`. The two new
+   rules below have the same shape.
+2. **Shared components** in `apps/web/src/components/`, their choices in `looks.js`: `Button` (primary, secondary,
+   ghost, danger, and accent for the hero; sizes sm, md, lg; `as="link"`; icon-only with a required label),
+   `Card` and its parts (surface, raised, accent, notice; media to the edges; a CSS hover lift, ADR-075's simple
+   tier), `PageHeader` and titled `Section`s, `EmptyState`, `ErrorState`, `Skeleton`, `Field` (text, select,
+   textarea, date, copy, with a count), one `Tabs` (navigation links, not an ARIA tab list). `/admin/design` draws
+   each in every state.
+3. **The owner's rules for pages (2026-10-21)** join the contract (section 3): titled sections with a heading and
+   one line, colour only with meaning and a word, data with its unit, window and empty state, aligned numbers under
+   a header row, one rhythm from the tokens.
+4. **Tokens.** Weights (`--weight-*`), `--type-page-title` and `--type-section-title`, `--target-min` and
+   `--target-touch`, four `--breakpoint-*` widths, `--elevation-hover` and danger press shadows. `--text-base` and
+   `--space-5` are replaced, not defined.
+5. **The check** also refuses a `var()` that no stylesheet declares and a media query width that is not a
+   breakpoint token, and a test refuses a CSS module class a component names but its module does not define.
+   Raw weights are not refused yet: 46 remain in the header and match stage files.
+6. **Dialogs and focus.** `Modal` takes `destructive`: a backdrop click does nothing, Escape and its buttons still
+   close it. Headings, `main` and dialogs focused by script (`tabindex="-1"`) draw no ring. Every target is at least
+   24 px, and 44 px on a touch screen.
 
 ### ADR-075 — Effects and animation stack: CSS for simple, Motion for intermediate, our own canvas module behind one effect registry for advanced
 

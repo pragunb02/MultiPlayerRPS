@@ -1,4 +1,4 @@
-/* The feedback inbox (CC-290): one card per item, the message first after its badges. */
+/* The feedback inbox (CC-290): one Card per item (CC-323), the message first after its badges. */
 .list {
   list-style: none;
   margin: 0;
@@ -7,12 +7,16 @@
   gap: var(--space-3);
 }
 .entry {
-  display: grid;
   gap: var(--space-2);
-  padding: var(--space-4);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.filters > div {
+  flex: 1 1 10rem;
 }
 .entryHeader {
   display: flex;
@@ -20,19 +24,24 @@
   align-items: center;
   gap: var(--space-2);
 }
+/* A badge says its type in words. A bug is in the danger colour, an idea in the info colour, the rest plain. */
 .badge {
   padding: 0 var(--space-2);
+  border: 1px solid transparent;
   border-radius: var(--radius-full);
   background: var(--color-surface-raised);
-  font-size: var(--text-sm);
-  font-weight: 800;
+  font-size: var(--type-label);
+  font-weight: var(--weight-heavy);
 }
 .type_bug {
-  background: var(--color-danger);
-  color: var(--color-primary-contrast);
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
 }
 .type_idea {
-  background: var(--color-primary-soft);
+  border-color: var(--color-info);
+  background: var(--color-info-soft);
+  color: var(--color-info);
 }
 .type_other {
   border: 1px solid var(--color-border);
@@ -42,7 +51,7 @@
 }
 .time {
   margin-left: auto;
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
   color: var(--color-text-muted);
 }
 /* Plain text: new lines show as typed, and a long word breaks rather than widening the page. */
@@ -56,7 +65,7 @@
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-4);
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
   color: var(--color-text-muted);
 }
 .context div {
@@ -64,7 +73,7 @@
   gap: var(--space-1);
 }
 .context dt {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .context dd {
   margin: 0;
@@ -73,17 +82,12 @@
 }
 .reply {
   margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 700;
+  font-size: var(--type-label);
+  font-weight: var(--weight-bold);
   overflow-wrap: anywhere;
 }
 .hasReply {
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
   color: var(--color-text-muted);
-}
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }

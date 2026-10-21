@@ -48,7 +48,7 @@ test.describe("feedback", () => {
 
     const message = dialog.getByRole("textbox", { name: "Message" });
     await message.fill("The invite link did not copy on my phone");
-    await expect(dialog.getByText("40 / 1000")).toBeVisible();
+    await expect(dialog.getByText("40 of 1000 characters")).toBeVisible();
     const sent = page.waitForRequest(
       (request) => request.url().endsWith("/api/feedback") && request.method() === "POST",
     );

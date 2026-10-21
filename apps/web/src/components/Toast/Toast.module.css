@@ -27,7 +27,7 @@
   padding: var(--space-3) var(--space-4);
   box-shadow: var(--shadow-md);
   max-width: 22rem;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   animation: toast-in var(--duration-base) var(--ease-out) both;
 }
 /* A tone-coloured gem in front of the message. */
@@ -72,7 +72,7 @@
   color: var(--color-primary-contrast);
   box-shadow: var(--shadow-press-small);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   text-decoration: none;
 }
 .action:hover {

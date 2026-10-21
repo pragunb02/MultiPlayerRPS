@@ -1,8 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { ANALYTICS_MAX_RANGE_DAYS, SITE_NAME } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
+import { Field } from "../../components/Field/Field.jsx";
+import { PageHeader, Sections } from "../../components/Page/Page.jsx";
+import { ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { useAnalytics } from "../../hooks/useAnalytics.js";
 import { useNow } from "../../hooks/useNow.js";
 import { isNotFound, isRetryable } from "../../lib/errors.js";
@@ -78,66 +82,68 @@ function RangePicker({ section, shown, today }) {
     navigate(paths.admin(section, draft));
   };
   return (
-    <form className={styles.range} onSubmit={submit} aria-label="Date range">
-      <label className={styles.rangeField}>
-        From
-        <input
-          type="date"
+    <Card as="form" className={styles.range} onSubmit={submit} aria-label="Date range">
+      <div className={styles.rangeFields}>
+        <Field
+          label="From"
+          kind="date"
           value={draft.from}
           max={draft.to}
           required
           onChange={change("from")}
           data-cc-control="admin.range.from"
         />
-      </label>
-      <label className={styles.rangeField}>
-        To
-        <input
-          type="date"
+        <Field
+          label="To"
+          kind="date"
           value={draft.to}
           min={draft.from}
           required
           onChange={change("to")}
           data-cc-control="admin.range.to"
         />
-      </label>
-      <label className={styles.rangeField}>
-        Group by
-        <select value={draft.bucket} onChange={change("bucket")} data-cc-control="admin.range.bucket">
+        <Field
+          label="Group by"
+          kind="select"
+          value={draft.bucket}
+          onChange={change("bucket")}
+          data-cc-control="admin.range.bucket"
+        >
           {BUCKETS.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
-        </select>
-      </label>
-      <Button control="admin.range.show" type="submit" variant="primary">
-        Show
-      </Button>
+        </Field>
+        <Button control="admin.range.show" type="submit" variant="primary">
+          Show
+        </Button>
+      </div>
       {tooLong && (
         <p className={styles.rangeError} role="alert">
           {TOO_LONG}
         </p>
       )}
       <p className={styles.presets}>
-        Last{" "}
-        {PRESETS.map((days, index) => (
-          <span key={days}>
-            {index > 0 && " · "}
-            <Link
-              to={paths.admin(section, {
-                from: addDays(today, 1 - days),
-                to: today,
-                bucket: days > 90 ? "week" : "day",
-              })}
-              data-cc-control={`admin.range.last${days}`}
-            >
-              {days} days
-            </Link>
-          </span>
+        <span className={styles.presetsLabel}>Last</span>
+        {PRESETS.map((days) => (
+          <Button
+            key={days}
+            as="link"
+            size="sm"
+            variant="ghost"
+            to={paths.admin(section, {
+              from: addDays(today, 1 - days),
+              to: today,
+              bucket: days > 90 ? "week" : "day",
+            })}
+            control={`admin.range.last${days}`}
+          >
+            {days} days
+          </Button>
         ))}
       </p>
-    </form>
+    </Card>
   );
 }
 
@@ -167,28 +173,19 @@ export function AdminPage() {
     <section className={styles.page} aria-labelledby="admin-title">
       <title>{`${tab.name} · Owner console · ${SITE_NAME}`}</title>
       <meta name="robots" content="noindex, nofollow" />
-      <header className={styles.header}>
-        <h1 id="admin-title">Owner console</h1>
-        <p className={styles.lede}>
-          Totals from the matches, sign ups and rewards the site already stores. No names, no ids, and groups
-          smaller than 5 are shown as “fewer than 5”. Days are India time.
-        </p>
-      </header>
+      <PageHeader
+        id="admin-title"
+        title="Owner console"
+        lede="Totals from the matches, sign ups and rewards the site already stores. No names, no ids, and groups smaller than 5 are shown as “fewer than 5”. Days are India time."
+      />
       <ConsoleTabs current={tab.id} range={query} />
-      {analytics.status === "loading" && (
-        <p className={styles.status} role="status">
-          Counting…
-        </p>
-      )}
+      {analytics.status === "loading" && <Skeleton label="Counting the totals" shape="tile" count={4} />}
       {analytics.status === "error" && (
-        <div className={styles.status} role="alert">
-          <p>{analytics.error.message}</p>
-          {isRetryable(analytics.error) && (
-            <Button control="admin.retry" variant="secondary" onClick={analytics.retry}>
-              Try again
-            </Button>
-          )}
-        </div>
+        <ErrorState
+          title={analytics.error.message}
+          control="admin"
+          onRetry={isRetryable(analytics.error) ? analytics.retry : undefined}
+        />
       )}
       {analytics.status !== "loading" && (
         <RangePicker
@@ -205,9 +202,9 @@ export function AdminPage() {
             {new Date(report.generatedAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })},
             refreshed every 5 minutes.
           </p>
-          <div className={styles.body}>
+          <Sections>
             <Page report={report} />
-          </div>
+          </Sections>
         </>
       )}
     </section>

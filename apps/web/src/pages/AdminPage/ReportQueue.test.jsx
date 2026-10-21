@@ -237,7 +237,7 @@ describe("the report queue's other states (CC-044)", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("The network failed");
-    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    await userEvent.click(within(alert).getByRole("button", { name: "Retry" }));
 
     expect(await screen.findAllByRole("article")).toHaveLength(1);
   });

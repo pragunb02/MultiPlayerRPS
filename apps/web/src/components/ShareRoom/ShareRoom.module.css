@@ -9,7 +9,7 @@
   align-items: center;
   gap: var(--space-3);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   color: var(--color-text-muted);
 }
 /* The code as an arcade ticket: big, spaced, on a dashed stub. */
@@ -22,22 +22,6 @@
   border-radius: var(--radius-md);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-}
-.label {
-  display: grid;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-.label input {
-  font: inherit;
-  font-weight: 400;
-  padding: var(--space-2) var(--space-3);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
 }
 .buttons {
   display: flex;
