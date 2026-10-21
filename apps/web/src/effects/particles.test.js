@@ -23,7 +23,7 @@ function fakeCanvas() {
 }
 
 const particle = (index) => [10, 20, 100, 0, 0, 0, 8, index, index % 4];
-const drawn = (calls) => calls.filter(([name]) => name === "fillRect" || name === "arc").length;
+const drawn = (calls) => calls.filter(([name]) => ["fillRect", "arc", "moveTo"].includes(name)).length;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
@@ -75,15 +75,23 @@ describe("the particle module (CC-328)", () => {
     run(second, { count: 2, durationMs: 100, inks: ["#fff"], spawn: () => [1, 2, 0, 0, 0, 0, 8, 0, 0] });
     vi.advanceTimersByTime(17);
 
-    expect(second.calls.filter(([name]) => name === "setTransform").at(-1)).toEqual([
-      "setTransform",
-      2,
-      0,
-      -0,
-      2,
-      2,
-      4,
-    ]);
+    const points = second.calls.filter(([name]) => name === "moveTo" || name === "lineTo");
+    expect(points.length).toBeGreaterThan(0);
+    // Every corner is within a particle's size of (1, 2), none near the first play's (500, 500).
+    expect(points.every(([, x, y]) => Math.abs(x - 1) <= 8 && Math.abs(y - 2) <= 8)).toBe(true);
+  });
+
+  it("draws each frame as one path and one fill per ink, never one call per particle", () => {
+    const canvas = fakeCanvas();
+    const inks = ["#1", "#2", "#3", "#4", "#5"];
+    run(canvas, { count: PARTICLE_CAP, durationMs: 1200, inks, spawn: particle });
+    vi.advanceTimersByTime(17);
+    const frame = canvas.calls.slice(canvas.calls.findLastIndex(([name]) => name === "clearRect"));
+
+    expect(frame.filter(([name]) => name === "fill")).toHaveLength(inks.length);
+    expect(frame.filter(([name]) => name === "fillStyle")).toHaveLength(inks.length);
+    expect(frame.filter(([name]) => ["fillRect", "arc", "setTransform"].includes(name))).toEqual([]);
+    expect(frame.filter(([name]) => name === "moveTo").length).toBeGreaterThanOrEqual(PARTICLE_CAP);
   });
 
   it("ends by itself after its duration and clears the canvas", async () => {

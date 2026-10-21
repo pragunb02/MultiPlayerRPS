@@ -122,20 +122,49 @@ describe("the effect host (CC-328)", () => {
     await waitFor(() => expect(canvases()).toHaveLength(0));
   });
 
-  it("drops a play during a game, and stops one when a game starts", async () => {
+  it("plays every queued celebration in turn, however many wait", async () => {
+    const win = fake("win_burst");
+    const level = fake("level_up");
+    const badge = fake("achievement");
+    await renderHost({ effects: [win.entry, level.entry, badge.entry] });
+
+    let plays;
+    act(() => {
+      plays = [play("win_burst"), play("level_up"), play("achievement")];
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    await act(async () => win.scene.runs[0].finish());
+    // The second starts next, not the third: a dequeued celebration is not refused for the ones behind it.
+    await waitFor(() => expect(level.scene.runs).toHaveLength(1));
+    expect(badge.scene.start).not.toHaveBeenCalled();
+    await act(async () => level.scene.runs[0].finish());
+    await waitFor(() => expect(badge.scene.runs).toHaveLength(1));
+    await act(async () => badge.scene.runs[0].finish());
+    await expect(Promise.all(plays)).resolves.toEqual([true, true, true]);
+  });
+
+  it("plays a celebration called as a game ends, and stops one when a game starts", async () => {
+    // The result calls play in the same moment the game ends, before the host hears the game is over.
     const win = fake("win_burst");
     const view = await renderHost({ effects: [win.entry], inGame: true });
 
-    await expect(play("win_burst")).resolves.toBe(false);
+    let ending;
+    act(() => {
+      ending = play("win_burst");
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    await act(async () => win.scene.runs[0].finish());
+    await expect(ending).resolves.toBe(true);
+
     view.setInGame(false);
     let played;
     act(() => {
       played = play("win_burst");
     });
-    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    await waitFor(() => expect(win.scene.runs).toHaveLength(2));
     view.setInGame(true);
     await expect(played).resolves.toBe(false);
-    expect(win.scene.runs[0].stop).toHaveBeenCalled();
+    expect(win.scene.runs[1].stop).toHaveBeenCalled();
     expect(canvases()).toHaveLength(0);
   });
 
@@ -339,4 +368,34 @@ describe("the event theme at India midnight (CC-328)", () => {
     await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"), { timeout: 3000 });
     expect(api.getFlags).toHaveBeenCalledWith(["event_diwali_2026"]);
   });
+
+  it("keeps looking when its timer fires early, and looks again after each one", async () => {
+    // The clock stands still 300 ms before midnight, so the first timer finds the same day; then it moves on.
+    let clock = Date.parse("2026-11-05T23:59:59.700+05:30");
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
+    await renderHost({ effects: EFFECTS, now: () => clock, api });
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(themeAttribute()).toBeUndefined();
+    clock = Date.parse("2026-11-06T00:00:01+05:30");
+    await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"), { timeout: 3000 });
+  });
+
+  it.each([
+    ["the tab is shown again", () => document.dispatchEvent(new Event("visibilitychange"))],
+    ["the window gets the focus", () => window.dispatchEvent(new Event("focus"))],
+  ])(
+    "takes the theme down after its window when %s, though the tab slept through midnight",
+    async (_, wake) => {
+      let clock = Date.parse("2026-11-11T23:00:00+05:30");
+      const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
+      await renderHost({ effects: EFFECTS, now: () => clock, api });
+      await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"));
+
+      // A sleeping tab's timer never fired; the morning after Bhai Dooj it wakes.
+      clock = Date.parse("2026-11-12T09:00:00+05:30");
+      act(wake);
+      await waitFor(() => expect(themeAttribute()).toBeUndefined());
+    },
+  );
 });

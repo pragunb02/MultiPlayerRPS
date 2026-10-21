@@ -62,6 +62,14 @@ describe("the effect gates (CC-328)", () => {
     expect(thirds).toEqual([40, 16, 30, 20, 14]);
   });
 
+  it("keeps a theme's burst out of a game, and lets a celebration from the result through", () => {
+    expect(canPlay({ ...ALL_CLEAR, entry: DIWALI, inGame: true })).toEqual({
+      ok: false,
+      gate: GATES.IN_GAME,
+    });
+    expect(canPlay({ ...ALL_CLEAR, entry: WIN, inGame: true })).toEqual({ ok: true, particles: 120 });
+  });
+
   it("tells a low-end device by save-data, memory or cores", () => {
     expect(isLowEnd({ hardwareConcurrency: 8, deviceMemory: 8 })).toBe(false);
     expect(isLowEnd({ hardwareConcurrency: 8 })).toBe(false);
