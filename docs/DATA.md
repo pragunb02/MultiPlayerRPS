@@ -176,10 +176,10 @@ of every nightly backup.
 `apps/server/src/persistence/roomDao.js`, lifetimes in `apps/server/src/domain/rooms/roomLifetimes.js` (CC-101)
 
 1. **Holds:** the room `code`, `gameId`, `options`, `status`, `hostId`, the seats (`playerId`, `displayName`,
-   `connected`), the running game (match id, seed, the engine's full state including hidden choices, and a `log` of
-   every move and forfeit with the player id and the time), `result`, `rematch` (who asked, who declined, the name of
-   a player who left), `series` (wins per player id), `createdAt`, `lastActivityAt`, `dueAt`, `expiresAt`, and
-   `network`.
+   `connected`), the running game (match id, seed, in a rematch the `starter` player id of who moves first (CC-091),
+   the engine's full state including hidden choices, and a `log` of every move and forfeit with the player id and the
+   time), `result`, `rematch` (who asked, who declined, the name of a player who left), `series` (wins per player
+   id), `createdAt`, `lastActivityAt`, `dueAt`, `expiresAt`, and `network`.
 2. **`network`** is a keyed hash of the host's network address: HMAC-SHA-256, cut to 16 hex characters
    (`apps/server/src/utils/networkKey.js`, CC-107). It lets the server count open rooms per network. The address
    itself is never stored. The key is a random key that the server makes in its memory for each UTC day (CC-249).
@@ -227,10 +227,10 @@ of every nightly backup.
 
 `apps/server/src/persistence/matchDao.js`
 
-1. **Holds:** per finished match: `matchId`, `roomCode`, `gameId`, `options`, `seed`, `players` (`playerId`,
-   `displayName`), `log` (every move and forfeit with the player id and the time, the same as the room's), `result`
-   (result, winners, reason), `startedAt`, `endedAt`, `schemaVersion`, and `credit` (whom the match does not count
-   for and why, CC-095).
+1. **Holds:** per finished match: `matchId`, `roomCode`, `gameId`, `options`, `seed`, `starter` (in a rematch, the
+   player id of who moved first, CC-091), `players` (`playerId`, `displayName`), `log` (every move and forfeit with
+   the player id and the time, the same as the room's), `result` (result, winners, reason), `startedAt`, `endedAt`,
+   `schemaVersion`, and `credit` (whom the match does not count for and why, CC-095).
 2. **Personal data:** pseudonymous. The move times describe how a person played.
 3. **Who can read it:** the players of that match (`GET /api/matches`, `GET /api/matches/:matchId`, participants
    only). Every player, the reader too, is named there by a match player id, a keyed hash of the match and the
