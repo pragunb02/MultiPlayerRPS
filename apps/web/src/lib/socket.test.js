@@ -31,7 +31,11 @@ function deferredLoad() {
         calls.push({ resolve, reject });
       }),
   );
-  return { load, finish: (io) => calls.at(-1).resolve(io), fail: () => calls.at(-1).reject(new Error("404")) };
+  return {
+    load,
+    finish: (io) => calls.at(-1).resolve(io),
+    fail: () => calls.at(-1).reject(new Error("404")),
+  };
 }
 
 /** A client whose Socket.IO is already downloaded, once `needNow` was called. */
@@ -55,6 +59,16 @@ describe("socket client", () => {
       expect.objectContaining({ autoConnect: false, transports: ["websocket"] }),
     );
     expect(io.socket.connect).not.toHaveBeenCalled();
+  });
+
+  it("gives Socket.IO options it may write to, as it does while it sets itself up", async () => {
+    const io = fakeIo(vi.fn().mockResolvedValue({ ok: true, data: {} }));
+    io.connect.mockImplementation((_url, options) => {
+      options.path = "/socket.io";
+      return io.socket;
+    });
+
+    await expect((await loadedClient(io)).request("room:create", {})).resolves.toEqual({});
   });
 
   it("resolves a request with the acknowledgement's data", async () => {

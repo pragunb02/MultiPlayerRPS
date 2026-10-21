@@ -39,11 +39,6 @@ const services = {
   download: createDownload({ document, URL: window.URL }),
 };
 removeServerHead(document);
-// Socket.IO is not in the first download (CC-333). A page that needs the connection to show anything downloads it
-// now, alongside its own code and the session request, so it connects as soon as before. Others wait for idle below.
-if (needsSocketNow(window.location.pathname)) {
-  services.socket.needNow();
-}
 
 // A page that downloads on demand, opened by its address, is fetched before the first render, as the router's own
 // lazy routes do. The first render then shows the page itself and not its skeleton, so nothing moves (CC-322).
@@ -51,6 +46,11 @@ if (needsSocketNow(window.location.pathname)) {
 preloadRouteFor(window.location.pathname).then(() => {
   // Before the first render, which takes the waking up screen of index.html away (CC-232).
   noteWaitingScreen({ document, window });
+  // Socket.IO is not in the first download (CC-333). A page that needs the connection to show anything asks for it
+  // now: after its own code, so the two do not share the line, and while the session is asked.
+  if (needsSocketNow(window.location.pathname)) {
+    services.socket.needNow();
+  }
   createRoot(document.getElementById("root")).render(
     <StrictMode>
       <BrowserRouter>

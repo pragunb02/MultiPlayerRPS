@@ -6,7 +6,8 @@ const ACK_TIMEOUT_MS = 8_000;
 const RETRY_MS = 2_000;
 /** Socket.IO's reason when the server disconnected the socket on purpose. It does not reconnect after it. */
 const SERVER_DISCONNECT = "io server disconnect";
-const OPTIONS = Object.freeze({ autoConnect: false, transports: ["websocket"], withCredentials: true });
+/** A new object each time: Socket.IO writes to the options it is given while it sets itself up. */
+const options = () => ({ autoConnect: false, transports: ["websocket"], withCredentials: true });
 
 /**
  * Socket.IO's client, about 16.6 kB of gzip, in its own download (CC-333). It resolves to nothing when the download
@@ -50,7 +51,7 @@ export function createSocketClient({
   const early = [];
 
   const arrived = (io) => {
-    socket = io(url, OPTIONS);
+    socket = io(url, options());
     early.splice(0).forEach(({ event, handler }) => socket.on(event, handler));
     if (wanted) socket.connect();
     return socket;
