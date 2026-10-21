@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { MatchProgressProvider } from "../components/Celebrations/MatchProgressProvider.jsx";
 import { FriendRequestToasts } from "../components/Friends/FriendRequestToasts.jsx";
@@ -7,35 +8,44 @@ import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { SaveProgressProvider } from "../components/SaveProgress/SaveProgressProvider.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
-import { AdminRoute } from "../pages/AdminPage/AdminRoute.jsx";
 import { CONSOLE_ROUTES } from "../pages/AdminPage/consolePages.js";
-import { ChallengePage } from "../pages/ChallengePage/ChallengePage.jsx";
-import { DailyPuzzlePage } from "../pages/DailyPuzzlePage/DailyPuzzlePage.jsx";
-import { FriendLinkPage } from "../pages/FriendLinkPage/FriendLinkPage.jsx";
-import { FriendsPage } from "../pages/FriendsPage/FriendsPage.jsx";
 import { HomePage } from "../pages/HomePage/HomePage.jsx";
-import { LeaderboardPage } from "../pages/LeaderboardPage/LeaderboardPage.jsx";
-import { PrivacyPage } from "../pages/LegalPages/PrivacyPage.jsx";
-import { TermsPage } from "../pages/LegalPages/TermsPage.jsx";
-import { LoginPage } from "../pages/LoginPage/LoginPage.jsx";
-import { NotFoundPage } from "../pages/NotFoundPage/NotFoundPage.jsx";
-import { PassAndPlayPage } from "../pages/PassAndPlayPage/PassAndPlayPage.jsx";
-import { PlayPage } from "../pages/PlayPage/PlayPage.jsx";
-import { ProfilePage } from "../pages/ProfilePage/ProfilePage.jsx";
-import { PublicProfilePage } from "../pages/PublicProfilePage/PublicProfilePage.jsx";
-import { RoomPage } from "../pages/RoomPage/RoomPage.jsx";
-import { SignupPage } from "../pages/SignupPage/SignupPage.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { LEGACY_ROUTES, paths, ROUTES } from "./paths.js";
+import { prefetchOnIntent } from "./routePrefetch.js";
+import {
+  AdminRoute,
+  ChallengePage,
+  DailyPuzzlePage,
+  FriendLinkPage,
+  FriendsPage,
+  LeaderboardPage,
+  LoginPage,
+  NotFoundPage,
+  PassAndPlayPage,
+  PlayPage,
+  preloadRouteFor,
+  PrivacyPage,
+  ProfilePage,
+  PublicProfilePage,
+  RoomPage,
+  SignupPage,
+  TermsPage,
+} from "./routePages.js";
 import { ServicesProvider } from "./ServicesProvider.jsx";
 
 /**
  * The app, independent of the browser entry point (router and services are passed in), so tests can render it
- * with a memory router and fake clients.
+ * with a memory router and fake clients. Every page but home downloads on demand (`routePages.js`, CC-322).
  *
  * @param {{ services: { api: object, socket: object, sound: object } }} props
  */
 export function App({ services }) {
+  // A page that downloads on demand starts downloading when a link to it is pointed at, focused or touched.
+  useEffect(
+    () => prefetchOnIntent({ document, origin: window.location.origin, preload: preloadRouteFor }),
+    [],
+  );
   return (
     <ErrorBoundary>
       <ServicesProvider services={services}>

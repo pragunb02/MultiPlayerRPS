@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi, GUEST } from "../testing/fakes.js";
 import { findUsableButton, renderApp } from "../testing/render.jsx";
+import { PlayPage } from "./routePages.js";
 
 /** The list of game cards, inside the Games section, once the catalogue has loaded. */
 const gameList = () => within(screen.getByRole("region", { name: "Games" })).findByRole("list");
@@ -128,6 +129,17 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /game over, page not found/ })).toBeInTheDocument();
+  });
+
+  it("starts downloading a game's lobby when its card's link is pointed at (CC-322)", async () => {
+    const user = userEvent.setup();
+    const preload = vi.spyOn(PlayPage, "preload");
+    renderApp();
+
+    await user.hover(within(await gameList()).getByRole("link", { name: "Chess" }));
+
+    expect(preload).toHaveBeenCalled();
+    preload.mockRestore();
   });
 
   it("offers a skip link to the main content (keyboard users)", () => {
