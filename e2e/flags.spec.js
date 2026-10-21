@@ -137,24 +137,31 @@ test.describe("event themes", () => {
 
   test("themes pass the layout probe", async ({ players }) => {
     test.setTimeout(180_000);
+    /** How far the page is wider than the window, and how many lines of the greeting are clipped. */
+    const measure = (page) =>
+      page.evaluate(() => ({
+        wider: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        clipped: [...document.querySelectorAll("[data-event-greeting], [data-event-greeting] *")].filter(
+          (node) => node.scrollWidth > node.clientWidth + 1,
+        ).length,
+      }));
     await withThemesOn(players, async () => {
+      // The same pages on a day outside every window: a theme may add nothing to their width. (Until CC-324's
+      // header lands, the header itself is wider than a 768 px window; that is not the theme's.)
+      const plain = (await players.open("visitor without a theme")).page;
       for (const theme of THEMES) {
         const { page } = await players.open(`visitor ${theme}`);
         await onThemeDay(page, theme);
         for (const path of ["/", "/games/chess"]) {
           for (const size of SIZES) {
-            await page.setViewportSize(size);
-            await page.goto(path);
+            await Promise.all([page.setViewportSize(size), plain.setViewportSize(size)]);
+            await Promise.all([page.goto(path), plain.goto(path)]);
             await expectThemeOn(page, theme);
+            await expect(plain.getByRole("heading", { level: 1 })).toBeVisible();
             const at = `${theme} on ${path} at ${size.width} × ${size.height}`;
-            const fits = await page.evaluate(() => ({
-              wider: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-              // Every line of the greeting fits its box: nothing clipped, nothing wider than it.
-              clipped: [
-                ...document.querySelectorAll("[data-event-greeting], [data-event-greeting] *"),
-              ].filter((node) => node.scrollWidth > node.clientWidth + 1).length,
-            }));
-            expect(fits, at).toEqual({ wider: 0, clipped: 0 });
+            const [themed, usual] = await Promise.all([measure(page), measure(plain)]);
+            // Every line of the greeting fits its box, and the band and the greeting widen nothing.
+            expect(themed, at).toEqual({ wider: usual.wider, clipped: 0 });
             if (path === "/") await expect(page.getByText(THEME_DAYS[theme].greeting), at).toBeVisible();
           }
         }
