@@ -5,7 +5,8 @@ import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
 
 // CC-207, the minimal CC-147: the inbox in the header lists the challenges that wait for the player.
-const T = Date.UTC(2026, 9, 20, 12);
+// Relative to today, so a challenge made "now" in a test is still open on any day the tests run.
+const T = Date.now();
 const challenge = (overrides = {}) => ({
   id: "c0000000000000000001",
   gameId: "chess",

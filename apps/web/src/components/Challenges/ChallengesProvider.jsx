@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHALLENGE_LIFETIME_MS, CHALLENGE_STATES, SOCKET_EVENTS } from "@classicade/shared";
 import { useServices } from "../../app/servicesContext.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -30,8 +30,9 @@ const knownFor = (state, who) => (state.who === who ? state.byId : {});
 /**
  * Keeps the player's challenges for the inbox and the popups (CC-139, CC-207). The inbox is read when a player is
  * known and every time the socket connects again, because a tab that was offline may have missed pushes. Each
- * `challenge:updated` push replaces what the tab knew about that challenge. A failed read keeps what the tab
- * already had: the next connection reads again, and nothing here is needed to play.
+ * `challenge:updated` push replaces what the tab knew about that challenge. A push that arrives while a read is on
+ * its way is newer than the read, so the read never undoes it. A failed read keeps what the tab already had: the
+ * next connection reads again, and nothing here is needed to play.
  *
  * @param {{ children: import("react").ReactNode }} props
  */
@@ -41,6 +42,8 @@ export function ChallengesProvider({ children }) {
   const who = identity?.id ?? "";
   const [state, setState] = useState(EMPTY);
   const [now, setNow] = useState(() => Date.now());
+  // The views this tab got since the last read of the inbox began. They are newer than what that read answers.
+  const sinceRead = useRef(new Map());
   const known = knownFor(state, who);
   // The tab looks again the moment the next challenge's time is up, so the inbox never offers one that has gone.
   const nextEnd = Math.min(
@@ -57,24 +60,32 @@ export function ChallengesProvider({ children }) {
 
   /** Keeps one view, the newest the tab got from a push or an answer. */
   const remember = useCallback(
-    (challenge) =>
-      setState((current) => {
-        return { who, byId: { ...knownFor(current, who), [challenge.id]: challenge } };
-      }),
+    (challenge) => {
+      sinceRead.current.set(challenge.id, challenge);
+      setState((current) => ({ who, byId: { ...knownFor(current, who), [challenge.id]: challenge } }));
+    },
     [who],
   );
 
   useEffect(() => {
     if (who === "") return undefined;
     let cancelled = false;
-    // The list replaces what the tab knew.
-    const load = () =>
-      api.getChallenges().then(
+    // The list replaces what the tab knew, except what the tab heard while the list was on its way.
+    const load = () => {
+      sinceRead.current = new Map();
+      return api.getChallenges().then(
         (list) =>
           !cancelled &&
-          setState({ who, byId: Object.fromEntries(list.map((challenge) => [challenge.id, challenge])) }),
+          setState({
+            who,
+            byId: {
+              ...Object.fromEntries(list.map((challenge) => [challenge.id, challenge])),
+              ...Object.fromEntries(sinceRead.current),
+            },
+          }),
         () => undefined,
       );
+    };
     load();
     const unsubscribers = [
       socket.on("connect", load),

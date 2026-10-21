@@ -96,7 +96,7 @@
 .matchHead,
 .match {
   display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto auto;
   gap: var(--space-3);
   align-items: center;
 }
@@ -174,6 +174,10 @@
     grid-column: 1 / -1;
     text-align: left;
   }
+}
+/* Report a past opponent (CC-044): small, after the time (under it on a phone), never the main thing to do. */
+.report {
+  justify-self: end;
 }
 /* Said once after the account was deleted (CC-035). */
 .visitor {

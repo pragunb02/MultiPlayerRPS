@@ -91,7 +91,7 @@ describe("LeaderboardPage", () => {
 
     const status = screen.getByRole("status", { busy: true });
     expect(status).toHaveTextContent("Loading the leaderboard…");
-    expect(status.querySelectorAll(".row")).toHaveLength(6);
+    expect(status.querySelectorAll(".bone-row")).toHaveLength(6);
   });
 
   it("invites the first winner when nobody is ranked yet", async () => {

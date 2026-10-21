@@ -328,12 +328,14 @@ describe("the feedback inbox (CC-290)", () => {
       "Conversion",
       "Engagement",
       "Feedback",
+      "Reports",
       "Ages",
       "Flags",
       "Design",
     ]);
     expect(onInbox.filter(([, current]) => current === "page")).toEqual([["Feedback", "page"]]);
     expect(screen.getByRole("link", { name: "Feedback" })).toHaveAttribute("href", "/admin/feedback");
+    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/admin/reports");
     expect(screen.getByRole("link", { name: "Flags" })).toHaveAttribute("href", "/admin/flags");
     expect(screen.getByRole("link", { name: "Design" })).toHaveAttribute("href", "/admin/design");
   });

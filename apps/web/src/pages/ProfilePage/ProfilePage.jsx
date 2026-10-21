@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { DELETED_PLAYER_NAME, getGame } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
@@ -14,6 +15,7 @@ import { YourRank } from "../../components/Leaderboard/YourRank.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { Section, Sections } from "../../components/Page/Page.jsx";
+import { ReportDialog } from "../../components/Report/ReportDialog.jsx";
 import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
 import { useStreakAtRisk } from "../../components/SaveProgress/saveProgressContext.js";
 import { StreakAtRisk } from "../../components/SaveProgress/StreakAtRisk.jsx";
@@ -109,8 +111,13 @@ function Opponent({ player, last, target, canAddFriends }) {
   );
 }
 
+/** Whether a past opponent is a person who can be reported: not a computer, not a deleted player's stand-in. */
+const isReportable = (player) => !player.computer && player.displayName !== DELETED_PLAYER_NAME;
+
 function MatchHistory({ canAddFriends }) {
   const history = useMatchHistory();
+  // The opponent the player pressed Report on, by the match and their place in it (CC-044, ADR-071).
+  const [reporting, setReporting] = useState(undefined);
   const more = useAction(history.loadMore, { id: "profile.matches.more" });
   if (history.status === "loading") return <Skeleton label="Loading matches" shape="row" count={3} />;
   if (history.status === "error") {
@@ -171,11 +178,39 @@ function MatchHistory({ canAddFriends }) {
                 <time className={styles.muted} dateTime={new Date(match.endedAt).toISOString()}>
                   {formatDate(match.endedAt)}
                 </time>
+                {match.players.map(
+                  (player, seat) =>
+                    player.playerId !== match.you &&
+                    isReportable(player) && (
+                      <Button
+                        key={player.playerId}
+                        control="profile.matches.report"
+                        variant="ghost"
+                        size="sm"
+                        className={styles.report}
+                        aria-label={`Report ${player.displayName}`}
+                        onClick={() =>
+                          setReporting({ name: player.displayName, target: { matchId: match.matchId, seat } })
+                        }
+                      >
+                        Report
+                      </Button>
+                    ),
+                )}
               </li>
             );
           })}
         </ul>
       </Card>
+      {reporting !== undefined && (
+        <ReportDialog
+          name={reporting.name}
+          target={reporting.target}
+          canBlock
+          onBlocked={() => undefined}
+          onClose={() => setReporting(undefined)}
+        />
+      )}
       {history.moreError && (
         <ErrorState
           title={`Couldn't load more matches. ${history.moreError.message}`}

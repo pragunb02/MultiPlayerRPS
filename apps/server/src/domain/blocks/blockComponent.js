@@ -8,7 +8,7 @@ export const MAX_BLOCKS_PER_PLAYER = 500;
 
 /**
  * The one answer for every reference the server cannot confirm, so the block route cannot be used to find out
- * whether a room, a match or a player exists (OWASP IDOR).
+ * whether a room, a match, a report or a player exists (OWASP IDOR).
  */
 const notPlayedWith = (cause) =>
   new NotFoundError("You can only block someone you played with", cause === undefined ? {} : { cause });
@@ -17,12 +17,17 @@ const notPlayedWith = (cause) =>
 const viewOf = (block) =>
   Object.freeze({ blockId: block.blockId, displayName: block.blockedName, blockedAt: block.createdAt });
 
-/** @typedef {import("../players/coPlayers.js").PlayedWith} BlockTarget   who to block, as someone the blocker played with */
+/**
+ * @typedef {import("../players/coPlayers.js").PlayedWith | { reportId: string }} BlockTarget   who to block: someone the
+ *   blocker played with, or the player of a report the blocker made, so the thank-you after a report can block in
+ *   one tap (ADR-071.4)
+ */
 
 /**
  * Blocks between players (CC-044, ADR-053). A block is silent and works both ways: the pair is never seated
  * together, never rematched and never paired, and the blocked player is never told. A player can block only someone
- * the server saw them play with: the other player of an open room both sit in, or of a match both played.
+ * the server saw them play with: the other player of an open room both sit in, or of a match both played, or someone
+ * they reported (ADR-071).
  *
  * @param {{
  *   blockAccessor: ReturnType<typeof import("../../data/blockAccessor.js").createBlockAccessor>,
@@ -33,13 +38,15 @@ const viewOf = (block) =>
  *   newBlockId?: () => string,
  *   limit?: number,
  *   followers?: ReadonlyArray<{ name: string, playersBlocked: (pair: { blockerId: string, blockedId: string, now: number }) => Promise<unknown> }>,
+ *   reports?: { reportedBy: (query: { reportId: string, reporterId: string }) => Promise<Readonly<{ playerId: string, displayName: string }>> },
  * }} deps  `rooms` is the room accessor: the room component reads blocks itself, so it cannot be read here. A
  *   room that has closed is gone from it. `matches` is the match component, read for the real players of a match
  *   (CC-297). `transfers` are the guests who signed
  *   in: a block that names a guest after that guest became an account still applies to the account (ADR-014).
  *   `seatIds` are the seat ids the room views show (CC-253), the same ones the room component uses. `limit` is for
  *   tests only. `followers` are told of every block, a repeated one too, before the block answers: friends end the
- *   friendship there (CC-052), so a block never leaves the pair friends, even for a moment
+ *   friendship there (CC-052), so a block never leaves the pair friends, even for a moment. `reports` finds who a
+ *   player reported, by their own report's id (ADR-071.4). Without it a report id names nobody
  */
 export function createBlockComponent({
   blockAccessor,
@@ -50,6 +57,7 @@ export function createBlockComponent({
   newBlockId = randomUUID,
   limit = MAX_BLOCKS_PER_PLAYER,
   followers = [],
+  reports,
 }) {
   assertDefined(blockAccessor, "blockAccessor");
   assertFunction(rooms?.getByCode, "rooms.getByCode");
@@ -59,7 +67,26 @@ export function createBlockComponent({
   assertFunction(seatIds?.seatIdOf, "seatIds.seatIdOf");
   assertFunction(newBlockId, "newBlockId");
   followers.forEach((follower) => assertFunction(follower.playersBlocked, `${follower.name}.playersBlocked`));
+  if (reports !== undefined) assertFunction(reports.reportedBy, "reports.reportedBy");
   const coPlayers = createCoPlayers({ rooms, matches, transfers, seatIds });
+
+  /**
+   * The person at `target`, once the server has checked that the blocker played with them there or reported them. A
+   * guest who signed in since is their account, so the block goes straight to it (ADR-014).
+   */
+  async function personAt(target, blockerId) {
+    if (!("reportId" in target)) {
+      return coPlayers.personAt({ target, askerId: blockerId, refusal: notPlayedWith });
+    }
+    if (reports === undefined) throw notPlayedWith();
+    const person = await reports
+      .reportedBy({ reportId: target.reportId, reporterId: blockerId })
+      .catch((err) => {
+        throw err instanceof NotFoundError ? notPlayedWith(err) : err;
+      });
+    if (person.playerId === blockerId) throw notPlayedWith();
+    return person;
+  }
 
   /** Each id as it is now: a guest who signed in is their account. Other ids stay as they are. */
   async function accountsOf(playerIds) {
@@ -106,8 +133,7 @@ export function createBlockComponent({
      * @throws {NotFoundError} for every reference the server cannot confirm, all with the same message
      */
     async block({ blocker, target, now }) {
-      // A guest at the seat who signed in since is their account, so the block goes straight to it (ADR-014).
-      const person = await coPlayers.personAt({ target, askerId: blocker.id, refusal: notPlayedWith });
+      const person = await personAt(target, blocker.id);
       const blockedId = person.playerId;
       const { created, block } = await blockAccessor.add({
         blockId: newBlockId(),

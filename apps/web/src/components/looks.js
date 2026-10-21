@@ -9,7 +9,7 @@ export const BUTTON_VARIANTS = Object.freeze(["primary", "accent", "secondary", 
 /** The sizes of a button. Every size is at least 24 px tall, and 44 px on a touch screen (WCAG 2.5.8 and our rule). */
 export const BUTTON_SIZES = Object.freeze(["sm", "md", "lg"]);
 
-/** The card looks. One `accent` card is the featured one of a screen. */
+/** The card looks. A game tone marks that game. A brand or gold accent marks the one featured card of a screen. */
 export const CARD_VARIANTS = Object.freeze(["surface", "raised", "accent", "notice"]);
 
 /** The colour along an accent card's top edge: a game's own colour, the brand, or gold for a reward. */

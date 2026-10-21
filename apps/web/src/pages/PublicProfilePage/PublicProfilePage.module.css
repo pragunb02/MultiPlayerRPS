@@ -75,3 +75,7 @@
   font-size: var(--type-body);
   overflow-wrap: normal;
 }
+/* Report this player (CC-044): small and at the end, so it never reads as the main thing to do. */
+.report {
+  justify-self: start;
+}

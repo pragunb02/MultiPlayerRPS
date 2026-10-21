@@ -129,8 +129,8 @@ export function CardStates() {
     <div className={styles.example} data-cc-component="card">
       <h3>Card</h3>
       <p className={styles.note}>
-        A clickable card has one link, stretched over it. Hover lifts it and adds the brand glow. One accent
-        card is the featured one of a screen.
+        A clickable card has one link, stretched over it. Hover lifts it and adds the brand glow. A game tone
+        marks that game, and a brand or gold accent marks the one featured card of a screen.
       </p>
       <ul className={styles.cards}>
         <Card as="li" interactive variant="accent" tone="chess" aria-labelledby="design-card-interactive">

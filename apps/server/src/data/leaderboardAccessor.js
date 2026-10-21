@@ -125,5 +125,8 @@ export function createLeaderboardAccessor({ leaderboardDao }) {
 
     /** @param {string} playerId @returns {Promise<number>} entries removed (CC-035) */
     removePlayer: (playerId) => leaderboardDao.deleteByPlayer(playerId),
+
+    /** @param {{ playerId: string, displayName: string }} change @returns {Promise<number>} entries renamed (CC-044) */
+    renamePlayer: (change) => leaderboardDao.renamePlayer(change),
   });
 }
