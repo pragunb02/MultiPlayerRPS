@@ -68,10 +68,10 @@ export function createInMemoryAccountDao() {
       return copy(accounts.get(accountId));
     },
 
-    async updatePasswordHash(accountId, passwordHash) {
+    async updatePasswordHash(accountId, { from, to }) {
       const doc = accounts.get(accountId);
-      if (doc !== undefined) {
-        accounts.set(accountId, { ...doc, passwordHash });
+      if (doc !== undefined && doc.passwordHash === from) {
+        accounts.set(accountId, { ...doc, passwordHash: to });
       }
     },
 
