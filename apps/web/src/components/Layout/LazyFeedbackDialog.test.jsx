@@ -22,7 +22,7 @@ describe("the Feedback dialog, loaded on its own", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     renderApp();
 
-    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    await act(() => vi.advanceTimersByTimeAsync(300));
 
     expect(screen.queryByRole("dialog")).toBeNull();
   });

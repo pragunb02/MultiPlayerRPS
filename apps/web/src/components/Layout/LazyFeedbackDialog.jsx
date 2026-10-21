@@ -1,38 +1,42 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-const loadDialog = () => import("../Feedback/FeedbackDialog.jsx");
-const FeedbackDialog = lazy(() => loadDialog().then((module) => ({ default: module.FeedbackDialog })));
-// Long enough after the first page that the dialog never competes with it, short enough to be there before a press.
-const PREFETCH_AFTER_MS = 2_000;
+// Just after the first page has drawn, so it never competes with it and is there before the first press.
+const PREFETCH_AFTER_MS = 300;
+
+/** The dialog's component once its code has loaded, shared by every player's copy on this page. */
+let loaded;
+const load = () =>
+  import("../Feedback/FeedbackDialog.jsx").then((module) => {
+    loaded = module.FeedbackDialog;
+    return loaded;
+  });
 
 /**
- * The Feedback dialog (CC-290), loaded on its own the first time it opens, so its code is not in the first route
- * (CC-324, from CC-322's bundle work: about 2.5 kB gzip). It is fetched once the page has been idle a moment, so a
- * press still answers at once (the match shell's 100 ms rule). Once opened it stays mounted until the player
- * changes, as before: the parent gives it a key per player.
+ * The Feedback dialog (CC-290), with its code in a chunk of its own, so it is not in the first route (CC-324, from
+ * CC-322's bundle work: about 2.5 kB gzip). The chunk is fetched just after the first page has drawn, or at once on
+ * the first press, and the dialog is drawn as soon as it is there. Not React's `lazy`: a suspended component is shown
+ * up to several hundred ms after its code arrives, which breaks the match shell's 100 ms rule for a press.
  *
  * @param {{ open: boolean, onClose: () => void }} props
  */
 export function LazyFeedbackDialog({ open, onClose }) {
-  const [wanted, setWanted] = useState(open);
-  if (open && !wanted) {
-    setWanted(true);
-  }
+  const [Dialog, setDialog] = useState(() => loaded);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      // A prefetch only: if it fails, the first open loads it again and shows its own error.
-      loadDialog().catch(() => {});
-    }, PREFETCH_AFTER_MS);
-    return () => clearTimeout(timer);
-  }, []);
+    if (Dialog !== undefined) return undefined;
+    let live = true;
+    // A failed load leaves the page as it was; the next press or page tries again.
+    const start = () =>
+      load().then(
+        (component) => live && setDialog(() => component),
+        () => {},
+      );
+    const timer = setTimeout(start, open ? 0 : PREFETCH_AFTER_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [Dialog, open]);
 
-  if (!wanted) {
-    return null;
-  }
-  return (
-    <Suspense fallback={null}>
-      <FeedbackDialog open={open} onClose={onClose} />
-    </Suspense>
-  );
+  return Dialog === undefined ? null : <Dialog open={open} onClose={onClose} />;
 }
