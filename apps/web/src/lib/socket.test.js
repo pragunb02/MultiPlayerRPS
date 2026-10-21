@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RELOAD_GUARD_MS, RELOADED_PARAM, recoverFromStaleBuild } from "../app/staleBuild.js";
 import { AppRequestError } from "./errors.js";
 import { createSocketClient } from "./socket.js";
 
@@ -271,7 +272,7 @@ describe("socket client", () => {
 
     it("rejects a request with TIMEOUT when the download fails", async () => {
       const { load, fail } = deferredLoad();
-      const client = createSocketClient({ load, setTimer: () => {} });
+      const client = createSocketClient({ load });
 
       const answer = client.request("room:join", {});
       fail();
@@ -279,28 +280,74 @@ describe("socket client", () => {
       await expect(answer).rejects.toMatchObject({ code: "TIMEOUT" });
     });
 
-    it("tries a failed download again while the connection is wanted", async () => {
+    describe("a download that never arrives", () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("rejects a request with TIMEOUT within the time limit while it waits", async () => {
+        const { load } = deferredLoad();
+        const client = createSocketClient({ load });
+
+        const answer = client.request("room:join", {}).catch((err) => err);
+        await vi.advanceTimersByTimeAsync(7_999);
+        const early = await Promise.race([answer, Promise.resolve("still waiting")]);
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(early).toBe("still waiting");
+        expect(await answer).toMatchObject({ code: "TIMEOUT" });
+      });
+
+      it("rejects a request with TIMEOUT when the failure gave way to a reload", async () => {
+        const { load, finish } = deferredLoad();
+        const client = createSocketClient({ load });
+
+        const answer = client.request("room:join", {}).catch((err) => err);
+        finish(undefined);
+        await vi.advanceTimersByTimeAsync(8_000);
+
+        expect(await answer).toMatchObject({ code: "TIMEOUT" });
+      });
+
+      it("never tries a failed download again by itself, even while the connection is wanted", async () => {
+        const { load, fail } = deferredLoad();
+        const client = createSocketClient({ load });
+        client.connect();
+        client.needNow();
+        fail();
+
+        await vi.advanceTimersByTimeAsync(10 * 60_000);
+
+        expect(load).toHaveBeenCalledOnce();
+      });
+    });
+
+    it("tries a failed download again on the next need, without the reload for a newer version", async () => {
       const io = fakeIo();
       const { load, fail, finish } = deferredLoad();
-      const timers = [];
-      const client = createSocketClient({ load, setTimer: (run, ms) => timers.push({ run, ms }) });
+      const quietly = vi.fn((run) => run());
+      const client = createSocketClient({ load, quietly });
       client.connect();
       client.needNow();
       fail();
-      await vi.waitFor(() => expect(timers).toHaveLength(1));
+      await flush();
+      expect(quietly).not.toHaveBeenCalled();
 
-      timers[0].run();
+      client.needNow();
       finish(io.connect);
 
-      expect(timers[0].ms).toBe(2_000);
+      expect(quietly).toHaveBeenCalledOnce();
+      expect(load).toHaveBeenCalledTimes(2);
       await vi.waitFor(() => expect(io.socket.connect).toHaveBeenCalledOnce());
     });
 
     it("waits for the next need after a failed download when no connection is wanted", async () => {
       const io = fakeIo();
       const { load, fail, finish } = deferredLoad();
-      const timers = [];
-      const client = createSocketClient({ load, setTimer: (run, ms) => timers.push({ run, ms }) });
+      const client = createSocketClient({ load });
       client.needNow();
       fail();
       await flush();
@@ -308,15 +355,13 @@ describe("socket client", () => {
       client.connect();
       finish(io.connect);
 
-      expect(timers).toEqual([]);
       expect(load).toHaveBeenCalledTimes(2);
       await vi.waitFor(() => expect(io.socket.connect).toHaveBeenCalledOnce());
     });
 
     it("does nothing more when the download gave way to a reload for a newer version (CC-181)", async () => {
       const { load, finish } = deferredLoad();
-      const timers = [];
-      const client = createSocketClient({ load, setTimer: (run, ms) => timers.push({ run, ms }) });
+      const client = createSocketClient({ load });
       client.connect();
       client.needNow();
 
@@ -325,8 +370,51 @@ describe("socket client", () => {
       client.needNow();
 
       expect(load).toHaveBeenCalledOnce();
-      expect(timers).toEqual([]);
       expect(client.isConnected()).toBe(false);
+    });
+
+    it("never reloads the tab again when Socket.IO's file stays missing after a reload (CC-181)", async () => {
+      // The tab came from a reload for a newer version, and the file never arrives: a filter, a gap at the CDN.
+      const listeners = new EventTarget();
+      const tab = {
+        reloads: 0,
+        location: {
+          href: `https://classicade.example/?${RELOADED_PARAM}=1`,
+          reload: () => {
+            tab.reloads += 1;
+          },
+        },
+        history: {
+          state: null,
+          replaceState: (_state, _title, url) => (tab.location.href = new URL(url, tab.location.href).href),
+        },
+        addEventListener: (type, listener) => listeners.addEventListener(type, listener),
+        removeEventListener: (type, listener) => listeners.removeEventListener(type, listener),
+      };
+      let time = 0;
+      const recovery = recoverFromStaleBuild({ window: tab, now: () => time });
+      // As Vite's own loader does: it tells the page, and fails unless the page swallowed it.
+      const load = vi.fn(async () => {
+        const error = new Error("Failed to fetch dynamically imported module");
+        const event = new Event("vite:preloadError", { cancelable: true });
+        listeners.dispatchEvent(event);
+        if (!event.defaultPrevented) throw error;
+        return undefined;
+      });
+      const client = createSocketClient({ load, quietly: recovery.quietly });
+      client.connect();
+
+      client.needNow();
+      await flush();
+      time = RELOAD_GUARD_MS + 1;
+      client.needNow();
+      await flush();
+      const answer = await client.request("room:join", {}).catch((err) => err);
+
+      expect(load).toHaveBeenCalledTimes(3);
+      expect(tab.reloads).toBe(0);
+      expect(answer).toMatchObject({ code: "TIMEOUT" });
+      recovery();
     });
   });
 

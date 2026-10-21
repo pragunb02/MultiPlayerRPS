@@ -2,8 +2,6 @@ import { ERROR_CODES } from "@classicade/shared";
 import { AppRequestError } from "./errors.js";
 
 const ACK_TIMEOUT_MS = 8_000;
-/** How long after a failed download of Socket.IO it is tried again, while the connection is wanted. */
-const RETRY_MS = 2_000;
 /** Socket.IO's reason when the server disconnected the socket on purpose. It does not reconnect after it. */
 const SERVER_DISCONNECT = "io server disconnect";
 /** A new object each time: Socket.IO writes to the options it is given while it sets itself up. */
@@ -13,6 +11,23 @@ const options = () => ({ autoConnect: false, transports: ["websocket"], withCred
  * Socket.IO's client, about 16.6 kB of gzip, in its own download (CC-333). It resolves to nothing when the download
  * failed because the tab is older than the last deploy and `staleBuild.js` is reloading the tab.
  */
+/**
+ * `promise`, or a rejection once `ms` have passed: a download that never arrives, or one that gave way to a reload,
+ * must not keep a request waiting for ever.
+ *
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ * @returns {Promise<T>}
+ */
+function within(promise, ms) {
+  let timer;
+  const late = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error("timed out")), ms);
+  });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
 const loadSocketIo = () => import("socket.io-client").then((module) => module?.io);
 
 /**
@@ -23,21 +38,23 @@ const loadSocketIo = () => import("socket.io-client").then((module) => module?.i
  * and the last connect or disconnect until it is here, and downloads it when `needNow()` is called (at once on the
  * pages that need the connection, when the browser is idle on the others, `main.jsx`) or a request is made. Every
  * subscription is attached, in the order it was made, before the socket can connect, so no push can be missed for
- * being early. A failed download is tried again after a moment while the connection is wanted, and otherwise the
- * next time something needs it.
+ * being early. A failed download is never tried again by itself, only when something needs the socket again
+ * (`needNow`, a request, a connect). Only the first try may reload the tab for a newer version (`staleBuild.js`):
+ * every later one runs through `quietly`, so a file that stays missing never reloads the tab over and over.
  *
  * @param {{
  *   load?: () => Promise<typeof import("socket.io-client").io | undefined>,
  *   url?: string,
  *   now?: () => number,
- *   setTimer?: (run: () => void, ms: number) => unknown,
- * }} [options]  injectable for tests
+ *   quietly?: <T>(run: () => Promise<T>) => Promise<T>,
+ * }} [options]  `quietly` runs a download whose failure must not reload the tab (`recoverFromStaleBuild`'s);
+ *   `load`, `url` and `now` are injectable for tests
  */
 export function createSocketClient({
   load = loadSocketIo,
   url = undefined,
   now = () => Date.now(),
-  setTimer = (run, ms) => setTimeout(run, ms),
+  quietly = (run) => run(),
 } = {}) {
   /** @type {import("socket.io-client").Socket | undefined} the socket, once Socket.IO is here */
   let socket;
@@ -47,6 +64,8 @@ export function createSocketClient({
   let needed = false;
   // The last of connect and disconnect, applied when the socket is here.
   let wanted = false;
+  // A download failed once, so the next ones must not reload the tab again.
+  let failed = false;
   /** @type {Array<{ event: string, handler: (...args: any[]) => void }>} subscriptions made before it was here */
   const early = [];
 
@@ -60,12 +79,12 @@ export function createSocketClient({
   /** @returns {Promise<import("socket.io-client").Socket>} the socket, downloading Socket.IO first if need be */
   const ready = () => {
     needed = true;
-    loading ??= load().then(
+    loading ??= (failed ? quietly(load) : load()).then(
       // The tab is reloading for a newer version: nothing here is used again.
       (io) => (io === undefined ? new Promise(() => {}) : arrived(io)),
       (error) => {
         loading = undefined;
-        if (wanted) setTimer(() => ready().catch(() => undefined), RETRY_MS);
+        failed = true;
         throw error;
       },
     );
@@ -119,7 +138,7 @@ export function createSocketClient({
       const sentAt = now();
       let ack;
       try {
-        const live = await ready();
+        const live = socket ?? (await within(ready(), ACK_TIMEOUT_MS));
         ack = await live.timeout(Math.max(0, ACK_TIMEOUT_MS - (now() - sentAt))).emitWithAck(event, payload);
       } catch {
         throw new AppRequestError({ code: "TIMEOUT", message: "The server took too long to answer" });

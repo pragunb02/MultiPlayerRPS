@@ -18,7 +18,7 @@ import "./styles/global.css";
 
 // Composition root of the web app: the only place real clients are created.
 // First of all, because it may change the address before the router reads it (CC-181).
-recoverFromStaleBuild({ window, now: () => Date.now() });
+const recovery = recoverFromStaleBuild({ window, now: () => Date.now() });
 // Also before the router, which must never see the share channel marker or keep it in the history (CC-279).
 takeLanding({ window, document });
 const sound = createSoundPlayer({
@@ -31,7 +31,8 @@ const sound = createSoundPlayer({
 sound.listen(window);
 const services = {
   api: createApiClient(),
-  socket: createSocketClient(),
+  // A download of Socket.IO tried again after it failed never reloads the tab for a newer version (CC-333).
+  socket: createSocketClient({ quietly: recovery.quietly }),
   sound,
   // Tabs of this browser tell each other the session changed (ADR-033). Older browsers without it get none.
   sessionBroadcast: createSessionBroadcast({ Channel: window.BroadcastChannel }),
