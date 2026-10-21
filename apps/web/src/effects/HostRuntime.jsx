@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useLocation } from "react-router";
-import { paths } from "../app/paths.js";
 import { useServices } from "../app/servicesContext.js";
 import { useInGame } from "../components/SiteRequests/inGameContext.js";
 import { useReducedMotion } from "../hooks/useReducedMotion.js";
@@ -25,14 +23,14 @@ const once = new Set();
  * with its colours and greeting, its entrance burst once per visit on the home page, and its success when a game
  * starts in the same visit.
  *
- * @param {{ effects?: typeof EFFECTS, now?: () => number }} props  the registry and the clock; tests give their own
+ * @param {{ home: boolean, effects?: typeof EFFECTS, now?: () => number }} props  whether the home page shows, the
+ *   registry and the clock; tests give their own
  */
-export function HostRuntime({ effects = EFFECTS, now = Date.now }) {
+export function HostRuntime({ home, effects = EFFECTS, now = Date.now }) {
   const { api } = useServices();
   const who = useSession().identity?.id ?? "";
   const reducedMotion = useReducedMotion();
   const inGame = useInGame();
-  const home = useLocation().pathname === paths.home();
   const preview = useSyncExternalStore(subscribe, currentPreview);
   const [today, setToday] = useState(() => indiaDay(now()));
   const [answer, setAnswer] = useState({ who: undefined, flags: NO_FLAGS });
