@@ -1,9 +1,8 @@
-import { effectNamed } from "./registry.js";
-
 /**
  * What connects the one `EffectHost` to everything else, in memory only (CC-328): `play` reaches the host, the host
  * says which theme is on for `useEventTheme`, and the console's preview says which theme this tab shows. Nothing
- * here is ever stored, so a reload clears a preview.
+ * here is ever stored, so a reload clears a preview. It is on the first route, so it imports nothing, not even the
+ * registry, which comes with the host's own chunk.
  */
 
 /** @type {((name: string, options: object) => Promise<boolean>) | undefined} */
@@ -42,10 +41,9 @@ export function showTheme(next) {
  * Shows a theme in this tab only, ignoring its flag and its window, until the tab reloads (the console's
  * "Preview in this tab"). `undefined` ends the preview.
  *
- * @param {string | undefined} name
+ * @param {string | undefined} name  a theme of the registry
  */
 export function previewTheme(name) {
-  if (name !== undefined) effectNamed(name);
   preview = name;
   changed();
 }
@@ -80,16 +78,13 @@ export function attachHost(play) {
 }
 
 /**
- * Asks the host to play an effect. Resolves when it ended (`true`) or was dropped (`false`), never rejects: an
- * effect is decoration, and the result is already in words on the page. With no host mounted it is dropped.
+ * Asks the host to play an effect. Resolves when it ended (`true`) or was dropped (`false`): an effect is
+ * decoration, and the result is already in words on the page. With no host mounted yet it is dropped. It rejects
+ * only for a name that is not in the registry, which is a mistake in code.
  *
  * @param {string} name  an entry of the registry
  * @param {{ origin?: { x: number, y: number, width?: number } }} [options]  where it starts, in CSS pixels of the
  *   viewport: a point, or a box whose top corners a burst comes from
  * @returns {Promise<boolean>}
- * @throws {RangeError} for a name that is not in the registry
  */
-export function play(name, options = {}) {
-  effectNamed(name);
-  return host ? host(name, options) : Promise.resolve(false);
-}
+export const play = (name, options = {}) => (host ? host(name, options) : Promise.resolve(false));

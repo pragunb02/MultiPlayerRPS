@@ -139,9 +139,10 @@ describe("the effect host (CC-328)", () => {
     expect(canvases()).toHaveLength(0);
   });
 
-  it("drops a play with no host, and an unknown name throws", async () => {
+  it("drops a play with no host, and refuses an unknown name", async () => {
     await expect(play("win_burst")).resolves.toBe(false);
-    expect(() => play("fireworks")).toThrow(RangeError);
+    await renderHost({ effects: [fake("win_burst").entry] });
+    await expect(play("fireworks")).rejects.toThrow(RangeError);
   });
 
   it("is silent when an effect's chunk fails to load", async () => {

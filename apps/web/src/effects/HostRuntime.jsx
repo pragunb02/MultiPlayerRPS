@@ -90,12 +90,12 @@ export function HostRuntime({ home, effects = EFFECTS, now = Date.now }) {
     };
     const hide = () => document.hidden && machine.stopAll();
     document.addEventListener("visibilitychange", hide);
-    const detach = attachHost((name, options) =>
-      machine.request(
-        effects.find((entry) => entry.name === name),
-        options,
-      ),
-    );
+    const detach = attachHost((name, options) => {
+      const entry = effects.find((effect) => effect.name === name);
+      return entry === undefined
+        ? Promise.reject(new RangeError(`Unknown effect "${name}"`))
+        : machine.request(entry, options);
+    });
     return () => {
       detach();
       document.removeEventListener("visibilitychange", hide);
