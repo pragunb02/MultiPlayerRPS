@@ -10,7 +10,6 @@ import { useMediaQuery } from "../../hooks/useMediaQuery.js";
 import { useSession } from "../../hooks/useSession.js";
 import { ChallengesProvider } from "../Challenges/ChallengesProvider.jsx";
 import { ConnectionBanner } from "../ConnectionBanner/ConnectionBanner.jsx";
-import { FeedbackDialog } from "../Feedback/FeedbackDialog.jsx";
 import { Inbox } from "../Inbox/Inbox.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
@@ -23,6 +22,7 @@ import { WakingUp } from "../WakingUp/WakingUp.jsx";
 import { AccountMenu } from "./AccountMenu.jsx";
 import { currentIf, HEADER_ROW_LINKS, HEADER_WIDE, SECTIONS, sectionOf } from "./headerLayout.js";
 import { HeaderMenu, PlayLinks } from "./HeaderMenu.jsx";
+import { LazyFeedbackDialog } from "./LazyFeedbackDialog.jsx";
 import styles from "./Layout.module.css";
 
 /** Three bars: the menu button's picture. */
@@ -212,7 +212,7 @@ function Shell() {
       <SiteFooter onFeedback={openFeedback} />
       {/* Outside the menu, which a phone hides while it is closed, so the footer can open it too. */}
       {/* A new dialog for each player: a draft and its email never pass to whoever uses the phone next. */}
-      <FeedbackDialog
+      <LazyFeedbackDialog
         key={identity?.id ?? "visitor"}
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
