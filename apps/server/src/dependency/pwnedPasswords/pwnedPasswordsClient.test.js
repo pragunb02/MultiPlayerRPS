@@ -6,10 +6,10 @@ import {
   PWNED_PASSWORDS_TIMEOUT_MS,
 } from "./pwnedPasswordsClient.js";
 
-const PREFIX = "5BAA6";
+const PREFIX = "ABCDE";
 const RANGE = [
   "003D68EB55068C33ACE09247EE4C639306B:3",
-  "1E4C9B93F3F0682250B6CF8331B7EE68FD8:10437277",
+  "0123456789ABCDEF0123456789ABCDEF012:10437277",
   // Padding lines (Add-Padding: true) have a count of 0.
   "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:0",
 ].join("\r\n");
@@ -45,7 +45,7 @@ describe("pwnedPasswordsClient", () => {
 
     const range = await createPwnedPasswordsClient({ fetch }).rangeOf(PREFIX);
 
-    expect(range.get("1E4C9B93F3F0682250B6CF8331B7EE68FD8")).toBe(10437277);
+    expect(range.get("0123456789ABCDEF0123456789ABCDEF012")).toBe(10437277);
     expect(range.get("003D68EB55068C33ACE09247EE4C639306B")).toBe(3);
     expect(range.get("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")).toBe(0);
     expect(range.size).toBe(3);
@@ -59,7 +59,7 @@ describe("pwnedPasswordsClient", () => {
     expect([...range]).toEqual([["003D68EB55068C33ACE09247EE4C639306B", 3]]);
   });
 
-  it.each(["", "5baa6", "5BAA", "5BAA61", "GGGGG"])(
+  it.each(["", "abcde", "ABCD", "ABCDE1", "GGGGG"])(
     "refuses a prefix that is not five capital hex digits (%j)",
     async (prefix) => {
       const { fetch, requests } = answering(RANGE);

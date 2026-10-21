@@ -53,9 +53,11 @@ describe("passwordScreen", () => {
   });
 
   it("refuses a breached password with the same words", async () => {
-    const { screen, outcomes } = setup({ breached: ["Tr0ub4dor&3"] });
+    const { screen, outcomes } = setup({ breached: ["not-a-real-secret-phrase"] });
 
-    await expect(screen.check({ password: "Tr0ub4dor&3", field: "password" })).rejects.toMatchObject({
+    await expect(
+      screen.check({ password: "not-a-real-secret-phrase", field: "password" }),
+    ).rejects.toMatchObject({
       message: EASY_PASSWORD,
       details: { field: "password" },
     });

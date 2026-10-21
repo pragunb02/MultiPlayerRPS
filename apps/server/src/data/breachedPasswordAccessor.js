@@ -33,6 +33,7 @@ export function createBreachedPasswordAccessor({ pwnedPasswords, commonPasswords
      * @throws {Error} when the service cannot answer, so the caller decides what that means
      */
     async isBreached(password) {
+      // SHA-1 is what the HIBP range API requires. It is only a lookup key and is never stored (passwordHasher does that).
       const sha1 = createHash("sha1").update(password, "utf8").digest("hex").toUpperCase();
       const range = await pwnedPasswords.rangeOf(sha1.slice(0, PREFIX_LENGTH));
       return (range.get(sha1.slice(PREFIX_LENGTH)) ?? 0) > 0;
