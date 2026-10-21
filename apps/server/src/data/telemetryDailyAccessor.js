@@ -5,6 +5,9 @@ import { assertDefined } from "../utils/assert.js";
  *   domain model: one India day's anonymous total of one event for one group of catalogue fields (CC-176)
  */
 
+/** A group's field names as the database finds them: sorted and joined by commas, "" for an event's own total. */
+export const fieldsOf = (names) => [...names].sort().join(",");
+
 /** The group written as text, the same for the same fields in any order. */
 const keyOf = (group) => JSON.stringify(Object.entries(group).sort(([a], [b]) => (a < b ? -1 : 1)));
 
@@ -28,6 +31,7 @@ export function createTelemetryDailyAccessor({ telemetryDailyDao }) {
         rows: rows.map(({ event, group, count, timings }) => ({
           event,
           key: keyOf(group),
+          fields: fieldsOf(Object.keys(group)),
           group,
           count,
           ...(timings && { timings }),
@@ -35,7 +39,8 @@ export function createTelemetryDailyAccessor({ telemetryDailyDao }) {
       }),
 
     /**
-     * @param {{ from: string, to: string, events: ReadonlyArray<string> }} range
+     * @param {{ from: string, to: string, events: ReadonlyArray<string>, fields?: string, dropBuckets?: ReadonlyArray<string> }} range
+     *   `fields`: one group's field names (`fieldsOf`). `dropBuckets`: timings read without their buckets
      * @returns {Promise<ReadonlyArray<TelemetryDaily>>}
      */
     read: async (range) =>

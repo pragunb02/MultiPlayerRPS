@@ -14,15 +14,19 @@ export function createInMemoryTelemetryDailyDao() {
       days.set(day, structuredClone([...rows]));
     },
 
-    read: async ({ from, to, events }) =>
+    read: async ({ from, to, events, fields, dropBuckets = [] }) =>
       [...days.entries()]
         .filter(([day]) => day >= from && day <= to)
         .sort(([a], [b]) => (a < b ? -1 : 1))
         .flatMap(([day, rows]) =>
           rows
-            .filter(({ event }) => events.includes(event))
+            .filter((row) => events.includes(row.event) && (fields === undefined || row.fields === fields))
             .sort(byEventAndKey)
-            .map(({ key, ...row }) => structuredClone({ day, ...row })),
+            .map(({ key, fields: names, ...row }) => {
+              const copy = structuredClone({ day, ...row });
+              dropBuckets.forEach((name) => delete copy.timings?.[name]?.buckets);
+              return copy;
+            }),
         ),
 
     async acquireRun({ day, owner, now, until }) {

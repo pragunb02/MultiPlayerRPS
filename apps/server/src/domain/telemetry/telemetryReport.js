@@ -1,6 +1,6 @@
 import { assertDefined } from "../../utils/assert.js";
 import { FEWER_THAN_MIN, MIN_GROUP_SIZE } from "../analytics/privacy.js";
-import { bucketPercentiles, groupKeyOf, mergeBuckets } from "./rollups.js";
+import { bucketPercentiles, groupKeyOf, mergeBuckets, ROLLUP_SPEC } from "./rollups.js";
 
 export { FEWER_THAN_MIN };
 
@@ -63,12 +63,18 @@ export function hideTimings(timings) {
 export function createTelemetryReport({ telemetryDailyAccessor }) {
   assertDefined(telemetryDailyAccessor, "telemetryDailyAccessor");
 
-  /** The rows of one group of fields: the rollup writes every field of a group, null when left out. */
-  async function rowsOf({ from, to, event, group }) {
-    const fields = [...group].sort().join();
-    const rows = await telemetryDailyAccessor.read({ from, to, events: [event] });
-    return rows.filter((row) => Object.keys(row.group).sort().join() === fields);
-  }
+  /**
+   * The rows of one group of fields, picked by the database (the rollup writes every field of a group, null when
+   * left out). `buckets: false` leaves the timings' buckets in the database (review of #176).
+   */
+  const rowsOf = ({ from, to, event, group }, { buckets = true } = {}) =>
+    telemetryDailyAccessor.read({
+      from,
+      to,
+      events: [event],
+      fields: [...group].sort().join(","),
+      ...(!buckets && { dropBuckets: ROLLUP_SPEC[event]?.timings ?? [] }),
+    });
 
   /**
    * Each value of a group summed over a range of days, busiest first. A range's percentiles come from the days'
@@ -113,7 +119,7 @@ export function createTelemetryReport({ telemetryDailyAccessor }) {
      * @param {{ from: string, to: string, event: string, group: ReadonlyArray<string> }} query
      */
     series: async (query) =>
-      (await rowsOf(query)).map(({ day, group, count, timings }) => ({
+      (await rowsOf(query, { buckets: false })).map(({ day, group, count, timings }) => ({
         day,
         group,
         count,

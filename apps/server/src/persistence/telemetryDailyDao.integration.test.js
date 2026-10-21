@@ -51,7 +51,8 @@ describe("MongoDB telemetry daily DAO honours the telemetry daily DAO contract (
 
     expect(await collection("telemetry_daily").indexes()).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ key: { day: 1, event: 1, key: 1 }, unique: true }),
+        expect.objectContaining({ key: { day: 1, event: 1, key: 1, version: 1 }, unique: true }),
+        expect.objectContaining({ key: { event: 1, fields: 1, day: 1 } }),
         expect.objectContaining({ key: { at: 1 }, expireAfterSeconds: TELEMETRY_DAILY_KEEP_DAYS * DAY_S }),
       ]),
     );
@@ -63,12 +64,59 @@ describe("MongoDB telemetry daily DAO honours the telemetry daily DAO contract (
     );
     // A total and its group, the day, and nothing that names anyone.
     const [doc] = await collection("telemetry_daily").find().toArray();
-    expect(Object.keys(doc).sort()).toEqual(["_id", "at", "count", "day", "event", "group", "key"]);
+    expect(Object.keys(doc).sort()).toEqual([
+      "_id",
+      "at",
+      "count",
+      "day",
+      "event",
+      "fields",
+      "group",
+      "key",
+      "version",
+    ]);
     expect(doc._id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(Object.values(doc).filter(hasPlayerIdShape)).toEqual([]);
-    // The same group twice on one day is refused by the unique key.
+    // The same group twice in one version of a day is refused by the unique key.
     await expect(collection("telemetry_daily").insertOne({ ...doc, _id: "another" })).rejects.toThrow(
       /duplicate key/,
     );
+  });
+
+  // Review of #176: a reader never sees half a day, so it cannot cache one.
+  it("reads a day whole while it is replaced: never a part, never both versions", async () => {
+    const dao = await createDao();
+    const day = { day: "2026-10-19", at: new Date(DAY_AT) };
+    const rows = (count) =>
+      Array.from({ length: 400 }, (_, index) => dailyRow({ group: { route: `/r${index}` }, count }));
+    await dao.replaceDay({ ...day, rows: rows(1) });
+    const total = async () =>
+      (await dao.read({ from: "2026-10-19", to: "2026-10-19", events: ["control_pressed"] })).reduce(
+        (sum, { count }) => sum + count,
+        0,
+      );
+
+    const replacing = dao.replaceDay({ ...day, rows: rows(2) });
+    const seen = [];
+    for (let read = 0; read < 15; read += 1) seen.push(await total());
+    await replacing;
+    seen.push(await total());
+
+    expect(seen.every((sum) => sum === 400 || sum === 800)).toBe(true);
+    expect(seen.at(-1)).toBe(800);
+    // Rows of a version that is not the day's (a replace that died half way) are never read.
+    await collection("telemetry_daily").insertOne({
+      _id: "left-over",
+      ...day,
+      ...dailyRow({ group: { route: "/left" }, count: 99 }),
+      version: "a-dead-run",
+    });
+    expect(await total()).toBe(800);
+    expect(
+      await collection("telemetry_daily").countDocuments({
+        day: "2026-10-19",
+        version: { $ne: "a-dead-run" },
+      }),
+    ).toBe(400);
   });
 });

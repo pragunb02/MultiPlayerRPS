@@ -8,6 +8,7 @@ const MINUTE = 60 * 1000;
 export const dailyRow = ({ event = "control_pressed", group = {}, count = 7, timings } = {}) => ({
   event,
   key: JSON.stringify(Object.entries(group).sort()),
+  fields: Object.keys(group).sort().join(","),
   group,
   count,
   ...(timings && { timings }),
@@ -21,6 +22,50 @@ export const dailyRow = ({ event = "control_pressed", group = {}, count = 7, tim
  * @param {() => Promise<ReturnType<typeof import("../persistence/telemetryDailyDao.js").createTelemetryDailyDao>>} createDao
  */
 export function runTelemetryDailyDaoContract(createDao) {
+  // Review of #176: the database picks the group, and the buckets stay behind when they are not wanted.
+  it("reads only the rows of the group's fields, and leaves a timing's buckets out when asked", async () => {
+    const dao = await createDao();
+    const timings = {
+      lcp_ms: {
+        n: 6,
+        p50: 1200,
+        p75: 1200,
+        p95: 3100,
+        buckets: [
+          [1250, 5],
+          [4000, 1],
+        ],
+      },
+    };
+    await dao.replaceDay({
+      day: "2026-10-19",
+      at: new Date(DAY_AT),
+      rows: [
+        dailyRow({ event: "page_speed_measured", count: 6, timings }),
+        dailyRow({ event: "page_speed_measured", group: { device: "phone" }, count: 6, timings }),
+        dailyRow({ event: "page_speed_measured", group: { device: "phone", route: "/" }, count: 6, timings }),
+      ],
+    });
+    const range = { from: "2026-10-19", to: "2026-10-19", events: ["page_speed_measured"] };
+
+    const phone = await dao.read({ ...range, fields: "device" });
+    const all = await dao.read({ ...range, fields: "", dropBuckets: ["lcp_ms"] });
+
+    expect(phone).toEqual([
+      { day: "2026-10-19", event: "page_speed_measured", group: { device: "phone" }, count: 6, timings },
+    ]);
+    expect(all).toEqual([
+      {
+        day: "2026-10-19",
+        event: "page_speed_measured",
+        group: {},
+        count: 6,
+        timings: { lcp_ms: { n: 6, p50: 1200, p75: 1200, p95: 3100 } },
+      },
+    ]);
+    expect(await dao.read(range)).toHaveLength(3);
+  });
+
   it("replaces a day's totals as a whole and reads them by day, event and group", async () => {
     const dao = await createDao();
     await dao.replaceDay({

@@ -576,7 +576,9 @@ job in `rollupJob.js` (CC-176)
 
 1. **Holds:** one document per India day, event and group of the rollup spec: `day`, `at` (the start of that day,
    for the TTL), `event`, `group` (the spec's fields for that group and their values, `null` for a field the event left
-   out), `key` (the group as text, for the unique index on `day`, `event` and `key`), `count`, and for timings
+   out), `key` (the group as text), `fields` (the group's field names, so the database picks a group, indexed with
+   `event` and `day`), `version` (the run that wrote it: unique on `day`, `event`, `key` and `version`, and a day is
+   read only in the version its run record names, so a reader never sees half a replaced day), `count`, and for timings
    `timings.<field>` with `n`, the day's exact `p50`, `p75` and `p95` (from the hourly counters), and `buckets`, pairs
    of an upper edge and a count, so a range of days can be read without single values. Open fields (control,
    element, build) keep their busiest 25, 25 and 5 values per group and sum the rest as `(other)`, so at most 20 000
@@ -591,8 +593,8 @@ job in `rollupJob.js` (CC-176)
 ### `telemetry_daily_runs`
 
 The same DAO (CC-176). One document per India day the job has seen: `_id` the day, `at`, `owner` and `leaseUntil`
-(the process rolling it up now, so a second one skips it; a random id per process, nothing about a person), and
-`doneAt`. Kept 40 days by a TTL index on `at`. No personal data.
+(the process rolling it up now, so a second one skips it; a random id per process, nothing about a person),
+`doneAt`, and `version`, the version of the day's rows that is read. Kept 40 days by a TTL index on `at`. No personal data.
 
 ### `daily_puzzle_attempts`
 
