@@ -116,17 +116,17 @@ describe("signed-in devices on the profile (CC-262)", () => {
   });
 
   it("shows loading, then a failure to load", async () => {
-    let fail;
-    const getDevices = vi.fn(
-      () =>
-        new Promise((_, reject) => {
-          fail = reject;
-        }),
-    );
+    // The answer is made before the page asks for it, so the test can refuse it whenever the page asks.
+    let fail = () => {};
+    const answer = new Promise((_, reject) => {
+      fail = reject;
+    });
+    const getDevices = vi.fn(() => answer);
     renderApp({ path: "/profile", api: profileApi({ getDevices }) });
     const account = await screen.findByRole("region", { name: "Account" });
 
     expect(within(account).getByText("Loading your devices…")).toBeVisible();
+    await vi.waitFor(() => expect(getDevices).toHaveBeenCalled());
     fail(new AppRequestError({ code: "UNKNOWN", message: "Something went wrong", status: 500 }));
 
     expect(await within(account).findByRole("alert")).toHaveTextContent(
