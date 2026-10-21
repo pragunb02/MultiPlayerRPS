@@ -61,6 +61,12 @@ describe("MongoDB challenge DAO honours the challenge DAO contract (integration)
         expect.objectContaining({ key: { fromId: 1, createdAt: -1 } }),
         expect.objectContaining({ key: { toId: 1, createdAt: -1 } }),
         expect.objectContaining({ key: { acceptedBy: 1 } }),
+        // One challenge per place for open challenges of each sender (CC-337).
+        expect.objectContaining({
+          key: { fromId: 1, openSlot: 1 },
+          unique: true,
+          partialFilterExpression: { openSlot: { $exists: true } },
+        }),
         expect.objectContaining({ key: { deleteAt: 1 }, expireAfterSeconds: 0 }),
       ]),
     );

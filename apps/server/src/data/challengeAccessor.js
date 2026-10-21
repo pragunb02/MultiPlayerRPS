@@ -1,6 +1,7 @@
 import { CHALLENGE_STATES } from "@classicade/shared";
+import { DuplicateKey } from "../persistence/errors.js";
 import { assertDefined } from "../utils/assert.js";
-import { NotFoundError } from "../utils/errors.js";
+import { ConflictError, NotFoundError } from "../utils/errors.js";
 
 /**
  * @typedef {Object} Challenge     domain model (frozen, times in ms): one challenge (CC-139, ADR-069)
@@ -22,8 +23,8 @@ import { NotFoundError } from "../utils/errors.js";
  * @property {ReadonlyArray<string>} laterBy  the players who moved it to their inbox
  */
 
-/** @returns {Readonly<Challenge>} */
-const toChallenge = ({ createdAt, expiresAt, endedAt, deleteAt, options, laterBy, ...doc }) =>
+/** @returns {Readonly<Challenge>} The place it holds (`openSlot`) stays in storage. */
+const toChallenge = ({ createdAt, expiresAt, endedAt, deleteAt, openSlot, options, laterBy, ...doc }) =>
   Object.freeze({
     ...doc,
     options: Object.freeze({ ...options }),
@@ -44,22 +45,36 @@ export function createChallengeAccessor({ challengeDao }) {
 
   return Object.freeze({
     /**
-     * Stores a new open challenge.
+     * Stores a new open challenge in one of the sender's `openSlots` places for open challenges, so the sender
+     * never has more open at once, however many are made at the same moment (CC-337). Places held by challenges
+     * that can never be open again are let go first.
      *
      * @param {Omit<Challenge, "state" | "endedAt" | "acceptedBy" | "acceptedName" | "roomCode" | "laterBy"> & { deleteAt: number }} challenge
      *   `deleteAt` is when storage forgets it by itself
+     * @param {{ openSlots: number }} limit
      * @returns {Promise<Readonly<Challenge>>}
+     * @throws {ConflictError} with `details.openSlots` when every place is held
      */
-    add: async ({ createdAt, expiresAt, deleteAt, ...challenge }) =>
-      toChallenge(
-        await challengeDao.insert({
-          ...challenge,
-          state: CHALLENGE_STATES.OPEN,
-          createdAt: new Date(createdAt),
-          expiresAt: new Date(expiresAt),
-          deleteAt: new Date(deleteAt),
-        }),
-      ),
+    async add({ createdAt, expiresAt, deleteAt, ...challenge }, { openSlots }) {
+      await challengeDao.freeSlots({ fromId: challenge.fromId, at: new Date(createdAt) });
+      for (let openSlot = 0; openSlot < openSlots; openSlot += 1) {
+        try {
+          return toChallenge(
+            await challengeDao.insert({
+              ...challenge,
+              state: CHALLENGE_STATES.OPEN,
+              createdAt: new Date(createdAt),
+              expiresAt: new Date(expiresAt),
+              deleteAt: new Date(deleteAt),
+              openSlot,
+            }),
+          );
+        } catch (err) {
+          if (!(err instanceof DuplicateKey && err.field === "openSlot")) throw err;
+        }
+      }
+      throw new ConflictError("Every place for an open challenge is taken", { details: { openSlots } });
+    },
 
     /**
      * @param {string} challengeId

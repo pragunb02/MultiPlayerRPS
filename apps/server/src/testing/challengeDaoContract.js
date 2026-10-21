@@ -10,9 +10,13 @@ const ARJUN = "user_ffffffffffffffffffffffff";
 const GUEST = "guest_00000000-0000-4000-8000-000000000001";
 
 let counter = 0;
-/** A challenge record as the accessor writes it, open for a day, with a fresh id unless one is given. */
-export const challengeRecord = ({ fromId = RIYA, toId, seconds = 0, challengeId } = {}) => ({
+/**
+ * A challenge record as the accessor writes it, open for a day, with a fresh id and a place for open challenges of
+ * its own unless they are given.
+ */
+export const challengeRecord = ({ fromId = RIYA, toId, seconds = 0, challengeId, openSlot } = {}) => ({
   challengeId: challengeId ?? `c${String(++counter).padStart(19, "0")}`,
+  openSlot: openSlot ?? counter,
   fromId,
   fromName: "Riya",
   fromPublic: true,
@@ -268,5 +272,78 @@ export function runChallengeDaoContract(createDao) {
     expect(await dao.remove(challengeId)).toBe(true);
     expect(await dao.remove(challengeId)).toBe(false);
     await expect(dao.get(challengeId)).rejects.toThrow(RangeError);
+  });
+
+  it("keeps one challenge in each place of a sender, and the same place free for anyone else (CC-337)", async () => {
+    const dao = await createDao();
+    await dao.insert(challengeRecord({ openSlot: 0 }));
+
+    const results = await Promise.allSettled([
+      dao.insert(challengeRecord({ openSlot: 1 })),
+      dao.insert(challengeRecord({ openSlot: 1 })),
+    ]);
+
+    await expect(dao.insert(challengeRecord({ openSlot: 0 }))).rejects.toMatchObject({
+      constructor: DuplicateKey,
+      field: "openSlot",
+    });
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(results.find((result) => result.status === "rejected").reason.field).toBe("openSlot");
+    expect((await dao.insert(challengeRecord({ fromId: ARJUN, openSlot: 0 }))).openSlot).toBe(0);
+    const taken = await dao.insert(challengeRecord({ openSlot: 2 }));
+    await expect(
+      dao.insert(challengeRecord({ challengeId: taken.challengeId, openSlot: 3 })),
+    ).rejects.toMatchObject({ field: "challengeId" });
+  });
+
+  it("lets go of the places of challenges that can never be open again, and keeps every other one", async () => {
+    const dao = await createDao();
+    const open = await dao.insert(challengeRecord({ openSlot: 0 }));
+    const declined = await dao.insert(challengeRecord({ openSlot: 1 }));
+    const withdrawn = await dao.insert(challengeRecord({ openSlot: 2 }));
+    const holding = await dao.insert(challengeRecord({ openSlot: 3 }));
+    const roomMade = await dao.insert(challengeRecord({ openSlot: 4 }));
+    const expired = await dao.insert(challengeRecord({ seconds: -DAY_SECONDS, openSlot: 5 }));
+    const others = await dao.insert(challengeRecord({ fromId: ARJUN, seconds: -DAY_SECONDS, openSlot: 0 }));
+    const stale = at(1 - 30);
+    await dao.end({
+      challengeId: declined.challengeId,
+      state: CHALLENGE_STATES.DECLINED,
+      at: at(1),
+      staleBefore: stale,
+    });
+    await dao.end({
+      challengeId: withdrawn.challengeId,
+      state: CHALLENGE_STATES.WITHDRAWN,
+      at: at(1),
+      staleBefore: stale,
+    });
+    for (const { challengeId } of [holding, roomMade]) {
+      await dao.claim({ challengeId, acceptedBy: GUEST, acceptedName: "G", at: at(1), staleBefore: stale });
+    }
+    await dao.setRoom({ challengeId: roomMade.challengeId, acceptedBy: GUEST, roomCode: "AB2CD3" });
+
+    expect(await dao.freeSlots({ fromId: RIYA, at: at(2) })).toBe(4);
+    expect(await dao.freeSlots({ fromId: RIYA, at: at(2) })).toBe(0);
+
+    const slotOf = async ({ challengeId }) => (await dao.get(challengeId)).openSlot;
+    expect(
+      await Promise.all([open, declined, withdrawn, holding, roomMade, expired, others].map(slotOf)),
+    ).toEqual([0, undefined, undefined, 3, undefined, undefined, 0]);
+    expect((await dao.insert(challengeRecord({ openSlot: 1 }))).openSlot).toBe(1);
+  });
+
+  it("moves a guest's places to their account, except a place the account holds already", async () => {
+    const dao = await createDao();
+    const kept = await dao.insert(challengeRecord({ fromId: GUEST, openSlot: 1 }));
+    const clash = await dao.insert(challengeRecord({ fromId: GUEST, openSlot: 0 }));
+    const own = await dao.insert(challengeRecord({ fromId: ARJUN, openSlot: 0 }));
+
+    expect(await dao.movePlayer({ from: GUEST, to: ARJUN })).toBe(2);
+
+    expect(await dao.get(kept.challengeId)).toMatchObject({ fromId: ARJUN, openSlot: 1 });
+    expect(await dao.get(clash.challengeId)).toMatchObject({ fromId: ARJUN });
+    expect((await dao.get(clash.challengeId)).openSlot).toBeUndefined();
+    expect((await dao.get(own.challengeId)).openSlot).toBe(0);
   });
 }

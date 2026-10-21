@@ -238,20 +238,22 @@ export function createChallengeComponent({
     return recipient;
   }
 
+  const openLimitReached = (cause) =>
+    new ConflictError(`You can have ${limits.openPerSender} challenges open at once. Take one back first`, {
+      details: { reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: limits.openPerSender },
+      cause,
+    });
+
   /**
-   * The limit a new challenge breaks, or undefined. It reads the sender's challenges with the new one stored, so
-   * challenges made at the same moment are judged in one order: the oldest within the limit stay, and any after
-   * them are refused. Checking before storing would let two at once both pass.
+   * The limit a new challenge breaks, or undefined, read with the new one stored. The limit of open ones is held
+   * by storage, one place per open challenge (CC-337). Only a guest who signed in to an account that had open ones
+   * too can be over it, and then a new one is refused until enough of them end. For the same person, challenges
+   * made at the same moment are judged in one order: the oldest stays, and any after it are refused.
    */
   async function brokenLimit(challenge, now) {
     const mine = [...(await challengeAccessor.listFrom(challenge.fromId))].sort(oldestFirst);
     const open = mine.filter((each) => stateAt(each, now) === CHALLENGE_STATES.OPEN);
-    if (open.findIndex((each) => each.challengeId === challenge.challengeId) >= limits.openPerSender) {
-      return new ConflictError(
-        `You can have ${limits.openPerSender} challenges open at once. Take one back first`,
-        { details: { reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: limits.openPerSender } },
-      );
-    }
+    if (open.length > limits.openPerSender) return openLimitReached();
     if (challenge.toId === "") return undefined;
     const recent = mine.filter(
       (each) => each.toId === challenge.toId && now < each.createdAt + limits.samePersonEveryMs,
@@ -280,19 +282,27 @@ export function createChallengeComponent({
       const value = rooms.checkOptions({ gameId, options });
       const recipient = await recipientOf({ from, to, now });
       const policy = await safety.policyFor({ playerId: from.id, now });
-      const challenge = await challengeAccessor.add({
-        challengeId: newId(),
-        fromId: from.id,
-        fromName: from.displayName,
-        fromPublic: policy.shareCardName,
-        toId: recipient.id,
-        toName: recipient.displayName,
-        gameId,
-        options: value,
-        createdAt: now,
-        expiresAt: now + lifetimes.openMs,
-        deleteAt: now + lifetimes.openMs + lifetimes.keptMs,
-      });
+      const challenge = await challengeAccessor
+        .add(
+          {
+            challengeId: newId(),
+            fromId: from.id,
+            fromName: from.displayName,
+            fromPublic: policy.shareCardName,
+            toId: recipient.id,
+            toName: recipient.displayName,
+            gameId,
+            options: value,
+            createdAt: now,
+            expiresAt: now + lifetimes.openMs,
+            deleteAt: now + lifetimes.openMs + lifetimes.keptMs,
+          },
+          { openSlots: limits.openPerSender },
+        )
+        .catch((err) => {
+          if (!(err instanceof ConflictError)) throw err;
+          throw openLimitReached(err);
+        });
       const broken = await brokenLimit(challenge, now);
       if (broken !== undefined) {
         await challengeAccessor.remove(challenge.challengeId);

@@ -23,6 +23,9 @@ const DUPLICATE_KEY_CODE = 11000;
  * @property {string} roomCode      the room made for both, "" until it is made
  * @property {string[]} laterBy     the players who moved it from a popup to their inbox
  * @property {Date} deleteAt        when MongoDB deletes the record by itself
+ * @property {number} [openSlot]    which of the sender's places for open challenges it holds, from 0. Unique per
+ *   sender, so two challenges made at the same moment can never take one place (CC-337). It is let go only once
+ *   the challenge can never be open again (`freeSlots`)
  */
 
 const challengeSchema = new mongoose.Schema(
@@ -44,12 +47,18 @@ const challengeSchema = new mongoose.Schema(
     roomCode: { type: String, default: "" },
     laterBy: { type: [String], default: [] },
     deleteAt: { type: Date, required: true },
+    openSlot: { type: Number },
   },
   { collection: "challenges", versionKey: false, minimize: false },
 );
 challengeSchema.index({ challengeId: 1 }, { unique: true });
 // The sender's own challenges, newest first: their inbox, the limit of open ones and the one in ten minutes rule.
 challengeSchema.index({ fromId: 1, createdAt: -1 });
+// One challenge per place for open challenges of each sender: the limit of open ones holds in one write (CC-337).
+challengeSchema.index(
+  { fromId: 1, openSlot: 1 },
+  { unique: true, name: "open_slot", partialFilterExpression: { openSlot: { $exists: true } } },
+);
 // The challenges sent to one player, for their inbox.
 challengeSchema.index({ toId: 1, createdAt: -1 });
 // The challenges a player took, so deleting their account or moving a guest finds them.
@@ -58,9 +67,10 @@ challengeSchema.index({ acceptedBy: 1 });
 challengeSchema.index({ deleteAt: 1 }, { expireAfterSeconds: 0 });
 
 const FIELDS =
-  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt";
+  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt openSlot";
 const PLAYER_FIELDS = Object.freeze(["fromId", "toId", "acceptedBy"]);
 const isDuplicate = (err) => err.code === DUPLICATE_KEY_CODE;
+const duplicateField = (err) => (Object.hasOwn(err.keyPattern, "openSlot") ? "openSlot" : "challengeId");
 
 /**
  * Challenges in MongoDB (CC-139, ADR-069). Every change of state is one conditional update, so two people taking
@@ -88,19 +98,45 @@ export function createChallengeDao({ connection }) {
     /**
      * @param {ChallengeDoc} challenge
      * @returns {Promise<ChallengeDoc>}
-     * @throws {DuplicateKey} when a challenge with that id exists
+     * @throws {DuplicateKey} with `field` "challengeId" when a challenge with that id exists, or "openSlot" when
+     *   another challenge of the sender holds that place
      */
     async insert(challenge) {
       try {
         await Challenge.create(challenge);
       } catch (err) {
         if (isDuplicate(err)) {
-          throw new DuplicateKey(`challenge ${challenge.challengeId} exists`, { cause: err });
+          const field = duplicateField(err);
+          throw Object.assign(new DuplicateKey(`challenge ${field} taken`, { cause: err }), { field });
         }
         throw err;
       }
       return dao.get(challenge.challengeId);
     },
+
+    /**
+     * Lets go of the places held by the sender's challenges that can never be open again at `at` or later:
+     * expired, declined, withdrawn, or taken with their room made. A hold whose room is not made yet keeps its
+     * place, since the challenge opens again if the room cannot be made.
+     *
+     * @param {{ fromId: string, at: Date }} query
+     * @returns {Promise<number>} places let go
+     */
+    freeSlots: async ({ fromId, at }) =>
+      (
+        await Challenge.updateMany(
+          {
+            fromId,
+            openSlot: { $exists: true },
+            $or: [
+              { expiresAt: { $lte: at } },
+              { state: { $in: [CHALLENGE_STATES.DECLINED, CHALLENGE_STATES.WITHDRAWN] } },
+              { state: CHALLENGE_STATES.ACCEPTED, roomCode: { $ne: "" } },
+            ],
+          },
+          { $unset: { openSlot: 1 } },
+        )
+      ).modifiedCount,
 
     /**
      * @param {string} challengeId
@@ -185,13 +221,25 @@ export function createChallengeDao({ connection }) {
     addLater: ({ challengeId, playerId }) => changed({ challengeId }, { $addToSet: { laterBy: playerId } }),
 
     /**
-     * Gives every mention of player `from` to `to`, in every field that names a player.
+     * Gives every mention of player `from` to `to`, in every field that names a player. A challenge `from` made
+     * keeps its place for open challenges unless `to` holds that place already. Then it has none, and the
+     * sender is over the limit of open challenges until enough of them end (CC-337).
      *
      * @param {{ from: string, to: string }} transfer
      * @returns {Promise<number>} records changed
      */
     async movePlayer({ from, to }) {
-      let moved = 0;
+      const placed = await Challenge.find(
+        { fromId: from, openSlot: { $exists: true } },
+        "challengeId",
+      ).lean();
+      for (const { challengeId } of placed) {
+        await Challenge.updateOne({ challengeId }, { $set: { fromId: to } }).catch((err) => {
+          if (!isDuplicate(err)) throw err;
+          return Challenge.updateOne({ challengeId }, { $set: { fromId: to }, $unset: { openSlot: 1 } });
+        });
+      }
+      let moved = placed.length;
       for (const field of PLAYER_FIELDS) {
         moved += (await Challenge.updateMany({ [field]: from }, { $set: { [field]: to } })).modifiedCount;
       }

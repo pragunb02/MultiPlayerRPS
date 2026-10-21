@@ -22,12 +22,25 @@ export function createInMemoryChallengeDao() {
     (doc.state === CHALLENGE_STATES.OPEN ||
       (doc.state === CHALLENGE_STATES.ACCEPTED && doc.roomCode === "" && doc.endedAt <= staleBefore));
 
+  /** The challenge of `fromId` that holds place `openSlot`, if any (MongoDB: the unique `open_slot` index). */
+  const holderOf = (fromId, openSlot) =>
+    [...challenges.values()].find((doc) => doc.fromId === fromId && doc.openSlot === openSlot);
+  /** Whether a challenge can never be open again at `at` or later. */
+  const overFor = (at) => (doc) =>
+    doc.expiresAt <= at ||
+    doc.state === CHALLENGE_STATES.DECLINED ||
+    doc.state === CHALLENGE_STATES.WITHDRAWN ||
+    (doc.state === CHALLENGE_STATES.ACCEPTED && doc.roomCode !== "");
+  const withoutSlot = ({ openSlot, ...doc }) => doc;
+
   const dao = Object.freeze({
     ensureIndexes: async () => {},
 
     async insert(challenge) {
-      if (challenges.has(challenge.challengeId)) {
-        throw new DuplicateKey(`challenge ${challenge.challengeId} exists`);
+      const taken = (field) => Object.assign(new DuplicateKey(`challenge ${field} taken`), { field });
+      if (challenges.has(challenge.challengeId)) throw taken("challengeId");
+      if (challenge.openSlot !== undefined && holderOf(challenge.fromId, challenge.openSlot) !== undefined) {
+        throw taken("openSlot");
       }
       challenges.set(challenge.challengeId, {
         toId: "",
@@ -48,6 +61,14 @@ export function createInMemoryChallengeDao() {
         throw new RangeError(`no challenge ${challengeId}`);
       }
       return copy(doc);
+    },
+
+    async freeSlots({ fromId, at }) {
+      const over = [...challenges.values()].filter(
+        (doc) => doc.fromId === fromId && doc.openSlot !== undefined && overFor(at)(doc),
+      );
+      over.forEach((doc) => challenges.set(doc.challengeId, withoutSlot(doc)));
+      return over.length;
     },
 
     listFrom: async (fromId) => list((doc) => doc.fromId === fromId),
@@ -103,8 +124,11 @@ export function createInMemoryChallengeDao() {
         const later = doc.laterBy.includes(from);
         if (fields.length === 0 && !later) continue;
         moved += fields.length + (later ? 1 : 0);
+        // A place `to` holds already is not moved (CC-337).
+        const keepsSlot =
+          doc.fromId !== from || doc.openSlot === undefined || holderOf(to, doc.openSlot) === undefined;
         challenges.set(id, {
-          ...doc,
+          ...(keepsSlot ? doc : withoutSlot(doc)),
           ...Object.fromEntries(fields.map((field) => [field, to])),
           laterBy: doc.laterBy.map((playerId) => (playerId === from ? to : playerId)),
         });

@@ -543,6 +543,24 @@ describe("challengeComponent: limits hold when challenges are made at the same m
   });
 });
 
+describe("challengeComponent: the limit of open challenges after a guest signs in (CC-337)", () => {
+  it("refuses a new one while the account is over the limit with the guest's, even with a place free", async () => {
+    const { make, challenges } = setup();
+    const own = [await make(), await make(), await make()];
+    for (let made = 0; made < 3; made += 1) {
+      await make({ from: GUEST, gameId: "chess", options: CHESS });
+    }
+    await challenges.transferPlayer({ from: GUEST.id, to: RIYA });
+    await challenges.withdraw({ challengeId: own[0].id, playerId: RIYA.id, now: T0 + 1 });
+
+    const refused = await make({ now: T0 + 2 }).catch((err) => err);
+
+    expect(refused).toBeInstanceOf(ConflictError);
+    expect(refused.details).toEqual({ reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: 3 });
+    expect(await challenges.inbox({ playerId: RIYA.id, now: T0 + 3 })).toHaveLength(5);
+  });
+});
+
 describe("challengeComponent: a hold that never got its room (claim lease)", () => {
   /** Someone took it, and the process stopped before the room was recorded. */
   async function cutOff() {
