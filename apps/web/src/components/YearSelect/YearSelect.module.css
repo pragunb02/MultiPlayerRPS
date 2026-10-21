@@ -4,7 +4,7 @@
   gap: var(--space-1);
 }
 .field label {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .field select {
   font: inherit;
@@ -28,7 +28,7 @@
 .error {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-danger);
 }
 /* A Hinglish line and its English line, one under the other (ADR-051). */

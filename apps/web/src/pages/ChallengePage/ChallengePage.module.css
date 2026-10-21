@@ -53,7 +53,7 @@
   display: grid;
   gap: var(--space-1);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .label input {
   min-width: 0;
@@ -66,5 +66,5 @@
 }
 .primaryLink {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }

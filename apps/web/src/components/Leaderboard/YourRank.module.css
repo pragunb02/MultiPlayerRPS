@@ -14,7 +14,7 @@
   align-items: center;
   gap: var(--space-2);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 .trophy {
   width: 2rem;
@@ -39,7 +39,7 @@
 }
 .stat dt {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
@@ -48,7 +48,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
   color: var(--color-gold);
 }

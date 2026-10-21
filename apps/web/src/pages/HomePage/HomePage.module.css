@@ -46,7 +46,7 @@
   border-radius: var(--radius-full);
   background: var(--color-backdrop);
   color: var(--color-on-hero);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 
 .games {
@@ -141,7 +141,7 @@
   background: var(--accent);
   color: var(--color-primary-contrast);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-size: var(--text-sm);
   transition: transform var(--duration-base) var(--ease-spring);
 }

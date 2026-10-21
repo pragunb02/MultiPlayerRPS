@@ -55,13 +55,13 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
 }
 .rank {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   color: var(--color-gold);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -84,7 +84,7 @@
 .stats dd {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-size: var(--text-xl);
   font-variant-numeric: tabular-nums;
 }

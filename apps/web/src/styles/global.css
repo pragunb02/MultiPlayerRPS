@@ -35,14 +35,29 @@ a {
   outline-offset: 2px;
 }
 
+/*
+ * A heading, the page's main area or a dialog that script focuses (tabindex -1) so a screen reader reads it is not
+ * a control: nothing can be pressed there. It draws no ring, because browsers count focus moved by script on a new
+ * page as keyboard focus, and the ring then showed to mouse and touch players too. Controls keep the ring above
+ * (CC-323).
+ */
+:is(h1, h2, h3, main, section, [role="dialog"], [role="region"])[tabindex="-1"]:focus {
+  outline: none;
+}
+
 h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   letter-spacing: -0.01em;
   line-height: var(--leading-tight);
   margin: 0 0 var(--space-4);
+}
+
+/* The page title: one style for every page (CC-323). A hero's display line sets its own size. */
+h1 {
+  font-size: var(--type-page-title);
 }
 
 .visually-hidden {

@@ -67,7 +67,7 @@ export function PlayPage() {
   }
 
   return (
-    <section className={styles.page}>
+    <section>
       <PageTitle>{game.name}</PageTitle>
       <div className={`${styles.banner} ${styles[gameArtFor(game.id).tone]}`}>
         <h1>{game.name}</h1>

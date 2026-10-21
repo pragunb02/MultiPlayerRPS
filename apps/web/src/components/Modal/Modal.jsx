@@ -55,9 +55,13 @@ function holdTab(event, dialog) {
  *
  * One dialog is open at a time. A dialog opened while another is open waits, drawing nothing, until the first closes.
  *
- * @param {{ open: boolean, title: import("react").ReactNode, onClose: () => void, children: import("react").ReactNode, actions: import("react").ReactNode }} props
+ * A destructive confirm (Resign, Delete, Block, Remove) passes `destructive`: a click on the backdrop then does
+ * nothing, so a stray tap beside the dialog never ends a game or deletes anything. Escape and the dialog's own
+ * buttons still close it (CC-323).
+ *
+ * @param {{ open: boolean, title: import("react").ReactNode, onClose: () => void, children: import("react").ReactNode, actions: import("react").ReactNode, destructive?: boolean }} props
  */
-export function Modal({ open, title, onClose, children, actions }) {
+export function Modal({ open, title, onClose, children, actions, destructive = false }) {
   const dialog = useRef(null);
   const titleId = useId();
   const id = useId();
@@ -104,7 +108,11 @@ export function Modal({ open, title, onClose, children, actions }) {
   // loss, a filter) would otherwise become the frame of the fixed backdrop: the dialog would be greyed with it and
   // cover only that part, leaving the buttons around it pressable (review of #113, CC-163).
   return createPortal(
-    <div className={styles.backdrop} onClick={onClose} data-cc-modal-backdrop="">
+    <div
+      className={styles.backdrop}
+      onClick={destructive ? undefined : onClose}
+      data-cc-modal-backdrop={destructive ? "destructive" : ""}
+    >
       <div
         ref={dialog}
         className={styles.dialog}

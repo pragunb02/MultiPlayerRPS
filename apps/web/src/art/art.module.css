@@ -117,7 +117,7 @@
 }
 .text {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
 }
 

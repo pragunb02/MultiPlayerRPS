@@ -45,7 +45,7 @@
   color: var(--color-primary-contrast);
   font-family: var(--font-display);
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 .glyph {
   grid-row: 1;

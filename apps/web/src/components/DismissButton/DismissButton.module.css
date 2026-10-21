@@ -12,7 +12,7 @@
   color: var(--color-text-muted);
   font: inherit;
   font-size: var(--text-lg);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   line-height: 1;
   cursor: pointer;
   /* Toasts don't take clicks (they must never cover a button); their × does. */

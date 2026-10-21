@@ -23,12 +23,12 @@
 .day {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-text-muted);
 }
 .task {
   margin: var(--space-1) 0 0;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .rating {
   margin-left: var(--space-2);
@@ -40,7 +40,7 @@
 }
 .problem {
   margin: 0;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-danger);
 }
 
@@ -62,7 +62,7 @@
   align-items: center;
   gap: var(--space-3);
   margin: 0;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .marks {
   display: inline-flex;
@@ -105,7 +105,7 @@
 }
 .solution {
   font-family: var(--font-mono);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .next {
   font-size: var(--text-sm);
@@ -120,12 +120,12 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-text);
 }
 .best {
   font-size: var(--text-sm);
-  font-weight: 400;
+  font-weight: var(--weight-regular);
   color: var(--color-text-muted);
 }
 .atRisk {

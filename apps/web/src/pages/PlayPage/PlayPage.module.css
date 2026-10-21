@@ -64,7 +64,7 @@
 .panel label {
   display: grid;
   gap: var(--space-1);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 /*
  * A field may be narrower than the width the browser gives it by default. Firefox sizes the room code field for 20
@@ -99,7 +99,7 @@
   background: var(--color-surface-raised);
   color: var(--color-text);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   text-decoration: none;
 }
 .link:hover {

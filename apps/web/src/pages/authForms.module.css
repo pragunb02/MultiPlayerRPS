@@ -38,5 +38,5 @@
   font-size: var(--text-sm);
 }
 .switch a {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }

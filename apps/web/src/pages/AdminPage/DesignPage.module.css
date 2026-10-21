@@ -7,7 +7,7 @@
   display: block;
   color: var(--color-text-muted);
   font-size: var(--type-label);
-  font-weight: 400;
+  font-weight: var(--weight-regular);
 }
 /* A phone scrolls the table sideways inside its section rather than squeezing each column into a sliver. */
 .table {
@@ -32,7 +32,7 @@ section:has(> .table) {
   min-width: 6rem;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .solid {
   background: var(--swatch);
@@ -217,7 +217,7 @@ section:has(> .table) {
   background: var(--color-primary-soft);
   color: var(--color-text);
   font-size: var(--type-caption);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   text-transform: uppercase;
 }
 .badgeSuccess {

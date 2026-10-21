@@ -31,7 +31,7 @@
 .name {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .when {
   margin-right: auto;

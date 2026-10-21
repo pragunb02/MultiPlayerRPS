@@ -27,7 +27,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 .summary {
   margin: 0;
@@ -36,7 +36,7 @@
   border-radius: var(--radius-full);
   background: var(--color-surface-raised);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
 }
 .muted {
@@ -87,7 +87,7 @@
 }
 .name {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 .meter {
   display: flex;
@@ -96,11 +96,11 @@
 }
 .count {
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 .reward {
   color: var(--color-success);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 /* Native <progress>: accessible, and styled without inline styles (strict CSP). */
 .bar {
@@ -128,7 +128,7 @@
   padding: var(--space-2) var(--space-3);
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-md);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-gold);
 }
 .sweep.done {
@@ -151,7 +151,7 @@
   background: var(--color-surface-raised);
   color: var(--color-text);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .chip.done {
   border-color: var(--color-success);

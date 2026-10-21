@@ -27,7 +27,7 @@
 .question {
   margin: 0;
   flex: 1 1 14rem;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .actions {
   display: flex;

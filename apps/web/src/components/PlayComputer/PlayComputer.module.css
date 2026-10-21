@@ -18,7 +18,7 @@
 }
 .badge {
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0 var(--space-2);

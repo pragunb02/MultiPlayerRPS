@@ -8,7 +8,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-2xl);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 .lede {
   margin: var(--space-2) 0 0;
@@ -32,7 +32,7 @@
   color: var(--color-text);
   box-shadow: var(--shadow-press-neutral-small);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-size: var(--text-sm);
   text-decoration: none;
 }
@@ -61,12 +61,12 @@
   display: grid;
   gap: var(--space-1);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .rangeField input,
 .rangeField select {
   font: inherit;
-  font-weight: 400;
+  font-weight: var(--weight-regular);
   padding: var(--space-2);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -77,7 +77,7 @@
   flex-basis: 100%;
   margin: 0;
   color: var(--color-danger);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .rangeField input:focus-visible,
 .rangeField select:focus-visible {
@@ -120,13 +120,13 @@
 }
 .tileLabel {
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-text-muted);
 }
 .tileValue {
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
   color: var(--color-primary);
 }

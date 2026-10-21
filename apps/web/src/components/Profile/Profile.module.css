@@ -5,7 +5,7 @@
   gap: var(--space-1);
 }
 .hinglish {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .english {
   color: var(--color-text-muted);
@@ -20,12 +20,12 @@
 .done {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .error {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-danger);
 }
 
@@ -42,7 +42,7 @@
 .legend {
   padding: 0 var(--space-2);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 /* Four across on a phone, six on a laptop. Each choice is at least 44 px to tap. */
 .choices {

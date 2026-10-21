@@ -4,7 +4,7 @@
   flex-direction: column;
 }
 .hinglish {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .form {
   display: grid;
@@ -33,7 +33,7 @@
   border: 2px solid var(--color-border);
   border-radius: var(--radius-full);
   background: var(--color-surface-raised);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   cursor: pointer;
 }
 .type:has(input:checked) {
@@ -49,7 +49,7 @@
   gap: var(--space-1);
 }
 .message label {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .message textarea {
   font: inherit;
@@ -89,7 +89,7 @@
 .error {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-danger);
 }
 .thanks {

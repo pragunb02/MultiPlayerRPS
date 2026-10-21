@@ -1,0 +1,123 @@
+/* Empty, error and loading (CC-323): one look for each, on every page. */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  text-align: center;
+  box-shadow: var(--elevation-1);
+}
+.art {
+  width: min(100%, 12rem);
+}
+.art > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.title {
+  margin: 0;
+  font-size: var(--type-section-title);
+}
+.pageTitle {
+  margin: 0;
+}
+.line {
+  margin: 0;
+  max-width: 44ch;
+  font-size: var(--type-body);
+  line-height: var(--leading-body);
+  color: var(--color-text-muted);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.error {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 2px solid var(--color-danger);
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-soft);
+}
+.error .actions {
+  justify-content: flex-start;
+  margin-top: 0;
+}
+.errorTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
+}
+.errorMark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+  font-weight: var(--weight-heavy);
+}
+.skeleton {
+  display: grid;
+  gap: var(--space-2);
+}
+.tiles {
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-4);
+}
+.bone {
+  display: block;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  /* A soft pulse on opacity only (ADR-012). It stops after a few beats, as nothing loops forever. */
+  animation: pulse var(--duration-celebrate) var(--ease-in-out) 10 alternate;
+}
+/* Each shape is the height of what it stands in for. */
+.line {
+  height: 1.25rem;
+  border-radius: var(--radius-sm);
+}
+.row {
+  height: 3.25rem;
+}
+.tile {
+  height: 6rem;
+}
+.card {
+  height: 14rem;
+  border-radius: var(--radius-lg);
+}
+.board {
+  width: min(100%, 28rem);
+  aspect-ratio: 1;
+  justify-self: center;
+  border-radius: var(--radius-lg);
+}
+.block {
+  height: 20rem;
+  border-radius: var(--radius-lg);
+}
+/* Literal values only: a var() inside keyframes moves the animation off the compositor (ADR-075). */
+@keyframes pulse {
+  to {
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bone {
+    animation: none;
+  }
+}

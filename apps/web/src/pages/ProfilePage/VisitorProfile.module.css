@@ -44,7 +44,7 @@
 }
 .login {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
 }
 /* The preview card: the real card's shape with a dashed edge, because nothing on it is earned yet. */
 .card {
@@ -65,7 +65,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   color: var(--color-text-muted);
 }
 /* An empty XP bar, drawn with CSS only. */
@@ -93,7 +93,7 @@
   background: var(--color-surface-raised);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   text-align: center;
 }
 /* Greyed out through the theme's own colours: grey, and a little faded, until the player earns it. */

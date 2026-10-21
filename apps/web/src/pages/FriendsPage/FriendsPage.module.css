@@ -52,7 +52,7 @@
 .name {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .muted {
   color: var(--color-text-muted);
@@ -71,11 +71,11 @@
   font-size: var(--text-sm);
 }
 .cta {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .presence {
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-text-muted);
 }
 .online {
@@ -89,13 +89,13 @@
   gap: var(--space-1);
   width: 100%;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .label input {
   width: 100%;
   min-width: 0;
   font: inherit;
-  font-weight: 400;
+  font-weight: var(--weight-regular);
   padding: var(--space-2) var(--space-3);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-sm);

@@ -13,11 +13,15 @@
   --shadow-press-small: 0 2px 0 #3f31c9;
   --shadow-press-accent-small: 0 2px 0 #8c1a43;
   --shadow-press-neutral-small: 0 2px 0 #c9cbe6;
+  --shadow-press-danger: 0 4px 0 #8e1f33;
+  --shadow-press-danger-small: 0 2px 0 #8e1f33;
   --glow-you: 0 4px 14px rgb(10 102 168 / 30%);
   /* Elevation (CC-314): how high a thing sits above the page. Aliases of the shadows above. */
   --elevation-1: var(--shadow-sm);
   --elevation-2: var(--shadow-md);
   --elevation-3: var(--shadow-md), var(--glow-primary);
+  /* The hover lift of an interactive card (CC-323): a little higher, with the brand glow. */
+  --elevation-hover: var(--shadow-md), var(--glow-primary);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,6 +36,8 @@
     --shadow-press-small: 0 2px 0 #4b3fc4;
     --shadow-press-accent-small: 0 2px 0 #b8326f;
     --shadow-press-neutral-small: 0 2px 0 #0b0c1d;
+    --shadow-press-danger: 0 4px 0 #b8455a;
+    --shadow-press-danger-small: 0 2px 0 #b8455a;
     --glow-you: 0 0 0 1px rgb(58 215 255 / 50%), 0 0 24px rgb(58 215 255 / 40%);
   }
 }
