@@ -30,6 +30,16 @@ export const TOKENS_FOLDER = "apps/web/src/styles/tokens/";
 export const isTokenFile = (file) => file === TOKENS_FILE || file.startsWith(TOKENS_FOLDER);
 
 /**
+ * A seasonal event theme (ADR-075): token overrides under `[data-event-theme="…"]` in `effects/themes/`. Its custom
+ * properties may hold raw values, because overriding tokens is all a theme does. Its other declarations follow
+ * every rule.
+ */
+const EVENT_THEME = /^apps\/web\/src\/effects\/themes\/[^/]+\.css$/;
+
+/** Whether a declaration is a token override in an event theme, which may hold a raw value. */
+const isThemeOverride = (file, prop) => EVENT_THEME.test(file) && prop.startsWith("--");
+
+/**
  * The text of every token file, the entry file first, as one stylesheet.
  *
  * @param {string} root  the repository root
@@ -291,7 +301,8 @@ export function checkCss({ css, file, tokens, exceptions = TOKEN_EXCEPTIONS, kno
       for (const rule of AT_RULES) rule.check({ atRule: node, tokens, report: reporter(node, rule.name) });
       return;
     }
-    if (node.type !== "decl" || excepted(exceptions, file, node.prop)) return;
+    if (node.type !== "decl" || excepted(exceptions, file, node.prop) || isThemeOverride(file, node.prop))
+      return;
     for (const rule of RULES) {
       rule.check({ decl: node, file, tokens, known: declared, report: reporter(node, rule.name) });
     }

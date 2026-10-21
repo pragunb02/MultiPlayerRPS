@@ -132,6 +132,13 @@ describe("the CSS token check", () => {
     expect(problemsIn(":root { --color-bg: #fff; }", "apps/web/src/styles/tokens/palette.css")).toEqual([]);
   });
 
+  it("lets an event theme override tokens with raw values, and checks the rest of it (ADR-075)", () => {
+    const theme = "apps/web/src/effects/themes/diwali.module.css";
+    const css = '[data-event-theme="diwali"] { --color-primary: #ff9f1c; --space-4: 1rem; color: #ffffff; }';
+    expect(problemsIn(css, theme).map(({ rule }) => rule)).toEqual(["classicade/no-raw-colour"]);
+    expect(problemsIn(".a { --tone: #fff; }", "apps/web/src/effects/themes/nested/x.css")).toHaveLength(1);
+  });
+
   it("refuses position: fixed outside the contract's pop-up components", () => {
     expect(messages(".a { position: fixed; }")).toEqual([
       expect.stringContaining("position: fixed draws over the page"),
