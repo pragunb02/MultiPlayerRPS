@@ -46,7 +46,12 @@ function formatterFor(zone) {
  * @returns {string | undefined}
  */
 export function canonicalZone(text) {
-  if (typeof text !== "string" || text.length === 0 || text.length > MAX_ZONE_LENGTH || !ZONE_PATTERN.test(text)) {
+  if (
+    typeof text !== "string" ||
+    text.length === 0 ||
+    text.length > MAX_ZONE_LENGTH ||
+    !ZONE_PATTERN.test(text)
+  ) {
     return undefined;
   }
   try {
@@ -96,8 +101,7 @@ export function startOfDayIn(zone, day) {
   return low;
 }
 
-const nextDay = (day) =>
-  new Date(Date.parse(`${day}T00:00:00.000Z`) + DAY_MS).toISOString().slice(0, 10);
+const nextDay = (day) => new Date(Date.parse(`${day}T00:00:00.000Z`) + DAY_MS).toISOString().slice(0, 10);
 
 /**
  * A player's calendar. With no record the player's zone is unknown and India time is used. After a change the old

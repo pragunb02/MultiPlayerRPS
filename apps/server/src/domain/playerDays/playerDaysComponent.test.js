@@ -56,7 +56,9 @@ describe("player days (CC-146)", () => {
           dayEndsAt: Date.parse("2026-10-21T18:30:00Z"),
         });
       } else {
-        expect(await refusal(days.getTimeZone({ playerId: "guest_a", now: NOW }))).toBeInstanceOf(NotFoundError);
+        expect(await refusal(days.getTimeZone({ playerId: "guest_a", now: NOW }))).toBeInstanceOf(
+          NotFoundError,
+        );
         expect(
           await refusal(days.setTimeZone({ playerId: "guest_a", zone: "Europe/London", now: NOW })),
         ).toBeInstanceOf(NotFoundError);
@@ -67,14 +69,21 @@ describe("player days (CC-146)", () => {
   it("allows one change in 7 days", async () => {
     const { days, flags } = setUp();
     const set = await days.setTimeZone({ playerId: "guest_a", zone: "America/New_York", now: NOW });
-    expect(set).toMatchObject({ zone: "America/New_York", chosen: true, changeableAt: NOW + ZONE_CHANGE_LOCK_MS });
+    expect(set).toMatchObject({
+      zone: "America/New_York",
+      chosen: true,
+      changeableAt: NOW + ZONE_CHANGE_LOCK_MS,
+    });
     expect(flags.successes).toEqual([["local_days", "guest_a"]]);
 
     const locked = await refusal(
       days.setTimeZone({ playerId: "guest_a", zone: "Europe/London", now: NOW + ZONE_CHANGE_LOCK_MS - 1 }),
     );
     expect(locked).toBeInstanceOf(ConflictError);
-    expect(locked.details).toEqual({ reason: TIME_ZONE_REFUSALS.LOCKED, changeableAt: NOW + ZONE_CHANGE_LOCK_MS });
+    expect(locked.details).toEqual({
+      reason: TIME_ZONE_REFUSALS.LOCKED,
+      changeableAt: NOW + ZONE_CHANGE_LOCK_MS,
+    });
 
     // The zone already in use again: nothing changes, no lock is started.
     const same = await days.setTimeZone({ playerId: "guest_a", zone: "America/New_York", now: NOW + DAY });
@@ -108,7 +117,9 @@ describe("player days (CC-146)", () => {
   it("moves a guest's zone only when the account has none", async () => {
     const { days } = setUp();
     await days.setTimeZone({ playerId: "guest_a", zone: "Asia/Tokyo", now: NOW });
-    expect(await days.transferPlayer({ from: "guest_a", to: { id: "user_x" } })).toEqual({ moved: { timeZone: 1 } });
+    expect(await days.transferPlayer({ from: "guest_a", to: { id: "user_x" } })).toEqual({
+      moved: { timeZone: 1 },
+    });
     expect((await days.getTimeZone({ playerId: "user_x", now: NOW })).zone).toBe("Asia/Tokyo");
     expect((await days.getTimeZone({ playerId: "guest_a", now: NOW })).chosen).toBe(false);
     // The lock moved with it: a fresh guest cannot be used to reset it.
@@ -117,10 +128,14 @@ describe("player days (CC-146)", () => {
     ).toBeInstanceOf(ConflictError);
 
     await days.setTimeZone({ playerId: "guest_b", zone: "Europe/Paris", now: NOW });
-    expect(await days.transferPlayer({ from: "guest_b", to: { id: "user_x" } })).toEqual({ moved: { timeZone: 0 } });
+    expect(await days.transferPlayer({ from: "guest_b", to: { id: "user_x" } })).toEqual({
+      moved: { timeZone: 0 },
+    });
     expect((await days.getTimeZone({ playerId: "user_x", now: NOW })).zone).toBe("Asia/Tokyo");
     // Again: nothing more.
-    expect(await days.transferPlayer({ from: "guest_b", to: { id: "user_x" } })).toEqual({ moved: { timeZone: 0 } });
+    expect(await days.transferPlayer({ from: "guest_b", to: { id: "user_x" } })).toEqual({
+      moved: { timeZone: 0 },
+    });
   });
 
   it("exports and erases the zone", async () => {

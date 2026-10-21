@@ -176,6 +176,10 @@ export function fakeApi(overrides = {}) {
     getAchievements: vi.fn().mockResolvedValue([]),
     getStreaks: vi.fn().mockResolvedValue(NO_STREAKS),
     getQuests: vi.fn().mockResolvedValue(QUESTS),
+    getTimeZone: vi
+      .fn()
+      .mockResolvedValue({ zone: "Asia/Calcutta", chosen: false, changeableAt: null, dayEndsAt: 0 }),
+    setTimeZone: vi.fn(async (zone) => ({ zone, chosen: true, changeableAt: 0, dayEndsAt: 0 })),
     // Like a puzzle the server has not sent yet. Tests of the daily puzzle page give their own (CC-144).
     getDailyPuzzle: vi.fn(() => new Promise(() => {})),
     playDailyMove: vi.fn(),

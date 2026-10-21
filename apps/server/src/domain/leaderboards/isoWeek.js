@@ -27,7 +27,11 @@ export function isoWeek(ms, offsetMs = 0) {
   }
   if (offsetMs !== 0) {
     const local = isoWeek(ms + offsetMs);
-    return Object.freeze({ id: local.id, startsAt: local.startsAt - offsetMs, endsAt: local.endsAt - offsetMs });
+    return Object.freeze({
+      id: local.id,
+      startsAt: local.startsAt - offsetMs,
+      endsAt: local.endsAt - offsetMs,
+    });
   }
   const startsAt = mondayOf(ms);
   const year = new Date(startsAt + 3 * DAY_MS).getUTCFullYear(); // the week's Thursday decides its year

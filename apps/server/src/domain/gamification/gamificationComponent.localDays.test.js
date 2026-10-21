@@ -94,7 +94,11 @@ function setUp(on = ["local_days", "streak_freezes"]) {
 describe("gamification on local days (CC-146)", () => {
   it("counts streaks and quests on the player's own day", async () => {
     const { gamification, days, finish } = setUp(["local_days"]);
-    await days.setTimeZone({ playerId: ALICE.playerId, zone: "America/New_York", now: at("2026-10-01T12:00Z") });
+    await days.setTimeZone({
+      playerId: ALICE.playerId,
+      zone: "America/New_York",
+      now: at("2026-10-01T12:00Z"),
+    });
     // 23:30 on 21 October in New York, already the 22nd in UTC and in India.
     const late = at("2026-10-22T03:30:00Z");
     await finish(match({ endedAt: late }));
@@ -120,7 +124,13 @@ describe("gamification on local days (CC-146)", () => {
     const late = at("2026-10-22T03:30:00Z");
     await finish(match({ endedAt: late }));
     const streaks = await gamification.getStreaks({ playerId: ALICE.playerId, now: late });
-    expect(streaks.daily).toEqual({ current: 1, best: 1, lastDay: "2026-10-22", playedToday: true, atRisk: false });
+    expect(streaks.daily).toEqual({
+      current: 1,
+      best: 1,
+      lastDay: "2026-10-22",
+      playedToday: true,
+      atRisk: false,
+    });
     expect(await gamification.getQuests({ playerId: ALICE.playerId, now: late })).toMatchObject({
       day: "2026-10-22",
       resetsAt: at("2026-10-23T00:00:00Z"),
@@ -145,33 +155,54 @@ describe("gamification on local days (CC-146)", () => {
 
 describe("streak freezes (CC-145)", () => {
   flagPaths("streak_freezes", (on) => {
-    it(on ? "earns, shows and spends freezes" : "has no freezes and breaks a streak on a missed day", async () => {
-      const { gamification, finish, successes } = setUp(on ? ["local_days", "streak_freezes"] : ["local_days"]);
-      await finish(match({ endedAt: indiaNoon("2026-10-19") }));
-      await finish(match({ endedAt: indiaNoon("2026-10-20") }));
-      const read = await gamification.getStreaks({ playerId: ALICE.playerId, now: indiaNoon("2026-10-22") });
-      await finish(match({ endedAt: indiaNoon("2026-10-22") }));
-      const after = await gamification.getStreaks({ playerId: ALICE.playerId, now: indiaNoon("2026-10-22") });
-      if (on) {
-        expect(read.daily).toMatchObject({ current: 2, freezes: { held: 0, covering: 1, earnBackLeft: 2 } });
-        expect(after.daily).toMatchObject({ current: 3, freezes: { held: 0, covering: 0, earnBackLeft: 1 } });
-        // Both players missed the 21st, so each counts once.
-        expect(successes).toEqual([
-          ["streak_freezes", ALICE.playerId],
-          ["streak_freezes", BOB.playerId],
-        ]);
-      } else {
-        expect(read.daily).toMatchObject({ current: 0 });
-        expect(read.daily).not.toHaveProperty("freezes");
-        expect(after.daily).toMatchObject({ current: 1, best: 2 });
-        expect(successes).toEqual([]);
-      }
-    });
+    it(
+      on ? "earns, shows and spends freezes" : "has no freezes and breaks a streak on a missed day",
+      async () => {
+        const { gamification, finish, successes } = setUp(
+          on ? ["local_days", "streak_freezes"] : ["local_days"],
+        );
+        await finish(match({ endedAt: indiaNoon("2026-10-19") }));
+        await finish(match({ endedAt: indiaNoon("2026-10-20") }));
+        const read = await gamification.getStreaks({
+          playerId: ALICE.playerId,
+          now: indiaNoon("2026-10-22"),
+        });
+        await finish(match({ endedAt: indiaNoon("2026-10-22") }));
+        const after = await gamification.getStreaks({
+          playerId: ALICE.playerId,
+          now: indiaNoon("2026-10-22"),
+        });
+        if (on) {
+          expect(read.daily).toMatchObject({
+            current: 2,
+            freezes: { held: 0, covering: 1, earnBackLeft: 2 },
+          });
+          expect(after.daily).toMatchObject({
+            current: 3,
+            freezes: { held: 0, covering: 0, earnBackLeft: 1 },
+          });
+          // Both players missed the 21st, so each counts once.
+          expect(successes).toEqual([
+            ["streak_freezes", ALICE.playerId],
+            ["streak_freezes", BOB.playerId],
+          ]);
+        } else {
+          expect(read.daily).toMatchObject({ current: 0 });
+          expect(read.daily).not.toHaveProperty("freezes");
+          expect(after.daily).toMatchObject({ current: 1, best: 2 });
+          expect(successes).toEqual([]);
+        }
+      },
+    );
   });
 
   it("covers a missed New York day across the summer time change", async () => {
     const { gamification, days, finish, published } = setUp();
-    await days.setTimeZone({ playerId: ALICE.playerId, zone: "America/New_York", now: at("2026-10-01T12:00Z") });
+    await days.setTimeZone({
+      playerId: ALICE.playerId,
+      zone: "America/New_York",
+      now: at("2026-10-01T12:00Z"),
+    });
     await finish(match({ endedAt: at("2026-10-30T16:00:00Z") })); // Friday 30th, noon in New York: a freeze
     await finish(match({ endedAt: at("2026-10-31T16:00:00Z") })); // Saturday 31st
     // Sunday 1 November lasts 25 hours in New York. 23:30 that evening is 04:30 UTC on the 2nd: still Sunday.
@@ -181,9 +212,16 @@ describe("streak freezes (CC-145)", () => {
     ).toMatchObject({ current: 2, atRisk: false, freezes: { held: 1, covering: 0 } });
     // Monday 2nd, 00:30 in New York (05:30 UTC): Sunday was missed, and the freeze covers it.
     await finish(match({ endedAt: at("2026-11-02T05:30:00Z") }));
-    const monday = await gamification.getStreaks({ playerId: ALICE.playerId, now: at("2026-11-02T05:30:00Z") });
+    const monday = await gamification.getStreaks({
+      playerId: ALICE.playerId,
+      now: at("2026-11-02T05:30:00Z"),
+    });
     // The freeze was spent, and Monday starts a new week, which earns one again.
-    expect(monday.daily).toMatchObject({ current: 3, lastDay: "2026-11-02", freezes: { held: 1, earnBackLeft: 1 } });
+    expect(monday.daily).toMatchObject({
+      current: 3,
+      lastDay: "2026-11-02",
+      freezes: { held: 1, earnBackLeft: 1 },
+    });
     const pushed = published.filter((p) => p.event === GAMIFICATION_EVENTS.STREAKS_UPDATED).at(-1);
     expect(pushed.payload.streaks.daily).toMatchObject({ current: 3, freezes: { held: 1 } });
   });
@@ -194,7 +232,10 @@ describe("streak freezes (CC-145)", () => {
     await finish(match({ endedAt: indiaNoon("2026-10-20") }));
     await finish(match({ endedAt: indiaNoon("2026-10-22") }));
     await finish(match({ endedAt: indiaNoon("2026-10-22") + 60_000 }));
-    const view = await gamification.getStreaks({ playerId: ALICE.playerId, now: indiaNoon("2026-10-22") + 60_000 });
+    const view = await gamification.getStreaks({
+      playerId: ALICE.playerId,
+      now: indiaNoon("2026-10-22") + 60_000,
+    });
     expect(view.daily).toMatchObject({ current: 3, freezes: { held: 1, earnBackLeft: 0 } });
   });
 
@@ -206,7 +247,11 @@ describe("streak freezes (CC-145)", () => {
     await finish(versus(ACCOUNT, "2026-10-22")); // the 21st covered: 0 freezes left
     await finish(versus(ALICE, "2026-10-22")); // the guest earns one
     moveMatches(ALICE.playerId, ACCOUNT);
-    await gamification.transferPlayer({ from: ALICE.playerId, to: { id: ACCOUNT.playerId }, now: indiaNoon("2026-10-22") });
+    await gamification.transferPlayer({
+      from: ALICE.playerId,
+      to: { id: ACCOUNT.playerId },
+      now: indiaNoon("2026-10-22"),
+    });
     const view = await gamification.getStreaks({ playerId: ACCOUNT.playerId, now: indiaNoon("2026-10-22") });
     expect(view.daily).toMatchObject({ current: 3, best: 3, freezes: { held: 1 } });
   });
@@ -215,7 +260,11 @@ describe("streak freezes (CC-145)", () => {
     const { gamification, finish } = setUp();
     await finish(match({ endedAt: indiaNoon("2026-10-19") }));
     const exported = await gamification.exportPlayer({ playerId: ALICE.playerId });
-    expect(exported.stats.dailyStreak).toMatchObject({ freezes: 1, freezeWeek: "2026-10-19", frozenDays: [] });
+    expect(exported.stats.dailyStreak).toMatchObject({
+      freezes: 1,
+      freezeWeek: "2026-10-19",
+      frozenDays: [],
+    });
     expect((await gamification.erasePlayer({ playerId: ALICE.playerId })).erased.stats).toBe(1);
   });
 });

@@ -5,6 +5,7 @@ import { Layout } from "../components/Layout/Layout.jsx";
 import { GamificationToasts } from "../components/GamificationToasts.jsx";
 import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { SaveProgressProvider } from "../components/SaveProgress/SaveProgressProvider.jsx";
+import { TimeZoneSync } from "../components/TimeZoneSync.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { AdminRoute } from "../pages/AdminPage/AdminRoute.jsx";
@@ -46,6 +47,7 @@ export function App({ services }) {
                 <ProgressToasts />
                 <GamificationToasts />
                 <FriendRequestToasts />
+                <TimeZoneSync />
                 <Routes>
                   <Route element={<Layout />}>
                     <Route index element={<HomePage />} />

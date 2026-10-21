@@ -138,7 +138,13 @@ export function nextDailyStreak(streak, { result, day, at, freezes = false, cove
   if (!freezes) {
     const carried = missed.length === 0 || missed.every((d) => covered.includes(d));
     const current = streak.lastDay !== "" && carried ? streak.current + 1 : 1;
-    return Object.freeze({ ...streak, current, best: Math.max(streak.best, current), lastDay: day, ...stamp });
+    return Object.freeze({
+      ...streak,
+      current,
+      best: Math.max(streak.best, current),
+      lastDay: day,
+      ...stamp,
+    });
   }
   const held = freezeFields(streak);
   let next;
@@ -174,7 +180,11 @@ export const freezeCoveredOn = (streak, day) => streak.earnBack?.day === day && 
  * @param {{ calendar?: Readonly<import("../playerDays/zoneCalendar.js").PlayerCalendar>, freezes?: boolean, showResetsAt?: boolean }} [options]
  *   `showResetsAt`: add when the player's day ends (local days, CC-146)
  */
-export function dailyStreakView(stored, now, { calendar = UTC_CALENDAR, freezes = false, showResetsAt = false } = {}) {
+export function dailyStreakView(
+  stored,
+  now,
+  { calendar = UTC_CALENDAR, freezes = false, showResetsAt = false } = {},
+) {
   const today = calendar.dayOf(now);
   const streak = readDailyStreak(stored, { calendar, today });
   const yesterday = addDays(today, -1);
@@ -191,7 +201,8 @@ export function dailyStreakView(stored, now, { calendar = UTC_CALENDAR, freezes 
     });
   }
   const held = freezeFields(streak);
-  const missed = streak.lastDay === "" || streak.lastDay >= today ? 0 : daysBetween(streak.lastDay, today) - 1;
+  const missed =
+    streak.lastDay === "" || streak.lastDay >= today ? 0 : daysBetween(streak.lastDay, today) - 1;
   const alive = streak.lastDay !== "" && missed <= held.freezes;
   const covering = alive ? missed : 0;
   const current = alive ? streak.current : 0;

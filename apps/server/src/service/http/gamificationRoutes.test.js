@@ -153,7 +153,9 @@ describe("time zone routes (CC-146)", () => {
         expect((await put("/time-zone", { zone: "America/New_York" }, carol.cookie)).status).toBe(404);
         const { streaks } = (await get("/streaks", carol.cookie)).body;
         expect(streaks.daily).not.toHaveProperty("resetsAt");
-        expect((await get("/quests", carol.cookie)).body.quests.resetsAt).toBe(Date.parse("2026-10-22T00:00:00Z"));
+        expect((await get("/quests", carol.cookie)).body.quests.resetsAt).toBe(
+          Date.parse("2026-10-22T00:00:00Z"),
+        );
         return;
       }
       expect((await get("/time-zone", carol.cookie)).body.timeZone).toMatchObject({ chosen: false });

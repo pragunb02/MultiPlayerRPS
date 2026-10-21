@@ -131,7 +131,9 @@ export function createPlayerDaysComponent({ timeZoneAccessor, flags }) {
       const guest = await recordOf(from);
       let moved = 0;
       if (guest !== undefined && (await recordOf(to.id)) === undefined) {
-        moved = (await timeZoneAccessor.save({ playerId: to.id, record: guest, expected: undefined })) ? 1 : 0;
+        moved = (await timeZoneAccessor.save({ playerId: to.id, record: guest, expected: undefined }))
+          ? 1
+          : 0;
       }
       await timeZoneAccessor.remove(from);
       return { moved: { timeZone: moved } };
@@ -142,7 +144,11 @@ export function createPlayerDaysComponent({ timeZoneAccessor, flags }) {
       const record = await recordOf(playerId);
       return record === undefined
         ? {}
-        : { zone: record.zone, previousZone: record.previousZone, changedAt: new Date(record.changedAt).toISOString() };
+        : {
+            zone: record.zone,
+            previousZone: record.previousZone,
+            changedAt: new Date(record.changedAt).toISOString(),
+          };
     },
 
     /** @param {{ playerId: string }} input @returns {Promise<{ erased: { timeZone: number } }>} */

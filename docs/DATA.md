@@ -57,6 +57,7 @@ does not.
 | [`feature_flags`](#feature_flags)                     | no: a flag name, its rollout and when it was set                                                                  | until the owner clears it                                                                               | the owner's Use the rollout in code                                                    |
 | [`feature_flag_counts`](#feature_flag_counts)         | no: per flag, India day and side, two counts                                                                      | 90 days after the day                                                                                   | MongoDB TTL index                                                                      |
 | [`daily_puzzle_attempts`](#daily_puzzle_attempts)     | pseudonymous: player id, how each day's puzzle went                                                               | until the account is deleted                                                                            | account deletion, the guest transfer                                                   |
+| [`player_time_zones`](#player_time_zones)             | pseudonymous: player id, the browser's time zone and the one before it, when it changed (CC-146)                  | until the account is deleted                                                                            | account deletion, the guest transfer                                                   |
 | [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)                                                       | until the player deletes the account                                                                    | account deletion (CC-035)                                                              |
 | [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                                                                         | 30 days                                                                                                 | MongoDB TTL index                                                                      |
 | [`legacy_closures`](#legacy_closures)                 | pseudonymous: the id of a legacy row whose player deleted the account                                             | for ever                                                                                                | nothing                                                                                |
@@ -274,7 +275,10 @@ of every nightly backup.
 `apps/server/src/persistence/statsDao.js`
 
 1. **Holds:** `playerId`, `winsByGame`, `matchesByGame`, `checkmateWins`, `questsCompleted`, `winStreak`,
-   `dailyStreak` (with the last UTC day played), `recentKeys`, `mergedFrom`, `updatedAt`, `version`.
+   `dailyStreak` (with the last day played: a UTC day, or the player's own day once `days` is `local`, CC-146; and
+   with `streak_freezes`, CC-145: `lastAt`, the freezes held, the week the last was earned, the days a freeze
+   covered, at most 60, and the earn back in progress), `recentKeys`, `mergedFrom`, `updatedAt`, `version`.
+   Documents stored before CC-145 and CC-146 have none of the new fields and are read as UTC days and no freezes.
 2. **Personal data:** pseudonymous. The last day played is behavioural.
 3. **Who can read it:** the player (`GET /api/streaks`, achievements). The owner.
 4. **Kept for:** for ever. A guest's document is removed when it moves to an account, which rebuilds the account's.
@@ -557,6 +561,20 @@ ADR-073, counts as ADR-034)
    guest data (CC-098).
 5. **Deleted by:** account deletion, and the guest transfer for the copy of a day that does not stay.
 
+### `player_time_zones`
+
+`apps/server/src/persistence/timeZoneDao.js`, rules in `apps/server/src/domain/playerDays/` (CC-146, ADR-077)
+
+1. **Holds:** one document per player who has local days and whose browser sent a time zone: `playerId`, `zone`
+   (canonical IANA name), `previousZone`, `changedAt`, `effectiveAt` (when the zone took over) and `floorDay`.
+   Index: unique on `playerId`.
+2. **Personal data:** pseudonymous. A time zone is coarse location of the player's device.
+3. **Who can read it:** the player (`GET /api/time-zone`, the data export). Never logged, counted or shown to
+   anyone else. The owner.
+4. **Kept for:** until the account is deleted. A guest's moves to an account that has none (ADR-014); otherwise it
+   is deleted at the transfer.
+5. **Deleted by:** account deletion, the guest transfer.
+
 ### `accounts.birthYear`
 
 `apps/server/src/persistence/accountDao.js`, the rule in `packages/shared/src/ages.js` (CC-152)
@@ -628,6 +646,7 @@ describe the stores as they were before CC-035 and are brought in line by CC-248
 | `player_reports`                            | deleted about the player; the player's own keep a stand-in | the reports the player made: reason, where, the name, when |
 | `feedback`                                  | not reached: no player id is stored, the TTL removes it    | no (nothing joins it to the player)                        |
 | `daily_puzzle_attempts`                     | deleted                                                    | every day, without the moves                               |
+| `player_time_zones`                         | deleted                                                    | the zone, the one before it, when it changed               |
 | `player_profiles`                           | deleted, so the handle leads nowhere                       | the handle, the avatar, the visibility                     |
 | `friendships`                               | deleted on either side, the friends see them gone          | friends by name and since when                             |
 | `friend_requests`                           | deleted on either side                                     | the requests the player sent, by name                      |

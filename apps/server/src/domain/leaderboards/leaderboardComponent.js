@@ -414,7 +414,15 @@ export function createLeaderboardComponent({
         const stored = await progressAccessor.get(playerId);
         const latest = rankedEntry({ xp: stored.xp, level: levelForXp(stored.xp) }, stored);
         const player = { playerId, displayName, level: latest.level };
-        await addXp({ player, xp: latest.xp, gained: XP_AWARDS[result], key: match.matchId, at, ends, offsetMs });
+        await addXp({
+          player,
+          xp: latest.xp,
+          gained: XP_AWARDS[result],
+          key: match.matchId,
+          at,
+          ends,
+          offsetMs,
+        });
         if (result === "win" && hasWinsBoard(match.gameId)) {
           await raiseWins({ player, gameId: match.gameId, at, ends });
         }

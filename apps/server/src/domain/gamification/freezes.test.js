@@ -25,7 +25,12 @@ describe("streak freezes (CC-145)", () => {
   });
 
   it("counts no forfeit towards a freeze", () => {
-    const after = nextDailyStreak(fresh, { result: "forfeit", day: "2026-10-19", at: noon("2026-10-19"), ...ON });
+    const after = nextDailyStreak(fresh, {
+      result: "forfeit",
+      day: "2026-10-19",
+      at: noon("2026-10-19"),
+      ...ON,
+    });
     expect(after).toBe(fresh);
   });
 
@@ -88,7 +93,11 @@ describe("streak freezes (CC-145)", () => {
   it("is not at risk while a freeze is spare", () => {
     const stored = play(fresh, "2026-10-19", "2026-10-26", "2026-10-27"); // 2 freezes
     const view = dailyStreakView(stored, noon("2026-10-28"), { calendar: india, freezes: true });
-    expect(view).toMatchObject({ current: 2, atRisk: false, freezes: { held: 2, covering: 0, earnBackLeft: 0 } });
+    expect(view).toMatchObject({
+      current: 2,
+      atRisk: false,
+      freezes: { held: 2, covering: 0, earnBackLeft: 0 },
+    });
   });
 
   it("reads an old streak with no freeze fields", () => {

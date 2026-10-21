@@ -231,7 +231,12 @@ export function createDailyPuzzleComponent({
      */
     async play({ kind: kindId, playerId, day, move, now }) {
       const kind = kindOf(kindId);
-      const { today, number, puzzle, attempt, stored, days } = await openAttempt({ kind, playerId, day, now });
+      const { today, number, puzzle, attempt, stored, days } = await openAttempt({
+        kind,
+        playerId,
+        day,
+        now,
+      });
       const judged = kind.judge({ puzzle, found: attempt.found, move });
       if (!judged.legal) {
         throw new ValidationError("That move is not possible here", {
@@ -274,7 +279,12 @@ export function createDailyPuzzleComponent({
      */
     async takeHint({ kind: kindId, playerId, day, now }) {
       const kind = kindOf(kindId);
-      const { today, number, puzzle, attempt, stored, days } = await openAttempt({ kind, playerId, day, now });
+      const { today, number, puzzle, attempt, stored, days } = await openAttempt({
+        kind,
+        playerId,
+        day,
+        now,
+      });
       if (sum(attempt.hints) >= kind.maxHints) {
         throw new ConflictError("No hints left today", {
           details: { reason: DAILY_PUZZLE_REFUSALS.NO_HINTS_LEFT },

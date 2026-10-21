@@ -49,7 +49,11 @@ function questsView(questDay, now, calendar) {
 function streaksView(stats, now, { calendar, freezes }) {
   return Object.freeze({
     win: Object.freeze({ current: stats.winStreak.current, best: stats.winStreak.best }),
-    daily: dailyStreakView(stats.dailyStreak, now, { calendar, freezes, showResetsAt: calendar.kind === "local" }),
+    daily: dailyStreakView(stats.dailyStreak, now, {
+      calendar,
+      freezes,
+      showResetsAt: calendar.kind === "local",
+    }),
   });
 }
 
@@ -222,7 +226,10 @@ export function createGamificationComponent({
     });
 
     if (counted.applied) {
-      events.emit(GAMIFICATION_EVENTS.STREAKS_UPDATED, { playerId, streaks: streaksView(stats, now, playerDays) });
+      events.emit(GAMIFICATION_EVENTS.STREAKS_UPDATED, {
+        playerId,
+        streaks: streaksView(stats, now, playerDays),
+      });
       if (freezes && freezeCoveredOn(counted.stats.dailyStreak, day)) {
         await days.freezeCovered({ playerId });
       }

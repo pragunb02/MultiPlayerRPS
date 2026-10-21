@@ -51,7 +51,11 @@ export function createGamificationRoutes({ gamificationComponent, playerDaysComp
 
     router.put("/time-zone", async (req, res) => {
       const { id } = requireIdentity(req.session);
-      const timeZone = await playerDaysComponent.setTimeZone({ playerId: id, zone: req.body?.zone, now: now() });
+      const timeZone = await playerDaysComponent.setTimeZone({
+        playerId: id,
+        zone: req.body?.zone,
+        now: now(),
+      });
       res.setHeader("Cache-Control", "no-store");
       res.json({ timeZone });
     });

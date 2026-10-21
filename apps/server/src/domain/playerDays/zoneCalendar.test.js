@@ -84,7 +84,10 @@ describe("changeZone (CC-146)", () => {
     expect(first.outcome).toBe("changed");
     const record = first.outcome === "changed" ? first.record : undefined;
     const soon = changeZone({ record, zone: "Europe/London", now: at("2026-10-27T10:00:00Z") });
-    expect(soon).toEqual({ outcome: "locked", changeableAt: at("2026-10-21T10:00:00Z") + ZONE_CHANGE_LOCK_MS });
+    expect(soon).toEqual({
+      outcome: "locked",
+      changeableAt: at("2026-10-21T10:00:00Z") + ZONE_CHANGE_LOCK_MS,
+    });
     const later = changeZone({ record, zone: "Europe/London", now: at("2026-10-28T10:00:00Z") });
     expect(later.outcome).toBe("changed");
     expect(changeZone({ record, zone: "America/New_York", now: at("2026-10-22T10:00:00Z") })).toEqual({
@@ -102,7 +105,11 @@ describe("changeZone (CC-146)", () => {
 
   it("a change west never repeats a day", () => {
     // India, 23:00 on 21 October (17:30 UTC), moves to New York, where it is still 13:30 on the 21st.
-    const moved = changeZone({ record: undefined, zone: "America/New_York", now: at("2026-10-21T17:30:00Z") });
+    const moved = changeZone({
+      record: undefined,
+      zone: "America/New_York",
+      now: at("2026-10-21T17:30:00Z"),
+    });
     const calendar = zoneCalendar(moved.outcome === "changed" ? moved.record : undefined);
     expect(daysSeen(calendar, "2026-10-21T17:30:00Z", 72)).toEqual([
       "2026-10-21",
@@ -117,7 +124,11 @@ describe("changeZone (CC-146)", () => {
   });
 
   it("a change east never skips a day", () => {
-    const inNewYork = changeZone({ record: undefined, zone: "America/New_York", now: at("2026-10-01T12:00:00Z") });
+    const inNewYork = changeZone({
+      record: undefined,
+      zone: "America/New_York",
+      now: at("2026-10-01T12:00:00Z"),
+    });
     const record = inNewYork.outcome === "changed" ? inNewYork.record : undefined;
     // New York, 20:00 on 21 October (00:00 UTC on the 22nd), moves to Tokyo, where it is already 09:00 on the 22nd.
     const moved = changeZone({ record, zone: "Asia/Tokyo", now: at("2026-10-22T00:00:00Z") });

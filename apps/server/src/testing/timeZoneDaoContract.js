@@ -28,7 +28,9 @@ export function runTimeZoneDaoContract(createDao) {
     it("creates a zone once and reads it back", async () => {
       const dao = await createDao();
       expect(await dao.save({ doc: zoneDoc(), expectedChangedAt: null })).toBe(true);
-      expect(await dao.save({ doc: zoneDoc({ zone: "Europe/London" }), expectedChangedAt: null })).toBe(false);
+      expect(await dao.save({ doc: zoneDoc({ zone: "Europe/London" }), expectedChangedAt: null })).toBe(
+        false,
+      );
       expect(await dao.findByPlayer("guest_a")).toEqual([zoneDoc()]);
     });
 
