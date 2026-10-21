@@ -133,6 +133,35 @@ describe("recoverFromStaleBuild", () => {
     });
   }
 
+  describe("quietly: a download tried again after it failed once (CC-333)", () => {
+    it("neither reloads nor swallows a failure while it is on its way, so its caller sees the failure", async () => {
+      const tab = fakeWindow("/");
+      const recovery = recoverFromStaleBuild({ window: tab, now: clock().now });
+      let swallowed;
+
+      await recovery.quietly(async () => {
+        swallowed = tab.failLoad();
+      });
+
+      expect(swallowed).toBe(false);
+      expect(tab.reloads).toBe(0);
+    });
+
+    it("reloads as before once it is over, and after one that failed", async () => {
+      const tab = fakeWindow("/");
+      const recovery = recoverFromStaleBuild({ window: tab, now: clock().now });
+
+      await recovery
+        .quietly(async () => {
+          throw new Error("404");
+        })
+        .catch(() => undefined);
+
+      expect(tab.failLoad()).toBe(true);
+      expect(tab.reloads).toBe(1);
+    });
+  });
+
   it("stops listening when asked", () => {
     const tab = fakeWindow("/");
     const stop = recoverFromStaleBuild({ window: tab, now: clock().now });
