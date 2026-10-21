@@ -47,8 +47,9 @@ string catalogue and translations (CC-218), hosting, bundle splitting as infrast
 
 1. **Fast on a ₹8,000 to ₹15,000 Android phone on patchy 4G.** 94 % of mobile use in India is Android (StatCounter,
    September 2026). Budgets:
-   1. The first route stays at or under 150 KB gzip of JavaScript (vision §6.11, enforced by CC-135). Today's main
-      chunk is about 118 to 132 KB. A look and feel PR records its gzip growth; the whole of CC-153 may add at most
+   1. The first route stays at or under 150 KB gzip of JavaScript (vision §6.11), the main chunk and its
+      preloads together. CI fails a PR over it (`node scripts/bin/check-bundle.mjs`, CC-135, CC-322). Since CC-322
+      the first route is about 146 kB (the main chunk about 132 kB). A look and feel PR records its gzip growth; the whole of CC-153 may add at most
       6 kB to the main chunk (CC-153 acceptance). Effects, Bit poses below the fold and the reward queue load lazily.
    2. Animate only `transform` and `opacity` (ADR-012, web.dev animations guide). The two documented exceptions
       stay the only ones. No canvas backgrounds, no video, no full-screen particle systems (ADR-016 amendment).
