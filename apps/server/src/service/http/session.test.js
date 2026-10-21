@@ -8,6 +8,7 @@ import {
   establishSession,
   requireIdentity,
   createSessionRenewals,
+  createRenewedSessionRelease,
   SESSION_ABSOLUTE_LIFETIME_MS,
   SESSION_END_REASONS,
 } from "./session.js";
@@ -194,6 +195,44 @@ describe("createSessionCheck (CC-116)", () => {
 
   it("refuses a session without an identity", async () => {
     await expect(setup().check({})).rejects.toThrow(UnauthorizedError);
+  });
+});
+
+describe("createRenewedSessionRelease (CC-326)", () => {
+  function answer(renewals, sessionID) {
+    const req = { sessionID, session: { identity: USER } };
+    const res = {
+      writeHead: vi.fn(function writeHead() {
+        return this;
+      }),
+    };
+    const next = vi.fn();
+    createRenewedSessionRelease({ renewals })(req, res, next);
+    return { req, res, next };
+  }
+
+  it("lets go of a session whose id was renewed while its request was on its way, so its cookie is not set again", () => {
+    const renewals = createSessionRenewals({ now: () => T0 });
+    const { req, res, next } = answer(renewals, "old-session");
+    renewals.begin("old-session");
+
+    res.writeHead(200);
+
+    expect(next).toHaveBeenCalledWith();
+    expect(req.session).toBeNull();
+  });
+
+  it("keeps every other session for its answer", () => {
+    const renewals = createSessionRenewals({ now: () => T0 });
+    renewals.begin("another-session");
+    const { req, res } = answer(renewals, "this-session");
+
+    expect(res.writeHead(200)).toBe(res);
+    expect(req.session).toEqual({ identity: USER });
+  });
+
+  it("needs the renewals", () => {
+    expect(() => createRenewedSessionRelease({})).toThrow();
   });
 });
 

@@ -139,6 +139,33 @@ export function createSessionRenewals({ now, graceMs = RENEWAL_GRACE_MS }) {
   });
 }
 
+/**
+ * Keeps a response from handing back a session id that was renewed while its request was on its way (CC-326).
+ * Sessions are rolling, so every response re-issues the cookie it came with. A request of this browser that was
+ * sent before "sign out other devices" (or a password change) but answered after it would set the old id again,
+ * over the new one, and the old id is already destroyed: the browser that asked to stay signed in is signed out
+ * on its next request. Such a response sets no cookie, and the session it carried is not saved back either.
+ *
+ * Use it right after the session middleware: a `writeHead` wrapped later runs first, so the session is let go
+ * before express-session decides on the cookie.
+ *
+ * @param {{ renewals: ReturnType<typeof createSessionRenewals> }} deps
+ * @returns {import("express").RequestHandler}
+ */
+export function createRenewedSessionRelease({ renewals }) {
+  assertDefined(renewals, "renewals");
+  return (req, res, next) => {
+    const writeHead = res.writeHead;
+    res.writeHead = function writeHeadWithoutRenewedId(...args) {
+      if (req.session && renewals.isRenewing(req.sessionID)) {
+        req.session = null;
+      }
+      return writeHead.apply(this, args);
+    };
+    next();
+  };
+}
+
 const signedOut = (cause) =>
   new UnauthorizedError("You were signed out on this device, please log in again", {
     details: { reason: SESSION_END_REASONS.SIGNED_OUT },

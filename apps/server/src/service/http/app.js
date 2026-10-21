@@ -8,7 +8,7 @@ import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createAdminAccess } from "./adminAccess.js";
 import { createRequestLogger, keepRoutePrefix } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
-import { createSessionGuard, createSessionRenewals } from "./session.js";
+import { createRenewedSessionRelease, createSessionGuard, createSessionRenewals } from "./session.js";
 import { createWebAppRouter } from "./webApp.js";
 
 /**
@@ -144,11 +144,13 @@ export function createHttpApp({
   app.use("/api", keepRoutePrefix);
   app.use("/api", createCsrfGuard({ allowedOrigins: config.allowedOrigins }));
   app.use("/api", sessionMiddleware);
+  const renewals = createSessionRenewals({ now });
+  // Straight after the session: an answer to a request that carried a just renewed id never sets it again (CC-326).
+  app.use("/api", createRenewedSessionRelease({ renewals }));
   // After the session, so a signed-in or guest player is counted by session rather than by address.
   app.use("/api", createApiRateLimit(apiLimit));
   // After the limit, so a flood of requests is refused before it costs a database read each. A session signed out
   // elsewhere or older than 90 days goes on as no session at all (CC-116).
-  const renewals = createSessionRenewals({ now });
   app.use("/api", createSessionGuard({ checkSession, onSessionEnded, renewals, now }));
 
   app.use(
