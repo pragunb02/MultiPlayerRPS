@@ -521,7 +521,7 @@ export function createTestApp({
   const otherSessionsEnded = [];
   const otherEndedListeners = [];
   const deletedListeners = [];
-  const checkSession = createSessionCheck({ accountComponent, now });
+  const checkSession = createSessionCheck({ accountComponent, suspensions: suspensionComponent, now });
 
   const app = createHttpApp({
     config,

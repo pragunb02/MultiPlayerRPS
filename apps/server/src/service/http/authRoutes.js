@@ -158,6 +158,9 @@ export function createAuthRoutes({
     const fromSessionId = req.sessionID;
     renewals.begin(fromSessionId);
     const sessionVersion = await bump();
+    // A suspension that landed while this request was on its way: the bump ended every session, and no new one is
+    // made for this browser either (CC-334). The suspension's record is written before its own bump, so it is seen.
+    await suspensionComponent.refuseSignIn({ playerId: identity.id, now: now() });
     await establishAccountSession(req, { identity, sessionVersion, signedInAt });
     onOtherSessionsEnded({ playerId: identity.id, fromSessionId, toSessionId: req.sessionID });
   }

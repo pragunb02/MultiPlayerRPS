@@ -1188,7 +1188,7 @@ export async function startServer({
   });
   const sessionEvents = new EventEmitter();
   // HTTP and realtime ask the same question of every signed-in session (CC-116).
-  const checkSession = createSessionCheck({ accountComponent, now });
+  const checkSession = createSessionCheck({ accountComponent, suspensions: suspensionComponent, now });
   const networkKey = createNetworkKey({ now });
   const app = createHttpApp({
     config,

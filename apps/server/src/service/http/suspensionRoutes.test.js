@@ -273,6 +273,54 @@ describe("what a suspension does to the account (CC-334, AC-2, AC-3, AC-5)", () 
   });
 });
 
+describe("a request on its way when the suspension lands (CC-334, review of the branch)", () => {
+  it.each([
+    ["sign out other devices", "/auth/sign-out-others", undefined],
+    [
+      "a password change",
+      "/auth/password",
+      { currentPassword: PASSWORD, newPassword: "a brand new passphrase" },
+    ],
+  ])("mints no new session for %s that bumps the version after the suspension", async (_, path, body) => {
+    const suspensionDao = createInMemorySuspensionDao();
+    const owner = await withOwner({ suspensionDao });
+    let landing;
+    // The suspension's record lands while this request is between the session guard and its own version bump.
+    const accountDao = {
+      ...owner.accountDao,
+      async bumpSessionVersion(change) {
+        if (landing !== undefined) await landing();
+        return owner.accountDao.bumpSessionVersion(change);
+      },
+    };
+    server = await startTestServer({ ...owner, accountDao });
+    const bob = await account("BobTest");
+    landing = async () => {
+      landing = undefined;
+      await suspensionDao.insert({
+        suspensionId: "00000000-0000-4000-c000-000000000001",
+        playerId: bob.identity.id,
+        nameThen: "BobTest",
+        duration: "7d",
+        reason: "harassment",
+        startedAt: new Date(),
+        endsAt: new Date(Date.now() + 7 * DAY_MS),
+        activeFor: bob.identity.id,
+        byId: "user_aaaaaaaaaaaaaaaaaaaaaaaa",
+        byName: "Owner",
+      });
+    };
+
+    const res = await call("POST", path, { body, cookie: bob.cookie });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.details).toMatchObject({ reason: "suspended" });
+    for (const cookie of new Set([bob.cookie, res.cookie])) {
+      expect((await call("GET", "/session", { cookie })).body.authenticated).toBe(false);
+    }
+  });
+});
+
 describe("POST /api/auth/suspended-export (CC-334, AC-7)", () => {
   it("exports a suspended account's data with its email and password, and only for a suspended account", async () => {
     server = await startTestServer(await withOwner());
