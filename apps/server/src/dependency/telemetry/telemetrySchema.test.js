@@ -27,6 +27,7 @@ describe("createTelemetrySchema", () => {
       "telemetry.dropped",
       "telemetry.logs.suppressed",
       "telemetry.scrubbed",
+      "telemetry_rollup.runs",
     ]);
   });
 
@@ -44,6 +45,7 @@ describe("createTelemetrySchema", () => {
       [METRICS.PIPELINE_FAILED]: ["step"],
       [METRICS.BOT_THINKING_DURATION]: ["game", "outcome"],
       [METRICS.TELEMETRY_DROPPED]: ["reason"],
+      [METRICS.TELEMETRY_ROLLUP_RUNS]: ["outcome"],
       [METRICS.EVENT_LOOP_P50]: [],
       [METRICS.EVENT_LOOP_P99]: [],
       [METRICS.MEMORY_RSS]: [],
@@ -60,6 +62,18 @@ describe("createTelemetrySchema", () => {
     );
     expect(allows(rules, "reason", "guest_00000000-0000-4000-8000-000000000001")).toBe(false);
     expect(allows(rules, "route", "/")).toBe(false);
+  });
+
+  it("lets telemetry_rollup.runs carry only an outcome, and the rollup's failure line only its step (CC-176)", () => {
+    const rules = schema.metrics[METRICS.TELEMETRY_ROLLUP_RUNS];
+    expect(allows(rules, "outcome", "ok")).toBe(true);
+    expect(allows(rules, "outcome", "failed")).toBe(true);
+    expect(allows(rules, "outcome", "2026-10-20")).toBe(false);
+    expect(schema.logs.lines["telemetry rollup failed"]).toBe(50);
+    ["lock", "read", "total", "write", "finish"].forEach((step) =>
+      expect(schema.logs.fields.step(step)).toBe(true),
+    );
+    expect(schema.logs.fields.step("control_pressed")).toBe(false);
   });
 
   it.each([

@@ -1,0 +1,222 @@
+import { randomUUID } from "node:crypto";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { TELEMETRY_ROLLUP_OUTCOMES, TELEMETRY_ROLLUP_STEPS } from "../../utils/operationsMetrics.js";
+import { addDays, dayOf, startOfDay } from "../../utils/indiaTime.js";
+import { yieldToEventLoop } from "../../utils/yieldToEventLoop.js";
+import { rollUpDay } from "./rollups.js";
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+/** How far back the job looks for a day with no run record: the hourly counters are kept 30 days (CC-175). */
+export const ROLLUP_LOOK_BACK_DAYS = 30;
+/** The complete days rolled up again on every run, so a late beacon is counted (owner default, 2026-10-22). */
+export const ROLLUP_REDO_DAYS = 2;
+/** How long a process holds a day before another may take it, if the first one died mid-run. */
+export const ROLLUP_LEASE_MS = 10 * MINUTE_MS;
+/** The time of the nightly run after India midnight: 00:30, the quietest half hour. */
+export const ROLLUP_AT_MS = 30 * MINUTE_MS;
+/** At most this many counters in one India hour: the day's cap of stored events (CC-175) bounds it. */
+const HOUR_LIMIT = 100_000;
+
+/** The steps a run can fail at and how a day's run ended, as operations telemetry names them (ADR-055). */
+export const ROLLUP_STEPS = TELEMETRY_ROLLUP_STEPS;
+export const ROLLUP_OUTCOMES = TELEMETRY_ROLLUP_OUTCOMES;
+
+/**
+ * The next 00:30 in India after a moment.
+ *
+ * @param {number} now  ms
+ * @returns {number} ms
+ */
+export function nextRunAt(now) {
+  const today = startOfDay(dayOf(now)) + ROLLUP_AT_MS;
+  return today > now ? today : startOfDay(addDays(dayOf(now), 1)) + ROLLUP_AT_MS;
+}
+
+class StepError extends Error {
+  constructor(step, cause) {
+    super(`rollup ${step} failed`, { cause });
+    this.step = step;
+  }
+}
+
+const stepped = async (step, work) => {
+  try {
+    return await work();
+  } catch (cause) {
+    throw new StepError(step, cause);
+  }
+};
+
+/**
+ * The nightly telemetry rollup (CC-176): turns each complete India day's hourly counters (CC-175) into daily totals
+ * kept 13 months. Each run rolls up every complete day of the last 30 that has no run record, and the last 2 complete
+ * days always. A day is leased before it is read, so a second process skips it, and replaced as a whole, so running it
+ * twice gives the same rows. A failed day keeps no run record, so the next tick tries again.
+ *
+ * @param {{
+ *   telemetryAccessor: Pick<ReturnType<typeof import("../../data/telemetryAccessor.js").createTelemetryAccessor>, "list">,
+ *   telemetryDailyAccessor: ReturnType<typeof import("../../data/telemetryDailyAccessor.js").createTelemetryDailyAccessor>,
+ *   isOn: () => Promise<boolean>,  the `telemetry_rollup` flag (CC-312)
+ *   now: () => number,
+ *   logger: import("pino").Logger,
+ *   onRun?: (run: { outcome: string }) => void,  the ops counter `telemetry_rollup.runs` (ADR-055)
+ *   owner?: string,  this process, for the leases
+ *   pause?: () => Promise<void>,  between the hours of a day, so live games are never held up
+ * }} deps
+ */
+export function createRollupJob({
+  telemetryAccessor,
+  telemetryDailyAccessor,
+  isOn,
+  now,
+  logger,
+  onRun = () => undefined,
+  owner = randomUUID(),
+  pause = yieldToEventLoop,
+}) {
+  assertDefined(telemetryAccessor, "telemetryAccessor");
+  assertDefined(telemetryDailyAccessor, "telemetryDailyAccessor");
+  assertFunction(isOn, "isOn");
+  assertFunction(now, "now");
+  assertDefined(logger, "logger");
+
+  /** The days this run rolls up, oldest first. */
+  async function daysToRoll(today) {
+    const window = { from: addDays(today, -ROLLUP_LOOK_BACK_DAYS), to: addDays(today, -1) };
+    const done = new Set(await telemetryDailyAccessor.doneDays(window));
+    const days = Array.from({ length: ROLLUP_LOOK_BACK_DAYS }, (_, index) => addDays(window.from, index));
+    return days.filter((day) => !done.has(day) || day >= addDays(today, -ROLLUP_REDO_DAYS));
+  }
+
+  /** A day's counters, an India hour at a time with a pause between hours. */
+  async function countersOf(day) {
+    const start = startOfDay(day);
+    const counters = [];
+    for (let hour = 0; hour < 24; hour += 1) {
+      const from = start + hour * HOUR_MS;
+      counters.push(...(await telemetryAccessor.list({ from, to: from + HOUR_MS, limit: HOUR_LIMIT })));
+      await pause();
+    }
+    return counters;
+  }
+
+  /** @returns {Promise<"ok" | "busy" | "failed">} */
+  async function rollDay(day) {
+    const dayStart = startOfDay(day);
+    let leased = false;
+    try {
+      leased = await stepped("lock", () =>
+        telemetryDailyAccessor.acquireRun({ day, dayStart, owner, now: now(), leaseMs: ROLLUP_LEASE_MS }),
+      );
+      if (!leased) return "busy";
+      const counters = await stepped("read", () => countersOf(day));
+      const rows = await stepped("total", () => rollUpDay({ day, counters }));
+      await stepped("write", () => telemetryDailyAccessor.replaceDay({ day, dayStart, rows }));
+      await stepped("finish", () => telemetryDailyAccessor.finishRun({ day, owner, now: now() }));
+      onRun({ outcome: ROLLUP_OUTCOMES.OK });
+      return "ok";
+    } catch (err) {
+      const step = err instanceof StepError ? err.step : "total";
+      // The day and the step, nothing about any event: the counters hold no one anyway.
+      logger.error({ err: err.cause ?? err, step }, "telemetry rollup failed");
+      onRun({ outcome: ROLLUP_OUTCOMES.FAILED });
+      if (leased) {
+        await telemetryDailyAccessor.releaseRun({ day, owner, now: now() }).catch(() => undefined);
+      }
+      return "failed";
+    }
+  }
+
+  return Object.freeze({
+    /**
+     * The owner's backfill after a fix (`scripts/bin/rollup-telemetry.mjs`): every complete day from `from`
+     * to yesterday, whatever their run records say and whatever the flag. Days older than the counters' 30 are left
+     * as they are, because nothing is left to total them from.
+     *
+     * @param {{ from: string }} input
+     * @returns {Promise<{ rolled: string[], busy: string[], failed: string[] }>}
+     */
+    async backfill({ from }) {
+      const today = dayOf(now());
+      const first =
+        from > addDays(today, -ROLLUP_LOOK_BACK_DAYS) ? from : addDays(today, -ROLLUP_LOOK_BACK_DAYS);
+      const result = { rolled: [], busy: [], failed: [] };
+      for (let day = first; day < today; day = addDays(day, 1)) {
+        const outcome = await rollDay(day);
+        result[outcome === "ok" ? "rolled" : outcome].push(day);
+      }
+      return result;
+    },
+
+    /**
+     * One run. Never throws: a failed day is logged and counted.
+     *
+     * @returns {Promise<{ rolled: string[], busy: string[], failed: string[], skipped?: string }>}
+     */
+    async runOnce() {
+      const result = { rolled: [], busy: [], failed: [] };
+      if (!(await isOn())) return { ...result, skipped: "flag_off" };
+      let days;
+      try {
+        days = await daysToRoll(dayOf(now()));
+      } catch (err) {
+        logger.error({ err, step: "lock" }, "telemetry rollup failed");
+        onRun({ outcome: ROLLUP_OUTCOMES.FAILED });
+        return result;
+      }
+      for (const day of days) {
+        const outcome = await rollDay(day);
+        result[outcome === "ok" ? "rolled" : outcome].push(day);
+      }
+      return result;
+    },
+  });
+}
+
+/**
+ * Runs the rollup on start, every hour and at 00:30 India time (CC-176, owner default 2026-10-22). One run at a time:
+ * a tick that comes while a run is still going is skipped. Timers do not keep the process alive.
+ *
+ * @param {{ run: () => Promise<unknown>, now: () => number, logger: import("pino").Logger }} deps
+ * @returns {{ start: () => void, stop: () => Promise<void> }}
+ */
+export function scheduleRollups({ run, now, logger }) {
+  let running;
+  let nightly;
+  let hourly;
+  let stopped = false;
+  const tick = () => {
+    if (stopped || running !== undefined) return;
+    running = Promise.resolve()
+      .then(run)
+      .catch((err) => logger.error({ err, step: "lock" }, "telemetry rollup failed"))
+      .finally(() => {
+        running = undefined;
+      });
+  };
+  const armNightly = () => {
+    nightly = setTimeout(
+      () => {
+        tick();
+        armNightly();
+      },
+      Math.max(1_000, nextRunAt(now()) - now()),
+    );
+    nightly.unref?.();
+  };
+  return {
+    start() {
+      tick();
+      hourly = setInterval(tick, HOUR_MS);
+      hourly.unref?.();
+      armNightly();
+    },
+    async stop() {
+      stopped = true;
+      clearTimeout(nightly);
+      clearInterval(hourly);
+      await running;
+    },
+  };
+}

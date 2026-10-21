@@ -3,6 +3,8 @@ import {
   BOT_THINKING_OUTCOMES,
   ROUTE_PATTERN,
   TELEMETRY_DROP_REASONS,
+  TELEMETRY_ROLLUP_OUTCOMES,
+  TELEMETRY_ROLLUP_STEPS,
   ROUTE_UNMATCHED,
   SOCKET_OUTCOMES,
 } from "../../utils/operationsMetrics.js";
@@ -17,6 +19,7 @@ export const METRICS = Object.freeze({
   PIPELINE_FAILED: "match_pipeline.failed",
   BOT_THINKING_DURATION: "bots.thinking.duration",
   TELEMETRY_DROPPED: "telemetry.dropped",
+  TELEMETRY_ROLLUP_RUNS: "telemetry_rollup.runs",
   EVENT_LOOP_P50: "nodejs.eventloop.delay.p50",
   EVENT_LOOP_P99: "nodejs.eventloop.delay.p99",
   MEMORY_RSS: "process.memory.rss",
@@ -106,6 +109,7 @@ const NAMED_LINES = Object.freeze({
   "computer player ran out of time to think": LEVEL.WARN,
   "computer player's thinking crashed": LEVEL.WARN,
   "request completed": LEVEL.ERROR,
+  "telemetry rollup failed": LEVEL.ERROR,
 });
 
 /** @typedef {(value: unknown) => boolean} Rule */
@@ -139,7 +143,8 @@ export function createTelemetrySchema({ matchSteps }) {
   const socketEvent = oneOf(Object.values(SOCKET_EVENTS));
   const game = oneOf(GAMES.map(({ id }) => id));
   const roomStatus = oneOf(Object.values(ROOM_STATUS));
-  const step = oneOf(matchSteps);
+  // A match pipeline step (ADR-047) or a step of the nightly telemetry rollup (CC-176).
+  const step = oneOf([...matchSteps, ...TELEMETRY_ROLLUP_STEPS]);
 
   const metricRules = {
     [METRICS.HTTP_DURATION]: {
@@ -157,6 +162,7 @@ export function createTelemetrySchema({ matchSteps }) {
     [METRICS.PIPELINE_FAILED]: { step },
     [METRICS.BOT_THINKING_DURATION]: { game, outcome: oneOf(Object.values(BOT_THINKING_OUTCOMES)) },
     [METRICS.TELEMETRY_DROPPED]: { reason: oneOf(Object.values(TELEMETRY_DROP_REASONS)) },
+    [METRICS.TELEMETRY_ROLLUP_RUNS]: { outcome: oneOf(Object.values(TELEMETRY_ROLLUP_OUTCOMES)) },
     [METRICS.EVENT_LOOP_P50]: {},
     [METRICS.EVENT_LOOP_P99]: {},
     [METRICS.MEMORY_RSS]: {},

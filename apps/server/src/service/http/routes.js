@@ -3,6 +3,7 @@ import { GAMES } from "@classicade/shared";
 import { createAccountRoutes } from "./accountRoutes.js";
 import { createAdminAccountRoutes } from "./adminAccountRoutes.js";
 import { createAdminRoutes } from "./adminRoutes.js";
+import { createAdminUxRoutes } from "./adminUxRoutes.js";
 import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
 import { createChallengeRoutes } from "./challengeRoutes.js";
@@ -25,6 +26,7 @@ import { createTelemetryRoutes } from "./telemetryRoutes.js";
  *   & Parameters<typeof createGamificationRoutes>[0]
  *   & { leaderboardComponent: Parameters<typeof createLeaderboardRoutes>[0]["leaderboardComponent"], leaderboardLimit?: { windowMs: number, limit: number } }
  *   & { analyticsComponent: Parameters<typeof createAdminRoutes>[0]["analyticsComponent"], adminAccess: ReturnType<typeof import("./adminAccess.js").createAdminAccess> }
+ *   & { uxReport?: Parameters<typeof createAdminUxRoutes>[0]["uxReport"] }
  *   & { playerDataComponent: Parameters<typeof createAccountRoutes>[0]["playerDataComponent"], onAccountDeleted: (playerId: string) => void, accountLimits?: Parameters<typeof createAccountRoutes>[0]["limits"] }
  *   & { blockComponent: Parameters<typeof createBlockRoutes>[0]["blockComponent"], blockLimits?: Parameters<typeof createBlockRoutes>[0]["limits"] }
  *   & { challengeComponent: Parameters<typeof createChallengeRoutes>[0]["challengeComponent"], challengeLimits?: Parameters<typeof createChallengeRoutes>[0]["limits"], networkOf: Parameters<typeof createChallengeRoutes>[0]["networkOf"] }
@@ -51,6 +53,7 @@ export function apiRouter({
   renewals,
   now,
   analyticsComponent,
+  uxReport,
   adminAccess,
   playerDataComponent,
   onAccountDeleted,
@@ -164,6 +167,10 @@ export function apiRouter({
   router.use(createTelemetryRoutes({ telemetryComponent, flagComponent, adminAccess, now }));
 
   router.use(createAdminRoutes({ analyticsComponent, requireAdmin: adminAccess.requireAdmin, now }));
+  // The owner's UX page (CC-177). A test app made without it answers the ordinary 404 there.
+  if (uxReport !== undefined) {
+    router.use(createAdminUxRoutes({ uxReport, adminAccess, flagComponent, now }));
+  }
   router.use(createAdminAccountRoutes({ accountComponent, requireAdmin: adminAccess.requireAdmin, now }));
 
   return router;

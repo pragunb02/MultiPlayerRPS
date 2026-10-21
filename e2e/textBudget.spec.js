@@ -1,29 +1,13 @@
 import { appendFileSync } from "node:fs";
+import { OVER_BUDGET_TODAY, TEXT_BUDGETS } from "@classicade/shared";
 import { expect, test } from "./fixtures.js";
 
 // The text budget of the key screens (CC-313 section 3, owner 2026-10-20): the visible words in `main`, above the
 // fold and in all, at a phone's 390 by 844 and a laptop's 1280 by 720. A screen over its budget fails the pull
 // request that made it so, and every run writes the counts to the job summary, so each change shows in review.
 
-/** Words above the fold, by screen. All of `main` may hold twice that. The same on a phone and a laptop. */
-export const TEXT_BUDGETS = Object.freeze({
-  home: 80,
-  "game page": 120,
-  "room waiting": 60,
-  "room playing (outside the board)": 30,
-  result: 60,
-  "sign-up": 80,
-});
-/**
- * Screens measured over their budget when this test was added (2026-10-21), so the test fails only if they grow.
- * Each is a finding for the owner, who either trims the screen (a ticket) or changes its budget, with a reason, in
- * the pull request that does. Remove a line once its screen fits.
- */
-export const OVER_BUDGET_TODAY = Object.freeze({
-  // The result with its rewards and the save progress card: 69 to 74 words above the fold in Chromium, as the
-  // rewards of the game vary, so a few words of room.
-  result: Object.freeze({ fold: 80, words: 120 }),
-});
+// The budgets live in the shared package, so the console's Week view (CC-177) shows the same numbers.
+export { OVER_BUDGET_TODAY, TEXT_BUDGETS };
 const SIZES = Object.freeze([
   ["phone", { width: 390, height: 844 }],
   ["laptop", { width: 1280, height: 720 }],

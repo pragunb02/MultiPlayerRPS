@@ -188,3 +188,4 @@ export {
   surfaceNamed,
 } from "./telemetry/surfaces.js";
 export { FUNNEL_IDS, FUNNEL_STEP_IDS, FUNNELS, isFunnelStep } from "./telemetry/funnels.js";
+export { OVER_BUDGET_TODAY, TEXT_BUDGETS, TEXT_LAST_MEASURED } from "./telemetry/textBudgets.js";

@@ -62,6 +62,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   leaderboardLimit?: { windowMs: number, limit: number },
  *   apiLimit?: { windowMs: number, limit: number },   the budget for all of /api together, per session or address
  *   analyticsComponent: ReturnType<typeof import("../../domain/analytics/analyticsComponent.js").createAnalyticsComponent>,
+ *   uxReport?: ReturnType<typeof import("../../domain/telemetry/uxReport.js").createUxReport>,  the owner's UX page
+ *     (CC-177). Without it `/api/admin/ux` is the ordinary 404
  *   isDatabaseUp: () => boolean,
  *   now?: () => number,   the clock for date-dependent answers (daily quests); tests pick a day
  *   recordRequest?: import("../../utils/operationsMetrics.js").OperationsMetrics["recordHttpRequest"],  operations
@@ -107,6 +109,7 @@ export function createHttpApp({
   leaderboardComponent,
   leaderboardLimit,
   analyticsComponent,
+  uxReport,
   apiLimit = DEFAULT_API_LIMIT,
   isDatabaseUp,
   now = Date.now,
@@ -193,6 +196,7 @@ export function createHttpApp({
       leaderboardComponent,
       leaderboardLimit,
       analyticsComponent,
+      uxReport,
       adminAccess,
       playerDataComponent,
       onAccountDeleted,

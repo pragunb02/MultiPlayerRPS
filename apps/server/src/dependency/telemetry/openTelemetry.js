@@ -179,6 +179,9 @@ function createOperationsMetrics(meter) {
   const telemetryDropped = meter.createCounter(METRICS.TELEMETRY_DROPPED, {
     description: "Usage counts (CC-175) not stored, by reason only.",
   });
+  const rollupRuns = meter.createCounter(METRICS.TELEMETRY_ROLLUP_RUNS, {
+    description: "Days of the nightly usage totals rolled up (CC-176), by outcome only.",
+  });
   const methods = new Set(HTTP_METHODS);
 
   return Object.freeze({
@@ -201,6 +204,9 @@ function createOperationsMetrics(meter) {
     },
     recordTelemetryDropped({ reason, count }) {
       telemetryDropped.add(count, { reason });
+    },
+    recordTelemetryRollup({ outcome }) {
+      rollupRuns.add(1, { outcome });
     },
     watch({ rooms, connections }) {
       const open = meter.createObservableGauge(METRICS.ROOMS_OPEN, {

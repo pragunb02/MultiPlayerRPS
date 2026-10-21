@@ -92,6 +92,42 @@ export const FLAGS = Object.freeze([
     success: "An interruption_ended event the server accepted.",
   }),
   Object.freeze({
+    name: "telemetry_rollup",
+    description:
+      "The server rolls the hourly usage counters up into daily totals kept 13 months, at 00:30 India time, on boot and every hour, redoing the last 2 days. Off means the job does not run. Only On runs it: a share has no player to pick.",
+    ticket: "CC-176",
+    default: false,
+    removeBy: "2027-02-28",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: false,
+    success: "A day rolled up into daily totals.",
+  }),
+  Object.freeze({
+    name: "console_ux",
+    description:
+      "Shows the console's UX page: funnels, dead and rage click hotspots, errors and speed by build, latency and the interruption budget, from the daily usage totals, with every total under 5 hidden.",
+    ticket: "CC-177",
+    default: false,
+    removeBy: "2027-02-28",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.ADMINS,
+    client: true,
+    success: "The owner opened the UX page and a section loaded.",
+  }),
+  Object.freeze({
+    name: "console_ux_week",
+    description:
+      "Shows the Week view on the console's UX page, the last full India week against the week before with the interruption budget's colours, and a badge on the UX tab when a line is red or amber. Opens by default on Mondays.",
+    ticket: "CC-313",
+    default: false,
+    removeBy: "2027-02-28",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.ADMINS,
+    client: true,
+    success: "The owner opened the Week view.",
+  }),
+  Object.freeze({
     name: "design_page",
     description:
       "Shows the console's Design page: every token of the design contract and the real components in their states, light or dark as the device shows them.",
