@@ -136,6 +136,13 @@ look-alike.
 colours for the viewer's own seat and everyone else's (`Seats`). A spectator, who has no seat, sees the seats in
 their seat colours.
 
+**Focus moved in code** (CC-100). A screen that moves focus to its heading or container, so a screen reader starts
+there, gives it `tabIndex={-1}` and no focus style of its own. `global.css` draws the usual ring on it only while
+the player is using the keyboard (the `using-keyboard` class from `app/inputModality.js`): no ring on page load or
+after a click, the ring after a key press. Never `outline: none` on such a target, and never `:focus-visible`
+alone, which Chromium matches on page load. A target whose ring another element draws (the pass-and-play board's
+region) may turn its own off.
+
 ## 3. Most per screen (D5)
 
 At most, at the same time:

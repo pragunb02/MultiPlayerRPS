@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
+import { followInputModality } from "./app/inputModality.js";
 import { takeLanding } from "./app/landing.js";
 import { removeServerHead } from "./app/serverHead.js";
 import { recoverFromStaleBuild } from "./app/staleBuild.js";
@@ -37,6 +38,8 @@ const services = {
   download: createDownload({ document, URL: window.URL }),
 };
 removeServerHead(document);
+// Focus moved in code shows its ring only for keyboard players (CC-100).
+followInputModality(document);
 // Before the first render, which takes the waking up screen of index.html away (CC-232).
 noteWaitingScreen({ document, window });
 

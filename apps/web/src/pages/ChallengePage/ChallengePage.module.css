@@ -36,9 +36,6 @@
   font-size: var(--text-xl);
   overflow-wrap: anywhere;
 }
-.heading:focus {
-  outline: none;
-}
 .icon {
   flex: none;
   width: 2rem;
