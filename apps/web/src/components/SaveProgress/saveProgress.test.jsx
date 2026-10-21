@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST, NO_STREAKS, PROGRESS } from "../../testing/fakes.js";
+import { installMatchMedia } from "../../testing/matchMedia.js";
 import { renderApp } from "../../testing/render.jsx";
 import { useSaveProgress } from "./saveProgressContext.js";
 import { movedAnything, savedMessage, winWorthSaving } from "./savedMessage.js";
@@ -476,6 +477,7 @@ describe("the header's sign-up link", () => {
   });
 
   it("marks the phone menu's button, so the nudge inside a closed menu is still seen (CC-259)", async () => {
+    installMatchMedia({ width: 390 });
     openRoom({ path: "/profile" });
 
     const button = await banner().findByRole("button", { name: "Menu, with Save progress" });

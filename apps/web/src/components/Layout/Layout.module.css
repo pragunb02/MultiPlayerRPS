@@ -20,16 +20,18 @@
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-sm);
 }
+
+/*
+ * The header (CC-324). Which layout shows is chosen in Layout.jsx from the same two widths (headerLayout.js), so
+ * this file only styles them: `.wide` from 64rem, `.compact` under it. Nothing in the row may wrap or push the page
+ * wider than the screen: every item but the name keeps its size, and the name gives way with an ellipsis.
+ */
 .header {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  min-height: 4.5rem; /* same height signed in or out (no layout jump) */
-  padding: var(--space-3) var(--space-6);
+  min-width: 0;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--elevation-1);
 }
 /* A neon strip under the header: the arcade's marquee light. */
 .header::after {
@@ -41,7 +43,21 @@
   height: 3px;
   background: var(--gradient-hero);
 }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-4);
+}
+.wide .row {
+  gap: var(--space-6);
+  min-height: 4.5rem; /* same height signed in or out (no layout jump) */
+  padding: var(--space-3) var(--space-6);
+}
 .brand {
+  flex: none;
   display: inline-flex;
   align-items: center;
   border-radius: var(--radius-sm);
@@ -50,58 +66,72 @@
 .brand:hover {
   transform: translateY(-1px) rotate(-1deg);
 }
+.mark {
+  display: block;
+  width: 2rem;
+  height: 2rem;
+}
+
+/* The game links in the row: pills, and the current one lit from below with a soft halo. */
 .nav {
   display: flex;
-  gap: var(--space-2);
+  flex: none;
+  gap: var(--space-1);
 }
-.nav a {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
+.nav a,
+.menuLinks a {
   color: var(--color-text-muted);
   font-family: var(--font-display);
   font-weight: 800;
   text-decoration: none;
-  transition: background-color var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+.nav a {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+}
+.compact .nav a {
+  font-size: var(--type-label);
+  padding: var(--space-1) var(--space-2);
 }
 .nav a:hover {
   background: var(--color-surface-raised);
   color: var(--color-text);
+  transform: translateY(-1px);
 }
 /* Text colour, not primary, on the soft pill: primary on primary-soft is just under 4.5:1. */
 .nav a[aria-current="page"] {
   background: var(--color-primary-soft);
   color: var(--color-text);
-  box-shadow: inset 0 -3px 0 var(--color-primary);
+  box-shadow:
+    inset 0 -3px 0 var(--color-primary),
+    var(--glow-current);
 }
-/* The Friends link is in the phone's menu only. A laptop finds it on the profile (CC-052). */
-.menuOnly {
-  display: none;
-}
-.player {
-  margin-left: auto;
+
+/* The right end of the row: the inbox, then sound, level and account, or the Menu button. */
+.end {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-3);
-}
-.identity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-/* A name is one word of up to 20 letters. It breaks where it must, so it never pushes Log out away (CC-256). */
-.name {
   min-width: 0;
-  overflow-wrap: anywhere;
-  font-weight: 700;
-  color: var(--color-text);
+  margin-left: auto;
 }
-.identity a {
+.end > * {
+  flex: none;
+}
+.login {
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
 }
 .cta {
+  flex: none;
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-accent);
@@ -109,6 +139,8 @@
   box-shadow: var(--shadow-press-accent);
   font-family: var(--font-display);
   font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
   transition: transform var(--duration-fast) var(--ease-out);
 }
 .cta:hover {
@@ -118,12 +150,112 @@
   transform: translateY(2px);
   box-shadow: var(--shadow-press-accent-small);
 }
-/* The square glyph and the menu button are for phones only. A wide screen shows the wordmark and every control. */
-.mark,
-.menuButton {
+
+/* A name is one word of up to 20 letters: cut with an ellipsis where it must be, never broken per letter. */
+.name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* The wide header's account menu: the name in a pill, and its panel under it. */
+.account {
+  position: relative;
+  min-width: 0;
+}
+.accountButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 11rem;
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--type-label);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+.accountButton:hover,
+.accountButton[aria-expanded="true"] {
+  border-color: var(--color-primary);
+}
+.accountButton.current {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  box-shadow: var(--glow-current);
+}
+.accountButton:focus-visible,
+.menuButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.chevron {
+  flex: none;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.accountButton[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+.accountPanel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--layer-menu);
+  display: grid;
+  gap: var(--space-1);
+  min-width: 13rem;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-3);
+  transition:
+    opacity var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+.accountPanel[hidden] {
   display: none;
 }
+.panelNote {
+  margin: var(--space-1) var(--space-3) var(--space-2);
+  font-size: var(--type-caption);
+  color: var(--color-text-muted);
+}
+.panelLink {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.panelLink:hover,
+.panelLink[aria-current="page"] {
+  background: var(--color-primary-soft);
+}
+
+/* The compact header's Menu button, with a dot when a guest has progress to save (CC-097). */
 .menuButton {
+  position: relative;
+  display: inline-grid;
   place-items: center;
   width: 2.5rem;
   height: 2.5rem;
@@ -138,13 +270,6 @@
 .menuButton:hover,
 .menuButton[aria-expanded="true"] {
   border-color: var(--color-primary);
-}
-.menuButton:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-}
-.menuButton {
-  position: relative;
 }
 .menuDot {
   position: absolute;
@@ -163,68 +288,91 @@
   stroke-width: 2.5;
   stroke-linecap: round;
 }
+
 /*
- * A phone gets one row (CC-259): the square glyph, the navigation and the menu button. The player's controls open
- * under that row, inside the header, and push the page down instead of covering it. So a tap meant for the page
- * never lands on the menu.
+ * The compact header's menu (CC-259, CC-324): full-width rows in labelled groups, under the row and inside the
+ * header, so it pushes the page down instead of covering it.
  */
-@media (max-width: 40rem) {
-  .header {
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    min-height: 3.5rem;
-    padding: var(--space-2) var(--space-4);
-  }
-  .brand .wordmark {
-    display: none;
-  }
-  .brand .mark {
-    display: block;
-    width: 2rem;
-    height: 2rem;
-  }
-  .brand {
-    flex: none;
-  }
-  /* A zero basis, so the links shrink and scroll sideways instead of pushing the menu button onto a new row. */
-  .nav {
-    flex: 1 1 0;
-    gap: var(--space-1);
-    min-width: 0;
-    overflow-x: auto;
-  }
-  .nav a {
-    padding: var(--space-1) var(--space-2);
-    font-size: var(--text-sm);
-    white-space: nowrap;
-  }
-  .menuButton {
-    display: inline-grid;
-    flex: none;
-    margin-left: auto;
-  }
-  .player {
-    display: none;
-    flex-basis: 100%;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin: var(--space-1) 0 var(--space-2);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--color-border);
-  }
-  .player.open {
-    display: flex;
-  }
-  .identity {
-    flex-wrap: wrap;
-  }
-  .menuOnly {
-    display: inline;
-    font-family: var(--font-display);
-    font-weight: 800;
+.menu {
+  display: none;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  transition:
+    opacity var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+.menu.open {
+  display: grid;
+}
+@starting-style {
+  .menu.open,
+  .accountPanel {
+    opacity: 0;
+    transform: translateY(-0.25rem);
   }
 }
+@media (min-width: 40rem) {
+  .menu.open {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    align-items: start;
+  }
+}
+.group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.groupTitle {
+  margin: 0;
+  font-size: var(--type-caption);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.menuLinks {
+  display: grid;
+  gap: var(--space-1);
+}
+.menuLinks:empty,
+.authRow:empty {
+  display: none;
+}
+.menuLinks a {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.menuLinks a:hover {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+.menuLinks a[aria-current="page"] {
+  background: var(--color-primary-soft);
+  box-shadow:
+    inset 3px 0 0 var(--color-primary),
+    var(--glow-current);
+}
+.youRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.youRow > :first-child {
+  flex: none;
+}
+.authRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 /*
  * Player names have no space to break at, and they appear all over the page: the profile heading, the greeting, the
  * score line, the turn lines. Any word too long for its line may break anywhere, so the page is never wider than a
@@ -236,4 +384,7 @@
   max-width: var(--content-width);
   margin: 0 auto;
   padding: var(--space-8) var(--space-4);
+}
+.wordmark {
+  display: block;
 }

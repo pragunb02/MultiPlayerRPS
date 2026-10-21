@@ -342,11 +342,19 @@ describe("a guest's progress moving to the account (CC-032, CC-097)", () => {
 });
 
 describe("header", () => {
+  // On a wide screen Log out is in the account menu, under the player's name (CC-324).
+  async function logOutButton(user) {
+    await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Riya" }));
+    return within(screen.getByRole("banner")).getByRole("button", { name: "Log out" });
+  }
+
   it("offers log in and sign up to visitors and guests", async () => {
+    const user = userEvent.setup();
     renderApp({ api: fakeApi({ getSession: async () => GUEST }) });
 
     const banner = screen.getByRole("banner");
     expect(await within(banner).findByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/signup");
+    await user.click(within(banner).getByRole("button", { name: GUEST.displayName }));
     expect(within(banner).getByRole("link", { name: "Profile" })).toBeInTheDocument();
   });
 
@@ -354,7 +362,7 @@ describe("header", () => {
     const user = userEvent.setup();
     const { api } = renderApp({ api: fakeApi({ getSession: async () => USER }) });
 
-    await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Log out" }));
+    await user.click(await logOutButton(user));
 
     expect(api.endSession).toHaveBeenCalledOnce();
     expect(
@@ -373,7 +381,7 @@ describe("header", () => {
       }),
     });
 
-    await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Log out" }));
+    await user.click(await logOutButton(user));
 
     await within(screen.getByRole("banner")).findByRole("link", { name: "Log in" });
     // The header shows "Log in" as soon as the session ends; the navigation home follows it.
@@ -390,7 +398,7 @@ describe("header", () => {
     });
     const { url } = renderApp({ path: "/games/chess", api });
 
-    await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Log out" }));
+    await user.click(await logOutButton(user));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach ClassiCade");
     expect(within(screen.getByRole("banner")).getByText("Riya")).toBeInTheDocument();

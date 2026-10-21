@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { FEEDBACK_MESSAGE_MAX, FEEDBACK_TYPES } from "@classicade/shared";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, GUEST } from "../../testing/fakes.js";
+import { installMatchMedia } from "../../testing/matchMedia.js";
 import { renderApp } from "../../testing/render.jsx";
 import { FEEDBACK_TYPE_LABELS } from "./feedbackText.js";
 
@@ -36,6 +37,7 @@ describe("the Feedback dialog (CC-290)", () => {
   });
 
   it("opens from the header menu too, where a phone finds it", async () => {
+    installMatchMedia({ width: 390 });
     const user = userEvent.setup();
     renderApp();
     const banner = screen.getByRole("banner");
@@ -52,17 +54,19 @@ describe("the Feedback dialog (CC-290)", () => {
     expect(within(banner).getByRole("button", { name: "Menu" })).toHaveFocus();
   });
 
-  it("opens from the header row on a wide screen, where there is no menu to close, and gives the focus back", async () => {
+  it("opens from the account menu on a wide screen, which closes under it, and gives the focus back", async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderApp({ api: fakeApi({ getSession: async () => GUEST }) });
     const banner = screen.getByRole("banner");
-    await within(banner).findByRole("link", { name: "Log in" });
+    const account = await within(banner).findByRole("button", { name: GUEST.displayName });
 
+    await user.click(account);
     await user.click(within(banner).getByRole("button", { name: "Feedback" }));
     await screen.findByRole("dialog", { name: /Send us feedback/ });
+    expect(account).toHaveAttribute("aria-expanded", "false");
     await user.keyboard("{Escape}");
 
-    expect(within(banner).getByRole("button", { name: "Feedback" })).toHaveFocus();
+    expect(account).toHaveFocus();
   });
 
   it("offers every type there is, each with a name", async () => {
@@ -212,6 +216,7 @@ describe("the Feedback dialog (CC-290)", () => {
     );
     await user.keyboard("{Escape}");
 
+    await user.click(await within(banner).findByRole("button", { name: "Riya" }));
     await user.click(await within(banner).findByRole("button", { name: "Log out" }));
     await within(banner).findByRole("link", { name: "Log in" });
     await user.click(within(footer).getByRole("button", { name: "Feedback" }));
