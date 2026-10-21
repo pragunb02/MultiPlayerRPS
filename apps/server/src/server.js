@@ -13,6 +13,7 @@ import { createFriendAccessor } from "./data/friendAccessor.js";
 import { createPrivacyAccessor } from "./data/privacyAccessor.js";
 import { createFeatureFlagAccessor } from "./data/featureFlagAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
+import { createReportAccessor } from "./data/reportAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
 import { createProfileAccessor } from "./data/profileAccessor.js";
@@ -40,6 +41,7 @@ import { createProfileCards } from "./domain/profiles/profileCards.js";
 import { createProfileComponent } from "./domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "./domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
+import { createReportComponent, REPORT_EVENTS } from "./domain/reports/reportComponent.js";
 import { createFlagComponent } from "./domain/flags/flagComponent.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
@@ -79,6 +81,7 @@ import { createFriendshipDao } from "./persistence/friendshipDao.js";
 import { createPrivacyDao } from "./persistence/privacyDao.js";
 import { createFeatureFlagDao } from "./persistence/featureFlagDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
+import { createReportDao } from "./persistence/reportDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
@@ -577,6 +580,42 @@ export function roomErasure({ roomComponent, domainEvents, newUuid = randomUUID 
 }
 
 /**
+ * How the owner's rename of a reported account reaches everywhere the name shows (CC-044, ADR-071.6): the account
+ * gets the safe default name and its sessions end, its seats in open rooms take the new name (so a game that ends
+ * later records it, and the boards keep it), its leaderboard rows take it, and its sockets are cut through
+ * REPORT_EVENTS.PLAYER_RENAMED, so the player signs in again under the new name.
+ *
+ * @param {{
+ *   accountComponent: Pick<ReturnType<typeof createAccountComponent>, "resetName">,
+ *   roomComponent: Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">,
+ *   leaderboardComponent: Pick<ReturnType<typeof createLeaderboardComponent>, "renamePlayer">,
+ *   domainEvents: import("node:events").EventEmitter,
+ * }} deps
+ * @returns {Parameters<typeof createReportComponent>[0]["names"]}
+ */
+export function reportedNames({ accountComponent, roomComponent, leaderboardComponent, domainEvents }) {
+  return {
+    async resetName({ playerId, now }) {
+      const displayName = await accountComponent.resetName({ playerId, now });
+      await roomComponent.renamePlayer({ playerId, displayName, now });
+      await leaderboardComponent.renamePlayer({ playerId, displayName });
+      domainEvents.emit(REPORT_EVENTS.PLAYER_RENAMED, { playerId });
+      return displayName;
+    },
+  };
+}
+
+/**
+ * Cuts the sockets of an account the owner renamed (CC-044): its sessions ended with the rename, so its open tabs
+ * show it signed out at once, as after a deletion.
+ *
+ * @param {{ domainEvents: import("node:events").EventEmitter, disconnectPlayer: (playerId: string) => void }} deps
+ */
+export function cutSocketsOnRename({ domainEvents, disconnectPlayer }) {
+  domainEvents.on(REPORT_EVENTS.PLAYER_RENAMED, ({ playerId }) => disconnectPlayer(playerId));
+}
+
+/**
  * Friends and their presence (CC-052, ADR-066). The presence tracker hears about every room change, so friends see
  * "in a game" while a game is on, and the friend component reads it. The gateway tells the tracker about tabs and
  * pushes what the friend component announces.
@@ -637,7 +676,7 @@ export function wireFriends({
  * @param {{
  *   config: Readonly<import("./config/index.js").Config>,
  *   logger: Logger,
- *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object, friends?: object, feedback?: object, challenges?: object },
+ *   limits?: { auth?: object, guest?: { windowMs: number, limit: number }, leaderboard?: { windowMs: number, limit: number }, api?: { windowMs: number, limit: number }, blocks?: object, profiles?: object, friends?: object, feedback?: object, reports?: object, challenges?: object },
  *     rate limits; production uses the
  *     defaults — only browser tests raise them, because every test player shares one IP
  *   now?: () => number,
@@ -697,6 +736,7 @@ export async function startServer({
   const accountDeletionDao = createAccountDeletionDao({ connection: database.connection });
   const blockDao = createBlockDao({ connection: database.connection });
   const feedbackDao = createFeedbackDao({ connection: database.connection });
+  const reportDao = createReportDao({ connection: database.connection });
   const dailyPuzzleAttemptDao = createDailyPuzzleAttemptDao({ connection: database.connection });
   const chessRatingDao = createChessRatingDao({ connection: database.connection });
   const profileDao = createProfileDao({ connection: database.connection });
@@ -722,6 +762,7 @@ export async function startServer({
       accountDeletionDao,
       blockDao,
       feedbackDao,
+      reportDao,
       dailyPuzzleAttemptDao,
       chessRatingDao,
       profileDao,
@@ -750,6 +791,7 @@ export async function startServer({
   const sessionAccessor = createSessionAccessor({ sessionDao });
   const blockAccessor = createBlockAccessor({ blockDao });
   const feedbackAccessor = createFeedbackAccessor({ feedbackDao });
+  const reportAccessor = createReportAccessor({ reportDao });
   const chessPuzzles = loadChessPuzzles();
   const dailyPuzzleAccessor = createDailyPuzzleAccessor({
     attemptDao: dailyPuzzleAttemptDao,
@@ -796,16 +838,6 @@ export async function startServer({
     now,
   });
   await flagComponent.refresh();
-  const blockComponent = createBlockComponent({
-    blockAccessor,
-    rooms: roomAccessor,
-    matches: matchComponent,
-    transfers: playerTransferAccessor,
-    seatIds,
-    // A block ends a friendship before it answers (CC-052). Friends are made further down, after the rooms they
-    // read, and nobody can block before the server listens.
-    followers: [{ name: "friends", playersBlocked: (pair) => friends.friendComponent.playersBlocked(pair) }],
-  });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
     matchAccessor,
@@ -839,6 +871,40 @@ export async function startServer({
     progress: progressionComponent,
     ratings: chessRatingComponent,
   });
+  // Reports are read by blocks (the one-tap block after a report), so they are made first (ADR-071.4).
+  // Rooms read blocks, which read reports, so the room component is made after them. A rename reaches the rooms
+  // through this, which gets the room component's rename as soon as it exists (long before any owner can rename).
+  const roomsToRename = /** @type {Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">} */ ({});
+  const reportComponent = createReportComponent({
+    reportAccessor,
+    coPlayers: createCoPlayers({
+      rooms: roomAccessor,
+      matches: matchComponent,
+      transfers: playerTransferAccessor,
+      seatIds,
+    }),
+    rooms: roomAccessor,
+    matches: matchComponent,
+    transfers: playerTransferAccessor,
+    profiles: profileComponent,
+    names: reportedNames({
+      accountComponent,
+      roomComponent: roomsToRename,
+      leaderboardComponent,
+      domainEvents,
+    }),
+  });
+  const blockComponent = createBlockComponent({
+    blockAccessor,
+    rooms: roomAccessor,
+    matches: matchComponent,
+    transfers: playerTransferAccessor,
+    seatIds,
+    reports: reportComponent,
+    // A block ends a friendship before it answers (CC-052). Friends are made further down, after the rooms they
+    // read, and nobody can block before the server listens.
+    followers: [{ name: "friends", playersBlocked: (pair) => friends.friendComponent.playersBlocked(pair) }],
+  });
   // Everything stored by player id moves with a guest who signs in (ADR-014), in this order. Leaderboards go
   // last: they are recomputed from the progress and matches that have moved by then.
   const playerTransferComponent = createPlayerTransferComponent({
@@ -849,6 +915,7 @@ export async function startServer({
       { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
+      { name: "reports", transferPlayer: reportComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
       { name: "profiles", transferPlayer: profileComponent.transferPlayer },
       // Made after the room component, which it needs, and called only once a guest signs in.
@@ -897,6 +964,7 @@ export async function startServer({
     seatIds,
     avatars: profileCards,
   });
+  roomsToRename.renamePlayer = roomComponent.renamePlayer;
   const friends = wireFriends({
     friendAccessor,
     privacyAccessor,
@@ -1002,6 +1070,11 @@ export async function startServer({
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
       {
+        name: "reports",
+        erasePlayer: reportComponent.erasePlayer,
+        exportPlayer: reportComponent.exportPlayer,
+      },
+      {
         name: "friends",
         erasePlayer: friends.friendComponent.erasePlayer,
         exportPlayer: friends.friendComponent.exportPlayer,
@@ -1070,6 +1143,8 @@ export async function startServer({
     friendComponent: friends.friendComponent,
     feedbackLimits: limits.feedback,
     feedbackComponent,
+    reportLimits: limits.reports,
+    reportComponent,
     dailyPuzzleComponent,
     safetyComponent,
     flagComponent,
@@ -1114,6 +1189,7 @@ export async function startServer({
   sessionEvents.on(SESSION_ENDED, (sessionId) => gateway.disconnectSession(sessionId));
   sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
   sessionEvents.on(ACCOUNT_DELETED, (playerId) => gateway.disconnectPlayer(playerId));
+  cutSocketsOnRename({ domainEvents, disconnectPlayer: gateway.disconnectPlayer });
 
   const housekeeping = startHousekeeping({
     roomComponent,

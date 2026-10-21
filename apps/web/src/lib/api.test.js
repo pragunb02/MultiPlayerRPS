@@ -243,6 +243,35 @@ describe("api client", () => {
     expect(player.mock.calls[0][0]).toBe("/api/profiles/a%2Fb");
   });
 
+  it("reports a player by where they met, and reads and acts on the owner's report queue (CC-044, ADR-071)", async () => {
+    const reported = respond(200, { report: { reportId: "r1", createdAt: 1 } });
+    const queued = respond(200, { groups: [{ groupId: "r1" }], total: 1, page: 0, more: false });
+    const acted = respond(200, { result: { closed: 2 } });
+    const target = { matchId: "m1", seat: 1, reason: "name" };
+
+    expect(await createApiClient({ fetchImpl: reported }).reportPlayer(target)).toEqual({
+      reportId: "r1",
+      createdAt: 1,
+    });
+    expect(await createApiClient({ fetchImpl: queued }).getReportQueue({ status: "dismissed" })).toEqual({
+      groups: [{ groupId: "r1" }],
+      total: 1,
+      page: 0,
+      more: false,
+    });
+    expect(await createApiClient({ fetchImpl: acted }).actOnReports("a/b", "dismiss")).toEqual({ closed: 2 });
+
+    expect(reported.mock.calls[0]).toEqual([
+      "/api/reports",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(target) }),
+    ]);
+    expect(queued.mock.calls[0][0]).toBe("/api/admin/reports?status=dismissed");
+    expect(acted.mock.calls[0]).toEqual([
+      "/api/admin/reports/a%2Fb/actions",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ action: "dismiss" }) }),
+    ]);
+  });
+
   it("makes, reads, takes and answers challenges by their id (CC-139)", async () => {
     const challenge = { id: "a/b", state: "open" };
     const one = respond(200, { challenge });

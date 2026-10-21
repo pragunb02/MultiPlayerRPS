@@ -7,6 +7,7 @@ import { createAuthRoutes } from "./authRoutes.js";
 import { createBlockRoutes } from "./blockRoutes.js";
 import { createChallengeRoutes } from "./challengeRoutes.js";
 import { createFeedbackRoutes } from "./feedbackRoutes.js";
+import { createReportRoutes } from "./reportRoutes.js";
 import { createFriendRoutes } from "./friendRoutes.js";
 import { createFlagRoutes } from "./flagRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
@@ -29,6 +30,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
  *   & { friendComponent: Parameters<typeof createFriendRoutes>[0]["friendComponent"], friendLimits?: Parameters<typeof createFriendRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
+ *   & { reportComponent: Parameters<typeof createReportRoutes>[0]["reportComponent"], reportLimits?: Parameters<typeof createReportRoutes>[0]["limits"] }
  *   & { flagComponent: Parameters<typeof createFlagRoutes>[0]["flagComponent"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { safetyComponent: Parameters<typeof createSafetyRoutes>[0]["safetyComponent"] }
@@ -62,6 +64,8 @@ export function apiRouter({
   friendLimits,
   feedbackComponent,
   feedbackLimits,
+  reportComponent,
+  reportLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   safetyComponent,
@@ -137,6 +141,15 @@ export function apiRouter({
       requireAdmin: adminAccess.requireAdmin,
       now,
       ...(feedbackLimits && { limits: feedbackLimits }),
+    }),
+  );
+
+  router.use(
+    createReportRoutes({
+      reportComponent,
+      requireAdmin: adminAccess.requireAdmin,
+      now,
+      ...(reportLimits && { limits: reportLimits }),
     }),
   );
 

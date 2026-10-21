@@ -98,3 +98,10 @@
   gap: var(--space-2);
   justify-items: start;
 }
+
+/* Report this player (CC-044): small and at the end, so it never reads as the main thing to do. */
+.report {
+  justify-self: start;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
