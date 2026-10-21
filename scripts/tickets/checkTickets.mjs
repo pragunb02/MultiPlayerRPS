@@ -140,12 +140,14 @@ export function checkTicket({ name, text, today }) {
   const repeated = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
   if (repeated.length > 0) problems.push(`acceptance criterion ids used twice: ${repeated.join(", ")}`);
 
-  const started = headCell(lines, "Started");
+  // A cell may carry a note after its value: the first day of Started and the first word of Type are what count. A
+  // ticket at Ready or later with no start day is new work, so it is checked too (review of #162).
+  const started = /\d{4}-\d{2}-\d{2}/.exec(headCell(lines, "Started"))?.[0];
+  const type = headCell(lines, "Type").split(/[\s(,]/)[0];
   const isNewFeature =
     template === "full" &&
-    headCell(lines, "Type") === "feature" &&
-    isDay(started) &&
-    started >= FRICTION_GUARDRAIL_FROM;
+    type === "feature" &&
+    (started === undefined || !isDay(started) || started >= FRICTION_GUARDRAIL_FROM);
   const kinds = section(lines, "Success metric")
     .lines.filter((line) => line.trim().startsWith("|"))
     .map((line) => cellsOf(line)[0].replace(/\*/g, ""));

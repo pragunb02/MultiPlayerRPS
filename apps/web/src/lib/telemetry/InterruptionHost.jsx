@@ -34,11 +34,6 @@ export function InterruptionHost() {
   const landed = useRef(false);
 
   useEffect(() => tracker.setEnabled(on), [tracker, on]);
-  useEffect(
-    () =>
-      tracker.onFirstEnded(() => services?.api.sendFlagSuccess("interruption_counts").catch(() => undefined)),
-    [tracker, services],
-  );
 
   useEffect(() => {
     if (!on) return undefined;

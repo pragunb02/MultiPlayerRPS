@@ -79,8 +79,6 @@ export function createInterruptionTracker({ telemetry, now, strict = false }) {
   /** @type {Map<object, { spec: ReturnType<typeof surfaceNamed>, openedAt: number, stack: string, phase: string, trigger: string, seq: number, marked?: string }>} */
   const visible = new Map();
   const reached = new Set();
-  let firstEnded = () => undefined;
-  let endedOnce = false;
 
   const track = (name, fields) => {
     if (enabled) telemetry.track(name, fields);
@@ -102,10 +100,6 @@ export function createInterruptionTracker({ telemetry, now, strict = false }) {
     const chosen = outcome ?? shown.marked ?? (shown.spec.kind === "dialog" ? ACTED : TIMED_OUT);
     const coveredBy = [...visible.values()].some((other) => other.seq > shown.seq);
     const final = chosen !== ACTED && chosen !== PAGE_LEFT && coveredBy ? COVERED : chosen;
-    if (enabled && !endedOnce) {
-      endedOnce = true;
-      firstEnded();
-    }
     track("interruption_ended", {
       surface: shown.spec.id,
       kind: shown.spec.kind,
@@ -205,7 +199,8 @@ export function createInterruptionTracker({ telemetry, now, strict = false }) {
       if (!isFunnelStep(funnel, step))
         throw new RangeError(`"${step}" is not a step of the funnel "${funnel}"`);
       const key = `${funnel}.${step}`;
-      if (reached.has(key)) return;
+      // Only a step that was sent is used up, so one reached while counts were off is sent once they are on.
+      if (reached.has(key) || !enabled) return;
       reached.add(key);
       track("funnel_step_reached", { funnel, step });
     },
@@ -227,13 +222,6 @@ export function createInterruptionTracker({ telemetry, now, strict = false }) {
       [...visible.keys()].forEach((handle) => end(handle, PAGE_LEFT));
       track("interruption_counted", { scope: "visit", ...countedFields(visit) });
       visit = counts();
-    },
-
-    /**
-     * @param {() => void} listener  told once, at the first interruption counted on this page (the flag's success)
-     */
-    onFirstEnded(listener) {
-      firstEnded = listener;
     },
 
     /** Surfaces showing now, for tests. */

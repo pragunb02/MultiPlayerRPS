@@ -1,11 +1,10 @@
-import { useContext, useEffect, useState } from "react";
+import { useState } from "react";
 import { getGame, ROOM_STATUS } from "@classicade/shared";
 import { outcomeMoment } from "../../games/outcomeMoment.js";
 import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
 import { gameNumber, matchPhase, PLAY_REASONS } from "../../games/roomView.js";
-import { ServicesContext } from "../../app/servicesContext.js";
 import { useAction } from "../../hooks/useAction.js";
-import { NO_INTERRUPTIONS } from "../../lib/telemetry/interruptions.js";
+import { useMatchPhase } from "../../hooks/useMatchPhase.js";
 import { ResultCelebration } from "../Celebrations/ResultCelebration.jsx";
 import { ClaimWin } from "../ClaimWin/ClaimWin.jsx";
 import { ComputerNote } from "../ComputerNote/ComputerNote.jsx";
@@ -17,30 +16,6 @@ import { ActionBar } from "./ActionBar.jsx";
 import { MatchFrame, MatchStage } from "./MatchFrame.jsx";
 import { sendIntent, shellLayout } from "./matchShell.js";
 import styles from "./MatchShell.module.css";
-
-const SEATED = Object.freeze(["waiting", "my-turn", "their-turn"]);
-const LINK_ENTRIES = Object.freeze(["room_link", "shared_link"]);
-
-/**
- * Tells the interruption counts where the match stands (CC-313): a game starts when play starts and is counted when
- * its result shows, and a seat in the room is the funnels' `seated` step. Leaving the room leaves the game.
- *
- * @param {string} phase  `matchPhase(room)`
- * @param {string} gameId
- */
-function useMatchPhase(phase, gameId) {
-  const services = useContext(ServicesContext);
-  const tracker = services?.interruptions ?? NO_INTERRUPTIONS;
-  const entry = services?.telemetry?.landing.entry;
-  useEffect(() => {
-    tracker.notePhase(phase, gameId);
-    if (SEATED.includes(phase)) {
-      tracker.reach("visit_to_play", "seated");
-      if (LINK_ENTRIES.includes(entry)) tracker.reach("link_to_seat", "seated");
-    }
-  }, [tracker, phase, gameId, entry]);
-  useEffect(() => () => tracker.notePhase(undefined), [tracker]);
-}
 
 /**
  * Whether the viewer saw the room's current game end on this page. A game that was already over when the page

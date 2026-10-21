@@ -43,10 +43,14 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
     return () => pending.forEach(clearTimeout);
   }, []);
 
-  /** Takes a toast away. How it ended was marked on its handle before, or it was dismissed. */
-  const remove = useCallback((id, outcome = "dismissed") => {
+  /**
+   * Takes a toast away. `dismissed` marks that it was closed. Without a mark it went by its time, unless its link
+   * was pressed before (CC-313).
+   */
+  const remove = useCallback((id, mark) => {
     waiting.current = waiting.current.filter((toast) => toast.id !== id);
-    shown.current.get(id)?.end(outcome);
+    if (mark === "dismissed") shown.current.get(id)?.dismissed();
+    shown.current.get(id)?.end();
     shown.current.delete(id);
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
@@ -65,7 +69,7 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
       const timer = setTimeout(
         () => {
           timers.current.delete(timer);
-          remove(toast.id, "timed_out");
+          remove(toast.id);
         },
         toast.action ? displayMs * ACTION_FACTOR : displayMs,
       );
@@ -124,7 +128,8 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
     [release],
   );
 
-  const value = useMemo(() => ({ show, dismiss: remove, hold }), [show, remove, hold]);
+  const dismiss = useCallback((id) => remove(id, "dismissed"), [remove]);
+  const value = useMemo(() => ({ show, dismiss, hold }), [show, dismiss, hold]);
 
   return (
     <ToastContext.Provider value={value}>
@@ -148,7 +153,7 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
                   to={toast.action.to}
                   className={styles.action}
                   data-cc-control="toast.action"
-                  onClick={() => remove(toast.id, "acted")}
+                  onClick={() => shown.current.get(toast.id)?.acted()}
                 >
                   {toast.action.label}
                 </Link>
@@ -156,7 +161,7 @@ export function ToastProvider({ children, displayMs = DISPLAY_MS }) {
                   control="toast.dismiss"
                   label={toast.action.dismissLabel}
                   onClick={() => {
-                    remove(toast.id);
+                    remove(toast.id, "dismissed");
                     toast.action.onDismiss();
                   }}
                 />

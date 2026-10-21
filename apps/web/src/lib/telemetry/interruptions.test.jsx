@@ -7,6 +7,7 @@ import { Modal } from "../../components/Modal/Modal.jsx";
 import { ToastProvider } from "../../components/Toast/ToastProvider.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { useInterruption } from "../../hooks/useInterruption.js";
+import { useMatchPhase } from "../../hooks/useMatchPhase.js";
 import { SessionContext } from "../../hooks/useSession.js";
 import { fakeApi } from "../../testing/fakes.js";
 import { flagPaths } from "../../testing/flagPaths.js";
@@ -168,7 +169,7 @@ describe("how each interruption ended (CC-313)", () => {
     render(
       <MemoryRouter>
         <ServicesContext.Provider value={{ interruptions: tracker }}>
-          <ToastProvider>
+          <ToastProvider displayMs={30}>
             <Grab />
           </ToastProvider>
         </ServicesContext.Provider>
@@ -179,6 +180,9 @@ describe("how each interruption ended (CC-313)", () => {
 
     act(() => toast.show("Saved", { surface: "toast.saved", action }));
     await user.click(screen.getByRole("link", { name: "Save it" }));
+    // Counting changes nothing on screen: the toast stays for its time, as it always did (review of #162).
+    expect(screen.getByRole("link", { name: "Save it" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Save it" })).not.toBeInTheDocument());
     act(() => toast.show("Saved again", { surface: "toast.saved", action }));
     await user.click(screen.getByRole("button", { name: "Close" }));
     let release;
@@ -222,6 +226,32 @@ describe("how each interruption ended (CC-313)", () => {
     view.unmount();
 
     expect(telemetry.named("interruption_ended").map(({ outcome }) => outcome)).toEqual(["dismissed"]);
+  });
+});
+
+describe("the phase a surface opens in (review of #162)", () => {
+  it("a card that opens with the result counts in the result, not during play", () => {
+    const { telemetry, tracker } = setup();
+    function Card() {
+      useInterruption("card.save_progress");
+      return null;
+    }
+    function Shell({ phase }) {
+      useMatchPhase(phase, "tictactoe");
+      return phase === "finished" ? <Card /> : null;
+    }
+    const tree = (phase) => (
+      <ServicesContext.Provider value={{ interruptions: tracker, telemetry }}>
+        <Shell phase={phase} />
+      </ServicesContext.Provider>
+    );
+    const view = render(tree("my-turn"));
+    view.rerender(tree("finished"));
+    view.unmount();
+
+    expect(telemetry.named("interruption_ended")).toEqual([
+      expect.objectContaining({ surface: "card.save_progress", phase: "result" }),
+    ]);
   });
 });
 
@@ -376,34 +406,6 @@ describe("the host's other duties (CC-313)", () => {
   });
 });
 
-describe("the flag's success (CC-313)", () => {
-  it("is sent once at the first interruption counted, and a failed send changes nothing", async () => {
-    const telemetry = recordingTelemetry();
-    const tracker = createInterruptionTracker({ telemetry, now: () => 0 });
-    const api = fakeApi({
-      getFlags: vi.fn(async () => ({ interruption_counts: true })),
-      sendFlagSuccess: vi.fn().mockRejectedValue(new Error("offline")),
-    });
-    const view = render(
-      <MemoryRouter initialEntries={["/"]}>
-        <ServicesContext.Provider value={{ api, telemetry, interruptions: tracker }}>
-          <SessionContext.Provider value={{ status: "anonymous", identity: undefined }}>
-            <InterruptionHost />
-          </SessionContext.Provider>
-        </ServicesContext.Provider>
-      </MemoryRouter>,
-    );
-    await waitFor(() => expect(tracker.isEnabled()).toBe(true));
-
-    tracker.open("toast.xp").end();
-    tracker.open("toast.quest").end();
-    view.unmount();
-
-    await waitFor(() => expect(api.sendFlagSuccess).toHaveBeenCalledOnce());
-    expect(telemetry.named("interruption_ended")).toHaveLength(2);
-  });
-});
-
 describe("the interruption_counts flag (CC-313)", () => {
   afterEach(() => vi.useRealTimers());
 
@@ -447,7 +449,8 @@ describe("the interruption_counts flag (CC-313)", () => {
           { funnel: "visit_to_play", step: "landed" },
           { funnel: "sign_up", step: "form_viewed" },
         ]);
-        await waitFor(() => expect(api.sendFlagSuccess).toHaveBeenCalledWith("interruption_counts"));
+        // The flag's success is told only when the server took a batch with an interruption (flagSuccess.test.js).
+        expect(api.sendFlagSuccess).not.toHaveBeenCalled();
       } else {
         expect(names).toEqual([]);
         expect(api.sendFlagSuccess).not.toHaveBeenCalled();

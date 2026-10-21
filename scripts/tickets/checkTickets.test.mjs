@@ -218,8 +218,19 @@ describe("the friction guardrail (CC-313 section 6)", () => {
     expect(
       checkTicket({ name: "CC-400.md", text: featureTicket({ type: "security" }), today: TODAY }),
     ).toEqual([]);
-    expect(checkTicket({ name: "CC-400.md", text: featureTicket({ started: "—" }), today: TODAY })).toEqual(
-      [],
-    );
+    // A ticket at Ready with no start day is new work, so it is checked (review of #162).
+    expect(
+      checkTicket({ name: "CC-400.md", text: featureTicket({ started: "—" }), today: TODAY }),
+    ).toHaveLength(1);
+  });
+
+  it("reads the first day of an annotated Started cell and the first word of an annotated Type cell", () => {
+    const annotated = featureTicket({
+      started: `${FRICTION_GUARDRAIL_FROM} (reopened 2026-11-02)`,
+      type: "feature (from CC-207)",
+    });
+    expect(checkTicket({ name: "CC-400.md", text: annotated, today: TODAY })).toHaveLength(1);
+    const older = featureTicket({ started: "2026-10-19, shaped 2026-10-22" });
+    expect(checkTicket({ name: "CC-400.md", text: older, today: TODAY })).toEqual([]);
   });
 });

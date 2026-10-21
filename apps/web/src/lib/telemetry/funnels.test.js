@@ -31,6 +31,10 @@ describe("funnel steps (CC-313 section 4)", () => {
     tracker.reach("sign_up", "form_viewed");
 
     expect(telemetry.tracked).toEqual([]);
+    // A step reached while off is not used up: once on, it is sent the first time it is reached (review of #162).
+    tracker.setEnabled(true);
+    tracker.reach("sign_up", "form_viewed");
+    expect(telemetry.named("funnel_step_reached")).toEqual([{ funnel: "sign_up", step: "form_viewed" }]);
   });
 
   it("names every funnel and step in snake case, each step with its ticket", () => {

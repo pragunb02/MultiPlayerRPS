@@ -20,11 +20,22 @@ const PRESS_EDGES = Object.freeze([1, 6, 21]);
  *   strict: boolean,
  *   wasWaking: boolean,
  *   onAccepted: () => void,
+ *   onBatchAccepted?: (events: ReadonlyArray<{ name: string }>) => void,
  *   surfaceOf?: (element: Element) => string | undefined,
  * }} deps
  * @returns {{ stop: () => void }}
  */
-export function startTelemetry({ window, facade, isOff, build, strict, wasWaking, onAccepted, surfaceOf }) {
+export function startTelemetry({
+  window,
+  facade,
+  isOff,
+  build,
+  strict,
+  wasWaking,
+  onAccepted,
+  onBatchAccepted,
+  surfaceOf,
+}) {
   const { document } = window;
   const setTimer = (run, ms) => window.setTimeout(run, ms);
   const clearTimer = (timer) => window.clearTimeout(/** @type {number} */ (timer));
@@ -33,6 +44,7 @@ export function startTelemetry({ window, facade, isOff, build, strict, wasWaking
     isOff,
     strict,
     onAccepted,
+    ...(onBatchAccepted && { onBatchAccepted }),
     setTimer,
     clearTimer,
     viewportWidth: () => window.innerWidth,
