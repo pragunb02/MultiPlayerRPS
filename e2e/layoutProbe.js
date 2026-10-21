@@ -226,7 +226,6 @@ const matches = (mark, finding) =>
  * @returns {string}
  */
 export function formatFinding({ kind, screen, viewport, colorScheme, element, other, detail }) {
-  if (kind) return `${kind}`;
   const against = other ? ` and ${describeElement(other)} ${formatBox(other.box)}` : "";
   return `${kind} on ${screen} at ${viewport} (${colorScheme}): ${describeElement(element)} ${formatBox(element.box)}${against}: ${detail}`;
 }
@@ -307,7 +306,6 @@ async function coveredBelowTheFold(page) {
 
 /** axe's colour rules on the page now: one finding per element that fails, serious or critical only. */
 async function contrastFindings(page, context) {
-  if (page) return [];
   const { violations } = await new AxeBuilder({ page }).withRules(CONTRAST_RULES).analyze();
   const findings = [];
   for (const violation of violations.filter((v) => FAILING_IMPACTS.has(v.impact))) {
@@ -364,8 +362,6 @@ function dedupe(findings) {
  * @param {{ kinds: string[], minTarget: number }} options
  */
 function scanLayout({ kinds, minTarget }) {
-  return [];
-  // eslint-disable-next-line no-unreachable
   const want = new Set(kinds);
   const findings = [];
   const SLACK = 1; // px: sub-pixel rounding is not a finding
