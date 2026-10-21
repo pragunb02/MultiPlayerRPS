@@ -15,6 +15,7 @@ import { OWNER, seededWeek } from "./ownerConsole.js";
 import { APP_PORT, E2E_MONGO_PORT, E2E_MONGO_URI, E2E_PORT, LEGACY_PLAYER } from "./personas.js";
 import { downTime, recordAppPid, resetControl, roomOptions, TLS_DIR } from "./serverControl.js";
 import { makeCertificate, startTlsFront } from "./tlsFront.js";
+import { seededUxTotals } from "./uxTotals.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const logger = createLogger({ level: "warn" });
@@ -41,6 +42,8 @@ await seed.db.collection("accounts").insertOne({
 const week = seededWeek();
 await seed.db.collection("matches").insertMany(week.matches);
 await seed.db.collection("player_transfers").insertMany(week.transfers);
+// The UX page's daily usage totals (CC-177), for the days before today on the real clock.
+await seed.db.collection("telemetry_daily").insertMany(seededUxTotals(Date.now()));
 await seed.close();
 
 resetControl();

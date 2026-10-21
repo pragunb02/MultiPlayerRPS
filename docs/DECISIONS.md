@@ -1025,6 +1025,11 @@ thinking crashed` with `game` only.
   `POST /api/telemetry` did not store, so the owner can see a flood, a broken build or the daily cap in Grafana. It
   carries no product data: the usage counts themselves stay in our own database (`telemetry_counts`, ADR-034), never
   in Grafana.
+- **Amended 2026-10-21 (CC-176): the nightly rollup.** One counter, `telemetry_rollup.runs`, with the one attribute
+  `outcome` (`ok`, `failed`), one per India day the job rolled up, and one named error line,
+  `telemetry rollup failed`, with the one field `step` (`lock`, `read`, `total`, `write`, `finish`). A day with no
+  `ok` by 03:00 India time, or `failed` two days running, is the alert. No day, group or total leaves: the totals stay
+  in `telemetry_daily`.
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 
@@ -1544,6 +1549,13 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
 - **Amended · 2026-10-20** (CC-290, ADR-059). Point 3 no longer holds for the feedback inbox at `/admin/feedback`,
   the console's first view of content about one person: messages players sent to the owner, and an adult's reply
   email shown one item at a time on request. The reasons and limits are in ADR-059. Every other view keeps point 3.
+- **Amended · 2026-10-21** (CC-176, CC-177, CC-313). Telemetry joins the console at `/admin/ux`, behind
+  `console_ux` and, for the Week view, `console_ux_week`; with either flag off the API answers the same 404. Point 2
+  is applied to every telemetry total, not only counts of people (one person can make all of a small count): a count
+  of 1 to 4 is `"<5"`, a share is `"<5"` when its part or its whole is 1 to 4 (stricter than point 2, so a shown share
+  never gives away a hidden count), and a percentile of fewer than 5 values is `"<5"`. Funnels are ratios of daily
+  totals, capped at 100 % and labelled so, never conversions. Point 4 holds: the page reads `telemetry_daily` only,
+  sections are cached 5 minutes per range, and the report is never told who asked.
 
 ### ADR-035 — Abuse limits: rooms, connections, sign-ups and failed logins
 

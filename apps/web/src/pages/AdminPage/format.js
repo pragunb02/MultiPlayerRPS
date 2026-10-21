@@ -83,12 +83,38 @@ export function formatSeconds(seconds) {
 export const formatDecimal = (value) =>
   value === FEWER_THAN_MIN ? FEWER_THAN_MIN_TEXT : numbers.format(Math.round(value * 100) / 100);
 
+/** What a number with nothing behind it yet says (CC-177): no events in the period, or a p75 of none. */
+export const NO_DATA_TEXT = "no data";
+
+/**
+ * A time in milliseconds: "180 ms", "2.5 s", "fewer than 5" for a percentile of fewer than 5 values (CC-177).
+ *
+ * @param {number | string | null} value
+ */
+export function formatMs(value) {
+  if (value === FEWER_THAN_MIN) return FEWER_THAN_MIN_TEXT;
+  if (typeof value !== "number") return NO_DATA_TEXT;
+  return value < 1000 ? `${numbers.format(value)} ms` : `${(value / 1000).toFixed(1)} s`;
+}
+
+/**
+ * A layout shift score with two decimals (CC-177).
+ *
+ * @param {number | string | null} value
+ */
+export function formatCls(value) {
+  if (value === FEWER_THAN_MIN) return FEWER_THAN_MIN_TEXT;
+  return typeof value === "number" ? value.toFixed(2) : NO_DATA_TEXT;
+}
+
 /** How each kind of value is shown on screen. */
 export const FORMATS = Object.freeze({
   count: formatCount,
   share: formatShare,
   seconds: formatSeconds,
   decimal: formatDecimal,
+  ms: formatMs,
+  cls: formatCls,
   text: (value) => String(value),
 });
 

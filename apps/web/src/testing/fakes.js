@@ -196,6 +196,7 @@ export function fakeApi(overrides = {}) {
     getFlags: vi.fn(async (names) => Object.fromEntries(names.map((name) => [name, false]))),
     sendFlagSuccess: vi.fn().mockResolvedValue(undefined),
     getAdminFlags: vi.fn(() => new Promise(() => {})),
+    getUxReport: vi.fn(() => new Promise(() => {})),
     setFlagRollout: vi.fn(),
     clearFlagRollout: vi.fn(),
     ...overrides,

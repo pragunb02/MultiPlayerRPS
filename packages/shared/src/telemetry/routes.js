@@ -37,6 +37,7 @@ export const ROUTE_TEMPLATES = Object.freeze([
   "/admin/feedback",
   "/admin/ages",
   "/admin/flags",
+  "/admin/ux/:section",
   "/play/:slug",
   "/room/:code",
 ]);
@@ -103,6 +104,7 @@ export const API_ENDPOINTS = Object.freeze([
   "/api/admin/flags",
   "/api/admin/flags/:name",
   "/api/admin/accounts/birth-year",
+  "/api/admin/ux",
 ]);
 
 const segmentsOf = (path) => path.split("/").filter((segment) => segment !== "");

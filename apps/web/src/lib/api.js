@@ -305,6 +305,13 @@ export function createApiClient({
     sendFlagSuccess: async (name) => {
       await request("POST", `/flags/${encodeURIComponent(name)}/success`);
     },
+    /**
+     * One section of the owner's UX page (CC-177) or its Week view (CC-313): anonymous totals, `"<5"` already applied.
+     *
+     * @param {{ section: string, from?: string, to?: string }} query  no range means the section's default
+     */
+    getUxReport: async ({ section, from, to }) =>
+      (await request("GET", `/admin/ux${toQuery({ section, from, to })}`)).report,
     /** The owner console's flags with their rollouts and counts (CC-312). */
     getAdminFlags: () => request("GET", "/admin/flags"),
     /** Sets a flag's rollout from the console, and answers the flag as it is now (CC-312). */

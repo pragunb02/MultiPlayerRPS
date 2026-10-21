@@ -12,12 +12,14 @@ const ReportQueue = lazyBoard(() => import("./ReportQueue.jsx"), "ReportQueue");
 const AgeCorrections = lazyBoard(() => import("./AgeCorrections.jsx"), "AgeCorrections");
 const FlagsPanel = lazyBoard(() => import("./FlagsPanel.jsx"), "FlagsPanel");
 const DesignPage = lazyBoard(() => import("./DesignPage.jsx"), "DesignPage");
+const UxPage = lazyBoard(() => import("./UxPage.jsx"), "UxPage");
 const PAGES = Object.freeze({
   [CONSOLE_VIEWS.TOTALS]: AdminPage,
   [CONSOLE_VIEWS.FEEDBACK]: FeedbackInbox,
   [CONSOLE_VIEWS.REPORTS]: ReportQueue,
   [CONSOLE_VIEWS.AGES]: AgeCorrections,
   [CONSOLE_VIEWS.FLAGS]: FlagsPanel,
+  [CONSOLE_VIEWS.UX]: UxPage,
   [CONSOLE_VIEWS.DESIGN]: DesignPage,
 });
 
@@ -33,8 +35,8 @@ const Waiting = () => (
  * as the server's 404, so the console's existence is not revealed. The server checks again on every request.
  *
  * @param {{ view: string }} props  a CONSOLE_VIEWS value: the totals and their sections, the feedback inbox (CC-290)
- *   the report queue (CC-044), the year of birth corrections (CC-152), the flags (CC-312) or the design contract
- *   (CC-314)
+ *   the report queue (CC-044), the year of birth corrections (CC-152), the flags (CC-312), the UX page (CC-177) or
+ *   the design contract (CC-314)
  */
 export function AdminRoute({ view }) {
   const Page = PAGES[view];

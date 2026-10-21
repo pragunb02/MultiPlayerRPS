@@ -89,6 +89,15 @@ describe("queryOf: one way to write a page's query (CC-290)", () => {
     expect(paths.adminFlags()).toBe("/admin/flags");
     expect(paths.adminDesign()).toBe("/admin/design");
   });
+
+  it("builds the UX page's addresses, a section and its range (CC-177)", () => {
+    expect(paths.adminUx()).toBe("/admin/ux");
+    expect(paths.adminUx("week")).toBe("/admin/ux/week");
+    expect(paths.adminUx("speed", { to: "2026-10-20", from: "2026-10-14", bucket: "day" })).toBe(
+      "/admin/ux/speed?from=2026-10-14&to=2026-10-20",
+    );
+    expect(describePage(paths.adminUx("week")).found).toBe(false);
+  });
 });
 
 describe("gameForSlug", () => {

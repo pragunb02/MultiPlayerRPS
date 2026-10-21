@@ -36,8 +36,9 @@ Research and sources: [tickets/CC-244.md](../tickets/CC-244.md). What is stored 
 7. **Not counted.** Browser tests and local development send nothing (CC-178 checks it). Owner accounts listed in
    `ADMIN_ACCOUNT_IDS` are dropped at ingestion, so the owner's own clicking does not count.
 8. **Retention.** Hourly counters 30 days (CC-175: no single event is stored, owner review 2026-10-21), then deleted by a MongoDB TTL index. Daily totals 13 months (CC-176).
-   A total is a count, or a p50 and p95, per day and per value of the fields listed. The console hides any total
-   under 5, as CC-233 does.
+   A total is a count, or a p50, p75 and p95 worked out from the hourly counters, per India day and per group of
+   the rollup spec (`apps/server/src/domain/telemetry/rollups.js`, CC-176). The console (`/admin/ux`, CC-177) shows
+   every total of 1 to 4, every share made of one and every percentile of fewer than 5 values as `"<5"`.
 9. **Day boundary.** Daily totals use the India day (Asia/Kolkata), as the CC-233 console does (open question Q6).
 
 ### The fields every event carries

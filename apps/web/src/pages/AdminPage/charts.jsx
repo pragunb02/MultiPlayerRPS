@@ -22,9 +22,11 @@ const PLOT = Object.freeze({ left: 44, right: 8, top: 12, bottom: 28 });
 /**
  * The numbers behind a chart as a table, with a scrollable frame on narrow screens.
  *
- * @param {{ caption: string, columns: ReadonlyArray<Column>, rows: ReadonlyArray<any> }} props
+ * @param {{ caption: string, columns: ReadonlyArray<Column>, rows: ReadonlyArray<any>, cells?: Record<string, (row: any) => import("react").ReactNode> }} props
+ *   `cells`: by column label, a cell drawn from the row (such as a colour badge) instead of its formatted value. The
+ *   exported file keeps the value
  */
-export function DataTable({ caption, columns, rows }) {
+export function DataTable({ caption, columns, rows, cells = {} }) {
   return (
     <div className={styles.tableFrame} role="region" aria-label={caption} tabIndex={0}>
       <table className={styles.table}>
@@ -42,7 +44,8 @@ export function DataTable({ caption, columns, rows }) {
           {rows.map((row, index) => (
             <tr key={index}>
               {columns.map((column, place) => {
-                const text = FORMATS[column.format ?? "text"](column.value(row));
+                const text =
+                  cells[column.label]?.(row) ?? FORMATS[column.format ?? "text"](column.value(row));
                 return place === 0 ? (
                   <th key={column.label} scope="row">
                     {text}
@@ -74,6 +77,7 @@ export function DataTable({ caption, columns, rows }) {
  *   rows: ReadonlyArray<any>,
  *   range: { from: string, to: string },
  *   tableOnly?: boolean,
+ *   cells?: Record<string, (row: any) => import("react").ReactNode>,
  *   children?: import("react").ReactNode,
  * }} props  `id` names the CSV file and the export button. `unit`: what each number counts, such as "players"
  */
@@ -86,6 +90,7 @@ export function ChartFigure({
   rows,
   range,
   tableOnly = false,
+  cells = {},
   children,
 }) {
   const titleId = useId();
@@ -123,13 +128,13 @@ export function ChartFigure({
       {tableOnly && rows.length === 0 ? (
         <p className={styles.empty}>Nothing yet in this period.</p>
       ) : tableOnly ? (
-        <DataTable caption={title} columns={columns} rows={rows} />
+        <DataTable caption={title} columns={columns} rows={rows} cells={cells} />
       ) : (
         <>
           {children}
           <details className={styles.details}>
             <summary data-cc-control={`admin.table.${id}`}>Show as a table</summary>
-            <DataTable caption={title} columns={columns} rows={rows} />
+            <DataTable caption={title} columns={columns} rows={rows} cells={cells} />
           </details>
         </>
       )}
