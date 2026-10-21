@@ -9,6 +9,7 @@ import { NotFoundError } from "../utils/errors.js";
  * @property {string} gameId
  * @property {Readonly<Record<string, unknown>>} options
  * @property {number} seed
+ * @property {string} [starter]       who moved first, when a rematch named them (CC-091). Without it the seed decided
  * @property {ReadonlyArray<Readonly<{ playerId: string, displayName: string }>>} players
  * @property {ReadonlyArray<Readonly<import("./roomAccessor.js").LogEntry>>} log
  * @property {Readonly<{ result: string, winners: string[], reason: string }>} result
