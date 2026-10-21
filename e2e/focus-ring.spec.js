@@ -1,8 +1,9 @@
-import { createRoom, expect, test } from "./fixtures.js";
+import { createRoom, expect, nextItemKey, tabUntil, test } from "./fixtures.js";
 
 // Some screens move focus to their heading in code, so a screen reader starts reading there (CC-100). That focus
 // is not the player's: the ring shows only when they use the keyboard. Chromium counts a focus made in code before
-// any key or click as keyboard focus, so `:focus-visible` alone draws a large ring on page load.
+// any key or click as keyboard focus, so `:focus-visible` alone draws a large ring on page load. A component that
+// turns its own ring off (the pass-and-play board's region, whose board draws it) keeps it off.
 
 /** The outline the focused element draws now. */
 const ringOf = (page) =>
@@ -10,9 +11,6 @@ const ringOf = (page) =>
     const style = getComputedStyle(document.activeElement);
     return { tag: document.activeElement.tagName, style: style.outlineStyle, width: style.outlineWidth };
   });
-
-/** Moves on with the keyboard. Safari's Tab reaches only form fields unless Option is held (CC-184). */
-const nextItem = (testInfo) => (testInfo.project.use.defaultBrowserType === "webkit" ? "Alt+Tab" : "Tab");
 
 test.describe("focus moved in code draws no ring until the keyboard is used (CC-100)", () => {
   test.skip(({ isMobile }) => isMobile, "a keyboard journey");
@@ -29,7 +27,7 @@ test.describe("focus moved in code draws no ring until the keyboard is used (CC-
     await expect(heading).toBeFocused();
     expect(await ringOf(page)).toMatchObject({ tag: "H1", style: "none" });
 
-    await page.keyboard.press(nextItem(testInfo));
+    await page.keyboard.press(nextItemKey(testInfo));
     await expect(page.getByRole("button", { name: "Play as guest" })).toBeFocused();
     expect(await ringOf(page)).toMatchObject({ style: "solid", width: "3px" });
   });
@@ -48,7 +46,7 @@ test.describe("focus moved in code draws no ring until the keyboard is used (CC-
     await expect(heading).toBeFocused();
     expect(await ringOf(page)).toMatchObject({ tag: "H1", style: "none" });
 
-    await page.keyboard.press(nextItem(testInfo));
+    await page.keyboard.press(nextItemKey(testInfo));
     expect(await ringOf(page)).toMatchObject({ style: "solid", width: "3px" });
   });
 
@@ -63,15 +61,24 @@ test.describe("focus moved in code draws no ring until the keyboard is used (CC-
     expect(await ringOf(page)).toMatchObject({ tag: "H1", style: "none" });
 
     await page.goto("/");
-    const link = page
-      .getByRole("region", { name: "Games" })
-      .getByRole("link", { name: "Chess", exact: true });
-    for (let press = 0; press < 20 && !(await link.evaluate((a) => a === document.activeElement)); press++) {
-      await page.keyboard.press(nextItem(testInfo));
-    }
-    await expect(link).toBeFocused();
+    const games = page.getByRole("region", { name: "Games" });
+    await tabUntil(page, games.getByRole("link", { name: "Chess", exact: true }), testInfo);
     await page.keyboard.press("Enter");
     await expect(chess).toBeFocused();
     expect(await ringOf(page)).toMatchObject({ tag: "H1", style: "solid", width: "3px" });
+  });
+
+  test("the pass-and-play board's region keeps its ring off after Tab: the board draws it", async ({
+    players,
+  }, testInfo) => {
+    const { page } = await players.open("Meena");
+    await page.goto("/games/tic-tac-toe/pass-and-play");
+    await page.getByRole("textbox", { name: "Player 1" }).fill("Asha");
+    await page.getByRole("textbox", { name: "Player 2" }).fill("Ben");
+    await tabUntil(page, page.getByRole("button", { name: "Start game" }), testInfo);
+    await page.keyboard.press("Enter");
+
+    await expect(page.getByRole("region", { name: /Asha|Ben/ })).toBeFocused();
+    expect(await ringOf(page)).toMatchObject({ tag: "SECTION", style: "none" });
   });
 });

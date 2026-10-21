@@ -141,7 +141,8 @@ there, gives it `tabIndex={-1}` and no focus style of its own. `global.css` draw
 the player is using the keyboard (the `using-keyboard` class from `app/inputModality.js`): no ring on page load or
 after a click, the ring after a key press. Never `outline: none` on such a target, and never `:focus-visible`
 alone, which Chromium matches on page load. A target whose ring another element draws (the pass-and-play board's
-region) may turn its own off.
+region) may turn its own off. The app's focus rules are in `@layer focus`, below every component style, so a
+component's own focus style or opt-out always wins.
 
 ## 3. Most per screen (D5)
 
