@@ -243,6 +243,45 @@ describe("api client", () => {
     expect(player.mock.calls[0][0]).toBe("/api/profiles/a%2Fb");
   });
 
+  it("suspends by a report's id, reads the history and current suspensions, lifts one, and exports while suspended (CC-334)", async () => {
+    const suspended = respond(200, { suspension: { suspensionId: "s1" }, closed: 1 });
+    const history = respond(200, { suspensions: [{ suspensionId: "s1" }] });
+    const current = respond(200, { suspensions: [] });
+    const lifted = respond(200, { suspension: { suspensionId: "s1", active: false } });
+    const exported = respond(200, { exportedAt: "2026-10-21T00:00:00.000Z" });
+    const choice = { duration: "7d", reason: "cheating" };
+
+    expect(await createApiClient({ fetchImpl: suspended }).suspendAccount("a/b", choice)).toEqual({
+      suspension: { suspensionId: "s1" },
+      closed: 1,
+    });
+    expect(await createApiClient({ fetchImpl: history }).getSuspensionHistory("a/b")).toEqual([
+      { suspensionId: "s1" },
+    ]);
+    expect(await createApiClient({ fetchImpl: current }).getCurrentSuspensions()).toEqual([]);
+    expect(await createApiClient({ fetchImpl: lifted }).liftSuspension("s/1")).toEqual({
+      suspensionId: "s1",
+      active: false,
+    });
+    const credentials = { email: "bob@example.com", password: "pw" };
+    await createApiClient({ fetchImpl: exported }).exportSuspendedData(credentials);
+
+    expect(suspended.mock.calls[0]).toEqual([
+      "/api/admin/reports/a%2Fb/suspension",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(choice) }),
+    ]);
+    expect(history.mock.calls[0][0]).toBe("/api/admin/reports/a%2Fb/suspensions");
+    expect(current.mock.calls[0][0]).toBe("/api/admin/suspensions");
+    expect(lifted.mock.calls[0]).toEqual([
+      "/api/admin/suspensions/s%2F1/lift",
+      expect.objectContaining({ method: "POST" }),
+    ]);
+    expect(exported.mock.calls[0]).toEqual([
+      "/api/auth/suspended-export",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(credentials) }),
+    ]);
+  });
+
   it("reports a player by where they met, and reads and acts on the owner's report queue (CC-044, ADR-071)", async () => {
     const reported = respond(200, { report: { reportId: "r1", createdAt: 1 } });
     const queued = respond(200, { groups: [{ groupId: "r1" }], total: 1, page: 0, more: false });

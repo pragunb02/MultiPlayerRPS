@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { REPORT_STATUS } from "@classicade/shared";
 import { useServices } from "../app/servicesContext.js";
 
 const LOADING = Object.freeze({
@@ -25,6 +26,7 @@ const LOADING = Object.freeze({
  *   error: Error | undefined,
  *   retry: () => void,
  *   act: (groupId: string, action: string) => Promise<{ closed: number, displayName?: string }>,
+ *   suspend: (groupId: string, choice: { duration: string, reason: string }) => Promise<{ suspension: object, closed: number }>,
  * }}
  */
 export function useReportQueue({ status, page }) {
@@ -57,5 +59,23 @@ export function useReportQueue({ status, page }) {
     [api],
   );
 
-  return { ...current, retry: () => setAttempt((n) => n + 1), act };
+  /**
+   * Suspends a group's account (CC-334). Its open reports close, so an open group leaves this list; on the other
+   * statuses the group stays, since its reports were closed already.
+   */
+  const suspend = useCallback(
+    async (groupId, choice) => {
+      const done = await api.suspendAccount(groupId, choice);
+      if ((status ?? REPORT_STATUS.OPEN) === REPORT_STATUS.OPEN) {
+        setResult((shown) => ({
+          ...shown,
+          groups: shown.groups.filter((group) => group.groupId !== groupId),
+        }));
+      }
+      return done;
+    },
+    [api, status],
+  );
+
+  return { ...current, retry: () => setAttempt((n) => n + 1), act, suspend };
 }

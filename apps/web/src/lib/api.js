@@ -128,6 +128,25 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     actOnReports: async (reportId, action) =>
       (await request("POST", `/admin/reports/${encodeURIComponent(reportId)}/actions`, { action })).result,
     /**
+     * Suspends the account a report group is about, for a duration and a closed reason (CC-334, ADR-078).
+     *
+     * @param {string} reportId  the group's id, its newest report
+     * @param {{ duration: string, reason: string }} suspension
+     * @returns {Promise<{ suspension: object, closed: number }>}
+     */
+    suspendAccount: (reportId, suspension) =>
+      request("POST", `/admin/reports/${encodeURIComponent(reportId)}/suspension`, suspension),
+    /** The suspensions of the account a report group is about, newest first (CC-334). */
+    getSuspensionHistory: async (reportId) =>
+      (await request("GET", `/admin/reports/${encodeURIComponent(reportId)}/suspensions`)).suspensions,
+    /** The suspensions in effect now (CC-334). */
+    getCurrentSuspensions: async () => (await request("GET", "/admin/suspensions")).suspensions,
+    /** Lifts a suspension early (CC-334). */
+    liftSuspension: async (suspensionId) =>
+      (await request("POST", `/admin/suspensions/${encodeURIComponent(suspensionId)}/lift`)).suspension,
+    /** A suspended account's data, with its email and password: it has no session (CC-334, ADR-078). */
+    exportSuspendedData: (credentials) => request("POST", "/auth/suspended-export", credentials),
+    /**
      * The player's friends view (CC-052): friends with their presence, the requests waiting for them and the ones
      * they sent, their Appear offline switch, and whether to show safety tips. A guest is refused with FORBIDDEN.
      */
