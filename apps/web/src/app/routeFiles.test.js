@@ -57,6 +57,22 @@ describe("prefetchPage: a page's files fetched as a hint only (CC-322)", () => {
     ]);
   });
 
+  it("links only this build's own files, never another address written into the list", () => {
+    writeBlock({
+      PlayPage: {
+        js: ["https://evil.example/x.js", "javascript:alert(1)", "/assets/../api/x.js", 7, "/assets/ok-1.js"],
+        css: ["//evil.example/x.css", "/assets/ok-2.css"],
+      },
+    });
+
+    prefetchPage({ document, name: "PlayPage" });
+
+    expect(hints()).toEqual([
+      ["modulepreload", "/assets/ok-1.js", ""],
+      ["prefetch", "/assets/ok-2.css", ""],
+    ]);
+  });
+
   it("does nothing for a page the build lists no files for", () => {
     writeBlock();
 

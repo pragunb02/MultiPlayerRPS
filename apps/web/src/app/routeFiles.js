@@ -31,8 +31,17 @@ export function prefetchPage({ document, name }) {
   for (const href of files.css) addHint(document, "prefetch", href);
 }
 
+/**
+ * A built file of this site: a script or stylesheet in `/assets/`, named by the build. The list is read from the
+ * page's own text, so anything else, such as another site's address or a `javascript:` URL, is never linked.
+ */
+const BUILT_FILE = /^\/assets\/[\w.-]+\.(?:js|css)$/;
+
 /** One hint link, unless a link to the same file is already on the page (ours, or one the build or Vite added). */
 function addHint(document, rel, href) {
+  if (typeof href !== "string" || !BUILT_FILE.test(href)) {
+    return;
+  }
   const known = [...document.querySelectorAll("link[href]")].some(
     (link) => link.getAttribute("href") === href,
   );
