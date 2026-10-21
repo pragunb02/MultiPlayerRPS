@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, send } from "../../testing/socketClients.js";
@@ -283,6 +284,90 @@ describe("auth routes", () => {
       expect(JSON.stringify(server.entries)).not.toContain("iya@example.com");
     },
   );
+
+  it("still logs the player in when saving an upgraded hash fails, and logs the failure (CC-260)", async () => {
+    const accountDao = {
+      ...createInMemoryAccountDao(),
+      updatePasswordHash: async () => Promise.reject(new Error("database unavailable")),
+    };
+    const weak = createPasswordHasher({ params: { N: 2 ** 9, r: 8, p: 1 } });
+    await accountDao.insert({
+      username: "Riya",
+      email: RIYA.email,
+      passwordHash: await weak.hash(RIYA.password),
+      createdAt: new Date(),
+    });
+    server = await startTestServer({ accountDao });
+
+    const login = await post("/api/auth/login", { email: RIYA.email, password: RIYA.password });
+
+    expect(login.status).toBe(200);
+    const [logged] = server.find("saving the upgraded password hash failed");
+    expect(logged).toMatchObject({ level: 40, playerId: login.body.identity.id });
+    expect(JSON.stringify(server.entries)).not.toContain(RIYA.email);
+  });
+
+  // The bundled list is the real one, and the breach service is a fake fetch, so no test touches the network.
+  describe("passwords attackers already know (CC-261)", () => {
+    const EASY = "That password is too easy to guess. Choose a different one.";
+    // Answers a range that holds the password's own suffix, after checking only its prefix was asked for.
+    const breachedRange = async (url) => {
+      const sha1 = createHash("sha1").update(RIYA.password).digest("hex").toUpperCase();
+      expect(url).toBe(`https://api.pwnedpasswords.com/range/${sha1.slice(0, 5)}`);
+      return new Response(`${sha1.slice(5)}:12\r\n${"0".repeat(35)}:0`);
+    };
+
+    it("refuses a common password at sign-up with 400 at the password field", async () => {
+      server = await startTestServer();
+
+      const res = await post("/api/auth/signup", { ...RIYA, password: "password1" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatchObject({
+        code: ERROR_CODES.VALIDATION_FAILED,
+        message: EASY,
+        details: { field: "password" },
+      });
+    });
+
+    it("refuses a breached password at sign-up, and counts the check without saying whose", async () => {
+      const outcomes = [];
+      server = await startTestServer({
+        pwnedPasswordsFetch: breachedRange,
+        metrics: { recordPasswordCheck: (check) => outcomes.push(check) },
+      });
+
+      const res = await post("/api/auth/signup", RIYA);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatchObject({ message: EASY, details: { field: "password" } });
+      expect(outcomes).toEqual([{ outcome: "breached" }]);
+    });
+
+    it("signs up when the breach service cannot be reached, and counts that", async () => {
+      const outcomes = [];
+      server = await startTestServer({ metrics: { recordPasswordCheck: (check) => outcomes.push(check) } });
+
+      const res = await post("/api/auth/signup", RIYA);
+
+      expect(res.status).toBe(201);
+      expect(outcomes).toEqual([{ outcome: "unavailable" }]);
+    });
+
+    it("refuses a common new password on a password change, at the new password field", async () => {
+      server = await startTestServer();
+      const { cookie } = await post("/api/auth/signup", RIYA);
+
+      const res = await post(
+        "/api/auth/password",
+        { currentPassword: RIYA.password, newPassword: "Password1" },
+        cookie,
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatchObject({ message: EASY, details: { field: "newPassword" } });
+    });
+  });
 
   it("never logs passwords or emails", async () => {
     server = await startTestServer();
