@@ -435,22 +435,44 @@ export function createRoomComponent({
   const readyToStart = (room) =>
     room.seats.length === engineFor(room).players.max &&
     room.seats.every((seat) => presenceOf(seat) === PRESENCE.HERE);
-  const startWhenReady = (room, now) => (readyToStart(room) ? start(room, now, 1) : room);
+  const startWhenReady = (room, now) => (readyToStart(room) ? start(room, now, { number: 1 }) : room);
 
-  function start(room, now, number) {
+  /**
+   * Starts the room's next game. `named` holds the `starter` for a rematch, and is empty for game 1, where the
+   * engine draws who moves first from the seed. The starter is kept beside the seed, so the game replays exactly
+   * (CC-091).
+   */
+  function start(room, now, { number, named = {} }) {
     const engine = engineFor(room);
     const seed = generateSeed();
     const state = engine.init({
       players: room.seats.map((seat) => seat.playerId),
       options: room.options,
       rng: createSeededRng(seed),
+      ...named,
     });
     return {
       ...room,
       status: ROOM_STATUS.PLAYING,
-      game: { matchId: generateMatchId(), number, seed, startedAt: now, state, log: [] },
+      game: { matchId: generateMatchId(), number, seed, ...named, startedAt: now, state, log: [] },
       lastActivityAt: now,
     };
+  }
+
+  /**
+   * Who moves first in the rematch of a finished room: the player seated after the one who started the game
+   * before, so with two players the first move alternates. It is read from the finished game's state, so it holds
+   * after a restart. Games where everyone moves at once (Rock Paper Scissors) name nobody (CC-091).
+   *
+   * @returns {{ starter?: string }}
+   */
+  function nextStarter(room) {
+    const engine = engineFor(room);
+    if (engine.starterOf === undefined) {
+      return {};
+    }
+    const players = room.seats.map((seat) => seat.playerId);
+    return { starter: players[(players.indexOf(engine.starterOf(room.game.state)) + 1) % players.length] };
   }
 
   /** Outcome of a forfeit: everyone except the leaver wins. */
@@ -492,14 +514,18 @@ export function createRoomComponent({
 
   /**
    * What accepting a request does. A rematch starts the next game in this room: new match id and seed, same
-   * options, seats reversed so the first move (X, White) alternates. A request of the game goes to its engine,
-   * and is logged so the match replays (a chess draw offer ends the game by agreement).
+   * options, seats reversed, and the first move (X, White) to the player who did not start the game before
+   * (CC-091). A request of the game goes to its engine, and is logged so the match replays (a chess draw offer ends
+   * the game by agreement).
    */
   function accepting(room, request, now) {
     const accepted = endRequest(room, { request, state: REQUEST_STATES.ACCEPTED, now });
     if (request.type === ROOM_REQUEST_TYPES.REMATCH) {
       const { result, rematch, game, finishedAt, ...rest } = accepted;
-      return start({ ...rest, seats: [...room.seats].reverse() }, now, gameNumberOf(room) + 1);
+      return start({ ...rest, seats: [...room.seats].reverse() }, now, {
+        number: gameNumberOf(room) + 1,
+        named: nextStarter(room),
+      });
     }
     const engine = engineFor(room);
     const { type, from, to } = request;
@@ -595,6 +621,7 @@ export function createRoomComponent({
           ...room.game,
           state: renamePlayer(room.game.state, from, to.id),
           log: renamePlayer(room.game.log, from, to.id),
+          ...(room.game.starter !== undefined && { starter: renamePlayer(room.game.starter, from, to.id) }),
         },
       }),
     };

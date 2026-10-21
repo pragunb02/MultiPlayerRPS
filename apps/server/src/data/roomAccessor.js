@@ -39,8 +39,9 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @property {string} [network]        an opaque name of the network the room was opened from, for the cap per network
  * @property {true} [quickMatch]     made by quick match (CC-051): its players met as strangers. Older rooms leave it out
  * @property {ReadonlyArray<Readonly<Seat>>} seats
- * @property {{ matchId: string, number?: number, seed: number, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry>, asked?: Record<string, Record<string, number>>, resumedAt?: number, turnCredit?: { entries: number, ms: number } }} [game]
- *   present once the game has started. Its `seed` and `log` reproduce the game exactly (see replayGame). `number`
+ * @property {{ matchId: string, number?: number, seed: number, starter?: string, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry>, asked?: Record<string, Record<string, number>>, resumedAt?: number, turnCredit?: { entries: number, ms: number } }} [game]
+ *   present once the game has started. Its `seed`, `starter` and `log` reproduce the game exactly (see replayGame).
+ *   `starter` is there only when a rematch named who moves first (CC-091). `number`
  *   counts the room's games from 1, and `asked` how often each player asked each limited request in this game.
  *   `resumedAt` is when the game last resumed after a server restart, and `turnCredit` the time given back to the
  *   current turn (the one after `entries` log entries) for a player due who was offline (see roomPresence.js)

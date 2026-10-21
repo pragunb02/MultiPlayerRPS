@@ -23,7 +23,9 @@ import { ROOM_REQUEST_TYPES } from "@classicade/shared";
  * @property {string} id                                     matches a GAME_IDS value
  * @property {{ min: number, max: number }} players          how many players a game needs
  * @property {(raw: unknown) => import("./result.js").Result<Options>} validateOptions
- * @property {(setup: { players: PlayerId[], options: Options, rng: import("./rng.js").Rng }) => State} init
+ * @property {(setup: { players: PlayerId[], options: Options, rng: import("./rng.js").Rng, starter?: PlayerId }) => State} init
+ *   `starter` is given only to an engine with `starterOf`, for a rematch (CC-091). Without it the engine draws who
+ *   starts from `rng`, as it always has
  * @property {(state: State, playerId: PlayerId, raw: unknown, ctx: MoveContext) => import("./result.js").Result<Move>} validateMove
  * @property {(state: State, playerId: PlayerId, move: Move, ctx: MoveContext) => State} applyMove
  * @property {(state: State) => Outcome} getOutcome
@@ -42,6 +44,10 @@ import { ROOM_REQUEST_TYPES } from "@classicade/shared";
  * @property {number} [turnLimitMs]
  *   Optional idle limit (CC-036): how long a player due to move may take once they have made their first move.
  *   The room ends the game when it passes. Games with their own clock (chess) leave it out.
+ * @property {(state: State) => PlayerId} [starterOf]
+ *   Optional, for games where one player moves first (CC-091). Who moved first in this game. An engine with this
+ *   hook also takes a `starter` in `init` and lets that player move first, so a rematch can give the first move to
+ *   the other player
  * @property {Readonly<Record<string, RequestType>>} [requestTypes]
  *   Optional requests a player of this game may send the other during play (CC-159), such as a draw offer. The
  *   room keeps them, so they expire, cool down and are answered the same way in every game.
@@ -140,6 +146,9 @@ export function defineEngine(engine) {
   const timeHooks = OPTIONAL_TIME_HOOKS.filter((name) => engine?.[name] !== undefined);
   if (timeHooks.length > 0 && !OPTIONAL_TIME_HOOKS.every((name) => typeof engine[name] === "function")) {
     problems.push("deadline and expire must be provided together, as functions");
+  }
+  if (engine?.starterOf !== undefined && typeof engine.starterOf !== "function") {
+    problems.push("starterOf must be a function");
   }
   if (engine?.turnLimitMs !== undefined && !isPositiveInteger(engine.turnLimitMs)) {
     problems.push("turnLimitMs must be a positive number of milliseconds");

@@ -91,6 +91,31 @@ describe("chessEngine setup", () => {
     expect(whites).toBeLessThan(600);
   });
 
+  it("gives White to a named starter, whatever the seed says, and names them as the starter (CC-091)", () => {
+    const state = chessEngine.init({
+      players: [A, B],
+      options: { timeControl: "blitz-5+0" },
+      rng: createSeededRng(42),
+      starter: A,
+    });
+
+    expect(state).toEqual({ ...newGame(), colors: { [A]: "w", [B]: "b" }, byColor: { w: A, b: B } });
+    expect(chessEngine.activePlayers(state)).toEqual([A]);
+    expect(chessEngine.starterOf(state)).toBe(A);
+    expect(chessEngine.starterOf(newGame())).toBe(B);
+  });
+
+  it("refuses a starter who is not one of the players (CC-091)", () => {
+    expect(() =>
+      chessEngine.init({
+        players: [A, B],
+        options: { timeControl: "blitz-5+0" },
+        rng: createSeededRng(42),
+        starter: "carol",
+      }),
+    ).toThrow(TypeError);
+  });
+
   it("defaults to blitz 5+0 and validates time controls", () => {
     expect(chessEngine.validateOptions({})).toEqual({ ok: true, value: { timeControl: "blitz-5+0" } });
     expect(chessEngine.validateOptions({ timeControl: "rapid-15+10" }).ok).toBe(true);

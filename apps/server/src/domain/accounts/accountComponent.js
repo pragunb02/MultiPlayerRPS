@@ -84,8 +84,10 @@ const identityOf = (account) =>
  * When the account's email was stored under an older spelling, the login rewrites it to the one spelling, and
  * `emailUpdate` says how that went (CC-245): "rewritten", or "collision" when another account already has it.
  * `legacyFailure` is a failure of the legacy store that this login did not need, passed up so it is logged.
+ * `rehashFailure` is a failure to save the stronger hash of an outdated one (CC-260). The login still succeeds, and
+ * the old hash is upgraded at a later login.
  *
- * @typedef {{ identity: Readonly<import("../../models/identity.js").Identity>, sessionVersion: number, emailUpdate?: "rewritten" | "collision", legacyFailure?: unknown }} SignIn
+ * @typedef {{ identity: Readonly<import("../../models/identity.js").Identity>, sessionVersion: number, emailUpdate?: "rewritten" | "collision", legacyFailure?: unknown, rehashFailure?: unknown }} SignIn
  */
 
 /** @param {Readonly<import("../../data/accountAccessor.js").Account>} account @returns {Readonly<SignIn>} */
@@ -103,6 +105,8 @@ const signInOf = (account) =>
  *   legacyUserAccessor: ReturnType<typeof import("../../data/legacyUserAccessor.js").createLegacyUserAccessor>,
  *   passwordHasher: ReturnType<typeof import("../../utils/passwordHasher.js").createPasswordHasher>,
  *   legacyPasswords: ReturnType<typeof import("../../utils/legacyPassword.js").createLegacyPasswordChecker>,
+ *   passwordScreen: Pick<ReturnType<typeof import("./passwordScreen.js").createPasswordScreen>, "check">,
+ *     refuses a new password attackers already know, at sign-up and on a password change (CC-261)
  *   accountDeletionAccessor: Pick<ReturnType<typeof import("../../data/accountDeletionAccessor.js").createAccountDeletionAccessor>, "closeLegacy" | "isLegacyClosed">,
  *     the legacy rows whose player deleted their account (CC-035)
  *   newNameSuffix?: () => string,   six letters for a safe default name (CC-044). Tests pick them
@@ -113,6 +117,7 @@ export function createAccountComponent({
   legacyUserAccessor,
   passwordHasher,
   legacyPasswords,
+  passwordScreen,
   accountDeletionAccessor,
   newNameSuffix = randomNameSuffix,
 }) {
@@ -120,6 +125,7 @@ export function createAccountComponent({
   assertDefined(legacyUserAccessor, "legacyUserAccessor");
   assertDefined(passwordHasher, "passwordHasher");
   assertDefined(legacyPasswords, "legacyPasswords");
+  assertDefined(passwordScreen, "passwordScreen");
   assertDefined(accountDeletionAccessor, "accountDeletionAccessor");
 
   /**
@@ -248,6 +254,26 @@ export function createAccountComponent({
     }
   }
 
+  /**
+   * Saves the stronger hash made during the login of an account whose stored hash is outdated (CC-260). It
+   * replaces the hash only while it is still the one that was checked, so a password change that landed meanwhile
+   * is kept. Best effort: the player has proved the password, so a failure here never fails the login. It is passed
+   * up to be logged, and the next login tries again.
+   *
+   * @returns {Promise<{ rehashFailure?: unknown }>}
+   */
+  async function saveUpgradedHash(account, upgraded) {
+    try {
+      await accountAccessor.updatePasswordHash(account.accountId, {
+        from: account.passwordHash,
+        to: upgraded,
+      });
+      return {};
+    } catch (err) {
+      return { rehashFailure: err };
+    }
+  }
+
   return Object.freeze({
     /**
      * Signing up with an email that already has an account, here or in the legacy app, in any spelling, answers the
@@ -258,6 +284,9 @@ export function createAccountComponent({
      *
      * A birth year is optional. Without one the account's age is unknown and it gets the under 18 defaults
      * (ADR-028). A player under 13 for the whole year cannot have an account (CC-152).
+     *
+     * A password attackers already know is refused once every field is valid (CC-261). That check looks at the
+     * password only, so its answer and its time say nothing about the email.
      *
      * @param {{ username: unknown, email: unknown, password: unknown, birthYear?: unknown, now: number }} input
      *   leave `birthYear` out when the player did not say
@@ -270,6 +299,7 @@ export function createAccountComponent({
         password: parsePassword(password),
         ...(birthYear !== undefined && { birthYear: statedBirthYear(birthYear, now) }),
       };
+      await passwordScreen.check({ password: credentials.password, field: "password" });
       const passwordHash = await passwordHasher.hash(credentials.password);
       // A legacy player's email stays theirs: they claim it by logging in, nobody can sign up with it. Once its
       // player deleted their account, the email is free for a new, empty account (CC-035).
@@ -289,8 +319,10 @@ export function createAccountComponent({
     /**
      * Same answer, and the same work, whether the email is unknown, belongs to an account or to a player of the old
      * app, or the password is wrong. Every login reads both stores and runs one scrypt and one bcrypt, so neither
-     * the answer nor the time it takes shows who has an account (CC-245). Upgrades the stored hash when its
-     * parameters are outdated.
+     * the answer nor the time it takes shows who has an account (CC-245). An account with an outdated hash also
+     * runs a hash at today's parameters alongside the check, whatever the password, so it is never quicker than an
+     * unknown email. On success that hash is saved, best effort and only over the hash that was checked, so the
+     * login never fails for it and a password changed meanwhile is kept (CC-260).
      *
      * @param {{ email: unknown, password: unknown, now: number }} input
      * @returns {Promise<Readonly<SignIn>>}
@@ -312,9 +344,14 @@ export function createAccountComponent({
         const typed = String(email).normalize("NFKC").trim();
         return signInOf(await loginLegacyUser(normalised, legacy, typed, now));
       }
-      const [matches] = await Promise.all([
+      // An outdated hash is cheaper to check than a current one. The hash at today's parameters is made at the same
+      // time, right password or wrong, so such an account costs at least what an unknown email costs and the time
+      // does not show which accounts have not signed in since the change (CC-260, CC-245).
+      const outdated = passwordHasher.needsRehash(account.passwordHash);
+      const [matches, , upgraded] = await Promise.all([
         passwordHasher.verify(normalised.password, account.passwordHash),
         legacyPasswords.verifyAgainstDummy(normalised.password),
+        outdated ? passwordHasher.hash(normalised.password) : undefined,
       ]);
       if (!matches) {
         throw new UnauthorizedError(INVALID_LOGIN, legacy.failure);
@@ -323,13 +360,8 @@ export function createAccountComponent({
       const signedIn = Object.freeze({
         ...signInOf(account),
         ...(legacy.failure !== undefined && { legacyFailure: legacy.failure.cause }),
+        ...(outdated && (await saveUpgradedHash(account, upgraded))),
       });
-      if (passwordHasher.needsRehash(account.passwordHash)) {
-        await accountAccessor.updatePasswordHash(
-          account.accountId,
-          await passwordHasher.hash(normalised.password),
-        );
-      }
       if (account.email !== normalised.email) {
         const outcome = await accountAccessor.healEmail({
           accountId: account.accountId,
@@ -378,6 +410,8 @@ export function createAccountComponent({
       if (next === current) {
         throw passwordFieldError("newPassword", "Choose a password different from your current one");
       }
+      // Only once the current password is right, so a borrowed signed-in browser cannot test passwords with it.
+      await passwordScreen.check({ password: next, field: "newPassword" });
       return accountAccessor.bumpSessionVersion({ accountId, passwordHash: await passwordHasher.hash(next) });
     },
 

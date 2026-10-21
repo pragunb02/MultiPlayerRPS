@@ -2,8 +2,8 @@ import { createSeededRng } from "./rng.js";
 
 /**
  * Rebuilds a game from its setup and action log. Engines always give the same result for the same input, so the
- * seed, the options and the log together reproduce the exact final state. Match history, replays and audits rely
- * on this.
+ * seed, the options, the starter (when a rematch named one, CC-091) and the log together reproduce the exact final
+ * state. Match history, replays and audits rely on this.
  *
  * Every logged move is re-validated (with the time it was played), so a tampered log cannot be replayed
  * into a result the rules would not allow.
@@ -13,13 +13,19 @@ import { createSeededRng } from "./rng.js";
  *   players: string[],
  *   options: unknown,
  *   seed: number,
+ *   starter?: string,
  *   log: ReadonlyArray<{ kind: string, playerId?: string, move?: unknown, at: number }>,
  * }} game
  * @returns {unknown} the final engine state
  * @throws {Error} when the log contains a move the rules reject, or an unknown entry
  */
-export function replayGame(engine, { players, options, seed, log }) {
-  let state = engine.init({ players: [...players], options, rng: createSeededRng(seed) });
+export function replayGame(engine, { players, options, seed, starter, log }) {
+  let state = engine.init({
+    players: [...players],
+    options,
+    rng: createSeededRng(seed),
+    ...(starter !== undefined && { starter }),
+  });
   log.forEach((entry, index) => {
     const ctx = { now: entry.at };
     switch (entry.kind) {
