@@ -23,13 +23,19 @@ export const isEffect = (name) => /^src\/effects\/(scenes|themes)\//.test(name);
 
 /**
  * Libraries only some pages need, which must never be in the first route again: chess.js leaked into it once
- * through one helper import (CC-322), and Motion is for the boards only (ADR-075).
+ * through one helper import (CC-322), Motion is for the boards only (ADR-075), and Socket.IO downloads on demand
+ * behind the small client of `src/lib/socket.js` (CC-333).
  */
 export const NEVER_ON_FIRST_ROUTE = Object.freeze([
   "node_modules/chess.js/",
   "node_modules/motion/",
   "node_modules/framer-motion/",
   "node_modules/motion-dom/",
+  "node_modules/socket.io-client/",
+  "node_modules/engine.io-client/",
+  "node_modules/socket.io-parser/",
+  "node_modules/engine.io-parser/",
+  "node_modules/@socket.io/component-emitter/",
 ]);
 
 const kB = (bytes) => bytes / 1000;

@@ -3,12 +3,13 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
 import { takeLanding } from "./app/landing.js";
-import { preloadRouteFor } from "./app/routePages.js";
+import { needsSocketNow, preloadRouteFor } from "./app/routePages.js";
 import { removeServerHead } from "./app/serverHead.js";
 import { recoverFromStaleBuild } from "./app/staleBuild.js";
 import { noteWaitingScreen } from "./app/wakingUp.js";
 import { createApiClient } from "./lib/api.js";
 import { createDownload } from "./lib/download.js";
+import { whenIdle } from "./lib/idle.js";
 import { createSessionBroadcast } from "./lib/sessionBroadcast.js";
 import { createSocketClient } from "./lib/socket.js";
 import { createSoundPlayer } from "./lib/sound/soundPlayer.js";
@@ -38,6 +39,11 @@ const services = {
   download: createDownload({ document, URL: window.URL }),
 };
 removeServerHead(document);
+// Socket.IO is not in the first download (CC-333). A page that needs the connection to show anything downloads it
+// now, alongside its own code and the session request, so it connects as soon as before. Others wait for idle below.
+if (needsSocketNow(window.location.pathname)) {
+  services.socket.needNow();
+}
 
 // A page that downloads on demand, opened by its address, is fetched before the first render, as the router's own
 // lazy routes do. The first render then shows the page itself and not its skeleton, so nothing moves (CC-322).
@@ -52,4 +58,6 @@ preloadRouteFor(window.location.pathname).then(() => {
       </BrowserRouter>
     </StrictMode>,
   );
+  // After the first render, when the browser has nothing more urgent to do. Connecting waits for the session anyway.
+  whenIdle({ window, run: () => services.socket.needNow() });
 });
