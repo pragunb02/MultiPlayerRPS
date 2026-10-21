@@ -6,7 +6,8 @@ import { useSession } from "./useSession.js";
 /**
  * Creates a room, starting a guest session first if needed, and resolves with its code. `create` makes a room to
  * invite a friend to. `playComputer` makes one where the game's computer character already sits, so the game has
- * started when the room opens (CC-221). `challenge` makes a challenge link that lasts a day instead (CC-139) and
+ * started when the room opens (CC-221). `quickMatch` looks for a person first and resolves with how it ended and
+ * the room of the game that started, if any (CC-051), and `cancelQuickMatch` ends that search. `challenge` makes a challenge link that lasts a day instead (CC-139) and
  * resolves with its id. The button that calls either shows the wait and any failure (see useAction).
  */
 export function useCreateRoom() {
@@ -31,6 +32,20 @@ export function useCreateRoom() {
     [socket, session],
   );
 
+  const quickMatch = useCallback(
+    async ({ gameId, level }) => {
+      await session.ensurePlayer();
+      const { outcome, room } = await socket.request(SOCKET_EVENTS.MATCH_QUICK, { gameId, level });
+      return { outcome, code: room?.code };
+    },
+    [socket, session],
+  );
+
+  const cancelQuickMatch = useCallback(
+    () => socket.request(SOCKET_EVENTS.MATCH_CANCEL).catch(() => ({ cancelled: false })),
+    [socket],
+  );
+
   const challenge = useCallback(
     async ({ gameId, options }) => {
       await session.ensurePlayer();
@@ -39,5 +54,5 @@ export function useCreateRoom() {
     [api, session],
   );
 
-  return { create, playComputer, challenge };
+  return { create, playComputer, quickMatch, cancelQuickMatch, challenge };
 }

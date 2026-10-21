@@ -43,6 +43,8 @@ import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js"
 import { createReportComponent, REPORT_EVENTS } from "./domain/reports/reportComponent.js";
 import { createFlagComponent } from "./domain/flags/flagComponent.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
+import { createMatchmakingComponent } from "./domain/matchmaking/matchmakingComponent.js";
+import { createQuickMatchCounts } from "./domain/matchmaking/quickMatchCounts.js";
 import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "./domain/dailyPuzzles/schedule.js";
 import { createBotTurns } from "./domain/bots/botTurns.js";
@@ -117,6 +119,8 @@ const OTHER_SESSIONS_ENDED = "otherSessionsEnded";
 const ACCOUNT_DELETED = "accountDeleted";
 const ROOM_SWEEP_INTERVAL_MS = 60_000;
 const GAUGE_INTERVAL_MS = 60_000;
+// How often the anonymous quick match counts are written to the log (CC-051), like the room gauge.
+const QUICK_MATCH_COUNTS_EVERY_MS = 60_000;
 const CLOCK_TICK_INTERVAL_MS = 1_000;
 const TRANSFER_RESUME_INTERVAL_MS = 60_000;
 // How often the match pipeline looks for games whose next attempt is due (CC-111).
@@ -973,6 +977,18 @@ export async function startServer({
     events: domainEvents,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  // Quick match (CC-051): one queue in this process's memory, so one server only until CC-061.
+  const quickMatchCounts = createQuickMatchCounts({ now });
+  const matchmaking = createMatchmakingComponent({
+    rooms: roomComponent,
+    bots: botComponent,
+    blocks: blockComponent,
+    safety: safetyComponent,
+    ratings: chessRatingComponent,
+    counts: quickMatchCounts,
+    now,
+    logger,
+  });
   const friends = wireFriends({
     friendAccessor,
     privacyAccessor,
@@ -1176,6 +1192,8 @@ export async function startServer({
     challengeComponent,
     recordSocketEvent: metrics.recordSocketEvent,
     friends,
+    matchmaking,
+    flags: flagComponent,
   });
   // Read only when telemetry takes a reading, once a minute in production.
   metrics.watch({ rooms: roomComponent.countRoomsByGame, connections: () => gateway.counts().connections });
@@ -1201,9 +1219,12 @@ export async function startServer({
 
   const keyRotation = dropOldNetworkKeysEveryMidnight({ networkKey, now });
   const flagRefresh = flagComponent.start();
+  const quickMatchLog = quickMatchCounts.logEvery({ logger, everyMs: QUICK_MATCH_COUNTS_EVERY_MS });
 
   const close = async () => {
     keyRotation.stop();
+    matchmaking.stop();
+    quickMatchLog.stop();
     housekeeping.stop();
     botDriver.stop();
     await thinkingWorkers.close();
@@ -1220,6 +1241,8 @@ export async function startServer({
     return { server, host, port, close };
   } catch (err) {
     keyRotation.stop();
+    matchmaking.stop();
+    quickMatchLog.stop();
     await flagRefresh.stop();
     botDriver.stop();
     await thinkingWorkers.close();

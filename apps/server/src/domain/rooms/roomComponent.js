@@ -720,15 +720,17 @@ export function createRoomComponent({
      *   gameId: string,
      *   options: unknown,
      *   now: number,
+     *   quickMatch?: boolean,
      * }} input  `network` names the host's network address without being it (see the gateway), so the rooms
      *   opened from one network can be counted. `earlierNetworks` are the names the same address had under
      *   earlier keys that are still in use, so rooms opened before the name changed still count (CC-249). Without
-     *   them only rooms with the same `network` count
+     *   them only rooms with the same `network` count. `quickMatch` marks a room quick match made (CC-051), so
+     *   whoever sits in it with the host met as strangers (ADR-051.7, `coPlayers`)
      * @throws {ConflictError} when the host already has as many waiting rooms as allowed, or their network as many
      *   open rooms (see roomLimits.js)
      * @throws {ServerBusyError} when the server holds as many rooms as it can
      */
-    async createRoom({ host, network, earlierNetworks = [], gameId, options, now }) {
+    async createRoom({ host, network, earlierNetworks = [], gameId, options, now, quickMatch = false }) {
       checkNetworks(network, earlierNetworks);
       const value = validOptions(gameId, options);
       await checkRoomLimits(host, [network, ...earlierNetworks], now);
@@ -739,6 +741,7 @@ export function createRoomComponent({
         status: ROOM_STATUS.WAITING,
         hostId: host.id,
         network,
+        ...(quickMatch && { quickMatch: true }),
         seats: [
           {
             playerId: host.id,

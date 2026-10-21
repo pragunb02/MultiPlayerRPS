@@ -129,6 +129,15 @@ by the fields below, and no id leaves that collection for analytics. So they are
 | `rematch_answered`  | the request was accepted, declined, or the window ended | `game_id`, `answer` (`accepted`, `declined`, `window_ended`, `player_left`)                                                                                                | Rematch rate, whether 30 minutes is long enough                                                                               |
 | `room_closed`       | the room closed                                         | `game_id`, `reason` (`ROOM_CLOSE_REASONS`), `status`, `life_min` bucket (under 5, 5 to 30, 30 to 120, over 120)                                                            | Whether lifetimes fit how people play (CC-101)                                                                                |
 
+**`quick_match_searched`** (CC-051, ADR-079, built as counts only). Trigger: a quick match search ended. Fields
+counted: the India `day` and `hour` slot, `game_id`, `outcome` (`matched`, `timed_out`, `skipped` for an empty
+site or the age policy, `cancelled`, `failed`) and the wait in buckets (up to 0.5, 1, 2, 3, 4 s, over 4 s). It
+answers the ADR-029 gate (the share of searches per hour slot matched within 4 s), the time to a match, and the
+friction guardrail (the share cancelled, and the waits of searches that ran out). No id of any kind is given to
+the counter, so none can be kept. Until CC-174 stores events, the server writes these counts to its log once a
+minute as one `quick match counts` line and keeps nothing. The flag's own counts (ADR-073) add exposures and one
+success per search that found a person.
+
 Minors: counts only, always. Retention: the CC-242 records 30 days (CC-242 decides), the totals 13 months.
 
 Also from the browser, for the time to first move:

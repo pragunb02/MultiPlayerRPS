@@ -111,3 +111,20 @@ export function parsePlayComputer(raw) {
   }
   return { ...parseCreateRoom(room), level };
 }
+
+/**
+ * A quick match search (CC-051): the game and the character's level for when nobody is free. Its options are the
+ * quick match pool's, never the client's (ADR-051.6).
+ *
+ * @returns {{ gameId: string, level: string }}
+ */
+export function parseQuickMatch(raw) {
+  const { gameId, level } = requireObject(raw, ["gameId", "level"]);
+  if (typeof gameId !== "string" || !GAME_ID_PATTERN.test(gameId)) {
+    throw new ValidationError("Unknown game", { details: { field: "gameId" } });
+  }
+  if (typeof level !== "string" || !LEVEL_PATTERN.test(level)) {
+    throw new ValidationError("Pick a level", { details: { field: "level" } });
+  }
+  return { gameId, level };
+}

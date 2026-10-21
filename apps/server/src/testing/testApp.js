@@ -42,6 +42,9 @@ import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "../domain/dailyPuzzles/schedule.js";
 import { createBotComponent } from "../domain/bots/botComponent.js";
+import { createMatchmakingComponent } from "../domain/matchmaking/matchmakingComponent.js";
+import { MATCHMAKING_RULES } from "../domain/matchmaking/matchmakingRules.js";
+import { createQuickMatchCounts } from "../domain/matchmaking/quickMatchCounts.js";
 import { createBotDriver } from "../domain/bots/botDriver.js";
 import { createBotTurns } from "../domain/bots/botTurns.js";
 import { createSealMaker, sealSecretFrom } from "../domain/bots/seals.js";
@@ -151,6 +154,8 @@ import { testConfig } from "./testConfig.js";
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
  *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
  *     to see what the service layer records (ADR-055)
+ *   matchmakingRules?: Partial<typeof MATCHMAKING_RULES>,   quick match rules a test changes (CC-051)
+ *   safety?: { policyFor: Function },   the age policy quick match reads, the real one unless a test gives its own
  * }} [options]
  */
 export function createTestApp({
@@ -184,6 +189,8 @@ export function createTestApp({
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
   metrics = {},
+  matchmakingRules,
+  safety,
 } = {}) {
   const config = testConfig(env, { buildInfoText });
   const capture = captureLogger();
@@ -376,6 +383,18 @@ export function createTestApp({
   });
   const networkOf = createNetworkKey({ now }).networkOf;
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
+  const quickMatchCounts = createQuickMatchCounts({ now });
+  const matchmaking = createMatchmakingComponent({
+    rooms: roomComponent,
+    bots: botComponent,
+    blocks: blockComponent,
+    safety: safety ?? safetyComponent,
+    ratings: chessRatingComponent,
+    counts: quickMatchCounts,
+    now,
+    logger: capture.logger,
+    ...(matchmakingRules && { rules: { ...MATCHMAKING_RULES, ...matchmakingRules } }),
+  });
   const friends = wireFriends({
     friendAccessor: createFriendAccessor({
       friendshipDao: createInMemoryFriendshipDao(),
@@ -564,6 +583,8 @@ export function createTestApp({
     roomComponent,
     botComponent,
     botDriver,
+    matchmaking,
+    quickMatchCounts,
     matchComponent,
     progressionComponent,
     playerTransferComponent,
@@ -632,6 +653,8 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     chessRatingComponent: testApp.chessRatingComponent,
     ...(options.metrics?.recordSocketEvent && { recordSocketEvent: options.metrics.recordSocketEvent }),
     friends: testApp.friends,
+    matchmaking: testApp.matchmaking,
+    flags: testApp.flagComponent,
   });
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));
@@ -646,6 +669,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
     baseUrl: `http://127.0.0.1:${port}`,
     close: async () => {
       testApp.botDriver.stop();
+      testApp.matchmaking.stop();
       await gateway.close();
       await testApp.tasks.drain();
     },

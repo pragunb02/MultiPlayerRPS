@@ -58,6 +58,54 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-079 — Quick match: Play looks for a person for up to 4 s beside the character's room, one in-memory queue
+
+- **Status:** Accepted by default (owner may change) · 2026-10-21 ([CC-051](tickets/CC-051.md), research with
+  sources there). Decided by the design lead, owner-delegated 2026-10-21. Ships behind the `quick_match` flag, off,
+  removed by 2027-01-15. Builds on ADR-025, ADR-029, ADR-051.5 to .9 and ADR-053.2.
+- **Context.** A visitor alone can play a labelled character at once (CC-221), but nobody can meet a stranger, and
+  the ADR-029 gate for "Find a person" has nothing to measure. A separate "Find a person" button would ask players
+  to choose before the crowd exists. The owner's brief: the main Play button keeps its character and adds a
+  parallel search for a person of at most 4 s, with no extra wait when nobody is free.
+- **Decision.**
+  1. **One button.** With the flag on, "Play <character>" sends `match:quick { gameId, level }`. The panel says
+     before the press: "First we look for a person to play, for up to 4 seconds. If nobody is free, you play
+     <character>." While it looks: "Still looking. If nobody is free, you play <character>, a computer player" and
+     Cancel. A computer is never seated without the press of a button that names it (ADR-025.1).
+  2. **In parallel.** The search makes the player's waiting room at once, marked `quickMatch: true`. A person
+     found joins the older search's room, which starts the game. Nobody found: the character sits in that same room
+     when the search time ends, so the fallback starts with no wait beyond the search.
+  3. **The liquidity gate (ADR-029).** No search on an empty site: when no other player is connected and nobody it
+     could meet is searching, Play starts the character at once. The search lasts 4 s until 20 searches found a
+     person, then the 80th percentile wait of the last 100 that did, from 1 s to 4 s.
+  4. **Pools and order.** One in-memory pool per game, and for chess one per 300-point rating band, each looking at
+     the bands beside it. Chess pairs within a window of 100 points that widens by 50 a second of the older search's
+     wait, to at most 300 (Lichess's limits are 100 to 133 at the start). First come, first served among those who
+     may be paired. Quick match chess is one pool at 3+2 (ADR-051.6), for the character too.
+  5. **Never paired:** the same player (a newer search cancels the older), a pair with a block either way (read at
+     the search's start, and again by the room as the person sits down, ADR-053.2), a pair whose pairing failed
+     already in this search, and a pair quick match paired 10 times in 24 hours (the ADR-021.3 cap).
+  6. **Minors (ADR-028, CC-152).** The age policy gains `quickMatch`: `strangers` for every audience today, `none`
+     keeps a player out of every search (the character at once). What a minor, an account of unknown age or a guest
+     gets: the same search as an adult, with no way to talk (no chat, emotes off, ADR-028.6), the room marked quick
+     match so no friend request (ADR-051.7, `friendRules.mayReach`) and no challenge again (ADR-051.8) can follow
+     from it, the opponent's chosen and filtered username and seat ids only (ADR-051.9), never a profile link or a
+     player id. Age bands are not split into pools: an adult can play as a guest, so a split would not keep anyone
+     apart and would halve a small crowd.
+  7. **Exactly one outcome per search:** `person`, `character`, `cancelled` or an error, in the event's own answer.
+     State changes only in synchronous code: searching, pairing (a cancel is kept and wins before the room is
+     joined), committed (a cancel is too late: the game starts and the room's own rules apply, ADR-034.5), settled.
+  8. **Cancel** on the Cancel button, on leaving the page, on the page being hidden, and when the tab that searched
+     disconnects.
+  9. **One server only.** The queue lives in the process (CC-061 brings a shared one). A restart drops every search.
+  10. **Counts (ADR-034).** Per India day, hour slot, game and outcome (`matched`, `timed_out`, `skipped`,
+      `cancelled`, `failed`), searches and waits in buckets, no id of anyone, written to the log once a minute
+      (`quick match counts`) until CC-174. The flag counts one success per search that found a person.
+- **Consequences.** A pool of a few people pairs people who press Play within seconds of each other, and everyone
+  else plays the character after a short wait. That wait is the friction the guardrail watches. Turning the flag off
+  goes back to CC-221's instant character at once. Matches do not record how players met yet: a match without the
+  mark already counts as quick match for a pair with a minor (ADR-066.5). Rooms without the field read as before.
+
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 
 - **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner

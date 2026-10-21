@@ -31,6 +31,14 @@ export const FRIENDS_MODES = Object.freeze({
   NONE: "none",
 });
 
+/**
+ * Whether quick match (CC-051, ADR-079) may pair the player with a stranger. `strangers` pairs them under the
+ * quick match rules: never with a blocked player, the room marked as quick match so no friend request
+ * (ADR-051.7) or challenge again (ADR-051.8) can follow from it, and no way to talk (ADR-028.6). `none` keeps the
+ * player out of every search: Play starts the computer character at once.
+ */
+export const QUICK_MATCH_MODES = Object.freeze({ STRANGERS: "strangers", NONE: "none" });
+
 /** In-game emotes (CC-169). */
 export const EMOTES = Object.freeze({ ON: "on", OFF: "off" });
 
@@ -56,6 +64,7 @@ const ADULT_POLICY = Object.freeze({
   canFollow: true,
   canBeFollowed: true,
   friendsMode: FRIENDS_MODES.MUTUAL,
+  quickMatch: QUICK_MATCH_MODES.STRANGERS,
   emotes: EMOTES.ON,
   quietHours: null,
   shareCardName: true,
@@ -73,6 +82,8 @@ const MINOR_POLICY = Object.freeze({
   canFollow: false,
   canBeFollowed: false,
   friendsMode: FRIENDS_MODES.MUTUAL_KNOWN,
+  // A minor plays strangers only under the quick match rules above: nothing can follow from the game (ADR-079.6).
+  quickMatch: QUICK_MATCH_MODES.STRANGERS,
   emotes: EMOTES.OFF,
   quietHours: QUIET_HOURS,
   shareCardName: false,

@@ -62,6 +62,7 @@ export {
   overdueFlags,
 } from "./flags.js";
 export { SOCKET_EVENTS } from "./events.js";
+export { QUICK_MATCH_OUTCOMES, QUICK_MATCH_RULES } from "./quickMatch.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";
 export { ACCOUNT_MESSAGES, IDENTITY_KINDS } from "./identity.js";
 export {

@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeSocket } from "../../testing/fakes.js";
+import { flagPaths } from "../../testing/flagPaths.js";
 import { renderApp } from "../../testing/render.jsx";
 
 describe("PlayPage", () => {
@@ -210,5 +211,112 @@ describe("PlayPage", () => {
     renderApp({ path: "/games/ludo" });
 
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+  });
+});
+
+// Quick match (CC-051): the same main button looks for a person first, behind its flag.
+flagPaths("quick_match", (on) => {
+  const flagged = () =>
+    fakeApi({ getFlags: vi.fn(async (names) => Object.fromEntries(names.map((name) => [name, on]))) });
+
+  it(`${on ? "looks for a person first, and says so before the press" : "plays the character at once, as before"}`, async () => {
+    const user = userEvent.setup();
+    const socket = fakeSocket();
+    socket.request.mockImplementation(async (event) => {
+      if (event === "match:quick") return { outcome: "person", room: { code: "AB2CD3" } };
+      if (event === "room:play-computer") return { code: "AB2CD3" };
+      return new Promise(() => {});
+    });
+    const api = flagged();
+    renderApp({ path: "/games/rock-paper-scissors", socket, api });
+    await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+
+    if (on) {
+      expect(
+        await screen.findByText(/First we look for a person to play, for up to 4 seconds/),
+      ).toBeVisible();
+    } else {
+      expect(screen.queryByText(/First we look for a person/)).toBeNull();
+    }
+    await user.click(screen.getByRole("button", { name: "Play Rocky" }));
+
+    expect(socket.request).toHaveBeenCalledWith(
+      ...(on
+        ? ["match:quick", { gameId: "rps", level: "easy" }]
+        : ["room:play-computer", { gameId: "rps", level: "easy", options: {} }]),
+    );
+    expect(await screen.findByText(/Joining room AB2CD3/)).toBeInTheDocument();
+  });
+
+  it(`${on ? "while it looks, says the character plays if nobody is free, and Cancel ends the search" : "offers no Cancel"}`, async () => {
+    const user = userEvent.setup();
+    const socket = fakeSocket();
+    let answer = () => {};
+    socket.request.mockImplementation((event) => {
+      if (event === "match:quick") return new Promise((resolve) => (answer = resolve));
+      if (event === "match:cancel") {
+        answer({ outcome: "cancelled" });
+        return Promise.resolve({ cancelled: true });
+      }
+      return new Promise(() => {});
+    });
+    const api = flagged();
+    const { url } = renderApp({ path: "/games/chess", socket, api });
+    await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+    if (on) await screen.findByText(/First we look for a person/);
+
+    await user.click(screen.getByRole("button", { name: "Play Queen Vee" }));
+    if (!on) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+      return;
+    }
+    const status = await screen.findByText(
+      /Still looking. If nobody is free, you play Queen Vee, a computer player/,
+      {},
+      { timeout: 2_000 },
+    );
+    expect(status.closest("[role=status]")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(socket.request).toHaveBeenCalledWith("match:cancel");
+    await vi.waitFor(() => expect(screen.queryByText(/Still looking. If nobody/)).toBeNull());
+    expect(url()).toBe("/games/chess");
+  });
+
+  it(`${on ? "tells the player nobody was free when the character starts after a search" : "shows no such line"}`, async () => {
+    const user = userEvent.setup();
+    const socket = fakeSocket();
+    socket.request.mockImplementation(async (event) => {
+      if (event === "match:quick") return { outcome: "character", room: { code: "AB2CD3" } };
+      if (event === "room:play-computer") return { code: "AB2CD3" };
+      return new Promise(() => {});
+    });
+    const api = flagged();
+    renderApp({ path: "/games/tic-tac-toe", socket, api });
+    await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+    if (on) await screen.findByText(/First we look for a person/);
+
+    await user.click(screen.getByRole("button", { name: "Play Pip" }));
+
+    expect(await screen.findByText(/Joining room AB2CD3/)).toBeInTheDocument();
+    expect(screen.queryByText("Nobody was free just now, so you're playing Pip.") !== null).toBe(on);
+  });
+
+  it(`${on ? "cancels the search when the page is hidden" : "sends nothing when the page is hidden"}`, async () => {
+    const user = userEvent.setup();
+    const socket = fakeSocket();
+    socket.request.mockImplementation(() => new Promise(() => {}));
+    const api = flagged();
+    renderApp({ path: "/games/rock-paper-scissors", socket, api });
+    await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+    if (on) await screen.findByText(/First we look for a person/);
+    await user.click(screen.getByRole("button", { name: "Play Rocky" }));
+
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    visibility.mockRestore();
+
+    expect(socket.request.mock.calls.some(([event]) => event === "match:cancel")).toBe(on);
   });
 });
