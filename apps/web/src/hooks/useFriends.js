@@ -123,19 +123,28 @@ export function useFriends() {
       },
     [read],
   );
+  const { recheck } = session;
   const retry = useCallback(() => {
+    // Without an account, an error is the session's own: ask the server again who this browser is.
+    if (!account) {
+      recheck();
+      return;
+    }
     setState({ who, status: "loading", view: undefined, error: undefined });
     setAttempt((n) => n + 1);
-  }, [who]);
+  }, [who, account, recheck]);
 
-  // Without a player the session decides: still loading, or a visitor with no session at all (CC-324: this used to
-  // stay "loading" for ever).
+  // Without a player the session decides (CC-324): a visitor only when the server said there is no session, the
+  // session's own error when the check failed, so a signed-in player is never told to sign up. This used to stay
+  // "loading" for ever.
   const withoutAccount = () => {
-    if (identity !== undefined) return "guest";
-    return session.status === "loading" ? "loading" : "visitor";
+    if (identity !== undefined) return { status: "guest", error: undefined };
+    if (session.status === "anonymous") return { status: "visitor", error: undefined };
+    if (session.status === "error") return { status: "error", error: session.error };
+    return { status: "loading", error: undefined };
   };
   const current = !account
-    ? { status: withoutAccount(), view: undefined, error: undefined }
+    ? { ...withoutAccount(), view: undefined }
     : state.who === who
       ? state
       : { status: "loading", view: undefined, error: undefined };

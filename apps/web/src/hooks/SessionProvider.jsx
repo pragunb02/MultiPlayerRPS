@@ -172,8 +172,13 @@ export function SessionProvider({ children }) {
       // Both keep this browser signed in as the same player and sign out every other one (CC-116).
       changePassword: (passwords) => api.changePassword(passwords),
       signOutOtherDevices: () => api.signOutOtherDevices(),
+      // After a failed check (status "error"): ask the server who this browser is once more (CC-324).
+      recheck: () => {
+        setState({ status: "loading", identity: undefined, error: undefined });
+        askLatest();
+      },
     };
-  }, [state, api, adopt, own, sessionBroadcast]);
+  }, [state, api, adopt, own, sessionBroadcast, askLatest]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

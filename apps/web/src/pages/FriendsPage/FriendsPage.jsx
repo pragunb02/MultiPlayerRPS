@@ -332,7 +332,7 @@ export function FriendsPage() {
       <p role="alert">
         Couldn&apos;t load your friends. {friends.error.message}{" "}
         <Button control="friends.retry" variant="secondary" onClick={friends.retry}>
-          Retry
+          Try again
         </Button>
       </p>
     );
