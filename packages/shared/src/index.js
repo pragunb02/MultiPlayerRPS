@@ -40,6 +40,16 @@ export {
   isFeedbackPage,
 } from "./feedback.js";
 export {
+  REPORT_ACTION,
+  REPORT_ACTIONS,
+  REPORT_CONTEXT,
+  REPORT_KEEP_DAYS,
+  REPORT_REASON,
+  REPORT_REASONS,
+  REPORT_STATUS,
+  REPORT_STATUSES,
+} from "./reports.js";
+export {
   assertClientFlag,
   assertFlagRegistry,
   FLAG_AUDIENCES,

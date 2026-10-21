@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { assertDefined } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
-import { parsePlayedWith, UUID_PATTERN } from "./playedWith.js";
+import { parseReference, REFERENCE_KIND, UUID_PATTERN } from "./playerReferenceInput.js";
 import { createRateLimit } from "./rateLimits.js";
 import { requireIdentity } from "./session.js";
 
@@ -21,11 +21,26 @@ export const BLOCK_LIMITS = Object.freeze({
 });
 
 /**
+ * Who to block: `{ roomCode, seat, seatId }`, `{ matchId, seat }` or `{ reportId }` (a report the caller made,
+ * ADR-071.4), and nothing else. Never a player id (playerReferenceInput.js).
+ *
+ * @returns {import("../../domain/blocks/blockComponent.js").BlockTarget}
+ */
+const parseTarget = (body) =>
+  /** @type {import("../../domain/blocks/blockComponent.js").BlockTarget} */ (
+    parseReference(body, {
+      kinds: [REFERENCE_KIND.ROOM, REFERENCE_KIND.MATCH, REFERENCE_KIND.REPORT],
+      message: "Send a room code or a match id, and a seat",
+    })
+  );
+
+/**
  * Blocks (CC-044, ADR-053), for guests and accounts alike. Visitors get 401.
  *
  * 1. `GET /blocks` answers `{ blocks: [{ blockId, displayName, blockedAt }] }`, the player's own blocks, newest first.
- * 2. `POST /blocks` with `{ roomCode, seat, seatId }` or `{ matchId, seat }` blocks the player in that seat, and answers
- *    `{ block }`. Anyone the server did not see the caller play with gets 404.
+ * 2. `POST /blocks` with `{ roomCode, seat, seatId }`, `{ matchId, seat }` or `{ reportId }` blocks the player in that
+ *    seat or of that report, and answers `{ block }`. Anyone the server did not see the caller play with or report
+ *    gets 404.
  * 3. `DELETE /blocks/:blockId` removes one of the player's own blocks and answers 204. Anyone else's gets 404.
  *
  * @param {{
@@ -65,7 +80,7 @@ export function createBlockRoutes({ blockComponent, now = Date.now, limits = {} 
   // The player's own limit first, so the network's budget counts only what it let through. One player hammering the
   // route can then use up at most their own share of a school's or a carrier's address.
   router.post("/blocks", signedIn, perPlayer, perAddress, async (req, res) => {
-    const target = parsePlayedWith(req.body);
+    const target = parseTarget(req.body);
     const blocker = requireIdentity(req.session);
     const block = await blockComponent.block({ blocker, target, now: now() });
     // Who was blocked is never logged: only the database holds it, for as long as the block lasts.

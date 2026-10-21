@@ -171,21 +171,36 @@ export function createAccountDao({ connection }) {
     },
 
     /**
-     * Counts the session version up, and sets a new password hash at the same moment when one is given, in one
-     * write. Every session made before no longer matches.
+     * Counts the session version up, and in the same write sets a new password hash or a new username when one is
+     * given. Every session made before no longer matches.
      *
-     * @param {{ accountId: string, passwordHash?: string }} change
+     * @param {{ accountId: string, passwordHash?: string, username?: string }} change  a new username is the owner's
+     *   rename of a reported name (CC-044)
      * @returns {Promise<number>} the new session version
      * @throws {RangeError} when absent
+     * @throws {DuplicateKey} with `field` "username" when another account has that name
      */
-    async bumpSessionVersion({ accountId, passwordHash }) {
-      const doc = mongoose.isValidObjectId(accountId)
-        ? await Account.findByIdAndUpdate(
-            accountId,
-            { $inc: { sessionVersion: 1 }, ...(passwordHash !== undefined && { $set: { passwordHash } }) },
-            { returnDocument: "after", projection: { sessionVersion: 1 } },
-          ).lean()
-        : null;
+    async bumpSessionVersion({ accountId, passwordHash, username }) {
+      const set = {
+        ...(passwordHash !== undefined && { passwordHash }),
+        ...(username !== undefined && { username, usernameKey: username.toLowerCase() }),
+      };
+      let doc;
+      try {
+        doc = mongoose.isValidObjectId(accountId)
+          ? await Account.findByIdAndUpdate(
+              accountId,
+              { $inc: { sessionVersion: 1 }, ...(Object.keys(set).length > 0 && { $set: set }) },
+              { returnDocument: "after", projection: { sessionVersion: 1 } },
+            ).lean()
+          : null;
+      } catch (err) {
+        throw err.code === DUPLICATE_KEY_CODE
+          ? Object.assign(new DuplicateKey("username already registered", { cause: err }), {
+              field: "username",
+            })
+          : err;
+      }
       if (doc === null) {
         throw new RangeError(`No account ${accountId}`);
       }

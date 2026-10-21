@@ -1242,6 +1242,32 @@ export function createRoomComponent({
     },
 
     /**
+     * The owner renamed the player's account after reports (CC-044, ADR-071.6): their seat in every open room takes
+     * the new name, so the others stop seeing the old one and a game that ends later is recorded under the new one.
+     * Each changed room is told.
+     *
+     * @param {{ playerId: string, displayName: string, now: number }} input
+     * @returns {Promise<Array<Readonly<import("../../data/roomAccessor.js").Room>>>} rooms that changed
+     */
+    async renamePlayer({ playerId, displayName, now }) {
+      const results = await eachRoom(await roomAccessor.listBySeat(playerId), (stored) =>
+        change({
+          code: stored.code,
+          now,
+          decide(room) {
+            const seat = seatOf(room, playerId);
+            if (seat === undefined || seat.displayName === displayName) return room;
+            const seats = room.seats.map((each) => (each === seat ? { ...each, displayName } : each));
+            return { ...room, seats };
+          },
+        }),
+      );
+      return announce(
+        results.filter((result) => !result.closed && result.changed).map((result) => result.room),
+      );
+    },
+
+    /**
      * The player deleted their account (CC-035). In every room they sit in, an anonymous stand-in takes their place
      * first and then leaves: a running game is forfeited, so the other player wins and the match is recorded with
      * the stand-in, a waiting seat is given up, and a finished room loses its rematch. Nothing in a room names the

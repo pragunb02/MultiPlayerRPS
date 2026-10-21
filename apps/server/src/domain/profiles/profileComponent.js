@@ -132,6 +132,26 @@ export function createProfileComponent({ profileAccessor, safety, accounts, prog
     },
 
     /**
+     * Who a report from a profile names (CC-044, ADR-071.1): the adult account behind the handle and the username a
+     * viewer sees there. Server only, never sent to a client. Anyone else is not found, alike, because a hidden
+     * profile shows no name to report.
+     *
+     * @param {{ handle: string, viewerId: string, now: number }} query
+     * @returns {Promise<Readonly<{ playerId: string, displayName: string }>>}
+     * @throws {NotFoundError} for a handle nobody has, a deleted account's, and anyone not surely an adult account
+     */
+    async personByHandle({ handle, now }) {
+      const profile = await profileAccessor.getByHandle(handle).catch((err) => {
+        throw err instanceof NotFoundError ? notFound(err) : err;
+      });
+      if (!(await policyOf(profile.playerId, now)).profileLink) throw notFound();
+      return Object.freeze({
+        playerId: profile.playerId,
+        displayName: await usernameOf(profile.playerId, now),
+      });
+    },
+
+    /**
      * What a viewer sees at a handle. Checked in this order, on every read:
      *
      * 1. No such handle, or a deleted account: not found, both alike. A block changes nothing (point 5 above).
