@@ -46,14 +46,21 @@ function fake(name, fields = {}) {
 }
 
 /** Renders the host as the layout does, and waits for its chunk, which it loads at idle. */
-async function renderHost({ effects, now = () => TODAY, api = fakeApi(), inGame = false, path = "/" } = {}) {
+async function renderHost({
+  effects,
+  now = () => TODAY,
+  api = fakeApi(),
+  inGame = false,
+  path = "/",
+  warm = false,
+} = {}) {
   const tree = (playing) => (
     <MemoryRouter initialEntries={[path]}>
       <ServicesContext.Provider value={{ api }}>
         <SessionContext.Provider value={{ status: "ready", identity: GUEST }}>
           <InGameContext.Provider value={{ inGame: playing, setInGame: () => {} }}>
             <EventGreeting />
-            <EffectHost effects={effects} now={now} />
+            <EffectHost effects={effects} now={now} warm={warm} />
           </InGameContext.Provider>
         </SessionContext.Provider>
       </ServicesContext.Provider>
@@ -120,6 +127,38 @@ describe("the effect host (CC-328)", () => {
     await expect(third).resolves.toBe(false);
     expect(badge.scene.start).not.toHaveBeenCalled();
     await waitFor(() => expect(canvases()).toHaveLength(0));
+  });
+
+  it("warms the particle module once at idle, off screen, so the first celebration of a visit is not the cold one", async () => {
+    const win = fake("win_burst");
+    await renderHost({ effects: [win.entry], warm: true });
+
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    const [warmUp] = win.scene.runs;
+    expect(warmUp.canvas.isConnected).toBe(false);
+    expect([warmUp.canvas.width, warmUp.canvas.height]).toEqual([1, 1]);
+    expect(warmUp.options).toMatchObject({ particles: 20, durationMs: 250 });
+    expect(canvases()).toHaveLength(0);
+    await act(async () => warmUp.finish());
+
+    // The real play still gets the canvas, and the warm-up never comes again in this visit.
+    let played;
+    act(() => {
+      played = play("win_burst");
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(2));
+    expect(win.scene.runs[1].canvas).toBe(canvases()[0]);
+    await act(async () => win.scene.runs[1].finish());
+    await expect(played).resolves.toBe(true);
+  });
+
+  it("does not warm the module under reduced motion, where nothing plays", async () => {
+    installMatchMedia({ reducedMotion: true });
+    const win = fake("win_burst");
+    await renderHost({ effects: [win.entry], warm: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(win.scene.load).not.toHaveBeenCalled();
   });
 
   it("plays every queued celebration in turn, however many wait", async () => {
