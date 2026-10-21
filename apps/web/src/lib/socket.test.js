@@ -3,6 +3,9 @@ import { RELOAD_GUARD_MS, RELOADED_PARAM, recoverFromStaleBuild } from "../app/s
 import { AppRequestError } from "./errors.js";
 import { createSocketClient } from "./socket.js";
 
+const realIo = vi.hoisted(() => ({ connect: vi.fn() }));
+vi.mock("socket.io-client", () => ({ io: realIo.connect }));
+
 /** A fake Socket.IO: `connect` is its `io()`, and the socket keeps its handlers so a test can play the server. */
 function fakeIo(ack) {
   const handlers = new Map();
@@ -342,6 +345,30 @@ describe("socket client", () => {
       expect(quietly).toHaveBeenCalledOnce();
       expect(load).toHaveBeenCalledTimes(2);
       await vi.waitFor(() => expect(io.socket.connect).toHaveBeenCalledOnce());
+    });
+
+    it("downloads Socket.IO's own package when no download is given", async () => {
+      const io = fakeIo();
+      realIo.connect.mockImplementation(io.connect);
+      const client = createSocketClient();
+
+      client.needNow();
+
+      await vi.waitFor(() => expect(io.connect).toHaveBeenCalledOnce());
+    });
+
+    it("tries again when asked to connect after a failed download, and keeps the failure to itself", async () => {
+      const { load, fail } = deferredLoad();
+      const client = createSocketClient({ load });
+      client.needNow();
+      fail();
+      await flush();
+
+      client.connect();
+      fail();
+      await flush();
+
+      expect(load).toHaveBeenCalledTimes(2);
     });
 
     it("waits for the next need after a failed download when no connection is wanted", async () => {
