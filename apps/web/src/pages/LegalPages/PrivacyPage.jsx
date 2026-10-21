@@ -112,6 +112,15 @@ export function PrivacyPage() {
             reports about you are deleted.
           </li>
           <li>
+            <strong>If your account is paused.</strong> When an account keeps breaking the rules, the owner
+            can pause the account for 24 hours, 7 days, 30 days or until they lift it. You are signed out, and
+            when you log in you see when the pause ends and can tell us through the feedback form if you think
+            it is a mistake. Nothing is deleted: you can still download your data with your email and
+            password. Nobody who reported you is told, and you are not told who reported. We store the pause
+            (how long, a reason from a short list, when, and who did it), and it is kept 180 days after the
+            pause ends, then deleted, or when you delete your account.
+          </li>
+          <li>
             <strong>Friends.</strong> With an account you can ask someone you played with to be friends, or
             send a friend link. We store who is friends with whom and when, until either of you removes the
             other, blocks the other or deletes the account. A friend request is kept for 30 days, and a friend
@@ -289,7 +298,8 @@ export function PrivacyPage() {
             chess rating, achievements, quests, daily puzzle days, leaderboard places, your profile and
             avatar, the players you blocked, your friends, the friend requests you sent, your open friend
             links, your Appear offline choice, your challenges and the reports you made. Other players appear
-            in it by their display name only.
+            in it by their display name only. If your account was ever paused, the file says when, for how
+            long and why, but not who did it.
           </li>
           <li>
             <strong>Delete my account</strong> deletes it at once, with your progress, chess rating,

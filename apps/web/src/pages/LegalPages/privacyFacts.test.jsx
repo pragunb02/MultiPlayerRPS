@@ -127,6 +127,11 @@ const FACTS = [
     page: /and the reports you made\. Other players appear in it by their display name only/,
   },
   {
+    fact: "a suspension is kept 180 days after it ends, deletes nothing, and no reporter is told (CC-334, ADR-078)",
+    data: "| [`account_suspensions`](#account_suspensions) | pseudonymous: the account's id, its name then, the duration, a closed reason, the times, the admin who acted, no free text |",
+    page: /the owner can pause the account.*Nothing is deleted.*Nobody who reported you is told, and you are not told who reported.*kept 180 days after the pause ends/,
+  },
+  {
     fact: "operations telemetry goes to Grafana Labs with no personal data (ADR-055)",
     data: "| [Operations telemetry](#operations-telemetry) | no: counts, timings and the names of warnings, never an id, name, email, IP address, room code, cookie or session |",
     page: /Grafana Labs.*receives counts and timings about how the server runs, and the names of its warnings and errors\. Never your IP address, email, player id, name, room code, cookies or session/,
