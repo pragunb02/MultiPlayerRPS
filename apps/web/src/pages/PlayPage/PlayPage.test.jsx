@@ -319,4 +319,42 @@ flagPaths("quick_match", (on) => {
 
     expect(socket.request.mock.calls.some(([event]) => event === "match:cancel")).toBe(on);
   });
+
+  it(`${on ? "never starts a search when the page was hidden before it was sent" : "plays the character after a hidden press, as before"}`, async () => {
+    const user = userEvent.setup();
+    const socket = fakeSocket();
+    socket.request.mockImplementation(async (event) => {
+      if (event === "room:play-computer") return { code: "AB2CD3" };
+      return new Promise(() => {});
+    });
+    // The visitor becomes a guest on the press, which takes a moment: the search is not sent yet when the page hides.
+    let guestReady = () => {};
+    const api = flagged();
+    api.startGuest.mockImplementation(
+      () =>
+        new Promise(
+          (resolve) =>
+            (guestReady = () => resolve({ id: "guest_x", kind: "guest", displayName: "Guest-ABCD" })),
+        ),
+    );
+    renderApp({ path: "/games/rock-paper-scissors", socket, api });
+    await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+    if (on) await screen.findByText(/First we look for a person/);
+    await user.click(screen.getByRole("button", { name: "Play Rocky" }));
+
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    visibility.mockRestore();
+    guestReady();
+
+    const sent = () => socket.request.mock.calls.map(([event]) => event);
+    if (on) {
+      await vi.waitFor(() => expect(api.startGuest).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(sent()).not.toContain("match:quick");
+      await vi.waitFor(() => expect(screen.getByRole("button", { name: "Play Rocky" })).toBeEnabled());
+    } else {
+      await vi.waitFor(() => expect(sent()).toContain("room:play-computer"));
+    }
+  });
 });

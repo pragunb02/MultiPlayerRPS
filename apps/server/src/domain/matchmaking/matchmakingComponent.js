@@ -23,8 +23,9 @@ const DAY_MS = 24 * 3_600_000;
  * 2. SEARCHING: in its pool, the character's room being made ready beside it. Cancel ends it at once.
  * 3. PAIRING: taken out of the pool with a partner, the host's room being awaited. A cancel now is kept and decided
  *    before the room is joined.
- * 4. COMMITTED: the game is being started (a person joining, or the character). A cancel now is too late: the
+ * 4. COMMITTED: the game is being started (a person joining, or the character). A cancel now is too late if the
  *    game starts, and the room's own rules apply to whoever is not there (a first move within 60 s, ADR-034.5).
+ *    It is still kept: when the person's join fails, the search ends cancelled instead of looking again.
  * 5. SETTLED: its one outcome is given.
  */
 const STATES = Object.freeze({
@@ -121,6 +122,16 @@ export function createMatchmakingComponent({
     return times.length;
   }
 
+  /** Forgets every pairing older than 24 hours, so no pair of player ids is held longer (DATA.md). */
+  function prunePairings() {
+    const since = now() - DAY_MS;
+    for (const [key, times] of pairings) {
+      const kept = times.filter((at) => at > since);
+      if (kept.length === 0) pairings.delete(key);
+      else if (kept.length !== times.length) pairings.set(key, kept);
+    }
+  }
+
   function addToPool(entry) {
     const pool = pools.get(entry.key) ?? new Set();
     pools.set(entry.key, pool.add(entry));
@@ -150,10 +161,6 @@ export function createMatchmakingComponent({
     if (result instanceof Error) {
       entry.reject(result);
     } else {
-      if (result.outcome === QUICK_MATCH_OUTCOMES.PERSON) {
-        recentWaits.push(waitMs);
-        recentWaits.splice(0, Math.max(0, recentWaits.length - rules.waitSamples));
-      }
       entry.resolve(result);
     }
     return true;
@@ -276,6 +283,10 @@ export function createMatchmakingComponent({
     }
     const key = pairKeyOf(host, guest);
     pairings.set(key, [...(pairings.get(key) ?? []), now()]);
+    // How long a person had to wait for a partner is the older side's wait. The newer side found someone at once,
+    // and counting it would pull the timeout down to nothing (ADR-079.3).
+    recentWaits.push(Math.max(0, now() - host.since));
+    recentWaits.splice(0, Math.max(0, recentWaits.length - rules.waitSamples));
     const found = Object.freeze({ outcome: QUICK_MATCH_OUTCOMES.PERSON, room: started });
     settle(host, found);
     settle(guest, found);
@@ -304,13 +315,15 @@ export function createMatchmakingComponent({
   /** Waiting searches that could not be paired yet are looked at again, as chess windows widen with the wait. */
   function scheduleSweep() {
     if (sweepTimer !== undefined) return;
-    if (![...pools.values()].some((pool) => pool.size > 1)) return;
+    const waiting = [...pools.values()].flatMap((pool) => [...pool]);
+    if (!waiting.some((entry) => entry.state === STATES.SEARCHING && hasNeighbour(entry))) return;
     sweepTimer = timers.set(() => {
       sweepTimer = undefined;
-      const waiting = [...pools.values()]
+      prunePairings();
+      const looking = [...pools.values()]
         .flatMap((pool) => [...pool])
         .sort((a, b) => a.since - b.since || a.order - b.order);
-      waiting.forEach(tryPair);
+      looking.forEach(tryPair);
     }, rules.sweepMs);
   }
 
@@ -339,7 +352,8 @@ export function createMatchmakingComponent({
     const partnerWaiting =
       pickPartner({ seeker: entry, candidates: candidatesFor(entry), now: now(), pairCountOf }, rules) !==
       undefined;
-    const plan = searchPlan({ othersOnline, partnerWaiting, recentWaits }, rules);
+    const probe = entry.order % rules.probeEvery === 0;
+    const plan = searchPlan({ othersOnline, partnerWaiting, recentWaits, probe }, rules);
     if (!plan.search) {
       await playNow(entry, plan.reason);
       return;
@@ -375,13 +389,17 @@ export function createMatchmakingComponent({
       cancelled(entry);
       return { cancelled: true };
     }
-    if (entry.state === STATES.PAIRING) {
+    if (entry.state === STATES.PAIRING || entry.state === STATES.COMMITTED) {
+      // Kept in either state: a pairing whose join then fails ends the search instead of looking again.
       entry.cancelRequested = true;
       const result = await entry.done.catch(() => undefined);
       return { cancelled: result?.outcome === QUICK_MATCH_OUTCOMES.CANCELLED };
     }
     return { cancelled: false };
   }
+
+  /** Whether a waiting search has someone in its own or a neighbouring pool who may be paired with it later. */
+  const hasNeighbour = (entry) => candidatesFor(entry).some((other) => other !== entry);
 
   return Object.freeze({
     /**
@@ -405,6 +423,7 @@ export function createMatchmakingComponent({
      */
     search({ player, network, earlierNetworks = [], gameId, level, othersOnline, socketId }) {
       botIdentity({ gameId, level });
+      prunePairings();
       /** @type {any} */
       const entry = {
         player,
@@ -446,6 +465,9 @@ export function createMatchmakingComponent({
       }
       return cancelEntry(entry);
     },
+
+    /** How many pairs of players quick match remembers pairing in the last 24 hours. For tests. */
+    heldPairs: () => pairings.size,
 
     /** Cancels every search, for shutdown. */
     stop() {

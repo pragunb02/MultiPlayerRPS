@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { QUICK_MATCH_OUTCOMES, SOCKET_EVENTS } from "@classicade/shared";
 import { useServices } from "../app/servicesContext.js";
 import { useSession } from "./useSession.js";
 
@@ -7,8 +7,9 @@ import { useSession } from "./useSession.js";
  * Creates a room, starting a guest session first if needed, and resolves with its code. `create` makes a room to
  * invite a friend to. `playComputer` makes one where the game's computer character already sits, so the game has
  * started when the room opens (CC-221). `quickMatch` looks for a person first and resolves with how it ended and
- * the room of the game that started, if any (CC-051), and `cancelQuickMatch` ends that search. `challenge` makes a challenge link that lasts a day instead (CC-139) and
- * resolves with its id. The button that calls either shows the wait and any failure (see useAction).
+ * the room of the game that started, if any (CC-051). Its `shouldStart` is asked once the player exists, and a
+ * false answer sends no search. `cancelQuickMatch` ends a search. `challenge` makes a challenge link that lasts a
+ * day instead (CC-139) and resolves with its id. The button that calls either shows the wait and any failure (see useAction).
  */
 export function useCreateRoom() {
   const { api, socket } = useServices();
@@ -33,8 +34,9 @@ export function useCreateRoom() {
   );
 
   const quickMatch = useCallback(
-    async ({ gameId, level }) => {
+    async ({ gameId, level, shouldStart = () => true }) => {
       await session.ensurePlayer();
+      if (!shouldStart()) return { outcome: QUICK_MATCH_OUTCOMES.CANCELLED, code: undefined };
       const { outcome, room } = await socket.request(SOCKET_EVENTS.MATCH_QUICK, { gameId, level });
       return { outcome, code: room?.code };
     },

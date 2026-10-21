@@ -50,6 +50,7 @@ export function PlayPage() {
   const quickMatchOn = useFlag("quick_match");
   const toast = useToast();
   const searching = useRef(false);
+  const cancelledBeforeSent = useRef(false);
   const [searchStarted, setSearchStarted] = useState(false);
   const { cancelQuickMatch } = createRoom;
   const playComputer = useAction(
@@ -60,11 +61,17 @@ export function PlayPage() {
         return;
       }
       searching.current = true;
+      cancelledBeforeSent.current = false;
       // A visitor becomes a guest on this press, and the flag is asked again for the guest. The search started
       // under the flag keeps showing as one meanwhile.
       setSearchStarted(true);
       try {
-        const { outcome, code: roomCode } = await createRoom.quickMatch({ gameId: game.id, level });
+        const { outcome, code: roomCode } = await createRoom.quickMatch({
+          gameId: game.id,
+          level,
+          // A page hidden or left while the guest was being made sent its cancel before any search existed.
+          shouldStart: () => !cancelledBeforeSent.current,
+        });
         if (outcome === QUICK_MATCH_OUTCOMES.CANCELLED) return;
         if (outcome === QUICK_MATCH_OUTCOMES.CHARACTER) {
           toast.show(`Nobody was free just now, so you're playing ${characterForGame(game.id).name}.`, {
@@ -82,7 +89,9 @@ export function PlayPage() {
   // A search ends when the page is left or hidden (CC-051): a player who is not looking must not be paired.
   useEffect(() => {
     const cancelIfSearching = () => {
-      if (searching.current) cancelQuickMatch();
+      if (!searching.current) return;
+      cancelledBeforeSent.current = true;
+      cancelQuickMatch();
     };
     const onVisibility = () => document.visibilityState === "hidden" && cancelIfSearching();
     document.addEventListener("visibilitychange", onVisibility);

@@ -77,7 +77,9 @@ the owner may change it.
      when the search time ends, so the fallback starts with no wait beyond the search.
   3. **The liquidity gate (ADR-029).** No search on an empty site: when no other player is connected and nobody it
      could meet is searching, Play starts the character at once. The search lasts 4 s until 20 searches found a
-     person, then the 80th percentile wait of the last 100 that did, from 1 s to 4 s.
+     person, then the 80th percentile wait of the last 100 that did, from 1 s to 4 s. A wait is the older side's
+     (how long a person waited for their partner; the newer side found someone at once), and one search in 10
+     looks the full 4 s anyway, so the timeout can grow again when the crowd thins (review fix, 2026-10-21).
   4. **Pools and order.** One in-memory pool per game, and for chess one per 300-point rating band, each looking at
      the bands beside it. Chess pairs within a window of 100 points that widens by 50 a second of the older search's
      wait, to at most 300 (Lichess's limits are 100 to 133 at the start). First come, first served among those who
@@ -91,10 +93,13 @@ the owner may change it.
      match so no friend request (ADR-051.7, `friendRules.mayReach`) and no challenge again (ADR-051.8) can follow
      from it, the opponent's chosen and filtered username and seat ids only (ADR-051.9), never a profile link or a
      player id. Age bands are not split into pools: an adult can play as a guest, so a split would not keep anyone
-     apart and would halve a small crowd.
+     apart and would halve a small crowd. **The owner has not decided this point yet.** Until then the design
+     stands, and setting an audience's `quickMatch` to `none` in `agePolicy.js` is the one-line change that keeps
+     it out.
   7. **Exactly one outcome per search:** `person`, `character`, `cancelled` or an error, in the event's own answer.
      State changes only in synchronous code: searching, pairing (a cancel is kept and wins before the room is
-     joined), committed (a cancel is too late: the game starts and the room's own rules apply, ADR-034.5), settled.
+     joined), committed (a cancel is too late if the game starts, and the room's own rules apply, ADR-034.5; it is
+     still kept, so a join that fails then ends the search instead of looking again), settled.
   8. **Cancel** on the Cancel button, on leaving the page, on the page being hidden, and when the tab that searched
      disconnects.
   9. **One server only.** The queue lives in the process (CC-061 brings a shared one). A restart drops every search.

@@ -96,6 +96,20 @@ describe("matchmaking rules (CC-051, ADR-079)", () => {
     expect(searchTimeoutMs(Array(20).fill(9_000))).toBe(4_000);
   });
 
+  it("lets a probe look the full search time whatever the waits say, so the timeout can grow again", () => {
+    const short = Array(20).fill(10);
+
+    expect(MATCHMAKING_RULES.probeEvery).toBe(10);
+    expect(searchPlan({ othersOnline: 3, partnerWaiting: false, recentWaits: short })).toEqual({
+      search: true,
+      timeoutMs: 1_000,
+    });
+    expect(searchPlan({ othersOnline: 3, partnerWaiting: false, recentWaits: short, probe: true })).toEqual({
+      search: true,
+      timeoutMs: 4_000,
+    });
+  });
+
   it("skips the search on an empty site, unless someone it could meet is searching (ADR-029)", () => {
     expect(searchPlan({ othersOnline: 0, partnerWaiting: false, recentWaits: [] })).toEqual({
       search: false,

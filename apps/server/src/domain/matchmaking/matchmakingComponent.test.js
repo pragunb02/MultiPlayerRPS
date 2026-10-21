@@ -511,4 +511,104 @@ describe("matchmakingComponent (CC-051)", () => {
     expect(strings.filter(hasPlayerIdShape)).toEqual([]);
     expect(JSON.stringify(rows)).not.toMatch(/Riya|Arjun|ROOM|socket/);
   });
+
+  it("chess searches in neighbouring rating bands are looked at again as the window widens", async () => {
+    // 1650 is in the 1500 to 1799 band and 1900 in the next one: 250 points apart, inside the window after 3 s.
+    const { search, time } = setup({ ratings: { [RIYA.id]: 1650, [ARJUN.id]: 1900 } });
+
+    const riya = search(RIYA, { gameId: GAME_IDS.CHESS });
+    const arjun = search(ARJUN, { gameId: GAME_IDS.CHESS });
+    await settled();
+    expect(riya.outcomes).toEqual([]);
+    await time.advance(3_000 + MATCHMAKING_RULES.sweepMs);
+
+    expect(riya.outcomes.map((result) => result.outcome)).toEqual([QUICK_MATCH_OUTCOMES.PERSON]);
+    expect(arjun.outcomes[0].room.code).toBe(riya.outcomes[0].room.code);
+  });
+
+  it("forgets a pairing 24 hours after it, so no pair of player ids stays in memory longer", async () => {
+    const { search, time, matchmaking } = setup();
+    search(RIYA);
+    search(ARJUN);
+    await settled();
+    expect(matchmaking.heldPairs()).toBe(1);
+
+    await time.advance(24 * 3_600_000 + 1);
+    search(MEERA, { othersOnline: 0 });
+    await settled();
+
+    expect(matchmaking.heldPairs()).toBe(0);
+  });
+
+  it("race: a cancel while the person is sitting down is kept, so a join that fails ends the search, never restarts it", async () => {
+    // Arjun's seat in Riya's room is refused a moment after Riya's tab closed.
+    let refuse = () => {};
+    const refusingJoin = (rooms) => ({
+      ...rooms,
+      joinRoom: (input) =>
+        input.player.id === ARJUN.id
+          ? new Promise((_, reject) => (refuse = () => reject(new ConflictError("This room is full"))))
+          : rooms.joinRoom(input),
+    });
+    const { search, time, matchmaking } = setup({ wrapRooms: refusingJoin });
+
+    const riya = search(RIYA);
+    await settled();
+    const arjun = search(ARJUN);
+    await settled();
+    const cancel = matchmaking.cancel({ playerId: RIYA.id, socketId: `socket-${RIYA.id}` });
+    refuse();
+    await settled();
+
+    expect(await cancel).toEqual({ cancelled: true });
+    expect(riya.outcomes).toEqual([{ outcome: QUICK_MATCH_OUTCOMES.CANCELLED }]);
+    await time.advance(SEARCH_MS);
+    expect(arjun.outcomes.map((result) => result.outcome)).toEqual([QUICK_MATCH_OUTCOMES.CHARACTER]);
+  });
+
+  /** 20 pairs where the older search waited 100 ms, 200 ms and so on up to 2 s before its partner came. */
+  async function twentyPairs({ search, time }) {
+    // A new pair each time, so the cap per pair never stops one.
+    const guest = (name, index) =>
+      Object.freeze({
+        kind: "guest",
+        id: `guest_00000000-0000-4000-8000-${String(index).padStart(10, "0")}${name}`,
+        displayName: `${name}${index}`,
+      });
+    for (let index = 1; index <= 20; index++) {
+      search(guest("aa", index));
+      await settled();
+      await time.advance(index * 100);
+      search(guest("bb", index));
+      await settled();
+    }
+  }
+
+  it("times the search by how long the older side waited for its partner, never by the newer side's instant", async () => {
+    const world = setup();
+    await twentyPairs(world);
+
+    const meera = world.search(MEERA);
+    await settled();
+    await world.time.advance(1_599);
+    expect(meera.outcomes).toEqual([]);
+    await world.time.advance(1);
+
+    // The 80th percentile of 100 ms to 2 s is 1.6 s. Counting the newer side's waits too would give 1.2 s.
+    expect(meera.outcomes.map((result) => result.outcome)).toEqual([QUICK_MATCH_OUTCOMES.CHARACTER]);
+  });
+
+  it("lets a share of searches look the full time, so a short timeout can grow again", async () => {
+    // The 41st search is a probe when one in 41 is.
+    const world = setup({ rules: { probeEvery: 41 } });
+    await twentyPairs(world);
+
+    const meera = world.search(MEERA);
+    await settled();
+    await world.time.advance(SEARCH_MS - 1);
+    expect(meera.outcomes).toEqual([]);
+    await world.time.advance(1);
+
+    expect(meera.outcomes.map((result) => result.outcome)).toEqual([QUICK_MATCH_OUTCOMES.CHARACTER]);
+  });
 });

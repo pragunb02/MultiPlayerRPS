@@ -12,7 +12,9 @@ import { isRatedGame } from "../ratings/chessRatingRules.js";
  *    computer character at once, with no wait (ADR-029, the liquidity gate).
  * 3. `waitSamples`, `minWaitSamples`, `timeoutPercentile`, `minSearchMs`: once `minWaitSamples` searches found a
  *    person, a search lasts as long as the 80th percentile of the last `waitSamples` waits that found one, never
- *    more than `searchMs` and never less than `minSearchMs` (ADR-029's "Search timeout" row).
+ *    more than `searchMs` and never less than `minSearchMs` (ADR-029's "Search timeout" row). A wait is the
+ *    older side's: how long a person waited for their partner. One search in `probeEvery` looks the full
+ *    `searchMs` anyway, so waits longer than the current timeout can be seen and the timeout can grow again.
  * 4. `bandWidth`, `windowStartRating`, `windowGrowthPerSecond`, `windowMaxRating`: chess pairs within a rating
  *    window that starts at 100 points and widens by 50 each second the older of the two has waited, up to 300
  *    (Lichess's limit is about 100 to 133 at the start, widening each missed wave). Pools are bands of 300 points,
@@ -28,6 +30,7 @@ export const MATCHMAKING_RULES = Object.freeze({
   minWaitSamples: 20,
   timeoutPercentile: 0.8,
   minSearchMs: 1_000,
+  probeEvery: 10,
   bandWidth: 300,
   windowStartRating: 100,
   windowGrowthPerSecond: 50,
@@ -152,13 +155,20 @@ export function searchTimeoutMs(recentWaits, rules = MATCHMAKING_RULES) {
  * Whether a search looks for a person at all, and for how long: the liquidity gate (ADR-029). It looks when someone
  * it could be paired with is searching already, or when at least `minOthersOnline` other players are connected.
  *
- * @param {{ othersOnline: number, partnerWaiting: boolean, recentWaits: ReadonlyArray<number> }} site
+ * @param {{ othersOnline: number, partnerWaiting: boolean, recentWaits: ReadonlyArray<number>, probe?: boolean }} site
+ *   `probe` is a search that looks the full `searchMs` whatever the waits say
  * @param {Readonly<typeof MATCHMAKING_RULES>} [rules]
  * @returns {Readonly<{ search: true, timeoutMs: number } | { search: false, reason: string }>}
  */
-export function searchPlan({ othersOnline, partnerWaiting, recentWaits }, rules = MATCHMAKING_RULES) {
+export function searchPlan(
+  { othersOnline, partnerWaiting, recentWaits, probe = false },
+  rules = MATCHMAKING_RULES,
+) {
   if (!partnerWaiting && othersOnline < rules.minOthersOnline) {
     return Object.freeze({ search: false, reason: SKIP_REASONS.EMPTY });
   }
-  return Object.freeze({ search: true, timeoutMs: searchTimeoutMs(recentWaits, rules) });
+  return Object.freeze({
+    search: true,
+    timeoutMs: probe ? rules.searchMs : searchTimeoutMs(recentWaits, rules),
+  });
 }
