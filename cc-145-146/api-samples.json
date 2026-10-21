@@ -1,0 +1,74 @@
+{
+  "GET /api/streaks (a freeze covering yesterday)": {
+    "streaks": {
+      "win": {
+        "current": 2,
+        "best": 6
+      },
+      "daily": {
+        "current": 12,
+        "best": 15,
+        "lastDay": "2026-10-19",
+        "playedToday": false,
+        "atRisk": false,
+        "resetsAt": 1792607400000,
+        "freezes": {
+          "held": 1,
+          "max": 2,
+          "covering": 1,
+          "earnBackLeft": 2
+        },
+        "nextMilestone": 30
+      }
+    }
+  },
+  "GET /api/quests (resetsAt is the player's midnight)": {
+    "resetsAt": 1792607400000
+  },
+  "GET /api/time-zone (browser in India, nothing chosen)": {
+    "status": 200,
+    "body": {
+      "timeZone": {
+        "zone": "Asia/Calcutta",
+        "chosen": false,
+        "changeableAt": null,
+        "dayEndsAt": 1792607400000
+      }
+    }
+  },
+  "PUT /api/time-zone { zone: \"America/New_York\" }": {
+    "status": 200,
+    "body": {
+      "timeZone": {
+        "zone": "America/New_York",
+        "chosen": true,
+        "changeableAt": 1793181602930,
+        "dayEndsAt": 1792607400000
+      }
+    }
+  },
+  "PUT /api/time-zone { zone: \"Europe/London\" } (inside 7 days)": {
+    "status": 409,
+    "body": {
+      "error": {
+        "code": "CONFLICT",
+        "message": "Your time zone changed less than 7 days ago",
+        "details": {
+          "reason": "zone-locked",
+          "changeableAt": 1793181602930
+        },
+        "requestId": "b2cfb1e1-d676-447c-84e0-b82b431fda99"
+      }
+    }
+  },
+  "PUT /api/time-zone { zone: \"Mars/Base\" }": {
+    "status": 400,
+    "body": {
+      "error": {
+        "code": "VALIDATION_FAILED",
+        "message": "That is not a time zone",
+        "requestId": "52bf5f3b-72cb-4a2a-9e23-0cf008f5d0b9"
+      }
+    }
+  }
+}
