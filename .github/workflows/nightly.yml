@@ -43,3 +43,25 @@ jobs:
           name: coverage-nightly
           path: coverage/
           retention-days: 14
+
+  # The time-bomb check (CC-325): every test again as if it were a year later, in India time, so a test that only
+  # passes before some day fails here first, not on main on that day.
+  future-clock:
+    name: Every unit and integration test a year ahead (time bombs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Kolkata
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Cache MongoDB binary (integration tests)
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - run: npm run test:future

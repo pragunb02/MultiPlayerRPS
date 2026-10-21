@@ -38,9 +38,16 @@ describe("the flag registry (CC-312)", () => {
     });
   });
 
-  it("no flag is past its removal date: remove the flag or move its removeBy day in a reviewed PR", () => {
-    expect(overdueFlags(FLAGS, today()).map(({ name }) => name)).toEqual([]);
-  });
+  // An alarm on purpose: it reads today's real date, so the day a flag's removal is due, this fails and someone
+  // removes the flag. The time-bomb check (npm run test:future, CC-325) leaves it out, because days ahead it is
+  // meant to fail.
+  it(
+    "no flag is past its removal date: remove the flag or move its removeBy day in a reviewed PR",
+    { tags: ["clock-alarm"] },
+    () => {
+      expect(overdueFlags(FLAGS, today()).map(({ name }) => name)).toEqual([]);
+    },
+  );
 
   it("finds the flags whose removal day has passed, not those due today", () => {
     const flags = [

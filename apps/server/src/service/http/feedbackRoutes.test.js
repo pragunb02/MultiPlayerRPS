@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ERROR_CODES, FEEDBACK_KEEP_DAYS, FEEDBACK_MESSAGE_MAX } from "@classicade/shared";
 import { createTestApp } from "../../testing/testApp.js";
 import { FEEDBACK_ITEM_MAX_BYTES, FEEDBACK_LIMITS, FEEDBACK_STORAGE_BUDGET_BYTES } from "./feedbackRoutes.js";
+import { minorBirthYear } from "../../testing/birthYears.js";
 
 // CC-290, ADR-059: anyone can send feedback. What is stored never names the player, and the limits hold per
 // session, per address and for the whole site.
@@ -143,7 +144,7 @@ describe("POST /api/feedback (CC-290)", () => {
     ["a guest", (app) => guest(app)],
     ["a visitor", async (app) => browser(app)],
     ["an account of unknown age", (app) => account(app)],
-    ["a minor's account", (app) => account(app, { birthYear: 2012 })],
+    ["a minor's account", (app) => account(app, { birthYear: minorBirthYear() })],
   ])("refuses a reply email from %s and stores nothing", async (_, who) => {
     const testApp = createTestApp();
     const player = await who(testApp.app);
