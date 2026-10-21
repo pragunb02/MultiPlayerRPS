@@ -60,7 +60,7 @@ export const POPUP_COMPONENTS = Object.freeze([
     "The fixed celebration overlay.",
   ),
   entry(
-    "apps/web/src/effects/EffectHost.jsx",
+    "apps/web/src/effects/HostRuntime.jsx",
     POPUP_KINDS.CELEBRATION,
     "The one effect canvas, aria-hidden.",
   ),

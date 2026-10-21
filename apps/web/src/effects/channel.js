@@ -28,12 +28,11 @@ export const currentTheme = () => theme;
 export const currentPreview = () => preview;
 
 /**
- * Says which theme is on. The host calls it; nothing else does.
+ * Says which theme is on, with its greeting. The host calls it; nothing else does.
  *
- * @param {{ name: string, greeting: { hi: string, en: string } } | undefined} entry
+ * @param {{ name: string, greeting: { hi: string, en: string } } | undefined} next
  */
-export function showTheme(entry) {
-  const next = entry && { name: entry.name, greeting: entry.greeting };
+export function showTheme(next) {
   if (next?.name === theme?.name) return;
   theme = next;
   changed();
@@ -49,6 +48,23 @@ export function previewTheme(name) {
   if (name !== undefined) effectNamed(name);
   preview = name;
   changed();
+}
+
+/** Whether a host takes plays now. */
+export const hostReady = () => host !== undefined;
+
+/**
+ * Runs `callback` when the browser is idle, or as soon as it can where it cannot say. Returns the cancel.
+ *
+ * @param {() => void} callback
+ */
+export function whenIdle(callback) {
+  if (typeof requestIdleCallback === "function") {
+    const id = requestIdleCallback(callback, { timeout: 2000 });
+    return () => cancelIdleCallback(id);
+  }
+  const id = setTimeout(callback, 0);
+  return () => clearTimeout(id);
 }
 
 /**

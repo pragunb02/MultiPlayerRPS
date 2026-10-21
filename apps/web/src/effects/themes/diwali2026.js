@@ -5,6 +5,15 @@ import tokens from "./diwali2026.module.css";
 export { tokens };
 
 /**
+ * The one line on the home hero, above the headline: the same for every player, no ask, no countdown (CC-328 D4).
+ * Hinglish first, English second (CC-332).
+ */
+export const greeting = Object.freeze({
+  hi: "Diwali ki shubhkamnayein! Roshni aur khushiyan tumhare saath.",
+  en: "Happy Diwali from all of us at ClassiCade.",
+});
+
+/**
  * The Diwali 2026 theme (CC-328, M-328-4). Its CSS holds the decoration tokens under `data-event-theme`; this is
  * its one entrance burst, once per visit on the home page: warm gold sparks rising gently from the band of diyas
  * at the top of the page and fading. No gravity, no flashing (WCAG 2.3.1).

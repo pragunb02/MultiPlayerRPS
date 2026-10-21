@@ -119,7 +119,9 @@ describe("event themes (CC-328)", () => {
     );
     for (const file of cssFiles) {
       const module = read(path.join(HERE, file.replace(".module.css", ".js")));
-      expect(module, file).toContain(`import "./${file}";`);
+      // Imported and exported: the build drops a CSS module nothing uses, and the theme would have no colours.
+      expect(module, file).toContain(`import tokens from "./${file}";`);
+      expect(module, file).toMatch(/^export { tokens };$/m);
     }
   });
 
@@ -131,7 +133,8 @@ describe("event themes (CC-328)", () => {
         return /\.(m?js|jsx|css)$/.test(entry.name) ? [full] : [];
       });
     const names = THEMES.map(({ name }) => name);
-    const INTERNAL = /["']([^"']*effects\/(?:scenes|themes)\/[^"']*|[^"']*effects\/particles(?:\.js)?)["']/g;
+    const IMPORTS = /\b(?:from|import\()\s*["']([^"'\n]+)["']/g;
+    const INTERNAL = /effects\/(?:scenes\/|themes\/|particles(?:\.js)?$)/;
     const found = files(WEB_SRC).flatMap((full) => {
       const file = path.relative(WEB_SRC, full);
       const text = read(full);
@@ -141,7 +144,10 @@ describe("event themes (CC-328)", () => {
           .filter((name) => new RegExp(`(?<![\\w-])${name}(?![\\w-])`).test(text))
           .map((name) => `${file} names the theme ${name}`),
         ...(text.includes("data-event-theme") ? [`${file} styles data-event-theme`] : []),
-        ...[...text.matchAll(INTERNAL)].map(([, target]) => `${file} imports ${target}`),
+        ...[...text.matchAll(IMPORTS)]
+          .map(([, target]) => target)
+          .filter((target) => INTERNAL.test(target))
+          .map((target) => `${file} imports ${target}`),
       ];
     });
 

@@ -18,8 +18,9 @@
  * @property {number} particles     at most PARTICLE_CAP; the low-end tier gets LOW_END_SHARE of them
  * @property {number} durationMs    at most MAX_EFFECT_MS
  * @property {number} budgetKB      gzip of its own chunk with its CSS
- * @property {{ hi: string, en: string }} [greeting]  themes: the one line on the home hero, Hinglish and English
- * @property {() => Promise<{ start: Function }>} load
+ * @property {() => Promise<{ start: Function, greeting?: { hi: string, en: string } }>} load  a theme's module also
+ *   exports its `greeting`, the one line on the home hero in Hinglish and English. It lives there, not here, to keep
+ *   the registry within its 0.5 kB on the first route; it shows with the theme's colours, when its chunk arrives
  */
 
 /** The most particles any effect may draw (ADR-075). */
@@ -35,7 +36,7 @@ export const LOW_END_SHARE = 1 / 3;
  * The only tokens a theme may set (CC-328 D5): decoration, never a status, a player, a text colour or a surface,
  * so no contrast in the design contract can change. `themes.test.js` fails on any other property.
  */
-export const THEMEABLE_TOKENS = Object.freeze([
+export const THEMEABLE_TOKENS = /* @__PURE__ */ Object.freeze([
   "--gradient-hero",
   "--grid-line",
   "--glow-primary",
@@ -97,10 +98,6 @@ export const EFFECTS = Object.freeze([
     particles: 60,
     durationMs: 1200,
     budgetKB: 6,
-    greeting: Object.freeze({
-      hi: "Diwali ki shubhkamnayein! Roshni aur khushiyan tumhare saath.",
-      en: "Happy Diwali from all of us at ClassiCade.",
-    }),
     load: () => import("./themes/diwali2026.js"),
   }),
   Object.freeze({
@@ -113,7 +110,6 @@ export const EFFECTS = Object.freeze([
     particles: 40,
     durationMs: 1500,
     budgetKB: 6,
-    greeting: Object.freeze({ hi: "Sardi ki raatein, garma garam games.", en: "Winter nights, warm games." }),
     load: () => import("./themes/winter2026.js"),
   }),
 ]);
@@ -127,7 +123,6 @@ export const EFFECTS = Object.freeze([
  */
 export function effectNamed(name) {
   const entry = EFFECTS.find((effect) => effect.name === name);
-  if (entry === undefined)
-    throw new RangeError(`Unknown effect "${name}". Add it to effects/registry.js first.`);
+  if (entry === undefined) throw new RangeError(`Unknown effect "${name}"`);
   return entry;
 }

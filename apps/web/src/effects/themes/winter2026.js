@@ -4,6 +4,12 @@ import tokens from "./winter2026.module.css";
 /** The theme's CSS module: only `:root[data-event-theme]` token overrides, no classes. Exported so the build keeps it. */
 export { tokens };
 
+/** The one line on the home hero, above the headline: Hinglish first, English second (CC-332). */
+export const greeting = Object.freeze({
+  hi: "Sardi ki raatein, garma garam games.",
+  en: "Winter nights, warm games.",
+});
+
 /**
  * The winter nights theme (CC-328, M-328-5), ready and off. Its CSS holds the decoration tokens under
  * `data-event-theme`; this is its one entrance burst, once per visit on the home page: snow motes drifting down

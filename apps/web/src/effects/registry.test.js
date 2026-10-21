@@ -58,8 +58,10 @@ describe("the effect registry (CC-328)", () => {
       expect(theme.removeBy >= today(), `${theme.name} is past its removeBy: delete it with its files`).toBe(
         true,
       );
-      expect(theme.greeting.hi.length, theme.name).toBeLessThanOrEqual(80);
-      expect(theme.greeting.en.length, theme.name).toBeLessThanOrEqual(100);
+      // Its one greeting, in its module: Hinglish and English within CC-332's caps.
+      const { greeting } = await theme.load();
+      expect(greeting.hi.length, theme.name).toBeLessThanOrEqual(80);
+      expect(greeting.en.length, theme.name).toBeLessThanOrEqual(100);
     }
   });
 

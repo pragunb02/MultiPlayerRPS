@@ -185,7 +185,7 @@ speaks, so it is listed too.
 | `apps/web/src/components/ProgressToasts.jsx`                 | celebration  | The level-up burst on the body.              |
 | `apps/web/src/components/Celebrations/ResultCelebration.jsx` | celebration  | Confetti after a win, drawn on the body.     |
 | `apps/web/src/art/effects/effects.module.css`                | celebration  | The fixed celebration overlay.               |
-| `apps/web/src/effects/EffectHost.jsx`                        | celebration  | The one effect canvas, aria-hidden.          |
+| `apps/web/src/effects/HostRuntime.jsx`                       | celebration  | The one effect canvas, aria-hidden.          |
 | `apps/web/src/effects/EffectHost.module.css`                 | celebration  | The fixed effect canvas, no clicks.          |
 | `apps/web/src/components/TurnBanner/TurnBanner.jsx`          | banner       | Whose turn it is, read out.                  |
 | `apps/web/src/components/PageAnnouncer/PageAnnouncer.jsx`    | announcer    | Reads out a new page.                        |
@@ -199,8 +199,8 @@ speaks, so it is listed too.
 
 <!-- popup-components:end -->
 
-**The effects (ADR-075, CC-328):** the effect registry's one `EffectHost` and its canvas (`apps/web/src/effects/`)
-are a celebration, at `--layer-effect`. The canvas exists only while an effect plays, is `aria-hidden` and takes no
+**The effects (ADR-075, CC-328):** the effect registry's one `EffectHost` (a small loader in the layout, which brings
+`HostRuntime` in its own chunk at idle) and its canvas (`apps/web/src/effects/`) are a celebration, at `--layer-effect`. The canvas exists only while an effect plays, is `aria-hidden` and takes no
 pointer events, and every celebration's meaning is also in words on the page. Components never draw an effect
 themselves: they call `useEffects().play(name)`, and ESLint refuses an import of `effects/scenes/*`,
 `effects/themes/*` or `effects/particles.js` outside `apps/web/src/effects/`. The older `art/effects/` rows above

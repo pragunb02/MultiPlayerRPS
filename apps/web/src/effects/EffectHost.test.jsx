@@ -9,10 +9,12 @@ import { flagPaths } from "../testing/flagPaths.js";
 import { installMatchMedia } from "../testing/matchMedia.js";
 import { renderApp } from "../testing/render.jsx";
 import { installVisibility } from "../testing/visibility.js";
-import { play, previewTheme } from "./channel.js";
+import { hostReady, play, previewTheme } from "./channel.js";
 import { EffectHost } from "./EffectHost.jsx";
 import { EventGreeting } from "./EventGreeting.jsx";
 import { EFFECTS, effectNamed } from "./registry.js";
+import { greeting as DIWALI_GREETING } from "./themes/diwali2026.js";
+import { greeting as WINTER_GREETING } from "./themes/winter2026.js";
 
 // The one effect host (CC-328, ADR-075): the queue, the gates and the theme, with scenes that only record what
 // they were asked, so each test decides when an effect ends.
@@ -23,7 +25,7 @@ const AFTER_DIWALI = Date.parse("2026-11-12T00:30:00+05:30");
 const TODAY = Date.parse("2026-10-21T12:00:00+05:30");
 
 /** A scene that records each start and ends only when the test says. */
-function recordedScene() {
+function recordedScene(name) {
   const runs = [];
   const start = vi.fn((canvas, options) => {
     let finish;
@@ -32,16 +34,19 @@ function recordedScene() {
     runs.push(run);
     return run;
   });
-  return { runs, start, load: vi.fn(async () => ({ start })) };
+  return { runs, start, load: vi.fn(async () => ({ start, greeting: GREETINGS[name] })) };
 }
 
-/** A registry entry with a recorded scene in place of the real one. */
+const GREETINGS = { diwali_2026: DIWALI_GREETING, winter_2026: WINTER_GREETING };
+
+/** A registry entry with a recorded scene in place of the real one, and a theme's real greeting. */
 function fake(name, fields = {}) {
-  const scene = recordedScene();
+  const scene = recordedScene(name);
   return { scene, entry: { ...effectNamed(name), load: scene.load, ...fields } };
 }
 
-function renderHost({ effects, now = () => TODAY, api = fakeApi(), inGame = false, path = "/" } = {}) {
+/** Renders the host as the layout does, and waits for its chunk, which it loads at idle. */
+async function renderHost({ effects, now = () => TODAY, api = fakeApi(), inGame = false, path = "/" } = {}) {
   const tree = (playing) => (
     <MemoryRouter initialEntries={[path]}>
       <ServicesContext.Provider value={{ api }}>
@@ -55,6 +60,7 @@ function renderHost({ effects, now = () => TODAY, api = fakeApi(), inGame = fals
     </MemoryRouter>
   );
   const view = render(tree(inGame));
+  await waitFor(() => expect(hostReady()).toBe(true));
   return { ...view, api, setInGame: (playing) => view.rerender(tree(playing)) };
 }
 
@@ -76,7 +82,7 @@ describe("the effect host (CC-328)", () => {
     const win = fake("win_burst");
     const level = fake("level_up");
     const badge = fake("achievement");
-    renderHost({ effects: [win.entry, level.entry, badge.entry], now: () => clock });
+    await renderHost({ effects: [win.entry, level.entry, badge.entry], now: () => clock });
 
     let first;
     act(() => {
@@ -118,7 +124,7 @@ describe("the effect host (CC-328)", () => {
 
   it("drops a play during a game, and stops one when a game starts", async () => {
     const win = fake("win_burst");
-    const view = renderHost({ effects: [win.entry], inGame: true });
+    const view = await renderHost({ effects: [win.entry], inGame: true });
 
     await expect(play("win_burst")).resolves.toBe(false);
     view.setInGame(false);
@@ -140,7 +146,7 @@ describe("the effect host (CC-328)", () => {
 
   it("is silent when an effect's chunk fails to load", async () => {
     const entry = { ...effectNamed("win_burst"), load: vi.fn().mockRejectedValue(new Error("chunk gone")) };
-    renderHost({ effects: [entry] });
+    await renderHost({ effects: [entry] });
 
     let played;
     act(() => {
@@ -155,7 +161,7 @@ describe("the effect host (CC-328)", () => {
     const win = fake("win_burst");
     const diwali = fake("diwali_2026");
     const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
-    renderHost({ effects: [win.entry, diwali.entry], now: () => PUJA, api });
+    await renderHost({ effects: [win.entry, diwali.entry], now: () => PUJA, api });
 
     // play resolves at once, loads nothing and makes no canvas.
     await expect(play("win_burst")).resolves.toBe(false);
@@ -173,7 +179,7 @@ describe("the effect host (CC-328)", () => {
     const visibility = installVisibility();
     const win = fake("win_burst");
     const removed = vi.spyOn(document, "removeEventListener");
-    const view = renderHost({ effects: [win.entry] });
+    const view = await renderHost({ effects: [win.entry] });
 
     let hidden;
     act(() => {
@@ -204,7 +210,7 @@ describe("the effect host (CC-328)", () => {
 
   it("asks for no flag outside every theme's window", async () => {
     const api = fakeApi();
-    renderHost({ api });
+    await renderHost({ api });
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(api.getFlags).not.toHaveBeenCalled();
@@ -216,19 +222,19 @@ describe("the effect host (CC-328)", () => {
     const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_winter_2026: true }) });
     const christmas = () => Date.parse("2026-12-25T10:00:00+05:30");
 
-    const lobby = renderHost({ effects: [winter.entry], now: christmas, api, path: "/games/chess" });
+    const lobby = await renderHost({ effects: [winter.entry], now: christmas, api, path: "/games/chess" });
     await waitFor(() => expect(winter.scene.load).toHaveBeenCalled());
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(winter.scene.start).not.toHaveBeenCalled();
     lobby.unmount();
 
-    const home = renderHost({ effects: [winter.entry], now: christmas, api });
+    const home = await renderHost({ effects: [winter.entry], now: christmas, api });
     await waitFor(() => expect(winter.scene.runs).toHaveLength(1));
     expect(winter.scene.runs[0].options).toMatchObject({ particles: 40, durationMs: 1500 });
     await act(async () => winter.scene.runs[0].finish());
     home.unmount();
 
-    renderHost({ effects: [winter.entry], now: christmas, api });
+    await renderHost({ effects: [winter.entry], now: christmas, api });
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(winter.scene.runs).toHaveLength(1);
   });
@@ -247,7 +253,7 @@ describe("the effect host (CC-328)", () => {
           resolveGate = () => resolve({ start: win.scene.start });
         }),
     );
-    renderHost({ effects: [win.entry, theme], now: () => PUJA, api });
+    await renderHost({ effects: [win.entry, theme], now: () => PUJA, api });
     act(() => {
       play("win_burst");
     });
@@ -262,7 +268,7 @@ describe("the effect host (CC-328)", () => {
 flagPaths("event_diwali_2026", (on) => {
   it("follows its flag and its window on the home hero, and counts a game started in the visit", async () => {
     const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: on }) });
-    const view = renderHost({ effects: EFFECTS, now: () => PUJA, api });
+    const view = await renderHost({ effects: EFFECTS, now: () => PUJA, api });
 
     await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["event_diwali_2026"]));
     await waitFor(() => expect(themeAttribute()).toBe(on ? "diwali_2026" : undefined));
@@ -283,7 +289,7 @@ flagPaths("event_diwali_2026", (on) => {
 
   it("is off again after its last day", async () => {
     const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: on }) });
-    renderHost({ effects: EFFECTS, now: () => AFTER_DIWALI, api });
+    await renderHost({ effects: EFFECTS, now: () => AFTER_DIWALI, api });
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(api.getFlags).not.toHaveBeenCalled();
@@ -310,7 +316,7 @@ flagPaths("event_diwali_2026", (on) => {
 flagPaths("event_winter_2026", (on) => {
   it("follows its flag inside its window, and is off on Diwali", async () => {
     const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_winter_2026: on }) });
-    renderHost({ effects: EFFECTS, now: () => Date.parse("2027-01-01T09:00:00+05:30"), api });
+    await renderHost({ effects: EFFECTS, now: () => Date.parse("2027-01-01T09:00:00+05:30"), api });
 
     await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["event_winter_2026"]));
     await waitFor(() => expect(themeAttribute()).toBe(on ? "winter_2026" : undefined));
@@ -320,15 +326,16 @@ flagPaths("event_winter_2026", (on) => {
 
 describe("the event theme at India midnight (CC-328)", () => {
   it("turns on when the window opens, without a reload", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    let clock = Date.parse("2026-11-05T23:59:30+05:30");
+    // A clock that runs from 300 ms before India midnight on the eve of Dhanteras.
+    const eve = Date.parse("2026-11-05T23:59:59.700+05:30");
+    const started = Date.now();
     const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
-    renderHost({ effects: EFFECTS, now: () => clock, api });
+    await renderHost({ effects: EFFECTS, now: () => eve + (Date.now() - started), api });
     expect(api.getFlags).not.toHaveBeenCalled();
+    expect(themeAttribute()).toBeUndefined();
 
-    clock += 31_000;
-    await act(async () => vi.advanceTimersByTime(31_000));
-    vi.useRealTimers();
-    await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"));
+    // The host looks again a second after midnight.
+    await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"), { timeout: 3000 });
+    expect(api.getFlags).toHaveBeenCalledWith(["event_diwali_2026"]);
   });
 });

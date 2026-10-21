@@ -8,7 +8,7 @@ import styles from "./EventGreeting.module.css";
  */
 export function EventGreeting() {
   const theme = useEventTheme();
-  if (theme === undefined) return null;
+  if (theme?.greeting === undefined) return null;
   return (
     <p className={styles.greeting} data-event-greeting={theme.name}>
       <span lang="hi-Latn" className={styles.hinglish}>
