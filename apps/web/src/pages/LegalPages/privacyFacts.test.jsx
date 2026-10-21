@@ -117,6 +117,16 @@ const FACTS = [
     page: /we store that you blocked them, the name they had and when, until you unblock them or either account is deleted/,
   },
   {
+    fact: "reports are kept 180 days, and the reported player is never told (CC-044, ADR-071)",
+    data: "| [`player_reports`](#player_reports) | pseudonymous: both player ids, the reported name then, the reason, where, the last moves, no free text |",
+    page: /we store who you reported.*The reported player is never told.*Reports are deleted 180 days after they were made/,
+  },
+  {
+    fact: "your own reports are in your export, without the other player's id (CC-044)",
+    data: "the reports the player made: reason, where, the name, when",
+    page: /and the reports you made\. Other players appear in it by their display name only/,
+  },
+  {
     fact: "operations telemetry goes to Grafana Labs with no personal data (ADR-055)",
     data: "| [Operations telemetry](#operations-telemetry) | no: counts, timings and the names of warnings, never an id, name, email, IP address, room code, cookie or session |",
     page: /Grafana Labs.*receives counts and timings about how the server runs, and the names of its warnings and errors\. Never your IP address, email, player id, name, room code, cookies or session/,
