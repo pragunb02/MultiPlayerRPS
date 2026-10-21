@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { ENGINES, replayGame } from "@classicade/games";
 import { connectDatabase } from "./persistence/database.js";
@@ -13,11 +13,19 @@ import { testConfig } from "./testing/testConfig.js";
 
 // Real MongoDB (in-memory), real composition root, real HTTP + WebSocket.
 let mongo;
-let dbCounter = 0;
+// Every test starts on the same database, emptied first. A new database per test made each server start create
+// about 110 collections and indexes, each synced to disk: 1.4 s a start on a quiet Mac and over 5 s under load, and
+// 2,700 files for mongod to sync when it stopped, over the 10 s hook limit (CC-336). The first start still makes
+// every collection and index, and the TTL index test below uses a database of its own.
+const DB = "it";
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
 }, 120_000);
+
+beforeEach(async () => {
+  await mongo.empty(DB);
+});
 
 afterAll(async () => {
   await mongo?.stop();
@@ -52,16 +60,21 @@ async function eventually(probe, timeoutMs = 5_000) {
   }
 }
 
-const freshConfig = () => testConfig({ MONGO_URI: mongo.uri(`it-${++dbCounter}`) });
+const freshConfig = () => testConfig({ MONGO_URI: mongo.uri(DB) });
 
-async function start(config = freshConfig(), { now } = {}) {
+async function start(config = freshConfig(), { now, rooms } = {}) {
   const capture = captureLogger();
   // A failing test shows what the server saw (refused sockets, session lookups) — rare flakes explain themselves.
   onTestFailed(() => {
     process.stderr.write(`\n--- server log (${config.mongoUri.split("/").pop()}) ---\n`);
     capture.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`));
   });
-  const app = await startServer({ config, logger: capture.logger, ...(now === undefined ? {} : { now }) });
+  const app = await startServer({
+    config,
+    logger: capture.logger,
+    ...(now === undefined ? {} : { now }),
+    ...(rooms === undefined ? {} : { rooms }),
+  });
   return { ...app, ...capture, config, url: `http://127.0.0.1:${app.port}` };
 }
 
@@ -92,7 +105,7 @@ describe("startServer (integration)", () => {
   });
 
   it("listens on the configured HOST (CC-287)", async () => {
-    const app = await start(testConfig({ MONGO_URI: mongo.uri(`it-${++dbCounter}`), HOST: "::1" }));
+    const app = await start(testConfig({ MONGO_URI: mongo.uri(DB), HOST: "::1" }));
 
     try {
       expect(app.server.address()).toEqual(expect.objectContaining({ address: "::1", family: "IPv6" }));
@@ -744,9 +757,22 @@ describe("a guest's progress moving to their account through the real compositio
     const startedAt = Date.now();
     const app = await start(freshConfig(), {
       now: () => Date.parse("2026-10-16T10:30:00Z") + Date.now() - startedAt,
+      // The rival joins and moves in all twelve games at script speed: the event budget would refuse it after
+      // about twenty (CC-107). The 150 ms pauses here used to let the budget refill (CC-336).
+      rooms: { limits: { eventBurstPerPlayer: 1_000 } },
     });
     const sockets = [];
-    const pause = () => new Promise((resolve) => setTimeout(resolve, 150));
+    // Each game is recorded before the next starts: the winner's progress push says it was counted, so the games
+    // are credited in the order they were played. Pauses of 150 ms stood in for it until CC-336.
+    const recorded = (socket, matchesPlayed) =>
+      new Promise((resolve) => {
+        const heard = (update) => {
+          if (update.progress.matchesPlayed !== matchesPlayed) return;
+          socket.off(SOCKET_EVENTS.PROGRESS_UPDATED, heard);
+          resolve(update);
+        };
+        socket.on(SOCKET_EVENTS.PROGRESS_UPDATED, heard);
+      });
     try {
       const signup = await fetch(`${app.url}/api/auth/signup`, {
         method: "POST",
@@ -764,13 +790,15 @@ describe("a guest's progress moving to their account through the real compositio
       const visitor = await guest(app.url);
       sockets.push(account, rival.socket, visitor.socket);
       for (let game = 0; game < 6; game += 1) {
+        const counted = recorded(account, game + 1);
         await play({ socket: account }, rival);
-        await pause();
+        await counted;
       }
       await progressOf(app.url, accountCookie, 6);
       for (let game = 0; game < 6; game += 1) {
+        const counted = recorded(visitor.socket, game + 1);
         await play(visitor, rival);
-        await pause();
+        await counted;
       }
       await progressOf(app.url, visitor.cookie, 6);
 
@@ -982,7 +1010,7 @@ describe("createSessionStore (integration)", () => {
 
   it("moves a returning player's stored expiry forward, writing at most once per touch interval (CC-096)", async () => {
     const database = await connectDatabase({
-      uri: mongo.uri(`roll-${++dbCounter}`),
+      uri: mongo.uri(DB),
       logger: captureLogger().logger,
     });
     try {
@@ -1014,7 +1042,8 @@ describe("createSessionStore (integration)", () => {
   });
 
   it("creates the TTL index that expires sessions before the server takes traffic", async () => {
-    const app = await start();
+    // A database of its own: the shared one already has the index from an earlier start.
+    const app = await start(testConfig({ MONGO_URI: mongo.uri("ttl-index") }));
     try {
       const connection = await mongoose.createConnection(app.config.mongoUri).asPromise();
       const indexes = await connection.db.collection(SESSION_COLLECTION).indexes();
