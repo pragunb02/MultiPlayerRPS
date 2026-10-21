@@ -3,8 +3,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  AT_RULES,
   checkCss,
   checkCssFiles,
+  customPropertiesIn,
   readTokenFiles,
   readTokens,
   RULES,
@@ -15,7 +17,8 @@ import { TOKEN_EXCEPTIONS, TOKEN_EXCEPTIONS_CEILING } from "./design/tokenExcept
 const ROOT = path.join(import.meta.dirname, "..");
 const CONTRACT = readFileSync(path.join(ROOT, "docs/design/CONTRACT.md"), "utf8");
 const TOKENS = readTokens(
-  ":root { --space-4: 1rem; --text-md: 1rem; --color-text: #161827; --layer-effect: 40; --layer-dialog: 30; }",
+  ":root { --space-4: 1rem; --space-2: 0.5rem; --text-md: 1rem; --color-text: #161827; --color-gold: #ffd34d; " +
+    "--color-tier-gold: #ffd34d; --layer-effect: 40; --layer-dialog: 30; --breakpoint-sm: 30rem; }",
 );
 const PAGE = "apps/web/src/pages/HomePage/HomePage.module.css";
 
@@ -143,7 +146,64 @@ describe("the CSS token check", () => {
       "classicade/no-raw-colour",
       "classicade/layer-tokens",
       "classicade/size-tokens",
+      "classicade/known-custom-properties",
       "classicade/popup-position",
+    ]);
+    expect(AT_RULES.map(({ name }) => name)).toEqual(["classicade/breakpoint-tokens"]);
+  });
+
+  it("refuses a var() that no stylesheet declares, such as --text-base or --space-5 (CC-323 AC-14)", () => {
+    expect(
+      problemsIn(".a {\n  font-size: var(--text-base);\n  padding: var(--space-5, var(--space-4));\n}"),
+    ).toEqual([
+      {
+        line: 2,
+        column: 3,
+        rule: "classicade/known-custom-properties",
+        message: expect.stringContaining(
+          "var(--text-base) in font-size names a custom property that no stylesheet",
+        ),
+      },
+      {
+        line: 3,
+        column: 3,
+        rule: "classicade/known-custom-properties",
+        message: expect.stringContaining("var(--space-5) in padding"),
+      },
+    ]);
+  });
+
+  it("lets through a custom property the same file declares, or one another stylesheet declares", () => {
+    expect(problemsIn(".a { --tone: var(--color-text); color: var(--tone); }")).toEqual([]);
+    const known = new Set(["--from-elsewhere"]);
+    expect(
+      checkCss({ css: ".a { color: var(--from-elsewhere); }", file: PAGE, tokens: TOKENS, known }),
+    ).toEqual([]);
+    expect(customPropertiesIn(".a { --one: 1; } .b { --two: 2; color: red; }")).toEqual(
+      new Set(["--one", "--two"]),
+    );
+  });
+
+  it("refuses a media query width that is not a breakpoint token (CC-323 AC-14)", () => {
+    expect(problemsIn("@media (max-width: 30rem) { .a { color: var(--color-text); } }")).toEqual([]);
+    expect(
+      problemsIn("@media (prefers-reduced-motion: reduce) { .a { color: var(--color-text); } }"),
+    ).toEqual([]);
+    expect(
+      problemsIn("@media (min-width: 31rem) and (width <= 50rem) { .a { color: var(--color-text); } }"),
+    ).toEqual([
+      {
+        line: 1,
+        column: 1,
+        rule: "classicade/breakpoint-tokens",
+        message: expect.stringContaining("@media width 31rem is not a breakpoint"),
+      },
+      {
+        line: 1,
+        column: 1,
+        rule: "classicade/breakpoint-tokens",
+        message: expect.stringContaining("@media width 50rem is not a breakpoint"),
+      },
     ]);
   });
 

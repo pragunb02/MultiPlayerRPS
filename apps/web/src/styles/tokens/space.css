@@ -15,4 +15,15 @@
   --radius-xl: 28px;
   --radius-full: 999px;
   --content-width: 72rem;
+  /* Tap targets (CC-323): 24 px is the WCAG 2.5.8 floor everywhere, 44 px is our own rule on touch screens. */
+  --target-min: 1.5rem;
+  --target-touch: 2.75rem;
+  /*
+   * Breakpoints (CC-323). A custom property cannot be read inside a media query, so these name the only widths a
+   * media query may use, and the token check refuses any other width.
+   */
+  --breakpoint-sm: 30rem;
+  --breakpoint-md: 40rem;
+  --breakpoint-lg: 48rem;
+  --breakpoint-xl: 64rem;
 }

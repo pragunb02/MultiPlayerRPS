@@ -90,7 +90,7 @@
 }
 /* "Unrated" is a word, not a number, so it is smaller and never broken inside on a phone. */
 .stats dd.unrated {
-  font-size: var(--text-base);
+  font-size: var(--type-body);
   overflow-wrap: normal;
 }
 .problem {
