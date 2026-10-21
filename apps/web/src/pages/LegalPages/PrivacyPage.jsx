@@ -217,7 +217,11 @@ export function PrivacyPage() {
             For everyone, adults included, the counts carry no id at all, so they cannot be linked to you or
             to each other.
           </li>
-          <li>The single counts are deleted after 30 days. Daily totals are kept 13 months.</li>
+          <li>
+            We keep only how many of each kind arrived in each hour, never a single press or page on its own,
+            so nothing says which counts came from one visit or in which order. These hourly counts are
+            deleted after 30 days. Daily totals are kept 13 months.
+          </li>
           <li>
             You can turn this off with the switch below, or in your profile. If your browser sends Global
             Privacy Control or Do Not Track, it is off already. Nothing records that you turned it off.
@@ -294,7 +298,7 @@ export function PrivacyPage() {
           <li>
             Counts and timings about how the server runs are kept for 14 days by Grafana Labs (section 5).
           </li>
-          <li>Usage counts: single counts 30 days, daily totals 13 months (section 4a).</li>
+          <li>Usage counts: hourly counts 30 days, daily totals 13 months (section 4a).</li>
         </ul>
       </LegalSection>
 

@@ -136,10 +136,25 @@ describe("errors and the connection (CC-174, EVENTS.md 3.5)", () => {
     expect(sent).not.toContain("AB2CD3");
   });
 
-  it("an error type off the list, or something thrown that is not an error, is other", () => {
-    class SecretRiyaError extends Error {}
+  it("reads an error's name, so DOM errors and a minified class still get their type (owner review 2026-10-21)", () => {
+    // A production build renames classes, but AppRequestError sets its own name.
+    class Q extends Error {
+      constructor() {
+        super(SECRET);
+        this.name = "AppRequestError";
+      }
+    }
 
-    expect(errorTypeOf(new SecretRiyaError("x"))).toBe("other");
+    expect(errorTypeOf(new DOMException(SECRET, "AbortError"))).toBe("AbortError");
+    expect(errorTypeOf(new DOMException(SECRET, "QuotaExceededError"))).toBe("QuotaExceededError");
+    expect(errorTypeOf(new Q())).toBe("AppRequestError");
+    expect(errorTypeOf(new AppRequestError({ code: "NOT_FOUND", message: SECRET }))).toBe("AppRequestError");
+  });
+
+  it("an error type off the list, or something thrown that is not an error, is other", () => {
+    const named = Object.assign(new Error("x"), { name: "SecretRiyaError" });
+
+    expect(errorTypeOf(named)).toBe("other");
     expect(errorTypeOf(SECRET)).toBe("other");
     expect(errorTypeOf({ name: "TypeError" })).toBe("other");
     expect(codeOf({ code: SECRET })).toBe("unknown");

@@ -38,6 +38,11 @@ export function TelemetryHost({ load = loadClient }) {
   const landed = useRef(false);
   // Started once, and kept while the flag is asked again for a new session.
   const running = useRef({ started: undefined, loading: false });
+  // The flag's answer now, read when the client's file arrives: it may have turned off while the file was on its way.
+  const flagNow = useRef(flag);
+  useLayoutEffect(() => {
+    flagNow.current = flag;
+  }, [flag]);
   const route = routeOf(location.pathname);
   const playerKind = kindOf(session.identity);
 
@@ -76,7 +81,7 @@ export function TelemetryHost({ load = loadClient }) {
     const begin = () =>
       load().then(({ startTelemetry }) => {
         current.loading = false;
-        if (current.started !== undefined || telemetry.isOff()) return;
+        if (current.started !== undefined || telemetry.isOff() || flagNow.current !== FLAG_STATES.ON) return;
         current.started = startTelemetry({
           window,
           facade: telemetry,

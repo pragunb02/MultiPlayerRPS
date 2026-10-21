@@ -39,7 +39,7 @@ import { createFeatureFlagAccessor } from "../data/featureFlagAccessor.js";
 import { createInMemoryFeatureFlagDao } from "./inMemoryFeatureFlagDao.js";
 import { createTelemetryAccessor } from "../data/telemetryAccessor.js";
 import { createTelemetryComponent } from "../domain/telemetry/telemetryComponent.js";
-import { createInMemoryTelemetryEventDao } from "./inMemoryTelemetryEventDao.js";
+import { createInMemoryTelemetryCountDao } from "./inMemoryTelemetryCountDao.js";
 import { createKeyedIds, KEYED_ID_LABELS, keyedIdSecretFrom } from "../utils/keyedIds.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
@@ -155,7 +155,7 @@ import { testConfig } from "./testConfig.js";
  *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
  *     to see what the service layer records (ADR-055)
  *   telemetryLimits?: object,   the limits on usage counts (CC-175)
- *   telemetryEventDao?: ReturnType<typeof createInMemoryTelemetryEventDao>,   where usage counts are stored, which a
+ *   telemetryCountDao?: ReturnType<typeof createInMemoryTelemetryCountDao>,   where usage counts are stored, which a
  *     test reads (CC-175)
  * }} [options]
  */
@@ -191,7 +191,7 @@ export function createTestApp({
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
   metrics = {},
   telemetryLimits = {},
-  telemetryEventDao = createInMemoryTelemetryEventDao(),
+  telemetryCountDao = createInMemoryTelemetryCountDao(),
 } = {}) {
   const config = testConfig(env, { buildInfoText });
   const capture = captureLogger();
@@ -262,7 +262,7 @@ export function createTestApp({
     now,
   });
   const telemetryComponent = createTelemetryComponent({
-    telemetryAccessor: createTelemetryAccessor({ telemetryEventDao }),
+    telemetryAccessor: createTelemetryAccessor({ telemetryCountDao }),
     now,
     limits: telemetryLimits,
     ...(metrics.recordTelemetryDropped && { onDropped: metrics.recordTelemetryDropped }),
@@ -596,7 +596,7 @@ export function createTestApp({
     dailyPuzzleComponent,
     flagComponent,
     telemetryComponent,
-    telemetryEventDao,
+    telemetryCountDao,
     matchPipeline,
     playerDataComponent,
     tasks,

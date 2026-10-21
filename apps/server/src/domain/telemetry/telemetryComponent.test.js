@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { exampleTelemetryEvent } from "@classicade/shared/testing";
 import { createTelemetryAccessor } from "../../data/telemetryAccessor.js";
-import { createInMemoryTelemetryEventDao } from "../../testing/inMemoryTelemetryEventDao.js";
+import { eventsOf } from "../../testing/telemetryCountDaoContract.js";
+import { createInMemoryTelemetryCountDao } from "../../testing/inMemoryTelemetryCountDao.js";
 import { ValidationError } from "../../utils/errors.js";
 import { createTelemetryComponent, indiaHourOf } from "./telemetryComponent.js";
 
@@ -11,8 +12,8 @@ const DAY_START = Date.UTC(2026, 9, 19, 18, 30);
 const H = 60 * 60 * 1000;
 
 function setup({ storedPerDay = 5, clock = { at: EVENING } } = {}) {
-  const dao = createInMemoryTelemetryEventDao();
-  const accessor = createTelemetryAccessor({ telemetryEventDao: dao });
+  const dao = createInMemoryTelemetryCountDao();
+  const accessor = createTelemetryAccessor({ telemetryCountDao: dao });
   const drops = [];
   const component = createTelemetryComponent({
     telemetryAccessor: accessor,
@@ -21,7 +22,7 @@ function setup({ storedPerDay = 5, clock = { at: EVENING } } = {}) {
     onDropped: (drop) => drops.push(drop),
     serverBuild: "2026.10.20+a40ce5b",
   });
-  const stored = () => accessor.list({ from: 0, to: Date.UTC(2030, 0), limit: 1000 });
+  const stored = async () => eventsOf(await accessor.list({ from: 0, to: Date.UTC(2030, 0), limit: 1000 }));
   return { dao, accessor, component, drops, clock, stored };
 }
 
@@ -125,18 +126,18 @@ describe("telemetry component (CC-175)", () => {
   });
 
   it("does not count a drop of nothing, and puts the count back when a write fails", async () => {
-    const dao = createInMemoryTelemetryEventDao();
+    const dao = createInMemoryTelemetryCountDao();
     let failing = true;
     const flaky = {
       ...dao,
-      insertMany: async (docs) => {
+      addCounts: async (docs) => {
         if (failing) throw new Error("database down");
-        return dao.insertMany(docs);
+        return dao.addCounts(docs);
       },
     };
     const drops = [];
     const component = createTelemetryComponent({
-      telemetryAccessor: createTelemetryAccessor({ telemetryEventDao: flaky }),
+      telemetryAccessor: createTelemetryAccessor({ telemetryCountDao: flaky }),
       now: () => EVENING,
       limits: { storedPerDay: 2 },
       onDropped: (drop) => drops.push(drop),
