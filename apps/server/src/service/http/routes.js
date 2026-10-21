@@ -18,6 +18,7 @@ import { createProfileRoutes } from "./profileRoutes.js";
 import { createProgressRoutes } from "./progressRoutes.js";
 import { createSafetyRoutes } from "./safetyRoutes.js";
 import { createSessionRoutes } from "./sessionRoutes.js";
+import { createSuspensionRoutes } from "./suspensionRoutes.js";
 
 /**
  * @param {Parameters<typeof createSessionRoutes>[0] & Parameters<typeof createMatchRoutes>[0] & Parameters<typeof createProgressRoutes>[0]
@@ -30,7 +31,8 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { profileComponent: Parameters<typeof createProfileRoutes>[0]["profileComponent"], profileLimits?: Parameters<typeof createProfileRoutes>[0]["limits"] }
  *   & { friendComponent: Parameters<typeof createFriendRoutes>[0]["friendComponent"], friendLimits?: Parameters<typeof createFriendRoutes>[0]["limits"] }
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
- *   & { reportComponent: Parameters<typeof createReportRoutes>[0]["reportComponent"], reportLimits?: Parameters<typeof createReportRoutes>[0]["limits"] }
+ *   & { reportComponent: Parameters<typeof createReportRoutes>[0]["reportComponent"] & Parameters<typeof createSuspensionRoutes>[0]["reportComponent"], reportLimits?: Parameters<typeof createReportRoutes>[0]["limits"] }
+ *   & { suspensionComponent: Parameters<typeof createSuspensionRoutes>[0]["suspensionComponent"] & Parameters<typeof createAuthRoutes>[0]["suspensionComponent"] }
  *   & { flagComponent: Parameters<typeof createFlagRoutes>[0]["flagComponent"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { safetyComponent: Parameters<typeof createSafetyRoutes>[0]["safetyComponent"] }
@@ -66,6 +68,7 @@ export function apiRouter({
   feedbackLimits,
   reportComponent,
   reportLimits,
+  suspensionComponent,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   safetyComponent,
@@ -91,6 +94,8 @@ export function apiRouter({
       onOtherSessionsEnded,
       renewals,
       onIdentityChanged,
+      suspensionComponent,
+      playerDataComponent,
       now,
       ...(authLimits && { limits: authLimits }),
     }),
@@ -150,6 +155,15 @@ export function apiRouter({
       requireAdmin: adminAccess.requireAdmin,
       now,
       ...(reportLimits && { limits: reportLimits }),
+    }),
+  );
+
+  router.use(
+    createSuspensionRoutes({
+      reportComponent,
+      suspensionComponent,
+      requireAdmin: adminAccess.requireAdmin,
+      now,
     }),
   );
 

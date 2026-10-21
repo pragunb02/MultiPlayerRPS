@@ -82,9 +82,11 @@ export function createInMemoryLeaderboardDao() {
       return rows.length;
     },
 
-    async top({ board, period, limit }) {
+    async top({ board, period, limit, excluding = [] }) {
       return [...entries.values()]
-        .filter((entry) => entry.board === board && entry.period === period)
+        .filter(
+          (entry) => entry.board === board && entry.period === period && !excluding.includes(entry.playerId),
+        )
         .sort((a, b) => (ranksAbove(a, b) ? -1 : 1))
         .slice(0, limit)
         .map(publicFields);
@@ -98,9 +100,10 @@ export function createInMemoryLeaderboardDao() {
       return publicFields(entry);
     },
 
-    async countAhead({ board, period, ...entry }) {
+    async countAhead({ board, period, excluding = [], ...entry }) {
       return [...entries.values()].filter(
-        (e) => e.board === board && e.period === period && ranksAbove(e, entry),
+        (e) =>
+          e.board === board && e.period === period && !excluding.includes(e.playerId) && ranksAbove(e, entry),
       ).length;
     },
 

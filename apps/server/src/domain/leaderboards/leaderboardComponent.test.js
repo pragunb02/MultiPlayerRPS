@@ -49,7 +49,7 @@ function match({ winner = ALICE, loser = BOB, gameId = "rps", endedAt = NOW, rea
  * `adults`: the player ids that are adults. Without it, everyone is, so names show as before CC-152.
  * `transfers`: replaces the guest transfers the boards look at (CC-291).
  */
-function setup({ adults, transfers, failing = () => false, matchReads, cards } = {}) {
+function setup({ adults, transfers, failing = () => false, matchReads, cards, suspended } = {}) {
   const matchAccessor = createMatchAccessor({ matchDao: createInMemoryMatchDao() });
   const progressAccessor = createProgressAccessor({ progressDao: createInMemoryProgressDao() });
   const stored = createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() });
@@ -76,6 +76,7 @@ function setup({ adults, transfers, failing = () => false, matchReads, cards } =
       return adults ?? playerIds;
     }),
     ...(cards !== undefined && { cards }),
+    ...(suspended !== undefined && { hidden: { activePlayerIds: async ({ at }) => suspended(at) } }),
   });
   /** Brings a player's stored XP to `xp`, as progression has done by the time the boards step runs. */
   const progressTo = async (player, xp) => {
@@ -517,6 +518,36 @@ describe("leaderboardComponent", () => {
     await expect(boards.standingFor({ boardId: "nope", viewer: ALICE, now: NOW })).rejects.toThrow(
       NotFoundError,
     );
+  });
+
+  describe("suspended accounts (CC-334, ADR-078 decision 6)", () => {
+    it("hides the rows of suspended accounts while it lasts, and ranks close up", async () => {
+      const HOUR = 60 * 60 * 1000;
+      const { boards, play, entries } = setup({
+        suspended: (at) => new Set(at < NOW + HOUR ? [BOB.id] : []),
+      });
+      await play({ winner: BOB, loser: ALICE }, [
+        [BOB, 90],
+        [ALICE, 40],
+      ]);
+
+      expect((await entries("overall")).map((row) => [row.rank, row.displayName])).toEqual([[1, "alice"]]);
+      expect((await boards.getBoard({ boardId: "overall", limit: 1, now: NOW })).entries).toHaveLength(1);
+      expect(await boards.standingFor({ boardId: "overall", viewer: ALICE, now: NOW })).toEqual({
+        listed: true,
+        rank: 1,
+        score: 40,
+      });
+
+      // Once it ends the rows are back, nothing was rewritten.
+      expect((await entries("overall", NOW + HOUR)).map((row) => [row.rank, row.displayName])).toEqual([
+        [1, "bob"],
+        [2, "alice"],
+      ]);
+      expect(await boards.standingFor({ boardId: "overall", viewer: ALICE, now: NOW + HOUR })).toMatchObject({
+        rank: 2,
+      });
+    });
   });
 
   describe("standingFor", () => {

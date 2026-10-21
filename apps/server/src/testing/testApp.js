@@ -66,10 +66,14 @@ import {
   identityFollowers,
   keepFinishedGameIn,
   matchPipelineSteps,
+  cutSocketsOnSuspension,
   reportedNames,
   roomErasure,
   wireFriends,
+  wireSuspensions,
 } from "../server.js";
+import { createSuspensionAccessor } from "../data/suspensionAccessor.js";
+import { createInMemorySuspensionDao } from "./inMemorySuspensionDao.js";
 import { createHttpApp } from "../service/http/app.js";
 import { createSessionCheck, createSessionMiddleware } from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
@@ -146,6 +150,8 @@ import { testConfig } from "./testConfig.js";
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
  *   reportLimits?: object,   the limits on reporting a player (CC-044)
  *   reportDao?: ReturnType<typeof createInMemoryReportDao>,   the reports store, which a test can read (CC-044)
+ *   suspensionDao?: ReturnType<typeof createInMemorySuspensionDao>,   the suspensions store, which a test can read
+ *     (CC-334)
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   daily puzzle moves and hints per player (CC-144)
  *   chessPuzzles?: ReadonlyArray<object>,   the daily chess puzzles, two known ones unless a test gives its own
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
@@ -180,6 +186,7 @@ export function createTestApp({
   feedbackLimits,
   reportLimits,
   reportDao = createInMemoryReportDao(),
+  suspensionDao = createInMemorySuspensionDao(),
   dailyPuzzleLimit,
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
@@ -253,6 +260,7 @@ export function createTestApp({
     logger: capture.logger,
     now,
   });
+  const suspensionAccessor = createSuspensionAccessor({ suspensionDao });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
     matchAccessor,
@@ -260,6 +268,7 @@ export function createTestApp({
     transfers: playerTransferAccessor,
     safety: safetyComponent,
     cards: profileCards,
+    hidden: suspensionAccessor,
   });
   const gamificationComponent = createGamificationComponent({
     gamificationAccessor: createGamificationAccessor({
@@ -286,6 +295,16 @@ export function createTestApp({
   // Rooms read blocks, which read reports, so the room component is made after them. A rename reaches the rooms
   // through this, which gets the room component's rename as soon as it exists (long before any owner can rename).
   const roomsToRename = /** @type {Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">} */ ({});
+  // As in the composition root: rooms, challenges and friends are made further down (CC-334).
+  const suspensionComponent = wireSuspensions({
+    suspensionAccessor,
+    accountComponent,
+    domainEvents,
+    adminAccountIds: config.adminAccountIds,
+    rooms: () => roomComponent,
+    challenges: () => challengeComponent,
+    friends: () => friends.friendComponent,
+  });
   const reportComponent = createReportComponent({
     reportAccessor: createReportAccessor({ reportDao }),
     coPlayers: createCoPlayers({
@@ -304,6 +323,7 @@ export function createTestApp({
       leaderboardComponent,
       domainEvents,
     }),
+    suspensions: suspensionComponent,
   });
   const blockComponent = createBlockComponent({
     blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
@@ -470,6 +490,11 @@ export function createTestApp({
         exportPlayer: reportComponent.exportPlayer,
       },
       {
+        name: "suspensions",
+        erasePlayer: suspensionComponent.erasePlayer,
+        exportPlayer: suspensionComponent.exportPlayer,
+      },
+      {
         name: "friends",
         erasePlayer: friends.friendComponent.erasePlayer,
         exportPlayer: friends.friendComponent.exportPlayer,
@@ -530,6 +555,7 @@ export function createTestApp({
     feedbackLimits,
     reportComponent,
     reportLimits,
+    suspensionComponent,
     dailyPuzzleComponent,
     safetyComponent,
     dailyPuzzleLimit,
@@ -577,6 +603,8 @@ export function createTestApp({
     friends,
     feedbackComponent,
     reportComponent,
+    suspensionComponent,
+    suspensionDao,
     dailyPuzzleComponent,
     flagComponent,
     matchPipeline,
@@ -637,6 +665,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));
   testApp.onAccountDeleted((playerId) => gateway.disconnectPlayer(playerId));
   testApp.domainEvents.on(REPORT_EVENTS.PLAYER_RENAMED, ({ playerId }) => gateway.disconnectPlayer(playerId));
+  cutSocketsOnSuspension({ domainEvents: testApp.domainEvents, disconnectPlayer: gateway.disconnectPlayer });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = /** @type {import("node:net").AddressInfo} */ (server.address());
   return {

@@ -28,6 +28,7 @@ const avatarOnly = (card, hidden) =>
   card === undefined ? {} : hidden ? (card.avatar === undefined ? {} : { avatar: card.avatar }) : card;
 // Without profiles nobody has an avatar or a profile link. Tests that are not about profiles build boards without.
 const NO_CARDS = Object.freeze({ cardsFor: async () => new Map() });
+const NOBODY_HIDDEN = Object.freeze({ activePlayerIds: async () => new Set() });
 const HISTORY_PAGE = 100;
 
 /**
@@ -76,6 +77,8 @@ function shownName({ displayName }, policy) {
  *     row's age policy, whose `boardName` says which name it shows (CC-152)
  *   cards?: Pick<ReturnType<typeof import("../profiles/profileCards.js").createProfileCards>, "cardsFor">,  the
  *     avatar and profile link beside each name a board shows (CC-034). Without it rows have neither
+ *   hidden?: { activePlayerIds: (query: { at: number }) => Promise<ReadonlySet<string>> },  the suspended accounts,
+ *     whose rows no board shows and no standing counts while it lasts (CC-334, ADR-078). Without it none is hidden
  * }} deps
  */
 export function createLeaderboardComponent({
@@ -85,7 +88,9 @@ export function createLeaderboardComponent({
   transfers,
   safety,
   cards = NO_CARDS,
+  hidden = NOBODY_HIDDEN,
 }) {
+  assertFunction(hidden?.activePlayerIds, "hidden.activePlayerIds");
   assertFunction(safety?.policiesFor, "safety.policiesFor");
   assertFunction(cards?.cardsFor, "cards.cardsFor");
   assertDefined(leaderboardAccessor, "leaderboardAccessor");
@@ -325,7 +330,9 @@ export function createLeaderboardComponent({
     async getBoard({ boardId, limit, now }) {
       const info = requireBoard(boardId);
       const { board, period, resetsAt } = storageFor(info, now);
-      const stored = await leaderboardAccessor.listTop({ board, period, limit });
+      // A suspended account's rows are left out in the store, so the board still fills to its limit (ADR-078).
+      const excluding = [...(await hidden.activePlayerIds({ at: now }))];
+      const stored = await leaderboardAccessor.listTop({ board, period, limit, excluding });
       // A guest whose move to an account is done is never shown, even when a row of it was left behind (#118).
       const gone = await movedGuestsAmong(
         stored.map((e) => e.playerId),
@@ -373,7 +380,13 @@ export function createLeaderboardComponent({
         return { listed: false, reason: LEADERBOARD_UNLISTED.UNRANKED };
       }
       try {
-        const { rank, score } = await leaderboardAccessor.getStanding({ board, period, playerId: viewer.id });
+        const excluding = [...(await hidden.activePlayerIds({ at: now }))];
+        const { rank, score } = await leaderboardAccessor.getStanding({
+          board,
+          period,
+          playerId: viewer.id,
+          excluding,
+        });
         return { listed: true, rank, score };
       } catch (err) {
         if (err instanceof NotFoundError) {

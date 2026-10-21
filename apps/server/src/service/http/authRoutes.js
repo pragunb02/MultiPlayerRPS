@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { normaliseEmail } from "../../models/credentials.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { AppError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
+import { AppError, ConflictError, UnauthorizedError, ValidationError } from "../../utils/errors.js";
+import { dayOf } from "../../utils/indiaTime.js";
 import { createLoginThrottle, LOGIN_THROTTLE } from "./loginThrottle.js";
 import { clientIpKey, createRateLimit } from "./rateLimits.js";
 import { establishAccountSession, requireIdentity } from "./session.js";
@@ -60,6 +61,12 @@ const TOO_MANY_ATTEMPTS = "Too many attempts, try again later";
  * 2. `POST /auth/login` with `{ email, password }` answers 200 with `{ identity, carriedOver? }`.
  * 3. `POST /auth/password` with `{ currentPassword, newPassword }` answers 204, and other devices are signed out.
  * 4. `POST /auth/sign-out-others` with no body answers 204, and other devices are signed out.
+ * 5. `POST /auth/suspended-export` with `{ email, password }` answers a suspended account's data as a JSON file
+ *    (CC-334, ADR-078 decision 7), with the login's limits. A wrong password is the login's 401; an account that is
+ *    not suspended is told to log in (409).
+ *
+ * A suspended account that logs in with the right password gets 403 with `details: { reason: "suspended", endsAt? }`
+ * and no session (ADR-078 decision 3). A wrong password answers the usual 401, so nobody learns who is suspended.
  *
  * Signing in replaces the current session (new id — no fixation) and disconnects sockets of the old one;
  * `onIdentityChanged` hears who the player was before (e.g. a guest whose seats and progress follow them, CC-083,
@@ -77,6 +84,8 @@ const TOO_MANY_ATTEMPTS = "Too many attempts, try again later";
  *   onOtherSessionsEnded: (which: { playerId: string, fromSessionId: string, toSessionId: string }) => void,
  *   renewals: ReturnType<typeof import("./session.js").createSessionRenewals>,
  *   onIdentityChanged: (change: { previous: import("../../models/identity.js").Identity | undefined, identity: import("../../models/identity.js").Identity }) => Promise<{ carriedOver?: { xp: number, matchesPlayed: number, matches: number } }>,
+ *   suspensionComponent: Pick<ReturnType<typeof import("../../domain/suspensions/suspensionComponent.js").createSuspensionComponent>, "refuseSignIn" | "isSuspended">,
+ *   playerDataComponent: Pick<ReturnType<typeof import("../../domain/accounts/playerDataComponent.js").createPlayerDataComponent>, "exportFor">,
  *   now?: () => number,
  *   limits?: Partial<typeof DEFAULT_LIMITS>,   any limit not given keeps its standard value
  * }} deps
@@ -87,9 +96,14 @@ export function createAuthRoutes({
   onOtherSessionsEnded,
   renewals,
   onIdentityChanged,
+  suspensionComponent,
+  playerDataComponent,
   now = Date.now,
   limits = {},
 }) {
+  assertFunction(suspensionComponent?.refuseSignIn, "suspensionComponent.refuseSignIn");
+  assertFunction(suspensionComponent?.isSuspended, "suspensionComponent.isSuspended");
+  assertFunction(playerDataComponent?.exportFor, "playerDataComponent.exportFor");
   assertDefined(accountComponent, "accountComponent");
   assertFunction(onSessionEnded, "onSessionEnded");
   assertFunction(onOtherSessionsEnded, "onOtherSessionsEnded");
@@ -166,8 +180,8 @@ export function createAuthRoutes({
     await signIn(req, res, signedUp, 201);
   });
 
-  router.post("/auth/login", perIp, async (req, res) => {
-    const { email, password } = requireFields(req.body, ["email", "password"]);
+  /** The login with its throttle: the same answers and the same work for every miss (CC-117, CC-245). */
+  async function checkedLogin(req, { email, password }) {
     const attempt = { email: normaliseEmail(email), address: clientIpKey(req) };
     await loginThrottle.before(attempt);
     let loggedIn;
@@ -183,6 +197,19 @@ export function createAuthRoutes({
       throw err;
     }
     loginThrottle.succeeded(attempt);
+    return loggedIn;
+  }
+
+  router.post("/auth/login", perIp, async (req, res) => {
+    const { email, password } = requireFields(req.body, ["email", "password"]);
+    const loggedIn = await checkedLogin(req, { email, password });
+    // The password was right: a suspended account is told when it may come back, and gets no session (ADR-078).
+    try {
+      await suspensionComponent.refuseSignIn({ playerId: loggedIn.identity.id, now: now() });
+    } catch (err) {
+      req.log.info({ playerId: loggedIn.identity.id }, "sign-in refused: the account is suspended");
+      throw err;
+    }
     req.log.info({ playerId: loggedIn.identity.id }, "logged in");
     if (loggedIn.legacyFailure !== undefined) {
       req.log.error({ err: loggedIn.legacyFailure }, "the legacy store failed behind a login");
@@ -198,6 +225,21 @@ export function createAuthRoutes({
       );
     }
     await signIn(req, res, loggedIn, 200);
+  });
+
+  // A suspended account has no session, so its export asks for the email and password again (ADR-078).
+  router.post("/auth/suspended-export", perIp, async (req, res) => {
+    const { email, password } = requireFields(req.body, ["email", "password"]);
+    const { identity } = await checkedLogin(req, { email, password });
+    const at = now();
+    if (!(await suspensionComponent.isSuspended({ playerId: identity.id, now: at }))) {
+      throw new ConflictError("This account isn't paused. Log in to download your data from your profile");
+    }
+    const exported = await playerDataComponent.exportFor({ playerId: identity.id, password, now: at });
+    req.log.info({ playerId: identity.id }, "data exported while suspended");
+    res.set("Cache-Control", "no-store");
+    res.attachment(`classicade-data-${dayOf(at)}.json`);
+    res.json(exported);
   });
 
   router.post("/auth/password", perIp, failedPasswordChanges, async (req, res) => {
