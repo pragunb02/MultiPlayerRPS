@@ -240,7 +240,7 @@ export function FeedbackInbox() {
           />
         )}
         {inbox.status === "ready" && inbox.items.length === 0 && (
-          <EmptyState title="No feedback here yet.">
+          <EmptyState title="Nothing here yet.">
             Items players send from the Feedback button show up here.
           </EmptyState>
         )}

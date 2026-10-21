@@ -209,7 +209,7 @@ describe("the feedback inbox (CC-290)", () => {
   it("says when there is nothing to show", async () => {
     await openInbox();
 
-    expect(await screen.findByText("No feedback here yet.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Nothing here yet." })).toBeInTheDocument();
   });
 
   it("marks an item read, then done, and shows its new status", async () => {
