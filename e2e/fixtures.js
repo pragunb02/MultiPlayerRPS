@@ -281,11 +281,11 @@ export const formFactor = (testInfo) => (testInfo.project.use.isMobile ? "mobile
 export const WIDE_HEADER_MIN_WIDTH = 1024;
 
 /** Opens a header disclosure (the Menu, the account menu, the sound options) unless it is open already. */
-async function openDisclosure(button) {
-  if ((await button.getAttribute("aria-expanded")) !== "true") {
-    await button.click();
+async function openDisclosure(button, timeout = undefined) {
+  if ((await button.getAttribute("aria-expanded", { timeout })) !== "true") {
+    await button.click({ timeout });
   }
-  await expect(button).toHaveAttribute("aria-expanded", "true");
+  await expect(button).toHaveAttribute("aria-expanded", "true", { timeout });
 }
 
 /**
@@ -304,7 +304,12 @@ export async function header(page) {
   }
   const account = banner.locator('[data-cc-control="header.account"]');
   if ((await account.count()) > 0) {
-    await openDisclosure(account);
+    try {
+      await openDisclosure(account, 2_000);
+    } catch (error) {
+      // The player signed out meanwhile, for example in another tab: there is no account menu to open any more.
+      if ((await account.count()) > 0) throw error;
+    }
   }
   return banner;
 }

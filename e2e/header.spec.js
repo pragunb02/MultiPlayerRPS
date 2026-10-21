@@ -155,13 +155,10 @@ test.describe("the wide header (CC-324)", () => {
     await expect(banner.getByRole("slider", { name: "Volume" })).toHaveCount(0);
 
     const account = banner.locator('[data-cc-control="header.account"]');
-    // The level beside it is a picture, not a stop, so Tab goes on to the account menu.
-    await page.keyboard.press("Tab");
-    await expect(account).toBeFocused();
+    // Focused directly: Safari's Tab skips buttons and links unless the player turns that on.
+    await account.focus();
     await page.keyboard.press("Enter");
     await expect(banner.getByRole("link", { name: "Profile" })).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(banner.getByRole("link", { name: "Friends" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(account).toHaveAttribute("aria-expanded", "false");
     await expect(account).toBeFocused();
