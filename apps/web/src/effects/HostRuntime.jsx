@@ -32,10 +32,10 @@ const once = new Set();
  * with its colours and greeting, its entrance burst once per visit on the home page, and its success when a game
  * starts in the same visit.
  *
- * @param {{ home: boolean, effects?: typeof EFFECTS, now?: () => number }} props  whether the home page shows, the
- *   registry and the clock; tests give their own
+ * @param {{ home: boolean, effects?: typeof EFFECTS, now?: () => number, warm?: boolean }} props  whether the home
+ *   page shows, the registry, the clock, and whether to warm the particle module at idle; tests give their own
  */
-export function HostRuntime({ home, effects = EFFECTS, now = Date.now }) {
+export function HostRuntime({ home, effects = EFFECTS, now = Date.now, warm = true }) {
   const { api } = useServices();
   const who = useSession().identity?.id ?? "";
   const reducedMotion = useReducedMotion();
@@ -146,6 +146,36 @@ export function HostRuntime({ home, effects = EFFECTS, now = Date.now }) {
     );
     return () => end(false);
   }, [job]);
+
+  // Once per visit, at idle, the particle module runs a quarter second on a canvas nobody sees. Its first run costs
+  // about twice a warm one on the throttled phone, and it should not be the player's first win. Not under reduced
+  // motion, where nothing plays, nor with save-data, which fetches nothing early, nor where the browser cannot say
+  // when it is idle: extra work then could land on a busy moment.
+  useEffect(() => {
+    const entry = effects.find((effect) => effect.kind === "celebration");
+    const skip =
+      !warm || reducedMotion || navigator.connection?.saveData || typeof requestIdleCallback !== "function";
+    if (skip || entry === undefined || once.has("warm")) return undefined;
+    let running;
+    let live = true;
+    const cancel = whenIdle(() => {
+      once.add("warm");
+      entry.load().then(
+        (module) => {
+          if (!live) return;
+          const offscreen = document.createElement("canvas");
+          offscreen.width = offscreen.height = 1;
+          running = module.start(offscreen, { particles: 20, durationMs: 250 });
+        },
+        () => {},
+      );
+    });
+    return () => {
+      live = false;
+      cancel();
+      running?.stop();
+    };
+  }, [warm, reducedMotion, effects]);
 
   // A game starting or reduced motion turning on stops what plays.
   useEffect(() => {

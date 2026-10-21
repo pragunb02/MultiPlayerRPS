@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ServicesContext } from "../app/servicesContext.js";
@@ -81,6 +81,9 @@ beforeEach(() => {
 afterEach(() => {
   act(() => previewTheme(undefined));
   vi.useRealTimers();
+  // Unmounted first: the host cancels its idle callbacks with the stubs still in place.
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe("the effect host (CC-328)", () => {
@@ -130,6 +133,9 @@ describe("the effect host (CC-328)", () => {
   });
 
   it("warms the particle module once at idle, off screen, so the first celebration of a visit is not the cold one", async () => {
+    // jsdom cannot say when it is idle; a browser can.
+    vi.stubGlobal("requestIdleCallback", (callback) => setTimeout(callback, 0));
+    vi.stubGlobal("cancelIdleCallback", (id) => clearTimeout(id));
     const win = fake("win_burst");
     await renderHost({ effects: [win.entry], warm: true });
 
@@ -154,6 +160,8 @@ describe("the effect host (CC-328)", () => {
 
   it("does not warm the module under reduced motion, where nothing plays", async () => {
     installMatchMedia({ reducedMotion: true });
+    vi.stubGlobal("requestIdleCallback", (callback) => setTimeout(callback, 0));
+    vi.stubGlobal("cancelIdleCallback", (id) => clearTimeout(id));
     const win = fake("win_burst");
     await renderHost({ effects: [win.entry], warm: true });
 
