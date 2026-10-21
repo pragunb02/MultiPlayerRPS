@@ -67,6 +67,30 @@ export const FLAGS = Object.freeze([
     client: true,
     success: "The owner opened a dialog on the Design page.",
   }),
+  Object.freeze({
+    name: "local_days",
+    description:
+      "Days follow the player's own time zone, from the browser, for the play streak, quests and the daily puzzle, with reset times in local time. When fully on, the weekly boards turn at Monday 00:00 India time.",
+    ticket: "CC-146",
+    default: false,
+    removeBy: "2027-01-31",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: true,
+    success: "A player's time zone was set from their browser.",
+  }),
+  Object.freeze({
+    name: "streak_freezes",
+    description:
+      "One free streak freeze a week, earned by playing, at most 2 held, spent automatically on a missed day and earned back with two matches the next day.",
+    ticket: "CC-145",
+    default: false,
+    removeBy: "2027-01-31",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: false,
+    success: "A freeze covered a missed day and the player came back to play.",
+  }),
 ]);
 
 const NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;

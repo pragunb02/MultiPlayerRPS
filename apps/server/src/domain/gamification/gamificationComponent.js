@@ -3,11 +3,11 @@ import { earnsNothing } from "../../models/deletedPlayer.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { creditFor, hasComputerPlayer } from "../matches/fairPlay.js";
 import { resultFor } from "../progression/progressionComponent.js";
-import { nextUtcMidnight, utcDay } from "./calendar.js";
+import { UTC_CALENDAR } from "../playerDays/zoneCalendar.js";
 import { achievementStanding, evaluateAchievements } from "./evaluateAchievements.js";
 import { applyMatchToQuests, newQuestDay } from "./questProgress.js";
 import { applyMatchToStats, emptyStats } from "./stats.js";
-import { dailyStreakView } from "./streaks.js";
+import { dailyStreakView, freezeCoveredOn, FROZEN_DAYS_KEPT, MAX_FREEZES } from "./streaks.js";
 
 /** Events the gamification component publishes (the gateway pushes each to the player concerned). */
 export const GAMIFICATION_EVENTS = Object.freeze({
@@ -25,11 +25,15 @@ const HISTORY_PAGE = 100;
 export const questKey = (day, questId) => `quest:${day}:${questId}`;
 const SWEEP = "sweep";
 
-/** @param {Readonly<import("./questProgress.js").QuestDay>} questDay @param {number} now */
-function questsView(questDay, now) {
+/**
+ * @param {Readonly<import("./questProgress.js").QuestDay>} questDay
+ * @param {number} now
+ * @param {Readonly<import("../playerDays/zoneCalendar.js").PlayerCalendar>} calendar
+ */
+function questsView(questDay, now, calendar) {
   return Object.freeze({
     day: questDay.day,
-    resetsAt: nextUtcMidnight(now),
+    resetsAt: calendar.nextDayAt(now),
     items: questDay.items.map(({ id, name, description, gameId, target, progress, bonusXp, completedAt }) =>
       Object.freeze({ id, name, description, gameId, target, progress, bonusXp, completedAt }),
     ),
@@ -37,12 +41,38 @@ function questsView(questDay, now) {
   });
 }
 
-/** @param {Readonly<import("./stats.js").PlayerStats>} stats @param {number} now */
-function streaksView(stats, now) {
+/**
+ * @param {Readonly<import("./stats.js").PlayerStats>} stats
+ * @param {number} now
+ * @param {{ calendar: Readonly<import("../playerDays/zoneCalendar.js").PlayerCalendar>, freezes: boolean }} days
+ */
+function streaksView(stats, now, { calendar, freezes }) {
   return Object.freeze({
     win: Object.freeze({ current: stats.winStreak.current, best: stats.winStreak.best }),
-    daily: dailyStreakView(stats.dailyStreak, now),
+    daily: dailyStreakView(stats.dailyStreak, now, { calendar, freezes, showResetsAt: calendar.kind === "local" }),
   });
+}
+
+/** Whose days a player has when no player days component is given: UTC days and no freezes, as before CC-146. */
+const UTC_DAYS = Object.freeze({
+  calendarFor: async ({ fallback }) => fallback,
+  freezesOn: async () => false,
+  freezeCovered: async () => {},
+});
+
+/** The guest's and the account's freezes together: the larger holding, at most 2, and the covered days joined. */
+function mergedFreezes(account, guest) {
+  if (account.freezes === undefined && guest.freezes === undefined) {
+    return {};
+  }
+  const frozenDays = [...new Set([...(account.frozenDays ?? []), ...(guest.frozenDays ?? [])])].sort();
+  const weeks = [account.freezeWeek ?? "", guest.freezeWeek ?? ""].sort();
+  return {
+    freezes: Math.min(MAX_FREEZES, Math.max(account.freezes ?? 0, guest.freezes ?? 0)),
+    freezeWeek: weeks[1],
+    frozenDays: frozenDays.slice(-FROZEN_DAYS_KEPT),
+    earnBack: null,
+  };
 }
 
 /** One catalog entry as the player sees it. */
@@ -70,13 +100,15 @@ function achievementView({ achievement, current, earned }, unlock) {
  *   matchAccessor: Pick<ReturnType<typeof import("../../data/matchAccessor.js").createMatchAccessor>, "listForPlayer">,
  *   progressionComponent: Pick<ReturnType<typeof import("../progression/progressionComponent.js").createProgressionComponent>, "awardBonus" | "getProgress">,
  *   events: { emit: (event: string, payload: unknown) => void },
- * }} deps
+ *   days?: Pick<ReturnType<typeof import("../playerDays/playerDaysComponent.js").createPlayerDaysComponent>, "calendarFor" | "freezesOn" | "freezeCovered">,
+ * }} deps  `days`: each player's calendar and freezes (CC-146, CC-145). Without it, UTC days and no freezes
  */
 export function createGamificationComponent({
   gamificationAccessor,
   matchAccessor,
   progressionComponent,
   events,
+  days = UTC_DAYS,
 }) {
   assertDefined(gamificationAccessor, "gamificationAccessor");
   assertFunction(matchAccessor?.listForPlayer, "matchAccessor.listForPlayer");
@@ -85,6 +117,15 @@ export function createGamificationComponent({
   assertFunction(events?.emit, "events.emit");
 
   const getStats = (playerId) => gamificationAccessor.getStats({ playerId, empty: emptyStats(playerId) });
+
+  /** A player's calendar (UTC days when `local_days` is off) and whether they have freezes. */
+  async function daysOf(playerId) {
+    const [calendar, freezes] = await Promise.all([
+      days.calendarFor({ playerId, fallback: UTC_CALENDAR }),
+      days.freezesOn({ playerId }),
+    ]);
+    return { calendar, freezes };
+  }
 
   /** Unlocks what the player has earned and doesn't have yet; returns the new unlocks as views. */
   async function unlockEarned({ playerId, stats, at, matchId }) {
@@ -146,14 +187,23 @@ export function createGamificationComponent({
   async function applyForPlayer({ match, playerId, displayName, now }) {
     const result = resultFor(match, playerId);
     const at = match.endedAt;
-    const day = utcDay(at);
+    const playerDays = await daysOf(playerId);
+    const { calendar, freezes } = playerDays;
+    const day = calendar.dayOf(at);
     const counted = await gamificationAccessor.applyToStatsOnce({
       playerId,
       key: match.matchId,
       at,
       empty: emptyStats(playerId),
       change: (stats) =>
-        applyMatchToStats(stats, { gameId: match.gameId, result, reason: match.result.reason, endedAt: at }),
+        applyMatchToStats(stats, {
+          gameId: match.gameId,
+          result,
+          reason: match.result.reason,
+          endedAt: at,
+          calendar,
+          freezes,
+        }),
     });
     const quests = await gamificationAccessor.applyToQuestDayOnce({
       playerId,
@@ -172,11 +222,17 @@ export function createGamificationComponent({
     });
 
     if (counted.applied) {
-      events.emit(GAMIFICATION_EVENTS.STREAKS_UPDATED, { playerId, streaks: streaksView(stats, now) });
+      events.emit(GAMIFICATION_EVENTS.STREAKS_UPDATED, { playerId, streaks: streaksView(stats, now, playerDays) });
+      if (freezes && freezeCoveredOn(counted.stats.dailyStreak, day)) {
+        await days.freezeCovered({ playerId });
+      }
     }
     // A late match from yesterday moved yesterday's quests: nothing on today's screen changed.
-    if (quests.applied && day === utcDay(now)) {
-      events.emit(GAMIFICATION_EVENTS.QUESTS_UPDATED, { playerId, quests: questsView(quests.questDay, now) });
+    if (quests.applied && day === calendar.dayOf(now)) {
+      events.emit(GAMIFICATION_EVENTS.QUESTS_UPDATED, {
+        playerId,
+        quests: questsView(quests.questDay, now, calendar),
+      });
     }
     await unlockEarned({ playerId, stats, at, matchId: match.matchId });
   }
@@ -232,22 +288,25 @@ export function createGamificationComponent({
 
     /** @param {{ playerId: string, now: number }} query */
     async getStreaks({ playerId, now }) {
-      return streaksView(await getStats(playerId), now);
+      const [stats, playerDays] = await Promise.all([getStats(playerId), daysOf(playerId)]);
+      return streaksView(stats, now, playerDays);
     },
 
     /**
-     * Today's quests (UTC). The first look of the day stores the day's snapshot.
+     * Today's quests, on the player's own day (UTC with `local_days` off). The first look of the day stores the day's
+     * snapshot.
      *
      * @param {{ playerId: string, now: number }} query
      */
     async getQuests({ playerId, now }) {
-      const day = utcDay(now);
+      const calendar = await days.calendarFor({ playerId, fallback: UTC_CALENDAR });
+      const day = calendar.dayOf(now);
       const questDay = await gamificationAccessor.getQuestDay({
         playerId,
         day,
         create: () => newQuestDay({ playerId, day }),
       });
-      return questsView(questDay, now);
+      return questsView(questDay, now, calendar);
     },
 
     /**
@@ -262,6 +321,10 @@ export function createGamificationComponent({
       const playerId = to.id;
       const achievements = await gamificationAccessor.moveUnlocks({ from, to: playerId });
       const guest = await getStats(from);
+      const own = await getStats(playerId);
+      const { calendar } = await daysOf(playerId);
+      // Days a freeze covered stay covered in the rebuild, so a protected streak survives the sign-in (CC-145).
+      const covered = [...(own.dailyStreak.frozenDays ?? []), ...(guest.dailyStreak.frozenDays ?? [])];
       const history = await historyOf(playerId);
       // Only the games that count for the account (CC-095), so merged stats stay within the fair play limits.
       const rebuilt = history
@@ -273,6 +336,8 @@ export function createGamificationComponent({
               result: resultFor(match, playerId),
               reason: match.result.reason,
               endedAt: match.endedAt,
+              calendar,
+              covered,
             }),
           emptyStats(playerId),
         );
@@ -285,6 +350,7 @@ export function createGamificationComponent({
           const merged = account.mergedFrom.includes(from);
           return {
             ...rebuilt,
+            dailyStreak: { ...rebuilt.dailyStreak, ...mergedFreezes(account.dailyStreak, guest.dailyStreak) },
             questsCompleted: account.questsCompleted + (merged ? 0 : guest.questsCompleted),
             mergedFrom: merged ? account.mergedFrom : [...account.mergedFrom, from],
           };

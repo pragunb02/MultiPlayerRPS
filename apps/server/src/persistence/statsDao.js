@@ -11,7 +11,7 @@ const FIELDS = "-_id -__v";
  * @property {number} checkmateWins
  * @property {number} questsCompleted
  * @property {{ current: number, best: number }} winStreak
- * @property {{ current: number, best: number, lastDay: string }} dailyStreak
+ * @property {{ current: number, best: number, lastDay: string, lastAt?: number, days?: string, freezes?: number, freezeWeek?: string, frozenDays?: string[], earnBack?: { day: string, matches: number } | null }} dailyStreak
  * @property {string[]} recentKeys    exactly-once window: the last keys (match ids, quest keys) applied
  * @property {string[]} mergedFrom
  * @property {Date} updatedAt
@@ -27,7 +27,18 @@ const statsSchema = new mongoose.Schema(
     checkmateWins: { type: Number, default: 0 },
     questsCompleted: { type: Number, default: 0 },
     winStreak: streak(),
-    dailyStreak: { ...streak(), lastDay: { type: String, default: "" } },
+    // Local days and freezes (CC-146, CC-145) are optional: a document stored before them has none, and the domain
+    // reads that as UTC days and no freezes (migrate on read, ADR-077.5).
+    dailyStreak: {
+      ...streak(),
+      lastDay: { type: String, default: "" },
+      lastAt: { type: Number },
+      days: { type: String },
+      freezes: { type: Number },
+      freezeWeek: { type: String },
+      frozenDays: { type: [String], default: undefined },
+      earnBack: { type: mongoose.Schema.Types.Mixed },
+    },
     recentKeys: { type: [String], default: [] },
     mergedFrom: { type: [String], default: [] },
     updatedAt: { type: Date, required: true },

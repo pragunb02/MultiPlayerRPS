@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dailyStreakView, nextDailyStreak, nextWinStreak } from "./streaks.js";
+import { UTC_CALENDAR, zoneCalendar } from "../playerDays/zoneCalendar.js";
+import { dailyStreakView, nextDailyStreak, nextWinStreak, readDailyStreak } from "./streaks.js";
 
 const ms = (iso) => Date.parse(iso);
 
@@ -49,5 +50,59 @@ describe("daily play streak", () => {
 
     expect(dailyStreakView(streak, ms("2026-10-16T23:59:59.999Z")).playedToday).toBe(true);
     expect(dailyStreakView(streak, ms("2026-10-17T00:00:00.000Z")).atRisk).toBe(true);
+  });
+});
+
+describe("daily play streak on local days (CC-146)", () => {
+  const india = zoneCalendar(undefined);
+  const newYork = zoneCalendar({
+    zone: "America/New_York",
+    previousZone: "UTC",
+    changedAt: 0,
+    effectiveAt: 0,
+    floorDay: "1970-01-01",
+  });
+
+  it("reads an old UTC streak without breaking it", () => {
+    // Stored before the switch: the last match was on the UTC day 20 October.
+    const old = { current: 5, best: 5, lastDay: "2026-10-20" };
+    // In India it is now 10:00 on the 22nd. The UTC 20th ran until 05:29 on the 21st there, so it is at risk, not 0.
+    expect(dailyStreakView(old, ms("2026-10-22T04:30:00Z"), { calendar: india })).toMatchObject({
+      current: 5,
+      lastDay: "2026-10-21",
+      atRisk: true,
+    });
+    // In New York it is 22:00 on the 21st: the UTC 20th ended at 20:00 on the 20th there.
+    expect(dailyStreakView(old, ms("2026-10-22T02:00:00Z"), { calendar: newYork })).toMatchObject({
+      current: 5,
+      lastDay: "2026-10-20",
+      atRisk: true,
+    });
+  });
+
+  it("never reads an old key as later than today", () => {
+    const old = { current: 2, best: 2, lastDay: "2026-10-21" };
+    // The UTC 21st overlaps the 22nd in India, but that has not come yet.
+    expect(readDailyStreak(old, { calendar: india, today: "2026-10-21" })).toEqual({ ...old, days: "local" });
+  });
+
+  it("marks local keys as UTC when read back on UTC days, keeping them", () => {
+    const local = { current: 2, best: 2, lastDay: "2026-10-21", days: "local", lastAt: 1 };
+    expect(readDailyStreak(local, { calendar: UTC_CALENDAR, today: "2026-10-21" })).toEqual({
+      ...local,
+      days: "utc",
+    });
+  });
+
+  it("counts a match at 23:30 in New York on the New York day", () => {
+    const stored = { current: 1, best: 1, lastDay: "2026-10-20", days: "local", lastAt: 0 };
+    const at = ms("2026-10-22T03:30:00Z"); // 23:30 on the 21st in New York, already the 22nd in UTC
+    expect(nextDailyStreak(stored, { result: "win", day: newYork.dayOf(at), at })).toEqual({
+      ...stored,
+      current: 2,
+      best: 2,
+      lastDay: "2026-10-21",
+      lastAt: at,
+    });
   });
 });
