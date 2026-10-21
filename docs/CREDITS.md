@@ -64,6 +64,8 @@ The puzzle page credits Lichess. They are data, not art, so the table check abov
 | `apps/web/public/og/rock-paper-scissors.801640cf.jpg` | Link preview card for Rock Paper Scissors, JPEG under 150 KB               | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-217) | 2026-10-20 |
 | `apps/web/public/og/tic-tac-toe.fd57d332.jpg`         | Link preview card for Tic-Tac-Toe, JPEG under 150 KB                       | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-217) | 2026-10-20 |
 | `apps/web/public/og/chess.b756bac7.jpg`               | Link preview card for Chess, JPEG under 150 KB                             | ClassiCade | LicenseRef-ClassiCade | Rendered from our own art by `apps/web/og/render.mjs` (CC-217) | 2026-10-20 |
+| `apps/web/src/effects/themes/diyas.svg`               | Diwali band: a clay diya with a still flame on a marigold string           | ClassiCade | LicenseRef-ClassiCade | Drawn for ClassiCade in CC-328, no reference traced, no AI     | 2026-10-21 |
+| `apps/web/src/effects/themes/frost.svg`               | Winter band: a snowflake and small stars of ice                            | ClassiCade | LicenseRef-ClassiCade | Drawn for ClassiCade in CC-328, no reference traced, no AI     | 2026-10-21 |
 
 ## Our own art drawn in code
 

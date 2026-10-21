@@ -14,16 +14,36 @@ body {
 }
 
 body {
-  /* The arcade floor: a faint 32px grid drawn with gradients, so no image is downloaded. */
+  /*
+   * The arcade floor: a faint 32px grid drawn with gradients, so no image is downloaded. Over it, an event theme's
+   * still ambient picture (--event-ambient, CC-328) runs along the footer's bottom padding band, where no text is.
+   */
   background-color: var(--color-bg);
   background-image:
-    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 32px),
+    var(--event-ambient, none), repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 32px),
     repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 32px);
+  background-repeat: repeat-x, repeat, repeat;
+  background-position:
+    center bottom,
+    0 0,
+    0 0;
+  background-size:
+    auto var(--space-6),
+    auto,
+    auto;
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--text-md);
   line-height: var(--leading-body);
   -webkit-font-smoothing: antialiased;
+}
+
+/* The same picture in the page's top padding band, under the header, where no text is (CC-328). Still: no motion. */
+main {
+  background-image: var(--event-ambient, none);
+  background-repeat: repeat-x;
+  background-position: center top;
+  background-size: auto var(--space-8);
 }
 
 a {

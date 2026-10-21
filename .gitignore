@@ -3,6 +3,8 @@ node_modules
 .vercel
 *.svg
 !apps/web/public/favicon.svg
+# The event themes' still ambient pictures (CC-328), credited in docs/CREDITS.md.
+!apps/web/src/effects/themes/*.svg
 coverage
 apps/server/build-info.json
 dist

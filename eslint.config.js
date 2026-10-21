@@ -11,6 +11,13 @@ const { COMMENT_STYLE_ON, COMMENT_STYLE_SWEEP, globsFor } = require("./eslint-ru
 const SERVER = "apps/server/src";
 const TESTS = ["**/*.test.js", "**/*.test.jsx"];
 
+// Scenes, themes and the particle module load only through the effect registry (ADR-075, CC-328): everything outside
+// apps/web/src/effects/ calls useEffects().play(name), so no page or component holds an effect or a theme.
+const EFFECT_INTERNALS = Object.freeze({
+  group: ["**/effects/scenes/*", "**/effects/themes/*", "**/effects/particles.js", "**/effects/particles"],
+  message: "Effects load only through effects/registry.js (ADR-075). Call useEffects().play(name) instead.",
+});
+
 // Layer rules from docs/ENGINEERING.md §1: adjacent layers only, top-down only.
 // Each entry lists what a layer may NOT import. The composition root (server.js, index.js) is exempt.
 const layer = (name) => `**/${name}/**`;
@@ -134,6 +141,11 @@ module.exports = [
     },
   },
   {
+    files: ["apps/web/src/**/*.{js,jsx}"],
+    ignores: ["apps/web/src/effects/**"],
+    rules: { "no-restricted-imports": ["error", { patterns: [EFFECT_INTERNALS] }] },
+  },
+  {
     files: ["apps/web/src/{pages,components}/**/*.{js,jsx}"],
     ignores: TESTS,
     rules: {
@@ -143,7 +155,10 @@ module.exports = [
       ],
       "no-restricted-imports": [
         "error",
-        { paths: [{ name: "socket.io-client", message: "Use the socket client in src/lib via a hook." }] },
+        {
+          paths: [{ name: "socket.io-client", message: "Use the socket client in src/lib via a hook." }],
+          patterns: [EFFECT_INTERNALS],
+        },
       ],
     },
   },

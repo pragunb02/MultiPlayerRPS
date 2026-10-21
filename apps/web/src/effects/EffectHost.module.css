@@ -1,0 +1,13 @@
+/*
+ * The one effect canvas (ADR-075, CC-328): a pop-up of the celebration kind (docs/design/CONTRACT.md section 5),
+ * over the page at --layer-effect and under the skip link. It never takes a click or a tap, and only exists while
+ * an effect plays.
+ */
+.canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--layer-effect);
+  pointer-events: none;
+}

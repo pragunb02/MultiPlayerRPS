@@ -185,6 +185,8 @@ speaks, so it is listed too.
 | `apps/web/src/components/ProgressToasts.jsx`                 | celebration  | The level-up burst on the body.              |
 | `apps/web/src/components/Celebrations/ResultCelebration.jsx` | celebration  | Confetti after a win, drawn on the body.     |
 | `apps/web/src/art/effects/effects.module.css`                | celebration  | The fixed celebration overlay.               |
+| `apps/web/src/effects/EffectHost.jsx`                        | celebration  | The one effect canvas, aria-hidden.          |
+| `apps/web/src/effects/EffectHost.module.css`                 | celebration  | The fixed effect canvas, no clicks.          |
 | `apps/web/src/components/TurnBanner/TurnBanner.jsx`          | banner       | Whose turn it is, read out.                  |
 | `apps/web/src/components/PageAnnouncer/PageAnnouncer.jsx`    | announcer    | Reads out a new page.                        |
 | `apps/web/src/components/MatchShell/MatchAnnouncer.jsx`      | announcer    | Reads out moves and results.                 |
@@ -197,9 +199,17 @@ speaks, so it is listed too.
 
 <!-- popup-components:end -->
 
-**Coming with ADR-075:** the effect registry's `EffectHost` and its canvas (`apps/web/src/effects/`) are a
-celebration. They join this list, at `--layer-effect`, in the pull request that builds them (CC-099). The list only
-names files that exist, so the row is added then.
+**The effects (ADR-075, CC-328):** the effect registry's one `EffectHost` and its canvas (`apps/web/src/effects/`)
+are a celebration, at `--layer-effect`. The canvas exists only while an effect plays, is `aria-hidden` and takes no
+pointer events, and every celebration's meaning is also in words on the page. Components never draw an effect
+themselves: they call `useEffects().play(name)`, and ESLint refuses an import of `effects/scenes/*`,
+`effects/themes/*` or `effects/particles.js` outside `apps/web/src/effects/`. The older `art/effects/` rows above
+leave when CC-099 moves their callers to `play`.
+
+**Event themes** may change only the decoration tokens in `THEMEABLE_TOKENS` (`effects/registry.js`): the hero
+gradient, the grid line, `--glow-primary`, `--glow-gold`, the `--color-neon-*` inks, `--effect-ink-1` to `-5` and
+`--event-ambient`. Never a status, a player, a text colour or a surface, so no contrast in this contract changes
+(`effects/themes/themes.test.js`).
 
 The banners that do not need a live region of their own (`RequestBanner`, `SiteRequests`, `ConnectionBanner`,
 `StreakAtRisk`, `SaveProgressCard`, `ComputerNote`) use `role="status"` or `role="alert"`, which the rule allows.

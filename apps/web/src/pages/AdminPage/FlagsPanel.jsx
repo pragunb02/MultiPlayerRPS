@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { FLAG_ROLLOUT, SITE_NAME } from "@classicade/shared";
 import { useServices } from "../../app/servicesContext.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { ThemePreview } from "../../effects/ThemePreview.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { useAdminFlags } from "../../hooks/useAdminFlags.js";
 import { useFlag } from "../../hooks/useFlag.js";
@@ -177,6 +178,7 @@ function Flag({ flag, days, setRollout, clearRollout }) {
         setRollout={setRollout}
         clearRollout={clearRollout}
       />
+      <ThemePreview flag={flag.name} />
     </article>
   );
 }

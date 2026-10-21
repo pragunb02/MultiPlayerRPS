@@ -7,6 +7,7 @@ import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
+import { EventGreeting } from "../../effects/EventGreeting.jsx";
 import { lazyBoard } from "../../games/lazyBoard.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useGames } from "../../hooks/useGames.js";
@@ -28,6 +29,7 @@ export function HomePage() {
       <PageTitle />
       <section className={styles.hero}>
         <div className={styles.heroText}>
+          <EventGreeting />
           <h1>Play the classics with anyone, in one click.</h1>
           <p className={styles.lead}>No downloads, no signup required. Pick a game, share a link, play.</p>
           {session.status === "ready" ? (

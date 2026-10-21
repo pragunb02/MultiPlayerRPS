@@ -1,0 +1,25 @@
+/*
+ * The winter nights theme (CC-328), ready and off: ice blue over the night arcade, for everyone. Only decoration
+ * tokens (THEMEABLE_TOKENS in effects/registry.js), so every contrast of the design contract stays as it is
+ * (themes.test.js). White hero text is 11.1:1 and 7.3:1 on the light gradient's stops.
+ */
+:root[data-event-theme="winter_2026"] {
+  --gradient-hero: linear-gradient(135deg, #1f3a6e 0%, #155e75 100%);
+  --grid-line: rgb(127 211 255 / 10%);
+  --glow-primary: 0 0 0 1px rgb(127 211 255 / 40%), 0 6px 20px rgb(31 122 180 / 30%);
+  --effect-ink-1: #bfe9ff;
+  --effect-ink-2: #7fd3ff;
+  --effect-ink-3: #ffffff;
+  --effect-ink-4: #c7c2ff;
+  --effect-ink-5: #9ff0e1;
+  /* Still frost in the page's padding bands only (global.css). */
+  --event-ambient: url("./frost.svg");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-event-theme="winter_2026"] {
+    --gradient-hero: linear-gradient(135deg, #0f2347 0%, #173b5c 100%);
+    --grid-line: rgb(191 233 255 / 8%);
+    --glow-primary: 0 0 0 1px rgb(127 211 255 / 50%), 0 0 24px rgb(127 211 255 / 40%);
+  }
+}
