@@ -6,7 +6,15 @@ import { flagPaths } from "../../testing/flagPaths.js";
 import { createInMemoryTelemetryCountDao } from "../../testing/inMemoryTelemetryCountDao.js";
 import { createInMemoryTelemetryDailyDao } from "../../testing/inMemoryTelemetryDailyDao.js";
 import { addDays, startOfDay } from "../../utils/indiaTime.js";
-import { createRollupJob, nextRunAt, ROLLUP_STEPS, scheduleRollups } from "./rollupJob.js";
+import { TELEMETRY_KEEP_DAYS } from "../../persistence/telemetryCountDao.js";
+import {
+  COUNTERS_KEPT_DAYS,
+  createRollupJob,
+  nextRunAt,
+  oldestFullDay,
+  ROLLUP_STEPS,
+  scheduleRollups,
+} from "./rollupJob.js";
 
 const HOUR = 60 * 60 * 1000;
 const MINUTE = 60 * 1000;
@@ -106,8 +114,9 @@ describe("the rollup job (CC-176)", () => {
 
     const first = await shared.job.runOnce();
 
-    expect(first.rolled).toHaveLength(30);
-    expect(first.rolled[0]).toBe(addDays("2026-10-21", -30));
+    // Only days whose counters are all still kept (review of #176): 30 days back, the TTL has taken its first hours.
+    expect(first.rolled).toHaveLength(29);
+    expect(first.rolled[0]).toBe(addDays("2026-10-21", -29));
     expect(first.rolled.at(-1)).toBe("2026-10-20");
     expect(await totalOn(shared.daily, "2026-10-12")).toBe(5);
     expect(await totalOn(shared.daily, "2026-10-17")).toBe(8);
@@ -116,8 +125,8 @@ describe("the rollup job (CC-176)", () => {
     shared.clock.now += HOUR;
     expect((await shared.job.runOnce()).rolled).toEqual(["2026-10-19", "2026-10-20"]);
 
-    // A day off the end of the window (31 days back) is left to the backfill.
-    expect(await totalOn(shared.daily, addDays("2026-10-21", -31))).toBeUndefined();
+    // A day partly deleted by the TTL (30 days back) is never rolled up: its total would be short.
+    expect(await totalOn(shared.daily, addDays("2026-10-21", -30))).toBeUndefined();
   });
 
   it("lets only one process roll up a day: a second one skips the days whose lease is held", async () => {
@@ -148,9 +157,51 @@ describe("the rollup job (CC-176)", () => {
 
     const { rolled } = await job.backfill({ from: "2026-01-01" });
 
-    expect(rolled[0]).toBe(addDays("2026-10-21", -30));
+    expect(rolled[0]).toBe(addDays("2026-10-21", -29));
     expect(rolled.at(-1)).toBe("2026-10-20");
     expect(await totalOn(daily, "2026-10-15")).toBe(8);
+  });
+
+  it("rolls up only days whose counters are all still kept, at any time of day", () => {
+    expect(COUNTERS_KEPT_DAYS).toBe(TELEMETRY_KEEP_DAYS);
+    expect(oldestFullDay(NOW)).toBe(addDays("2026-10-21", -29));
+    expect(oldestFullDay(startOfDay("2026-10-21"))).toBe(addDays("2026-10-21", -29));
+    expect(oldestFullDay(startOfDay("2026-10-22") - 1)).toBe(addDays("2026-10-21", -29));
+  });
+
+  it("stops between days when told to, so a shutdown waits for one day at most", async () => {
+    const { job, counts } = setup();
+    await press(counts, "2026-10-20", 5);
+    let asked = 0;
+
+    const { rolled } = await job.runOnce({ isStopped: () => (asked += 1) > 1 });
+    const back = await job.backfill({ from: "2026-10-01", isStopped: () => true });
+
+    expect(rolled).toHaveLength(1);
+    expect(back.rolled).toEqual([]);
+  });
+
+  it("tells a run in progress to stop when the scheduler stops", async () => {
+    const seen = [];
+    let release;
+    const scheduled = scheduleRollups({
+      run: async ({ isStopped }) => {
+        await new Promise((resolve) => {
+          release = resolve;
+        });
+        seen.push(isStopped());
+      },
+      now: () => NOW,
+      logger: captureLogger().logger,
+    });
+
+    scheduled.start();
+    await vi.waitFor(() => expect(release).toBeDefined());
+    const stopping = scheduled.stop();
+    release();
+    await stopping;
+
+    expect(seen).toEqual([true]);
   });
 
   // AC-7

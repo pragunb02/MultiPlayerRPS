@@ -4,7 +4,7 @@
 //   MONGO_URI=… node scripts/bin/rollup-telemetry.mjs --from 2026-10-01
 //
 // Rolls up every complete India day from that day to yesterday again, whatever the run records and the
-// telemetry_rollup flag say. Only the last 30 days still have hourly counters, so older days are left as they are.
+// telemetry_rollup flag say. Only days whose hourly counters are all still kept (the last 29 complete ones) are rolled up.
 // It prints the days it rolled up, and the days another process held or that failed. Nothing about any player.
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";

@@ -179,7 +179,7 @@ that ships it builds four new indexes at boot (`matches.endedAt`, `player_transf
 ### Usage totals and the UX page (CC-176, CC-177)
 
 - **The nightly job** runs in the server process, behind the server-only flag `telemetry_rollup` (only **On** runs
-  it): on boot, every hour and at 00:30 India time. Each run rolls up every complete India day of the last 30 with no
+  it): on boot, every hour and at 00:30 India time. Each run rolls up every complete India day whose hourly counters are all still kept (the last 29) with no
   run record, and always the last 2, so a late beacon is counted and a sleep or a deploy over midnight is caught up.
   A lease per day (`telemetry_daily_runs`) stops a second instance doing the same day. The deploy that ships it builds
   the `telemetry_daily` and `telemetry_daily_runs` indexes at boot (empty collections).
@@ -187,7 +187,7 @@ that ships it builds four new indexes at boot (`matches.endedAt`, `player_transf
   `outcome="ok"` by 03:00 India time, and the named line `telemetry rollup failed` with its `step`. The next tick
   retries by itself.
 - **Backfill after a fix:** `MONGO_URI=… node scripts/bin/rollup-telemetry.mjs --from YYYY-MM-DD` rolls up every
-  complete day from then to yesterday again, flag or not. Only the last 30 days still have hourly counters.
+  complete day from then to yesterday again, flag or not. Only days whose counters are all still kept (the last 29 complete ones) are rolled up: the day 30 back has lost its first hours to the TTL.
 - **Ramp:** turn `telemetry_rollup` On once `telemetry_ingest` has counted 7 days; the first run backfills them. Then
   turn on `console_ux` (admins) for the UX page, and `console_ux_week` after the first full week of totals.
 - **The UX page** is `/admin/ux` (sections `/admin/ux/<section>`), API `GET /api/admin/ux?section=…&from=…&to=…`,

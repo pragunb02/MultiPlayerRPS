@@ -7,8 +7,22 @@ import { rollUpDay } from "./rollups.js";
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
-/** How far back the job looks for a day with no run record: the hourly counters are kept 30 days (CC-175). */
-export const ROLLUP_LOOK_BACK_DAYS = 30;
+/** How long the hourly counters are kept (CC-175, `TELEMETRY_KEEP_DAYS` in persistence): 30 days after each hour. */
+export const COUNTERS_KEPT_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The oldest India day whose counters are all still kept: its first hour is less than 30 days old. The day 30 back has
+ * already lost its first hours to the TTL, so its total would be short and is never written (review of #176).
+ *
+ * @param {number} now  ms
+ * @returns {string}
+ */
+export function oldestFullDay(now) {
+  const kept = now - COUNTERS_KEPT_DAYS * DAY_MS;
+  const day = dayOf(kept);
+  return startOfDay(day) > kept ? day : addDays(day, 1);
+}
 /** The complete days rolled up again on every run, so a late beacon is counted (owner default, 2026-10-22). */
 export const ROLLUP_REDO_DAYS = 2;
 /** How long a process holds a day before another may take it, if the first one died mid-run. */
@@ -82,11 +96,24 @@ export function createRollupJob({
   assertDefined(logger, "logger");
 
   /** The days this run rolls up, oldest first. */
-  async function daysToRoll(today) {
-    const window = { from: addDays(today, -ROLLUP_LOOK_BACK_DAYS), to: addDays(today, -1) };
+  async function daysToRoll(at) {
+    const today = dayOf(at);
+    const window = { from: oldestFullDay(at), to: addDays(today, -1) };
     const done = new Set(await telemetryDailyAccessor.doneDays(window));
-    const days = Array.from({ length: ROLLUP_LOOK_BACK_DAYS }, (_, index) => addDays(window.from, index));
+    const days = [];
+    for (let day = window.from; day <= window.to; day = addDays(day, 1)) days.push(day);
     return days.filter((day) => !done.has(day) || day >= addDays(today, -ROLLUP_REDO_DAYS));
+  }
+
+  /** Rolls up days one after the other, stopping between two days when told to (a shutdown). */
+  async function rollDays(days, isStopped) {
+    const result = { rolled: [], busy: [], failed: [] };
+    for (const day of days) {
+      if (isStopped()) break;
+      const outcome = await rollDay(day);
+      result[outcome === "ok" ? "rolled" : outcome].push(day);
+    }
+    return result;
   }
 
   /** A day's counters, an India hour at a time with a pause between hours. */
@@ -131,54 +158,50 @@ export function createRollupJob({
   return Object.freeze({
     /**
      * The owner's backfill after a fix (`scripts/bin/rollup-telemetry.mjs`): every complete day from `from`
-     * to yesterday, whatever their run records say and whatever the flag. Days older than the counters' 30 are left
-     * as they are, because nothing is left to total them from.
+     * to yesterday, whatever their run records say and whatever the flag. Only days whose counters are all still
+     * kept: older days are left as they are, because their totals could no longer be whole.
      *
-     * @param {{ from: string }} input
+     * @param {{ from: string, isStopped?: () => boolean }} input
      * @returns {Promise<{ rolled: string[], busy: string[], failed: string[] }>}
      */
-    async backfill({ from }) {
-      const today = dayOf(now());
-      const first =
-        from > addDays(today, -ROLLUP_LOOK_BACK_DAYS) ? from : addDays(today, -ROLLUP_LOOK_BACK_DAYS);
-      const result = { rolled: [], busy: [], failed: [] };
-      for (let day = first; day < today; day = addDays(day, 1)) {
-        const outcome = await rollDay(day);
-        result[outcome === "ok" ? "rolled" : outcome].push(day);
-      }
-      return result;
+    async backfill({ from, isStopped = () => false }) {
+      const at = now();
+      const today = dayOf(at);
+      const oldest = oldestFullDay(at);
+      const days = [];
+      for (let day = from > oldest ? from : oldest; day < today; day = addDays(day, 1)) days.push(day);
+      return rollDays(days, isStopped);
     },
 
     /**
-     * One run. Never throws: a failed day is logged and counted.
+     * One run. Never throws: a failed day is logged and counted. `isStopped` is asked before each day, so a shutdown
+     * waits for one day at most.
      *
+     * @param {{ isStopped?: () => boolean }} [options]
      * @returns {Promise<{ rolled: string[], busy: string[], failed: string[], skipped?: string }>}
      */
-    async runOnce() {
+    async runOnce({ isStopped = () => false } = {}) {
       const result = { rolled: [], busy: [], failed: [] };
       if (!(await isOn())) return { ...result, skipped: "flag_off" };
       let days;
       try {
-        days = await daysToRoll(dayOf(now()));
+        days = await daysToRoll(now());
       } catch (err) {
         logger.error({ err, step: "lock" }, "telemetry rollup failed");
         onRun({ outcome: ROLLUP_OUTCOMES.FAILED });
         return result;
       }
-      for (const day of days) {
-        const outcome = await rollDay(day);
-        result[outcome === "ok" ? "rolled" : outcome].push(day);
-      }
-      return result;
+      return rollDays(days, isStopped);
     },
   });
 }
 
 /**
  * Runs the rollup on start, every hour and at 00:30 India time (CC-176, owner default 2026-10-22). One run at a time:
- * a tick that comes while a run is still going is skipped. Timers do not keep the process alive.
+ * a tick that comes while a run is still going is skipped. Timers do not keep the process alive. `run` is given
+ * `isStopped`, which turns true once `stop` is called, so a catch-up of many days ends after the day in hand.
  *
- * @param {{ run: () => Promise<unknown>, now: () => number, logger: import("pino").Logger }} deps
+ * @param {{ run: (options: { isStopped: () => boolean }) => Promise<unknown>, now: () => number, logger: import("pino").Logger }} deps
  * @returns {{ start: () => void, stop: () => Promise<void> }}
  */
 export function scheduleRollups({ run, now, logger }) {
@@ -189,7 +212,7 @@ export function scheduleRollups({ run, now, logger }) {
   const tick = () => {
     if (stopped || running !== undefined) return;
     running = Promise.resolve()
-      .then(run)
+      .then(() => run({ isStopped: () => stopped }))
       .catch((err) => logger.error({ err, step: "lock" }, "telemetry rollup failed"))
       .finally(() => {
         running = undefined;
