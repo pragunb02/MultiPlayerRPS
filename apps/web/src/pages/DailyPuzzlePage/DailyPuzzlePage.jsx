@@ -154,7 +154,14 @@ function DailyPuzzle({ kind, info, view }) {
             {view.task(puzzle)} <span className={styles.rating}>Rated {puzzle.rating}</span>
           </p>
         </header>
-        <Suspense fallback={<p role="status">Loading the board…</p>}>
+        {/* The board's square is kept while it downloads, so the panel under it on a phone does not jump (CC-322). */}
+        <Suspense
+          fallback={
+            <p role="status" className={styles.boardWaiting}>
+              Loading the board…
+            </p>
+          }
+        >
           <Board puzzle={puzzle} interactive={reason === ""} reason={reason} onMove={move.run} />
         </Suspense>
         {move.error !== undefined && (

@@ -86,6 +86,14 @@ describe("matchComponent", () => {
     });
   });
 
+  it("records the starter a rematch named beside the seed, so the match replays exactly (CC-091)", () => {
+    const matches = setup();
+    const rematch = room({ game: { ...room().game, starter: "guest_b" } });
+
+    expect(matches.finishedMatch({ room: rematch, outcome: WIN_A }).starter).toBe("guest_b");
+    expect(matches.finishedMatch({ room: room(), outcome: WIN_A })).not.toHaveProperty("starter");
+  });
+
   it.each([
     ["guest_a", WIN_A, "win"],
     ["guest_b", WIN_A, "loss"],

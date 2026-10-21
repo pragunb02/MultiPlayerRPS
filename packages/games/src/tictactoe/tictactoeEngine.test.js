@@ -65,6 +65,43 @@ describe("tictactoeEngine rules", () => {
     expect(bobStarts).toBeLessThan(600);
   });
 
+  it("gives X and the first move to a named starter, whatever the seed says (CC-091)", () => {
+    const state = tictactoeEngine.init({
+      players: [A, B],
+      options: {},
+      rng: createSeededRng(42),
+      starter: A,
+    });
+
+    expect(state.marks).toEqual({ [A]: "X", [B]: "O" });
+    expect(state.turn).toBe(A);
+    expect(tictactoeEngine.starterOf(state)).toBe(A);
+  });
+
+  it("names the seeded starter as the one who started, also after moves (CC-091)", () => {
+    expect(tictactoeEngine.starterOf(play([]))).toBe(B);
+    expect(tictactoeEngine.starterOf(play([0, 3]))).toBe(B);
+  });
+
+  it("starts exactly as before when no starter is named (CC-091)", () => {
+    const state = play([]);
+
+    expect(state).toEqual({
+      players: [A, B],
+      marks: { [B]: "X", [A]: "O" },
+      board: Array(9).fill(""),
+      turn: B,
+      winner: "",
+      winningLine: [],
+    });
+  });
+
+  it("refuses a starter who is not one of the players (CC-091)", () => {
+    expect(() =>
+      tictactoeEngine.init({ players: [A, B], options: {}, rng: createSeededRng(42), starter: "carol" }),
+    ).toThrow(TypeError);
+  });
+
   // X (bob) completes `line`. O plays the two `blockers`, which never form a line or block X.
   it.each([
     [

@@ -81,6 +81,13 @@ import { createBackgroundTasks } from "../utils/backgroundTasks.js";
 import { createNetworkKey } from "../utils/networkKey.js";
 import { createLegacyPasswordChecker } from "../utils/legacyPassword.js";
 import { createPasswordHasher } from "../utils/passwordHasher.js";
+import { createBreachedPasswordAccessor } from "../data/breachedPasswordAccessor.js";
+import {
+  createPwnedPasswordsClient,
+  NO_NETWORK_FETCH,
+} from "../dependency/pwnedPasswords/pwnedPasswordsClient.js";
+import { createPasswordScreen } from "../domain/accounts/passwordScreen.js";
+import { loadCommonPasswords } from "../persistence/commonPasswords.js";
 import { createTtlCache } from "../utils/ttlCache.js";
 import { createEmptyAnalyticsDao } from "./emptyAnalyticsDao.js";
 import { captureLogger } from "./captureLogger.js";
@@ -157,6 +164,8 @@ import { testConfig } from "./testConfig.js";
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
  *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
  *     to see what the service layer records (ADR-055)
+ *   pwnedPasswordsFetch?: typeof fetch,   how Have I Been Pwned is asked about a new password (CC-261). By default
+ *     it always fails, as when the service cannot be reached, so no test touches the network
  * }} [options]
  */
 export function createTestApp({
@@ -191,6 +200,7 @@ export function createTestApp({
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
   metrics = {},
+  pwnedPasswordsFetch = NO_NETWORK_FETCH,
 } = {}) {
   const config = testConfig(env, { buildInfoText });
   const capture = captureLogger();
@@ -219,6 +229,14 @@ export function createTestApp({
     legacyUserAccessor,
     passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }), // fast for tests
     legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
+    // The real common password list. The breach service is asked through `pwnedPasswordsFetch` only (CC-261).
+    passwordScreen: createPasswordScreen({
+      breachedPasswords: createBreachedPasswordAccessor({
+        pwnedPasswords: createPwnedPasswordsClient({ fetch: pwnedPasswordsFetch }),
+        commonPasswords: loadCommonPasswords(),
+      }),
+      ...(metrics.recordPasswordCheck && { recordCheck: metrics.recordPasswordCheck }),
+    }),
     accountDeletionAccessor,
   });
   const domainEvents = new EventEmitter();

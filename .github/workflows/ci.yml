@@ -56,6 +56,10 @@ jobs:
       - run: npm audit --audit-level=high
       # Leaves out the tests tagged slow (long bot games). nightly.yml runs every test (CC-203).
       - run: npm run test:coverage
+      # The first route at most 150 kB gzip, chess.js and Motion never on it, each effect within ADR-075's budget
+      # (CC-135, CC-322). Part of this required check, so the ruleset's list of checks stays the same.
+      - name: Bundle size budget
+        run: npm run build:web && node scripts/bin/check-bundle.mjs
       - name: Coverage report
         if: always()
         uses: actions/upload-artifact@v7

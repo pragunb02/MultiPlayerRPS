@@ -11,6 +11,7 @@ const MATCH_SCHEMA_VERSION = 1;
  * @property {string} gameId
  * @property {Record<string, unknown>} options
  * @property {number} seed
+ * @property {string} [starter]   who moved first, when a rematch named them (CC-091)
  * @property {Array<{ playerId: string, displayName: string }>} players
  * @property {Array<Record<string, unknown>>} log
  * @property {{ result: string, winners: string[], reason: string }} result
@@ -33,6 +34,8 @@ const matchSchema = new mongoose.Schema(
     gameId: { type: String, required: true },
     options: { type: mongoose.Schema.Types.Mixed, default: {} },
     seed: { type: Number, required: true },
+    // Who moved first, only in a rematch that named them (CC-091). Absent, the seed decided.
+    starter: { type: String },
     players: {
       type: [
         {
@@ -63,7 +66,7 @@ matchSchema.index({ "players.playerId": 1, endedAt: -1 });
 matchSchema.index({ endedAt: 1 });
 
 const FIELDS =
-  "-_id matchId roomCode gameId options seed players log result startedAt endedAt schemaVersion credit";
+  "-_id matchId roomCode gameId options seed starter players log result startedAt endedAt schemaVersion credit";
 // A player's games that count for them: judged without them in `notCounted`, or not judged yet.
 const countedFor = (playerId) => ({ "credit.notCounted.playerId": { $ne: playerId } });
 // Computer characters' ids (ADR-025). Their games never count on a leaderboard.

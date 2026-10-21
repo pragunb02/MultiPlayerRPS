@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi, GUEST } from "../testing/fakes.js";
 import { findUsableButton, renderApp } from "../testing/render.jsx";
+import { PlayPage } from "./routePages.js";
 
 /** The list of game cards, inside the Games section, once the catalogue has loaded. */
 const gameList = () => within(screen.getByRole("region", { name: "Games" })).findByRole("list");
@@ -128,6 +129,31 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /game over, page not found/ })).toBeInTheDocument();
+  });
+
+  it("hints the lobby's files when its card's link is pointed at, and runs none of its code (CC-322)", async () => {
+    const user = userEvent.setup();
+    const hint = vi.spyOn(PlayPage, "prefetch");
+    const run = vi.spyOn(PlayPage, "preload");
+    renderApp();
+
+    await user.hover(within(await gameList()).getByRole("link", { name: "Chess" }));
+
+    expect(hint).toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    hint.mockRestore();
+    run.mockRestore();
+  });
+
+  it("draws the page a redirect lands on, for each old or short address", async () => {
+    for (const [path, heading] of [
+      ["/leaderboards", /leaderboard/i],
+      ["/login-signup.html", /log in/i],
+    ]) {
+      const view = renderApp({ path });
+      expect(await screen.findByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
+      view.unmount();
+    }
   });
 
   it("offers a skip link to the main content (keyboard users)", () => {
