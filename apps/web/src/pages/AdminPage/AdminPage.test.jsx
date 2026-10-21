@@ -94,12 +94,12 @@ describe("owner console pages", () => {
     expect(tile("Weekly returning players")).not.toHaveTextContent("North Star");
     expect(within(tile("Active players")).getByText("16")).toBeVisible();
     expect(tile("Active players")).toHaveTextContent("Before: 0 (new)");
-    expect(tile("Matches finished")).toHaveTextContent("Before: 30 (−30.0%)");
+    expect(tile("Matches finished")).toHaveTextContent("Before: 30 (▼ −30.0%)");
     expect(tile("New players")).toHaveTextContent("Before: 16 (no change)");
     expect(tile("Weekly returning players")).toHaveTextContent(
       "real play on 3 or more days in the full week from 2025-03-03",
     );
-    expect(tile("Weekly returning players")).toHaveTextContent("Before: 5 (+100.0%)");
+    expect(tile("Weekly returning players")).toHaveTextContent("Before: 5 (▲ +100.0%)");
     expect(tile("Matches per player")).toHaveTextContent("2.63");
     expect(tile("Matches per player")).toHaveTextContent("Before: fewer than 5");
     expect(tile("Guest to account")).toHaveTextContent("33.3%");
@@ -352,7 +352,7 @@ describe("owner console pages", () => {
     expect(screen.getByText(/kept for 28 days after the week ends/)).toBeVisible();
   });
 
-  it("keeps the range form when the server refuses the range, without a Try again that would fail the same way", async () => {
+  it("keeps the range form when the server refuses the range, without a Retry that would fail the same way", async () => {
     const getAnalytics = vi.fn().mockRejectedValue(
       new AppRequestError({
         code: "VALIDATION_FAILED",
@@ -366,7 +366,7 @@ describe("owner console pages", () => {
     });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("at most 400 days");
-    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(screen.getByLabelText("From")).toHaveValue("2025-01-01");
     expect(screen.getByLabelText("To")).toHaveValue("2026-10-18");
 
@@ -397,7 +397,7 @@ describe("owner console pages", () => {
     renderApp({ path: "/admin", api: ownerApi({ getAnalytics }) });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Something broke");
-    await act(() => userEvent.click(screen.getByRole("button", { name: "Try again" })));
+    await act(() => userEvent.click(screen.getByRole("button", { name: "Retry" })));
 
     expect(await screen.findByText("Active players")).toBeVisible();
   });

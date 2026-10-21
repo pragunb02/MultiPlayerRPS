@@ -55,6 +55,31 @@ describe("the friends page (CC-052)", () => {
     expect(api.getFriends).not.toHaveBeenCalled();
   });
 
+  it("shows a visitor the way to an account instead of loading for ever (CC-323 bug 1)", async () => {
+    const api = fakeApi({ getSession: vi.fn(async () => undefined) });
+    renderApp({ path: "/friends", api });
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Friends are for accounts" })).toBeVisible();
+    const main = within(screen.getByRole("main"));
+    expect(main.getByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/signup?next=%2Ffriends");
+    expect(main.getByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login?next=%2Ffriends");
+    expect(screen.queryByText("Loading your friends…")).toBeNull();
+    expect(api.getFriends).not.toHaveBeenCalled();
+  });
+
+  it("a removal is a destructive confirm: a danger button, and a click beside the dialog keeps it (CC-323)", async () => {
+    renderApp({ path: "/friends", api: friendsApi() });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Arjun" }));
+    const dialog = screen.getByRole("dialog", { name: "Remove Arjun?" });
+    expect(within(dialog).getByRole("button", { name: "Remove" })).toHaveAttribute(
+      "data-cc-variant",
+      "danger",
+    );
+    await userEvent.click(document.querySelector("[data-cc-modal-backdrop]"));
+    expect(screen.getByRole("dialog", { name: "Remove Arjun?" })).toBeInTheDocument();
+  });
+
   it("says so when an account has no friends yet", async () => {
     renderApp({ path: "/friends", api: friendsApi({ getFriends: vi.fn().mockResolvedValue(NO_FRIENDS) }) });
 
@@ -208,7 +233,7 @@ describe("the friends page (CC-052)", () => {
     act(() =>
       socket.push(SOCKET_EVENTS.FRIEND_PRESENCE_CHANGED, { handle: ARJUN.handle, presence: "offline" }),
     );
-    expect(screen.getByText("Loading…")).toBeVisible();
+    expect(screen.getByText("Loading your friends…")).toBeVisible();
     await act(async () => answer(VIEW));
 
     const list = await screen.findByRole("list", { name: "Friends" });
@@ -240,7 +265,7 @@ describe("the friends page (CC-052)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Make a friend link" }));
     await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
 
-    expect(await screen.findByText("Couldn't copy. Select the link and copy it")).toBeVisible();
+    expect(await screen.findByText("Couldn't copy. Select the text and copy it")).toBeVisible();
   });
 
   it("says when the friends could not be loaded, and tries again", async () => {
@@ -252,7 +277,7 @@ describe("the friends page (CC-052)", () => {
     });
     renderApp({ path: "/friends", api });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load your friends. Server down");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn.t load your friends\.Server down/);
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByText("Abhi tumhare koi friends nahi hain.")).toBeVisible();

@@ -1,42 +1,21 @@
+/* Log in and sign up (CC-323): the form is the shared card with the brand strip along its top. */
 .page {
   max-width: 26rem;
   margin: 0 auto;
 }
 .page h1 {
   text-align: center;
-  font-size: var(--text-2xl);
 }
-/* The form as a player card: a gradient strip on top, like a cartridge label. */
 .form {
-  position: relative;
-  display: grid;
   gap: var(--space-4);
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-8) var(--space-6) var(--space-6);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-}
-.form::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 6px;
-  background: var(--gradient-hero);
-}
-.note {
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-primary-soft);
-  font-size: var(--text-sm);
-  color: var(--color-text);
 }
 .switch {
   text-align: center;
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
 }
 .switch a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
   font-weight: var(--weight-bold);
 }

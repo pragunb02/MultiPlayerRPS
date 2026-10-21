@@ -74,10 +74,33 @@ describe("LeaderboardPage", () => {
     expect(screen.getByText("7 wins")).toBeInTheDocument();
   });
 
+  it("heads the rankings with what each column holds, in the board's unit (CC-323)", async () => {
+    renderApp({
+      path: "/leaderboards/overall",
+      api: api({ boards: { overall: { board: boardInfo("overall"), entries: ENTRIES } } }),
+    });
+
+    await screen.findByRole("list", { name: "Overall XP rankings" });
+    const head = document.querySelector(".head");
+    expect(head).toHaveAttribute("aria-hidden", "true");
+    expect([...head.children].map((cell) => cell.textContent)).toEqual(["Place", "Player", "Level", "XP"]);
+  });
+
+  it("reserves the board's room with row shapes while it loads, as one busy status (CC-323)", () => {
+    renderApp({ path: "/leaderboards/chess", api: api() });
+
+    const status = screen.getByRole("status", { busy: true });
+    expect(status).toHaveTextContent("Loading the leaderboard…");
+    expect(status.querySelectorAll(".row")).toHaveLength(6);
+  });
+
   it("invites the first winner when nobody is ranked yet", async () => {
     renderApp({ path: "/leaderboards/tic-tac-toe", api: api() });
 
-    expect(await screen.findByText("No ranked players yet. Win a match to claim #1!")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 3, name: "No ranked players yet." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Win a match to claim #1!")).toBeInTheDocument();
   });
 
   it("explains a failure and tries again", async () => {
@@ -89,9 +112,9 @@ describe("LeaderboardPage", () => {
     renderApp({ path: "/leaderboards/overall", api: fake });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't load the leaderboard. You're offline.",
+      /Couldn.t load the leaderboard\.You.re offline\./,
     );
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await user.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByRole("list", { name: "Overall XP rankings" })).toBeInTheDocument();
   });

@@ -4,6 +4,10 @@ import { FEEDBACK_STATUSES, FEEDBACK_TYPES, SITE_NAME } from "@classicade/shared
 import { paths } from "../../app/paths.js";
 import { useServices } from "../../app/servicesContext.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardBody, CardFooter } from "../../components/Card/Card.jsx";
+import { Field } from "../../components/Field/Field.jsx";
+import { PageHeader, Section } from "../../components/Page/Page.jsx";
+import { EmptyState, ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { FEEDBACK_STATUS_LABELS, FEEDBACK_TYPE_LABELS } from "../../components/Feedback/feedbackText.js";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { useAction } from "../../hooks/useAction.js";
@@ -28,21 +32,20 @@ const sentAt = (ms) =>
 /** A filter of the inbox: all, or one value of a list. A change is a new address, so Back returns to the last one. */
 function Filter({ label, name, value, options, labels, onChange }) {
   return (
-    <label className={consoleStyles.rangeField}>
-      {label}
-      <select
-        value={value ?? ""}
-        onChange={(event) => onChange(name, event.target.value)}
-        data-cc-control={`admin.feedback.${name}`}
-      >
-        <option value="">All</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {labels[option]}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Field
+      label={label}
+      kind="select"
+      value={value ?? ""}
+      onChange={(event) => onChange(name, event.target.value)}
+      data-cc-control={`admin.feedback.${name}`}
+    >
+      <option value="">All</option>
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {labels[option]}
+        </option>
+      ))}
+    </Field>
   );
 }
 
@@ -52,7 +55,7 @@ function StatusButton({ item, status, setStatus }) {
     id: `admin.feedback.mark_${status}`,
   });
   return (
-    <Button control={`admin.feedback.mark_${status}`} variant="secondary" action={action}>
+    <Button control={`admin.feedback.mark_${status}`} variant="secondary" size="sm" action={action}>
       {`Mark ${FEEDBACK_STATUS_LABELS[status].toLowerCase()}`}
     </Button>
   );
@@ -75,8 +78,9 @@ function Details({ feedbackId }) {
       cancelled = true;
     };
   }, [api, feedbackId]);
-  if (shown.status === "loading") return <p role="status">Loading…</p>;
-  if (shown.status === "error") return <p role="alert">{shown.error.message}</p>;
+  if (shown.status === "loading") return <Skeleton label="Loading the reply email" />;
+  if (shown.status === "error")
+    return <ErrorState title={shown.error.message} control="admin.feedback.details" />;
   return shown.item.replyEmail === undefined ? (
     <p className={styles.reply}>No reply email.</p>
   ) : (
@@ -90,11 +94,12 @@ function DeleteButton({ item, remove }) {
   const action = useAction(() => remove(item.feedbackId), { id: "admin.feedback.delete.confirm" });
   return (
     <>
-      <Button control="admin.feedback.delete" variant="ghost" onClick={() => setAsking(true)}>
+      <Button control="admin.feedback.delete" variant="danger" size="sm" onClick={() => setAsking(true)}>
         Delete
       </Button>
       <Modal
         open={asking}
+        destructive
         title="Delete this feedback?"
         onClose={() => setAsking(false)}
         actions={
@@ -106,7 +111,7 @@ function DeleteButton({ item, remove }) {
             >
               Cancel
             </Button>
-            <Button control="admin.feedback.delete.confirm" variant="primary" action={action}>
+            <Button control="admin.feedback.delete.confirm" variant="danger" action={action}>
               Delete for good
             </Button>
           </>
@@ -126,7 +131,7 @@ function Entry({ item, setStatus, remove }) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
   return (
-    <article className={styles.entry} aria-labelledby={`feedback-${item.feedbackId}`}>
+    <Card className={styles.entry} aria-labelledby={`feedback-${item.feedbackId}`}>
       <header className={styles.entryHeader}>
         <span id={`feedback-${item.feedbackId}`} className={`${styles.badge} ${styles[`type_${item.type}`]}`}>
           {FEEDBACK_TYPE_LABELS[item.type]}
@@ -136,31 +141,34 @@ function Entry({ item, setStatus, remove }) {
           {sentAt(item.createdAt)}
         </time>
       </header>
-      <p className={styles.message}>{item.message}</p>
-      <dl className={styles.context}>
-        <div>
-          <dt>Page</dt>
-          <dd>{item.page}</dd>
-        </div>
-        <div>
-          <dt>Device</dt>
-          <dd>{item.device}</dd>
-        </div>
-        <div>
-          <dt>From</dt>
-          <dd>{item.kind}</dd>
-        </div>
-        <div>
-          <dt>Build</dt>
-          <dd>{item.build}</dd>
-        </div>
-      </dl>
-      {item.hasReplyEmail && <p className={styles.hasReply}>Has a reply email</p>}
-      <div id={detailsId}>{open && <Details feedbackId={item.feedbackId} />}</div>
-      <div className={styles.actions}>
+      <CardBody>
+        <p className={styles.message}>{item.message}</p>
+        <dl className={styles.context}>
+          <div>
+            <dt>Page</dt>
+            <dd>{item.page}</dd>
+          </div>
+          <div>
+            <dt>Device</dt>
+            <dd>{item.device}</dd>
+          </div>
+          <div>
+            <dt>From</dt>
+            <dd>{item.kind}</dd>
+          </div>
+          <div>
+            <dt>Build</dt>
+            <dd>{item.build}</dd>
+          </div>
+        </dl>
+        {item.hasReplyEmail && <p className={styles.hasReply}>Has a reply email</p>}
+        <div id={detailsId}>{open && <Details feedbackId={item.feedbackId} />}</div>
+      </CardBody>
+      <CardFooter>
         <Button
           control="admin.feedback.details"
           variant="ghost"
+          size="sm"
           aria-expanded={open}
           aria-controls={detailsId}
           onClick={() => setOpen(!open)}
@@ -171,8 +179,8 @@ function Entry({ item, setStatus, remove }) {
           <StatusButton key={status} item={item} status={status} setStatus={setStatus} />
         ))}
         <DeleteButton item={item} remove={remove} />
-      </div>
-    </article>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -196,62 +204,63 @@ export function FeedbackInbox() {
     <section className={consoleStyles.page} aria-labelledby="feedback-title">
       <title>{`Feedback · Owner console · ${SITE_NAME}`}</title>
       <meta name="robots" content="noindex, nofollow" />
-      <header className={consoleStyles.header}>
-        <h1 id="feedback-title">Feedback</h1>
-        <p className={consoleStyles.lede}>
-          What players sent from the Feedback button. No player ids or addresses are stored, and every item is
-          deleted 180 days after it was sent.
-        </p>
-      </header>
+      <PageHeader
+        id="feedback-title"
+        title="Feedback"
+        lede="What players sent from the Feedback button. No player ids or addresses are stored, and every item is deleted 180 days after it was sent."
+      />
       <ConsoleTabs current="feedback" />
-      <div className={consoleStyles.range} role="group" aria-label="Filters">
-        <Filter
-          label="Type"
-          name="type"
-          value={filters.type}
-          options={FEEDBACK_TYPES}
-          labels={FEEDBACK_TYPE_LABELS}
-          onChange={change}
-        />
-        <Filter
-          label="Status"
-          name="status"
-          value={filters.status}
-          options={FEEDBACK_STATUSES}
-          labels={FEEDBACK_STATUS_LABELS}
-          onChange={change}
-        />
-      </div>
-      {inbox.status === "loading" && (
-        <p className={consoleStyles.status} role="status">
-          Loading…
-        </p>
-      )}
-      {inbox.status === "error" && (
-        <div className={consoleStyles.status} role="alert">
-          <p>{inbox.error.message}</p>
-          {isRetryable(inbox.error) && (
-            <Button control="admin.feedback.retry" variant="secondary" onClick={inbox.retry}>
-              Try again
-            </Button>
-          )}
+      <Card as="div" role="group" aria-label="Filters">
+        <div className={styles.filters}>
+          <Filter
+            label="Type"
+            name="type"
+            value={filters.type}
+            options={FEEDBACK_TYPES}
+            labels={FEEDBACK_TYPE_LABELS}
+            onChange={change}
+          />
+          <Filter
+            label="Status"
+            name="status"
+            value={filters.status}
+            options={FEEDBACK_STATUSES}
+            labels={FEEDBACK_STATUS_LABELS}
+            onChange={change}
+          />
         </div>
-      )}
-      {inbox.status === "ready" && inbox.items.length === 0 && <p>No feedback here yet.</p>}
-      {inbox.items.length > 0 && (
-        <ol className={styles.list}>
-          {inbox.items.map((item) => (
-            <li key={item.feedbackId}>
-              <Entry item={item} setStatus={inbox.setStatus} remove={inbox.remove} />
-            </li>
-          ))}
-        </ol>
-      )}
-      {inbox.next !== undefined && (
-        <Button control="admin.feedback.older" variant="secondary" action={older}>
-          Older
-        </Button>
-      )}
+      </Card>
+      <Section title="Items" description="Newest first, 50 at a time. Times are India time.">
+        {inbox.status === "loading" && <Skeleton label="Loading the feedback" shape="card" count={2} />}
+        {inbox.status === "error" && (
+          <ErrorState
+            title={inbox.error.message}
+            control="admin.feedback"
+            onRetry={isRetryable(inbox.error) ? inbox.retry : undefined}
+          />
+        )}
+        {inbox.status === "ready" && inbox.items.length === 0 && (
+          <EmptyState title="No feedback here yet.">
+            Items players send from the Feedback button show up here.
+          </EmptyState>
+        )}
+        {inbox.items.length > 0 && (
+          <ol className={styles.list}>
+            {inbox.items.map((item) => (
+              <li key={item.feedbackId}>
+                <Entry item={item} setStatus={inbox.setStatus} remove={inbox.remove} />
+              </li>
+            ))}
+          </ol>
+        )}
+        {inbox.next !== undefined && (
+          <div>
+            <Button control="admin.feedback.older" variant="secondary" action={older}>
+              Older
+            </Button>
+          </div>
+        )}
+      </Section>
     </section>
   );
 }

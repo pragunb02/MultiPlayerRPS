@@ -39,7 +39,8 @@ describe("blocked players on the profile (CC-044)", () => {
   it("shows loading until the list arrives", async () => {
     const section = await openBlocked(profileApi({ getBlocks: vi.fn(() => new Promise(() => {})) }));
 
-    expect(within(section).getByText("Loading…")).toBeVisible();
+    expect(within(section).getByRole("status")).toHaveAttribute("aria-busy", "true");
+    expect(within(section).getByRole("status")).toHaveTextContent("Loading your blocked players");
   });
 
   it("lists an account's blocks newest first, and unblocks one", async () => {

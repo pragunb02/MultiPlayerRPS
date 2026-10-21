@@ -1,10 +1,6 @@
-/* Add friend beside a seat or a past opponent, as small as the seat's Block, and its answer (CC-052). */
-.add {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
-}
+/* The answer that takes the place of Add friend beside a seat or a past opponent (CC-052). The button is the small size. */
 .tag {
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
   font-weight: var(--weight-bold);
 }

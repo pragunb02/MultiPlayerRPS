@@ -65,9 +65,6 @@
   font-variant-numeric: tabular-nums;
   font-weight: var(--weight-bold);
 }
-.link {
-  font-weight: var(--weight-bold);
-}
 @keyframes slide-in {
   from {
     opacity: 0;

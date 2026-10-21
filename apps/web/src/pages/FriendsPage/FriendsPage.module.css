@@ -1,36 +1,18 @@
-/* The friends page and the friend link's page (CC-052). */
+/* The friends page and the friend link's page (CC-052, CC-323): titled sections, and lists with a line between rows. */
 .page {
   display: grid;
   gap: var(--space-4);
   max-width: 44rem;
-}
-.page h1,
-.page h2 {
-  margin: 0;
-}
-.page h1 {
-  font-size: var(--text-2xl);
-}
-.section {
-  display: grid;
-  gap: var(--space-3);
-}
-.card {
-  display: grid;
-  gap: var(--space-3);
-  justify-items: start;
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  min-width: 0;
 }
 .list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  gap: var(--space-2);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  overflow: hidden;
 }
 /* A long name wraps on a phone, and the buttons stay at the end of the row. */
 .item {
@@ -39,9 +21,9 @@
   align-items: center;
   gap: var(--space-2) var(--space-3);
   padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
+}
+.item + .item {
+  border-top: 1px solid var(--color-border);
 }
 .who {
   display: grid;
@@ -56,7 +38,7 @@
 }
 .muted {
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
 }
 .buttons,
 .actions {
@@ -66,41 +48,26 @@
   gap: var(--space-2) var(--space-3);
   margin: 0;
 }
-.small {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-sm);
-}
-.cta {
-  font-weight: var(--weight-bold);
-}
+/* Presence is a word and a dot in its colour: success for online, the brand for in a game, muted for offline. */
 .presence {
-  font-size: var(--text-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--type-label);
   font-weight: var(--weight-bold);
   color: var(--color-text-muted);
+}
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: currentColor;
 }
 .online {
   color: var(--color-success);
 }
 .playing {
   color: var(--color-primary);
-}
-.label {
-  display: grid;
-  gap: var(--space-1);
-  width: 100%;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-}
-.label input {
-  width: 100%;
-  min-width: 0;
-  font: inherit;
-  font-weight: var(--weight-regular);
-  padding: var(--space-2) var(--space-3);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
 }
 .invite {
   display: flex;

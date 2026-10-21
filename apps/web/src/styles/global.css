@@ -59,6 +59,11 @@ h3 {
 h1 {
   font-size: var(--type-page-title);
 }
+@media (max-width: 30rem) {
+  h1 {
+    font-size: var(--type-title);
+  }
+}
 
 .visually-hidden {
   position: absolute;

@@ -156,7 +156,7 @@ test.describe("owner console", () => {
     await page.goto(`/admin?from=2024-01-01&to=${SEEDED_WEEK.to}&bucket=week`);
 
     await expect(page.getByRole("alert")).toContainText("at most 400 days");
-    await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0);
     await page.getByLabel("From").fill(SEEDED_WEEK.from);
     await page.getByRole("button", { name: "Show" }).click();
 
@@ -218,7 +218,7 @@ test.describe("owner console", () => {
     for (const role of ["success", "warning", "danger", "info", "you", "opponent"]) {
       await expect(page.locator(`[data-cc-role="${role}"]`)).toContainText(/\d+\.\d:1/);
     }
-    await expect(page.locator("[data-cc-component]")).toHaveCount(7);
+    await expect(page.locator("[data-cc-component]")).toHaveCount(12);
     await expect(page.getByText("Your turn", { exact: true })).toBeVisible();
 
     // The real dialog: Tab and Shift+Tab never leave it, the page behind is inert, Escape gives the focus back.
@@ -238,6 +238,14 @@ test.describe("owner console", () => {
     await expect(dialog).toHaveCount(0);
     await expect(page.locator("#root")).not.toHaveAttribute("inert");
     await expect(opener).toBeFocused();
+
+    // Blocking is a destructive confirm: a click beside it leaves it open (CC-323).
+    await opener.click();
+    await expect(dialog).toBeVisible();
+    await page.mouse.click(4, 4);
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
 
     await page.getByRole("button", { name: "Show a toast" }).click();
     await expect(page.getByText("Saved. This is a toast.")).toBeVisible();

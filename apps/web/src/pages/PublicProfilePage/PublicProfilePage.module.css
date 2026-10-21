@@ -12,8 +12,7 @@
 }
 .header h1 {
   margin: 0;
-  font-size: var(--text-2xl);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   min-width: 0;
 }
 .hidden {
@@ -24,27 +23,6 @@
   margin: 0;
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  border: 2px dashed var(--color-border);
-  border-radius: var(--radius-md);
-}
-.card {
-  position: relative;
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  display: grid;
-  gap: var(--space-3);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-}
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 6px;
-  background: var(--gradient-hero);
 }
 .levelRow {
   display: flex;
@@ -62,10 +40,10 @@
   margin: 0;
   font-family: var(--font-display);
   font-weight: var(--weight-heavy);
-  color: var(--color-gold);
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
 }
 .stats {
   display: grid;
@@ -77,9 +55,13 @@
   display: grid;
   gap: var(--space-1);
 }
+.stats div + div {
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--color-border);
+}
 .stats dt {
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
 }
 .stats dd {
   margin: 0;
@@ -92,9 +74,4 @@
 .stats dd.unrated {
   font-size: var(--type-body);
   overflow-wrap: normal;
-}
-.problem {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: start;
 }

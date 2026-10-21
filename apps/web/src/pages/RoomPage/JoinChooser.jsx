@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
-import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import styles from "./JoinChooser.module.css";
@@ -33,7 +33,7 @@ export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
   return (
     <section className={styles.chooser} aria-labelledby="join-chooser-heading">
       <PageTitle>{`${game ? `${game.name} · ` : ""}Room ${code}`}</PageTitle>
-      <div className={styles.card}>
+      <Card as="div" variant="accent" tone="primary" className={styles.card}>
         <InviteArt className={styles.art} />
         <h1 id="join-chooser-heading" ref={heading} tabIndex={-1} className={styles.heading}>
           {invitedTo}
@@ -47,17 +47,17 @@ export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
           <Button control="join.guest" size="lg" action={playAsGuest}>
             Play as guest
           </Button>
-          <Link className={styles.link} to={paths.login(returnTo)} data-cc-control="join.login">
+          <Button as="link" to={paths.login(returnTo)} control="join.login" variant="secondary" size="lg">
             Log in
-          </Link>
-          <Link className={styles.link} to={paths.signup(returnTo)} data-cc-control="join.signup">
+          </Button>
+          <Button as="link" to={paths.signup(returnTo)} control="join.signup" variant="secondary" size="lg">
             Sign up
-          </Link>
+          </Button>
         </div>
         <p className={styles.hint}>
           Playing as a guest? Sign up later and your XP and match history come with you.
         </p>
-      </div>
+      </Card>
     </section>
   );
 }

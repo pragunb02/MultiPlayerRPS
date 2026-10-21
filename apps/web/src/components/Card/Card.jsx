@@ -22,7 +22,7 @@ const toneOk = (variant, tone) =>
  * The parts, in order: `CardMedia` (art that runs to the card's edges), `CardHeader`, `CardBody`, `CardFooter`.
  *
  * @param {{
- *   as?: "article" | "section" | "div" | "li" | "aside",
+ *   as?: "article" | "section" | "div" | "li" | "aside" | "form" | "figure",
  *   variant?: "surface" | "raised" | "accent" | "notice",
  *   tone?: string,
  *   interactive?: boolean,
@@ -102,7 +102,8 @@ export function CardMedia({ children, className = "" }) {
 export function CardHeader({ title, titleAs: Heading = "h3", description, aside, id }) {
   const fallback = useId();
   return (
-    <header className={styles.header}>
+    // A div, not a header: a header outside an article or section is the page's banner landmark (a card as a li).
+    <div className={styles.header}>
       <div className={styles.titleRow}>
         <Heading id={id ?? fallback} className={styles.title}>
           {title}
@@ -110,7 +111,7 @@ export function CardHeader({ title, titleAs: Heading = "h3", description, aside,
         {aside !== undefined && <div className={styles.aside}>{aside}</div>}
       </div>
       {description !== undefined && <p className={styles.description}>{description}</p>}
-    </header>
+    </div>
   );
 }
 
@@ -143,5 +144,6 @@ export function CardBody({ children, className = "" }) {
  * @param {{ children: import("react").ReactNode, className?: string }} props
  */
 export function CardFooter({ children, className = "" }) {
-  return <footer className={`${styles.footer} ${className}`}>{children}</footer>;
+  // A div, not a footer: a footer outside an article or section is the page's contentinfo landmark.
+  return <div className={`${styles.footer} ${className}`}>{children}</div>;
 }

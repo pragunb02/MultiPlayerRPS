@@ -50,6 +50,27 @@ export const TYPE_ROLES = Object.freeze([
   Object.freeze({ token: "--type-body", use: "Reading text." }),
   Object.freeze({ token: "--type-title", use: "A page or dialog title." }),
   Object.freeze({ token: "--type-display", use: "The one big line of a hero or a result." }),
+  Object.freeze({ token: "--type-page-title", use: "The page's h1, the same on every page." }),
+  Object.freeze({ token: "--type-section-title", use: "A section's or a card's title." }),
+]);
+
+/** Font weights by job (CC-323). */
+export const WEIGHTS = Object.freeze([
+  Object.freeze({ token: "--weight-regular", use: "Reading text." }),
+  Object.freeze({ token: "--weight-medium", use: "A quiet emphasis." }),
+  Object.freeze({ token: "--weight-bold", use: "Labels, links and numbers." }),
+  Object.freeze({ token: "--weight-heavy", use: "Headings and buttons, in the display face." }),
+]);
+
+/**
+ * The only widths a media query may use (CC-323). A media query cannot read a custom property, so the token check
+ * compares each width with these.
+ */
+export const BREAKPOINTS = Object.freeze([
+  Object.freeze({ token: "--breakpoint-sm", use: "A phone held upright." }),
+  Object.freeze({ token: "--breakpoint-md", use: "A large phone, or the header's compact mode." }),
+  Object.freeze({ token: "--breakpoint-lg", use: "A tablet held upright." }),
+  Object.freeze({ token: "--breakpoint-xl", use: "A laptop." }),
 ]);
 
 /** Line heights by job. */

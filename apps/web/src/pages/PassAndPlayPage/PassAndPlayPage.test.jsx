@@ -323,3 +323,21 @@ describe("Chess on one phone", () => {
     expect(document.getElementById("result-heading")).toHaveTextContent("Draw by agreement");
   });
 });
+
+describe("the pass and play setup's parts (CC-323)", () => {
+  it("is one card with the shared page title and a field for each name", async () => {
+    renderApp({ path: "/games/tic-tac-toe/pass-and-play" });
+
+    const form = await screen.findByRole("form", { name: "Players" });
+    expect(form).toHaveAttribute("data-cc-card", "surface");
+    expect(screen.getByRole("heading", { level: 1, name: "Tic Tac Toe: pass and play" })).toHaveClass(
+      "pageTitle",
+    );
+    for (const name of ["Player 1", "Player 2"]) {
+      expect(within(form).getByRole("textbox", { name }).closest("[data-cc-field]")).toHaveAttribute(
+        "data-cc-field",
+        "text",
+      );
+    }
+  });
+});

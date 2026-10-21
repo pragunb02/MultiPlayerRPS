@@ -1,19 +1,4 @@
-/* Streaks in the arcade look (CC-087): a big flame for the daily streak, chunky stat tiles. */
-.card {
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-6);
-  display: grid;
-  gap: var(--space-3);
-}
-.heading {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-heavy);
-}
+/* Streaks in the arcade look (CC-087): a big flame for the daily streak, then the four numbers with their words. */
 .top {
   display: flex;
   align-items: center;
@@ -36,21 +21,14 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+/* A streak about to end needs the player today, so it wears the warning role, with its words. */
 .atRisk {
   margin: 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  border: 2px solid var(--color-streak);
-  background: var(--color-surface-raised);
+  border: 2px solid var(--color-warning);
+  background: var(--color-warning-soft);
   font-weight: var(--weight-heavy);
-}
-.problem {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: start;
-}
-.problem p {
-  margin: 0;
 }
 .stats {
   display: grid;
@@ -59,9 +37,10 @@
   margin: 0;
 }
 .stats div {
-  background: var(--color-surface-raised);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
 }
 .stats dt {
   font-size: var(--text-xs);
@@ -73,11 +52,7 @@
 .stats dd {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-lg);
+  font-size: var(--type-section-title);
   font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
-}
-/* The daily streak's tile burns in the streak colour. */
-.stats div:first-child dd {
-  color: var(--color-streak);
 }

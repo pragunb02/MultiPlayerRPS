@@ -131,7 +131,7 @@ describe("ChallengePage (CC-139)", () => {
 
     await user.click(await screen.findByRole("button", { name: "Copy link" }));
 
-    expect(await screen.findByText("Couldn't copy. Select the link and copy it")).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't copy. Select the text and copy it")).toBeInTheDocument();
   });
 
   it("follows the server's pushes, so its creator sees the moment someone takes it", async () => {
@@ -201,14 +201,14 @@ describe("ChallengePage (CC-139)", () => {
     expect(screen.getByRole("link", { name: "Pick a game" })).toHaveAttribute("href", "/");
   });
 
-  it("offers Try again when the server could not be reached", async () => {
+  it("offers Retry when the server could not be reached", async () => {
     const { user, api } = openPage({
       view: new AppRequestError({ code: "INTERNAL", message: "Server down" }),
     });
 
     expect(await screen.findByText("Server down")).toBeInTheDocument();
     api.getChallenge.mockResolvedValue(challenge());
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await user.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByRole("button", { name: "Accept and play" })).toBeInTheDocument();
   });

@@ -4,25 +4,10 @@
   place-items: center;
   padding-block: var(--space-8);
 }
+/* The shared accent card, narrow and centred, with its words in the middle. */
 .card {
-  position: relative;
-  overflow: hidden;
   width: min(100%, 30rem);
-  display: grid;
-  gap: var(--space-4);
   text-align: center;
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  padding: var(--space-8) var(--space-6);
-}
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 6px;
-  background: var(--gradient-hero);
 }
 .art {
   justify-self: center;
@@ -30,17 +15,6 @@
 }
 .heading {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-heavy);
-}
-.heading:focus {
-  outline: none;
-}
-.heading:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 4px;
-  border-radius: var(--radius-sm);
 }
 .room {
   margin: 0;
@@ -74,34 +48,6 @@
 .actions {
   display: grid;
   gap: var(--space-3);
-}
-/* Log in / Sign up: links (they go to a page) that look like secondary buttons. */
-.link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-3) var(--space-6);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: var(--shadow-press-neutral);
-  font-family: var(--font-display);
-  font-weight: var(--weight-heavy);
-  text-decoration: none;
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-.link:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-primary);
-}
-.link:active {
-  transform: translateY(2px);
-  box-shadow: var(--shadow-press-neutral-small);
-}
-.link:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
 }
 .hint {
   margin: 0;

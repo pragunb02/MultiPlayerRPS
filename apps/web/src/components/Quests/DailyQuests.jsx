@@ -1,11 +1,12 @@
 import { useId } from "react";
-import { Link } from "react-router";
 import { paths } from "../../app/paths.js";
 import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { useCountdown } from "../../hooks/useCountdown.js";
 import { useQuests } from "../../hooks/useQuests.js";
 import { Button } from "../Button/Button.jsx";
+import { Card, CardHeader } from "../Card/Card.jsx";
+import { ErrorState, Skeleton } from "../States/States.jsx";
 import { StreakAtRisk } from "../SaveProgress/StreakAtRisk.jsx";
 import styles from "./DailyQuests.module.css";
 import { resetsIn } from "./resetsIn.js";
@@ -85,19 +86,17 @@ function SweepRow({ sweep }) {
 export function DailyQuests({ compact = false }) {
   const quests = useQuests();
   const headingId = useId();
-  const Heading = compact ? "h2" : "h3";
 
   let body;
   if (quests.status === "loading") {
-    body = <p>Loading quests…</p>;
+    body = <Skeleton label="Loading quests" shape="row" count={compact ? 1 : 3} />;
   } else if (quests.status === "error") {
     body = (
-      <div role="alert" className={styles.problem}>
-        <p>Couldn't load quests. {quests.error.message}</p>
-        <Button control="quests.retry" variant="secondary" onClick={quests.retry}>
-          Try again
-        </Button>
-      </div>
+      <ErrorState
+        title={`Couldn't load quests. ${quests.error.message}`}
+        control="quests"
+        onRetry={quests.retry}
+      />
     );
   } else {
     const { items, sweep, resetsAt } = quests.data;
@@ -130,22 +129,33 @@ export function DailyQuests({ compact = false }) {
         )}
         <ResetsIn at={resetsAt} onElapsed={quests.retry} />
         {compact && (
-          <Link to={paths.profile()} data-cc-control="quests.console">
-            Open your player console
-          </Link>
+          <div className={styles.more}>
+            <Button as="link" to={paths.profile()} control="quests.console" variant="secondary" size="sm">
+              Open your player console
+            </Button>
+          </div>
         )}
       </>
     );
   }
 
   return (
-    <section className={`${styles.card} ${compact ? styles.compact : ""}`} aria-labelledby={headingId}>
-      <Heading id={headingId} className={styles.heading}>
-        Daily quests
-      </Heading>
+    <Card
+      as="section"
+      variant={compact ? "accent" : "surface"}
+      tone={compact ? "primary" : undefined}
+      className={compact ? styles.compact : ""}
+      aria-labelledby={headingId}
+    >
+      <CardHeader
+        id={headingId}
+        titleAs={compact ? "h2" : "h3"}
+        title="Daily quests"
+        description="Three new quests every day, each worth bonus XP."
+      />
       {body}
       {/* Home: a guest's streak at risk is today's other thing to do (CC-097); the profile shows it itself. */}
       {compact && <StreakAtRisk />}
-    </section>
+    </Card>
   );
 }

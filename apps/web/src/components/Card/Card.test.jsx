@@ -28,7 +28,7 @@ describe("Card (CC-323)", () => {
       expect(screen.getByRole("heading", { level: 3, name: "Rock Paper Scissors" })).toBeInTheDocument();
       expect(screen.getByTestId("art").parentElement).toHaveClass("media");
       expect(screen.getByTestId("art").parentElement).toHaveAttribute("aria-hidden", "true");
-      expect(card.lastElementChild.tagName).toBe("FOOTER");
+      expect(card.lastElementChild).toHaveClass("footer");
       unmount();
     }
     expect(ACCENT_TONES).toEqual(["primary", "rps", "tictactoe", "chess", "gold"]);
@@ -88,6 +88,19 @@ describe("Card (CC-323)", () => {
     expect(locked).toHaveAttribute("aria-disabled", "true");
     expect(locked).not.toHaveClass("interactive");
     expect(locked).toHaveTextContent("Sign in to play ranked.");
+  });
+
+  it("adds no landmark of its own, even as a list item (CC-323)", () => {
+    render(
+      <ul>
+        <Card as="li">
+          <CardHeader title="Chess" />
+          <CardFooter>Play</CardFooter>
+        </Card>
+      </ul>,
+    );
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
   });
 
   it("gives a header without an id its own, and parts take extra classes", () => {

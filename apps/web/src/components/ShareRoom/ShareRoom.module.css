@@ -23,22 +23,6 @@
   background: var(--color-primary-soft);
   color: var(--color-primary);
 }
-.label {
-  display: grid;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  color: var(--color-text-muted);
-}
-.label input {
-  font: inherit;
-  font-weight: var(--weight-regular);
-  padding: var(--space-2) var(--space-3);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-}
 .buttons {
   display: flex;
   flex-wrap: wrap;

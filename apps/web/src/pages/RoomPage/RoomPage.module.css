@@ -1,19 +1,7 @@
-/* What the match shell's stage shows while the room waits for players: the invite, or who the game waits for. */
-.card {
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  box-shadow: var(--shadow-sm);
+/* What the match shell's stage shows while the room waits for players: the invite, in the shared Card (CC-323). */
+.inviteMedia {
+  padding: var(--space-4);
 }
-.invite {
-  display: grid;
-  gap: var(--space-2);
-}
-.invite h2 {
-  margin-bottom: var(--space-2);
-}
-.inviteArt {
-  justify-self: center;
+.inviteMedia > .inviteArt {
   width: 8rem;
 }

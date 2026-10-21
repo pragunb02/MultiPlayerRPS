@@ -6,6 +6,16 @@ import { useSession } from "./useSession.js";
 /** Whether the player has an account. Friends need one (CC-052): a guest is shown how to save their progress. */
 const isAccount = (identity) => identity?.kind === "user";
 
+/**
+ * What a player without an account sees: a guest is shown how to save their progress, and a visitor with no player
+ * at all is shown how to sign up or log in. Only while the session is still being read is it loading. A visitor's
+ * page once waited here for ever, as it had no player to wait for (CC-323).
+ */
+const playerStatus = (identity, sessionStatus) => {
+  if (identity !== undefined) return "guest";
+  return sessionStatus === "loading" ? "loading" : "visitor";
+};
+
 /** A friend's new presence, put into the view the tab already has. */
 const withPresence = (view, { handle, presence }) => ({
   ...view,
@@ -43,14 +53,14 @@ async function readAgainAfterPushes({ getFriends, reading, missed, stillFor, onV
 /**
  * The player's friends (CC-052): the view from `GET /api/friends`, kept current by the server's pushes, and the
  * things a player does with it. Each change also comes back as a push to every tab, so a second tab follows along.
- * A guest gets `status: "guest"` and nothing is asked of the server. Loads again whenever the player becomes
+ * A guest gets `status: "guest"`, a visitor `status: "visitor"`, and nothing is asked of the server. Loads again whenever the player becomes
  * someone else.
  *
  * A push can overtake an answer the server wrote a moment before it, which would then show the older state. So a
  * push that arrives while the view is being read makes the hook read it once more after.
  *
  * @returns {{
- *   status: "loading" | "guest" | "ready" | "error",
+ *   status: "loading" | "guest" | "visitor" | "ready" | "error",
  *   view: { friends: object[], incoming: object[], outgoing: object[], settings: { appearOffline: boolean }, safetyTips: boolean } | undefined,
  *   error: Error | undefined,
  *   retry: () => void,
@@ -62,7 +72,8 @@ async function readAgainAfterPushes({ getFriends, reading, missed, stillFor, onV
  */
 export function useFriends() {
   const { api, socket } = useServices();
-  const { identity } = useSession();
+  const session = useSession();
+  const { identity } = session;
   const account = isAccount(identity);
   const who = identity?.id ?? "";
   const [attempt, setAttempt] = useState(0);
@@ -128,7 +139,7 @@ export function useFriends() {
   }, [who]);
 
   const current = !account
-    ? { status: identity === undefined ? "loading" : "guest", view: undefined, error: undefined }
+    ? { status: playerStatus(identity, session.status), view: undefined, error: undefined }
     : state.who === who
       ? state
       : { status: "loading", view: undefined, error: undefined };

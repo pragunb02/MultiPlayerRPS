@@ -1,38 +1,7 @@
-/* Looks like the app's secondary button, so it sits in a row of buttons without standing out as an ad. */
-.link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: var(--shadow-press-neutral);
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-heavy);
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  text-decoration: none;
-  transition:
-    transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out);
-}
-.link:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-success);
-}
-.link:active {
-  transform: translateY(2px);
-  box-shadow: var(--shadow-press-neutral-small);
-  transition-duration: var(--duration-instant);
-}
-/* A green dot instead of WhatsApp's logo, which is theirs and not ours to use. */
+/* A green dot instead of WhatsApp's logo, which is theirs and not ours to use. The link is the shared Button. */
 .dot {
   width: 0.625rem;
   height: 0.625rem;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--color-success);
 }

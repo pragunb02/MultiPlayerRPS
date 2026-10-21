@@ -21,19 +21,18 @@
 }
 .text h1 {
   margin: 0;
-  font-size: var(--text-2xl);
 }
 .art {
   width: min(100%, 9rem);
 }
 .lead {
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: var(--type-section-title);
 }
 .muted {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
 }
 .actions {
   display: flex;
@@ -41,20 +40,6 @@
   align-items: center;
   gap: var(--space-4);
   margin-top: var(--space-2);
-}
-.login {
-  font-family: var(--font-display);
-  font-weight: var(--weight-heavy);
-}
-/* The preview card: the real card's shape with a dashed edge, because nothing on it is earned yet. */
-.card {
-  display: grid;
-  gap: var(--space-4);
-  padding: var(--space-6);
-  background: var(--color-surface);
-  border: 2px dashed var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
 }
 .levelRow {
   display: flex;

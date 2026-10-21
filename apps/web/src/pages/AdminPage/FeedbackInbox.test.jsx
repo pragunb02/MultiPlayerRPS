@@ -286,9 +286,23 @@ describe("the feedback inbox (CC-290)", () => {
     const { user } = await openInbox({ api });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Something broke");
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await user.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByText("Back again")).toBeInTheDocument();
+  });
+
+  it("offers no Retry for a failure that trying again cannot fix (CC-323)", async () => {
+    const api = ownerApi({
+      getFeedbackInbox: vi
+        .fn()
+        .mockRejectedValue(
+          new AppRequestError({ code: "VALIDATION_FAILED", message: "Bad filter", status: 400 }),
+        ),
+    });
+    await openInbox({ api });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Bad filter");
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 
   it("shows the same console tabs as every other console page, with Feedback as the current one", async () => {

@@ -4,29 +4,20 @@
   gap: var(--space-4);
   max-width: 32rem;
 }
-.page h1 {
-  margin: 0;
-  font-size: var(--text-2xl);
-}
-.lead {
-  margin: 0;
-}
-.panel {
+/* A game's own options (in games/) take the field look until each game's options use Field. */
+.options {
   display: grid;
-  gap: var(--space-4);
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  box-shadow: var(--shadow-sm);
+  gap: var(--space-3);
 }
-.panel label {
+.options label {
   display: grid;
   gap: var(--space-1);
+  font-size: var(--type-label);
   font-weight: var(--weight-bold);
 }
-.panel input,
-.panel select {
+.options input,
+.options select {
+  min-height: 2.75rem;
   font: inherit;
   padding: var(--space-2) var(--space-3);
   border: 2px solid var(--color-border);
@@ -37,16 +28,5 @@
 .small {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-/* The game did not download: what happened and Try again, above Start. */
-.failure {
-  display: grid;
-  justify-items: start;
-  gap: var(--space-2);
-}
-.failure p {
-  margin: 0;
-  color: var(--color-danger);
-  font-weight: var(--weight-bold);
+  font-size: var(--type-label);
 }

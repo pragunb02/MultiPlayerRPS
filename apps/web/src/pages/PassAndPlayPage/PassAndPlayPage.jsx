@@ -2,8 +2,12 @@ import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { gameForSlug, paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardBody } from "../../components/Card/Card.jsx";
+import { Field } from "../../components/Field/Field.jsx";
 import { NOT_COUNTED_NOTE, PassAndPlayShell } from "../../components/MatchShell/PassAndPlayShell.jsx";
+import { PageHeader } from "../../components/Page/Page.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { ErrorState } from "../../components/States/States.jsx";
 import { checkNames, MAX_NAME_LENGTH } from "../../games/passAndPlay/localMatch.js";
 import { gameView } from "../../games/registry.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
@@ -76,41 +80,41 @@ function PassAndPlay({ game, entry }) {
   }
 
   const nameField = (index) => (
-    <label>
-      Player {index + 1}
-      <input
-        value={typed[index]}
-        onChange={(event) => setTyped(typed.map((name, at) => (at === index ? event.target.value : name)))}
-        maxLength={MAX_NAME_LENGTH}
-        autoComplete="off"
-        placeholder={`Player ${index + 1}`}
-      />
-    </label>
+    <Field
+      label={`Player ${index + 1}`}
+      value={typed[index]}
+      onChange={(event) => setTyped(typed.map((name, at) => (at === index ? event.target.value : name)))}
+      maxLength={MAX_NAME_LENGTH}
+      autoComplete="off"
+      placeholder={`Player ${index + 1}`}
+    />
   );
 
   return (
     <section className={styles.page}>
       <PageTitle>{`${game.name} · Pass and play`}</PageTitle>
-      <h1>{game.name}: pass and play</h1>
-      <p className={styles.lead}>Two players take turns on this phone.</p>
-      <form className={styles.panel} onSubmit={start}>
-        {nameField(0)}
-        {nameField(1)}
-        {Options && <Options value={options} onChange={setOptions} />}
-        <p className={styles.small}>Names stay on this phone. Nothing about the game is sent or saved.</p>
-        <p className={styles.small}>{NOT_COUNTED_NOTE}</p>
-        {load.failed && (
-          <div className={styles.failure}>
-            <p role="alert">The game could not load. Check your connection and try again.</p>
-            <Button control="pass.retry" variant="secondary" onClick={load.retry}>
-              Try again
-            </Button>
-          </div>
-        )}
-        <Button control="pass.start" type="submit" size="lg" reason={reason}>
-          Start game
-        </Button>
-      </form>
+      <PageHeader title={`${game.name}: pass and play`} lede="Two players take turns on this phone." />
+      <Card as="form" onSubmit={start} aria-label="Players">
+        <CardBody>
+          {nameField(0)}
+          {nameField(1)}
+          {Options && (
+            <div className={styles.options}>
+              <Options value={options} onChange={setOptions} />
+            </div>
+          )}
+          <p className={styles.small}>Names stay on this phone. Nothing about the game is sent or saved.</p>
+          <p className={styles.small}>{NOT_COUNTED_NOTE}</p>
+          {load.failed && (
+            <ErrorState title="The game could not load." control="pass" onRetry={load.retry}>
+              Check your connection and try again.
+            </ErrorState>
+          )}
+          <Button control="pass.start" type="submit" size="lg" reason={reason}>
+            Start game
+          </Button>
+        </CardBody>
+      </Card>
     </section>
   );
 }

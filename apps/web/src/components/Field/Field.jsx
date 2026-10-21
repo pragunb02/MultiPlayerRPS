@@ -8,14 +8,24 @@ import styles from "./Field.module.css";
  * Copies a read-only value with its own button, which answers like every button (CC-164): "Copied" for a moment,
  * or what went wrong under it.
  */
-function CopyControl({ id, value, control, describedBy, copyLabel, onCopied, ...input }) {
+function CopyControl({
+  id,
+  value,
+  control,
+  describedBy,
+  copyLabel,
+  copyVariant,
+  copyFailure,
+  onCopied,
+  ...input
+}) {
   const copy = useAction(
     async () => {
       try {
         await navigator.clipboard.writeText(value);
       } catch (cause) {
         // Shown under the button. The browser's own reason means nothing to a player.
-        throw new Error("Couldn't copy. Select the text and copy it", { cause });
+        throw new Error(copyFailure, { cause });
       }
       onCopied?.();
     },
@@ -32,7 +42,7 @@ function CopyControl({ id, value, control, describedBy, copyLabel, onCopied, ...
         onFocus={(event) => event.target.select()}
         {...input}
       />
-      <Button control={control} variant="secondary" action={copy} doneLabel="Copied">
+      <Button control={control} variant={copyVariant} action={copy} doneLabel="Copied">
         {copyLabel}
       </Button>
     </div>
@@ -52,14 +62,17 @@ function CopyControl({ id, value, control, describedBy, copyLabel, onCopied, ...
  *   label: string,
  *   kind?: "text" | "select" | "textarea" | "date" | "copy",
  *   error?: import("react").ReactNode,
- *   hint?: string,
+ *   hint?: import("react").ReactNode,
  *   showCount?: boolean,
  *   control?: string,
  *   copyLabel?: string,
+ *   copyVariant?: "primary" | "secondary",
+ *   copyFailure?: string,
  *   onCopied?: () => void,
  *   children?: import("react").ReactNode,
  * } & import("react").InputHTMLAttributes<HTMLInputElement>} props  `control`: the copy button's control name.
- *   `onCopied`: called after a copy, such as to show a toast
+ *   `copyVariant`: the copy button's look, primary when copying is the region's main step. `copyFailure`: what to
+ *   do when the copy fails, in the field's own words. `onCopied`: called after a copy, such as to show a toast
  */
 export function Field({
   label,
@@ -69,6 +82,8 @@ export function Field({
   showCount,
   control = "field.copy",
   copyLabel = "Copy",
+  copyVariant = "secondary",
+  copyFailure = "Couldn't copy. Select the text and copy it",
   onCopied,
   className = "",
   children,
@@ -112,6 +127,8 @@ export function Field({
         control={control}
         describedBy={describedBy}
         copyLabel={copyLabel}
+        copyVariant={copyVariant}
+        copyFailure={copyFailure}
         onCopied={onCopied}
         {...input}
       />

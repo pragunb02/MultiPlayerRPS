@@ -56,7 +56,7 @@ export function ErrorState({ title, control, onRetry, className = "", children }
       <p className={styles.errorTitle}>
         <span className={styles.errorMark} aria-hidden="true">
           !
-        </span>
+        </span>{" "}
         {title}
       </p>
       {children !== undefined && <p className={styles.line}>{children}</p>}

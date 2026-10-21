@@ -8,7 +8,7 @@ import { Button } from "../Button/Button.jsx";
 import { Field } from "../Field/Field.jsx";
 import { Modal } from "../Modal/Modal.jsx";
 import { currentDevice, feedbackPage } from "./feedbackContext.js";
-import { countText, FEEDBACK_TEXT, FEEDBACK_TYPE_LABELS } from "./feedbackText.js";
+import { FEEDBACK_TEXT, FEEDBACK_TYPE_LABELS } from "./feedbackText.js";
 import styles from "./FeedbackDialog.module.css";
 
 const EMPTY = Object.freeze({ type: FEEDBACK_DEFAULT_TYPE, message: "", replyEmail: "" });
@@ -65,9 +65,6 @@ export function FeedbackDialog({ open, onClose }) {
   const [missing, setMissing] = useState(false);
   const [sent, setSent] = useState(false);
   const formId = useId();
-  const countId = useId();
-  const hintId = useId();
-  const errorId = useId();
 
   const send = useAction(
     async () => {
@@ -175,33 +172,18 @@ export function FeedbackDialog({ open, onClose }) {
             </label>
           ))}
         </fieldset>
-        <div className={styles.message}>
-          <label htmlFor={`${formId}-message`}>{FEEDBACK_TEXT.messageLabel}</label>
-          <textarea
-            id={`${formId}-message`}
-            rows={5}
-            maxLength={FEEDBACK_MESSAGE_MAX}
-            required
-            value={draft.message}
-            onChange={update("message")}
-            aria-invalid={missing || undefined}
-            aria-describedby={[hintId, countId, missing && errorId].filter(Boolean).join(" ")}
-            data-cc-control="feedback.message"
-          />
-          <div className={styles.under}>
-            <p id={hintId} className={styles.hint}>
-              <Lines text={FEEDBACK_TEXT.messageHint} />
-            </p>
-            <p id={countId} className={styles.count}>
-              {countText(draft.message.length, FEEDBACK_MESSAGE_MAX)}
-            </p>
-          </div>
-          {missing && (
-            <p id={errorId} className={styles.error}>
-              <Lines text={FEEDBACK_TEXT.messageMissing} />
-            </p>
-          )}
-        </div>
+        <Field
+          label={FEEDBACK_TEXT.messageLabel}
+          kind="textarea"
+          rows={5}
+          maxLength={FEEDBACK_MESSAGE_MAX}
+          required
+          value={draft.message}
+          onChange={update("message")}
+          hint={<Lines text={FEEDBACK_TEXT.messageHint} />}
+          error={missing ? <Lines text={FEEDBACK_TEXT.messageMissing} /> : ""}
+          data-cc-control="feedback.message"
+        />
         {replyEmailAllowed && (
           <Field
             label={FEEDBACK_TEXT.replyLabel}

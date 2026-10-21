@@ -21,8 +21,8 @@
   --type-display: var(--text-2xl);
   --leading-tight: 1.2;
   --leading-body: 1.5;
-  /* The page title (CC-323): one h1 style for every page, a step smaller on a phone. */
-  --type-page-title: clamp(1.75rem, 1.25rem + 2vw, 2.5rem);
+  /* The page title (CC-323): one h1 style for every page. On a phone it steps down to --type-title (global.css). */
+  --type-page-title: var(--text-2xl);
   /* A section's title inside a page or a card's title (CC-323). */
   --type-section-title: var(--text-lg);
   /* Weights (CC-323): the four the app uses, by job. */
