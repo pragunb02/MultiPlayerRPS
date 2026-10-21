@@ -167,7 +167,7 @@ Sources: suggestqueries.google.com (gl=in, hl=en and hl=hi), DuckDuckGo and Bing
 These are targets to check against existing tickets, not new work.
 
 - **Core Web Vitals, at the 75th percentile:** LCP of 2.5 s or less, INP of 200 ms or less and CLS of 0.1 or less (https://web.dev/articles/vitals).
-- **First route:** at most 150 KB compressed. This is met today with 135 KB of JS and 12 KB of CSS.
+- **First route:** at most 150 KB compressed. Since CC-322 it is about 146 KB of JS (gzip) and 11 KB of CSS, and CI fails a pull request that goes over (`scripts/bin/check-bundle.mjs`).
 - **Each game board chunk:** at most 100 KB.
 - **Share image:** under 300 KB (CC-217).
 - **Fonts:** system fonts or one WOFF2 subset.

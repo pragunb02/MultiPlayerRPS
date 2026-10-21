@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPasswordHasher } from "./passwordHasher.js";
+import { createPasswordHasher, DEFAULT_SCRYPT_PARAMS } from "./passwordHasher.js";
 
 // Cheap parameters keep the tests fast; the format and logic are identical.
 const FAST = { N: 2 ** 10, r: 8, p: 1 };
@@ -59,7 +59,21 @@ describe("passwordHasher", () => {
     expect(await hasher.verifyAgainstDummy("whatever")).toBe(false);
   });
 
-  it("uses strong defaults in production (N = 2^15)", async () => {
-    expect(await createPasswordHasher().hash("x")).toMatch(/^scrypt\$32768\$8\$1\$/);
+  it("uses OWASP's alternative parameters in production, N = 2^15, r = 8, p = 3 (CC-260)", async () => {
+    expect(DEFAULT_SCRYPT_PARAMS).toEqual({ N: 2 ** 15, r: 8, p: 3 });
+    expect(await createPasswordHasher().hash("x")).toMatch(/^scrypt\$32768\$8\$3\$/);
+  });
+
+  it("asks for a rehash of a hash made with the old production parameters, p = 1 (CC-260)", () => {
+    const production = createPasswordHasher();
+
+    expect(production.needsRehash("scrypt$32768$8$1$c2FsdA==$aGFzaA==")).toBe(true);
+    expect(production.needsRehash("scrypt$32768$8$3$c2FsdA==$aGFzaA==")).toBe(false);
+  });
+
+  it("still verifies a hash made with the old production parameters (CC-260)", async () => {
+    const old = await createPasswordHasher({ params: { N: 2 ** 15, r: 8, p: 1 } }).hash("pw-12345678");
+
+    expect(await createPasswordHasher().verify("pw-12345678", old)).toBe(true);
   });
 });
