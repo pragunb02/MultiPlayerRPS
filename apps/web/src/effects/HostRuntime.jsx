@@ -4,7 +4,16 @@ import { useInGame } from "../components/SiteRequests/inGameContext.js";
 import { useReducedMotion } from "../hooks/useReducedMotion.js";
 import { useSession } from "../hooks/useSession.js";
 import { attachHost, currentPreview, showTheme, subscribe, whenIdle } from "./channel.js";
-import { activeTheme, canPlay, GATES, indiaDay, inWindow, isLowEnd, msToIndiaMidnight } from "./gates.js";
+import {
+  activeTheme,
+  canPlay,
+  GATES,
+  indiaDay,
+  inWindow,
+  isLowEnd,
+  isPhone,
+  msToIndiaMidnight,
+} from "./gates.js";
 import { EFFECTS, MAX_EFFECT_MS } from "./registry.js";
 import styles from "./EffectHost.module.css";
 
@@ -58,7 +67,7 @@ export function HostRuntime({ home, effects = EFFECTS, now = Date.now }) {
         entry,
         now: now(),
         ...machine.facts,
-        device: { lowEnd: isLowEnd(navigator) },
+        device: { lowEnd: isLowEnd(navigator), phone: isPhone(window) },
         hidden: document.hidden,
         busy,
       });

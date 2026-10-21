@@ -2,10 +2,15 @@ import { PARTICLE_CAP } from "./registry.js";
 
 /**
  * Our canvas particle module (ADR-075 point 3, CC-328): one canvas, one typed-array pool shared by every effect,
- * at most PARTICLE_CAP particles, the device pixel ratio clamped to 2, the canvas resized at most once a frame,
- * and a stop that clears the canvas and removes every listener. It stops by itself after its duration and when the
- * tab is hidden. Loaded lazily with the first scene; never on the first route (at most 1.5 kB gzip).
+ * at most PARTICLE_CAP particles, the device pixel ratio clamped to 1.5 (ADR-075 allows 2; 1.5 holds 150 ms/s of
+ * main thread on the throttled phone), the canvas resized at most once a frame, each frame one path and one fill per
+ * ink with only the last frame's box cleared, and a stop that clears the canvas and removes every listener. It stops
+ * by itself after its duration and when the tab is hidden. Loaded lazily with the first scene; never on the first
+ * route (at most 1.5 kB gzip).
  */
+
+/** The most device pixels per CSS pixel the canvas draws. */
+const MAX_SCALE = 1.5;
 
 /** The shapes a particle can have. */
 export const SHAPES = Object.freeze({ RECT: 0, STAR: 1, DOT: 2, RAY: 3 });
@@ -74,6 +79,8 @@ export function run(canvas, { count, durationMs, inks, spawn, gravity = 0, drag 
   let scale = 1;
   let sized = false;
   let stopped = false;
+  // The box the last frame drew in, in CSS pixels: left, top, right, bottom. Nothing yet.
+  const drawn = [0, 0, 0, 0];
   let finish;
   const done = new Promise((resolve) => (finish = resolve));
   // A browser that cannot draw on a canvas just shows no effect.
@@ -108,7 +115,7 @@ export function run(canvas, { count, durationMs, inks, spawn, gravity = 0, drag 
   function draw(now) {
     if (started < 0) started = last = now;
     if (!sized) {
-      scale = Math.min(2, devicePixelRatio || 1);
+      scale = Math.min(MAX_SCALE, devicePixelRatio || 1);
       canvas.width = Math.round(innerWidth * scale);
       canvas.height = Math.round(innerHeight * scale);
       sized = true;
@@ -116,38 +123,66 @@ export function run(canvas, { count, durationMs, inks, spawn, gravity = 0, drag 
     const age = now - started;
     const step = Math.min(now - last, 50) / 1000;
     last = now;
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    // One transform a frame: everything below is in CSS pixels. Only the box the last frame drew in is cleared.
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    context.clearRect(drawn[0], drawn[1], drawn[2] - drawn[0], drawn[3] - drawn[1]);
     if (age >= durationMs) return stop();
     // Every particle fades out over the last 40 %, never flashing (WCAG 2.3.1).
     context.globalAlpha = Math.min(1, (durationMs - age) / (durationMs * 0.4));
     const slow = Math.max(0, 1 - drag * step);
-    for (let index = 0; index < total; index += 1) {
-      const at = index * FIELDS;
+    drawn[0] = drawn[1] = Infinity;
+    drawn[2] = drawn[3] = -Infinity;
+    for (let at = 0; at < total * FIELDS; at += FIELDS) {
       pool[at + 2] *= slow;
       pool[at + 3] = pool[at + 3] * slow + gravity * step;
       pool[at] += pool[at + 2] * step;
       pool[at + 1] += pool[at + 3] * step;
       pool[at + 4] += pool[at + 5] * step;
-      const size = pool[at + 6];
-      const shape = looks[index * 2 + 1];
-      const angle = shape === SHAPES.RAY ? Math.atan2(pool[at + 3], pool[at + 2]) : pool[at + 4];
-      const cos = Math.cos(angle) * scale;
-      const sin = Math.sin(angle) * scale;
-      context.setTransform(cos, sin, -sin, cos, pool[at] * scale, pool[at + 1] * scale);
-      context.fillStyle = inks[looks[index * 2]];
-      if (shape === SHAPES.DOT) {
-        context.beginPath();
-        context.arc(0, 0, size / 2, 0, 6.2832);
-        context.fill();
-      } else if (shape === SHAPES.RAY) {
-        context.fillRect(-size * 2, -size / 6, size * 4, size / 3);
-      } else {
-        context.fillRect(-size / 2, -size / 4, size, size / 2);
-        if (shape === SHAPES.STAR) context.fillRect(-size / 4, -size / 2, size / 2, size);
+      // A ray reaches twice its size from its middle; anything else less.
+      const reach = pool[at + 6] * 2 + 2;
+      drawn[0] = Math.min(drawn[0], pool[at] - reach);
+      drawn[1] = Math.min(drawn[1], pool[at + 1] - reach);
+      drawn[2] = Math.max(drawn[2], pool[at] + reach);
+      drawn[3] = Math.max(drawn[3], pool[at + 1] + reach);
+    }
+    // One path and one fill per ink: the canvas's cost is in its calls, not in the corners of a path.
+    for (let ink = 0; ink < inks.length; ink += 1) {
+      context.beginPath();
+      for (let index = 0; index < total; index += 1) {
+        if (looks[index * 2] !== ink) continue;
+        const at = index * FIELDS;
+        const size = pool[at + 6];
+        const shape = looks[index * 2 + 1];
+        const angle = shape === SHAPES.RAY ? Math.atan2(pool[at + 3], pool[at + 2]) : pool[at + 4];
+        if (shape === SHAPES.RAY) {
+          quad(pool[at], pool[at + 1], angle, size * 2, size / 6);
+        } else if (shape === SHAPES.DOT) {
+          // A small diamond: a mote of light, four corners instead of a curve.
+          quad(pool[at], pool[at + 1], 0.7854, size / 2, size / 2);
+        } else {
+          quad(pool[at], pool[at + 1], angle, size / 2, size / 4);
+          if (shape === SHAPES.STAR) quad(pool[at], pool[at + 1], angle, size / 4, size / 2);
+        }
       }
+      context.fillStyle = inks[ink];
+      context.fill();
     }
     frame = requestAnimationFrame(draw);
+  }
+
+  /** Adds a rectangle turned by `angle` around (x, y), `half` wide and `side` high from its middle, to the path. */
+  function quad(x, y, angle, half, side) {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const ax = cos * half;
+    const ay = sin * half;
+    const bx = -sin * side;
+    const by = cos * side;
+    context.moveTo(x + ax + bx, y + ay + by);
+    context.lineTo(x - ax + bx, y - ay + by);
+    context.lineTo(x - ax - bx, y - ay - by);
+    context.lineTo(x + ax - bx, y + ay - by);
+    context.closePath();
   }
 
   addEventListener("resize", resize);

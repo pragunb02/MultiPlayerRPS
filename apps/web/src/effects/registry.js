@@ -31,6 +31,11 @@ export const DEFAULT_PARTICLES = 150;
 export const MAX_EFFECT_MS = 1500;
 /** The share of its particles an effect draws on a low-end phone or with save-data. */
 export const LOW_END_SHARE = 1 / 3;
+/**
+ * The most particles an effect draws on a phone-sized screen (under 40rem wide), which also shows less of it: what
+ * holds 150 ms/s of main thread on the throttled profile (Chromium 4x CPU, 390 x 844, design lead 2026-10-21).
+ */
+export const PHONE_PARTICLE_CAP = 80;
 
 /**
  * The only tokens a theme may set (CC-328 D5): decoration, never a status, a player, a text colour or a surface,

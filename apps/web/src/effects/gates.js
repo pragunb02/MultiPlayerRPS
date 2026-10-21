@@ -1,4 +1,4 @@
-import { LOW_END_SHARE } from "./registry.js";
+import { LOW_END_SHARE, PHONE_PARTICLE_CAP } from "./registry.js";
 
 /**
  * The gates every effect passes, in ADR-075's order, as pure functions: the host gives them the facts and does
@@ -19,6 +19,9 @@ export const msToIndiaMidnight = (ms) => 86_400_000 - ((ms + INDIA_OFFSET_MS) % 
 
 /** Whether an India day is inside a theme's window, both ends included. */
 export const inWindow = (entry, day) => entry.window.from <= day && day <= entry.window.to;
+
+/** Whether a window is phone-sized, under 40rem (640 px) wide: it gets at most PHONE_PARTICLE_CAP particles. */
+export const isPhone = (view) => view.innerWidth < 640;
 
 /**
  * Whether a device gets the low-end tier: save-data, at most 2 GB of memory or at most 4 cores.
@@ -50,7 +53,7 @@ export const GATES = Object.freeze({
  *   now: number,
  *   reducedMotion: boolean,
  *   flags: Readonly<Record<string, boolean>>,
- *   device: { lowEnd: boolean },
+ *   device: { lowEnd: boolean, phone?: boolean },
  *   hidden: boolean,
  *   inGame?: boolean,
  *   busy: boolean,
@@ -61,7 +64,8 @@ export function canPlay({ entry, now, reducedMotion, flags, device, hidden, inGa
   if (reducedMotion) return { ok: false, gate: GATES.REDUCED_MOTION };
   if (entry.flag && flags[entry.flag] !== true) return { ok: false, gate: GATES.FLAG };
   if (entry.window && !inWindow(entry, indiaDay(now))) return { ok: false, gate: GATES.WINDOW };
-  const particles = device.lowEnd ? Math.ceil(entry.particles * LOW_END_SHARE) : entry.particles;
+  const tier = device.lowEnd ? Math.ceil(entry.particles * LOW_END_SHARE) : entry.particles;
+  const particles = device.phone ? Math.min(tier, PHONE_PARTICLE_CAP) : tier;
   if (hidden) return { ok: false, gate: GATES.HIDDEN };
   // A theme's burst never plays during a game. A celebration is called from the result, as the game ends, so the
   // host may not have heard yet that the game is over: it is not held back by this gate.
