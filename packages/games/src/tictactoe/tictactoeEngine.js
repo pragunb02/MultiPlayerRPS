@@ -1,7 +1,7 @@
 import { GAME_IDS, GAME_STATUS, MOVE_REJECTIONS, TTT_CELLS, TTT_MARKS } from "@classicade/shared";
 import { defineEngine } from "../engine.js";
 import { ok, reject } from "../result.js";
-import { randomIndex } from "../rng.js";
+import { chooseStarter } from "../starter.js";
 
 /** The eight ways to make three in a row. */
 export const WINNING_LINES = Object.freeze(
@@ -52,9 +52,9 @@ export const tictactoeEngine = defineEngine({
     return ok({});
   },
 
-  /** @returns {TicTacToeState} */
-  init({ players, rng }) {
-    const starter = players[randomIndex(rng, players.length)];
+  /** @returns {TicTacToeState} the starter plays X. A rematch names them, game 1 draws them from the seed */
+  init({ players, rng, starter: named }) {
+    const starter = chooseStarter({ players, rng, starter: named });
     const other = players.find((p) => p !== starter);
     return {
       players: [players[0], players[1]],
@@ -113,6 +113,9 @@ export const tictactoeEngine = defineEngine({
   viewFor(state) {
     return { board: state.board, marks: state.marks, turn: state.turn, winningLine: state.winningLine };
   },
+
+  /** The player who moved first plays X (CC-091). */
+  starterOf: (state) => state.players.find((p) => state.marks[p] === TTT_MARKS.X),
 
   playersOf: (state) => [...state.players],
 

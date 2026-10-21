@@ -146,6 +146,33 @@ const CHECKS = Object.freeze([
     },
   },
   {
+    // A rematch names who moves first (CC-091). Only engines with starterOf take a starter.
+    name: "lets a named starter move first, and starterOf names who started",
+    run(engine, scenario) {
+      if (engine.starterOf === undefined) {
+        return;
+      }
+      assert(
+        scenario.players.includes(engine.starterOf(setup(engine, scenario))),
+        "starterOf must name one of the players",
+      );
+      const options = engine.validateOptions(scenario.options).value;
+      for (const starter of scenario.players) {
+        const state = engine.init({
+          players: [...scenario.players],
+          options,
+          rng: createSeededRng(scenario.seed ?? 42),
+          starter,
+        });
+        assert(engine.starterOf(state) === starter, `starterOf does not name ${starter}, the starter given`);
+        assert(
+          JSON.stringify(engine.activePlayers(state)) === JSON.stringify([starter]),
+          `${starter} was named the starter but is not the only player to move`,
+        );
+      }
+    },
+  },
+  {
     name: "never throws on garbage moves and rejects them with a known reason",
     run(engine, scenario) {
       const state = setup(engine, scenario);
