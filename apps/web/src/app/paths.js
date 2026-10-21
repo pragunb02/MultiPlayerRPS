@@ -25,6 +25,7 @@ import {
  *   /privacy  /terms                   the privacy policy and the terms of use
  *   /admin  /admin/:section?from=…&to=…&bucket=…   the owner console (CC-233), not found for anyone but an admin
  *   /admin/feedback?type=…&status=…    the console's feedback inbox (CC-290)
+ *   /admin/reports?status=…            the console's report queue (CC-044)
  *   /admin/flags                       the console's feature flags (CC-312)
  *   /admin/design                      the console's living design contract (CC-314)
  *
@@ -53,6 +54,7 @@ export const ROUTES = Object.freeze({
   ADMIN: "admin",
   ADMIN_SECTION: "admin/:section",
   ADMIN_FEEDBACK: "admin/feedback",
+  ADMIN_REPORTS: "admin/reports",
   ADMIN_AGES: "admin/ages",
   ADMIN_FLAGS: "admin/flags",
   ADMIN_DESIGN: "admin/design",
@@ -189,6 +191,12 @@ export const paths = Object.freeze({
    * @param {{ type?: string, status?: string }} [filters]  each left out for all
    */
   adminFeedback: (filters = {}) => `/admin/feedback${queryOf(filters, FEEDBACK_FILTER_KEYS)}`,
+  /**
+   * The console's report queue (CC-044), for one status.
+   *
+   * @param {{ status?: string, page?: string }} [filters]  open and the first page when left out
+   */
+  adminReports: (filters = {}) => `/admin/reports${queryOf(filters, ["status", "page"])}`,
   /** The console's year of birth corrections (CC-152). */
   adminAges: () => "/admin/ages",
   /** The console's feature flags (CC-312). */

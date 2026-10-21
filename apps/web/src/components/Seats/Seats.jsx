@@ -10,6 +10,7 @@ import { Button } from "../Button/Button.jsx";
 import { isComputer, levelNameOf } from "../computer.js";
 import { AddFriendButton } from "../Friends/AddFriendButton.jsx";
 import { Modal } from "../Modal/Modal.jsx";
+import { ReportDialog } from "../Report/ReportDialog.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import styles from "./Seats.module.css";
 
@@ -71,8 +72,8 @@ function PresenceChip({ room, seat }) {
 }
 
 /**
- * Whether the viewer can block the player in this seat (CC-044): only from their own seat, and only another person,
- * never a computer character or a deleted player's stand-in.
+ * Whether the viewer can block or report the player in this seat (CC-044): only from their own seat, and only another
+ * person, never a computer character or a deleted player's stand-in.
  */
 const canBlock = (room, seat) =>
   room.you !== "" && seat.playerId !== room.you && !isComputer(seat) && seat.deleted !== true;
@@ -140,8 +141,9 @@ function BlockDialog({ room, seat, index, onClose, onBlocked }) {
 /**
  * Who is in the room: avatars and names (CC-034), host, you, and where each player is (CC-158). A computer character is always
  * labelled as one, with its level (ADR-025). Changes to the other players are read
- * out once they settle, with a soft sound. A seated viewer can block another person from their seat (CC-044), and an
- * account can add them as a friend once the game is not on, which is the result screen (CC-052).
+ * out once they settle, with a soft sound. A seated viewer can block or report another person from their seat
+ * (CC-044, ADR-071), and an account can add them as a friend once the game is not on, which is the result screen
+ * (CC-052).
  *
  * @param {{ room: { code: string, seats: Array<{ playerId: string, displayName: string, avatar?: string, connected: boolean, presence: string, graceUntil: number, bot?: { character: string, level: string }, deleted?: true }>, hostId: string, you: string, players: { max: number }, status: string, serverTime: number, game?: object } }} props  every id in a room view is a seat id (CC-253)
  */
@@ -151,7 +153,7 @@ export function Seats({ room }) {
   const notice = usePresenceNotice(room);
   // Blocked from this page. The server keeps the block. This only changes what the seat shows until the page goes.
   const [blocked, setBlocked] = useState(() => new Set());
-  // The seat the viewer pressed Block on, and who sat where at that moment, while the question is open.
+  // The seat the viewer pressed Block or Report on (`kind`), and who sat where at that moment, while it is open.
   const [asking, setAsking] = useState(undefined);
   const seating = room.seats.map((seat) => seat.playerId).join(" ");
   // The design contract's player colours (CC-314): a seated viewer sees their own seat as "you" and every other
@@ -162,7 +164,7 @@ export function Seats({ room }) {
     return seat.playerId === room.you ? styles.mine : styles.theirs;
   };
   // Someone left, joined or the seats swapped (a rematch) while the question was open. The question may now be about
-  // someone else's seat, so it closes and the player can press Block again on the seat they mean.
+  // someone else's seat, so it closes and the player can press Block or Report again on the seat they mean.
   if (asking !== undefined && asking.seating !== seating) {
     setAsking(undefined);
   }
@@ -195,12 +197,23 @@ export function Seats({ room }) {
                     variant="ghost"
                     className={styles.block}
                     aria-label={`Block ${seat.displayName}`}
-                    onClick={() => setAsking({ seat, index, seating })}
+                    onClick={() => setAsking({ kind: "block", seat, index, seating })}
                   >
                     Block
                   </Button>
                 </>
               )
+            )}
+            {canBlock(room, seat) && (
+              <Button
+                control="room.seat.report"
+                variant="ghost"
+                className={styles.block}
+                aria-label={`Report ${seat.displayName}`}
+                onClick={() => setAsking({ kind: "report", seat, index, seating })}
+              >
+                Report
+              </Button>
             )}
           </li>
         ))}
@@ -210,7 +223,16 @@ export function Seats({ room }) {
           </li>
         ))}
       </ul>
-      {asking !== undefined && asking.seating === seating && (
+      {asking?.kind === "report" && asking.seating === seating && (
+        <ReportDialog
+          name={asking.seat.displayName}
+          target={{ roomCode: room.code, seat: asking.index, seatId: asking.seat.playerId }}
+          canBlock={!blocked.has(asking.seat.playerId)}
+          onClose={() => setAsking(undefined)}
+          onBlocked={() => setBlocked((current) => new Set([...current, asking.seat.playerId]))}
+        />
+      )}
+      {asking?.kind === "block" && asking.seating === seating && (
         <BlockDialog
           room={room}
           seat={asking.seat}

@@ -169,3 +169,43 @@ describe("past opponents in your history (CC-034)", () => {
     expect(second).toHaveTextContent("Rock Paper Scissors vs KabirTest, Rocky (computer)");
   });
 });
+
+describe("reporting a past opponent from your history (CC-044, ADR-071)", () => {
+  const match = {
+    matchId: "00000000-0000-4000-8000-000000000003",
+    gameId: "rps",
+    you: "you-id",
+    players: [
+      { playerId: "bot", displayName: "Rocky", computer: true },
+      { playerId: "you-id", displayName: GUEST.displayName },
+      { playerId: "other-id", displayName: "KabirTest", avatar: "fox" },
+      { playerId: "gone-id", displayName: "Deleted player" },
+    ],
+    outcomeForYou: "win",
+    endedAt: Date.UTC(2026, 9, 19),
+  };
+
+  it("offers Report for each person you played, never a computer or a deleted player, and sends the match and place", async () => {
+    const reportPlayer = vi.fn().mockResolvedValue({ reportId: "r1", createdAt: 1 });
+    const blockPlayer = vi.fn().mockResolvedValue({ blockId: "b1", displayName: "KabirTest", blockedAt: 2 });
+    openProfile({ getMatches: vi.fn(async () => ({ matches: [match] })), reportPlayer, blockPlayer });
+    const history = await screen.findByRole("list", { name: "Match history" });
+
+    expect(
+      within(history)
+        .getAllByRole("button", { name: /^Report / })
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual(["Report KabirTest"]);
+    await userEvent.click(within(history).getByRole("button", { name: "Report KabirTest" }));
+    const dialog = await screen.findByRole("dialog", { name: /Report KabirTest/ });
+    await userEvent.click(within(dialog).getByRole("radio", { name: /Cheating or stalling/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Send report" }));
+
+    expect(reportPlayer).toHaveBeenCalledWith({ matchId: match.matchId, seat: 2, reason: "cheating" });
+    const thanks = await screen.findByRole("dialog", { name: /Thanks, we got it/ });
+    await userEvent.click(within(thanks).getByRole("button", { name: "Block KabirTest too" }));
+    expect(blockPlayer).toHaveBeenCalledWith({ reportId: "r1" });
+    await userEvent.click(within(thanks).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});

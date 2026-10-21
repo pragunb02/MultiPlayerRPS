@@ -39,6 +39,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   friendLimits?: Parameters<typeof import("./friendRoutes.js").createFriendRoutes>[0]["limits"],
  *   feedbackComponent: ReturnType<typeof import("../../domain/feedback/feedbackComponent.js").createFeedbackComponent>,
  *   feedbackLimits?: Parameters<typeof import("./feedbackRoutes.js").createFeedbackRoutes>[0]["limits"],
+ *   reportComponent: Parameters<typeof import("./reportRoutes.js").createReportRoutes>[0]["reportComponent"],
+ *   reportLimits?: Parameters<typeof import("./reportRoutes.js").createReportRoutes>[0]["limits"],
  *   dailyPuzzleComponent: ReturnType<typeof import("../../domain/dailyPuzzles/dailyPuzzleComponent.js").createDailyPuzzleComponent>,
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   moves and hints per player (CC-144)
  *   safetyComponent: ReturnType<typeof import("../../domain/safety/safetyComponent.js").createSafetyComponent>,  the age
@@ -85,6 +87,8 @@ export function createHttpApp({
   friendLimits,
   feedbackComponent,
   feedbackLimits,
+  reportComponent,
+  reportLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   safetyComponent,
@@ -180,6 +184,8 @@ export function createHttpApp({
       friendLimits,
       feedbackComponent,
       feedbackLimits,
+      reportComponent,
+      reportLimits,
       dailyPuzzleComponent,
       dailyPuzzleLimit,
       safetyComponent,
