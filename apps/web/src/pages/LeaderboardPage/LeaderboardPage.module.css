@@ -190,7 +190,11 @@
   font-variant-numeric: tabular-nums;
   color: var(--color-xp);
 }
+/* The tag keeps its size and its one line; the name before it gives way with its ellipsis (CC-324). */
 .tag {
+  flex: none;
+  white-space: nowrap;
+  overflow-wrap: normal;
   margin-left: var(--space-2);
   padding: 0 var(--space-2);
   border-radius: var(--radius-full);

@@ -43,14 +43,14 @@ async function readAgainAfterPushes({ getFriends, reading, missed, stillFor, onV
 /**
  * The player's friends (CC-052): the view from `GET /api/friends`, kept current by the server's pushes, and the
  * things a player does with it. Each change also comes back as a push to every tab, so a second tab follows along.
- * A guest gets `status: "guest"` and nothing is asked of the server. Loads again whenever the player becomes
- * someone else.
+ * A guest gets `status: "guest"`, someone with no session at all `status: "visitor"`, and neither asks the server
+ * anything. Loads again whenever the player becomes someone else.
  *
  * A push can overtake an answer the server wrote a moment before it, which would then show the older state. So a
  * push that arrives while the view is being read makes the hook read it once more after.
  *
  * @returns {{
- *   status: "loading" | "guest" | "ready" | "error",
+ *   status: "loading" | "visitor" | "guest" | "ready" | "error",
  *   view: { friends: object[], incoming: object[], outgoing: object[], settings: { appearOffline: boolean }, safetyTips: boolean } | undefined,
  *   error: Error | undefined,
  *   retry: () => void,
@@ -62,7 +62,8 @@ async function readAgainAfterPushes({ getFriends, reading, missed, stillFor, onV
  */
 export function useFriends() {
   const { api, socket } = useServices();
-  const { identity } = useSession();
+  const session = useSession();
+  const { identity } = session;
   const account = isAccount(identity);
   const who = identity?.id ?? "";
   const [attempt, setAttempt] = useState(0);
@@ -127,8 +128,14 @@ export function useFriends() {
     setAttempt((n) => n + 1);
   }, [who]);
 
+  // Without a player the session decides: still loading, or a visitor with no session at all (CC-324: this used to
+  // stay "loading" for ever).
+  const withoutAccount = () => {
+    if (identity !== undefined) return "guest";
+    return session.status === "loading" ? "loading" : "visitor";
+  };
   const current = !account
-    ? { status: identity === undefined ? "loading" : "guest", view: undefined, error: undefined }
+    ? { status: withoutAccount(), view: undefined, error: undefined }
     : state.who === who
       ? state
       : { status: "loading", view: undefined, error: undefined };

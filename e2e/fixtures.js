@@ -277,25 +277,50 @@ export async function createRoom(player, gameSlug) {
  */
 export const formFactor = (testInfo) => (testInfo.project.use.isMobile ? "mobile" : "desktop");
 
-/** The widest screen, in CSS pixels, that gets the phone header: 40rem in Layout.module.css. */
-export const PHONE_HEADER_MAX_WIDTH = 640;
+/** The narrowest screen, in CSS pixels, that gets the wide header: 64rem in headerLayout.js (CC-324). */
+export const WIDE_HEADER_MIN_WIDTH = 1024;
+
+/** Opens a header disclosure (the Menu, the account menu, the sound options) unless it is open already. */
+async function openDisclosure(button) {
+  if ((await button.getAttribute("aria-expanded")) !== "true") {
+    await button.click();
+  }
+  await expect(button).toHaveAttribute("aria-expanded", "true");
+}
 
 /**
- * The header, with the player's controls on screen (sound, level, name, Log in, Sign up, Log out). On a phone they
- * sit in the header's menu (CC-259), so this opens it first when it is closed. The menu closes on every new page,
- * so call this again after the page changes.
+ * The header, with the player's controls on screen (sound, level, name, Profile, Friends, Log in, Sign up, Log out,
+ * Feedback). Under 64rem they sit in the header's menu (CC-259, CC-324), so this opens it first when it is closed.
+ * On a wide screen it opens the account menu, under the player's name, when there is a player. Both close on every
+ * new page, so call this again after the page changes.
  *
  * @param {import("@playwright/test").Page} page
  */
 export async function header(page) {
   const banner = page.getByRole("banner");
-  if (page.viewportSize().width <= PHONE_HEADER_MAX_WIDTH) {
-    const toggle = banner.getByRole("button", { name: "Menu" });
-    if ((await toggle.getAttribute("aria-expanded")) !== "true") {
-      await toggle.click();
-    }
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  if (page.viewportSize().width < WIDE_HEADER_MIN_WIDTH) {
+    await openDisclosure(banner.getByRole("button", { name: /^Menu/ }));
+    return banner;
   }
+  const account = banner.locator('[data-cc-control="header.account"]');
+  if ((await account.count()) > 0) {
+    await openDisclosure(account);
+  }
+  return banner;
+}
+
+/**
+ * The header with the sound switch, the volume and the sound settings on screen: the menu under 64rem, the sound
+ * pill's panel on a wide screen (CC-324).
+ *
+ * @param {import("@playwright/test").Page} page
+ */
+export async function soundControls(page) {
+  const banner = page.getByRole("banner");
+  if (page.viewportSize().width < WIDE_HEADER_MIN_WIDTH) {
+    return header(page);
+  }
+  await openDisclosure(banner.getByRole("button", { name: "Sound options" }));
   return banner;
 }
 

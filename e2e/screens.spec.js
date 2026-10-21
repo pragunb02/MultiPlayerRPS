@@ -22,9 +22,7 @@ test.describe("home", () => {
 
     await expect(page.getByText(/You're playing as Guest-/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Play as a guest" })).toHaveCount(0);
-    await expect(
-      page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Profile" }),
-    ).toBeVisible();
+    await expect((await header(page)).getByRole("link", { name: "Profile" })).toBeVisible();
     await page.reload();
     await expect(page.getByText(/You're playing as Guest-/)).toBeVisible();
   });
@@ -189,7 +187,7 @@ test.describe("profile", () => {
     await bob.page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /Paper/ }).click();
     await expect(alice.page.getByRole("heading", { name: /^You won/ })).toBeVisible();
 
-    await alice.page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Profile" }).click();
+    await (await header(alice.page)).getByRole("link", { name: "Profile" }).click();
 
     await expect(alice.page).toHaveURL("/profile");
     const history = alice.page.getByRole("list", { name: "Match history" });

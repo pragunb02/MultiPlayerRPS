@@ -21,8 +21,8 @@ import { SiteRequests } from "../SiteRequests/SiteRequests.jsx";
 import { SoundPopover } from "../SoundControl/SoundControl.jsx";
 import { WakingUp } from "../WakingUp/WakingUp.jsx";
 import { AccountMenu } from "./AccountMenu.jsx";
-import { HEADER_ROW_LINKS, HEADER_WIDE, SECTIONS, sectionOf } from "./headerLayout.js";
-import { currentIf, HeaderMenu, PlayLinks } from "./HeaderMenu.jsx";
+import { currentIf, HEADER_ROW_LINKS, HEADER_WIDE, SECTIONS, sectionOf } from "./headerLayout.js";
+import { HeaderMenu, PlayLinks } from "./HeaderMenu.jsx";
 import styles from "./Layout.module.css";
 
 /** Three bars: the menu button's picture. */

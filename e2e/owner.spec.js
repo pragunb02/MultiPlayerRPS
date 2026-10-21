@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "./fixtures.js";
+import { expect, header, test } from "./fixtures.js";
 import { OWNER, SEEDED_TOTALS, SEEDED_WEEK, STATUS_TOTALS, STATUS_WEEK } from "./ownerConsole.js";
 import { BASE_URL, newAccount } from "./personas.js";
 
@@ -43,7 +43,7 @@ test.describe("owner console", () => {
     const { page } = owner;
     await logIn(owner, OWNER);
 
-    await page.getByRole("banner").getByRole("link", { name: "Console" }).click();
+    await (await header(page)).getByRole("link", { name: "Console" }).click();
     await at(page, "/admin", "Overview");
     await page.goto(`/admin?${WEEK}`);
     await at(page, `/admin?${WEEK}`, "Overview");
@@ -178,7 +178,7 @@ test.describe("owner console", () => {
     await page.getByLabel("Password").fill(account.password);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("banner").getByRole("link", { name: "Profile" })).toBeVisible();
+    await expect((await header(page)).getByRole("link", { name: "Profile" })).toBeVisible();
     await expect(page.getByRole("banner").getByRole("link", { name: "Console" })).toHaveCount(0);
 
     riya.expect(404, "/admin/players");

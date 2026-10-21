@@ -1,4 +1,4 @@
-import { expect, joinAsGuest, test } from "./fixtures.js";
+import { expect, header, joinAsGuest, test } from "./fixtures.js";
 
 // Requests and presence across the whole site (CC-207, CC-158), from the owner's report: two players finish a
 // game, Alice goes to the home page without pressing Leave, Bob asks for a rematch, and Alice never heard of it
@@ -49,8 +49,8 @@ async function setTabHidden(player, hidden) {
 /** The ways a player leaves the room's page without pressing Leave. */
 const WAYS_OUT = Object.freeze({
   "the logo": (player) => player.page.getByRole("link", { name: "ClassiCade home" }).click(),
-  "Games in the menu": (player) =>
-    player.page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Games" }).click(),
+  "Games in the menu": async (player) =>
+    (await header(player.page)).getByRole("link", { name: "Games" }).click(),
   "the Back button": (player) => player.page.goBack(),
 });
 

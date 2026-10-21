@@ -43,3 +43,6 @@ export function sectionOf(pathname) {
       return undefined;
   }
 }
+
+/** `aria-current` for a link to `section` while the player is in it. */
+export const currentIf = (section, current) => (section === current ? "page" : undefined);

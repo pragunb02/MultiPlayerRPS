@@ -123,8 +123,7 @@ export function Inbox() {
         {asks > 0 && (
           <>
             {" "}
-            <span className={styles.count}>{asks}</span>{" "}
-            <span className="visually-hidden">waiting</span>
+            <span className={styles.count}>{asks}</span> <span className="visually-hidden">waiting</span>
           </>
         )}
       </button>

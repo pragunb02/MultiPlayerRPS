@@ -186,7 +186,7 @@ test.describe("a visitor who does not wait", () => {
 
       await page.reload();
       await homeIsReady(page);
-      await page.getByRole("link", { name: "Leaderboards" }).click();
+      await (await header(page)).getByRole("link", { name: "Leaderboards" }).click();
       await expect(page).toHaveURL(/\/leaderboards\//);
 
       expect(await framesSeen(page)).toEqual(["none"]);

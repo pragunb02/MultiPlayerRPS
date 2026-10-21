@@ -55,6 +55,31 @@ describe("the friends page (CC-052)", () => {
     expect(api.getFriends).not.toHaveBeenCalled();
   });
 
+  // CC-324, the audit's bug 1: with no session at all the page said "Loading…" for ever and asked nothing.
+  it("shows a visitor what friends are for and how to sign in, instead of loading for ever", async () => {
+    const api = fakeApi({ getSession: vi.fn(async () => undefined) });
+    renderApp({ path: "/friends", api });
+
+    const empty = await screen.findByRole("region", { name: "Play with your friends" });
+    expect(within(empty).getByRole("link", { name: "Sign up" })).toHaveAttribute(
+      "href",
+      "/signup?next=%2Ffriends",
+    );
+    expect(within(empty).getByRole("link", { name: "Log in" })).toHaveAttribute(
+      "href",
+      "/login?next=%2Ffriends",
+    );
+    expect(screen.queryByText("Loading…")).toBeNull();
+    expect(api.getFriends).not.toHaveBeenCalled();
+  });
+
+  it("says Loading while the session is still unknown", async () => {
+    const api = fakeApi({ getSession: vi.fn(() => new Promise(() => {})) });
+    renderApp({ path: "/friends", api });
+
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
+  });
+
   it("says so when an account has no friends yet", async () => {
     renderApp({ path: "/friends", api: friendsApi({ getFriends: vi.fn().mockResolvedValue(NO_FRIENDS) }) });
 

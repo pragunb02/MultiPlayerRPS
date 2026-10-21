@@ -205,6 +205,8 @@ export function AdminPage() {
             {new Date(report.generatedAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })},
             refreshed every 5 minutes.
           </p>
+          {/* The section's own heading, so each chart's h3 sits under an h2 (axe heading-order, CC-324). */}
+          <h2 className={styles.sectionTitle}>{tab.name}</h2>
           <div className={styles.body}>
             <Page report={report} />
           </div>

@@ -89,6 +89,11 @@
   flex-basis: 100%;
   font-size: var(--text-sm);
 }
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
 .generated,
 .compare {
   margin: 0;

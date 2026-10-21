@@ -6,11 +6,8 @@ import { FEEDBACK_TEXT } from "../Feedback/feedbackText.js";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
 import { SoundControl } from "../SoundControl/SoundControl.jsx";
 import { PlayerName } from "./AccountMenu.jsx";
-import { SECTIONS } from "./headerLayout.js";
+import { currentIf, SECTIONS } from "./headerLayout.js";
 import styles from "./Layout.module.css";
-
-/** `aria-current` for a link to `section` while the player is in it. */
-export const currentIf = (section, current) => (section === current ? "page" : undefined);
 
 /** One labelled group of the menu, with its small heading. */
 function Group({ title, children }) {

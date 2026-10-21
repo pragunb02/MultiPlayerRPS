@@ -117,7 +117,7 @@ test.describe("other tabs of the same browser (CC-115)", () => {
     await second.goto("/games/tic-tac-toe");
     await second.getByRole("button", { name: "Create room" }).click();
     await expect(inviteCard(second)).toBeVisible();
-    await expect((await header(second)).getByTitle("Guest")).toBeVisible();
+    await expect((await header(second)).locator('[data-cc-identity="guest"]')).toBeVisible();
     const roomPath = new URL(second.url()).pathname;
     await markPage(second);
 
@@ -137,9 +137,9 @@ test.describe("other tabs of the same browser (CC-115)", () => {
     await markPage(second);
 
     await createRoom(person, "tic-tac-toe");
-    const guestName = (await banner(person.page).getByTitle("Guest").textContent()).trim();
+    const guestName = (await banner(person.page).locator('[data-cc-identity="guest"]').textContent()).trim();
 
-    await expect(banner(second).getByTitle("Guest")).toHaveText(guestName);
+    await expect(banner(second).locator('[data-cc-identity="guest"]')).toHaveText(guestName);
     expect(await wasNotReloaded(second)).toBe(true);
   });
 

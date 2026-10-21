@@ -284,6 +284,9 @@ describe("the wide header, from 64rem (CC-324)", () => {
     renderApp({ path: "/leaderboards/weekly" });
 
     await within(banner()).findByRole("link", { name: "Log in" });
-    expect(within(panel()).getByRole("link", { name: "Leaderboards" })).toHaveAttribute("aria-current", "page");
+    expect(within(panel()).getByRole("link", { name: "Leaderboards" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 });
