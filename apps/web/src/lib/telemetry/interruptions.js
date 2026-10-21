@@ -9,6 +9,7 @@ import {
   surfaceNamed,
   TELEMETRY_BUCKETS,
 } from "@classicade/shared";
+import { NO_TELEMETRY } from "./facade.js";
 
 /**
  * Interruptions and steps (CC-313): every toast, banner, dialog, card, line, request and screen the site shows, how
@@ -241,4 +242,4 @@ export function createInterruptionTracker({ telemetry, now, strict = false }) {
 }
 
 /** A tracker that counts nothing, for tests and pages without services. */
-export const NO_INTERRUPTIONS = createInterruptionTracker({ telemetry: { track: () => {} }, now: () => 0 });
+export const NO_INTERRUPTIONS = createInterruptionTracker({ telemetry: NO_TELEMETRY, now: Date.now });
