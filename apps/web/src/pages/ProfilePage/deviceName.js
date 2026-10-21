@@ -1,5 +1,4 @@
-/** What the server says when it could not tell the browser or the system (CC-262). */
-const UNKNOWN = "Unknown";
+import { DEVICE_UNKNOWN as UNKNOWN } from "@classicade/shared";
 
 /**
  * A device in words, such as "Chrome on Android", from the coarse browser and system the server read at sign-in

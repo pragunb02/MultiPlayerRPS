@@ -166,7 +166,9 @@ export function createSessionRenewals({ now, graceMs = RENEWAL_GRACE_MS }) {
  * Sessions are rolling, so every response re-issues the cookie it came with. A request of this browser that was
  * sent before "sign out other devices" (or a password change) but answered after it would set the old id again,
  * over the new one, and the old id is already destroyed: the browser that asked to stay signed in is signed out
- * on its next request. Such a response sets no cookie, and the session it carried is not saved back either.
+ * on its next request. Such a response sets no cookie. It cannot stop the store write, which express-session
+ * starts before the headers: an unchanged session is only touched, which never puts a destroyed one back, and a
+ * changed one is written back and then refused by its old session version (corrected in CC-262).
  *
  * Use it right after the session middleware: a `writeHead` wrapped later runs first, so the session is let go
  * before express-session decides on the cookie.
@@ -288,7 +290,8 @@ export function createSessionGuard({ checkSession, onSessionEnded, renewals, now
     // out alone from then on. With the sign-in time above, these are the only changes ever made to a signed-in
     // session after it is made, each once. Keep it so: a request of a device being signed out that is still on its
     // way then only touches its session, which never puts the deleted session back in the store (see ADR-081).
-    if (req.session.identity.kind === IDENTITY_KINDS.USER && req.session.device === undefined) {
+    // A device without an id counts as none, so a session stored with an empty one is repaired too.
+    if (req.session.identity.kind === IDENTITY_KINDS.USER && req.session.device?.id === undefined) {
       req.session.device = { ...newDevice(userAgentOf(req)) };
     }
     next();

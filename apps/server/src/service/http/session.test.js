@@ -340,6 +340,15 @@ describe("createSessionGuard (CC-116)", () => {
     expect(req.session.device).toEqual({ id: expect.any(String), browser: "Chrome", system: "Android" });
   });
 
+  it("gives a new device to a signed-in session whose stored device has no id", async () => {
+    const { middleware } = guard(async () => {});
+    const req = request({ identity: USER, sessionVersion: 0, signedInAt: T0, device: {} });
+
+    await middleware(req, {}, vi.fn());
+
+    expect(req.session.device).toEqual({ id: expect.any(String), browser: "Chrome", system: "Android" });
+  });
+
   it("gives no device to a guest, or to a session it is about to end", async () => {
     const { middleware: lets } = guard(async () => {});
     const { middleware: ends } = guard(signedOutCheck);

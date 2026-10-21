@@ -1,25 +1,4 @@
-/** The browsers a device can be named by (CC-262). Anything else is unknown. */
-export const BROWSERS = Object.freeze({
-  CHROME: "Chrome",
-  EDGE: "Edge",
-  FIREFOX: "Firefox",
-  OPERA: "Opera",
-  SAFARI: "Safari",
-  SAMSUNG: "Samsung Internet",
-  UNKNOWN: "Unknown",
-});
-
-/** The systems a device can be named by (CC-262). Anything else is unknown. */
-export const SYSTEMS = Object.freeze({
-  ANDROID: "Android",
-  CHROME_OS: "ChromeOS",
-  IPAD: "iPad",
-  IPHONE: "iPhone",
-  LINUX: "Linux",
-  MAC: "macOS",
-  WINDOWS: "Windows",
-  UNKNOWN: "Unknown",
-});
+import { DEVICE_BROWSERS as BROWSERS, DEVICE_SYSTEMS as SYSTEMS } from "@classicade/shared";
 
 // The first rule that matches wins, so the order matters. Edge, Opera and Samsung Internet also say "Chrome", and
 // every browser on an iPhone also says "Safari". An iPhone also says "like Mac OS X", and Android also says "Linux".

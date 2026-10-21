@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { hasPlayerIdShape } from "../../models/playerIdShape.js";
+import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { createSocketClients, send } from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
 import { dayOf } from "../../utils/indiaTime.js";
@@ -131,6 +132,50 @@ describe("GET /api/auth/devices (CC-262)", () => {
     const res = await devicesOf(renewed);
 
     expect(res.body.devices).toEqual([expect.objectContaining({ id: laptopId, current: true })]);
+  });
+
+  // A session from before CC-262 has no device. A second "sign out other devices" of the same browser, sent while
+  // the first is renewing its id, passes the guard by its grace without getting one, and must still keep a device.
+  it("keeps a device for a session renewed by a request that passed by its grace", async () => {
+    const accounts = createInMemoryAccountDao();
+    let releaseBump;
+    let bumping;
+    const accountDao = {
+      ...accounts,
+      bumpSessionVersion: async (change) => {
+        const result = await accounts.bumpSessionVersion(change);
+        if (bumping) {
+          const reached = bumping;
+          bumping = undefined;
+          reached();
+          await new Promise((resolve) => {
+            releaseBump = resolve;
+          });
+        }
+        return result;
+      },
+    };
+    server = await startTestServer({ now: () => SIGNED_IN, accountDao });
+    const laptop = (await call("POST", "/api/auth/signup", { body: RIYA, agent: LAPTOP_AGENT })).cookie;
+    const sid = sessionIdOf(laptop);
+    const stored = await new Promise((resolve) => server.store.get(sid, (_, data) => resolve(data)));
+    delete stored.device;
+    await new Promise((resolve) => server.store.set(sid, stored, resolve));
+    const bumped = new Promise((resolve) => {
+      bumping = resolve;
+    });
+
+    const first = call("POST", "/api/auth/sign-out-others", { cookie: laptop, agent: LAPTOP_AGENT });
+    await bumped;
+    const second = await call("POST", "/api/auth/sign-out-others", { cookie: laptop, agent: LAPTOP_AGENT });
+    releaseBump();
+    await first;
+
+    expect(second.status).toBe(204);
+    const listed = await devicesOf(second.cookie);
+    expect(listed.body.devices).toEqual([
+      expect.objectContaining({ id: expect.stringMatching(/^[A-Za-z0-9_-]{22}$/), current: true }),
+    ]);
   });
 
   it("refuses a visitor without a session and a guest, who has no devices to list", async () => {

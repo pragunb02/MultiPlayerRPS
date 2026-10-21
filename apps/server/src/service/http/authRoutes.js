@@ -146,9 +146,10 @@ export function createAuthRoutes({
    */
   async function keepOnlyThisSession(req, { bump, signedInAt }) {
     const identity = requireIdentity(req.session);
-    // The same browser keeps its device under the new id, so it stays "This device" in the list (CC-262). The
-    // session guard gave every signed-in session one before any route runs.
-    const { device } = req.session;
+    // The same browser keeps its device under the new id, so it stays "This device" in the list (CC-262). A
+    // session from before CC-262 whose request passed the guard by its renewal grace has none yet, so it gets one
+    // here.
+    const device = req.session.device?.id === undefined ? newDevice(userAgentOf(req)) : req.session.device;
     const fromSessionId = req.sessionID;
     renewals.begin(fromSessionId);
     const sessionVersion = await bump();

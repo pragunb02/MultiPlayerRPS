@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_MESSAGES,
+  DEVICE_BROWSERS,
+  DEVICE_SYSTEMS,
   GAME_STATUS,
   IDENTITY_KINDS,
   MOVE_REJECTIONS,
@@ -32,6 +34,8 @@ describe.each([
   ["REQUEST_ANSWERS", REQUEST_ANSWERS],
   ["PRESENCE", PRESENCE],
   ["ROOM_END_REASONS", ROOM_END_REASONS],
+  ["DEVICE_BROWSERS", DEVICE_BROWSERS],
+  ["DEVICE_SYSTEMS", DEVICE_SYSTEMS],
 ])("%s", (_name, constants) => {
   it("is immutable", () => {
     expect(Object.isFrozen(constants)).toBe(true);

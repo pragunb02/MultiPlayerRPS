@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BROWSERS, deviceFromUserAgent, SYSTEMS } from "./userAgentDevice.js";
+import { DEVICE_BROWSERS as BROWSERS, DEVICE_SYSTEMS as SYSTEMS } from "@classicade/shared";
+import { deviceFromUserAgent } from "./userAgentDevice.js";
 
 // Real user agents, as each browser sent them in 2026 (Chrome's are the reduced ones).
 const AGENTS = Object.freeze({
