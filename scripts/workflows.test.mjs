@@ -104,6 +104,18 @@ describe("slow tests", () => {
   });
 });
 
+// The bundle size budget is a step of the required checks job, not a job of its own, so the owner's ruleset needs no
+// new check name (CC-322).
+describe("bundle size budget", () => {
+  it("builds the site and runs the check in the checks job", async () => {
+    const step = parse(await read(".github/workflows/ci.yml")).jobs.checks.steps.find(
+      (/** @type {{ name?: string }} */ each) => each.name === "Bundle size budget",
+    );
+
+    expect(step.run).toBe("npm run build:web && node scripts/bin/check-bundle.mjs");
+  });
+});
+
 describe("browser engines", () => {
   it("runs the browser suite on Firefox on every pull request (CC-184)", async () => {
     const ci = await read(".github/workflows/ci.yml");

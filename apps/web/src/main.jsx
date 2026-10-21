@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
 import { takeLanding } from "./app/landing.js";
+import { preloadRouteFor } from "./app/routePages.js";
 import { removeServerHead } from "./app/serverHead.js";
 import { recoverFromStaleBuild } from "./app/staleBuild.js";
 import { noteWaitingScreen } from "./app/wakingUp.js";
@@ -81,13 +82,18 @@ const services = {
   download: createDownload({ document, URL: window.URL }),
 };
 removeServerHead(document);
-// Before the first render, which takes the waking up screen of index.html away (CC-232).
-noteWaitingScreen({ document, window });
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <BrowserRouter>
-      <App services={services} />
-    </BrowserRouter>
-  </StrictMode>,
-);
+// A page that downloads on demand, opened by its address, is fetched before the first render, as the router's own
+// lazy routes do. The first render then shows the page itself and not its skeleton, so nothing moves (CC-322).
+// Until then the waking up screen of index.html stays. Home is in the first download and renders at once.
+preloadRouteFor(window.location.pathname).then(() => {
+  // Before the first render, which takes the waking up screen of index.html away (CC-232).
+  noteWaitingScreen({ document, window });
+  createRoot(document.getElementById("root")).render(
+    <StrictMode>
+      <BrowserRouter>
+        <App services={services} />
+      </BrowserRouter>
+    </StrictMode>,
+  );
+});
