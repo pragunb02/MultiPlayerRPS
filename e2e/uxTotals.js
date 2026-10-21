@@ -12,22 +12,26 @@ const DAYS = 28;
 
 /**
  * @param {number} now  ms
- * @returns {Array<object>} the documents of `telemetry_daily`
+ * @returns {Promise<Array<object>>} the documents of `telemetry_daily`
  */
-export function seededUxTotals(now) {
+export async function seededUxTotals(now) {
   const today = dayOf(now);
-  return Array.from({ length: DAYS }, (_, index) => addDays(today, -(index + 1))).flatMap((day, index) => {
-    const events = uxSeedEvents({ day, scale: index < 7 ? 1 : 0.8 });
-    const counters = events.map(({ receivedAt, ...fields }) => ({ ...fields, hour: receivedAt, count: 1 }));
-    return rollUpDay({ day, counters }).map(({ event, group, count, timings }) => ({
-      _id: randomUUID(),
-      day,
-      at: new Date(startOfDay(day)),
-      event,
-      key: groupKeyOf(group),
-      group,
-      count,
-      ...(timings && { timings }),
-    }));
-  });
+  const days = Array.from({ length: DAYS }, (_, index) => addDays(today, -(index + 1)));
+  const perDay = await Promise.all(
+    days.map(async (day, index) => {
+      const events = uxSeedEvents({ day, scale: index < 7 ? 1 : 0.8 });
+      const counters = events.map(({ receivedAt, ...fields }) => ({ ...fields, hour: receivedAt, count: 1 }));
+      return (await rollUpDay({ day, counters })).map(({ event, group, count, timings }) => ({
+        _id: randomUUID(),
+        day,
+        at: new Date(startOfDay(day)),
+        event,
+        key: groupKeyOf(group),
+        group,
+        count,
+        ...(timings && { timings }),
+      }));
+    }),
+  );
+  return perDay.flat();
 }

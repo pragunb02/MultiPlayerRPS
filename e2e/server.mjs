@@ -43,7 +43,7 @@ const week = seededWeek();
 await seed.db.collection("matches").insertMany(week.matches);
 await seed.db.collection("player_transfers").insertMany(week.transfers);
 // The UX page's daily usage totals (CC-177), for the days before today on the real clock.
-await seed.db.collection("telemetry_daily").insertMany(seededUxTotals(Date.now()));
+await seed.db.collection("telemetry_daily").insertMany(await seededUxTotals(Date.now()));
 await seed.close();
 
 resetControl();

@@ -230,7 +230,9 @@ function capOpenFields(rows, group) {
     const partitions = new Map();
     result.forEach((row) => {
       const rest = groupKeyOf({ ...row.group, [field]: undefined });
-      partitions.set(rest, [...(partitions.get(rest) ?? []), row]);
+      const members = partitions.get(rest);
+      if (members === undefined) partitions.set(rest, [row]);
+      else members.push(row);
     });
     result = [...partitions.values()].flatMap((members) => {
       const busiest = [...members].sort(
@@ -262,17 +264,26 @@ function timingsOf(values) {
 }
 
 /**
- * One India day's totals from its hourly counters, by the spec. Pure.
+ * One India day's totals from its hourly counters, by the spec. Nothing but the totals is touched, and the work
+ * grows with the counters (each is visited once per group of its event). `pause` runs after each group of each
+ * event, so a busy day never holds up live games for long (review of #176).
  *
- * @param {{ day: string, counters: ReadonlyArray<Record<string, unknown> & { name: string, count: number }>, spec?: typeof ROLLUP_SPEC }} input
- * @returns {Array<{ day: string, event: string, group: Record<string, string | boolean>, count: number, timings?: Record<string, object> }>}
+ * @param {{
+ *   day: string,
+ *   counters: ReadonlyArray<Record<string, unknown> & { name: string, count: number }>,
+ *   spec?: typeof ROLLUP_SPEC,
+ *   pause?: () => Promise<void>,
+ * }} input
+ * @returns {Promise<Array<{ day: string, event: string, group: Record<string, string | boolean>, count: number, timings?: Record<string, object> }>>}
  */
-export function rollUpDay({ day, counters, spec = ROLLUP_SPEC }) {
+export async function rollUpDay({ day, counters, spec = ROLLUP_SPEC, pause = async () => {} }) {
   const byEvent = new Map();
-  counters.forEach((counter) => {
-    if (!Object.hasOwn(spec, counter.name)) return;
-    byEvent.set(counter.name, [...(byEvent.get(counter.name) ?? []), counter]);
-  });
+  for (const counter of counters) {
+    if (!Object.hasOwn(spec, counter.name)) continue;
+    const own = byEvent.get(counter.name);
+    if (own === undefined) byEvent.set(counter.name, [counter]);
+    else own.push(counter);
+  }
   const out = [];
   for (const [event, own] of byEvent) {
     const { groups, timings } = spec[event];
@@ -287,6 +298,7 @@ export function rollUpDay({ day, counters, spec = ROLLUP_SPEC }) {
         const timed = timingsOf(timingValues);
         out.push({ day, event, group: values, count, ...(timed && { timings: timed }) });
       });
+      await pause();
     }
   }
   return out;

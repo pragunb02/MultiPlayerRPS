@@ -122,7 +122,9 @@ export function createRollupJob({
     const counters = [];
     for (let hour = 0; hour < 24; hour += 1) {
       const from = start + hour * HOUR_MS;
-      counters.push(...(await telemetryAccessor.list({ from, to: from + HOUR_MS, limit: HOUR_LIMIT })));
+      // One at a time: spreading an hour of up to 100 000 counters into push would overflow the call stack.
+      for (const row of await telemetryAccessor.list({ from, to: from + HOUR_MS, limit: HOUR_LIMIT }))
+        counters.push(row);
       await pause();
     }
     return counters;
@@ -138,7 +140,7 @@ export function createRollupJob({
       );
       if (!leased) return "busy";
       const counters = await stepped("read", () => countersOf(day));
-      const rows = await stepped("total", () => rollUpDay({ day, counters }));
+      const rows = await stepped("total", () => rollUpDay({ day, counters, pause }));
       await stepped("write", () => telemetryDailyAccessor.replaceDay({ day, dayStart, rows }));
       await stepped("finish", () => telemetryDailyAccessor.finishRun({ day, owner, now: now() }));
       onRun({ outcome: ROLLUP_OUTCOMES.OK });

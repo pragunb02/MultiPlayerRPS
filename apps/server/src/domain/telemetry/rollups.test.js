@@ -99,7 +99,7 @@ describe("percentiles from the counters", () => {
 
 describe("rollUpDay (CC-176)", () => {
   // AC-1
-  it("totals each group exactly", () => {
+  it("totals each group exactly", async () => {
     const counters = [
       counter("control_pressed", { route: "/", control: "home.play_guest", has_reason: false }, 4, 0),
       counter("control_pressed", { route: "/", control: "home.play_guest", has_reason: false }, 3, 5),
@@ -115,7 +115,7 @@ describe("rollUpDay (CC-176)", () => {
       ),
     ];
 
-    const rows = rollUpDay({ day: DAY, counters });
+    const rows = await rollUpDay({ day: DAY, counters });
 
     expect(rowOf(rows, "control_pressed", {})).toEqual(
       expect.objectContaining({ day: DAY, count: 9, group: {} }),
@@ -144,8 +144,8 @@ describe("rollUpDay (CC-176)", () => {
     ]);
   });
 
-  it("keeps only groups of the spec, never a field the spec does not list", () => {
-    const rows = rollUpDay({
+  it("keeps only groups of the spec, never a field the spec does not list", async () => {
+    const rows = await rollUpDay({
       day: DAY,
       counters: [counter("visit_ended", { active_s: "30-60", presses: "1-5" }, 5)],
     });
@@ -163,12 +163,12 @@ describe("rollUpDay (CC-176)", () => {
     expect(rows.some((row) => "player_kind" in row.group && "presses" in row.group)).toBe(false);
   });
 
-  it("keeps the busiest values of an open field and sums the rest as other, so forged names cannot grow the rows", () => {
+  it("keeps the busiest values of an open field and sums the rest as other, so forged names cannot grow the rows", async () => {
     const counters = Array.from({ length: TOP_KEPT.control + 5 }, (_, index) =>
       counter("control_pressed", { control: `home.c${index}`, has_reason: false }, 100 - index),
     );
 
-    const byControl = rollUpDay({ day: DAY, counters }).filter(
+    const byControl = (await rollUpDay({ day: DAY, counters })).filter(
       (row) => row.event === "control_pressed" && Object.keys(row.group).sort().join() === "control,route",
     );
 
@@ -176,5 +176,25 @@ describe("rollUpDay (CC-176)", () => {
     const other = byControl.find((row) => row.group.control === OTHER_VALUE);
     // The five quietest: 100 - 25 ... 100 - 29.
     expect(other.count).toBe([75, 74, 73, 72, 71].reduce((a, b) => a + b, 0));
+  });
+
+  // Review of #176: the work grows with the counters, not with their square, and live games get a turn.
+  it("takes turns with live games between events and groups, and grows linearly with the counters", async () => {
+    const counters = Array.from({ length: 60_000 }, (_, index) =>
+      counter("control_pressed", { control: `home.c${index % 500}`, has_reason: false }, 1, index % 24),
+    );
+    counters.push(counter("visit_ended", { active_s: "30-60", presses: "1-5" }));
+    let pauses = 0;
+
+    const started = performance.now();
+    const rows = await rollUpDay({ day: DAY, counters, pause: async () => (pauses += 1) });
+    const took = performance.now() - started;
+
+    expect(
+      rows.find((row) => row.event === "control_pressed" && Object.keys(row.group).length === 0).count,
+    ).toBe(60_000);
+    // One turn after each group of each event: control_pressed has 4 groups, visit_ended 4.
+    expect(pauses).toBe(ROLLUP_SPEC.control_pressed.groups.length + ROLLUP_SPEC.visit_ended.groups.length);
+    expect(took).toBeLessThan(1500);
   });
 });
