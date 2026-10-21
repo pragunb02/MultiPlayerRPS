@@ -63,3 +63,17 @@ The `Changelog fragments` job runs `--check --base HEAD^1` on every pull request
 on a ticket that is not on the board and has no row, and on a pull request that adds, changes or removes a
 changelog entry by hand. The collector's own pull request passes because every line it adds is made from a fragment
 that the same pull request deletes, and it changes nothing else in the changelog.
+
+## What a builder edits, and what it leaves alone
+
+Moved here from CLAUDE.md workflow rule 5 in CC-302.
+
+1. A builder adds its one fragment and updates the linked findings in `KNOWN_ISSUES.md`.
+2. **Builders do not edit `PROGRESS.md`'s changelog, the board rows in `BACKLOG.md` or any next free line.** The
+   `Changelog fragments` job fails a pull request that edits the changelog by hand. Board rows and next free lines are
+   not checked by a machine yet, so review checks them.
+3. The board's 🟦 for a started ticket comes from the PR's fragment (`status: in-progress`), or from the coordinator
+   at dispatch.
+4. The coordinator runs the collector after a batch of merges (above), and also keeps the stage counters and the
+   Status table in `PROGRESS.md`.
+5. A pull request that only allocates numbers or notes owner answers puts that text in a fragment too.

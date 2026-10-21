@@ -6,7 +6,9 @@ Last updated: 2026-10-18 (docs audit: bots, sessions and tabs, abuse limits, own
 
 Until 2026-10-16 production ran an Express 4 monolith (`index.js`: routes, every socket handler, game rules, DB writes)
 with EJS pages and client-authoritative games. Its findings and their fixes: [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Its
-`users` collection is still read so legacy players can log in (CC-078).
+`users` collection is still read (never written) so legacy players can log in (CC-078). The legacy code is in
+the repository history before the CC-029 merge. The legacy collections are never deleted (owner, CC-251,
+[DATA.md](DATA.md)).
 
 ## 2. Architecture
 
@@ -51,6 +53,24 @@ console (`adminRoutes.js`) and the web app router. `domain/` has identity, rooms
 gamification, leaderboards, bots, analytics and the player transfer. `persistence/` stores rooms, matches, accounts,
 progress, stats, quests, boards, transfers and sessions in MongoDB, so nothing is lost on a restart (CC-101). The full
 list of what is stored where is [DATA.md](DATA.md).
+
+What is built, by workspace (moved from CLAUDE.md in CC-302):
+
+1. `apps/web`: React app (session, home, lobby `/play/:gameId`, room `/room/:code`, `/login`, `/signup`, `/profile`,
+   client game registry `src/games/registry.js` with lazy-loaded boards for RPS, Tic-Tac-Toe and Chess,
+   share/seats/modal/toasts; ADR-009).
+2. `apps/server`: composition root, config, MongoDB + session store, identity model and component, HTTP app (request
+   logging, error translation, `/api/session`), Socket.IO gateway (session-authenticated, origin-checked,
+   rate-limited, standard acks, room handlers), room manager (domain state machine + accessor + MongoDB DAO, rooms
+   survive restarts, lifetimes in `roomLifetimes.js`, CC-101), match history (MongoDB, replayable via `replayGame`),
+   progression (XP/levels, exactly-once, pushed via `progress:updated`), accounts (scrypt, `/api/auth/signup|login`),
+   background tasks for post-game work, gamification (achievements, streaks, daily quests, ADR-013), leaderboards for
+   accounts and for guests under their server-given name, rematch (ADR-015, ADR-060), player data following a guest
+   who signs in (`playerTransferComponent`, ADR-014), typed errors, pino logger.
+3. `packages/shared`: game catalog, error codes, socket events, identity kinds, move rejections.
+4. `packages/games`: engine contract, registry, seeded RNG, contract test kit (`@classicade/games/testing`), engines
+   RPS, Tic-Tac-Toe and Chess (server clocks via the optional `deadline`/`expire` time hooks).
+5. Integration tests use an in-memory MongoDB (`testing/memoryMongo.js`).
 
 ### Computer players (CC-138, CC-221, CC-225, ADR-025, ADR-040, ADR-041)
 

@@ -1,6 +1,8 @@
 # Engineering Guidelines
 
 How we structure, write and test code in ClassiCade. These rules apply to all new code (`apps/`, `packages/`).
+New code is JavaScript ES modules with JSDoc types, on Express 5, with pure functions where possible, a `*.test.js`
+beside every module, and dependencies passed in (for example `createApp({ config })`) rather than imported globals.
 The legacy app they replaced was deleted in CC-029. Where a rule can be checked by a tool, it is
 (ESLint, Prettier, Vitest coverage). Rules are a starting point, not a substitute for thinking — if a rule
 gets in the way of a clearly better design, write an ADR.
@@ -83,6 +85,7 @@ Data objects are **plain and frozen** — no methods that do work, so logic can'
 | **Dependency inversion**               | High-level code receives its dependencies (factory parameters); it never imports concrete infrastructure. The composition root decides what is real and what is fake. |
 | **Separation of concerns / layering**  | §1. Transport, business rules and storage evolve independently.                                                                                                       |
 | **Pure core, imperative shell**        | Rules (game engines, XP maths, rating maths) are pure functions. Time, randomness, I/O and sockets live at the edges and are injected.                                |
+| **Server-authoritative games**         | Clients send intents. The server validates them, applies them and decides results. A player's identity comes from the session.                                        |
 | **Fail fast**                          | Invalid config stops boot; invalid input is rejected at the edge; broken invariants throw immediately.                                                                |
 | **YAGNI / KISS**                       | Build the simplest thing that meets the current ticket and leaves the extension points open. No speculative abstractions (§3 rule 10).                                |
 | **DRY — for knowledge, not for lines** | One source of truth for rules and constants. Two similar-looking lines that change for different reasons may stay separate.                                           |
@@ -138,7 +141,7 @@ Data objects are **plain and frozen** — no methods that do work, so logic can'
 10. **Validate input at the edge, strictly.** Types, lengths, patterns, list sizes; reject unknown fields. Once inside the domain, data is trusted.
 11. **No abstraction without a second use.** No base classes or "interfaces" with one implementation. Dependency injection already gives us testability. (Contracts like `GameEngine` are fine — they have several implementations by design.)
 12. **Constants over string literals** for event names, game ids, error codes — defined once (usually `@classicade/shared`).
-13. **Small and obvious.** One responsibility per function/module. Names say what, comments say why. No dead code, no commented-out code, no `var`, `===` only.
+13. **Small and obvious.** One responsibility per function/module. Names say what, comments say why. No dead code, no commented-out code, no `var`, `===` only. **Inclusive language** in code, comments and docs: allowlist and denylist, primary and replica.
 
 ---
 

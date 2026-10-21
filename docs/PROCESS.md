@@ -31,7 +31,10 @@ Tickets written before CC-311 keep their old emoji statuses and are not checked.
 - **Lite**, [tickets/TEMPLATE-lite.md](tickets/TEMPLATE-lite.md): work you can describe in one sentence (a bug fix,
   a test fix, a small docs change). Problem, fix, acceptance criteria, test, files.
 
-A ticket says which in its Template row. When in doubt, use the full one.
+A ticket says which in its Template row. When in doubt, use the full one. Every ticket gets a file, small ones
+included. A small one (under about an hour) gets Root cause and a short Research note (working agreement rule 4).
+The board's 🟦 comes from the PR's fragment ([changes/README.md](changes/README.md)), or from the coordinator at
+dispatch.
 
 ## 1. The shaping interview
 
@@ -73,7 +76,8 @@ The same lenses review twice:
    evidence.
 
 Both block only on correctness, security or a missing requirement. Anything else becomes a follow-up ticket or a
-note in the ticket.
+note in the ticket: design findings below high severity become follow-up tickets (owner, 2026-10-20, CLAUDE.md
+workflow rule 9).
 
 ## 5. Appetite and the cut line
 
@@ -122,3 +126,72 @@ rollout in the console's Flags tab, `/admin/flags`, without a deploy.
 
 About two weeks after full rollout, the coordinator writes the ticket's Post-launch review: the success metric
 against its target, the guardrail, and the call (keep, iterate or remove). Then the Status becomes Reviewed.
+
+## The working agreement in full (owner, 17 October 2026)
+
+Moved here from CLAUDE.md in CC-302, word for word apart from the note in brackets after rule 6. CLAUDE.md keeps one line per rule with the same numbers. These
+rules come first: where they differ from anything else in CLAUDE.md or the docs, they win.
+
+1. **Feature freeze.** No new feature or idea tickets until every ticket already on the board is closed, across all
+   phases, in the order set by `docs/PRODUCT_VISION.md`. New ideas are written down in `docs/IDEAS.md` only, not as
+   tickets, and are not started.
+2. **Allowed new tickets:** security (always), testing (unit, integration, browser), and bugs in things that already
+   exist. These are fixes, not new ideas.
+3. **Security is P0 by default.** It drops to P1 only when a higher priority P0 is already in progress. A security
+   issue is never cut or deferred without the owner.
+4. **Research before code.** Every ticket starts with a Research section in its ticket file before any code: how our
+   code does it today, how other products do it (with sources), and what is best for ClassiCade. Coding starts after
+   that section is written. A small fix under an hour (one-line hotfix, test fix) still gets a ticket file with Root
+   cause and a short Research note, written before the PR is merged.
+5. **Document everything.** Decisions go in `docs/DECISIONS.md`, research in the ticket or `docs/investigations/`,
+   changes in `docs/PROGRESS.md` (through a fragment in `docs/changes/`, workflow rule 5). Nothing decided only in chat.
+6. **Steady, not frantic.** At most six builders run at once, and only on independent work (no shared files).
+   Builders run lint, format, coverage and only their own browser tests locally; CI runs the full browser suite.
+   `main` stays green: a red `main` is fixed before anything else merges. **Fast mode ended 2026-10-18 (owner):**
+   every check is required again, branches must be up to date, and builders run their own gates in full. (Workflow
+   rule 9, 2026-10-20, later lowered the limit to 5 builders on one machine. Running at most 5 meets both.)
+7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (the growth plan, `docs/GROWTH.md`,
+   added by PR #60) and the owner's admin console are in scope.
+8. **Reviews before every merge.** Every pull request is reviewed before merge by reviewer agents in parallel: a
+   code reviewer (correctness, tests, the working agreement and comment style, regressions), a security reviewer
+   (auth, sessions, sockets, input, data exposure, secrets) and, for any change players can see, a design reviewer
+   (phone and desktop layouts, plain words, accessibility, the look and feel domain). Each finding is checked by a
+   second agent that tries to refute it. Confirmed findings are fixed, or written down with a reason, before the
+   merge.
+
+## Ticket and ADR numbers
+
+Moved here from CLAUDE.md in CC-302.
+
+1. `CC-###` are **tickets** (units of work). Sequential, permanent, never reused. The next free ID is at the top of
+   `BACKLOG.md`.
+2. `FR-*` and `NFR-*` are requirements (PRD). `SEC-*`, `BUG-*` and `DEBT-*` are audit findings (KNOWN_ISSUES.md).
+   `ADR-*` are decisions.
+3. Tickets link to requirements, findings and ADRs. Every finding is linked from at least one ticket.
+4. **Who assigns numbers (CC-299, ADR-068).** The coordinator assigns ticket and ADR numbers when it dispatches a
+   builder, writes them in the builder's brief, and bumps the "next free" lines itself (top of `BACKLOG.md`, top of
+   `DECISIONS.md`, the Process row of `PROGRESS.md`). **Builders never edit the next free lines.** A builder who needs
+   a new ticket or ADR asks the coordinator for a number, so two builders never take the same one.
+5. **Stages.** Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met, unless the owner
+   explicitly agreed (CLAUDE.md workflow rule 8).
+
+## Which file to update, and when
+
+Moved here from CLAUDE.md's "Where things are tracked" table in CC-302. CLAUDE.md keeps the map of what each file
+holds. Builders change `BACKLOG.md` and `PROGRESS.md` only through a fragment ([changes/README.md](changes/README.md)).
+
+| File                     | Update when                                                  |
+| ------------------------ | ------------------------------------------------------------ |
+| `docs/BRD.md`            | Business direction changes                                   |
+| `docs/PRD.md`            | The scope of a feature changes                               |
+| `docs/PRODUCT_VISION.md` | Direction changes                                            |
+| `docs/ARCHITECTURE.md`   | Structure changes                                            |
+| `docs/BACKLOG.md`        | Tickets are added, started or completed (through a fragment) |
+| `docs/tickets/CC-###.md` | A ticket is started or progresses                            |
+| `docs/PROGRESS.md`       | Every working session (through a fragment)                   |
+| `docs/changes/CC-###.md` | Every PR that changes a ticket                               |
+| `docs/DECISIONS.md`      | A decision is made or reversed                               |
+| `docs/PROCESS.md`        | The process changes                                          |
+| `docs/DEPLOYMENT.md`     | The deploy setup changes                                     |
+| `docs/ENGINEERING.md`    | Standards change                                             |
+| `docs/KNOWN_ISSUES.md`   | An issue is found or fixed                                   |
