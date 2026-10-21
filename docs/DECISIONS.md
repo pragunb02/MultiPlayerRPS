@@ -2,9 +2,8 @@
 
 Format: each decision gets an ID, status (`Open` · `Accepted` · `Accepted by default (owner may change)` ·
 `Superseded`), date, context, decision, consequences. Newest first within each section. IDs are permanent and never
-reused; the next free ID is **ADR-066**. Reserved for open work (2026-10-20): ADR-065 (CC-034) and ADR-067
-(CC-308). Never used: ADR-058 (reserved for CC-163, which needed no ADR) and ADR-064 (reserved for CC-297, which
-amended ADR-057 instead). A later change to a decision is a dated
+reused; the next free ID is **ADR-077**. Reserved for open work (2026-10-21): none. Never used: ADR-058 (reserved for
+CC-163, which needed no ADR) and ADR-064 (reserved for CC-297, which amended ADR-057 instead). A later change to a decision is a dated
 **Amended** paragraph under it. "Accepted by default" means the builders chose and the owner has not decided yet;
 the owner may change it.
 
@@ -58,6 +57,57 @@ the owner may change it.
   `passAndPlay` entry to its registry entry. Untimed chess and rotated pieces are in IDEAS.md.
 
 ## Accepted decisions
+
+### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
+
+- **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner
+  answered on 2026-10-20: "Accept all, with stylelint". **Point 6 (how the check runs) is pending the owner's
+  confirmation.** Amends ADR-009 (styling) and ADR-012 point 1 (tokens).
+- **Context.** Every feature picked its own colours, pop-ups and stacking order. There were 13 raw `z-index` values,
+  no `info` or player colours, and nothing written for a reviewer to point at. The shared `Modal` let Tab reach the
+  page behind it (WCAG 2.4.3). The owner's premium redesign (2026-10-21) builds on this contract, so its values must
+  be easy to retune.
+- **Decision.**
+  1. **Tokens by role, one file per role.** `apps/web/src/styles/tokens.css` only imports
+     `styles/tokens/{palette,type,space,elevation,layers,motion}.css`, the only files allowed to hold raw values. A
+     palette, type scale, elevation or glow refresh is a values-only change in one file. `tokens.test.js` fails when a
+     token sits in another role's file.
+  2. **Colour roles** in the shape of Material 3's roles. Status: `success`, `warning`, `danger` and `info`, where
+     `info` is an alias of `primary` (D3) and danger means losing something the player made, never a lost game
+     (ADR-050). Players: `you` (XP blue) and `opponent` (accent magenta) (D2), never the only signal. Each role has
+     `-soft` and `on-` colours. Every text role is at least 4.5:1 on the page, a card and its own `-soft` in both themes,
+     and the focus ring is 3:1. Brand colours are decoration and identity, never status.
+  3. **Type roles, elevation and named layers.** `--type-*` and `--leading-*` are aliases of the existing sizes, and
+     `--elevation-1` to `-3` are aliases of the shadows and glows. Every `z-index` is a `--layer-*` token, in the order
+     the app had before.
+  4. **Seven component contracts** in `docs/design/CONTRACT.md`: button, dialog, toast, banner, card, badge and empty
+     state, each with when to use it, its states, its accessibility rules and the most per screen. At most one dialog,
+     one banner, one toast on a phone and two on desktop, and one primary button per region (D5). Copy limits are
+     checked in review (D6).
+  5. **The dialog.** The one `Modal` keeps Tab inside, moving the focus itself in every engine. The page behind is
+     `inert`, focus returns on close, and a second dialog waits for the first.
+  6. **The check, in `npm run lint` (D4).** The owner chose stylelint. stylelint 17.16.0, the latest, fails
+     `npm audit` (GHSA-vfj7-8cjw-p6xm in `braces`, with no fixed release), and ADR-008 requires 0. So the rules are
+     **stylelint-shaped rules on PostCSS until stylelint 18 drops `braces`, then wrapped with
+     `stylelint.createPlugin`**. PostCSS is already installed by Vite and is a declared dev dependency. The rules
+     refuse in CSS: a raw colour, a raw `z-index`, a raw `px` or `rem` in type, spacing or radius, a raw value in a
+     custom property, and `position: fixed` outside the pop-up files. An ESLint rule, `classicade/popup-contract`,
+     refuses `createPortal`, a dialog role or `aria-live` outside the contract's components. The exceptions list and
+     the list of pop-up files may only shrink. Tests fail when either differs from the contract.
+  7. **A living page** at `/admin/design` in the owner console (ADR-036 allowlist, the same 404 for others, `no-store`,
+     `noindex`, lazy chunk). It sits behind the `design_page` flag (admins, remove by 2026-12-31) and draws the real
+     tokens and components (D1).
+- **Why.** These follow the W3C Design Tokens format's shape (roles over aliases), Material 3's colour roles and one
+  snackbar at a time, and NN/g on modal dialogs and notifications. WCAG 1.4.1, 1.4.3, 1.4.11, 2.4.3 and 4.1.3 set the
+  accessibility rules. A number in the contract can be checked in review (CC-316); a check in lint stops what a machine
+  can see.
+- **Consequences.** A new token, role, layer, pop-up file or exception is a contract change in the same pull request.
+  Five raw spacing and radius values are listed exceptions. The design page shows the device's theme, not both side
+  by side, until CC-280 adds a theme choice. Moving to stylelint 18 is a small follow-up once it is released. Aligned with ADR-075: an event theme in `effects/themes/` may override tokens with raw values, the `EffectHost` joins the pop-up list when CC-099 builds it, and keyframes hold literal values (no `var()`).
+- **Builder notes (CC-314, 2026-10-21).** The build added `--layer-banner-alert` (the connection strip stays at 20)
+  and `--layer-menu` (CC-139's inbox panel). It moved the SVG and board font sizes to `--type-svg-*` and
+  `--type-board-*` tokens instead of exceptions. The pop-up list has 18 files, seven of them announcers. "Escape waits
+  while a destructive action runs" is not built.
 
 ### ADR-075 — Effects and animation stack: CSS for simple, Motion for intermediate, our own canvas module behind one effect registry for advanced
 
@@ -2275,6 +2325,11 @@ New screens must use tokens and the art registry; a style attribute fails `npm r
   pushes so the level is live; it is mounted per identity (`key`), and only when there is a session, so visitors
   never request `/api/progress`.
 
+**Amended 2026-10-21 (ADR-076, CC-314), point 1.** The tokens are still the single source, now one file per role
+(palette, type, space, elevation, layers, motion). Status, player, type, elevation and layer roles were added as
+aliases. Every `z-index` is a `--layer-*` token. The pale `info-soft` background (lighter than primary-soft, which
+is under 4.5:1 as noted above) carries info text.
+
 ### ADR-011 — URL scheme: one canonical URL per screen, readable slugs, old URLs redirect
 
 - **Status:** Accepted · 2026-10-16
@@ -2327,6 +2382,10 @@ New screens must use tokens and the art registry; a style attribute fails `npm r
   - **Tests:** Vitest project `web` (jsdom) with Testing Library; fakes for the injected clients.
 - **Consequences:** No CSS framework to learn or upgrade; tests never touch the network; swapping transport or adding
   caching happens in `src/lib` only.
+
+**Amended 2026-10-21 (ADR-076, CC-314).** The token file is now an entry file, `styles/tokens.css`, importing one
+file per role from `styles/tokens/`. Components pick tokens by role from `docs/design/CONTRACT.md`. `npm run lint`
+refuses raw colours, sizes and `z-index` outside the token files, and new pop-up types outside the contract.
 
 ### ADR-008 — Dependency policy: latest stable, minimal, zero known vulnerabilities
 
