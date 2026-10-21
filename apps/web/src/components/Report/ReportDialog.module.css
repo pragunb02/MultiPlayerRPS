@@ -1,0 +1,62 @@
+/* The Hinglish line first, the English line under it, as the feedback dialog shows them (CC-290). */
+.lines {
+  display: flex;
+  flex-direction: column;
+}
+.hinglish {
+  font-weight: 700;
+}
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+.reasons {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.reasons legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm);
+}
+/* Each reason is a row with its radio inside, so the whole row can be pressed, at least 44 px tall. */
+.reason {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+.reason:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.reason:has(input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.help {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.error {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-danger);
+}
+.thanks {
+  display: grid;
+  gap: var(--space-3);
+}
+.thanks p {
+  margin: 0;
+}

@@ -13,7 +13,13 @@ import {
   parseUsername,
   previousEmailSpelling,
 } from "../../models/credentials.js";
-import { ACCOUNT_ID_PREFIX, createIdentity, isAccountId } from "../../models/identity.js";
+import { randomInt } from "node:crypto";
+import {
+  ACCOUNT_ID_PREFIX,
+  createIdentity,
+  GUEST_NAME_ALPHABET,
+  isAccountId,
+} from "../../models/identity.js";
 import { normaliseLegacyUsername, usernameCandidates } from "../../models/legacyUsername.js";
 import { assertDefined } from "../../utils/assert.js";
 import {
@@ -28,6 +34,15 @@ import { yearOf } from "../../utils/indiaTime.js";
 const INVALID_LOGIN = "Invalid email or password";
 const { EMAIL_UNAVAILABLE } = ACCOUNT_MESSAGES;
 const USERNAME_ATTEMPTS = 20;
+
+/** The safe default name the owner can give a reported account (CC-044, ADR-071.6): `Player_` and six letters. */
+const SAFE_NAME_PREFIX = "Player_";
+const SAFE_NAME_SUFFIX_LENGTH = 6;
+const randomNameSuffix = () =>
+  Array.from(
+    { length: SAFE_NAME_SUFFIX_LENGTH },
+    () => GUEST_NAME_ALPHABET[randomInt(GUEST_NAME_ALPHABET.length)],
+  ).join("");
 
 /** The account behind a player id. Guests have none, so they have no password to change. */
 function accountIdOf(playerId) {
@@ -90,6 +105,7 @@ const signInOf = (account) =>
  *   legacyPasswords: ReturnType<typeof import("../../utils/legacyPassword.js").createLegacyPasswordChecker>,
  *   accountDeletionAccessor: Pick<ReturnType<typeof import("../../data/accountDeletionAccessor.js").createAccountDeletionAccessor>, "closeLegacy" | "isLegacyClosed">,
  *     the legacy rows whose player deleted their account (CC-035)
+ *   newNameSuffix?: () => string,   six letters for a safe default name (CC-044). Tests pick them
  * }} deps
  */
 export function createAccountComponent({
@@ -98,6 +114,7 @@ export function createAccountComponent({
   passwordHasher,
   legacyPasswords,
   accountDeletionAccessor,
+  newNameSuffix = randomNameSuffix,
 }) {
   assertDefined(accountAccessor, "accountAccessor");
   assertDefined(legacyUserAccessor, "legacyUserAccessor");
@@ -362,6 +379,31 @@ export function createAccountComponent({
         throw passwordFieldError("newPassword", "Choose a password different from your current one");
       }
       return accountAccessor.bumpSessionVersion({ accountId, passwordHash: await passwordHasher.hash(next) });
+    },
+
+    /**
+     * Gives the account a safe default name, `Player_` and six letters, after the owner looked at reports on it
+     * (CC-044, ADR-071.6). The name passes the name filter (ADR-022): letters that happen to spell a refused word
+     * are drawn again, as is a name another account has. Every session ends in the same write, so the player signs
+     * in again and sees the new name everywhere.
+     *
+     * @param {{ playerId: string, now: number }} input
+     * @returns {Promise<string>} the new name
+     * @throws {ForbiddenError} for a guest, whose name the server gave
+     * @throws {NotFoundError} when the account is not there any more
+     */
+    async resetName({ playerId }) {
+      const accountId = accountIdOf(playerId);
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          const username = parseUsername(`${SAFE_NAME_PREFIX}${newNameSuffix()}`);
+          await accountAccessor.bumpSessionVersion({ accountId, username });
+          return username;
+        } catch (err) {
+          const drawAgain = err instanceof ConflictError || err instanceof ValidationError;
+          if (!drawAgain || attempt >= USERNAME_ATTEMPTS) throw err;
+        }
+      }
     },
 
     /**

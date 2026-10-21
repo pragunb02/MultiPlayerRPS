@@ -1,0 +1,391 @@
+import { randomUUID } from "node:crypto";
+import { REPORT_ACTION, REPORT_CONTEXT, REPORT_REASONS, REPORT_STATUS } from "@classicade/shared";
+import { deletedPlayer } from "../../models/deletedPlayer.js";
+import { isAccountId } from "../../models/identity.js";
+import { assertDefined, assertFunction } from "../../utils/assert.js";
+import { ConflictError, GoneError, NotFoundError } from "../../utils/errors.js";
+import { dayOf } from "../../utils/indiaTime.js";
+import { renameIdShapes } from "../identity/idShapes.js";
+
+/**
+ * When a reporter's reports count for less (ADR-071.5, after Lichess's `reportban` and reporter accuracy, softened):
+ * at least this many of their kept reports were dismissed and none was acted on. Their new reports are still stored
+ * and thanked as any, but marked `setAside` and listed last. Counts never act on anyone by themselves.
+ */
+export const REPORTER_TRUST = Object.freeze({ dismissedAtLeast: 3 });
+
+/**
+ * How much of what happened between the pair a report keeps (ADR-071.3): enough to see stalling, a move pattern or
+ * a stream of requests, too little to be a game record of its own.
+ */
+export const REPORT_SNAPSHOT = Object.freeze({ moves: 10, requests: 5, textMax: 200 });
+
+/**
+ * What the composition root is told when the owner renamed a reported account, so it can cut the account's sockets:
+ * its sessions ended with the rename (ADR-071.6).
+ */
+export const REPORT_EVENTS = Object.freeze({ PLAYER_RENAMED: "report:player-renamed" });
+
+/**
+ * How much of the queue one answer holds: groups a page, and reports shown in each group (the counts cover all).
+ */
+export const REPORT_QUEUE = Object.freeze({ groupsPerPage: 25, itemsPerGroup: 20 });
+
+/** The one answer for every reference the server cannot confirm, so reporting cannot probe rooms, matches or handles. */
+const notFound = (cause) =>
+  new NotFoundError("We couldn't find that player", cause === undefined ? {} : { cause });
+
+/** The roles a snapshot names players by. Never a player id (ADR-057). */
+const ROLE = Object.freeze({ REPORTED: "reported", REPORTER: "reporter", OTHER: "other" });
+
+/**
+ * @typedef {import("../players/coPlayers.js").PlayedWith | { handle: string }} ReportTarget   who to report: a seat
+ *   of an open room or a stored match (coPlayers.js), or a public profile's handle (ADR-065)
+ * @typedef {Readonly<{ playerId: string, displayName: string }>} Person   who a report names, as they are now
+ */
+
+/**
+ * Player reports (CC-044, ADR-071). A player reports someone they played with or whose public profile they opened,
+ * by where they met, never by an id. The reported player is never told. The owner reads the reports grouped by
+ * player in the console and dismisses them or renames the account to a safe default.
+ *
+ * @param {{
+ *   reportAccessor: ReturnType<typeof import("../../data/reportAccessor.js").createReportAccessor>,
+ *   coPlayers: Pick<ReturnType<typeof import("../players/coPlayers.js").createCoPlayers>, "personAt">,
+ *   rooms: { getByCode: (code: string) => Promise<Readonly<import("../../data/roomAccessor.js").Room>> },
+ *   matches: { getById: (matchId: string) => Promise<Readonly<{ gameId: string, log: ReadonlyArray<Readonly<{ kind: string, playerId?: string, move?: unknown, at: number }>> }>> },
+ *   transfers: Pick<ReturnType<typeof import("../../data/playerTransferAccessor.js").createPlayerTransferAccessor>, "listFrom">,
+ *   profiles: { personByHandle: (query: { handle: string, viewerId: string, now: number }) => Promise<Person> },
+ *   names: { resetName: (query: { playerId: string, now: number }) => Promise<string> },
+ *   newReportId?: () => string,
+ *   newUuid?: () => string,
+ * }} deps  `coPlayers` checks that the two played together (ADR-053.3), the same check blocks and friends use.
+ *   `rooms` is the room accessor and `matches` the match component's server-only full record, read for the last
+ *   moves and requests. `transfers` are the guests who signed in, so a report follows them to their account.
+ *   `profiles` finds the adult account behind a handle, and nobody else. `names` gives an account a safe default name
+ *   and makes it show everywhere (composed in server.js). `newUuid` makes deleted reporters' stand-ins
+ */
+export function createReportComponent({
+  reportAccessor,
+  coPlayers,
+  rooms,
+  matches,
+  transfers,
+  profiles,
+  names,
+  newReportId = randomUUID,
+  newUuid = randomUUID,
+}) {
+  assertDefined(reportAccessor, "reportAccessor");
+  assertFunction(coPlayers?.personAt, "coPlayers.personAt");
+  assertFunction(rooms?.getByCode, "rooms.getByCode");
+  assertFunction(matches?.getById, "matches.getById");
+  assertFunction(transfers?.listFrom, "transfers.listFrom");
+  assertFunction(profiles?.personByHandle, "profiles.personByHandle");
+  assertFunction(names?.resetName, "names.resetName");
+  assertFunction(newReportId, "newReportId");
+
+  /** A snapshot's text: plain JSON with every player id replaced by a role, cut to REPORT_SNAPSHOT.textMax. */
+  const textOf = (value, roleOf) =>
+    (JSON.stringify(renameIdShapes(value ?? null, roleOf)) ?? "null").slice(0, REPORT_SNAPSHOT.textMax);
+
+  /** The last moves of a game log and the last requests between the pair, players named by role. */
+  function recentOf({ log = [], requests = [], reporterId, reportedId }) {
+    const roleOf = (playerId) =>
+      playerId === reportedId ? ROLE.REPORTED : playerId === reporterId ? ROLE.REPORTER : ROLE.OTHER;
+    const pair = new Set([reporterId, reportedId]);
+    const moves = log
+      .filter((entry) => entry.kind === "move")
+      .slice(-REPORT_SNAPSHOT.moves)
+      .map((entry) => ({
+        by: roleOf(entry.playerId),
+        kind: "move",
+        text: textOf(entry.move, roleOf),
+        at: entry.at,
+      }));
+    const asked = requests
+      .filter((request) => pair.has(request.from) && pair.has(request.to))
+      .slice(-REPORT_SNAPSHOT.requests)
+      .map((request) => ({
+        by: roleOf(request.from),
+        kind: "request",
+        text: `${request.type} ${request.state}`.slice(0, REPORT_SNAPSHOT.textMax),
+        at: request.createdAt,
+      }));
+    return [...moves, ...asked].sort((a, b) => a.at - b.at);
+  }
+
+  /** Each id as it is now: a guest who signed in is their account. Other ids stay as they are. */
+  async function accountsOf(playerIds) {
+    const moved = new Map(
+      (await transfers.listFrom([...new Set(playerIds)])).map((transfer) => [transfer.from, transfer.to.id]),
+    );
+    return (id) => moved.get(id) ?? id;
+  }
+
+  /** The person a target names and what is kept of where they met. */
+  async function resolve({ reporter, target, now }) {
+    try {
+      if ("handle" in target) {
+        const person = await profiles.personByHandle({ handle: target.handle, viewerId: reporter.id, now });
+        if (person.playerId === reporter.id) throw notFound();
+        return { person, context: { kind: REPORT_CONTEXT.PROFILE } };
+      }
+      const person = await coPlayers.personAt({ target, askerId: reporter.id, refusal: notFound });
+      const ids = { reporterId: reporter.id, reportedId: person.playerId };
+      // The room or match may still name the guest the reported player was when they sat down.
+      const seatedId = (playerId, current) =>
+        current(playerId) === person.playerId ? person.playerId : playerId;
+      if ("roomCode" in target) {
+        const room = await rooms.getByCode(target.roomCode);
+        const current = await accountsOf(room.seats.map((seat) => seat.playerId));
+        const log = (room.game?.log ?? []).map((entry) => ({
+          ...entry,
+          playerId: seatedId(entry.playerId, current),
+        }));
+        const requests = (room.requests ?? []).map((request) => ({
+          ...request,
+          from: seatedId(request.from, current),
+          to: seatedId(request.to, current),
+        }));
+        return {
+          person,
+          context: {
+            kind: REPORT_CONTEXT.ROOM,
+            gameId: room.gameId,
+            roomCode: room.code,
+            ...(room.game?.matchId !== undefined && { matchId: room.game.matchId }),
+            recent: recentOf({ log, requests, ...ids }),
+          },
+        };
+      }
+      const match = await matches.getById(target.matchId);
+      const current = await accountsOf(match.log.map((entry) => entry.playerId ?? ""));
+      const log = match.log.map((entry) => ({ ...entry, playerId: seatedId(entry.playerId, current) }));
+      return {
+        person,
+        context: {
+          kind: REPORT_CONTEXT.MATCH,
+          gameId: match.gameId,
+          matchId: target.matchId,
+          recent: recentOf({ log, ...ids }),
+        },
+      };
+    } catch (err) {
+      // A room that closed between the check and the read is a stranger's room too.
+      throw err instanceof NotFoundError || err instanceof GoneError ? notFound(err) : err;
+    }
+  }
+
+  /** Whether a reporter's earlier reports were dismissed often enough, and never acted on (REPORTER_TRUST). */
+  async function isSetAside(reporterId) {
+    const made = await reportAccessor.listByReporter(reporterId);
+    const dismissed = made.filter((report) => report.status === REPORT_STATUS.DISMISSED).length;
+    const actioned = made.some((report) => report.status === REPORT_STATUS.ACTIONED);
+    return !actioned && dismissed >= REPORTER_TRUST.dismissedAtLeast;
+  }
+
+  /** One report as the console shows it: everything but who reported and who was reported. */
+  const itemOf = (report) =>
+    Object.freeze({
+      reportId: report.reportId,
+      reason: report.reason,
+      nameThen: report.reportedName,
+      context: report.context,
+      setAside: report.setAside,
+      createdAt: report.createdAt,
+      ...(report.action !== undefined && { action: report.action, closedAt: report.closedAt }),
+    });
+
+  /**
+   * The reports about one player as one group of the console, named by its newest report's id. The counts come from
+   * the whole group; the items are the newest REPORT_QUEUE.itemsPerGroup, set aside ones last (ADR-071.5).
+   */
+  function groupOf(counted, reports) {
+    const kind = isAccountId(counted.reportedId) ? "account" : "guest";
+    const items = [...reports.filter((r) => !r.setAside), ...reports.filter((r) => r.setAside)];
+    return Object.freeze({
+      groupId: counted.newestId,
+      kind,
+      canRename: kind === "account" && reports[0]?.status === REPORT_STATUS.OPEN,
+      names: Object.freeze([...new Set(reports.map((report) => report.reportedName))]),
+      reports: counted.reports,
+      reporters: counted.reporters,
+      setAside: counted.setAside,
+      reasons: Object.freeze(
+        Object.fromEntries(
+          REPORT_REASONS.map((reason) => [
+            reason,
+            reports.filter((report) => report.reason === reason).length,
+          ]),
+        ),
+      ),
+      lastAt: counted.lastAt,
+      items: Object.freeze(items.map(itemOf)),
+    });
+  }
+
+  return Object.freeze({
+    /**
+     * Stores a report on the person at `target` and answers only its id and time, the same for every report, so the
+     * answer says nothing about who that is or what will happen. A second report by the same reporter on the same
+     * player the same India day answers the first one.
+     *
+     * @param {{ reporter: Readonly<import("../../models/identity.js").Identity>, target: ReportTarget, reason: string, now: number }} input
+     *   `reason` is already checked by the service layer
+     * @returns {Promise<Readonly<{ reportId: string, createdAt: number }>>}
+     * @throws {NotFoundError} for every reference the server cannot confirm, all with the same message
+     */
+    async report({ reporter, target, reason, now }) {
+      const { person, context } = await resolve({ reporter, target, now });
+      const { report } = await reportAccessor.add({
+        reportId: newReportId(),
+        reporterId: reporter.id,
+        reportedId: person.playerId,
+        reportedName: person.displayName,
+        reason,
+        context,
+        day: dayOf(now),
+        setAside: await isSetAside(reporter.id),
+        at: now,
+      });
+      return Object.freeze({ reportId: report.reportId, createdAt: report.createdAt });
+    },
+
+    /**
+     * Who the player reported in one of their own reports, as they are now, so the thank-you can block them in one
+     * tap (ADR-071.4). Server only: never sent to a client.
+     *
+     * @param {{ reportId: string, reporterId: string }} query
+     * @returns {Promise<Person>}
+     * @throws {NotFoundError} for anyone else's report and an unknown one, alike
+     */
+    async reportedBy({ reportId, reporterId }) {
+      const report = await reportAccessor.get(reportId);
+      if (report.reporterId !== reporterId) throw new NotFoundError("No such report");
+      const playerId = (await accountsOf([report.reportedId]))(report.reportedId);
+      return Object.freeze({ playerId, displayName: report.reportedName });
+    },
+
+    /**
+     * The owner's queue: the reports of one status grouped by reported player, groups with the most reporters first
+     * (set aside reports do not count), then the newest, one page at a time. Grouping happens in the store before the
+     * page is cut, so a flood about one player cannot push another out. No player id, of the reporter or the
+     * reported, is in it.
+     *
+     * @param {{ status: string, page: number, pageSize?: number }} query  `page` counts from 0
+     * @returns {Promise<Readonly<{ groups: ReadonlyArray<object>, total: number, page: number, more: boolean }>>}
+     *   `total` is how many groups there are, `more` whether a later page has some
+     */
+    async queue({ status, page, pageSize = REPORT_QUEUE.groupsPerPage }) {
+      const { total, groups } = await reportAccessor.listGroups({
+        status,
+        skip: page * pageSize,
+        limit: pageSize,
+      });
+      const shown = await Promise.all(
+        groups.map(async (counted) =>
+          groupOf(
+            counted,
+            await reportAccessor.listAbout({
+              reportedId: counted.reportedId,
+              status,
+              limit: REPORT_QUEUE.itemsPerGroup,
+            }),
+          ),
+        ),
+      );
+      return Object.freeze({
+        groups: Object.freeze(shown),
+        total,
+        page,
+        more: (page + 1) * pageSize < total,
+      });
+    },
+
+    /**
+     * Acts on the player of a report: dismisses their open reports, or renames their account to a safe default and
+     * closes them as acted on. Only reports up to this one close, so one that came in after the owner loaded the
+     * queue stays open: the console sends the newest report of the group it showed (review of #150).
+     *
+     * @param {{ reportId: string, action: string, now: number }} input  `action` is one of REPORT_ACTIONS
+     * @returns {Promise<Readonly<{ closed: number, displayName?: string }>>}
+     * @throws {NotFoundError} for an unknown report
+     * @throws {ConflictError} when the report is closed already, or a rename is asked for a guest
+     */
+    async act({ reportId, action, now }) {
+      const report = await reportAccessor.get(reportId);
+      if (report.status !== REPORT_STATUS.OPEN) {
+        throw new ConflictError("These reports are closed already");
+      }
+      const { reportedId } = report;
+      const upTo = { createdAt: report.createdAt, reportId };
+      if (action === REPORT_ACTION.RENAME) {
+        if (!isAccountId(reportedId)) {
+          throw new ConflictError("A guest's name is given by the server and cannot be renamed");
+        }
+        const displayName = await names.resetName({ playerId: reportedId, now });
+        const closed = await reportAccessor.closeOpen({
+          reportedId,
+          upTo,
+          status: REPORT_STATUS.ACTIONED,
+          action,
+          at: now,
+        });
+        return Object.freeze({ closed, displayName });
+      }
+      const closed = await reportAccessor.closeOpen({
+        reportedId,
+        upTo,
+        status: REPORT_STATUS.DISMISSED,
+        action: REPORT_ACTION.DISMISS,
+        at: now,
+      });
+      return Object.freeze({ closed });
+    },
+
+    /**
+     * A guest just signed in (ADR-014): the reports they made and the reports about them now name the account, so
+     * signing in never gets round a report. Running it twice moves nothing more.
+     *
+     * @param {{ from: string, to: Readonly<import("../../models/identity.js").Identity>, now: number }} transfer
+     * @returns {Promise<{ moved: { reports: number } }>}
+     */
+    async transferPlayer({ from, to }) {
+      const made = await reportAccessor.moveReporter({ from, to: to.id });
+      const received = await reportAccessor.moveReported({ from, to: to.id });
+      return { moved: { reports: made + received } };
+    },
+
+    /**
+     * The reports the player made, for their data export (CC-035): never the reported player's id and never what
+     * happened to them. Reports about the player are other players' words.
+     *
+     * @param {{ playerId: string }} query
+     */
+    exportPlayer: async ({ playerId }) =>
+      (await reportAccessor.listByReporter(playerId)).map((report) => ({
+        reason: report.reason,
+        where: report.context.kind,
+        displayName: report.reportedName,
+        reportedAt: new Date(report.createdAt).toISOString(),
+      })),
+
+    /**
+     * Deletes every report about the player, and gives each report they made a stand-in of its own, so a report on
+     * someone who harmed them outlives their account but no longer leads to them (CC-035).
+     * Running it twice changes nothing.
+     *
+     * @param {{ playerId: string }} input
+     * @returns {Promise<{ erased: { reports: number } }>}
+     */
+    async erasePlayer({ playerId }) {
+      const anonymised = await reportAccessor.anonymiseReporter({
+        reporterId: playerId,
+        standIn: () => deletedPlayer(newUuid()).id,
+      });
+      const removed = await reportAccessor.removeAbout(playerId);
+      return { erased: { reports: anonymised + removed } };
+    },
+  });
+}
