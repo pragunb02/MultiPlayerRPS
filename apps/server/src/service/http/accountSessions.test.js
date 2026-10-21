@@ -35,6 +35,7 @@ async function call(method, path, { body, cookie, headers = {} } = {}) {
     status: res.status,
     body: text === "" ? {} : JSON.parse(text),
     cookie: setCookie ? setCookie.split(";")[0] : cookie,
+    setsCookie: setCookie !== null,
   };
 }
 
@@ -220,6 +221,45 @@ describe("POST /api/auth/password (CC-116)", () => {
 });
 
 describe("POST /api/auth/sign-out-others (CC-116)", () => {
+  // CC-326: the profile page asks for several things at once, and the button can be pressed before they are all
+  // answered. Sessions are rolling, so an answer would set the old, destroyed id again over the new one.
+  it("keeps this device signed in when a request it sent before is answered after it", async () => {
+    const accounts = createInMemoryAccountDao();
+    let reading;
+    let release;
+    const accountDao = {
+      ...accounts,
+      getById: async (accountId) => {
+        const account = await accounts.getById(accountId);
+        if (reading) {
+          reading();
+          await new Promise((resolve) => {
+            release = resolve;
+          });
+        }
+        return account;
+      },
+    };
+    server = await startTestServer({ accountDao });
+    const laptop = (await call("POST", "/api/auth/signup", { body: RIYA })).cookie;
+    const read = new Promise((resolve) => {
+      reading = resolve;
+    });
+
+    const earlier = call("GET", "/api/account", { cookie: laptop });
+    await read;
+    reading = undefined;
+    const signedOut = await call("POST", "/api/auth/sign-out-others", { cookie: laptop });
+    release();
+    const answered = await earlier;
+
+    expect(signedOut.status).toBe(204);
+    expect(answered.status).toBe(200);
+    expect(answered.setsCookie).toBe(false);
+    expect((await whoAmI(signedOut.cookie)).authenticated).toBe(true);
+    expect(await whoAmI(laptop)).toEqual({ authenticated: false });
+  });
+
   it("signs out every other device and keeps this one", async () => {
     const { laptop, phone } = await twoDevices();
     const tablet = (await login()).cookie;
