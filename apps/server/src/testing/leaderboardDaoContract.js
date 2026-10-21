@@ -124,6 +124,21 @@ export function runLeaderboardDaoContract(createDao) {
     expect(await dao.listByPlayer("user_nobody")).toEqual([]);
   });
 
+  it("renames every entry of one player and nobody else's (CC-044)", async () => {
+    const dao = await createDao();
+    await dao.raiseScore({ ...XP, ...player("user_a", "alice", 2), score: 80, at: at() });
+    await dao.addOnce({ ...WEEK, ...player("user_a", "alice", 2), key: "m1", inc: 30, at: at(1) });
+    await dao.raiseScore({ ...XP, ...player("user_b", "bob"), score: 10, at: at() });
+
+    expect(await dao.renamePlayer({ playerId: "user_a", displayName: "Player_ABCDEF" })).toBe(2);
+
+    expect((await dao.listByPlayer("user_a")).map((entry) => entry.displayName)).toEqual([
+      "Player_ABCDEF",
+      "Player_ABCDEF",
+    ]);
+    expect((await dao.listByPlayer("user_b"))[0]).toMatchObject({ displayName: "bob", score: 10 });
+  });
+
   it("deletes every entry of one player and nobody else's (CC-035)", async () => {
     const dao = await createDao();
     await dao.raiseScore({ ...XP, ...player("user_a", "alice", 2), score: 80, at: at() });

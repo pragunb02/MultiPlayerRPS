@@ -8,7 +8,7 @@ import { createCsrfGuard, contentSecurityPolicy } from "./requestGuards.js";
 import { createAdminAccess } from "./adminAccess.js";
 import { createRequestLogger, keepRoutePrefix } from "./requestLogger.js";
 import { apiRouter } from "./routes.js";
-import { createSessionGuard, createSessionRenewals } from "./session.js";
+import { createRenewedSessionRelease, createSessionGuard, createSessionRenewals } from "./session.js";
 import { createWebAppRouter } from "./webApp.js";
 
 /**
@@ -39,6 +39,8 @@ import { createWebAppRouter } from "./webApp.js";
  *   friendLimits?: Parameters<typeof import("./friendRoutes.js").createFriendRoutes>[0]["limits"],
  *   feedbackComponent: ReturnType<typeof import("../../domain/feedback/feedbackComponent.js").createFeedbackComponent>,
  *   feedbackLimits?: Parameters<typeof import("./feedbackRoutes.js").createFeedbackRoutes>[0]["limits"],
+ *   reportComponent: Parameters<typeof import("./reportRoutes.js").createReportRoutes>[0]["reportComponent"],
+ *   reportLimits?: Parameters<typeof import("./reportRoutes.js").createReportRoutes>[0]["limits"],
  *   dailyPuzzleComponent: ReturnType<typeof import("../../domain/dailyPuzzles/dailyPuzzleComponent.js").createDailyPuzzleComponent>,
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   moves and hints per player (CC-144)
  *   safetyComponent: ReturnType<typeof import("../../domain/safety/safetyComponent.js").createSafetyComponent>,  the age
@@ -85,6 +87,8 @@ export function createHttpApp({
   friendLimits,
   feedbackComponent,
   feedbackLimits,
+  reportComponent,
+  reportLimits,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   safetyComponent,
@@ -140,11 +144,13 @@ export function createHttpApp({
   app.use("/api", keepRoutePrefix);
   app.use("/api", createCsrfGuard({ allowedOrigins: config.allowedOrigins }));
   app.use("/api", sessionMiddleware);
+  const renewals = createSessionRenewals({ now });
+  // Straight after the session: an answer to a request that carried a just renewed id never sets it again (CC-326).
+  app.use("/api", createRenewedSessionRelease({ renewals }));
   // After the session, so a signed-in or guest player is counted by session rather than by address.
   app.use("/api", createApiRateLimit(apiLimit));
   // After the limit, so a flood of requests is refused before it costs a database read each. A session signed out
   // elsewhere or older than 90 days goes on as no session at all (CC-116).
-  const renewals = createSessionRenewals({ now });
   app.use("/api", createSessionGuard({ checkSession, onSessionEnded, renewals, now }));
 
   app.use(
@@ -180,6 +186,8 @@ export function createHttpApp({
       friendLimits,
       feedbackComponent,
       feedbackLimits,
+      reportComponent,
+      reportLimits,
       dailyPuzzleComponent,
       dailyPuzzleLimit,
       safetyComponent,

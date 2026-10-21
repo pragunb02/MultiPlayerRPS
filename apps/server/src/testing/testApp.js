@@ -32,6 +32,8 @@ import { createProfileCards } from "../domain/profiles/profileCards.js";
 import { createProfileComponent } from "../domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "../domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "../domain/feedback/feedbackComponent.js";
+import { createReportComponent, REPORT_EVENTS } from "../domain/reports/reportComponent.js";
+import { createReportAccessor } from "../data/reportAccessor.js";
 import { createFlagComponent } from "../domain/flags/flagComponent.js";
 import { createFeatureFlagAccessor } from "../data/featureFlagAccessor.js";
 import { createInMemoryFeatureFlagDao } from "./inMemoryFeatureFlagDao.js";
@@ -48,6 +50,7 @@ import { inProcessThinking } from "./inProcessThinking.js";
 import { createGamificationComponent } from "../domain/gamification/gamificationComponent.js";
 import { createIdentityComponent } from "../domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "../domain/identity/playerTransferComponent.js";
+import { createCoPlayers } from "../domain/players/coPlayers.js";
 import { createLeaderboardComponent } from "../domain/leaderboards/leaderboardComponent.js";
 import { createMatchComponent } from "../domain/matches/matchComponent.js";
 import { createMatchPlayerIds, matchPlayerSecretFrom } from "../domain/matches/matchPlayerIds.js";
@@ -63,6 +66,7 @@ import {
   identityFollowers,
   keepFinishedGameIn,
   matchPipelineSteps,
+  reportedNames,
   roomErasure,
   wireFriends,
 } from "../server.js";
@@ -88,6 +92,7 @@ import {
 } from "./inMemoryFriendDaos.js";
 import { createInMemoryProfileDao } from "./inMemoryProfileDao.js";
 import { createInMemoryFeedbackDao } from "./inMemoryFeedbackDao.js";
+import { createInMemoryReportDao } from "./inMemoryReportDao.js";
 import { TEST_CHESS_PUZZLES } from "./dailyPuzzleSet.js";
 import { createInMemoryDailyPuzzleAttemptDao } from "./inMemoryDailyPuzzleAttemptDao.js";
 import { createInMemoryChessRatingDao } from "./inMemoryChessRatingDao.js";
@@ -139,6 +144,8 @@ import { testConfig } from "./testConfig.js";
  *   friendLimits?: object,   the limits on friend requests, changes and link lookups (CC-052)
  *   friendRules?: object,   the friends rules (FRIEND_LIMITS), such as how many requests may wait (CC-052)
  *   feedbackLimits?: object,   the limits on sending feedback (CC-290)
+ *   reportLimits?: object,   the limits on reporting a player (CC-044)
+ *   reportDao?: ReturnType<typeof createInMemoryReportDao>,   the reports store, which a test can read (CC-044)
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   daily puzzle moves and hints per player (CC-144)
  *   chessPuzzles?: ReadonlyArray<object>,   the daily chess puzzles, two known ones unless a test gives its own
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
@@ -171,6 +178,8 @@ export function createTestApp({
   friendLimits,
   friendRules,
   feedbackLimits,
+  reportLimits,
+  reportDao = createInMemoryReportDao(),
   dailyPuzzleLimit,
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
@@ -221,15 +230,6 @@ export function createTestApp({
     playerTransferDao: createInMemoryPlayerTransferDao(),
   });
   const seatIds = createSeatIds({ secret: seatSecretFrom(config.sessionSecret) });
-  const blockComponent = createBlockComponent({
-    blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
-    rooms: roomAccessor,
-    matches: matchComponent,
-    transfers: playerTransferAccessor,
-    seatIds,
-    // As in the composition root: friends are made after the rooms they read (CC-052).
-    followers: [{ name: "friends", playersBlocked: (pair) => friends.friendComponent.playersBlocked(pair) }],
-  });
   const dailyPuzzleComponent = createDailyPuzzleComponent({
     dailyPuzzleAccessor: createDailyPuzzleAccessor({ attemptDao: dailyPuzzleAttemptDao, catalogues: {} }),
     kinds: [createChessKind({ puzzles: chessPuzzles })],
@@ -282,6 +282,39 @@ export function createTestApp({
     progress: progressionComponent,
     ratings: chessRatingComponent,
   });
+  // Reports are read by blocks (the one-tap block after a report), so they are made first (ADR-071.4).
+  // Rooms read blocks, which read reports, so the room component is made after them. A rename reaches the rooms
+  // through this, which gets the room component's rename as soon as it exists (long before any owner can rename).
+  const roomsToRename = /** @type {Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">} */ ({});
+  const reportComponent = createReportComponent({
+    reportAccessor: createReportAccessor({ reportDao }),
+    coPlayers: createCoPlayers({
+      rooms: roomAccessor,
+      matches: matchComponent,
+      transfers: playerTransferAccessor,
+      seatIds,
+    }),
+    rooms: roomAccessor,
+    matches: matchComponent,
+    transfers: playerTransferAccessor,
+    profiles: profileComponent,
+    names: reportedNames({
+      accountComponent,
+      roomComponent: roomsToRename,
+      leaderboardComponent,
+      domainEvents,
+    }),
+  });
+  const blockComponent = createBlockComponent({
+    blockAccessor: createBlockAccessor({ blockDao: createInMemoryBlockDao() }),
+    rooms: roomAccessor,
+    matches: matchComponent,
+    transfers: playerTransferAccessor,
+    seatIds,
+    reports: reportComponent,
+    // As in the composition root: friends are made after the rooms they read (CC-052).
+    followers: [{ name: "friends", playersBlocked: (pair) => friends.friendComponent.playersBlocked(pair) }],
+  });
   const playerTransferComponent = createPlayerTransferComponent({
     playerTransferAccessor,
     participants: transferParticipants([
@@ -290,6 +323,7 @@ export function createTestApp({
       { name: "chessRatings", transferPlayer: chessRatingComponent.transferPlayer },
       { name: "gamification", transferPlayer: gamificationComponent.transferPlayer },
       { name: "blocks", transferPlayer: blockComponent.transferPlayer },
+      { name: "reports", transferPlayer: reportComponent.transferPlayer },
       { name: "dailyPuzzles", transferPlayer: dailyPuzzleComponent.transferPlayer },
       { name: "profiles", transferPlayer: profileComponent.transferPlayer },
       // Made after the room component, which it needs, and called only once a guest signs in.
@@ -331,6 +365,7 @@ export function createTestApp({
     seatIds,
     avatars: profileCards,
   });
+  roomsToRename.renamePlayer = roomComponent.renamePlayer;
   const challengeComponent = createChallengeComponent({
     challengeAccessor: createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() }),
     rooms: roomComponent,
@@ -430,6 +465,11 @@ export function createTestApp({
       },
       { name: "blocks", erasePlayer: blockComponent.erasePlayer, exportPlayer: blockComponent.exportPlayer },
       {
+        name: "reports",
+        erasePlayer: reportComponent.erasePlayer,
+        exportPlayer: reportComponent.exportPlayer,
+      },
+      {
         name: "friends",
         erasePlayer: friends.friendComponent.erasePlayer,
         exportPlayer: friends.friendComponent.exportPlayer,
@@ -488,6 +528,8 @@ export function createTestApp({
     friendLimits,
     feedbackComponent,
     feedbackLimits,
+    reportComponent,
+    reportLimits,
     dailyPuzzleComponent,
     safetyComponent,
     dailyPuzzleLimit,
@@ -534,6 +576,7 @@ export function createTestApp({
     networkOf,
     friends,
     feedbackComponent,
+    reportComponent,
     dailyPuzzleComponent,
     flagComponent,
     matchPipeline,
@@ -593,6 +636,7 @@ export async function startTestServer({ now = Date.now, ...options } = {}) {
   testApp.onSessionEnded((sessionId) => gateway.disconnectSession(sessionId));
   testApp.onOtherSessionsEnded((which) => gateway.disconnectOtherSessions(which));
   testApp.onAccountDeleted((playerId) => gateway.disconnectPlayer(playerId));
+  testApp.domainEvents.on(REPORT_EVENTS.PLAYER_RENAMED, ({ playerId }) => gateway.disconnectPlayer(playerId));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = /** @type {import("node:net").AddressInfo} */ (server.address());
   return {
