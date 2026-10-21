@@ -74,6 +74,7 @@ export function uxSeedEvents({ day, scale = 1 }) {
   many(14, "dead_clicked", { element: "img" });
   many(7, "dead_clicked", { control: "lobby.rules", route: "/games/rock-paper-scissors" });
   many(2, "dead_clicked", { element: "div", route: "/leaderboards" });
+  many(5, "dead_clicked", { control: "toast.xp.close", route: "/profile", surface: "toast.xp" });
   many(6, "rage_clicked", {
     control: "room.rematch.ask",
     presses: "3",

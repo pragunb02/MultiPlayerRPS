@@ -98,6 +98,8 @@ describe("GET /api/admin/ux (CC-177)", () => {
     ["an unknown section", "section=everything"],
     ["no section", ""],
     ["only one end of the range", "section=clicks&from=2026-10-01"],
+    ["only the other end of the range", "section=clicks&to=2026-10-01"],
+    ["an end that is not a day", "section=clicks&from=2026-10-01&to=2026-13-01"],
     ["a day that is not a day", "section=clicks&from=2026-02-30&to=2026-03-01"],
     ["a range that ends before it starts", "section=clicks&from=2026-10-10&to=2026-10-01"],
     ["a range that reaches today", "section=clicks&from=2026-10-14&to=2026-10-21"],

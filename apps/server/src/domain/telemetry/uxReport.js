@@ -528,11 +528,10 @@ export function createUxReport({ telemetryReport, cache, now }) {
       const total = sum(rows);
       if (total < 5) return FEWER_THAN_MIN;
       let seen = 0;
-      for (const label of TELEMETRY_BUCKETS.SHOWN_MS) {
-        seen += sum(rows, ({ group }) => group.shown_ms === label);
-        if (seen >= Math.ceil(total / 2)) return label;
-      }
-      return FEWER_THAN_MIN;
+      // Every row's bucket is one of the catalogue's labels, so the half is always reached.
+      return TELEMETRY_BUCKETS.SHOWN_MS.find(
+        (label) => (seen += sum(rows, ({ group }) => group.shown_ms === label)) >= Math.ceil(total / 2),
+      );
     };
     const mix = (rows, surface, field) =>
       Object.fromEntries(

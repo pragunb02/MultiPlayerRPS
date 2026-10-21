@@ -148,11 +148,8 @@ const sortedPairs = (values) => [...values.entries()].sort(([a], [b]) => a - b);
 /** The value at a rank (1-based) of a sorted list of `[value, count]` pairs. */
 function atRank(pairs, rank) {
   let seen = 0;
-  for (const [value, count] of pairs) {
-    seen += count;
-    if (seen >= rank) return value;
-  }
-  return pairs.at(-1)[0];
+  // The rank is at most the sum of the counts, so a pair is always found.
+  return pairs.find(([, count]) => (seen += count) >= rank)[0];
 }
 
 const RANKS = Object.freeze({ p50: 0.5, p75: 0.75, p95: 0.95 });
@@ -200,7 +197,8 @@ function bucketsOf(field, values) {
   const edges = edgesOf(field);
   const sums = new Map();
   for (const [value, count] of values) {
-    const edge = edges.find((upper) => value <= upper) ?? edges.at(-1);
+    // The last edge is the catalogue's longest value, so every value has a bucket.
+    const edge = edges.find((upper) => value <= upper);
     sums.set(edge, (sums.get(edge) ?? 0) + count);
   }
   return sortedPairs(sums);

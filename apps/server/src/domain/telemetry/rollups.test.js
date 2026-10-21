@@ -50,6 +50,12 @@ describe("the rollup spec (CC-176)", () => {
     }
   });
 
+  it("refuses a spec that would total by a timing, whose values are not a closed list", () => {
+    expect(() => worstCaseRows({ page_speed_measured: { groups: [["lcp_ms"]], timings: [] } })).toThrow(
+      /page_speed_measured.lcp_ms is ms/,
+    );
+  });
+
   // AC-4
   it("the spec stays under the row budget", () => {
     const worst = worstCaseRows(ROLLUP_SPEC);
@@ -147,7 +153,11 @@ describe("rollUpDay (CC-176)", () => {
   it("keeps only groups of the spec, never a field the spec does not list", async () => {
     const rows = await rollUpDay({
       day: DAY,
-      counters: [counter("visit_ended", { active_s: "30-60", presses: "1-5" }, 5)],
+      counters: [
+        counter("visit_ended", { active_s: "30-60", presses: "1-5" }, 5),
+        // A name the spec does not total (an event from a newer catalogue) is left out.
+        counter("not_in_the_spec", {}, 3),
+      ],
     });
 
     rows.forEach((row) => {
@@ -176,6 +186,29 @@ describe("rollUpDay (CC-176)", () => {
     const other = byControl.find((row) => row.group.control === OTHER_VALUE);
     // The five quietest: 100 - 25 ... 100 - 29.
     expect(other.count).toBe([75, 74, 73, 72, 71].reduce((a, b) => a + b, 0));
+  });
+
+  it("keeps the timings of the values it sums as other", async () => {
+    const counters = Array.from({ length: TOP_KEPT.control + 2 }, (_, index) =>
+      counter(
+        "action_waited",
+        {
+          control: `lobby.c${index}`,
+          transport: "socket",
+          wait_ms: 100 * (index + 1),
+          outcome: "ok",
+          showed_spinner: false,
+        },
+        50 - index,
+      ),
+    );
+
+    const rows = await rollUpDay({ day: DAY, counters });
+
+    const other = rows.find((row) => row.event === "action_waited" && row.group.control === OTHER_VALUE);
+    // The two quietest: 2600 ms 25 times and 2700 ms 24 times.
+    expect(other.count).toBe(49);
+    expect(other.timings.wait_ms).toEqual(expect.objectContaining({ n: 49, p50: 2600, p95: 2700 }));
   });
 
   // Review of #176: the work grows with the counters, not with their square, and live games get a turn.

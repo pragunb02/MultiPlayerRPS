@@ -218,6 +218,17 @@ describe("the UX report (CC-177)", () => {
     expect(budget.worst).toBe("amber");
   });
 
+  it("gives latency per control at p50 and p95, and how the waits ended", async () => {
+    const { uxReport } = await uxReportOver({ now: NOW });
+
+    const { controls, outcomes } = await uxReport.get({ section: "latency", range: RANGE });
+
+    expect(controls).toEqual([expect.objectContaining({ control: "lobby.create", presses: 280 })]);
+    expect(controls[0].p50).toBeGreaterThan(0);
+    expect(controls[0].p95).toBeGreaterThanOrEqual(controls[0].p50);
+    expect(outcomes).toEqual([{ outcome: "ok", count: 280 }]);
+  });
+
   it("answers an empty store with zeros and hidden shares, never an error", async () => {
     const { uxReport } = await uxReportOver({ now: NOW, seed: false });
 

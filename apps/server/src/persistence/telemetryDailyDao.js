@@ -7,6 +7,8 @@ export const TELEMETRY_DAILY_KEEP_DAYS = 400;
 export const TELEMETRY_RUNS_KEEP_DAYS = 40;
 const DAY_S = 24 * 60 * 60;
 const DUPLICATE_KEY = 11000;
+/** How often a read is made again when a day was replaced while it was read. Replaces are hours apart. */
+const READ_ATTEMPTS = 5;
 
 /**
  * @typedef {Object} TelemetryDailyDoc   persistence object: one India day's total of one event for one group of
@@ -106,25 +108,35 @@ export function createTelemetryDailyDao({ connection }) {
      * @returns {Promise<Array<Omit<TelemetryDailyDoc, "at" | "key" | "fields" | "version">>>} by day, event and group
      */
     async read({ from, to, events, fields, dropBuckets = [] }) {
-      const runs = await Run.find(
-        { _id: { $gte: from, $lte: to }, version: { $ne: null } },
-        { version: 1 },
-      ).lean();
-      if (runs.length === 0) return [];
       const projection = {
         ...HIDDEN,
         ...Object.fromEntries(dropBuckets.map((name) => [`timings.${name}.buckets`, 0])),
       };
-      return Daily.find(
-        {
-          event: { $in: [...events] },
-          ...(fields !== undefined && { fields }),
-          $or: runs.map(({ _id, version }) => ({ day: _id, version })),
-        },
-        projection,
-      )
-        .sort({ day: 1, event: 1, key: 1 })
-        .lean();
+      const versionsOf = async () =>
+        Run.find({ _id: { $gte: from, $lte: to }, version: { $ne: null } }, { version: 1 })
+          .sort({ _id: 1 })
+          .lean();
+      const same = (a, b) =>
+        a.length === b.length &&
+        a.every((run, index) => run._id === b[index]._id && run.version === b[index].version);
+      // The versions are read before and after the rows. When a replace switched a day in between, its old rows may
+      // already be gone, so the read is made again: what is returned was whole for every day.
+      for (let attempt = 0; attempt < READ_ATTEMPTS; attempt += 1) {
+        const runs = await versionsOf();
+        if (runs.length === 0) return [];
+        const rows = await Daily.find(
+          {
+            event: { $in: [...events] },
+            ...(fields !== undefined && { fields }),
+            $or: runs.map(({ _id, version }) => ({ day: _id, version })),
+          },
+          projection,
+        )
+          .sort({ day: 1, event: 1, key: 1 })
+          .lean();
+        if (same(runs, await versionsOf())) return rows;
+      }
+      throw new Error("telemetry daily totals kept changing while they were read");
     },
 
     /**

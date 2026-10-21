@@ -83,6 +83,41 @@ describe("MongoDB telemetry daily DAO honours the telemetry daily DAO contract (
     );
   });
 
+  it("passes on a failure to take a lease that is not another holder", async () => {
+    const dao = await createDao();
+    const Run = databases.at(-1).connection.model("TelemetryDailyRun");
+    const update = Run.findOneAndUpdate;
+    Run.findOneAndUpdate = async () => {
+      throw new Error("database down");
+    };
+    try {
+      const now = new Date(DAY_AT);
+      await expect(
+        dao.acquireRun({ day: "2026-10-19", at: now, owner: "a", now, until: new Date(DAY_AT + 60_000) }),
+      ).rejects.toThrow("database down");
+    } finally {
+      Run.findOneAndUpdate = update;
+    }
+  });
+
+  it("gives up with an error, never a part of a day, when the versions keep changing under a read", async () => {
+    const dao = await createDao();
+    await dao.replaceDay({ day: "2026-10-19", at: new Date(DAY_AT), rows: [dailyRow()] });
+    const Run = databases.at(-1).connection.model("TelemetryDailyRun");
+    let flip = 0;
+    const find = Run.find;
+    Run.find = () => ({
+      sort: () => ({ lean: async () => [{ _id: "2026-10-19", version: `v${(flip += 1)}` }] }),
+    });
+    try {
+      await expect(
+        dao.read({ from: "2026-10-19", to: "2026-10-19", events: ["control_pressed"] }),
+      ).rejects.toThrow("kept changing");
+    } finally {
+      Run.find = find;
+    }
+  });
+
   // Review of #176: a reader never sees half a day, so it cannot cache one.
   it("reads a day whole while it is replaced: never a part, never both versions", async () => {
     const dao = await createDao();

@@ -19,9 +19,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * @returns {string}
  */
 export function oldestFullDay(now) {
-  const kept = now - COUNTERS_KEPT_DAYS * DAY_MS;
-  const day = dayOf(kept);
-  return startOfDay(day) > kept ? day : addDays(day, 1);
+  // The day `kept` falls in started at or before it, so its first hours are gone: the next day is the oldest whole one.
+  return addDays(dayOf(now - COUNTERS_KEPT_DAYS * DAY_MS), 1);
 }
 /** The complete days rolled up again on every run, so a late beacon is counted (owner default, 2026-10-22). */
 export const ROLLUP_REDO_DAYS = 2;
@@ -146,9 +145,8 @@ export function createRollupJob({
       onRun({ outcome: ROLLUP_OUTCOMES.OK });
       return "ok";
     } catch (err) {
-      const step = err instanceof StepError ? err.step : "total";
-      // The day and the step, nothing about any event: the counters hold no one anyway.
-      logger.error({ err: err.cause ?? err, step }, "telemetry rollup failed");
+      // Every step is wrapped, so the error names its step. The day and the step, nothing about any event.
+      logger.error({ err: err.cause, step: err.step }, "telemetry rollup failed");
       onRun({ outcome: ROLLUP_OUTCOMES.FAILED });
       if (leased) {
         await telemetryDailyAccessor.releaseRun({ day, owner, now: now() }).catch(() => undefined);

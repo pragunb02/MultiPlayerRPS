@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, GUEST } from "../../testing/fakes.js";
 import { flagPaths } from "../../testing/flagPaths.js";
 import { renderApp } from "../../testing/render.jsx";
@@ -128,6 +129,116 @@ describe("the console's UX page (CC-177)", () => {
     );
     expect(within(budget).getByRole("row", { name: /Rage and dead/ })).toHaveTextContent("Red");
     expect(within(budget).getByRole("row", { name: /first move/ })).toHaveTextContent("No colour");
+  });
+
+  it("latency per control at p50 and p95, and how the waits ended", async () => {
+    await openUx("latency");
+
+    const waits = within(await figure("Wait per control")).getByRole("table");
+    expect(rowsOf(waits)[1]).toBe("lobby.create280500 ms900 ms");
+    expect(rowsOf(waits)[2]).toBe("room.leavefewer than 5fewer than 5fewer than 5");
+    expect(await figure("How the waits ended")).toHaveTextContent("ok280");
+  });
+
+  it("marks a fall and no change in words, with the arrow hidden from readers", async () => {
+    const api = ownerApi({
+      getUxReport: vi.fn(async () => ({
+        ...UX_REPORTS.clicks,
+        presses: { now: 900, before: 1000, change: -0.1 },
+        dead: { now: 20, before: 20, change: 0 },
+      })),
+    });
+    await openUx("clicks", api);
+
+    const presses = (await screen.findByText("Presses", { selector: "dt" })).parentElement;
+    expect(presses).toHaveTextContent("Before: 1,000 (▼ −10.0%)");
+    const dead = screen.getByText("Dead clicks", { selector: "dt" }).parentElement;
+    expect(dead).toHaveTextContent("Before: 20 (no change)");
+  });
+
+  it("exports the budget with each colour in words", async () => {
+    const created = [];
+    URL.createObjectURL = vi.fn((blob) => {
+      created.push(blob);
+      return "blob:test";
+    });
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const { user } = await openUx("interruptions");
+    await figure("The interruption budget");
+
+    await user.click(screen.getByRole("button", { name: "Export CSV: The interruption budget" }));
+    await user.click(screen.getByRole("button", { name: "Export CSV: Dismissed and covered, by surface" }));
+
+    expect(await created[0].text()).toContain("Optional interruptions per visit,0.93,0.5 or less,0.9,amber");
+    expect(await created[1].text()).toContain("toast.xp,630,0.3333,green,0,green");
+  });
+
+  it("shows the failure, with a retry, when a section cannot be read", async () => {
+    const getUxReport = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new AppRequestError({ code: "SERVER_BUSY", message: "The server is busy", status: 503 }),
+      )
+      .mockImplementation(async ({ section }) => UX_REPORTS[section]);
+    const { user } = await openUx("funnels", ownerApi({ getUxReport }));
+
+    await user.click(await screen.findByRole("button", { name: "Retry" }));
+
+    await figure("Visit to play");
+  });
+
+  it("shows the not found page for an unknown section, or when the server will not say it has the page", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(WEDNESDAY);
+    const { unmount } = renderApp({ path: "/admin/ux/everything", api: ownerApi() });
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
+    unmount();
+
+    const notFound = new AppRequestError({ code: "NOT_FOUND", message: "Not found", status: 404 });
+    renderApp({
+      path: "/admin/ux/clicks",
+      api: ownerApi({
+        getUxReport: vi.fn().mockRejectedValue(notFound),
+        sendFlagSuccess: vi.fn().mockRejectedValue(notFound),
+      }),
+    });
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
+  });
+
+  it("keeps the page when telling the flag's success fails", async () => {
+    const api = ownerApi({ sendFlagSuccess: vi.fn().mockRejectedValue(new Error("offline")) });
+    await openUx("clicks", api);
+
+    await figure("Dead click hotspots");
+    expect(api.sendFlagSuccess).toHaveBeenCalledWith("console_ux");
+  });
+
+  it("refuses a range that starts after it ends, or is too long, before asking the server", async () => {
+    const { user, api } = await openUx("clicks");
+    await figure("Dead click hotspots");
+    const asked = api.getUxReport.mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-10-20" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-10-01" } });
+    await user.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("The range must start before it ends.");
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2024-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-10-20" } });
+    await user.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("at most 400 days");
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-10-01" } });
+    await user.click(screen.getByRole("button", { name: "Show" }));
+    await vi.waitFor(() =>
+      expect(api.getUxReport).toHaveBeenLastCalledWith({
+        section: "clicks",
+        from: "2026-10-01",
+        to: "2026-10-20",
+      }),
+    );
+    expect(api.getUxReport.mock.calls.length).toBeGreaterThan(asked);
   });
 
   it("loads every section again for a new range", async () => {

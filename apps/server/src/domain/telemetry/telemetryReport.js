@@ -42,7 +42,6 @@ export function ratePer({ part, whole, per }) {
 
 /** A timing's percentiles for the console: hidden when fewer than 5 events carried it. */
 export function hideTimings(timings) {
-  if (timings === undefined) return undefined;
   return Object.fromEntries(
     Object.entries(timings).map(([field, { n, p50, p75, p95 }]) => [
       field,
@@ -73,7 +72,7 @@ export function createTelemetryReport({ telemetryDailyAccessor }) {
       to,
       events: [event],
       fields: [...group].sort().join(","),
-      ...(!buckets && { dropBuckets: ROLLUP_SPEC[event]?.timings ?? [] }),
+      ...(!buckets && { dropBuckets: ROLLUP_SPEC[event].timings }),
     });
 
   /**

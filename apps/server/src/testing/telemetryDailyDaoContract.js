@@ -91,6 +91,17 @@ export function runTelemetryDailyDaoContract(createDao) {
     ]);
   });
 
+  it("reads nothing before any day was written, and a day replaced by no rows is empty", async () => {
+    const dao = await createDao();
+    const range = { from: "2026-10-19", to: "2026-10-19", events: ["control_pressed"] };
+    expect(await dao.read(range)).toEqual([]);
+
+    await dao.replaceDay({ day: "2026-10-19", at: new Date(DAY_AT), rows: [dailyRow()] });
+    await dao.replaceDay({ day: "2026-10-19", at: new Date(DAY_AT), rows: [] });
+
+    expect(await dao.read(range)).toEqual([]);
+  });
+
   it("keeps a row's timings as they were written", async () => {
     const dao = await createDao();
     const timings = {

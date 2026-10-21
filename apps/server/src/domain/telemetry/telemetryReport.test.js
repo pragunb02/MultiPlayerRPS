@@ -88,6 +88,41 @@ describe("the telemetry report (CC-176)", () => {
     expect(ratePer({ part: 5, whole: 200, per: 100 })).toBe(2.5);
   });
 
+  it("lists groups busiest first, and groups of the same size in a fixed order", async () => {
+    const report = await reportWith({
+      "2026-10-19": [
+        row("dead_clicked", { route: "/b" }, 5),
+        row("dead_clicked", { route: "/c" }, 9, {
+          wait_ms: {
+            n: 9,
+            p50: 100,
+            p75: 200,
+            p95: 300,
+            buckets: [
+              [100, 5],
+              [300, 4],
+            ],
+          },
+        }),
+        row("dead_clicked", { route: "/a" }, 5),
+      ],
+    });
+
+    const rows = await report.totals({
+      from: "2026-10-19",
+      to: "2026-10-19",
+      event: "dead_clicked",
+      group: ["route"],
+    });
+
+    expect(rows.map(({ group }) => group.route)).toEqual(["/c", "/a", "/b"]);
+    // Nine values are enough to show a percentile.
+    const [shown] = await report
+      .read({ from: "2026-10-19", to: "2026-10-19", event: "dead_clicked", group: ["route"] })
+      .then((read) => read.filter(({ group }) => group.route === "/c"));
+    expect(shown.timings.wait_ms).toEqual({ n: 9, p50: 100, p75: 300, p95: 300 });
+  });
+
   it("reads a range's percentiles from the days' bucket counters, and a day's exactly", async () => {
     const timings = (p75, buckets) => ({ lcp_ms: { n: 10, p50: 900, p75, p95: 3000, buckets } });
     const report = await reportWith({

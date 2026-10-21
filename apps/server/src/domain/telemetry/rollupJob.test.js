@@ -218,6 +218,57 @@ describe("the rollup job (CC-176)", () => {
     });
   });
 
+  it("counts a run that could not read the run records as failed, and the scheduler logs a run that throws", async () => {
+    const base = createInMemoryTelemetryDailyDao();
+    const dailyDao = {
+      ...base,
+      doneDays: async () => {
+        throw new Error("database down");
+      },
+    };
+    const { job, log, runs } = setup({ stores: { countDao: createInMemoryTelemetryCountDao(), dailyDao } });
+
+    const result = await job.runOnce();
+
+    expect(result).toEqual({ rolled: [], busy: [], failed: [] });
+    expect(log.find("telemetry rollup failed")[0]).toEqual(expect.objectContaining({ step: "lock" }));
+    expect(runs).toEqual([{ outcome: "failed" }]);
+
+    const logged = captureLogger();
+    const scheduled = scheduleRollups({
+      run: async () => {
+        throw new Error("boom");
+      },
+      now: () => NOW,
+      logger: logged.logger,
+    });
+    scheduled.start();
+    await logged.once("telemetry rollup failed");
+    await scheduled.stop();
+  });
+
+  it("logs a lease that could not be taken as the lock step, and gives back nothing it did not take", async () => {
+    const base = createInMemoryTelemetryDailyDao();
+    let released = 0;
+    const dailyDao = {
+      ...base,
+      acquireRun: async () => {
+        throw new Error("database down");
+      },
+      releaseRun: async (...args) => {
+        released += 1;
+        return base.releaseRun(...args);
+      },
+    };
+    const { job, log } = setup({ stores: { countDao: createInMemoryTelemetryCountDao(), dailyDao } });
+
+    const { failed } = await job.runOnce();
+
+    expect(failed).toHaveLength(29);
+    expect(log.find("telemetry rollup failed")[0]).toEqual(expect.objectContaining({ step: "lock" }));
+    expect(released).toBe(0);
+  });
+
   // AC-8
   it("a failed run is counted and retried", async () => {
     const base = createInMemoryTelemetryDailyDao();

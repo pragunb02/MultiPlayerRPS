@@ -100,13 +100,6 @@ export const SPEED_LABELS = Object.freeze({
 
 export const DEVICE_LABELS = Object.freeze({ phone: "Phone", tablet: "Tablet", desktop: "Desktop" });
 
-/** A count, a mean or a share that may be hidden, as a plain number with up to 2 decimals. */
-export function formatValue(value) {
-  if (value === FEWER_THAN_MIN) return FEWER_THAN_MIN_TEXT;
-  if (typeof value !== "number") return NO_DATA_TEXT;
-  return String(Math.round(value * 100) / 100);
-}
-
 /** A funnel step's ratio to the step before: a share, said to be capped when the totals went over 100 %. */
 export function formatRatio({ ratio, capped }) {
   if (ratio === undefined) return "";
