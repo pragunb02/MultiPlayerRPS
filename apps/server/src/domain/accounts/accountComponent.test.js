@@ -16,6 +16,7 @@ import { createLegacyPasswordChecker } from "../../utils/legacyPassword.js";
 import { createPasswordHasher } from "../../utils/passwordHasher.js";
 import { createAccountDeletionAccessor } from "../../data/accountDeletionAccessor.js";
 import { createInMemoryAccountDeletionDao } from "../../testing/inMemoryAccountDeletionDao.js";
+import { parseUsername } from "../../models/credentials.js";
 import { createAccountComponent } from "./accountComponent.js";
 
 const FAST = { N: 2 ** 10, r: 8, p: 1 };
@@ -862,6 +863,68 @@ describe("accountComponent", () => {
       const stored = await accountDao.getByEmail("riya@example.com");
       expect(stored.passwordHash).toMatch(/^scrypt\$/);
       expect(JSON.stringify(stored)).not.toContain(NEW);
+    });
+  });
+  describe("resetName (CC-044, ADR-071.6)", () => {
+    it("renames an account to Player_ and six letters that pass the name filter, and signs it out everywhere", async () => {
+      const { accounts } = setup();
+      const { identity } = await accounts.signup({ ...RIYA, now: NOW });
+
+      const name = await accounts.resetName({ playerId: identity.id, now: NOW });
+
+      expect(name).toMatch(/^Player_[A-HJ-NP-Z2-9]{6}$/);
+      expect(parseUsername(name)).toBe(name);
+      expect((await accounts.profileOf({ playerId: identity.id, now: NOW })).username).toBe(name);
+      expect(await accounts.sessionVersionOf({ playerId: identity.id })).toBe(1);
+      expect(
+        (await accounts.login({ email: RIYA.email, password: RIYA.password })).identity.displayName,
+      ).toBe(name);
+    });
+
+    it("tries another name when the first is taken", async () => {
+      const accountDao = createInMemoryAccountDao();
+      const suffixes = ["AAAAAA", "AAAAAA", "BBBBBB"];
+      const accounts = createAccountComponent({
+        accountAccessor: createAccountAccessor({ accountDao }),
+        legacyUserAccessor: legacyAccessor(),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
+        accountDeletionAccessor: noDeletions(),
+        newNameSuffix: () => suffixes.shift(),
+      });
+      const riya = (await accounts.signup({ ...RIYA, now: NOW })).identity;
+      const arjun = (
+        await accounts.signup({ ...RIYA, username: "Arjun", email: "arjun@example.com", now: NOW })
+      ).identity;
+
+      expect(await accounts.resetName({ playerId: riya.id, now: NOW })).toBe("Player_AAAAAA");
+      expect(await accounts.resetName({ playerId: arjun.id, now: NOW })).toBe("Player_BBBBBB");
+    });
+
+    it("draws again when the random letters spell a word the name filter refuses (review of #150)", async () => {
+      const suffixes = ["FUCKAB", "BBBBBB"];
+      const accounts = createAccountComponent({
+        accountAccessor: createAccountAccessor({ accountDao: createInMemoryAccountDao() }),
+        legacyUserAccessor: legacyAccessor(),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
+        accountDeletionAccessor: noDeletions(),
+        newNameSuffix: () => suffixes.shift(),
+      });
+      const riya = (await accounts.signup({ ...RIYA, now: NOW })).identity;
+
+      expect(await accounts.resetName({ playerId: riya.id, now: NOW })).toBe("Player_BBBBBB");
+    });
+
+    it("refuses a guest, and answers NotFoundError for an account that is gone", async () => {
+      const { accounts } = setup();
+
+      await expect(
+        accounts.resetName({ playerId: "guest_00000000-0000-4000-8000-000000000001", now: NOW }),
+      ).rejects.toThrow(ForbiddenError);
+      await expect(
+        accounts.resetName({ playerId: "user_0123456789abcdef01234567", now: NOW }),
+      ).rejects.toThrow(NotFoundError);
     });
   });
 });
