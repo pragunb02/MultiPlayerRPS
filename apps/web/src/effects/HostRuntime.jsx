@@ -53,19 +53,20 @@ export function HostRuntime({ home, effects = EFFECTS, now = Date.now }) {
   // The queue: `play` from anywhere lands here.
   useEffect(() => {
     const machine = host.current;
-    const gate = (entry) =>
+    const gate = (entry, busy) =>
       canPlay({
         entry,
         now: now(),
         ...machine.facts,
         device: { lowEnd: isLowEnd(navigator) },
         hidden: document.hidden,
-        busy: machine.job !== undefined || machine.queue.length > 0,
+        busy,
       });
     machine.next = () => {
       while (machine.job === undefined && machine.queue.length > 0) {
         const item = machine.queue.shift();
-        const answer = now() - item.at > LATE_MS ? { ok: false } : gate(item.entry);
+        // Its turn has come: only the late start and the real gates can drop it, never the ones waiting behind it.
+        const answer = now() - item.at > LATE_MS ? { ok: false } : gate(item.entry, false);
         if (answer.ok) {
           machine.job = { ...item, particles: answer.particles };
           setJob(machine.job);
@@ -76,7 +77,7 @@ export function HostRuntime({ home, effects = EFFECTS, now = Date.now }) {
     };
     machine.request = (entry, options) =>
       new Promise((resolve) => {
-        const answer = gate(entry);
+        const answer = gate(entry, machine.job !== undefined || machine.queue.length > 0);
         if (answer.ok || (answer.gate === GATES.BUSY && entry.kind === "celebration")) {
           machine.queue.push({ entry, options, resolve, at: now() });
           machine.next();
@@ -142,11 +143,25 @@ export function HostRuntime({ home, effects = EFFECTS, now = Date.now }) {
     if (inGame || reducedMotion) host.current.stopAll();
   }, [inGame, reducedMotion]);
 
-  // A window opens and closes at India midnight.
+  // A window opens and closes at India midnight. A sleeping tab's timer may never fire, or fire early, so the day is
+  // read again whenever the timer fires (and the timer set again), when the tab is shown and when it gets the focus.
   useEffect(() => {
-    const id = setTimeout(() => setToday(indiaDay(now())), msToIndiaMidnight(now()) + 1000);
-    return () => clearTimeout(id);
-  }, [today, now]);
+    let id;
+    const look = () => {
+      clearTimeout(id);
+      setToday(indiaDay(now()));
+      id = setTimeout(look, msToIndiaMidnight(now()) + 1000);
+    };
+    const wake = () => !document.hidden && look();
+    look();
+    document.addEventListener("visibilitychange", wake);
+    addEventListener("focus", wake);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener("visibilitychange", wake);
+      removeEventListener("focus", wake);
+    };
+  }, [now]);
 
   // One question for the flags of the themes that could be on today; none outside every window.
   useEffect(() => {

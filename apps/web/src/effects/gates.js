@@ -42,7 +42,7 @@ export const GATES = Object.freeze({
 
 /**
  * Whether an effect may start now, gate by gate in ADR-075's order: reduced motion, the flag, the window, the
- * device (which only sets the tier), a hidden tab, a game being played, and one effect at a time. The first gate
+ * device (which only sets the tier), a hidden tab, a game being played (themes only), and one effect at a time. The first gate
  * that says no is named, so the host can queue a celebration that only waits for another one.
  *
  * @param {{
@@ -63,7 +63,9 @@ export function canPlay({ entry, now, reducedMotion, flags, device, hidden, inGa
   if (entry.window && !inWindow(entry, indiaDay(now))) return { ok: false, gate: GATES.WINDOW };
   const particles = device.lowEnd ? Math.ceil(entry.particles * LOW_END_SHARE) : entry.particles;
   if (hidden) return { ok: false, gate: GATES.HIDDEN };
-  if (inGame) return { ok: false, gate: GATES.IN_GAME };
+  // A theme's burst never plays during a game. A celebration is called from the result, as the game ends, so the
+  // host may not have heard yet that the game is over: it is not held back by this gate.
+  if (inGame && entry.kind === "theme") return { ok: false, gate: GATES.IN_GAME };
   if (busy) return { ok: false, gate: GATES.BUSY };
   return { ok: true, particles };
 }
