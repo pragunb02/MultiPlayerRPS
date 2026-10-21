@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { activeTheme, canPlay, GATES, indiaDay, inWindow, isLowEnd, msToIndiaMidnight } from "./gates.js";
-import { EFFECTS, effectNamed } from "./registry.js";
+import {
+  activeTheme,
+  canPlay,
+  GATES,
+  indiaDay,
+  inWindow,
+  isLowEnd,
+  isPhone,
+  msToIndiaMidnight,
+} from "./gates.js";
+import { EFFECTS, effectNamed, PHONE_PARTICLE_CAP } from "./registry.js";
 
 // The gates of ADR-075, in order (CC-328).
 const WIN = effectNamed("win_burst");
@@ -60,6 +69,19 @@ describe("the effect gates (CC-328)", () => {
         }).particles,
     );
     expect(thirds).toEqual([40, 16, 30, 20, 14]);
+  });
+
+  it("gives a phone at most PHONE_PARTICLE_CAP particles, and a low-end phone a third", () => {
+    expect(PHONE_PARTICLE_CAP).toBe(80);
+    const phone = { lowEnd: false, phone: true };
+    expect(canPlay({ ...ALL_CLEAR, entry: WIN, device: phone })).toEqual({ ok: true, particles: 80 });
+    expect(canPlay({ ...ALL_CLEAR, entry: DIWALI, device: phone })).toEqual({ ok: true, particles: 60 });
+    expect(canPlay({ ...ALL_CLEAR, entry: WIN, device: { lowEnd: true, phone: true } })).toEqual({
+      ok: true,
+      particles: 40,
+    });
+    expect(isPhone({ innerWidth: 390 })).toBe(true);
+    expect(isPhone({ innerWidth: 1280 })).toBe(false);
   });
 
   it("keeps a theme's burst out of a game, and lets a celebration from the result through", () => {

@@ -47,14 +47,24 @@ describe("the particle module (CC-328)", () => {
     // The cap: never more than PARTICLE_CAP, whatever an effect asks for.
     expect(spawn).toHaveBeenCalledTimes(PARTICLE_CAP);
     vi.advanceTimersByTime(17);
-    // The device pixel ratio is clamped to 2: a DPR 3 phone draws at 2.
-    expect([canvas.width, canvas.height]).toEqual([innerWidth * 2, innerHeight * 2]);
+    // The device pixel ratio is clamped to 1.5 (ADR-075 allows up to 2; 1.5 holds the frame budget): a DPR 3 phone
+    // draws at 1.5.
+    expect([canvas.width, canvas.height]).toEqual([
+      Math.round(innerWidth * 1.5),
+      Math.round(innerHeight * 1.5),
+    ]);
     expect(drawn(canvas.calls)).toBeGreaterThanOrEqual(PARTICLE_CAP);
 
     stop();
     await done;
     const after = canvas.calls.length;
-    expect(canvas.calls.at(-1)).toEqual(["clearRect", 0, 0, innerWidth * 2, innerHeight * 2]);
+    expect(canvas.calls.at(-1)).toEqual([
+      "clearRect",
+      0,
+      0,
+      Math.round(innerWidth * 1.5),
+      Math.round(innerHeight * 1.5),
+    ]);
     vi.advanceTimersByTime(500);
     expect(canvas.calls.length, "no frame after stop").toBe(after);
     expect(removed).toHaveBeenCalledWith("resize", expect.any(Function));
