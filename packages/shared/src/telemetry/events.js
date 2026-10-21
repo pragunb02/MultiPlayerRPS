@@ -1,8 +1,28 @@
 import { ERROR_CODES } from "../errors.js";
 import { GAME_IDS } from "../games.js";
 import { SHARE_CHANNELS } from "../shareChannels.js";
+import {
+  TELEMETRY_BUCKETS,
+  TELEMETRY_ENTRIES,
+  TELEMETRY_ERROR_TYPES,
+  TELEMETRY_MAX_SINCE_LOAD_MS,
+  TELEMETRY_MAX_WAIT_MS,
+  TELEMETRY_PLAYER_KINDS,
+  TELEMETRY_SOCKET_CODES,
+} from "./early.js";
 import { fits, flag, list, ms, optional, pattern, ratio } from "./fields.js";
 import { API_ENDPOINTS, OTHER_ENDPOINT, TELEMETRY_ROUTES } from "./routes.js";
+
+// The small values the page needs early live in early.js (CC-322). The catalogue still offers them.
+export {
+  TELEMETRY_BUCKETS,
+  TELEMETRY_ENTRIES,
+  TELEMETRY_ERROR_TYPES,
+  TELEMETRY_MAX_SINCE_LOAD_MS,
+  TELEMETRY_MAX_WAIT_MS,
+  TELEMETRY_PLAYER_KINDS,
+  TELEMETRY_SOCKET_CODES,
+};
 
 /**
  * The telemetry catalogue in code (CC-174, CC-175): every event of docs/analytics/EVENTS.md that is built, with each
@@ -23,62 +43,6 @@ export const TELEMETRY_TIER = "counts";
 export const TELEMETRY_DEVICES = Object.freeze({ PHONE: "phone", TABLET: "tablet", DESKTOP: "desktop" });
 /** The widths in CSS pixels at which a tablet and a desktop start. */
 export const DEVICE_WIDTHS = Object.freeze({ TABLET: 600, DESKTOP: 1024 });
-
-/** `player_kind`: no session yet, a guest or an account. */
-export const TELEMETRY_PLAYER_KINDS = Object.freeze({
-  VISITOR: "visitor",
-  GUEST: "guest",
-  ACCOUNT: "account",
-});
-
-/** How a page load arrived (EVENTS.md 3.1), from a fixed list of referrer hosts, never the referrer itself. */
-export const TELEMETRY_ENTRIES = Object.freeze({
-  SHARED_LINK: "shared_link",
-  DIRECT: "direct",
-  ROOM_LINK: "room_link",
-  SEARCH: "search",
-  SOCIAL: "social",
-  OTHER_SITE: "other_site",
-});
-
-/** The buckets of the bucketed fields, each label a fixed string. */
-export const TELEMETRY_BUCKETS = Object.freeze({
-  ACTIVE_S: Object.freeze(["0-10", "10-30", "30-60", "60-120", "120-300", "300-900", "900-1800", "1800+"]),
-  VISIT_PRESSES: Object.freeze(["0", "1-5", "6-20", "21+"]),
-  RAGE_PRESSES: Object.freeze(["3", "4", "5", "6+"]),
-  AFTER_S: Object.freeze(["0-10", "10-60", "60-600", "600+"]),
-  GUEST_MATCHES: Object.freeze(["0", "1", "2-5", "6-20", "21+"]),
-  GUEST_AGE_DAYS: Object.freeze(["0", "1", "2-7", "8+"]),
-});
-
-/** The constructor names `client_errored` may carry. Any other is `other`. */
-export const TELEMETRY_ERROR_TYPES = Object.freeze([
-  "Error",
-  "TypeError",
-  "RangeError",
-  "ReferenceError",
-  "SyntaxError",
-  "AppRequestError",
-  "AbortError",
-  "NetworkError",
-  "SecurityError",
-  "QuotaExceededError",
-  "NotAllowedError",
-  "other",
-]);
-
-/** Why the realtime connection changed: Socket.IO's disconnect reasons and the server's refusal codes. */
-export const TELEMETRY_SOCKET_CODES = Object.freeze([
-  "server_disconnect",
-  "client_disconnect",
-  "ping_timeout",
-  "transport_close",
-  "transport_error",
-  "parse_error",
-  "connect_error",
-  ...Object.values(ERROR_CODES),
-  "other",
-]);
 
 /** Error codes a client event may carry, besides `network`, `timeout` and `unknown`. */
 const CODES = Object.freeze([...Object.values(ERROR_CODES), "network", "timeout", "unknown"]);
@@ -124,13 +88,6 @@ const ELEMENTS = Object.freeze([
 
 /** The build names an event may carry: the web build's stamp (CC-290) or the server's calendar version (CC-303). */
 export const BUILD_PATTERN = /^(?:\d{1,4}\.\d{1,2}\.\d{1,2}\+(?:[0-9a-f]{7}|local)|dev|unknown)$/;
-
-/** The longest time any field holds: an hour. */
-const HOUR_MS = 60 * 60 * 1000;
-/** The longest a single wait or page timing holds: two minutes. Longer is clamped. */
-export const TELEMETRY_MAX_WAIT_MS = 2 * 60 * 1000;
-/** The longest a time to first move holds: an hour. Longer is clamped. */
-export const TELEMETRY_MAX_SINCE_LOAD_MS = HOUR_MS;
 
 const control = pattern(CONTROL_PATTERN, CONTROL_MAX);
 const element = list(ELEMENTS);

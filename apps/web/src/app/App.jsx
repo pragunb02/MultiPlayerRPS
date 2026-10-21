@@ -10,7 +10,7 @@ import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { countRenderErrors } from "../lib/telemetry/errorFields.js";
 import { NO_TELEMETRY } from "../lib/telemetry/facade.js";
-import { TelemetryHost } from "../lib/telemetry/TelemetryHost.jsx";
+import { TelemetryStub } from "../lib/telemetry/TelemetryStub.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { prefetchOnIntent } from "./routePrefetch.js";
 import { APP_ROUTES, prefetchRouteFor } from "./routePages.js";
@@ -32,7 +32,7 @@ export function App({ services }) {
     <ErrorBoundary onError={countRenderErrors(services.telemetry ?? NO_TELEMETRY)}>
       <ServicesProvider services={services}>
         <SessionProvider>
-          <TelemetryHost />
+          <TelemetryStub />
           <ToastProvider>
             <SaveProgressProvider>
               <MatchProgressProvider>

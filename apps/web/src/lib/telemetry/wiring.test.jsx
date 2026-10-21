@@ -24,12 +24,12 @@ describe("page views (CC-174)", () => {
 
     await waitFor(() => expect(telemetry.named("page_viewed")).toHaveLength(1));
     expect(telemetry.named("page_viewed")).toEqual([{ is_landing: true, entry: "shared_link", via: "wa" }]);
-    expect(telemetry.context()).toEqual({ route: "/games/chess", playerKind: "visitor" });
+    expect(telemetry.context()).toEqual({ path: "/games/chess", playerKind: "visitor" });
 
     await user.click(screen.getAllByRole("link", { name: /ClassiCade|Home/ })[0]);
     await waitFor(() => expect(telemetry.named("page_viewed")).toHaveLength(2));
     expect(telemetry.named("page_viewed")[1]).toEqual({ is_landing: false });
-    expect(telemetry.context().route).toBe("/");
+    expect(telemetry.context().path).toBe("/");
   });
 });
 

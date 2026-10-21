@@ -1,4 +1,4 @@
-import { bucketOf, TELEMETRY_BUCKETS } from "@classicade/shared";
+import { bucketOf, endpointOf, NOT_FOUND_ROUTE, TELEMETRY_BUCKETS } from "@classicade/shared";
 import { watchClicks } from "./clicks.js";
 import { createTelemetryClient, TELEMETRY_URL } from "./client.js";
 import { errorTypeOf } from "./errorFields.js";
@@ -7,6 +7,27 @@ import { measurePageSpeed } from "./pageSpeed.js";
 /** The lower ends of the `visit_ended` buckets after the first (EVENTS.md 3.1). */
 const ACTIVE_EDGES_S = Object.freeze([10, 30, 60, 120, 300, 900, 1800]);
 const PRESS_EDGES = Object.freeze([1, 6, 21]);
+
+/** What an event held by the first page's stub may make its fields from, which loads only with the client. */
+const LOADED = Object.freeze({ endpointOf });
+
+/**
+ * The client as the facade's sink (CC-322): it turns the address each event happened at into its screen, and makes
+ * the fields an event gave as a function, so the stub needs neither the screens nor the API templates.
+ *
+ * @param {{ track: (name: string, fields: object, context: { route: string, playerKind: string }) => void, stop: () => void }} client
+ * @param {(path: string) => string} routeOf  the screen of an address (routeOf.js), which the host gives
+ * @returns {import("./facade.js").TelemetrySink}
+ */
+export const sinkOf = (client, routeOf) =>
+  Object.freeze({
+    track: (name, fields, { path, playerKind }) =>
+      client.track(name, typeof fields === "function" ? fields(LOADED) : fields, {
+        route: path === undefined ? NOT_FOUND_ROUTE : routeOf(path),
+        playerKind,
+      }),
+    stop: () => client.stop(),
+  });
 
 /**
  * Starts usage counts on this page (CC-174), the part loaded after the first paint: the client, the press watcher,
@@ -21,10 +42,21 @@ const PRESS_EDGES = Object.freeze([1, 6, 21]);
  *   wasWaking: boolean,
  *   onAccepted: () => void,
  *   surfaceOf?: (element: Element) => string | undefined,
- * }} deps
+ *   routeOf: (path: string) => string,
+ * }} deps  `routeOf` turns an address into its screen (routeOf.js)
  * @returns {{ stop: () => void }}
  */
-export function startTelemetry({ window, facade, isOff, build, strict, wasWaking, onAccepted, surfaceOf }) {
+export function startTelemetry({
+  window,
+  facade,
+  isOff,
+  build,
+  strict,
+  wasWaking,
+  onAccepted,
+  surfaceOf,
+  routeOf,
+}) {
   const { document } = window;
   const setTimer = (run, ms) => window.setTimeout(run, ms);
   const clearTimer = (timer) => window.clearTimeout(/** @type {number} */ (timer));
@@ -102,7 +134,7 @@ export function startTelemetry({ window, facade, isOff, build, strict, wasWaking
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("pagehide", onPageHide);
   window.addEventListener("unhandledrejection", onRejection);
-  facade.attach(client);
+  facade.attach(sinkOf(client, routeOf));
 
   return Object.freeze({
     stop() {

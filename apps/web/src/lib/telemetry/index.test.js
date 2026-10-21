@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TELEMETRY_BATCH } from "./client.js";
 import { createTelemetryFacade } from "./facade.js";
 import { startTelemetry } from "./index.js";
+import { routeOf } from "./routeOf.js";
 
 const BUILD = "0.1.0+abc1234";
 const visibility = (state) => {
@@ -27,12 +28,13 @@ function start({ beacon = true, surfaceOf } = {}) {
       : { ...navigator },
   );
   const facade = createTelemetryFacade({ isOff: () => false });
-  facade.setContext({ route: "/", playerKind: "guest" });
+  facade.setContext({ path: "/", playerKind: "guest" });
   const onAccepted = vi.fn();
   const started = startTelemetry({
     window,
     facade,
     isOff: () => false,
+    routeOf,
     build: BUILD,
     strict: true,
     wasWaking: false,
@@ -41,6 +43,53 @@ function start({ beacon = true, surfaceOf } = {}) {
   });
   return { facade, started, beacons, fetched, onAccepted };
 }
+
+describe("the hand-over from the first page's stub (CC-174, CC-322)", () => {
+  it("sends the counts held before it loaded, each at the screen it happened on, with the fields it fills", () => {
+    const beacons = [];
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      sendBeacon: (url, body) => beacons.push(JSON.parse(body)) > 0,
+    });
+    const held = createTelemetryFacade({ isOff: () => false });
+    // Before the client loads: the first page's render error, a failed request and the first page view.
+    held.track("client_errored", { kind: "render", error_type: "TypeError" });
+    held.setContext({ path: "/games/chess/rooms/AB2CD3", playerKind: "guest" });
+    held.track("request_failed", ({ endpointOf }) => ({
+      endpoint: endpointOf("/api/matches/abc?x=1"),
+      status: 500,
+      code: "unknown",
+    }));
+    held.track("page_viewed", { is_landing: true, entry: "room_link" });
+    held.setContext({ path: "/no/such/page", playerKind: "account" });
+    held.track("page_viewed", { is_landing: false });
+
+    const started = startTelemetry({
+      window,
+      facade: held,
+      isOff: () => false,
+      routeOf,
+      build: BUILD,
+      strict: true,
+      wasWaking: false,
+      onAccepted: () => {},
+    });
+    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true }));
+
+    const events = beacons
+      .flatMap(({ events: sent }) => sent)
+      .filter(({ name }) => name !== "page_speed_measured");
+    expect(events.map(({ name, route, player_kind: kind }) => [name, route, kind])).toEqual([
+      ["client_errored", "not_found", "visitor"],
+      ["request_failed", "/games/chess/rooms/:code", "guest"],
+      ["page_viewed", "/games/chess/rooms/:code", "guest"],
+      ["page_viewed", "not_found", "account"],
+    ]);
+    expect(events[1]).toMatchObject({ endpoint: "/api/matches/:matchId", status: 500, code: "unknown" });
+    expect(JSON.stringify(events)).not.toMatch(/AB2CD3|abc/);
+    started.stop();
+  });
+});
 
 describe("the started client (CC-174)", () => {
   it("posts a full batch as JSON to our own server, with the session cookie, and tells when it was taken", async () => {

@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { createElement as h } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,8 +8,11 @@ import { SessionContext } from "../../hooks/useSession.js";
 import { fakeApi } from "../../testing/fakes.js";
 import { flagPaths } from "../../testing/flagPaths.js";
 import { TelemetryHost } from "./TelemetryHost.jsx";
+import { TelemetryStub } from "./TelemetryStub.jsx";
 import { TELEMETRY_BATCH, createTelemetryClient, deviceOf } from "./client.js";
 import { createTelemetryFacade } from "./facade.js";
+import { sinkOf } from "./index.js";
+import { routeOf } from "./routeOf.js";
 import { isTelemetryOff, TELEMETRY_STORAGE_KEY } from "./optOut.js";
 
 const BUILD = "0.1.0+abc1234";
@@ -261,10 +264,10 @@ describe("the facade (CC-174)", () => {
     const facade = createTelemetryFacade({ isOff: () => false });
     const { client, beacons } = setup();
 
-    facade.setContext({ route: "/games/chess", playerKind: "guest" });
+    facade.setContext({ path: "/games/chess", playerKind: "guest" });
     facade.track(...press("lobby.create"));
-    facade.setContext({ route: "/games/chess/rooms/:code", playerKind: "guest" });
-    facade.attach(client);
+    facade.setContext({ path: "/games/chess/rooms/AB2CD3", playerKind: "guest" });
+    facade.attach(sinkOf(client, routeOf));
     facade.track(...press("room.leave"));
     client.flushNow();
 
@@ -280,14 +283,14 @@ describe("the facade (CC-174)", () => {
     for (let index = 0; index < 150; index += 1) facade.track(...press());
 
     facade.detach();
-    facade.attach(client);
+    facade.attach(sinkOf(client, routeOf));
     client.flushNow();
     expect(beacons).toEqual([]);
 
     const again = createTelemetryFacade({ isOff: () => false });
     for (let index = 0; index < 150; index += 1) again.track(...press());
     const other = setup();
-    again.attach(other.client);
+    again.attach(sinkOf(other.client, routeOf));
     other.client.flushNow();
     const handed = [...other.posts, ...other.beacons].flatMap(({ events }) => events);
     expect(handed).toHaveLength(100);
@@ -296,12 +299,12 @@ describe("the facade (CC-174)", () => {
   it("keeps the screen, the kind of player and how the page load arrived", () => {
     const facade = createTelemetryFacade({ isOff: () => false, landing: { entry: "search", via: "" } });
 
-    expect(facade.context()).toEqual({ route: "not_found", playerKind: "visitor" });
-    facade.setContext({ route: "/", playerKind: "guest" });
+    expect(facade.context()).toEqual({ playerKind: "visitor" });
+    facade.setContext({ path: "/", playerKind: "guest" });
     expect(facade.landing).toEqual({ entry: "search", via: "" });
     facade.setLanding({ entry: "shared_link", via: "copy" });
 
-    expect(facade.context()).toEqual({ route: "/", playerKind: "guest" });
+    expect(facade.context()).toEqual({ path: "/", playerKind: "guest" });
     expect(facade.landing).toEqual({ entry: "shared_link", via: "copy" });
     expect(createTelemetryFacade({ isOff: () => false }).landing).toEqual({ entry: "direct", via: "" });
   });
@@ -323,7 +326,7 @@ describe("the facade (CC-174)", () => {
     const { client, beacons } = setup();
     const heard = vi.fn();
     facade.onSwitched(heard);
-    facade.attach(client);
+    facade.attach(sinkOf(client, routeOf));
     facade.track(...press());
 
     off = true;
@@ -374,6 +377,44 @@ describe("the host (CC-174)", () => {
 
     await waitFor(() => expect(api.sendFlagSuccess).toHaveBeenCalledWith("telemetry_client"));
     expect(idle).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("the host and the switch (CC-174)", () => {
+  it("stops the client when counts are switched off, and starts it again when they are switched back on", async () => {
+    vi.useRealTimers();
+    vi.stubGlobal("requestIdleCallback", (run) => setTimeout(run, 0));
+    let off = false;
+    const telemetry = createTelemetryFacade({ isOff: () => off });
+    const load = vi.fn(() => import("./index.js"));
+    const api = fakeApi({ getFlags: vi.fn(async () => ({ telemetry_client: true })) });
+    const view = render(
+      h(
+        MemoryRouter,
+        { initialEntries: ["/"] },
+        h(
+          ServicesContext.Provider,
+          { value: { api, telemetry } },
+          h(
+            SessionContext.Provider,
+            { value: { status: "anonymous", identity: undefined } },
+            h(TelemetryHost, { load }),
+          ),
+        ),
+      ),
+    );
+    await waitFor(() => expect(telemetry.isAttached()).toBe(true));
+
+    off = true;
+    act(() => telemetry.switched());
+    expect(telemetry.isAttached()).toBe(false);
+    off = false;
+    act(() => telemetry.switched());
+
+    await waitFor(() => expect(telemetry.isAttached()).toBe(true));
+    expect(load).toHaveBeenCalledTimes(2);
+    view.unmount();
     vi.unstubAllGlobals();
   });
 });
@@ -442,7 +483,10 @@ describe("the telemetry_client flag (CC-174)", () => {
             h(
               SessionContext.Provider,
               { value: { status: "anonymous", identity: undefined } },
-              h(TelemetryHost, { load }),
+              // The first page's stub counts the page view and loads the host (CC-322).
+              h(TelemetryStub, {
+                loadHost: async () => ({ TelemetryHost: () => h(TelemetryHost, { load }) }),
+              }),
             ),
           ),
         ),

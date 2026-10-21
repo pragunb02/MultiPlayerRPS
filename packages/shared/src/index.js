@@ -151,23 +151,27 @@ export {
   isTelemetryBuild,
   isTelemetryEventName,
   SERVER_COMMON_FIELDS,
-  TELEMETRY_BUCKETS,
   TELEMETRY_DEVICES,
   TELEMETRY_ELEMENT_ROLES,
   TELEMETRY_ELEMENT_TAGS,
-  TELEMETRY_ENTRIES,
-  TELEMETRY_ERROR_TYPES,
   TELEMETRY_EVENT_NAMES,
   TELEMETRY_EVENTS,
-  TELEMETRY_MAX_SINCE_LOAD_MS,
-  TELEMETRY_MAX_WAIT_MS,
-  TELEMETRY_PLAYER_KINDS,
-  TELEMETRY_SOCKET_CODES,
   TELEMETRY_SOURCES,
   TELEMETRY_TIER,
   telemetryEventNamed,
 } from "./telemetry/events.js";
-export { bucketOf, fits as fitsTelemetryField, roundMs } from "./telemetry/fields.js";
+export {
+  bucketOf,
+  roundMs,
+  TELEMETRY_BUCKETS,
+  TELEMETRY_ENTRIES,
+  TELEMETRY_ERROR_TYPES,
+  TELEMETRY_MAX_SINCE_LOAD_MS,
+  TELEMETRY_MAX_WAIT_MS,
+  TELEMETRY_PLAYER_KINDS,
+  TELEMETRY_SOCKET_CODES,
+} from "./telemetry/early.js";
+export { fits as fitsTelemetryField } from "./telemetry/fields.js";
 export {
   API_ENDPOINTS,
   endpointOf,

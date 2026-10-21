@@ -17,8 +17,7 @@ import { entryOf } from "./lib/telemetry/entry.js";
 import { codeOf, socketCodeOf } from "./lib/telemetry/errorFields.js";
 import { createTelemetryFacade } from "./lib/telemetry/facade.js";
 import { isSwitchedOff, isTelemetryOff } from "./lib/telemetry/optOut.js";
-import { routeOf } from "./lib/telemetry/routeOf.js";
-import { endpointOf, roundMs, TELEMETRY_MAX_SINCE_LOAD_MS } from "@classicade/shared";
+import { roundMs, TELEMETRY_MAX_SINCE_LOAD_MS } from "@classicade/shared";
 import "./styles/global.css";
 
 // Composition root of the web app: the only place real clients are created.
@@ -27,7 +26,7 @@ import "./styles/global.css";
 const isOff = () =>
   isTelemetryOff({ getStorage: () => window.localStorage, navigator, location: window.location });
 const telemetry = createTelemetryFacade({ isOff });
-telemetry.setContext({ route: routeOf(window.location.pathname), playerKind: "visitor" });
+telemetry.setContext({ path: window.location.pathname, playerKind: "visitor" });
 // Before the router, because it may change the address before the router reads it (CC-181).
 recoverFromStaleBuild({
   window,
@@ -57,8 +56,13 @@ const services = {
     // The server hears the switch too, so it records no sign-up, login or error about this browser (CC-174).
     countsOff: () => isSwitchedOff(() => window.localStorage),
     onRequest: () => telemetry.noteRequest("http"),
+    // The API's templates load with the client (CC-322), which names the endpoint.
     onFailure: ({ path, status, error }) =>
-      telemetry.track("request_failed", { endpoint: endpointOf(`/api${path}`), status, code: codeOf(error) }),
+      telemetry.track("request_failed", ({ endpointOf }) => ({
+        endpoint: endpointOf(`/api${path}`),
+        status,
+        code: codeOf(error),
+      })),
   }),
   socket: createSocketClient({
     onRequest: () => telemetry.noteRequest("socket"),
