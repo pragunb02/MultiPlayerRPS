@@ -121,19 +121,26 @@ export function createPlayerDaysComponent({ timeZoneAccessor, flags }) {
     },
 
     /**
-     * A guest became an account (ADR-014, ADR-077.9): the account keeps its own zone; one without takes the guest's,
-     * with its lock. Idempotent.
+     * A guest became an account (ADR-014, ADR-077.9): the account keeps its own zone. One without takes the guest's
+     * zone as a fresh change made now on the account's own days, so the account's past days are never rewritten (no
+     * repaired streak, no replayed day) and the 7 day lock starts at the sign-in. Idempotent.
      *
-     * @param {{ from: string, to: { id: string } }} transfer
+     * @param {{ from: string, to: { id: string }, now: number }} transfer
      * @returns {Promise<{ moved: { timeZone: number } }>}
      */
-    async transferPlayer({ from, to }) {
+    async transferPlayer({ from, to, now }) {
       const guest = await recordOf(from);
       let moved = 0;
       if (guest !== undefined && (await recordOf(to.id)) === undefined) {
-        moved = (await timeZoneAccessor.save({ playerId: to.id, record: guest, expected: undefined }))
-          ? 1
-          : 0;
+        const asked = changeZone({ record: undefined, zone: guest.zone, now });
+        if (asked.outcome === "changed") {
+          const saved = await timeZoneAccessor.save({
+            playerId: to.id,
+            record: asked.record,
+            expected: undefined,
+          });
+          moved = saved ? 1 : 0;
+        }
       }
       await timeZoneAccessor.remove(from);
       return { moved: { timeZone: moved } };

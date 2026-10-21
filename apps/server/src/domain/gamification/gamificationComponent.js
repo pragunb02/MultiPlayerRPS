@@ -61,7 +61,6 @@ function streaksView(stats, now, { calendar, freezes }) {
 const UTC_DAYS = Object.freeze({
   calendarFor: async ({ fallback }) => fallback,
   freezesOn: async () => false,
-  freezeCovered: async () => {},
 });
 
 /** The guest's and the account's freezes together: the larger holding, at most 2, and the covered days joined. */
@@ -194,20 +193,27 @@ export function createGamificationComponent({
     const playerDays = await daysOf(playerId);
     const { calendar, freezes } = playerDays;
     const day = calendar.dayOf(at);
+    // Whether this match moved the streak onto its day: only such a match can have spent a freeze (CC-145). The
+    // change can run again after a conflict, so the last run's answer is the one saved.
+    let movedOnto = false;
     const counted = await gamificationAccessor.applyToStatsOnce({
       playerId,
       key: match.matchId,
       at,
       empty: emptyStats(playerId),
-      change: (stats) =>
-        applyMatchToStats(stats, {
+      change: (stats) => {
+        const next = applyMatchToStats(stats, {
           gameId: match.gameId,
           result,
           reason: match.result.reason,
           endedAt: at,
           calendar,
           freezes,
-        }),
+          now,
+        });
+        movedOnto = stats.dailyStreak.lastDay !== day && next.dailyStreak.lastDay === day;
+        return next;
+      },
     });
     const quests = await gamificationAccessor.applyToQuestDayOnce({
       playerId,
@@ -230,7 +236,7 @@ export function createGamificationComponent({
         playerId,
         streaks: streaksView(stats, now, playerDays),
       });
-      if (freezes && freezeCoveredOn(counted.stats.dailyStreak, day)) {
+      if (freezes && movedOnto && freezeCoveredOn(counted.stats.dailyStreak, day)) {
         await days.freezeCovered({ playerId });
       }
     }

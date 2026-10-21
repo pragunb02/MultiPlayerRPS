@@ -51,7 +51,7 @@ import { createSealMaker, sealSecretFrom } from "./domain/bots/seals.js";
 import { createThinkingQueue } from "./domain/bots/thinkingQueue.js";
 import { createBotThinkingClient } from "./dependency/thinking/botThinkingClient.js";
 import { createGamificationComponent } from "./domain/gamification/gamificationComponent.js";
-import { INDIA_WEEK_OFFSET_MS } from "./domain/leaderboards/isoWeek.js";
+import { createWeekRule } from "./domain/leaderboards/weekRule.js";
 import { createPlayerDaysComponent } from "./domain/playerDays/playerDaysComponent.js";
 import { createIdentityComponent } from "./domain/identity/identityComponent.js";
 import { createPlayerTransferComponent } from "./domain/identity/playerTransferComponent.js";
@@ -875,8 +875,8 @@ export async function startServer({
     transfers: playerTransferAccessor,
     safety: safetyComponent,
     cards: profileCards,
-    // Monday 00:00 India time once local_days is on for everyone; a visitor's answer is on only then (ADR-015).
-    weekOffset: async () => ((await flagComponent.isOn("local_days", undefined)) ? INDIA_WEEK_OFFSET_MS : 0),
+    // Monday 00:00 India time once local_days is on for everyone, and for good (ADR-015, ADR-077.6).
+    weekOffset: createWeekRule({ flags: flagComponent }),
   });
   const chessRatingComponent = createChessRatingComponent({ chessRatingAccessor, events: domainEvents });
   const profileComponent = createProfileComponent({

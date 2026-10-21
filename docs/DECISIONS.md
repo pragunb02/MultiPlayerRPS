@@ -83,7 +83,9 @@ the owner may change it.
      switch never breaks a streak and gives at most one day once. Quest and puzzle days keep their keys. Nothing is
      rewritten in bulk; legacy collections are never touched.
   6. **Weekly boards turn at Monday 00:00 India time** (ADR-015 amended 2026-10-17) once `local_days` is fully on,
-     for everyone at once. The week id format stays.
+     for everyone at once, asked without counting a flag exposure (`isFullyOn`). Once switched, a server stays on
+     India weeks until it restarts, so a rollback or stale overrides cannot show a started week twice. The week id
+     format stays.
   7. **Freezes** (ADR-026.5). The first counted match of a week (Monday to Sunday, the player's own days) earns one,
      at most 2 held. A counted match after missed days spends one per missed day, automatically, only when the
      freezes cover them all; otherwise none is spent and the streak starts at 1. A frozen day keeps the streak and
@@ -92,8 +94,9 @@ the owner may change it.
      the play streak has freezes.
   8. **Honest copy.** Facts only: no countdown on the streak, no loss words, no exclamation marks, for every age. A
      test reads the copy.
-  9. **Guests and data** (ADR-014, ADR-048). The account keeps its own zone, otherwise the guest's moves with its
-     lock. Freezes: the larger holding of the two, at most 2, and the frozen days joined, so the rebuild from the
+  9. **Guests and data** (ADR-014, ADR-048). The account keeps its own zone. One without takes the guest's zone as a
+     fresh change made at the sign-in on the account's own days (point 4), so the account's past days are never
+     rewritten and the 7 day lock starts then. Freezes: the larger holding of the two, at most 2, and the frozen days joined, so the rebuild from the
      history treats them as covered. The zone and the freezes are in the export and erased with the account.
   10. **Two flags**, both audience everyone, off, removed by 2027-01-31: `local_days` (CC-146) and
       `streak_freezes` (CC-145), so each ramps and rolls back on its own. Off, the code behaves as before: UTC days

@@ -90,6 +90,13 @@ describe("streak freezes (CC-145)", () => {
     });
   });
 
+  it("names no milestone past the last one", () => {
+    const long = { ...play(fresh, "2026-10-19"), current: 400, best: 400 };
+    expect(
+      dailyStreakView(long, noon("2026-10-19"), { calendar: india, freezes: true }).nextMilestone,
+    ).toBeNull();
+  });
+
   it("is not at risk while a freeze is spare", () => {
     const stored = play(fresh, "2026-10-19", "2026-10-26", "2026-10-27"); // 2 freezes
     const view = dailyStreakView(stored, noon("2026-10-28"), { calendar: india, freezes: true });

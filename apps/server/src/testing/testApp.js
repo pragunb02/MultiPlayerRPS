@@ -39,7 +39,7 @@ import { createFeatureFlagAccessor } from "../data/featureFlagAccessor.js";
 import { createInMemoryFeatureFlagDao } from "./inMemoryFeatureFlagDao.js";
 import { createTimeZoneAccessor } from "../data/timeZoneAccessor.js";
 import { createPlayerDaysComponent } from "../domain/playerDays/playerDaysComponent.js";
-import { INDIA_WEEK_OFFSET_MS } from "../domain/leaderboards/isoWeek.js";
+import { createWeekRule } from "../domain/leaderboards/weekRule.js";
 import { createInMemoryTimeZoneDao } from "./inMemoryTimeZoneDao.js";
 import { createKeyedIds, KEYED_ID_LABELS, keyedIdSecretFrom } from "../utils/keyedIds.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
@@ -271,7 +271,7 @@ export function createTestApp({
     transfers: playerTransferAccessor,
     safety: safetyComponent,
     cards: profileCards,
-    weekOffset: async () => ((await flagComponent.isOn("local_days", undefined)) ? INDIA_WEEK_OFFSET_MS : 0),
+    weekOffset: createWeekRule({ flags: flagComponent }),
   });
   const gamificationComponent = createGamificationComponent({
     gamificationAccessor: createGamificationAccessor({

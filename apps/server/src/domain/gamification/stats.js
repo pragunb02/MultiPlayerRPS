@@ -37,20 +37,22 @@ const bump = (counts, key) => Object.freeze({ ...counts, [key]: (counts[key] ?? 
 
 /**
  * One recorded match, from one player's side. The match day is the player's own (CC-146): `calendar` defaults to UTC
- * days, as before. `freezes` and `covered` are the freeze rules of CC-145 (see `nextDailyStreak`).
+ * days, as before. `freezes` and `covered` are the freeze rules of CC-145 (see `nextDailyStreak`). `now` is when the
+ * match is applied: an old UTC streak is read as of then, so a match that arrives late never moves it back.
  *
  * @param {Readonly<PlayerStats>} stats
  * @param {{ gameId: string, result: import("./streaks.js").MatchResult, reason: string, endedAt: number,
- *   calendar?: Readonly<import("../playerDays/zoneCalendar.js").PlayerCalendar>, freezes?: boolean, covered?: ReadonlyArray<string> }} match
+ *   calendar?: Readonly<import("../playerDays/zoneCalendar.js").PlayerCalendar>, freezes?: boolean, covered?: ReadonlyArray<string>, now?: number }} match
  * @returns {Readonly<PlayerStats>}
  */
 export function applyMatchToStats(
   stats,
-  { gameId, result, reason, endedAt, calendar = UTC_CALENDAR, freezes = false, covered = [] },
+  { gameId, result, reason, endedAt, calendar = UTC_CALENDAR, freezes = false, covered = [], now = endedAt },
 ) {
   const won = result === "win";
   const day = calendar.dayOf(endedAt);
-  const daily = readDailyStreak(stats.dailyStreak, { calendar, today: day });
+  const today = calendar.dayOf(now);
+  const daily = readDailyStreak(stats.dailyStreak, { calendar, today: today > day ? today : day });
   return Object.freeze({
     ...stats,
     matchesByGame: bump(stats.matchesByGame, gameId),

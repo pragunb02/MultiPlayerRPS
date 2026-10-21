@@ -117,7 +117,7 @@ describe("player days (CC-146)", () => {
   it("moves a guest's zone only when the account has none", async () => {
     const { days } = setUp();
     await days.setTimeZone({ playerId: "guest_a", zone: "Asia/Tokyo", now: NOW });
-    expect(await days.transferPlayer({ from: "guest_a", to: { id: "user_x" } })).toEqual({
+    expect(await days.transferPlayer({ from: "guest_a", to: { id: "user_x" }, now: NOW })).toEqual({
       moved: { timeZone: 1 },
     });
     expect((await days.getTimeZone({ playerId: "user_x", now: NOW })).zone).toBe("Asia/Tokyo");
@@ -128,14 +128,67 @@ describe("player days (CC-146)", () => {
     ).toBeInstanceOf(ConflictError);
 
     await days.setTimeZone({ playerId: "guest_b", zone: "Europe/Paris", now: NOW });
-    expect(await days.transferPlayer({ from: "guest_b", to: { id: "user_x" } })).toEqual({
+    expect(await days.transferPlayer({ from: "guest_b", to: { id: "user_x" }, now: NOW })).toEqual({
       moved: { timeZone: 0 },
     });
     expect((await days.getTimeZone({ playerId: "user_x", now: NOW })).zone).toBe("Asia/Tokyo");
     // Again: nothing more.
-    expect(await days.transferPlayer({ from: "guest_b", to: { id: "user_x" } })).toEqual({
+    expect(await days.transferPlayer({ from: "guest_b", to: { id: "user_x" }, now: NOW })).toEqual({
       moved: { timeZone: 0 },
     });
+  });
+
+  it("moves nothing when the guest's zone is India's, or when the account got a zone at the same moment", async () => {
+    const { days } = setUp();
+    await days.setTimeZone({ playerId: "guest_a", zone: "America/New_York", now: NOW - ZONE_CHANGE_LOCK_MS });
+    await days.setTimeZone({ playerId: "guest_a", zone: "Asia/Kolkata", now: NOW });
+    expect(await days.transferPlayer({ from: "guest_a", to: { id: "user_x" }, now: NOW })).toEqual({
+      moved: { timeZone: 0 },
+    });
+    expect((await days.getTimeZone({ playerId: "user_x", now: NOW })).chosen).toBe(false);
+
+    const accessor = createTimeZoneAccessor({ timeZoneDao: createInMemoryTimeZoneDao() });
+    const racing = createPlayerDaysComponent({
+      timeZoneAccessor: {
+        ...accessor,
+        save: async (write) => write.playerId !== "user_y" && accessor.save(write),
+      },
+      flags: fakeFlags(["local_days"]),
+    });
+    await racing.setTimeZone({ playerId: "guest_b", zone: "Asia/Tokyo", now: NOW });
+    expect(await racing.transferPlayer({ from: "guest_b", to: { id: "user_y" }, now: NOW })).toEqual({
+      moved: { timeZone: 0 },
+    });
+  });
+
+  it("gives up with a conflict when every write of a change loses to another", async () => {
+    const accessor = createTimeZoneAccessor({ timeZoneDao: createInMemoryTimeZoneDao() });
+    const days = createPlayerDaysComponent({
+      timeZoneAccessor: { ...accessor, save: async () => false },
+      flags: fakeFlags(["local_days"]),
+    });
+    expect(
+      await refusal(days.setTimeZone({ playerId: "guest_a", zone: "Asia/Tokyo", now: NOW })),
+    ).toBeInstanceOf(ConflictError);
+  });
+
+  it("moves a guest's zone as a fresh change at the sign-in, never rewriting the account's past days", async () => {
+    const { days } = setUp();
+    // The guest chose New York days ago; the account has always had India days.
+    await days.setTimeZone({ playerId: "guest_a", zone: "America/New_York", now: NOW - 3 * DAY });
+    const signIn = NOW;
+    await days.transferPlayer({ from: "guest_a", to: { id: "user_x" }, now: signIn });
+
+    const calendar = await days.calendarFor({ playerId: "user_x", fallback: UTC_CALENDAR });
+    // 01:00 on the 21st in India, still the 20th in New York: before the sign-in it stays an India day.
+    expect(calendar.dayOf(Date.parse("2026-10-20T19:30:00Z"))).toBe("2026-10-21");
+    // The account's India day still ends at India's midnight; New York days follow from then.
+    expect(calendar.nextDayAt(signIn)).toBe(Date.parse("2026-10-21T18:30:00Z"));
+    expect(calendar.dayOf(Date.parse("2026-10-21T18:30:00Z"))).toBe("2026-10-22");
+    // The lock starts at the sign-in.
+    expect((await days.getTimeZone({ playerId: "user_x", now: signIn })).changeableAt).toBe(
+      signIn + ZONE_CHANGE_LOCK_MS,
+    );
   });
 
   it("exports and erases the zone", async () => {
@@ -153,9 +206,10 @@ describe("player days (CC-146)", () => {
 
   it("asks the streak_freezes flag for freezes and counts its success", async () => {
     const { days, flags } = setUp(["streak_freezes"]);
-    expect(await days.freezesOn({ playerId: "user_x" })).toBe(true);
-    expect(await days.localDaysOn({ playerId: "user_x" })).toBe(false);
-    await days.freezeCovered({ playerId: "user_x" });
-    expect(flags.successes).toEqual([["streak_freezes", "user_x"]]);
+    const account = "user_0123456789abcdef01234567";
+    expect(await days.freezesOn({ playerId: account })).toBe(true);
+    expect(await days.localDaysOn({ playerId: account })).toBe(false);
+    await days.freezeCovered({ playerId: account });
+    expect(flags.successes).toEqual([["streak_freezes", account]]);
   });
 });

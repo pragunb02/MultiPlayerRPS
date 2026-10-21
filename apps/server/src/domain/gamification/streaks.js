@@ -97,14 +97,13 @@ function earnWeekly(streak, day) {
   return { ...streak, freezeWeek: week, freezes: Math.min(MAX_FREEZES, streak.freezes + 1) };
 }
 
-/** A further counted match on the day after a cover: the second one gives the freeze back, once. */
+/**
+ * A further counted match on the day after a cover. The cover itself was the first of EARN_BACK_MATCHES (2), so this
+ * one gives the freeze back, once.
+ */
 function countEarnBack(streak, day) {
   if (streak.earnBack === null || streak.earnBack.day !== day) {
     return streak;
-  }
-  const matches = streak.earnBack.matches + 1;
-  if (matches < EARN_BACK_MATCHES) {
-    return { ...streak, earnBack: { day, matches } };
   }
   return { ...streak, earnBack: null, freezes: Math.min(MAX_FREEZES, streak.freezes + 1) };
 }

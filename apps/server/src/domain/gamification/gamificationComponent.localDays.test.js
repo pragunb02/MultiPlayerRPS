@@ -226,6 +226,21 @@ describe("streak freezes (CC-145)", () => {
     expect(pushed.payload.streaks.daily).toMatchObject({ current: 3, freezes: { held: 1 } });
   });
 
+  it("counts the freeze's success once, not again for an own forfeit that day", async () => {
+    const { finish, successes } = setUp();
+    const solo = (endedAt, extra = {}) => match({ endedAt, players: [ALICE, BOB], ...extra });
+    await finish(solo(indiaNoon("2026-10-19")));
+    await finish(solo(indiaNoon("2026-10-20")));
+    await finish(solo(indiaNoon("2026-10-22"))); // the 21st covered for both players
+    const forfeit = {
+      ...solo(indiaNoon("2026-10-22") + 60_000),
+      log: [{ kind: "forfeit", playerId: ALICE.playerId }],
+      result: { result: "win", winners: [BOB.playerId], reason: "forfeit" },
+    };
+    await finish(forfeit);
+    expect(successes.filter(([, id]) => id === ALICE.playerId)).toHaveLength(1);
+  });
+
   it("earns the freeze back with a second match that day", async () => {
     const { gamification, finish } = setUp();
     await finish(match({ endedAt: indiaNoon("2026-10-19") }));
@@ -254,6 +269,34 @@ describe("streak freezes (CC-145)", () => {
     });
     const view = await gamification.getStreaks({ playerId: ACCOUNT.playerId, now: indiaNoon("2026-10-22") });
     expect(view.daily).toMatchObject({ current: 3, best: 3, freezes: { held: 1 } });
+  });
+
+  it("joins freezes when only one side has any", async () => {
+    const { gamification, finish, moveMatches } = setUp();
+    const off = setUp(["local_days"]);
+    // The guest plays with freezes; the account never did.
+    await finish(match({ endedAt: indiaNoon("2026-10-19"), players: [ALICE, BOB] }));
+    moveMatches(ALICE.playerId, ACCOUNT);
+    await gamification.transferPlayer({
+      from: ALICE.playerId,
+      to: { id: ACCOUNT.playerId },
+      now: indiaNoon("2026-10-19"),
+    });
+    expect(
+      (await gamification.getStreaks({ playerId: ACCOUNT.playerId, now: indiaNoon("2026-10-19") })).daily,
+    ).toMatchObject({ current: 1, freezes: { held: 1 } });
+    // The account has freezes; a guest from before freezes has none.
+    const versus = (player, day) => match({ endedAt: indiaNoon(day), players: [player, BOB] });
+    await finish(versus(ACCOUNT, "2026-10-20"));
+    await off.finish(versus({ playerId: "guest_c", displayName: "Cleo" }, "2026-10-20"));
+    await gamification.transferPlayer({
+      from: "guest_c",
+      to: { id: ACCOUNT.playerId },
+      now: indiaNoon("2026-10-20"),
+    });
+    expect(
+      (await gamification.getStreaks({ playerId: ACCOUNT.playerId, now: indiaNoon("2026-10-20") })).daily,
+    ).toMatchObject({ current: 2, freezes: { held: 1 } });
   });
 
   it("exports the freezes with the stats", async () => {

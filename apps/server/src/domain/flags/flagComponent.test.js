@@ -147,6 +147,16 @@ describe("flag component: who gets a flag (CC-312)", () => {
     expect(await flags.clearRollout({ name: "new_lobby" })).toBe(false);
   });
 
+  it("says whether a flag is on for everyone, from the rollout alone (CC-146)", async () => {
+    const { flags } = setup();
+    expect(flags.isFullyOn("server_only")).toBe(true);
+    await flags.setRollout({ name: "new_lobby", rollout: 50 });
+    expect(flags.isFullyOn("new_lobby")).toBe(false);
+    await flags.setRollout({ name: "new_lobby", rollout: FLAG_ROLLOUT.ON });
+    expect(flags.isFullyOn("new_lobby")).toBe(true);
+    expect(() => flags.isFullyOn("no_such_flag")).toThrow(RangeError);
+  });
+
   it("refuses to set an unknown flag or a rollout that is not off, on or 0 to 100", async () => {
     const { flags } = setup();
 
@@ -318,6 +328,8 @@ describe("flag component: anonymous counts (CC-312)", () => {
 
   it("counts are anonymous and small groups are hidden: 1 to 4 becomes <5, zero stays zero", async () => {
     const { flags } = setup();
+    // A question about the whole rollout counts nobody (CC-146: the weekly boards ask it on every read).
+    expect(flags.isFullyOn("new_lobby")).toBe(false);
     for (const player of players.slice(0, 7)) {
       await flags.isOn("new_lobby", player);
     }
