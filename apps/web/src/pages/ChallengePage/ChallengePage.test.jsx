@@ -51,7 +51,7 @@ describe("ChallengePage (CC-139)", () => {
     });
 
     const heading = await screen.findByRole("heading", { name: "You've been challenged to Chess" });
-    // The heading takes the focus in an effect, a moment after it is drawn, later still on a busy runner.
+    // The page moves focus in an effect, which can run a moment after the heading is drawn.
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText("Riya challenges you to Chess.")).toBeInTheDocument();
     expect(screen.getByText("Open for 24 more hours.")).toBeInTheDocument();
