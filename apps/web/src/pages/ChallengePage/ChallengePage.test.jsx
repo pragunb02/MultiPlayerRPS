@@ -133,7 +133,7 @@ describe("ChallengePage (CC-139)", () => {
 
     await user.click(await screen.findByRole("button", { name: "Copy link" }));
 
-    expect(await screen.findByText("Couldn't copy. Select the text and copy it")).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't copy. Select the link and copy it")).toBeInTheDocument();
   });
 
   it("follows the server's pushes, so its creator sees the moment someone takes it", async () => {

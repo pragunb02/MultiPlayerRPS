@@ -102,6 +102,7 @@ function Yours({ challenge, onChange }) {
           value={copied}
           control="challenge.copy"
           copyLabel="Copy link"
+          copyFailure="Couldn't copy. Select the link and copy it"
           onCopied={() => toast.show("Link copied", { tone: "success" })}
         />
         <div className={styles.actions}>

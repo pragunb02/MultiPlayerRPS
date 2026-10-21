@@ -265,7 +265,7 @@ describe("the friends page (CC-052)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Make a friend link" }));
     await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
 
-    expect(await screen.findByText("Couldn't copy. Select the text and copy it")).toBeVisible();
+    expect(await screen.findByText("Couldn't copy. Select the link and copy it")).toBeVisible();
   });
 
   it("says when the friends could not be loaded, and tries again", async () => {

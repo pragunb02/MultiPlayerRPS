@@ -216,6 +216,7 @@ function FriendLink({ origin = siteOrigin() }) {
             value={withShareChannel(link, SHARE_CHANNELS.COPY)}
             control="friends.link.copy"
             copyLabel="Copy link"
+            copyFailure="Couldn't copy. Select the link and copy it"
             onCopied={() => toast.show("Link copied", { tone: "success" })}
           />
           <div className={styles.actions}>
