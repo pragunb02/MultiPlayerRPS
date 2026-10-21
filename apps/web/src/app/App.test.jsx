@@ -123,7 +123,7 @@ describe("App", () => {
     const loading = within(screen.getByRole("region", { name: "Games" })).getByRole("status");
     expect(loading).toHaveAttribute("aria-busy", "true");
     expect(loading).toHaveTextContent("Loading the games");
-    expect(loading.querySelectorAll(".bone.card")).toHaveLength(3);
+    expect(loading.querySelectorAll(".bone.bone-card")).toHaveLength(3);
     await gameList();
   });
 

@@ -19,13 +19,15 @@
 .muted {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
 }
+/* The list is measured by its own width, so a quest's name never breaks inside a narrow column (CC-323). */
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
+  container-type: inline-size;
 }
 /* One row per quest, split by thin lines. A done quest says so in words, in the success role. */
 .quest {
@@ -114,7 +116,7 @@
   border: 2px solid var(--color-border);
   background: var(--color-surface-raised);
   color: var(--color-text);
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
   font-weight: var(--weight-bold);
 }
 .chip.done {
@@ -124,7 +126,7 @@
 .chip.done .count {
   color: var(--color-success);
 }
-@media (max-width: 30rem) {
+@container (max-width: 28rem) {
   .quest {
     grid-template-columns: auto 1fr;
   }

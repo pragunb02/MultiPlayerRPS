@@ -89,14 +89,14 @@ export function Skeleton({ label, shape = "line", count = 1, className = "" }) {
     throw new Error(`Skeleton shape "${shape}" is not one of ${SKELETON_SHAPES}`);
   return (
     <div
-      className={`${styles.skeleton} ${styles[`${shape}s`]} ${className}`}
+      className={`${styles.skeleton} ${styles[`bones-${shape}`] ?? ""} ${className}`}
       role="status"
       aria-busy="true"
       data-cc-state="loading"
     >
       <span className="visually-hidden">{label}</span>
       {Array.from({ length: count }, (_, index) => (
-        <span key={index} className={`${styles.bone} ${styles[shape]}`} aria-hidden="true" />
+        <span key={index} className={`${styles.bone} ${styles[`bone-${shape}`]}`} aria-hidden="true" />
       ))}
     </div>
   );

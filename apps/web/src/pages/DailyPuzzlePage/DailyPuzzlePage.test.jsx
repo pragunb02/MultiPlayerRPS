@@ -316,7 +316,7 @@ describe("the daily chess puzzle page (CC-144)", () => {
     expect(loading).toHaveAttribute("role", "status");
     expect(loading).toHaveAttribute("aria-busy", "true");
     expect(loading).toHaveTextContent("Loading today's puzzle");
-    expect(loading.querySelector(".bone")).toHaveClass("board");
+    expect(loading.querySelector(".bone")).toHaveClass("bone-board");
     const panel = await screen.findByRole("complementary", { name: "Today's puzzle" });
     expect(panel).toHaveClass("card", "accent", "tone-chess");
   });

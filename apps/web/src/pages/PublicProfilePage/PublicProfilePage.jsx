@@ -21,7 +21,7 @@ const chessRating = ({ rating, provisional, games }) =>
 /** The public part of an adult's profile: level, games, wins and the chess rating (CC-034). Nothing else. */
 function PublicStats({ player }) {
   return (
-    <Section id="player-stats" title="Stats" description="Level, games and chess rating, all time.">
+    <Section id="player-stats" title="Stats" description="Level, games played and won, and rating, all time.">
       <Card variant="raised" as="div">
         <div className={styles.levelRow}>
           <LevelBadge level={player.level} size="md" decorative />

@@ -83,7 +83,7 @@ describe("LeaderboardPage", () => {
     await screen.findByRole("list", { name: "Overall XP rankings" });
     const head = document.querySelector(".head");
     expect(head).toHaveAttribute("aria-hidden", "true");
-    expect([...head.children].map((cell) => cell.textContent)).toEqual(["Place", "Player", "Level", "XP"]);
+    expect([...head.children].map((cell) => cell.textContent)).toEqual(["#", "Player", "Level", "XP"]);
   });
 
   it("reserves the board's room with row shapes while it loads, as one busy status (CC-323)", () => {

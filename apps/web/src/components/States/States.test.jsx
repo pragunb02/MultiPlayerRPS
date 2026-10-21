@@ -61,14 +61,14 @@ describe("Skeleton (CC-323)", () => {
     expect(status).toHaveTextContent("Loading the leaderboard");
     const bones = status.querySelectorAll("[aria-hidden='true']");
     expect(bones).toHaveLength(5);
-    for (const bone of bones) expect(bone).toHaveClass("bone", "row");
+    for (const bone of bones) expect(bone).toHaveClass("bone", "bone-row");
   });
 
   it("has a shape for every kind of content, and refuses others", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(SKELETON_SHAPES).toEqual(["line", "row", "tile", "card", "board", "block"]);
     render(<Skeleton label="Loading" />);
-    expect(screen.getByRole("status").querySelectorAll(".line")).toHaveLength(1);
+    expect(screen.getByRole("status").querySelectorAll(".bone-line")).toHaveLength(1);
     expect(() => render(<Skeleton label="x" shape="blob" />)).toThrow(/shape "blob"/);
   });
 });

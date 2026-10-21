@@ -95,7 +95,7 @@ const scoreUnit = (metric) => (metric === LEADERBOARD_METRICS.XP ? "XP" : "Wins"
 function HeaderRow({ metric }) {
   return (
     <div className={styles.head} aria-hidden="true">
-      <span>Place</span>
+      <span>#</span>
       <span>Player</span>
       <span className={styles.headLevel}>Level</span>
       <span className={styles.headScore}>{scoreUnit(metric)}</span>

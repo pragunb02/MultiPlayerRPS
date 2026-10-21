@@ -74,7 +74,7 @@
   display: grid;
   gap: var(--space-2);
 }
-.tiles {
+.bones-tile {
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
   gap: var(--space-4);
 }
@@ -86,27 +86,27 @@
   animation: pulse var(--duration-celebrate) var(--ease-in-out) 10 alternate;
 }
 /* Each shape is the height of what it stands in for. */
-.line {
+.bone-line {
   height: 1.25rem;
   border-radius: var(--radius-sm);
 }
-.row {
+.bone-row {
   height: 3.25rem;
 }
-.tile {
+.bone-tile {
   height: 6rem;
 }
-.card {
+.bone-card {
   height: 14rem;
   border-radius: var(--radius-lg);
 }
-.board {
+.bone-board {
   width: min(100%, 28rem);
   aspect-ratio: 1;
   justify-self: center;
   border-radius: var(--radius-lg);
 }
-.block {
+.bone-block {
   height: 20rem;
   border-radius: var(--radius-lg);
 }
