@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { createTelemetryDailyAccessor } from "../../data/telemetryDailyAccessor.js";
 import { createInMemoryTelemetryDailyDao } from "../../testing/inMemoryTelemetryDailyDao.js";
 import { startOfDay } from "../../utils/indiaTime.js";
-import { createTelemetryReport, FEWER_THAN_MIN, hideSmall, shareOrHidden } from "./telemetryReport.js";
+import {
+  createTelemetryReport,
+  FEWER_THAN_MIN,
+  hideSmall,
+  ratePer,
+  shareOrHidden,
+} from "./telemetryReport.js";
 
 const row = (event, group, count, timings) => ({ event, group, count, ...(timings && { timings }) });
 
@@ -74,6 +80,12 @@ describe("the telemetry report (CC-176)", () => {
     expect(shareOrHidden(5, 4)).toBe(FEWER_THAN_MIN);
     expect(shareOrHidden(0, 10)).toBe(0);
     expect(shareOrHidden(5, 20)).toBe(0.25);
+    // A rate is checked on its part and whole first, and scaled after (review of #176, HIGH).
+    expect(ratePer({ part: 3, whole: 200, per: 100 })).toBe(FEWER_THAN_MIN);
+    expect(ratePer({ part: 5, whole: 4, per: 100 })).toBe(FEWER_THAN_MIN);
+    expect(ratePer({ part: 0, whole: 0, per: 100 })).toBe(FEWER_THAN_MIN);
+    expect(ratePer({ part: 0, whole: 200, per: 100 })).toBe(0);
+    expect(ratePer({ part: 5, whole: 200, per: 100 })).toBe(2.5);
   });
 
   it("reads a range's percentiles from the days' bucket counters, and a day's exactly", async () => {

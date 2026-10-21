@@ -162,6 +162,62 @@ describe("the UX report (CC-177)", () => {
     expect(smallNumbers(week)).toEqual([]);
   });
 
+  // Review of #176, HIGH (ADR-036): a rate per 100 must not let a hidden count of 1 to 4 be worked out.
+  it("hides every rate per 100 whose part is 1 to 4, and gives a hidden value no colour", async () => {
+    const BUILD = "2026.10.20+def5678";
+    const many = (day, count, name, fields) =>
+      Array.from({ length: count }, (_, index) => ({
+        receivedAt: startOfDay(day) + (index % 24) * 60 * 60 * 1000,
+        name,
+        build: BUILD,
+        tier: "counts",
+        route: "/",
+        device: "phone",
+        player_kind: "guest",
+        ...fields,
+      }));
+    const ended = (outcome) => ({
+      surface: "toast.xp",
+      kind: "toast",
+      class: "optional",
+      blocking: false,
+      outcome,
+      shown_ms: "1-3s",
+      phase: "result",
+      trigger: "system",
+      stack: "0",
+    });
+    const { uxReport } = await uxReportOver({
+      now: NOW,
+      seed: false,
+      extra: (day) => [
+        ...many(day, 200, "control_pressed", { control: "home.play_guest", has_reason: false }),
+        ...many(day, 3, "dead_clicked", { element: "img" }),
+        ...many(day, 100, "page_viewed", { is_landing: false }),
+        ...many(day, 3, "client_errored", { kind: "render", error_type: "TypeError" }),
+        ...many(day, 100, "visit_ended", { active_s: "30-60", presses: "6-20" }),
+        ...many(day, 60, "interruption_ended", ended("timed_out")),
+        ...many(day, 3, "interruption_ended", ended("dismissed")),
+      ],
+    });
+    const day = { from: "2026-10-20", to: "2026-10-20" };
+
+    const clicks = await uxReport.get({ section: "clicks", range: day });
+    const errors = await uxReport.get({ section: "errors", range: day });
+    const budget = await uxReport.get({ section: "interruptions", range: day });
+
+    // 3 dead clicks in 200 presses would read as 1.5 per 100, and 1.5 × 2 gives the 3 back.
+    expect(clicks.per100Presses.now).toBe("<5");
+    const browser = errors.events.find(({ event }) => event === "client_errored");
+    expect(browser.byBuild).toEqual([{ build: BUILD, count: "<5", per100Pages: "<5" }]);
+    const rate = budget.lines.find(({ measure }) => measure === "rage_and_dead_per_100_presses");
+    expect(rate).toEqual(expect.objectContaining({ value: "<5", colour: "none" }));
+    // 3 dismissed of 63 shown: hidden, and no colour to narrow it down.
+    const xp = budget.surfaces.find(({ surface }) => surface === "toast.xp");
+    expect(xp.dismissed).toEqual({ value: "<5", colour: "none" });
+    expect(budget.worst).toBe("amber");
+  });
+
   it("answers an empty store with zeros and hidden shares, never an error", async () => {
     const { uxReport } = await uxReportOver({ now: NOW, seed: false });
 

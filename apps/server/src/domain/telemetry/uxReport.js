@@ -10,7 +10,7 @@ import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { addDays, dayOf, daysBetween, daysOf, weekOf } from "../../utils/indiaTime.js";
 import { BUDGET_COLOURS, colourBudget, SURFACE_MIN_SHOWN } from "./interruptionBudget.js";
 import { OTHER_VALUE } from "./rollups.js";
-import { FEWER_THAN_MIN, hideSmall, shareOrHidden } from "./telemetryReport.js";
+import { FEWER_THAN_MIN, hideSmall, ratePer, shareOrHidden } from "./telemetryReport.js";
 
 /** How long a report is reused before it is worked out again (ADR-036.4, CC-177). */
 export const UX_REPORT_TTL_MS = 5 * 60 * 1000;
@@ -247,7 +247,7 @@ export function createUxReport({ telemetryReport, cache, now }) {
       rage: await totalOf(period, "rage_clicked"),
     });
     const [now, then] = await Promise.all([counts(range), counts(before)]);
-    const per100 = (period) => shareOrHidden((period.dead + period.rage) * 100, period.presses);
+    const per100 = (period) => ratePer({ part: period.dead + period.rage, whole: period.presses, per: 100 });
     return {
       presses: compared(now.presses, then.presses),
       dead: compared(now.dead, then.dead),
@@ -291,7 +291,11 @@ export function createUxReport({ telemetryReport, cache, now }) {
           byBuild: builds.map((build) => {
             const count = byBuild.find(({ group }) => group.build === build)?.count ?? 0;
             const pages = views.find(({ group }) => group.build === build)?.count ?? 0;
-            return { build, count: hideSmall(count), per100Pages: shareOrHidden(count * 100, pages) };
+            return {
+              build,
+              count: hideSmall(count),
+              per100Pages: ratePer({ part: count, whole: pages, per: 100 }),
+            };
           }),
         };
       }),
@@ -429,6 +433,13 @@ export function createUxReport({ telemetryReport, cache, now }) {
     };
   }
 
+  /**
+   * A colour worked out on exact counts would narrow down a hidden value ("green" means at most the line), so a
+   * hidden value has no colour, and worstColour never sees it (review of #176).
+   */
+  const colourShown = (value, colour) => (value === FEWER_THAN_MIN ? BUDGET_COLOURS.NONE : colour);
+  const shownWithColour = (value, colour) => ({ value, colour: colourShown(value, colour) });
+
   /** Each line's value as it may leave: the parts and wholes of shares are checked, counts hidden when small. */
   function shownBudget(raw) {
     const coloured = colourBudget({
@@ -443,17 +454,21 @@ export function createUxReport({ telemetryReport, cache, now }) {
       optional_per_game_during_play: shareOrHidden(raw.optionalDuringPlay, raw.games),
       blocking_optional_during_play: hideSmall(raw.blockingOptionalDuringPlay),
       first_move_p75_slower: Number.isFinite(coloured.lines[4].value) ? round(coloured.lines[4].value) : null,
-      rage_and_dead_per_100_presses: shareOrHidden(raw.rageAndDead * 100, raw.presses),
+      rage_and_dead_per_100_presses: ratePer({ part: raw.rageAndDead, whole: raw.presses, per: 100 }),
     };
     return {
-      lines: coloured.lines.map(({ measure, colour }) => ({ measure, value: values[measure], colour })),
+      lines: coloured.lines.map(({ measure, colour }) => ({
+        measure,
+        value: values[measure],
+        colour: colourShown(values[measure], colour),
+      })),
       surfaces: coloured.surfaces.map(({ surface, shown, dismissed, covered }) => {
         const raws = raw.surfaces.find((entry) => entry.surface === surface);
         return {
           surface,
           shown: hideSmall(shown),
-          dismissed: { value: shareOrHidden(raws.dismissed, shown), colour: dismissed.colour },
-          covered: { value: shareOrHidden(raws.covered, shown), colour: covered.colour },
+          dismissed: shownWithColour(shareOrHidden(raws.dismissed, shown), dismissed.colour),
+          covered: shownWithColour(shareOrHidden(raws.covered, shown), covered.colour),
         };
       }),
     };

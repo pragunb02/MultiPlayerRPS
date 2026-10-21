@@ -14,13 +14,15 @@ import { uxSeedEvents } from "./uxSeed.js";
  * The UX report over made-up counts (CC-177): the last 14 complete India days before `now` get the seed, the 7
  * before the last 7 at `beforeScale`, rolled up by the real job into daily totals.
  *
- * @param {{ now: number, beforeScale?: number, seed?: boolean }} options
+ * @param {{ now: number, beforeScale?: number, seed?: boolean, extra?: (day: string) => object[] }} options  `extra`:
+ *   more events for each of the 14 days, with or without the seed
  */
-export async function uxReportOver({ now, beforeScale = 0.8, seed = true }) {
+export async function uxReportOver({ now, beforeScale = 0.8, seed = true, extra = () => [] }) {
   const telemetryAccessor = createTelemetryAccessor({ telemetryCountDao: createInMemoryTelemetryCountDao() });
   const dailyDao = createInMemoryTelemetryDailyDao();
   const telemetryDailyAccessor = createTelemetryDailyAccessor({ telemetryDailyDao: dailyDao });
   const today = dayOf(now);
+  for (let back = 1; back <= 14; back += 1) await telemetryAccessor.add(extra(addDays(today, -back)));
   if (seed) {
     for (let back = 1; back <= 14; back += 1) {
       await telemetryAccessor.add(

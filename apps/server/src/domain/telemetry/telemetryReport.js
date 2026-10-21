@@ -27,6 +27,19 @@ const round = (value) => Math.round(value * 10_000) / 10_000;
 export const shareOrHidden = (part, whole) =>
   whole === 0 || small(part) || small(whole) ? FEWER_THAN_MIN : round(part / whole);
 
+/**
+ * A rate per `per` (such as dead clicks per 100 presses), or `"<5"` when its part or its whole is 1 to 4, or its whole
+ * is 0. The check is made on the counts and the scaling after it, so a shown rate never gives away a hidden count
+ * (review of #176, ADR-036.2): multiplying the part first would let 3 in 200 show as 1.5.
+ *
+ * @param {{ part: number, whole: number, per: number }} counts
+ * @returns {number | typeof FEWER_THAN_MIN}
+ */
+export function ratePer({ part, whole, per }) {
+  if (whole === 0 || small(part) || small(whole)) return FEWER_THAN_MIN;
+  return round((part * per) / whole);
+}
+
 /** A timing's percentiles for the console: hidden when fewer than 5 events carried it. */
 export function hideTimings(timings) {
   if (timings === undefined) return undefined;
