@@ -58,6 +58,47 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-080 — Passwords: scrypt at N=2^15, r=8, p=3 with rehash at login, and new passwords checked against SecLists and Pwned Passwords
+
+- **Status:** Accepted · 2026-10-21 ([CC-260](tickets/CC-260.md), [CC-261](tickets/CC-261.md)). Decided by the
+  coordinator, who has design authority for security tickets. Adds no dependency (ADR-008): Node's `scrypt`,
+  `createHash` and `fetch`.
+- **Context.** SEC-23: new hashes used scrypt N=2^15, r=8, p=1, below OWASP's Password Storage Cheat Sheet, which
+  asks for N=2^17, r=8, p=1, or N=2^15, r=8, p=3 (or an equal trade). SEC-24: sign-up and password change accepted
+  any password of 8 to 128 characters, including the most common and the breached ones. NIST SP 800-63B (5.1.1.2)
+  asks verifiers to compare new passwords against lists of commonly used, expected or compromised values.
+- **Decision.**
+  1. **scrypt N=2^15, r=8, p=3** for every new hash. Memory is 128 × N × r, 32 MiB per hash whatever p is, which
+     is safe on Render's 512 MB. N=2^17 is not used: 128 MiB per hash would run out of memory with a few logins at
+     once. Measured on the owner's laptop (Apple M4 Pro, Node 24.21): a hash takes about 40 ms at p=1 and about
+     127 ms at p=3 (median of 30, CC-260 has the numbers). The stop line was about 300 ms.
+  2. **Old hashes keep working.** Each hash stores its own parameters and still verifies. After a successful login,
+     a hash with other parameters is made again and saved. That is best effort: a failed save never fails the login,
+     it is logged as "saving the upgraded password hash failed" (warning, forwarded to telemetry), and the next login
+     tries again.
+  3. **The dummy hash** that gives an unknown email the same work as a real one is made with the same new
+     parameters, so timing still says nothing about which emails have accounts.
+  4. **New passwords are screened** at sign-up and on a password change, never at login, after the length rules:
+     1. first against the bundled SecLists `10k-most-common.txt` (MIT, credited in CREDITS.md), compared in lower
+        case,
+     2. then against Have I Been Pwned's Pwned Passwords range API: only the first 5 hex characters of the
+        password's SHA-1 leave the server, with `Add-Padding: true`, a 1.5 s timeout, from the server only.
+  5. **Fail open.** When the range API fails or is late the password is let through after the local check. Every
+     check counts its outcome (`clear`, `common`, `breached`, `unavailable`) in the anonymous counter
+     `accounts.password_checks` (ADR-055), with nothing about the player.
+  6. **One plain refusal** for both sources, at the field: "That password is too easy to guess. Choose a different
+     one." It names neither the list nor the service.
+  7. **The fetch is injected.** `index.js` passes the real `fetch`. `startServer`, the test app and the browser
+     tests default to a fetch that always fails, so no test touches the network.
+- **Why.** p=3 meets OWASP's minimum at the same memory, and Node runs the three lanes one after another, so it
+  costs time, not memory. k-anonymity with padding is how Pwned Passwords is meant to be used and sends nothing that
+  names a person. A refused password costs the player one retry. Failing closed would stop every sign-up when a
+  service we do not run is down.
+- **Consequences.** A login with an old hash costs one extra hash, once. Sign-up and password change can take up
+  to 1.5 s longer when the range API is slow. The privacy page and DATA.md list Have I Been Pwned as a fifth service.
+  The web app makes no new request, so the CSP's `connect-src` is unchanged. A long run of `unavailable` in the
+  counter means the breach half is off and needs a look.
+
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 
 - **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner

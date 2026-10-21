@@ -50,6 +50,13 @@ https://database.lichess.org/#puzzles, released by Lichess under **CC0-1.0**. Th
 `apps/server/src/persistence/puzzles/chessPuzzles.json`, with the source and licence beside them in `LICENSE.md`.
 The puzzle page credits Lichess. They are data, not art, so the table check above does not cover them.
 
+The common password list (CC-261, ADR-080) is `Passwords/Common-Credentials/10k-most-common.txt` from **SecLists**
+by Daniel Miessler, Jason Haddix and contributors, https://github.com/danielmiessler/SecLists, released under the
+**MIT** License (copyright 2018 Daniel Miessler). It is kept unchanged on the server in
+`apps/server/src/persistence/passwords/commonPasswords.txt`, with its source, commit, checksum and the full licence
+notice beside it in `LICENSE.md`. The server refuses these passwords at sign-up and on a password change, and the
+list is never sent to a browser.
+
 ## Our own image files
 
 | File                                                  | What                                                                       | Author     | Licence               | Source                                                         | Added      |
