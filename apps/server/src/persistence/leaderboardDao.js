@@ -204,6 +204,17 @@ export function createLeaderboardDao({ connection }) {
       Entry.find({ playerId }, `${FIELDS} board period`).sort({ board: 1, period: 1 }).lean(),
 
     /**
+     * Gives every entry of one player a new name, after the owner renamed a reported account (CC-044).
+     *
+     * @param {{ playerId: string, displayName: string }} change
+     * @returns {Promise<number>} entries changed
+     */
+    async renamePlayer({ playerId, displayName }) {
+      const { modifiedCount } = await Entry.updateMany({ playerId }, { $set: { displayName } });
+      return modifiedCount;
+    },
+
+    /**
      * Deletes every entry of one player (CC-035).
      *
      * @param {string} playerId
