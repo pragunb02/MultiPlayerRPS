@@ -197,7 +197,7 @@ export function PrivacyPage() {
       </LegalSection>
 
       <LegalSection title="5. Who else handles it">
-        <p>Four services run the site for us and only handle data to do that:</p>
+        <p>Five services run the site for us and only handle data to do that:</p>
         <ul>
           <li>
             <strong>Render</strong> hosts the server. Like any web host it sees the requests your browser
@@ -216,6 +216,14 @@ export function PrivacyPage() {
             <strong>Grafana Labs</strong> (Grafana Cloud, India region) receives counts and timings about how
             the server runs, and the names of its warnings and errors. Never your IP address, email, player
             id, name, room code, cookies or session. We use it to see when the site is slow or failing.
+          </li>
+          <li>
+            <strong>Have I Been Pwned</strong> (Pwned Passwords) helps us refuse passwords that are already
+            known to attackers. When you choose a password, at sign-up or when you change it, our server sends
+            it the first 5 characters of a scrambled form of the password (a SHA-1 hash) and gets back a list
+            of known ones that start the same way. The check finishes on our server. It never receives the
+            password itself, the rest of the scrambled form, your email or anything else about you, and your
+            browser does not contact it.
           </li>
         </ul>
         <p>Their servers may be outside your country, including in the United States.</p>

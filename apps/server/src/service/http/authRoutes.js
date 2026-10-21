@@ -196,6 +196,13 @@ export function createAuthRoutes({
     if (loggedIn.legacyFailure !== undefined) {
       req.log.error({ err: loggedIn.legacyFailure }, "the legacy store failed behind a login");
     }
+    // The player is signed in with the old hash, which the next login tries to upgrade again (CC-260).
+    if (loggedIn.rehashFailure !== undefined) {
+      req.log.warn(
+        { err: loggedIn.rehashFailure, playerId: loggedIn.identity.id },
+        "saving the upgraded password hash failed",
+      );
+    }
     // An account stored under an older email spelling is rewritten at its login (CC-245). The logs never hold the
     // email, only that it happened, and a warning when another account already had the new spelling.
     if (loggedIn.emailUpdate === "rewritten") {

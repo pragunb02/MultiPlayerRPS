@@ -2,7 +2,7 @@ import { PageTitle } from "../../components/PageTitle.jsx";
 import styles from "./LegalPage.module.css";
 
 /** When the texts were last changed. Change it with every edit, readers compare it with what they saw before. */
-export const LEGAL_TEXT_DATE = "18 October 2026";
+export const LEGAL_TEXT_DATE = "21 October 2026";
 
 /**
  * The frame of a legal page: its title, a visible draft note and the text.
