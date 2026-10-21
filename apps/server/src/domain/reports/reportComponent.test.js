@@ -106,7 +106,13 @@ function setup({ rooms = { ROOM22: room() }, matches = {}, profiles = fakeProfil
     suspensions: {
       async suspend(input) {
         suspended.push(input);
-        return { suspension: { suspensionId: "s-1", nameThen: input.nameThen }, failed: [] };
+        // The suspension component names the account as it is now, whatever the reports say (review of CC-334).
+        if (suspended.length > 1) {
+          throw new ConflictError("This account is suspended already. Lift it first", {
+            details: { appliedAgain: true },
+          });
+        }
+        return { suspension: { suspensionId: "s-1", nameThen: "Arjun now" }, failed: [] };
       },
       historyOf: async ({ playerId }) => [
         { suspensionId: `history of ${playerId === ARJUN.id ? "Arjun" : "?"}` },
@@ -516,11 +522,15 @@ describe("reportComponent.suspend: the owner suspends a group's account (CC-334,
       now: T0 + 99,
     });
 
-    expect(result).toEqual({ suspension: { suspensionId: "s-1", nameThen: "Arjun" }, failed: [], closed: 2 });
+    expect(result).toEqual({
+      suspension: { suspensionId: "s-1", nameThen: "Arjun now" },
+      failed: [],
+      closed: 2,
+    });
+    // No name from the reports is passed on: the suspension takes the account's own (review of CC-334).
     expect(suspended).toEqual([
       {
         playerId: ARJUN.id,
-        nameThen: "Arjun",
         duration: "7d",
         reason: "harassment",
         by: OWNER,
@@ -531,6 +541,29 @@ describe("reportComponent.suspend: the owner suspends a group's account (CC-334,
     expect(actioned.groups[0].items.every((item) => item.action === "suspend")).toBe(true);
     expect(groups.find((group) => group.kind === "guest").canSuspend).toBe(false);
     expect(arjun.canSuspend).toBe(true);
+  });
+
+  it("closes the group's open reports when a retry applies a suspension's effects again, and passes the 409 on", async () => {
+    const { reports } = await threeReports();
+    const { groups } = await reports.queue({ status: "open", page: 0 });
+    const arjun = groups.find((group) => group.names.includes("Arjun"));
+    const input = { reportId: arjun.groupId, duration: "7d", reason: "harassment", by: OWNER };
+    await reports.suspend({ ...input, now: T0 + 99 });
+    // A new report came in after the first try, and the owner presses Suspend on it.
+    const { reportId } = await reports.report({
+      reporter: RIYA,
+      target: { roomCode: "ROOM22", seat: 1, seatId: SEAT_IDS.seatIdOf(room(), ARJUN.id) },
+      reason: "other",
+      now: T0 + DAY_MS,
+    });
+
+    const again = await reports.suspend({ ...input, reportId, now: T0 + DAY_MS + 1 }).catch((err) => err);
+
+    expect(again).toBeInstanceOf(ConflictError);
+    expect(again.details).toEqual({ appliedAgain: true });
+    expect((await reports.queue({ status: "open", page: 0 })).groups.map((group) => group.names)).toEqual([
+      ["Guest-T001"],
+    ]);
   });
 
   it("can suspend from a group that is closed already, and shows the player's history by the report's id", async () => {

@@ -56,6 +56,8 @@ const NOBODY_TO_NAME = Object.freeze({
   },
 });
 
+const NOBODY_SUSPENDED = Object.freeze({ isSuspended: async () => false });
+
 /** What a player is told about a challenge that is no longer open. A block reads exactly as "expired" (ADR-053). */
 const ENDED_MESSAGES = Object.freeze({
   [CHALLENGE_STATES.ACCEPTED]: "Someone already took this challenge",
@@ -124,6 +126,8 @@ export function stateAt(challenge, now) {
  *   safety: Pick<ReturnType<typeof import("../safety/safetyComponent.js").createSafetyComponent>, "policyFor">,
  *   events: { emit: (event: string, payload: unknown) => void },
  *   recipients?: { resolve: (query: { from: Readonly<{ id: string }>, target: unknown, now: number }) => Promise<Readonly<{ id: string, displayName: string }>> },
+ *   suspended?: { isSuspended: (query: { playerId: string, now: number }) => Promise<boolean> },  whether a
+ *     creator's account is suspended (CC-334): their challenge then reads as withdrawn. Without it nobody is
  *   newId?: () => string,
  *   lifetimes?: Readonly<typeof CHALLENGE_LIFETIMES>,
  *   limits?: Readonly<typeof CHALLENGE_LIMITS>,
@@ -140,6 +144,7 @@ export function createChallengeComponent({
   safety,
   events,
   recipients = NOBODY_TO_NAME,
+  suspended = NOBODY_SUSPENDED,
   newId = newChallengeId,
   lifetimes = CHALLENGE_LIFETIMES,
   limits = CHALLENGE_LIMITS,
@@ -151,6 +156,7 @@ export function createChallengeComponent({
   assertFunction(safety?.policyFor, "safety.policyFor");
   assertFunction(events?.emit, "events.emit");
   assertFunction(recipients?.resolve, "recipients.resolve");
+  assertFunction(suspended?.isSuspended, "suspended.isSuspended");
   assertFunction(newId, "newId");
 
   /** Whether two players are on either side of a block. A visitor without a player id is never blocked. */
@@ -344,6 +350,10 @@ export function createChallengeComponent({
       const challenge = await openFor(challengeId, player.id, now);
       if (challenge.toId !== "" && challenge.toId !== player.id) {
         throw new ForbiddenError("This challenge is for someone else");
+      }
+      // A creator suspended a moment before their challenges were withdrawn is never seated (review of CC-334).
+      if (await suspended.isSuspended({ playerId: challenge.fromId, now })) {
+        throw ended(CHALLENGE_STATES.WITHDRAWN);
       }
       const claim = { challengeId, acceptedBy: player.id };
       const claimed = await challengeAccessor.claim({

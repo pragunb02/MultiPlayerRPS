@@ -393,6 +393,7 @@ export function createTestApp({
     safety: safetyComponent,
     events: domainEvents,
     ...(challengeRecipients && { recipients: challengeRecipients }),
+    suspended: suspensionComponent,
   });
   const networkOf = createNetworkKey({ now }).networkOf;
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });

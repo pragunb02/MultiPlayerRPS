@@ -108,6 +108,16 @@ the owner may change it.
   board read. Opponents' ratings are not refunded (a follow-up with CC-042 if wanted). A reason is not shown at
   sign-in, which Santa Clara 2.0 asks for: it is in the player's export and given on appeal. The DPDP grievance path
   for children is checked by the lawyer with ADR-028.9.
+- **Amended after the review of the branch (2026-10-21).** (1) The session check (every request and handshake)
+  refuses a suspended account first, with a reason of its own that gets no renewal grace, and a password change or
+  "sign out other devices" on its way checks the suspension after its own version bump, so neither mints a session.
+  (2) The effects are idempotent: asking again for an account suspended already applies them again (sessions,
+  sockets, followers, the group's reports) and answers 409 with `details.appliedAgain`, so a first try that failed
+  halfway is finished by a retry. (3) The store holds one suspension in effect per player: `activeFor`, the player
+  id, under a unique partial index, freed when the suspension ends by time or is lifted; two at once give one record
+  and one 409. (4) The followers run challenges, friends, then rooms, and taking a challenge from a suspended creator
+  answers as a withdrawn one, so nobody is seated with the player while their rooms are left. (5) The suspension
+  keeps the account's name as it is then, not the name a report saw.
 
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 

@@ -1,3 +1,5 @@
+import { DuplicateKey } from "../persistence/errors.js";
+
 /** Test double with the same contract as `createSuspensionDao` (verified by the shared contract tests). */
 export function createInMemorySuspensionDao() {
   /** @type {Map<string, object>} records by suspension id */
@@ -14,6 +16,12 @@ export function createInMemorySuspensionDao() {
 
     async insert(doc) {
       if (records.has(doc.suspensionId)) throw new Error(`Duplicate suspension ${doc.suspensionId}`);
+      if (
+        doc.activeFor !== undefined &&
+        [...records.values()].some((each) => each.activeFor === doc.activeFor)
+      ) {
+        throw new DuplicateKey(`${doc.activeFor} has a suspension in effect already`);
+      }
       records.set(doc.suspensionId, copy({ endsAt: null, ...doc }));
       return copy(records.get(doc.suspensionId));
     },
@@ -33,8 +41,17 @@ export function createInMemorySuspensionDao() {
     async lift({ suspensionId, liftedAt, liftedById, liftedByName, deleteAt }) {
       const doc = records.get(suspensionId);
       if (doc === undefined || !inEffectAt(doc, liftedAt)) return false;
-      records.set(suspensionId, { ...doc, liftedAt, liftedById, liftedByName, deleteAt });
+      const { activeFor, ...rest } = doc;
+      records.set(suspensionId, { ...rest, liftedAt, liftedById, liftedByName, deleteAt });
       return true;
+    },
+
+    async releaseEnded({ playerId, at }) {
+      const ended = [...records.values()].filter(
+        (doc) => doc.activeFor === playerId && doc.endsAt !== null && doc.endsAt <= at,
+      );
+      ended.forEach(({ activeFor, ...rest }) => records.set(rest.suspensionId, rest));
+      return ended.length;
     },
 
     async deleteByPlayer(playerId) {

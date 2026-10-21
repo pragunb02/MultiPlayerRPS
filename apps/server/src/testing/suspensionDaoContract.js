@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { DuplicateKey } from "../persistence/errors.js";
 
 const T0 = new Date(Date.UTC(2026, 9, 21, 12));
 const at = (hours) => new Date(T0.getTime() + hours * 60 * 60 * 1000);
@@ -108,6 +109,46 @@ export function runSuspensionDaoContract(createDao) {
 
     expect(lifted).toBe(false);
     expect(await dao.getById(ended.suspensionId)).toEqual(ended);
+  });
+
+  it("holds at most one suspension per player marked active, even when two are stored at once (review of CC-334)", async () => {
+    const dao = await createDao();
+
+    const results = await Promise.allSettled([
+      dao.insert(record({ activeFor: BOB })),
+      dao.insert(record({ activeFor: BOB })),
+    ]);
+
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(results.find((result) => result.status === "rejected").reason).toBeInstanceOf(DuplicateKey);
+    expect(await dao.listByPlayer(BOB)).toHaveLength(1);
+    // Other players, and records with no mark, are not held back.
+    await expect(dao.insert(record({ playerId: RIYA, activeFor: RIYA }))).resolves.toBeDefined();
+    await expect(dao.insert(record())).resolves.toBeDefined();
+  });
+
+  it("frees the mark when a suspension ends by time or is lifted, so a new one can be stored", async () => {
+    const dao = await createDao();
+    const ended = await dao.insert(record({ startedAt: at(0), endsAt: at(24), activeFor: BOB }));
+
+    await expect(dao.insert(record({ startedAt: at(30), activeFor: BOB }))).rejects.toThrow(DuplicateKey);
+    expect(await dao.releaseEnded({ playerId: BOB, at: at(23) })).toBe(0);
+    expect(await dao.releaseEnded({ playerId: BOB, at: at(24) })).toBe(1);
+    expect(await dao.getById(ended.suspensionId)).not.toHaveProperty("activeFor");
+    const untilLifted = await dao.insert(
+      record({ startedAt: at(30), endsAt: null, duration: "until-lifted", activeFor: BOB }),
+    );
+
+    expect(await dao.releaseEnded({ playerId: BOB, at: at(10_000) })).toBe(0);
+    await dao.lift({
+      suspensionId: untilLifted.suspensionId,
+      liftedAt: at(40),
+      liftedById: OWNER,
+      liftedByName: "Owner",
+      deleteAt: at(40),
+    });
+    expect(await dao.getById(untilLifted.suspensionId)).not.toHaveProperty("activeFor");
+    await expect(dao.insert(record({ startedAt: at(41), activeFor: BOB }))).resolves.toBeDefined();
   });
 
   it("deletes every suspension of one player and nobody else's", async () => {

@@ -20,14 +20,31 @@ const GUEST = "guest_00000000-0000-4000-8000-000000000001";
 let counter = 0;
 const newId = () => `00000000-0000-4000-c000-${String(++counter).padStart(12, "0")}`;
 
-function setUp({ followers = [], admins = [OWNER_ID] } = {}) {
+function setUp({
+  followers = [],
+  admins = [OWNER_ID],
+  failSessionsOnce = false,
+  names = { [BOB]: "Bob" },
+} = {}) {
   const ended = [];
+  let failNext = failSessionsOnce;
   const events = new EventEmitter();
   const started = [];
   events.on(SUSPENSION_EVENTS.STARTED, (payload) => started.push(payload));
   const suspensions = createSuspensionComponent({
     suspensionAccessor: createSuspensionAccessor({ suspensionDao: createInMemorySuspensionDao() }),
-    accounts: { endSessions: async ({ playerId }) => ended.push(playerId) },
+    accounts: {
+      async endSessions({ playerId }) {
+        if (failNext) {
+          failNext = false;
+          throw new Error("database blip");
+        }
+        ended.push(playerId);
+      },
+      // The account's name now, which may differ from the name in the reports (review of CC-334).
+      usernamesOf: async ({ playerIds }) =>
+        new Map(playerIds.filter((id) => Object.hasOwn(names, id)).map((id) => [id, names[id]])),
+    },
     events,
     followers,
     isProtected: (playerId) => admins.includes(playerId),
@@ -39,7 +56,6 @@ function setUp({ followers = [], admins = [OWNER_ID] } = {}) {
 const suspendBob = (suspensions, fields = {}) =>
   suspensions.suspend({
     playerId: BOB,
-    nameThen: "Bob",
     duration: "7d",
     reason: "harassment",
     by: OWNER,
@@ -88,6 +104,39 @@ describe("suspensionComponent (CC-334, ADR-078)", () => {
     expect(failed).toEqual([{ name: "rooms", err: expect.any(Error) }]);
     expect(ended).toEqual([BOB]);
     expect(await suspensions.isSuspended({ playerId: BOB, now: T0 + 1 })).toBe(true);
+  });
+
+  it("names the account by its name now, not the name a report saw", async () => {
+    const { suspensions } = setUp({ names: { [BOB]: "Player_K7QM2X" } });
+
+    const { suspension } = await suspendBob(suspensions);
+
+    expect(suspension.nameThen).toBe("Player_K7QM2X");
+    const gone = setUp({ names: {} });
+    await expect(suspendBob(gone.suspensions)).rejects.toThrow(NotFoundError);
+  });
+
+  it("applies the effects again when asked to suspend an account already suspended, so a failed first try is finished", async () => {
+    const order = [];
+    const { suspensions, ended, started } = setUp({
+      failSessionsOnce: true,
+      followers: [{ name: "rooms", playerSuspended: async () => order.push("rooms") }],
+    });
+
+    await expect(suspendBob(suspensions)).rejects.toThrow("database blip");
+    expect(await suspensions.isSuspended({ playerId: BOB, now: T0 + 1 })).toBe(true);
+    expect(ended).toEqual([]);
+
+    const again = await suspendBob(suspensions, { now: T0 + 1 }).catch((err) => err);
+
+    expect(again).toBeInstanceOf(ConflictError);
+    expect(again.message).toBe("This account is suspended already. Lift it first");
+    expect(again.details).toEqual({ appliedAgain: true });
+    expect(ended).toEqual([BOB]);
+    expect(started).toEqual([{ playerId: BOB }]);
+    expect(order).toEqual(["rooms"]);
+    // Still one suspension: nothing new was stored.
+    expect(await suspensions.historyOf({ playerId: BOB, now: T0 + 1 })).toHaveLength(1);
   });
 
   it("lasts until lifted with no end, and ends by itself after 24 hours, 7 days or 30 days", async () => {

@@ -624,7 +624,7 @@ export function cutSocketsOnRename({ domainEvents, disconnectPlayer }) {
  *
  * @param {{
  *   suspensionAccessor: ReturnType<typeof createSuspensionAccessor>,
- *   accountComponent: Pick<ReturnType<typeof createAccountComponent>, "signOutOtherDevices">,
+ *   accountComponent: Pick<ReturnType<typeof createAccountComponent>, "signOutOtherDevices" | "usernamesOf">,
  *   domainEvents: import("node:events").EventEmitter,
  *   adminAccountIds: ReadonlyArray<string>,
  *   rooms: () => Pick<ReturnType<typeof createRoomComponent>, "removePlayer">,
@@ -645,12 +645,17 @@ export function wireSuspensions({
   return createSuspensionComponent({
     suspensionAccessor,
     // Counting the version up ends every session of the account at its next request or handshake (ADR-030.4).
-    accounts: { endSessions: ({ playerId }) => accountComponent.signOutOtherDevices({ playerId }) },
+    accounts: {
+      endSessions: ({ playerId }) => accountComponent.signOutOtherDevices({ playerId }),
+      usernamesOf: (query) => accountComponent.usernamesOf(query),
+    },
     events: domainEvents,
+    // Challenges and friends first: a challenge taken while the rooms were being left would seat the player again
+    // (review of CC-334). Taking one from a suspended creator is refused too.
     followers: [
-      { name: "rooms", playerSuspended: (input) => rooms().removePlayer(input) },
       { name: "challenges", playerSuspended: (input) => challenges().playerSuspended(input) },
       { name: "friends", playerSuspended: (input) => friends().playerSuspended(input) },
+      { name: "rooms", playerSuspended: (input) => rooms().removePlayer(input) },
     ],
     isProtected: (playerId) => admins.has(playerId),
   });
@@ -1039,6 +1044,7 @@ export async function startServer({
     blocks: blockComponent,
     safety: safetyComponent,
     events: domainEvents,
+    suspended: suspensionComponent,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const friends = wireFriends({

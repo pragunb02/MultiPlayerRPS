@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { SUSPENDED_REASON, SUSPENSION_DURATION_MS } from "@classicade/shared";
 import { isAccountId } from "../../models/identity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
-import { ConflictError, ForbiddenError } from "../../utils/errors.js";
+import { ConflictError, ForbiddenError, NotFoundError } from "../../utils/errors.js";
 
 /** What the composition root hears when a suspension starts, so it can cut the account's sockets (ADR-078). */
 export const SUSPENSION_EVENTS = Object.freeze({ STARTED: "suspension:started" });
@@ -32,7 +32,10 @@ const UNTIL_LIFTED_TEXT = "until lifted";
  *
  * @param {{
  *   suspensionAccessor: ReturnType<typeof import("../../data/suspensionAccessor.js").createSuspensionAccessor>,
- *   accounts: { endSessions: (input: { playerId: string }) => Promise<unknown> },
+ *   accounts: {
+ *     endSessions: (input: { playerId: string }) => Promise<unknown>,
+ *     usernamesOf: (query: { playerIds: ReadonlyArray<string> }) => Promise<ReadonlyMap<string, string>>,
+ *   },
  *   events: { emit: (name: string, payload: object) => unknown },
  *   followers: ReadonlyArray<SuspensionFollower>,
  *   isProtected: (playerId: string) => boolean,
@@ -50,6 +53,7 @@ export function createSuspensionComponent({
 }) {
   assertDefined(suspensionAccessor, "suspensionAccessor");
   assertFunction(accounts?.endSessions, "accounts.endSessions");
+  assertFunction(accounts?.usernamesOf, "accounts.usernamesOf");
   assertFunction(events?.emit, "events.emit");
   assertDefined(followers, "followers");
   followers.forEach((follower) =>
@@ -83,16 +87,51 @@ export function createSuspensionComponent({
     return (await suspensionAccessor.listByPlayer(playerId)).find((each) => inEffect(each, now));
   }
 
+  /**
+   * What a suspension does once its record is stored: every session ends (the record first, then the version, so a
+   * sign-in that read the account in between gets a session its next request ends), the sockets are cut, and each
+   * follower lets go of the player. Running it again is harmless, so a retry finishes a first try that failed
+   * halfway (review of CC-334).
+   *
+   * @returns {Promise<Array<{ name: string, err: unknown }>>} the followers that failed
+   */
+  async function applyEffects(playerId, now) {
+    await accounts.endSessions({ playerId });
+    events.emit(SUSPENSION_EVENTS.STARTED, { playerId });
+    const failed = [];
+    for (const follower of followers) {
+      try {
+        await follower.playerSuspended({ playerId, now });
+      } catch (err) {
+        failed.push({ name: follower.name, err });
+      }
+    }
+    return failed;
+  }
+
+  /** The answer to a second suspension: the first one's effects are applied again, and nothing new is stored. */
+  async function appliedAgain(playerId, now) {
+    await applyEffects(playerId, now);
+    return new ConflictError("This account is suspended already. Lift it first", {
+      details: { appliedAgain: true },
+    });
+  }
+
   return Object.freeze({
     /**
      * Suspends an account. `duration` and `reason` are already checked by the service layer.
      *
-     * @param {{ playerId: string, nameThen: string, duration: string, reason: string, by: Actor, now: number }} input
+     * The suspension keeps the account's name as it is now, which may be the safe name of a rename since the reports
+     * (review of CC-334).
+     *
+     * @param {{ playerId: string, duration: string, reason: string, by: Actor, now: number }} input
      * @returns {Promise<Readonly<{ suspension: object, failed: ReadonlyArray<{ name: string, err: unknown }> }>>}
      *   `failed`: the followers that could not let go of the player, for the logs
-     * @throws {ConflictError} for a guest, an admin account, or an account suspended already
+     * @throws {ConflictError} for a guest or an admin account; and for an account suspended already, with
+     *   `details.appliedAgain`, once the effects of its suspension were applied again
+     * @throws {NotFoundError} when the account is not there any more
      */
-    async suspend({ playerId, nameThen, duration, reason, by, now }) {
+    async suspend({ playerId, duration, reason, by, now }) {
       if (!isAccountId(playerId)) {
         throw new ConflictError("Only an account can be suspended: a guest has no account to pause");
       }
@@ -100,31 +139,31 @@ export function createSuspensionComponent({
         throw new ConflictError("An admin account can't be suspended");
       }
       if ((await currentOf(playerId, now)) !== undefined) {
-        throw new ConflictError("This account is suspended already. Lift it first");
+        throw await appliedAgain(playerId, now);
+      }
+      const nameThen = (await accounts.usernamesOf({ playerIds: [playerId] })).get(playerId);
+      if (nameThen === undefined) {
+        throw new NotFoundError("That account is not there any more");
       }
       const lasts = SUSPENSION_DURATION_MS[duration];
-      const suspension = await suspensionAccessor.add({
-        suspensionId: newId(),
-        playerId,
-        nameThen,
-        duration,
-        reason,
-        by,
-        startedAt: now,
-        ...(lasts !== undefined && { endsAt: now + lasts }),
-      });
-      // The record first, then the version: a sign-in that read the account in between gets a session that its next
-      // request ends, and one after sees the record (ADR-078).
-      await accounts.endSessions({ playerId });
-      events.emit(SUSPENSION_EVENTS.STARTED, { playerId });
-      const failed = [];
-      for (const follower of followers) {
-        try {
-          await follower.playerSuspended({ playerId, now });
-        } catch (err) {
-          failed.push({ name: follower.name, err });
-        }
+      let suspension;
+      try {
+        suspension = await suspensionAccessor.add({
+          suspensionId: newId(),
+          playerId,
+          nameThen,
+          duration,
+          reason,
+          by,
+          startedAt: now,
+          ...(lasts !== undefined && { endsAt: now + lasts }),
+        });
+      } catch (err) {
+        // Another suspension of the player was stored a moment before (the store holds one): finish its effects.
+        if (err instanceof ConflictError) throw await appliedAgain(playerId, now);
+        throw err;
       }
+      const failed = await applyEffects(playerId, now);
       return Object.freeze({ suspension: viewOf(suspension, now), failed: Object.freeze(failed) });
     },
 

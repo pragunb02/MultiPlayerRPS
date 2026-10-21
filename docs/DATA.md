@@ -614,8 +614,10 @@ and `apps/server/src/service/http/suspensionRoutes.js` (CC-334, ADR-078)
 1. **Holds:** one document per suspension the owner made: `suspensionId` (random), `playerId` (the suspended
    account), `nameThen` (its name then), `duration` (`24h`, `7d`, `30d`, `until-lifted`), `reason` (one of four; no
    free text), `startedAt`, `endsAt` (null until lifted), `byId` and `byName` (the admin who acted), and on an early
-   lift `liftedAt`, `liftedById`, `liftedByName`, then `deleteAt`. Indexes: unique on `suspensionId`, on `playerId`
-   and `startedAt`, on `liftedAt` and `endsAt` (the ones in effect), TTL on `deleteAt`. Nothing in `accounts` changes.
+   lift `liftedAt`, `liftedById`, `liftedByName`, then `deleteAt`, and `activeFor` (the player id again, only while
+   the suspension may be in effect, removed when it ends or is lifted). Indexes: unique on `suspensionId`, on
+   `playerId` and `startedAt`, on `liftedAt` and `endsAt` (the ones in effect), unique partial on `activeFor` (at most
+   one in effect per player), TTL on `deleteAt`. Nothing in `accounts` changes.
 2. **Personal data:** pseudonymous, plus two display names. It says that the owner took an account off the site, for
    how long and why, and who did it.
 3. **Who can read it:** admins in the console, without any player id (`GET /api/admin/reports/:reportId/suspensions`,

@@ -374,22 +374,25 @@ export function createReportComponent({
       if (!isAccountId(playerId)) {
         throw new ConflictError("Only an account can be suspended: a guest has no account to pause");
       }
-      const { suspension, failed } = await suspensions.suspend({
-        playerId,
-        nameThen: report.reportedName,
-        duration,
-        reason,
-        by,
-        now,
-      });
-      const closed = await reportAccessor.closeOpen({
-        reportedId: report.reportedId,
-        upTo: { createdAt: report.createdAt, reportId },
-        status: REPORT_STATUS.ACTIONED,
-        action: SUSPENSION_REPORT_ACTION,
-        at: now,
-      });
-      return Object.freeze({ suspension, failed, closed });
+      const closeGroup = () =>
+        reportAccessor.closeOpen({
+          reportedId: report.reportedId,
+          upTo: { createdAt: report.createdAt, reportId },
+          status: REPORT_STATUS.ACTIONED,
+          action: SUSPENSION_REPORT_ACTION,
+          at: now,
+        });
+      let suspended;
+      try {
+        // The suspension names the account as it is now, not as a report saw it (review of CC-334).
+        suspended = await suspensions.suspend({ playerId, duration, reason, by, now });
+      } catch (err) {
+        // A retry on an account suspended already: its effects were applied again, so its reports close too.
+        if (err instanceof ConflictError && err.details?.appliedAgain === true) await closeGroup();
+        throw err;
+      }
+      const closed = await closeGroup();
+      return Object.freeze({ suspension: suspended.suspension, failed: suspended.failed, closed });
     },
 
     /**

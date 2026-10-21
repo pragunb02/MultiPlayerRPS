@@ -3,7 +3,7 @@ import { ERROR_CODES, SOCKET_EVENTS, SUSPENSION_DURATIONS } from "@classicade/sh
 import { hasPlayerIdShape } from "../../models/playerIdShape.js";
 import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { createInMemorySuspensionDao } from "../../testing/inMemorySuspensionDao.js";
-import { createSocketClients, startRoom } from "../../testing/socketClients.js";
+import { createSocketClients, send, startRoom } from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
 import { createPasswordHasher } from "../../utils/passwordHasher.js";
 
@@ -330,7 +330,16 @@ describe("POST /api/auth/suspended-export (CC-334, AC-7)", () => {
       call("POST", "/auth/suspended-export", { body: { email: bob.email, password } });
 
     expect((await exportFor()).status).toBe(409);
-    const { reportId } = await reported(alice, bob);
+    const { code, reportId } = await reported(alice, bob);
+    // Bob moves first with seed 42, and the race to 3 ends on Alice's move: one recorded match for Bob.
+    await send(bob.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 1 } });
+    await send(alice.socket, SOCKET_EVENTS.GAME_MOVE, { code, move: { add: 2 } });
+    await server.tasks.drain();
+    const before = await call("POST", "/account/export", {
+      body: { password: PASSWORD },
+      cookie: bob.cookie,
+    });
+    expect(before.body.matches).toHaveLength(1);
     const owner = await logIn("owner@example.com");
     await suspend(owner, reportId, { duration: "7d", reason: "cheating" });
 
@@ -351,8 +360,13 @@ describe("POST /api/auth/suspended-export (CC-334, AC-7)", () => {
       },
     ]);
     expect(JSON.stringify(res.body.suspensions)).not.toMatch(/Owner/);
-    // Nothing was deleted: the game Bob was in is still his.
-    expect(res.body.matches.length + res.body.progress.matchesPlayed).toBeGreaterThanOrEqual(0);
+    // Nothing was deleted: every store reads as it did before the suspension, the finished game included.
+    for (const store of ["matches", "progress", "gamification", "leaderboards", "chessRatings", "reports"]) {
+      expect(before.body, store).toHaveProperty(store);
+      expect(res.body[store], store).toEqual(before.body[store]);
+    }
+    expect(res.body.matches).toHaveLength(1);
+    expect(res.body.progress.xp).toBeGreaterThan(0);
     expect(res.cookie).toBeUndefined();
   });
 });

@@ -30,7 +30,13 @@ const DAY = 24 * 60 * MINUTE;
 const CHESS = Object.freeze({ timeControl: "5+0" });
 
 /** Riya is an adult account. Everyone named in `to` targets is found by that name. */
-function setup({ blocked = [], adults = [RIYA.id], rooms: roomOverrides = {}, named = true } = {}) {
+function setup({
+  blocked = [],
+  adults = [RIYA.id],
+  rooms: roomOverrides = {},
+  named = true,
+  suspended = [],
+} = {}) {
   const emitted = [];
   const madeRooms = [];
   let ids = 0;
@@ -67,6 +73,7 @@ function setup({ blocked = [], adults = [RIYA.id], rooms: roomOverrides = {}, na
       },
     }),
     newId: () => `c${String(++ids).padStart(19, "0")}`,
+    suspended: { isSuspended: async ({ playerId }) => suspended.includes(playerId) },
   });
   const make = (fields = {}) =>
     challenges.create({ from: RIYA, gameId: "chess", options: CHESS, now: T0, ...fields });
@@ -662,6 +669,17 @@ describe("challengeComponent: a player's data", () => {
 });
 
 describe("challengeComponent.playerSuspended (CC-334, ADR-078 decision 5)", () => {
+  it("refuses taking a challenge whose creator is suspended, as a withdrawn one, and makes no room", async () => {
+    const { make, accept, madeRooms } = setup({ suspended: [RIYA.id] });
+    const { id } = await make();
+
+    const refusal = await accept(id).catch((err) => err);
+
+    expect(refusal).toBeInstanceOf(GoneError);
+    expect(refusal.details).toEqual({ state: CHALLENGE_STATES.WITHDRAWN });
+    expect(madeRooms).toEqual([]);
+  });
+
   it("withdraws every open challenge a suspended player made, and leaves the ones sent to them", async () => {
     const { make, challenges, accessor, emitted } = setup();
     const link = await make();

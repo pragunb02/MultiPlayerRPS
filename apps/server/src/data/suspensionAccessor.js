@@ -1,6 +1,7 @@
 import { SUSPENSION_KEEP_DAYS } from "@classicade/shared";
 import { assertDefined } from "../utils/assert.js";
-import { NotFoundError } from "../utils/errors.js";
+import { DuplicateKey } from "../persistence/errors.js";
+import { ConflictError, NotFoundError } from "../utils/errors.js";
 
 const KEEP_MS = SUSPENSION_KEEP_DAYS * 24 * 60 * 60 * 1000;
 
@@ -23,7 +24,7 @@ const KEEP_MS = SUSPENSION_KEEP_DAYS * 24 * 60 * 60 * 1000;
  */
 
 /** @returns {Readonly<Suspension>} */
-const toSuspension = ({ startedAt, endsAt, liftedAt, deleteAt, ...doc }) =>
+const toSuspension = ({ startedAt, endsAt, liftedAt, deleteAt, activeFor, ...doc }) =>
   Object.freeze({
     ...doc,
     startedAt: startedAt.getTime(),
@@ -46,18 +47,30 @@ export function createSuspensionAccessor({ suspensionDao }) {
      * @param {Omit<Suspension, "byId" | "byName" | "liftedAt" | "liftedById" | "liftedByName"> & { by: Actor }} input
      *   leave `endsAt` out for a suspension until lifted
      * @returns {Promise<Readonly<Suspension>>}
+     * @throws {ConflictError} when the player has a suspension in effect already, also one stored a moment before:
+     *   the store holds one mark per player (review of CC-334)
      */
     async add({ by, startedAt, endsAt, ...fields }) {
-      return toSuspension(
-        await suspensionDao.insert({
-          ...fields,
-          startedAt: new Date(startedAt),
-          endsAt: endsAt === undefined ? null : new Date(endsAt),
-          byId: by.id,
-          byName: by.name,
-          ...(endsAt !== undefined && { deleteAt: new Date(endsAt + KEEP_MS) }),
-        }),
-      );
+      // A suspension of the player that has ended by now no longer holds the player's one mark.
+      await suspensionDao.releaseEnded({ playerId: fields.playerId, at: new Date(startedAt) });
+      try {
+        return toSuspension(
+          await suspensionDao.insert({
+            ...fields,
+            startedAt: new Date(startedAt),
+            endsAt: endsAt === undefined ? null : new Date(endsAt),
+            byId: by.id,
+            byName: by.name,
+            activeFor: fields.playerId,
+            ...(endsAt !== undefined && { deleteAt: new Date(endsAt + KEEP_MS) }),
+          }),
+        );
+      } catch (err) {
+        if (err instanceof DuplicateKey) {
+          throw new ConflictError("This account is suspended already. Lift it first", { cause: err });
+        }
+        throw err;
+      }
     },
 
     /**

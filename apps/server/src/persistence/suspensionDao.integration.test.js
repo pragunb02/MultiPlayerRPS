@@ -45,6 +45,11 @@ describe("MongoDB suspension DAO honours the suspension DAO contract (integratio
         expect.objectContaining({ key: { suspensionId: 1 }, unique: true }),
         expect.objectContaining({ key: { playerId: 1, startedAt: -1 } }),
         expect.objectContaining({ key: { liftedAt: 1, endsAt: 1 } }),
+        expect.objectContaining({
+          key: { activeFor: 1 },
+          unique: true,
+          partialFilterExpression: { activeFor: { $type: "string" } },
+        }),
       ]),
     );
   });

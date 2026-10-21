@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SUSPENSION_KEEP_DAYS } from "@classicade/shared";
 import { createInMemorySuspensionDao } from "../testing/inMemorySuspensionDao.js";
-import { NotFoundError } from "../utils/errors.js";
+import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { createSuspensionAccessor } from "./suspensionAccessor.js";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -48,7 +48,7 @@ describe("suspensionAccessor (CC-334, ADR-078)", () => {
   it("keeps a timed suspension until 180 days after it ends, and one until lifted with no end at all", async () => {
     const { dao, suspensions } = setUp();
     const timed = await suspensions.add(input());
-    const untilLifted = await suspensions.add(input({ untilLifted: true }));
+    const untilLifted = await suspensions.add(input({ playerId: RIYA, untilLifted: true }));
 
     expect((await dao.getById(timed.suspensionId)).deleteAt).toEqual(new Date(timed.endsAt + KEEP_MS));
     expect((await dao.getById(untilLifted.suspensionId)).deleteAt).toBeUndefined();
@@ -92,6 +92,23 @@ describe("suspensionAccessor (CC-334, ADR-078)", () => {
     expect(await suspensions.listByPlayer(BOB)).toEqual([second, first]);
     expect(await suspensions.removePlayer(BOB)).toBe(2);
     expect(await suspensions.listByPlayer(BOB)).toEqual([]);
+  });
+
+  it("refuses a second suspension in effect for the same player, even two at once, and allows one after the end", async () => {
+    const { suspensions } = setUp();
+
+    const results = await Promise.allSettled([suspensions.add(input()), suspensions.add(input())]);
+
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(results.find((result) => result.status === "rejected").reason).toBeInstanceOf(ConflictError);
+    // After the first one ended by time, a new one is stored.
+    await expect(
+      suspensions.add(input({ startedAt: T0 + 24 * HOUR_MS, untilLifted: true })),
+    ).resolves.toBeDefined();
+    expect(await suspensions.listByPlayer(BOB)).toHaveLength(2);
+    expect(await suspensions.listByPlayer(BOB)).not.toContainEqual(
+      expect.objectContaining({ activeFor: BOB }),
+    );
   });
 
   it("answers NotFoundError for an unknown suspension", async () => {
