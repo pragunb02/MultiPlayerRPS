@@ -64,12 +64,13 @@ const WEBKIT_SELECT_STYLE =
 
 /**
  * WebKit's hint that a script file was fetched ahead of time and then not run within a few seconds of the page
- * loading. The app fetches a game board's files ahead of time as it starts loading the board, and on a busy test
- * machine running it can take longer than WebKit's few seconds. It is advice about speed, not a failure, and only
- * WebKit gives it for these files.
+ * loading. The app fetches a game board's files ahead of time as it starts loading the board, and a page's files
+ * when a link to it is pointed at (CC-322), and on a busy test machine running them can take longer than WebKit's
+ * few seconds. It is advice about speed, not a failure, and only WebKit gives it for these files. A file name may
+ * hold a dot, as a CSS module's script does (`illustrations.module-B9eTxlRk.js`).
  */
 const WEBKIT_PRELOAD_HINT =
-  /^The resource https:\/\/[^ ]+\/assets\/[\w-]+\.js was preloaded using link preload but not used within a few seconds from the window's load event\./;
+  /^The resource https:\/\/[^ ]+\/assets\/[\w.-]+\.js was preloaded using link preload but not used within a few seconds from the window's load event\./;
 
 /**
  * Firefox warns when something measures the page before its stylesheets have loaded. "debugger eval code" is the
