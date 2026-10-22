@@ -84,6 +84,11 @@ const duplicateField = ({ keyPattern }) =>
     : Object.hasOwn(keyPattern, "toId")
       ? "recentTo"
       : "challengeId";
+/** Each field held by one challenge at most, with the key of the unique index that holds it (CC-337). */
+const HELD_KEYS = Object.freeze([
+  ["openSlot", { fromId: "$fromId", openSlot: "$openSlot" }],
+  ["recentTo", { fromId: "$fromId", toId: "$toId" }],
+]);
 /** What a moved challenge gives up when its new player holds its place or mark already, in the order tried. */
 const MARKS_DROPPED = Object.freeze([{}, { recentTo: 1 }, { recentTo: 1, openSlot: 1 }]);
 
@@ -108,7 +113,25 @@ export function createChallengeDao({ connection }) {
   });
 
   const dao = Object.freeze({
-    ensureIndexes: () => Challenge.syncIndexes(),
+    /**
+     * Builds the indexes. A server without the two unique ones (a rollback to before CC-337: its `syncIndexes`
+     * drops them) can leave two holders of one place or mark, and building the index would then fail with E11000
+     * and stop the start. So first the oldest holder of each keeps it and the others give it up. The checks after
+     * each write still count challenges with no place or mark.
+     */
+    async ensureIndexes() {
+      for (const [field, key] of HELD_KEYS) {
+        const groups = await Challenge.aggregate([
+          { $match: { [field]: { $exists: true } } },
+          { $sort: { createdAt: 1, challengeId: 1 } },
+          { $group: { _id: key, ids: { $push: "$challengeId" } } },
+          { $match: { "ids.1": { $exists: true } } },
+        ]);
+        const extra = groups.flatMap(({ ids }) => ids.slice(1));
+        await Challenge.updateMany({ challengeId: { $in: extra } }, { $unset: { [field]: 1 } });
+      }
+      await Challenge.syncIndexes();
+    },
 
     /**
      * @param {ChallengeDoc} challenge
