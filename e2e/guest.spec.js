@@ -14,7 +14,7 @@ test.describe("guest players", () => {
     await alice.page.goto("/games/chess");
     await alice.page.getByRole("button", { name: "Create room" }).click();
     await expect(alice.page.getByRole("alert")).toHaveText(
-      "You already have 3 rooms waiting; close one first",
+      "You have too many rooms waiting for a player. Close one, then try again.",
     );
     await expect(alice.page).toHaveURL("/games/chess");
 
@@ -24,7 +24,7 @@ test.describe("guest players", () => {
     await expect(alice.page).toHaveURL("/games/tic-tac-toe");
     await alice.page.goto("/games/chess");
     await alice.page.getByRole("button", { name: "Create room" }).click();
-    await expect(alice.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: "Waiting for a friend to join" })).toBeVisible();
   });
 
   test("play Rock Paper Scissors without seeing the other's choice before the reveal", async ({
@@ -96,7 +96,7 @@ test.describe("guest players", () => {
     const seats = alice.page.getByRole("list", { name: "Players" });
     await expect(seats).toContainText(account.username);
     await expect(seats).not.toContainText("Guest-");
-    await expect(alice.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
+    await expect(alice.page.getByRole("heading", { name: "Waiting for a friend to join" })).toBeVisible();
 
     const friend = await players.open("friend");
     await joinAsGuest(friend, room.path);

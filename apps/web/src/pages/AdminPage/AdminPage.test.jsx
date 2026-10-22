@@ -365,7 +365,9 @@ describe("owner console pages", () => {
       api: ownerApi({ getAnalytics }),
     });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("at most 400 days");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That wasn't accepted. Check what you entered and try again.",
+    );
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     expect(screen.getByLabelText("From")).toHaveValue("2025-01-01");
     expect(screen.getByLabelText("To")).toHaveValue("2026-10-18");
@@ -396,7 +398,9 @@ describe("owner console pages", () => {
       .mockResolvedValue(REPORT);
     renderApp({ path: "/admin", api: ownerApi({ getAnalytics }) });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Something broke");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That didn't work on our side. Try again in a moment.",
+    );
     await act(() => userEvent.click(screen.getByRole("button", { name: "Try again" })));
 
     expect(await screen.findByText("Active players")).toBeVisible();

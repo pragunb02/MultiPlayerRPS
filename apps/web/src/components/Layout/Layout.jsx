@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { ErrorBoundary } from "../../app/ErrorBoundary.jsx";
 import { paths, returnPathFor } from "../../app/paths.js";
 import { Logo, LogoMark } from "../../art/Logo.jsx";
 import { Svg } from "../../art/Svg.jsx";
@@ -193,7 +194,11 @@ function Shell() {
       <main id="main" className={styles.main}>
         <WakingUp />
         <SiteRequests />
-        <Outlet />
+        {/* A page that breaks shows why and the ways on, under a header that still works. Going to another
+            address from there draws that page again (CC-350). */}
+        <ErrorBoundary resetKey={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <PageAnnouncer />
       <SiteFooter onFeedback={openFeedback} />

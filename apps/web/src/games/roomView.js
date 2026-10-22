@@ -34,7 +34,8 @@ export function matchPhase(room) {
 
 /** The reasons a board can be closed to the viewer, in their words (CC-164). */
 export const PLAY_REASONS = Object.freeze({
-  RECONNECTING: "Reconnecting",
+  // Says the game waits too, so a player who lost the connection knows their turn is not lost (CL-37).
+  RECONNECTING: "Reconnecting. Your move can wait.",
   WATCHING: "You are watching this game",
   WAITING: "Waiting for an opponent to join",
   OVER: "The game is over",

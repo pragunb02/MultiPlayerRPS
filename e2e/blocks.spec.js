@@ -72,7 +72,11 @@ test.describe("blocks", () => {
     const next = await openRps(alice);
     await bob.page.goto(next);
     await expect(bob.page.getByRole("heading", { name: "Can't join this room" })).toBeVisible();
-    await expect(bob.page.getByText("This room is full")).toBeVisible();
+    await expect(
+      bob.page.getByText(
+        "Two players are already in this room. Ask your friend for a new link, or start your own game.",
+      ),
+    ).toBeVisible();
     // Nothing Bob's browser received names the block.
     expect(bob.record.socketFrames.slice(bobFramesBefore).join("\n")).not.toMatch(/block/i);
     await expect(bob.page.getByText(/blocked/i)).toHaveCount(0);

@@ -11,7 +11,7 @@ export function NotFoundPage() {
       <GameOver404 className={styles.art} />
       <h1>Page not found</h1>
       <p>
-        That page doesn't exist.{" "}
+        That page doesn't exist. The link may be old or mistyped.{" "}
         <Link to={paths.home()} className={styles.home} data-cc-control="notfound.home">
           Back to the games
         </Link>

@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from "react-route
 import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS, ROOM_STATUS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
+import { Button } from "../../components/Button/Button.jsx";
 import { MatchShell } from "../../components/MatchShell/MatchShell.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
@@ -13,6 +14,7 @@ import { useRoomAlerts } from "../../games/useRoomAlerts.js";
 import { useReconnecting } from "../../hooks/useReconnecting.js";
 import { useRoom } from "../../hooks/useRoom.js";
 import { useSession } from "../../hooks/useSession.js";
+import { playerMessage } from "../../lib/errors.js";
 import { CATEGORIES } from "../../lib/notify/categories.js";
 import { JoinChooser } from "./JoinChooser.jsx";
 import styles from "./RoomPage.module.css";
@@ -26,6 +28,30 @@ const CLOSED_REASONS = Object.freeze({
 });
 
 /**
+ * The ways on from a room the player can't be in: a new game of the same kind when the game is known, and home
+ * (CC-350, audit D2).
+ *
+ * @param {{ game: { id: string } | undefined, control: string }} props  `control` names the links, for example
+ *   "room.closed"
+ */
+function WaysOn({ game, control }) {
+  return (
+    <>
+      {game && (
+        <p>
+          <Link to={paths.game(game.id)} data-cc-control={`${control}.new_game`}>
+            Start a new game
+          </Link>
+        </p>
+      )}
+      <Link to={paths.home()} data-cc-control={`${control}.home`}>
+        Back to home
+      </Link>
+    </>
+  );
+}
+
+/**
  * A room that is gone for good: why, and the quickest way to a new game of the same kind.
  *
  * @param {{ reason: string, game: { id: string, name: string } | undefined }} props
@@ -36,16 +62,7 @@ function RoomClosed({ reason, game }) {
       <PageTitle>Room closed</PageTitle>
       <h1>Room closed</h1>
       <p>{CLOSED_REASONS[reason] ?? "This room has been closed."}</p>
-      {game && (
-        <p>
-          <Link to={paths.game(game.id)} data-cc-control="room.closed.new_game">
-            Start a new {game.name} game
-          </Link>
-        </p>
-      )}
-      <Link to={paths.home()} data-cc-control="room.closed.home">
-        Back to the games
-      </Link>
+      <WaysOn game={game} control="room.closed" />
     </section>
   );
 }
@@ -121,10 +138,14 @@ export function RoomPage() {
       <section>
         <PageTitle>Can't join this room</PageTitle>
         <h1>Can't join this room</h1>
-        <p>{session.error.message}</p>
-        <Link to={paths.home()} data-cc-control="room.error.home">
-          Back to the games
-        </Link>
+        <p>{playerMessage(session.error)}</p>
+        {/* Who the player is comes with the page, so loading the page again is the way to ask again (CL-28). */}
+        <p>
+          <Button control="room.error.retry" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        </p>
+        <WaysOn game={urlGame} control="room.error" />
       </section>
     );
   }
@@ -148,17 +169,12 @@ export function RoomPage() {
       <section>
         <PageTitle>{notFound ? "Room not found" : "Can't join this room"}</PageTitle>
         <h1>{notFound ? "Room not found" : "Can't join this room"}</h1>
-        <p>{notFound ? `There is no room with the code ${code}.` : room.error.message}</p>
-        {urlGame && (
-          <p>
-            <Link to={paths.game(urlGame.id)} data-cc-control="room.error.new_game">
-              Start a new {urlGame.name} game
-            </Link>
-          </p>
-        )}
-        <Link to={paths.home()} data-cc-control="room.error.home">
-          Back to the games
-        </Link>
+        <p>
+          {notFound
+            ? `There's no room with the code ${code}. The game may have ended, or the code has a typo. Check it with your friend, or start a new game.`
+            : playerMessage(room.error)}
+        </p>
+        <WaysOn game={urlGame} control="room.error" />
       </section>
     );
   }
@@ -172,7 +188,8 @@ export function RoomPage() {
     away === "" ? (
       <div className={`${styles.card} ${styles.invite}`}>
         <InviteArt className={styles.inviteArt} />
-        <h2>Invite a friend</h2>
+        <h2>Waiting for a friend to join</h2>
+        <p>Send them this link. The game starts as soon as they open it.</p>
         <ShareRoom code={view.code} gameId={view.gameId} />
       </div>
     ) : (

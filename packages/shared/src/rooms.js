@@ -32,6 +32,17 @@ export const ROOM_LIMIT_REASONS = Object.freeze({
   SERVER_FULL: "server-full",
 });
 
+/**
+ * Why joining a room was refused, in the `details.reason` of the 409 answer (CC-350), so the page can say what to
+ * do in its own words. A player blocked with someone in the room gets FULL, exactly as a full room would (CC-044).
+ */
+export const ROOM_JOIN_REFUSALS = Object.freeze({
+  /** the game started without this player */
+  STARTED: "started",
+  /** every seat is taken */
+  FULL: "full",
+});
+
 /** Room codes avoid look-alike characters (0/O, 1/I/L) so they can be read out loud or typed from a screenshot. */
 export const ROOM_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export const ROOM_CODE_LENGTH = 6;

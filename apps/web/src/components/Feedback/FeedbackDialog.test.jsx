@@ -157,7 +157,7 @@ describe("the Feedback dialog (CC-290)", () => {
     expect(message()).toHaveValue("Half a thought");
   });
 
-  it("shows the server's reason when sending fails, and keeps the message", async () => {
+  it("says in plain words why sending failed, and keeps the message", async () => {
     const refused = new AppRequestError({
       code: "RATE_LIMITED",
       message: "You have sent a lot of feedback, thank you! Try again in an hour",
@@ -169,7 +169,9 @@ describe("the Feedback dialog (CC-290)", () => {
 
     await user.click(send());
 
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Try again in an hour");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Too many tries in a row. Wait a minute, then try again.",
+    );
     expect(message()).toHaveValue("Again");
   });
 

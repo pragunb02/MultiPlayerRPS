@@ -100,7 +100,7 @@ describe("where the match stands and why the board is closed (CC-164)", () => {
   });
 
   it("says Reconnecting before anything else while the connection is being restored", () => {
-    expect(playReason(room(), { reconnecting: true })).toBe("Reconnecting");
-    expect(playReason(room({ you: "" }), { reconnecting: true })).toBe("Reconnecting");
+    expect(playReason(room(), { reconnecting: true })).toBe("Reconnecting. Your move can wait.");
+    expect(playReason(room({ you: "" }), { reconnecting: true })).toBe("Reconnecting. Your move can wait.");
   });
 });

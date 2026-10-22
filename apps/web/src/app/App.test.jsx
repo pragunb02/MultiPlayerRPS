@@ -151,6 +151,8 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /game over, page not found/ })).toBeInTheDocument();
+    expect(screen.getByText(/That page doesn't exist. The link may be old or mistyped./)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to the games" })).toHaveAttribute("href", "/");
   });
 
   it("hints the lobby's files when its card's link is pointed at, and runs none of its code (CC-322)", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApiClient } from "./api.js";
-import { AppRequestError } from "./errors.js";
+import { AppRequestError, PLAYER_WORDS } from "./errors.js";
 
 const respond = (status, body) =>
   vi.fn().mockResolvedValue({ status, ok: status >= 200 && status < 300, json: async () => body });
@@ -109,7 +109,8 @@ describe("api client", () => {
     expect(error).toMatchObject({
       code: "CONFLICT",
       status: 409,
-      message: "That username is taken",
+      message: PLAYER_WORDS.CONFLICT,
+      serverMessage: "That username is taken",
       details: { field: "username" },
     });
   });

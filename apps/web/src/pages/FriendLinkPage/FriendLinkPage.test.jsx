@@ -94,7 +94,9 @@ describe("the friend link page (CC-052)", () => {
     const down = new AppRequestError({ code: "UNKNOWN", message: "Server down", status: 500 });
     renderApp({ path: PATH, api: linkApi(undefined, { getFriendLink: vi.fn().mockRejectedValue(down) }) });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't open this friend link. Server down");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't open this friend link. Something went wrong. Try again.",
+    );
   });
 
   it("shows loading until the link's page arrives", async () => {

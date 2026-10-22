@@ -132,7 +132,11 @@ describe("SiteRequests (CC-207)", () => {
 
     await user.click(within(question()).getByRole("button", { name: "Accept and go" }));
 
-    expect(await screen.findByText("That request is no longer open")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "That can't be done right now. Reload the page to see what changed, then try again.",
+      ),
+    ).toBeInTheDocument();
     expect(url()).toBe("/");
   });
 

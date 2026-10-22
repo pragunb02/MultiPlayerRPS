@@ -261,7 +261,9 @@ describe("Seats: blocking from a seat (CC-044)", () => {
     await userEvent.click(blockButton());
     await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Block" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("You can only block someone you played with");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't find that. It may have been removed. Go back and try again.",
+    );
     expect(screen.getByRole("dialog")).toBeVisible();
     expect(toast.show).not.toHaveBeenCalled();
   });

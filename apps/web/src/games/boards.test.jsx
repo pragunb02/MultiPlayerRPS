@@ -336,11 +336,18 @@ describe("TicTacToeBoard", () => {
       await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "top right: empty" })));
       await act(async () => vi.advanceTimersByTime(410));
       await act(async () =>
-        refuse(new AppRequestError({ code: "VALIDATION_FAILED", message: "Cell taken", status: 400 })),
+        refuse(
+          new AppRequestError({
+            code: "VALIDATION_FAILED",
+            message: "Cell taken",
+            details: { reason: "ILLEGAL_MOVE" },
+            status: 400,
+          }),
+        ),
       );
 
       // The answer is in: the refusal shows now, not when the spinner's 300 ms are up.
-      expect(screen.getByText("Cell taken")).toBeInTheDocument();
+      expect(screen.getByText("That move isn't allowed. Choose another one.")).toBeInTheDocument();
       await act(async () => fireEvent.click(screen.getByRole("gridcell", { name: "bottom left: empty" })));
       expect(onMove).toHaveBeenLastCalledWith({ cell: 6 });
       expect(screen.queryByText("Sending your move")).not.toBeInTheDocument();

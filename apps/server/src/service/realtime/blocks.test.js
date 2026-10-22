@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
+import { ERROR_CODES, ROOM_JOIN_REFUSALS, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, nextEvent, send, startRoom } from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
 
@@ -14,7 +14,14 @@ afterEach(async () => {
   server = undefined;
 });
 
-const FULL = { ok: false, error: { code: ERROR_CODES.CONFLICT, message: "This room is full" } };
+const FULL = {
+  ok: false,
+  error: {
+    code: ERROR_CODES.CONFLICT,
+    message: "This room is full",
+    details: { reason: ROOM_JOIN_REFUSALS.FULL },
+  },
+};
 
 /** Alice hosts a race, Bob joins and moves first (seed 42), Alice wins. */
 async function finishedRace(alice, bob) {

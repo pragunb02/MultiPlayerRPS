@@ -69,7 +69,7 @@ describe("old and alternative URLs lead to the canonical one", () => {
   ])("rooms: %s (%s) → /games/tic-tac-toe/rooms/AB2CD3", async (from) => {
     const { url } = renderApp({ path: from, api: asGuest(), socket: roomSocket(tictactoeRoom) });
 
-    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
     // The address is recorded after the screen is drawn (LocationProbe runs in an effect).
     await waitFor(() => expect(url()).toBe("/games/tic-tac-toe/rooms/AB2CD3"));
     expect(document.title).toBe("Tic Tac Toe · Room AB2CD3 · ClassiCade");
@@ -141,7 +141,7 @@ describe("account pages and `next`", () => {
     await user.type(screen.getByLabelText("Password"), "correct horse battery");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
-    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
     // The address is recorded after the screen is drawn (LocationProbe runs in an effect).
     await waitFor(() => expect(url()).toBe("/games/tic-tac-toe/rooms/AB2CD3"));
   });

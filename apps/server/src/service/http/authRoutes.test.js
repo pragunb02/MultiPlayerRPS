@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
-import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
+import { ERROR_CODES, NAME_REFUSALS, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, send } from "../../testing/socketClients.js";
 import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { startTestServer } from "../../testing/testApp.js";
@@ -105,7 +105,7 @@ describe("auth routes", () => {
       expect.objectContaining({
         code: ERROR_CODES.VALIDATION_FAILED,
         message: "That name is reserved. Please choose another name.",
-        details: { field: "username" },
+        details: { field: "username", reason: NAME_REFUSALS.RESERVED },
       }),
     );
   });

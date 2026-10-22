@@ -110,7 +110,11 @@ describe("ReportDialog (CC-044)", () => {
     await user.click(reason("name"));
     await user.click(within(dialog()).getByRole("button", { name: "Send report" }));
 
-    expect(await within(dialog()).findByText("We couldn't find that player")).toBeVisible();
+    expect(
+      await within(dialog()).findByText(
+        "We couldn't find that. It may have been removed. Go back and try again.",
+      ),
+    ).toBeVisible();
     expect(reason("name")).toBeChecked();
   });
 });

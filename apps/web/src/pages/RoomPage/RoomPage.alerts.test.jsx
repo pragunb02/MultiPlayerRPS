@@ -256,7 +256,12 @@ describe("draw offers (CC-104, CC-159)", () => {
 
     await user.click(within(await popup()).getByRole("button", { name: "Accept" }));
 
-    expect(await screen.findByText("That request is no longer open")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "That can't be done right now. Reload the page to see what changed, then try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("That request is no longer open")).not.toBeInTheDocument();
     expect(within(screen.getByRole("region", POPUP)).getByRole("button", { name: "Accept" })).toBeEnabled();
   });
 
@@ -556,7 +561,7 @@ describe("room sounds (CC-103)", () => {
   it("plays the start when the opponent joins and the game begins", async () => {
     const waiting = { ...chess(), status: "waiting", seats: [ME], game: undefined };
     const { socket, sound } = openRoom(waiting);
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     push(socket, chess());
 

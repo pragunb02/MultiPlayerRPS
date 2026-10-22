@@ -65,7 +65,12 @@ test.describe("history: browsing", () => {
     }
     await host.page.goto(room.path);
     await host.page.reload();
-    await at(host.page, room.path, `Tic Tac Toe · Room ${room.code} · ClassiCade`, "Invite a friend");
+    await at(
+      host.page,
+      room.path,
+      `Tic Tac Toe · Room ${room.code} · ClassiCade`,
+      "Waiting for a friend to join",
+    );
   });
 
   test("a redirect is never a step in history: Back skips it", async ({ players }) => {
@@ -106,12 +111,12 @@ test.describe("history: rooms", () => {
     const host = await players.open("host");
     await host.page.goto("/games/chess");
     await host.page.getByRole("button", { name: "Create room" }).click();
-    await expect(host.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
+    await expect(host.page.getByRole("heading", { name: "Waiting for a friend to join" })).toBeVisible();
     const roomUrl = host.url();
     expect(roomUrl).toMatch(/^\/games\/chess\/rooms\/[A-Z0-9]{6}$/);
 
     await host.page.reload();
-    await expect(host.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
+    await expect(host.page.getByRole("heading", { name: "Waiting for a friend to join" })).toBeVisible();
     // Still one seat: coming back after a reload never seated the host twice.
     await expect(host.page.getByRole("list", { name: "Players" }).getByRole("listitem")).toHaveCount(2); // host + "waiting"
 

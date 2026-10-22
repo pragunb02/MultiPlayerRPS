@@ -38,9 +38,19 @@ describe("account settings on the profile (CC-116)", () => {
   });
 
   it.each([
-    ["Current password", "currentPassword", "That is not your current password"],
-    ["New password", "newPassword", "Passwords are 8–128 characters"],
-  ])("shows a refusal of the %s next to that box", async (label, field, message) => {
+    [
+      "Current password",
+      "currentPassword",
+      "That is not your current password",
+      "That isn't your current password. Check it and try again.",
+    ],
+    [
+      "New password",
+      "newPassword",
+      "Passwords are 8–128 characters",
+      "That wasn't accepted. Check what you entered and try again.",
+    ],
+  ])("shows a refusal of the %s next to that box, in plain words", async (label, field, message, words) => {
     const api = profileApi(USER, { changePassword: vi.fn().mockRejectedValue(fieldError(message, field)) });
     const account = await openAccount(api);
 
@@ -48,7 +58,8 @@ describe("account settings on the profile (CC-116)", () => {
 
     const input = within(account).getByLabelText(label);
     await vi.waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
-    expect(within(account).getByText(message)).toBeInTheDocument();
+    expect(within(account).getByText(words)).toBeInTheDocument();
+    expect(within(account).queryByText(message)).toBeNull();
     expect(within(account).queryByRole("alert")).toBeNull();
   });
 
@@ -64,7 +75,9 @@ describe("account settings on the profile (CC-116)", () => {
 
     await userEvent.click(within(account).getByRole("button", { name: "Change password" }));
 
-    expect(await within(account).findByRole("alert")).toHaveTextContent("Too many attempts, try again later");
+    expect(await within(account).findByRole("alert")).toHaveTextContent(
+      "Too many tries in a row. Wait a minute, then try again.",
+    );
   });
 
   it("signs out the other devices and says so", async () => {
@@ -87,7 +100,9 @@ describe("account settings on the profile (CC-116)", () => {
 
     await userEvent.click(within(account).getByRole("button", { name: "Sign out other devices" }));
 
-    expect(await within(account).findByRole("alert")).toHaveTextContent("Internal server error");
+    expect(await within(account).findByRole("alert")).toHaveTextContent(
+      "That didn't work on our side. Try again in a moment.",
+    );
   });
 
   it("is not shown to a guest, who has no password", async () => {

@@ -68,7 +68,7 @@ describe("the avatar picker on your profile (CC-034)", () => {
     await user.click(within(picker).getByRole("radio", { name: "Fox" }));
 
     expect(await within(picker).findByRole("alert")).toHaveTextContent(
-      "Couldn't save your avatar. Too many changes",
+      "Couldn't save your avatar. Too many tries in a row. Wait a minute, then try again.",
     );
   });
 
@@ -79,7 +79,11 @@ describe("the avatar picker on your profile (CC-034)", () => {
       }),
     });
 
-    expect(await screen.findByText("Couldn't load your profile settings. Server down")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Couldn't load your profile settings. That didn't work on our side. Try again in a moment.",
+      ),
+    ).toBeInTheDocument();
   });
 });
 

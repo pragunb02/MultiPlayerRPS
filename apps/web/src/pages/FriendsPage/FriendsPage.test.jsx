@@ -252,7 +252,9 @@ describe("the friends page (CC-052)", () => {
     });
     renderApp({ path: "/friends", api });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load your friends. Server down");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't load your friends. Something went wrong. Try again.",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByText("Abhi tumhare koi friends nahi hain.")).toBeVisible();

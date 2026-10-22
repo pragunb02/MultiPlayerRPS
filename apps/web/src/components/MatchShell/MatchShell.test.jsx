@@ -162,7 +162,7 @@ describe("MatchShell with a game that brings only a Board (CC-157)", () => {
     expect(screen.getByTestId("board-reason")).toHaveTextContent("Not your turn");
 
     update(roomView(), { reconnecting: true });
-    expect(screen.getByTestId("board-reason")).toHaveTextContent("Reconnecting");
+    expect(screen.getByTestId("board-reason")).toHaveTextContent("Reconnecting. Your move can wait.");
   });
 
   it("writes the match phase and the request state on the frame, for tests and telemetry", () => {
@@ -245,7 +245,9 @@ describe("MatchShell action bar", () => {
     mount(roomView(), { game: { Board: FakeBoard, actions: chessActions }, reconnecting: true });
 
     for (const name of ["Offer draw", "Resign", "Leave room"]) {
-      expect(screen.getByRole("button", { name })).toHaveAccessibleDescription("Reconnecting");
+      expect(screen.getByRole("button", { name })).toHaveAccessibleDescription(
+        "Reconnecting. Your move can wait.",
+      );
     }
   });
 

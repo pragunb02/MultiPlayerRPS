@@ -72,7 +72,9 @@ test.describe("account holder", () => {
       await page.getByLabel("Email").fill(email);
       await page.getByLabel("Password").fill("not my password");
       await page.getByRole("button", { name: "Log in" }).click();
-      await expect(page.getByRole("alert")).toHaveText("Invalid email or password");
+      await expect(page.getByRole("alert")).toHaveText(
+        "That email and password don't match. Check them and try again.",
+      );
       await expect(page).toHaveURL("/login");
     }
   });
@@ -100,7 +102,7 @@ test.describe("account holder", () => {
 
     const message = page.getByText("If it's yours");
     await expect(message).toHaveText(
-      "That email can't be used. If it's yours, log in or reset your password.",
+      "That email can't be used. If it's yours, log in. Forgot your password? Tell us with Feedback and we'll help.",
     );
     await expect(page.getByLabel("Email")).toHaveAttribute("aria-invalid", "true");
     await expect(page).toHaveURL("/signup?next=%2Fgames%2Fchess");
@@ -133,7 +135,9 @@ test.describe("account holder", () => {
     await settings.getByLabel("Current password").fill("not my password");
     await settings.getByLabel("New password").fill(newPassword);
     await settings.getByRole("button", { name: "Change password" }).click();
-    await expect(settings.getByText("That is not your current password")).toBeVisible();
+    await expect(
+      settings.getByText("That isn't your current password. Check it and try again."),
+    ).toBeVisible();
     await settings.getByLabel("Current password").fill(account.password);
     await settings.getByRole("button", { name: "Change password" }).click();
     await expect(settings.getByRole("status")).toHaveText(
@@ -151,7 +155,9 @@ test.describe("account holder", () => {
     await phone.page.getByLabel("Email").fill(account.email);
     await phone.page.getByLabel("Password").fill(account.password);
     await phone.page.getByRole("button", { name: "Log in" }).click();
-    await expect(phone.page.getByRole("alert")).toHaveText("Invalid email or password");
+    await expect(phone.page.getByRole("alert")).toHaveText(
+      "That email and password don't match. Check them and try again.",
+    );
     await phone.page.getByLabel("Password").fill(newPassword);
     await phone.page.getByRole("button", { name: "Log in" }).click();
     await expect(phone.page).toHaveURL("/");
@@ -199,6 +205,6 @@ test.describe("account holder", () => {
     await second.page.getByRole("button", { name: "Create account" }).click();
 
     await expect(second.page.getByLabel("Username")).toHaveAttribute("aria-invalid", "true");
-    await expect(second.page.getByText("That username is taken")).toBeVisible();
+    await expect(second.page.getByText("That username is taken. Try another one.")).toBeVisible();
   });
 });

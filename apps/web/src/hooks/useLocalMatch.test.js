@@ -17,14 +17,16 @@ afterEach(() => {
 });
 
 describe("useLocalMatch", () => {
-  it("rejects a refused move in the engine's words and keeps the game as it was", async () => {
+  it("rejects a refused move in the same plain words as online, and keeps the game as it was", async () => {
     const { result } = renderHook(() =>
       useLocalMatch({ engine: tictactoeEngine, names: NAMES, options: {} }),
     );
     await act(() => result.current.move({ cell: 0 }));
 
     await expect(result.current.move({ cell: 0 })).rejects.toThrow(AppRequestError);
-    await expect(result.current.move({ cell: 0 })).rejects.toThrow("That cell is taken");
+    await expect(result.current.move({ cell: 0 })).rejects.toThrow(
+      "That move isn't allowed. Choose another one.",
+    );
     expect(result.current.holder).toBe("player-2");
   });
 
@@ -46,7 +48,7 @@ describe("useLocalMatch", () => {
     const { result } = renderHook(() => useLocalMatch({ engine: chessEngine, names: NAMES, options: {} }));
 
     await expect(result.current.moveAs("player-2", { type: "move", from: "e7", to: "e5" })).rejects.toThrow(
-      "Wait for your turn",
+      "It's not your turn yet. Wait for the other player.",
     );
     await act(() => result.current.moveAs("player-2", { type: "resign" }));
 

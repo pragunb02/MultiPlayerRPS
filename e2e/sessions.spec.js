@@ -8,7 +8,7 @@ import { newAccount } from "./personas.js";
 const banner = (page) => page.getByRole("banner");
 const loginLink = async (page) => (await header(page)).getByRole("link", { name: "Log in" });
 const chooser = (page) => page.getByRole("heading", { name: "You're invited to play Tic Tac Toe" });
-const inviteCard = (page) => page.getByRole("heading", { name: "Invite a friend" });
+const inviteCard = (page) => page.getByRole("heading", { name: "Waiting for a friend to join" });
 
 /** Marks the page, so a test can tell afterwards that it was never reloaded. */
 const markPage = (page) =>

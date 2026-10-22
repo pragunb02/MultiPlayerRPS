@@ -69,7 +69,7 @@ test.describe("game lobby", () => {
     await page.getByRole("button", { name: "Play as guest" }).click(); // no session yet: choose how to join
     await expect(page.getByRole("heading", { name: "Room not found" })).toBeVisible();
     await expect(page).toHaveTitle("Room not found · ClassiCade");
-    await page.getByRole("link", { name: "Back to the games" }).click();
+    await page.getByRole("link", { name: "Back to home" }).click();
     await expect(page).toHaveURL("/");
   });
 
@@ -99,8 +99,12 @@ test.describe("room", () => {
     await joinAsGuest(latecomer, room.path);
 
     await expect(latecomer.page.getByRole("heading", { name: "Can't join this room" })).toBeVisible();
-    await expect(latecomer.page.getByText("This game has already started")).toBeVisible();
-    await latecomer.page.getByRole("link", { name: "Start a new Tic Tac Toe game" }).click();
+    await expect(
+      latecomer.page.getByText(
+        "This game started without you, so you can't join it. Ask your friend for a new link, or start your own game.",
+      ),
+    ).toBeVisible();
+    await latecomer.page.getByRole("link", { name: "Start a new game" }).click();
     await expect(latecomer.page).toHaveURL("/games/tic-tac-toe");
   });
 
@@ -118,7 +122,7 @@ test.describe("room", () => {
     // The room existed, so the link is not called wrong: it says why the room is gone (CC-101).
     await expect(late.page.getByRole("heading", { name: "Room closed" })).toBeVisible();
     await expect(late.page.getByText("Everyone left, so the room closed.")).toBeVisible();
-    await late.page.getByRole("link", { name: "Start a new Chess game" }).click();
+    await late.page.getByRole("link", { name: "Start a new game" }).click();
     await expect(late.page).toHaveURL("/games/chess");
   });
 
@@ -244,5 +248,80 @@ test.describe("account forms", () => {
     await page.getByLabel("Password").fill(account.password);
     await page.getByLabel("Password").press("Enter");
     await expect(page).toHaveURL("/");
+  });
+});
+
+/**
+ * Lets a page break on purpose (CC-350). React reports the error it caught in the console, which the players fixture
+ * would count as a problem, so the console errors of this one moment are taken back out. Any other problem stays.
+ */
+async function breakingOnPurpose(player, run) {
+  const before = player.record.problems.length;
+  await run();
+  const added = player.record.problems.splice(before);
+  player.record.problems.push(...added.filter((problem) => !problem.startsWith("console.error:")));
+}
+
+/** The home page gets a game list it cannot draw, so it breaks while it draws. */
+const breakHome = (page) => page.route("**/api/games", (route) => route.fulfill({ json: { games: [null] } }));
+
+test.describe("plain errors (CC-350)", () => {
+  test("a page that breaks keeps the header, and Reload the page draws it again", async ({ players }) => {
+    const visitor = await players.open("visitor");
+    const { page } = visitor;
+    await breakHome(page);
+
+    await breakingOnPurpose(visitor, async () => {
+      await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1, name: "This page broke" })).toBeVisible();
+    });
+    await expect(page.getByRole("alert")).toContainText("Your games and progress are safe.");
+    await expect((await header(page)).getByRole("link", { name: "Log in" })).toBeVisible();
+
+    await page.unroute("**/api/games");
+    await page.getByRole("button", { name: "Reload the page" }).click();
+    await expect(page.getByRole("link", { name: "Chess" })).toBeVisible();
+    await expect(page.getByText("This page broke")).toHaveCount(0);
+  });
+
+  test("Go to the home page leaves a page that broke", async ({ players }) => {
+    const visitor = await players.open("visitor");
+    const { page } = visitor;
+    await breakHome(page);
+    await breakingOnPurpose(visitor, async () => {
+      await page.goto("/?from=crash");
+      await expect(page.getByRole("heading", { level: 1, name: "This page broke" })).toBeVisible();
+    });
+
+    await page.unroute("**/api/games");
+    await page.getByRole("button", { name: "Go to the home page" }).click();
+    await expect(page).toHaveURL("/");
+    await expect(page.getByRole("link", { name: "Chess" })).toBeVisible();
+  });
+
+  test("a server fault on log in shows plain words and the next step, never the server's own", async ({
+    players,
+  }) => {
+    const visitor = await players.open("visitor");
+    const { page } = visitor;
+    visitor.expect(500, "/api/auth/login");
+    await page.route("**/api/auth/login", (route) =>
+      route.fulfill({
+        status: 500,
+        json: { error: { code: "INTERNAL", message: "Internal server error", requestId: "r1" } },
+      }),
+    );
+    await page.goto("/login");
+    await page.getByLabel("Email").fill("nobody.here@example.com");
+    await page.getByLabel("Password").fill("any password at all");
+
+    await page.getByRole("button", { name: "Log in" }).click();
+
+    await expect(page.getByRole("alert")).toContainText(
+      "That didn't work on our side. Try again in a moment.",
+    );
+    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expect(page.getByText("Internal server error")).toHaveCount(0);
+    await expect(page.getByLabel("Email")).toHaveValue("nobody.here@example.com");
   });
 });

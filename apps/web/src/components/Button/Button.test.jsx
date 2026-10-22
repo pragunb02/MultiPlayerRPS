@@ -187,7 +187,9 @@ describe("Button (CC-164)", () => {
     await user.click(screen.getByRole("button", { name: "Go" }));
     const retry = await screen.findByRole("button", { name: "Retry" });
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Can't reach ClassiCade");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "We couldn't reach ClassiCade. Check your connection, then try again.",
+    );
     expect(retry).toHaveAttribute("data-cc-control", "test.go.retry");
     await user.click(retry);
     expect(fn).toHaveBeenCalledTimes(2);

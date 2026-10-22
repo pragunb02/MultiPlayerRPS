@@ -262,7 +262,7 @@ export async function joinAsGuest(player, path) {
 export async function createRoom(player, gameSlug) {
   await player.page.goto(`/games/${gameSlug}`);
   await player.page.getByRole("button", { name: "Create room" }).click();
-  await player.page.getByRole("heading", { name: "Invite a friend" }).waitFor();
+  await player.page.getByRole("heading", { name: "Waiting for a friend to join" }).waitFor();
   const invite = await player.page.getByRole("textbox", { name: "Invite link" }).inputValue();
   const { pathname } = new URL(invite);
   return { invite, path: pathname, code: pathname.split("/").pop() };

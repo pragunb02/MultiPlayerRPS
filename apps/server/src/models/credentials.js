@@ -1,3 +1,4 @@
+import { NAME_REFUSALS } from "@classicade/shared";
 import { ValidationError } from "../utils/errors.js";
 import { isOffensiveName, isReservedName } from "./publicName.js";
 
@@ -11,7 +12,8 @@ export const RESERVED_NAME = "That name is reserved. Please choose another name.
 export const UNSUITABLE_NAME =
   "Please choose another name. Names are shown to everyone, so keep it friendly.";
 
-const invalid = (field, message) => new ValidationError(message, { details: { field } });
+const invalid = (field, message, reason) =>
+  new ValidationError(message, { details: { field, ...(reason !== undefined && { reason }) } });
 
 /**
  * Usernames are public (rooms, leaderboards), so they must not pass as staff, a bot or a game, and must not be
@@ -25,10 +27,10 @@ export function parseUsername(raw) {
     throw invalid("username", "Usernames are 3–20 letters, numbers or underscores");
   }
   if (isReservedName(raw)) {
-    throw invalid("username", RESERVED_NAME);
+    throw invalid("username", RESERVED_NAME, NAME_REFUSALS.RESERVED);
   }
   if (isOffensiveName(raw)) {
-    throw invalid("username", UNSUITABLE_NAME);
+    throw invalid("username", UNSUITABLE_NAME, NAME_REFUSALS.UNSUITABLE);
   }
   return raw;
 }

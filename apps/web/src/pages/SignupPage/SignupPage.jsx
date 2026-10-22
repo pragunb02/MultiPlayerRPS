@@ -21,8 +21,8 @@ const RULES = {
 /**
  * The one answer for every email that can't be used, whoever it belongs to, so sign-up never tells who plays here
  * (CC-238). The words are `ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE`, and "log in" is a link that keeps where the player
- * was heading. The email itself never goes into the link. Password reset does not exist yet (CC-033), so it is
- * named but not linked.
+ * was heading. The email itself never goes into the link. Password reset does not exist yet (CC-033), so a player
+ * who forgot theirs is pointed to the Feedback button at the foot of every page (CC-350, CL-92).
  *
  * @param {{ next: string }} props  where to go after logging in
  */
@@ -32,10 +32,17 @@ function EmailUnavailable({ next }) {
       That email can&apos;t be used. If it&apos;s yours,{" "}
       <Link to={paths.login(next)} data-cc-control="auth.email_unavailable_login">
         log in
-      </Link>{" "}
-      or reset your password.
+      </Link>
+      . Forgot your password? Tell us with Feedback and we&apos;ll help.
     </>
   );
+}
+
+/** What the server's refusal of one field means, in the form's own words, never the server's (CC-350). */
+function fieldWords(field, err, value) {
+  if (field === "username" && err.code === ERROR_CODES.CONFLICT)
+    return "That username is taken. Try another one.";
+  return RULES[field]?.(value) || err.message;
 }
 
 /** What the server is sent: the year as a number, or nothing at all when the player would rather not say. */
@@ -70,7 +77,9 @@ export function SignupPage() {
         const field = err.details?.field;
         if (!(field && field in form)) throw err;
         const unavailable = field === "email" && err.code === ERROR_CODES.CONFLICT;
-        setFieldErrors({ [field]: unavailable ? <EmailUnavailable next={next} /> : err.message });
+        setFieldErrors({
+          [field]: unavailable ? <EmailUnavailable next={next} /> : fieldWords(field, err, form[field]),
+        });
         if (err.details.reason === "too-young") setTooYoung(true);
       }
     },

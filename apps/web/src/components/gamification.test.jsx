@@ -137,7 +137,7 @@ describe("DailyQuests", () => {
     renderWith(<DailyQuests />, { api: fakeApi({ getQuests }) });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't load quests. Can't reach ClassiCade",
+      "Couldn't load quests. We couldn't reach ClassiCade. Check your connection, then try again.",
     );
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
@@ -268,7 +268,7 @@ describe("StreakCard", () => {
     renderWith(<StreakCard />, { api: fakeApi({ getStreaks }) });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't load streaks. Can't reach ClassiCade",
+      "Couldn't load streaks. We couldn't reach ClassiCade. Check your connection, then try again.",
     );
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
@@ -349,7 +349,7 @@ describe("AchievementGrid", () => {
     renderWith(<AchievementGrid />, { api: fakeApi({ getAchievements }) });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't load achievements. Can't reach ClassiCade",
+      "Couldn't load achievements. We couldn't reach ClassiCade. Check your connection, then try again.",
     );
     await user.click(screen.getByRole("button", { name: "Try again" }));
 

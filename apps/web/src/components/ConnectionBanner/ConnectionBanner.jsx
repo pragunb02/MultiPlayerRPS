@@ -9,8 +9,8 @@ export const RECONNECTING_AFTER_MS = 1_000;
 
 /**
  * The player's own connection (CC-158), under the site header on every page. When the connection has been gone
- * for a second, "Reconnecting…" shows and is read out at once, while the room's controls say "Reconnecting" if
- * pressed. When the server said it is restarting for a deploy, the banner says the game is safe instead, at once,
+ * for a second, "Connection lost. Reconnecting… Your game is kept." shows and is read out at once, while the room's
+ * controls say "Reconnecting. Your move can wait." if pressed (CC-350). When the server said it is restarting for a deploy, the banner says the game is safe instead, at once,
  * because rooms are kept and rejoined by themselves (CC-101). It goes away the moment the connection is back.
  */
 export function ConnectionBanner() {
@@ -36,7 +36,9 @@ export function ConnectionBanner() {
   return (
     <div className={styles.banner} role="alert">
       <span className={styles.spinner} aria-hidden="true" />
-      {restarting ? "Server restarting, your game is safe" : "Reconnecting…"}
+      {restarting
+        ? "Server restarting, your game is safe"
+        : "Connection lost. Reconnecting… Your game is kept."}
     </div>
   );
 }

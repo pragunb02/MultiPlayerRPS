@@ -8,6 +8,7 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   ROOM_END_REASONS,
+  ROOM_JOIN_REFUSALS,
   ROOM_LIMIT_REASONS,
   ROOM_REQUEST_TYPES,
   ROOM_STATUS,
@@ -858,14 +859,16 @@ export function createRoomComponent({
             return waiting ? startWhenReady(back, now) : back;
           }
           if (!waiting) {
-            throw new ConflictError("This game has already started");
+            throw new ConflictError("This game has already started", {
+              details: { reason: ROOM_JOIN_REFUSALS.STARTED },
+            });
           }
           // Every seat is taken, and the game waits for a player who is away. Or someone here is blocked with them.
           if (
             room.seats.length === engineFor(room).players.max ||
             room.seats.some((seat) => blocked.has(seat.playerId))
           ) {
-            throw new ConflictError(FULL);
+            throw new ConflictError(FULL, { details: { reason: ROOM_JOIN_REFUSALS.FULL } });
           }
           const seated = withSeats(
             room,

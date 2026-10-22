@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
+import { ERROR_CODES, ROOM_JOIN_REFUSALS, SOCKET_EVENTS } from "@classicade/shared";
 import {
   createSocketClients,
   eventWhere,
@@ -152,7 +152,11 @@ describe("rooms over sockets", () => {
 
     const ack = await send(carol.socket, SOCKET_EVENTS.ROOM_JOIN, { code });
 
-    expect(ack.error).toEqual({ code: ERROR_CODES.CONFLICT, message: "This game has already started" });
+    expect(ack.error).toEqual({
+      code: ERROR_CODES.CONFLICT,
+      message: "This game has already started",
+      details: { reason: ROOM_JOIN_REFUSALS.STARTED },
+    });
   });
 
   it("refuses unavailable games", async () => {

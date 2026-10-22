@@ -63,7 +63,7 @@ export {
 } from "./flags.js";
 export { SOCKET_EVENTS } from "./events.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";
-export { ACCOUNT_MESSAGES, IDENTITY_KINDS } from "./identity.js";
+export { ACCOUNT_MESSAGES, IDENTITY_KINDS, NAME_REFUSALS } from "./identity.js";
 export {
   PRESENCE,
   REQUEST_ANSWERS,
@@ -72,6 +72,7 @@ export {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   ROOM_END_REASONS,
+  ROOM_JOIN_REFUSALS,
   ROOM_LIMIT_REASONS,
   ROOM_REQUEST_TYPES,
   ROOM_STATUS,

@@ -1,3 +1,4 @@
+import { ROOM_JOIN_REFUSALS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
@@ -91,7 +92,7 @@ describe("roomComponent: a game starts only with everyone there (CC-112)", () =>
     await rooms.joinRoom({ code, player: BOB, now: T0 + 2 });
 
     await expect(rooms.joinRoom({ code, player: CAROL, now: T0 + 3 })).rejects.toThrow(
-      new ConflictError("This room is full"),
+      new ConflictError("This room is full", { details: { reason: ROOM_JOIN_REFUSALS.FULL } }),
     );
   });
 

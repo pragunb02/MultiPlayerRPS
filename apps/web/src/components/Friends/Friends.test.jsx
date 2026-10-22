@@ -69,7 +69,11 @@ describe("Add friend in match history (CC-052)", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Add friend Arjun" }));
 
-    expect(await screen.findByText("You have 10 requests waiting.")).toBeVisible();
+    expect(
+      await screen.findByText(
+        "That can't be done right now. Reload the page to see what changed, then try again.",
+      ),
+    ).toBeVisible();
   });
 
   it("is not offered to a guest in history, who finds how to save progress on the Friends page", async () => {

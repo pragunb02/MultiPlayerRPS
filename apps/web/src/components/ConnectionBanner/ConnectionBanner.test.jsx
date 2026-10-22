@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
 
-// The player's own connection (CC-158): "Reconnecting…" after a second without one, "Server restarting, your game
-// is safe" at once after the server said so, and nothing for a disconnect made on purpose.
+// The player's own connection (CC-158): "Connection lost. Reconnecting…" after a second without one, "Server
+// restarting, your game is safe" at once after the server said so, and nothing for a disconnect made on purpose.
 
 function open() {
   const socket = fakeSocket();
@@ -30,7 +30,7 @@ describe("ConnectionBanner (CC-158)", () => {
     act(() => vi.advanceTimersByTime(999));
     expect(banner()).toBeNull();
     act(() => vi.advanceTimersByTime(1));
-    expect(banner()).toHaveTextContent("Reconnecting…");
+    expect(banner()).toHaveTextContent("Connection lost. Reconnecting… Your game is kept.");
     expect(sound.played).toEqual(["connection"]);
 
     back();
@@ -49,7 +49,7 @@ describe("ConnectionBanner (CC-158)", () => {
 
     expect(banner()).toBeNull();
     act(() => vi.advanceTimersByTime(1_000));
-    expect(banner()).toHaveTextContent("Reconnecting…");
+    expect(banner()).toHaveTextContent("Connection lost. Reconnecting… Your game is kept.");
   });
 
   it("shows nothing for a drop shorter than a second", async () => {
