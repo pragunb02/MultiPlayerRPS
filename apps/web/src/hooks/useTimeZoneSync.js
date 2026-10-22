@@ -4,13 +4,7 @@ import { useFlag } from "./useFlag.js";
 import { useSession } from "./useSession.js";
 
 /** The browser's own time zone, such as "Asia/Kolkata", or "" when it does not say. */
-export const browserTimeZone = () => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
-  } catch {
-    return "";
-  }
-};
+export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
 
 /**
  * Tells the server the browser's time zone, so the player's days are their own (CC-146, ADR-077). Only with the

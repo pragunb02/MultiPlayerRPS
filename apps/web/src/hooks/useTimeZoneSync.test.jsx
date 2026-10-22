@@ -4,7 +4,7 @@ import { ServicesContext } from "../app/servicesContext.js";
 import { fakeApi, GUEST } from "../testing/fakes.js";
 import { flagPaths } from "../testing/flagPaths.js";
 import { SessionContext } from "./useSession.js";
-import { useTimeZoneSync } from "./useTimeZoneSync.js";
+import { browserTimeZone, useTimeZoneSync } from "./useTimeZoneSync.js";
 
 // The browser tells the server its time zone (CC-146).
 function wrapperFor(api, identity) {
@@ -59,6 +59,11 @@ describe("useTimeZoneSync (CC-146)", () => {
     });
     renderHook(() => useTimeZoneSync({ zoneOf: newYork }), { wrapper: wrapperFor(api, GUEST) });
     await waitFor(() => expect(api.setTimeZone).toHaveBeenCalledTimes(1));
+  });
+
+  it("reads the browser's own zone by default", () => {
+    expect(browserTimeZone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    expect(browserTimeZone()).not.toBe("");
   });
 
   it("waits for a player", async () => {

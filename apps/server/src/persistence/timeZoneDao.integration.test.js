@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
 import { runTimeZoneDaoContract } from "../testing/timeZoneDaoContract.js";
@@ -31,4 +31,13 @@ async function createDao() {
 
 describe("MongoDB time zone DAO (CC-146)", () => {
   runTimeZoneDaoContract(createDao);
+
+  it("passes on a write the database refuses for another reason than a duplicate", async () => {
+    const dao = await createDao();
+    const incomplete = { playerId: "guest_a", zone: "Asia/Dubai" };
+    await expect(dao.save({ doc: /** @type {any} */ (incomplete), expectedChangedAt: null })).rejects.toThrow(
+      /validation failed/i,
+    );
+    expect(await dao.findByPlayer("guest_a")).toEqual([]);
+  });
 });
