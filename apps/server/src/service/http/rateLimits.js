@@ -64,8 +64,10 @@ export const sessionOrIpKey = (req) =>
  *   skip?: (req: import("express").Request) => boolean,
  *   skipSuccessfulRequests?: boolean,
  *   headers?: boolean,
+ *   onLimited?: import("express").RequestHandler,
  * }} options  `keyGenerator` defaults to the client address. `headers` is off for a second limiter on the same
- *   route, so the two do not write over each other's headers.
+ *   route, so the two do not write over each other's headers. `onLimited` answers a request over the limit
+ *   instead of the standard 429, for a route that must always answer the same (telemetry, CC-175).
  * @returns {import("express").RequestHandler}
  */
 export function createRateLimit({
@@ -78,6 +80,7 @@ export function createRateLimit({
   skipFailedRequests = false,
   requestWasSuccessful,
   headers = true,
+  onLimited,
 }) {
   return rateLimit({
     windowMs,
@@ -89,10 +92,12 @@ export function createRateLimit({
     ...(requestWasSuccessful !== undefined && { requestWasSuccessful }),
     standardHeaders: headers ? "draft-7" : false,
     legacyHeaders: false,
-    handler: (req, res) =>
-      res.status(429).json({
-        error: { code: ERROR_CODES.RATE_LIMITED, message, requestId: req.id },
-      }),
+    handler:
+      onLimited ??
+      ((req, res) =>
+        res.status(429).json({
+          error: { code: ERROR_CODES.RATE_LIMITED, message, requestId: req.id },
+        })),
   });
 }
 

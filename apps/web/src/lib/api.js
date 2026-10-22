@@ -4,16 +4,44 @@ import { AppRequestError, networkError } from "./errors.js";
  * The HTTP API client — the only place the web app calls `fetch`. Same-origin requests carry the session
  * cookie automatically; errors become AppRequestError with the server's code.
  *
- * @param {{ fetchImpl?: typeof fetch, baseUrl?: string }} [options]  injectable for tests
+ * @param {{
+ *   fetchImpl?: typeof fetch,
+ *   baseUrl?: string,
+ *   onRequest?: () => void,
+ *   onFailure?: (failure: { path: string, status: number, error: AppRequestError }) => void,
+ *   countsOff?: () => boolean,
+ * }} [options]  `fetchImpl` and `baseUrl` are injectable for tests. Usage counts (CC-174) hear of each request,
+ *   and of each that failed: its path, which they turn into a template, its status (0 for no answer) and the error.
+ *   While `countsOff` says this browser's usage counts switch is off, every request says so in `X-CC-Counts: off`, so
+ *   the server records nothing about it either (CC-174)
  */
-export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseUrl = "" } = {}) {
+export function createApiClient({
+  fetchImpl = (...args) => fetch(...args),
+  baseUrl = "",
+  onRequest = () => undefined,
+  onFailure = () => undefined,
+  countsOff = () => false,
+} = {}) {
   async function request(method, path, body) {
+    onRequest();
+    try {
+      return await answer(method, path, body);
+    } catch (error) {
+      if (error instanceof AppRequestError) onFailure({ path, status: error.status, error });
+      throw error;
+    }
+  }
+
+  async function answer(method, path, body) {
     let res;
     try {
       res = await fetchImpl(`${baseUrl}/api${path}`, {
         method,
         credentials: "same-origin",
-        headers: body === undefined ? {} : { "Content-Type": "application/json" },
+        headers: {
+          ...(body !== undefined && { "Content-Type": "application/json" }),
+          ...(countsOff() && { "X-CC-Counts": "off" }),
+        },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch (err) {
