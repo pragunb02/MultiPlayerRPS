@@ -6,6 +6,7 @@ import {
   isFetchRefusedWhileLeaving,
   isRealtimeDownMessage,
 } from "./browserNoise.js";
+import { silenceWebAudio } from "./testAudio.js";
 
 /**
  * `players.open(name)` gives a person their own browser (own cookies), as Render serves it: behind HTTPS, so the
@@ -64,6 +65,11 @@ function isSoundSetting(raw) {
 }
 
 export const test = base.extend({
+  // Playwright's own page is as silent as each person's browser below (CC-344).
+  context: async ({ context }, use) => {
+    await context.addInitScript(silenceWebAudio);
+    await use(context);
+  },
   players: async ({ browser, baseURL }, use, testInfo) => {
     const opened = [];
     // Playwright records a video only of its own `page`, not of the browsers opened here. So when a project asks
@@ -79,6 +85,8 @@ export const test = base.extend({
         extraHTTPHeaders: { "X-Forwarded-Proto": "https" },
         recordVideo,
       });
+      // WebKit cannot be muted at launch, so every page's sound goes to a silent output (testAudio.js, CC-344).
+      await context.addInitScript(silenceWebAudio);
       const page = await context.newPage();
       const record = { problems: [], urls: [], socketFrames: [], expected: [] };
       const isExpected = (status, url) =>

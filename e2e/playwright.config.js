@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL } from "./personas.js";
 import { RESTARTS, specFilesFor } from "./shards.js";
+import { CHROMIUM_MUTES_AUDIO, FIREFOX_MUTES_AUDIO } from "./testAudio.js";
 import { CHROMIUM_ACCEPTS_TEST_CERTIFICATE } from "./tlsFront.js";
 
 // Browser tests of whole journeys, one file per kind of person (ENGINEERING.md §4). Run: npm run test:e2e
@@ -38,6 +39,15 @@ if (!Object.hasOwn(ENGINES, engine)) {
 }
 const targets = ENGINES[engine];
 
+// How each engine starts. Chromium accepts the e2e server's certificate during the handshake instead of restarting
+// each request after the error (CC-319). Chromium and Firefox are muted, and WebKit, which has no such setting, is
+// silenced in the page by the fixtures (testAudio.js, CC-344).
+const LAUNCH = Object.freeze({
+  chromium: { args: [...CHROMIUM_ACCEPTS_TEST_CERTIFICATE, ...CHROMIUM_MUTES_AUDIO] },
+  firefox: { firefoxUserPrefs: { ...FIREFOX_MUTES_AUDIO } },
+  webkit: undefined,
+});
+
 /**
  * Restarting the server cuts every player off, so the restart tests run last and one at a time, after all the
  * others, one device after another.
@@ -63,8 +73,7 @@ export default defineConfig({
     baseURL: BASE_URL,
     // The e2e server's certificate is made for each run (tlsFront.js), so no browser trusts it by itself.
     ignoreHTTPSErrors: true,
-    // Chromium accepts it during the handshake instead of restarting each request after the error (CC-319).
-    ...(engine === "chromium" ? { launchOptions: { args: [...CHROMIUM_ACCEPTS_TEST_CERTIFICATE] } } : {}),
+    ...(LAUNCH[engine] === undefined ? {} : { launchOptions: LAUNCH[engine] }),
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

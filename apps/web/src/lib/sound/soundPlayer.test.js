@@ -422,3 +422,12 @@ describe("soundPlayer (CC-103)", () => {
     });
   });
 });
+
+// The web tests run in jsdom, which has no Web Audio, so no test can play a sound out loud: each one passes in a
+// pretend context like the one above (CC-344).
+describe("the web test environment", () => {
+  it("has no audio context to play through", () => {
+    expect(window.AudioContext).toBeUndefined();
+    expect(window.webkitAudioContext).toBeUndefined();
+  });
+});

@@ -56,6 +56,7 @@ export default defineConfig({
         "e2e/tlsFront.js",
         "e2e/shards.js",
         "e2e/reportSummary.js",
+        "e2e/testAudio.js",
       ],
       // Entry points only wire things together (covered indirectly): server index.js, web main.jsx, scripts/bin and
       // the two comment scripts, whose logic is tested in eslint-rules/cssComments.mjs and scripts/commentOnly.mjs, and
