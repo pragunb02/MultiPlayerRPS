@@ -30,9 +30,24 @@ a {
   color: var(--color-primary);
 }
 
-:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
+/* The app's focus rings sit in their own layer, below every style outside a layer, so a component's own focus
+   style (or its choice of none) always wins over them, whatever the order the stylesheets load in (CC-100). */
+@layer focus {
+  :focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Focus moved in code (a heading on a new screen, a dialog: tabindex="-1") is for screen readers. Its ring shows
+     only while the player is using the keyboard (app/inputModality.js), because browsers disagree about
+     :focus-visible here. */
+  [tabindex="-1"]:focus {
+    outline: none;
+  }
+  .using-keyboard [tabindex="-1"]:focus {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }
 
 h1,
