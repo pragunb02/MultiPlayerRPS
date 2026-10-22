@@ -98,6 +98,8 @@ const MAIN_CONTROLS = Object.freeze({
 /**
  * States whose layout the layout ticket CC-172 still has to fix. They are marked as expected to fail, so the suite
  * stays green and a fix shows up as "expected to fail, but passed", which means this list needs updating.
+ * Playwright's list reporter marks an expected failure with a ✘ like a real one, and counts it as passed: these six
+ * show ✘ on every run, Firefox included (it is a laptop here), and are not flaky (CC-346).
  */
 const CHESS_LAPTOP = "your own clock and the bottom rank are under the fold at 1280×720 (A8)";
 const CHESS_PHONE = "Offer draw and Resign are under the fold at 390×844 (A8)";
@@ -193,6 +195,48 @@ test.describe("a game that brings only a board plugs into the match shell", () =
     expect(await controls(ending)).toEqual(["room.rematch.ask", "room.new_opponent", "room.leave"]);
     await expect(slot(clicker, "stage").locator('[data-cc-control="ttt.cell"]')).toHaveCount(9);
   });
+});
+
+// The board downloads when it is first shown (CC-322). On CI's Firefox it came while a press on Leave room was on
+// its way, pushed the button down and took the press (CC-346). Its place is now kept while it downloads, so Leave
+// room can be pressed, keeps its focus as the game starts and stays put when the board comes.
+test("Leave room stays where it is, focused and pressable, while the board downloads", async ({
+  players,
+}) => {
+  const { alice, bob } = await openPair(players);
+  let release;
+  const held = new Promise((resolve) => {
+    release = resolve;
+  });
+  await alice.page.route("**/assets/TicTacToeBoard-*.js", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const leave = alice.page.locator('main [data-cc-control="room.leave"]');
+  // Where the button is on the page, not in the window: pressing it scrolls it into view.
+  const box = () =>
+    leave.evaluate((button) => {
+      const { x, y, width, height } = button.getBoundingClientRect();
+      return [x + scrollX, y + scrollY, width, height].map(Math.round);
+    });
+
+  await alice.page.goto("/games/tic-tac-toe");
+  await alice.page.locator('main [data-cc-control="lobby.create"]').click();
+  const invite = await alice.page.getByRole("textbox", { name: "Invite link" }).inputValue();
+  await leave.focus();
+  await bob.page.goto(invite);
+  await bob.page.locator('main [data-cc-control="join.guest"]').click();
+
+  await expect(alice.page.getByText("Loading the board…")).toBeVisible();
+  await expect(leave).toBeFocused();
+  const whileLoading = await box();
+  await leave.click();
+  await expect(alice.page.getByRole("dialog", { name: "Leave the game?" })).toBeVisible();
+
+  release();
+  await expect(alice.page.locator('main [data-cc-control="ttt.cell"]')).toHaveCount(9);
+  await expect(alice.page.getByRole("dialog", { name: "Leave the game?" })).toBeVisible();
+  expect(await box()).toEqual(whileLoading);
 });
 
 // The outcome moments (CC-163): each way a game ends has its own tone, words and effect. A win earned on the board

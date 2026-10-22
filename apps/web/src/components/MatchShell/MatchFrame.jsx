@@ -11,6 +11,10 @@ import styles from "./MatchShell.module.css";
  * The game's board, loaded on demand. A new game (a rematch, or Play again on one phone) is a fresh board, not the
  * last one's, because the board is keyed by the game's number.
  *
+ * While the board downloads (CC-322), its place on the stage is kept for it, as tall as the smallest board of that
+ * game at that width (`boardSpace` in MatchShell.module.css). The action bar under the stage then stays where it is
+ * when the board comes, so a press on Leave room cannot land on the board instead (CC-346).
+ *
  * @param {{
  *   room: any,
  *   game: import("../../games/registry.js").GameViewEntry,
@@ -27,7 +31,15 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
     );
   }
   return (
-    <Suspense fallback={<p aria-busy="true">Loading the board…</p>}>
+    <Suspense
+      fallback={
+        <div className={styles.boardSpace} data-cc-board-space={room.gameId}>
+          <p className={styles.boardSpaceFill} aria-busy="true">
+            Loading the board…
+          </p>
+        </div>
+      }
+    >
       <Board
         key={gameNumber(room)}
         room={room}

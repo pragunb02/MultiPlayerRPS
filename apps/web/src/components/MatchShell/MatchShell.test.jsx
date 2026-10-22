@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -184,6 +185,37 @@ describe("MatchShell with a game that brings only a Board (CC-157)", () => {
     expect(within(slot("stage")).getByText("Invite here")).toBeInTheDocument();
     expect(screen.queryByText(/Board for game/)).toBeNull();
     expect(controlsIn(slot("action-bar"))).toEqual(["room.leave"]);
+  });
+
+  it("keeps Leave room pressable and focused while the board downloads, and keeps the board's place (CC-346)", async () => {
+    const user = userEvent.setup();
+    let arrive;
+    const LazyBoard = lazy(
+      () =>
+        new Promise((resolve) => {
+          arrive = () => resolve({ default: FakeBoard });
+        }),
+    );
+    const { update } = mount(roomView({ status: "waiting", seats: [ME], game: undefined }), {
+      game: { Board: LazyBoard },
+    });
+    const leave = screen.getByRole("button", { name: "Leave room" });
+    leave.focus();
+
+    update(roomView());
+
+    // The game started and its board is on its way: its place is kept, and Leave room is the same button, focused.
+    expect(
+      within(slot("stage")).getByText("Loading the board…").closest("[data-cc-board-space]"),
+    ).toHaveAttribute("data-cc-board-space", "chess");
+    expect(screen.getByRole("button", { name: "Leave room" })).toBe(leave);
+    expect(leave).toHaveFocus();
+    await user.click(leave);
+    expect(screen.getByRole("dialog", { name: "Leave the game?" })).toBeInTheDocument();
+
+    await act(async () => arrive());
+    expect(within(slot("stage")).getByText("Board for game 1")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Leave the game?" })).toBeInTheDocument();
   });
 
   it("says so when the game has no board in the web app yet", () => {
