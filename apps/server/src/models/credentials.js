@@ -1,4 +1,4 @@
-import { NAME_REFUSALS } from "@classicade/shared";
+import { NAME_REFUSALS, PASSWORD_REFUSALS } from "@classicade/shared";
 import { ValidationError } from "../utils/errors.js";
 import { isOffensiveName, isReservedName } from "./publicName.js";
 
@@ -98,10 +98,14 @@ export const previousEmailSpelling = (raw) => raw.trim().toLowerCase();
  */
 export function parsePassword(raw) {
   if (typeof raw !== "string" || raw.length < PASSWORD_LENGTH.min || raw.length > PASSWORD_LENGTH.max) {
-    throw invalid("password", `Passwords are ${PASSWORD_LENGTH.min}–${PASSWORD_LENGTH.max} characters`);
+    throw invalid(
+      "password",
+      `Passwords are ${PASSWORD_LENGTH.min}–${PASSWORD_LENGTH.max} characters`,
+      PASSWORD_REFUSALS.LENGTH,
+    );
   }
   if (raw.trim().length === 0) {
-    throw invalid("password", "Passwords cannot be only spaces");
+    throw invalid("password", "Passwords cannot be only spaces", PASSWORD_REFUSALS.ONLY_SPACES);
   }
   return raw;
 }

@@ -19,7 +19,7 @@ const fieldError = (message, field, reason) =>
     code: "VALIDATION_FAILED",
     message,
     status: 400,
-    details: reason === undefined ? { field } : { field, reason },
+    details: { field, reason },
   });
 
 describe("account settings on the profile (CC-116)", () => {
@@ -54,8 +54,29 @@ describe("account settings on the profile (CC-116)", () => {
       "New password",
       "newPassword",
       "Passwords are 8–128 characters",
-      "That wasn't accepted. Check what you entered and try again.",
-      undefined,
+      "A password needs 8 to 128 characters. Change its length and try again.",
+      "password-length",
+    ],
+    [
+      "New password",
+      "newPassword",
+      "Passwords cannot be only spaces",
+      "A password can't be only spaces. Add letters or numbers.",
+      "password-only-spaces",
+    ],
+    [
+      "New password",
+      "newPassword",
+      "That password is too easy to guess. Choose a different one.",
+      "That password is too easy to guess. Try a longer phrase only you would know.",
+      "easy-password",
+    ],
+    [
+      "New password",
+      "newPassword",
+      "Choose a password different from your current one",
+      "That's your current password. Choose a new one.",
+      "same-as-current",
     ],
   ])(
     "shows a refusal of the %s next to that box, in plain words",

@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ACCOUNT_MESSAGES } from "@classicade/shared";
+import { ACCOUNT_MESSAGES, PASSWORD_REFUSALS } from "@classicade/shared";
 import { AppRequestError } from "../lib/errors.js";
 import { fakeApi, GUEST, PROGRESS } from "../testing/fakes.js";
 import { renderApp } from "../testing/render.jsx";
@@ -118,14 +118,14 @@ describe("SignupPage", () => {
     expect(screen.getByLabelText("Username")).toHaveAttribute("aria-invalid", "true");
   });
 
-  it("puts the form's own words at a field the server refused, never the server's", async () => {
+  it("says why the server refused a password the form accepted, with what to do (CC-350)", async () => {
     const user = userEvent.setup();
     const api = fakeApi({
       signup: async () => {
         throw new AppRequestError({
           code: "VALIDATION_FAILED",
-          message: "body.password failed pattern",
-          details: { field: "password" },
+          message: "That password is too easy to guess. Choose a different one.",
+          details: { field: "password", reason: PASSWORD_REFUSALS.EASY },
         });
       },
     });
@@ -133,13 +133,13 @@ describe("SignupPage", () => {
 
     await user.type(screen.getByLabelText("Username"), "Riya");
     await user.type(screen.getByLabelText("Email"), "riya@example.com");
-    await user.type(screen.getByLabelText("Password"), "correct horse battery");
+    await user.type(screen.getByLabelText("Password"), "password123");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(
-      await screen.findByText("That wasn't accepted. Check what you entered and try again."),
+      await screen.findByText("That password is too easy to guess. Try a longer phrase only you would know."),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/failed pattern/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toHaveAttribute("aria-invalid", "true");
   });
 
   it.each([

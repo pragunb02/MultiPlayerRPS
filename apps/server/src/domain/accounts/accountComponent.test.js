@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { describe, expect, it, vi } from "vitest";
-import { ACCOUNT_MESSAGES } from "@classicade/shared";
+import { ACCOUNT_MESSAGES, PASSWORD_REFUSALS } from "@classicade/shared";
 import { createAccountAccessor } from "../../data/accountAccessor.js";
 import { createLegacyUserAccessor } from "../../data/legacyUserAccessor.js";
 import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
@@ -969,18 +969,25 @@ describe("accountComponent", () => {
     );
 
     it.each([
-      ["short", "Passwords are 8–128 characters"],
-      ["          ", "Passwords cannot be only spaces"],
-      [undefined, "Passwords are 8–128 characters"],
-      [RIYA.password, "Choose a password different from your current one"],
-    ])("refuses a new password that breaks the rules (%o)", async (newPassword, message) => {
-      const { accounts, playerId } = await signedUp();
+      ["short", "Passwords are 8–128 characters", PASSWORD_REFUSALS.LENGTH],
+      ["          ", "Passwords cannot be only spaces", PASSWORD_REFUSALS.ONLY_SPACES],
+      [undefined, "Passwords are 8–128 characters", PASSWORD_REFUSALS.LENGTH],
+      [RIYA.password, "Choose a password different from your current one", PASSWORD_REFUSALS.SAME_AS_CURRENT],
+    ])(
+      "refuses a new password that breaks the rules (%o), naming why",
+      async (newPassword, message, reason) => {
+        const { accounts, playerId } = await signedUp();
 
-      await expect(
-        accounts.changePassword({ playerId, currentPassword: RIYA.password, newPassword }),
-      ).rejects.toMatchObject({ constructor: ValidationError, message, details: { field: "newPassword" } });
-      expect(await accounts.sessionVersionOf({ playerId })).toBe(0);
-    });
+        await expect(
+          accounts.changePassword({ playerId, currentPassword: RIYA.password, newPassword }),
+        ).rejects.toMatchObject({
+          constructor: ValidationError,
+          message,
+          details: { field: "newPassword", reason },
+        });
+        expect(await accounts.sessionVersionOf({ playerId })).toBe(0);
+      },
+    );
 
     it("refuses a new password attackers already know at the new password field, and changes nothing (CC-261)", async () => {
       const screen = refusingPasswords(["password1"]);

@@ -64,7 +64,13 @@ export {
 } from "./flags.js";
 export { SOCKET_EVENTS } from "./events.js";
 export { GAME_IDS, GAME_STATUS, GAMES, getGame, getGameBySlug, MOVE_REJECTIONS } from "./games.js";
-export { ACCOUNT_MESSAGES, ACCOUNT_REFUSALS, IDENTITY_KINDS, NAME_REFUSALS } from "./identity.js";
+export {
+  ACCOUNT_MESSAGES,
+  ACCOUNT_REFUSALS,
+  IDENTITY_KINDS,
+  NAME_REFUSALS,
+  PASSWORD_REFUSALS,
+} from "./identity.js";
 export {
   PRESENCE,
   REQUEST_ANSWERS,

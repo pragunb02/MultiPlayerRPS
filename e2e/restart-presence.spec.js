@@ -108,7 +108,7 @@ test.describe("the server restarts", () => {
       alice.page
         .getByRole("main")
         .getByRole("status")
-        .filter({ hasText: /^Reconnecting\. Your move can wait\.$/ }),
+        .filter({ hasText: /^Reconnecting… Your clock may still be running\.$/ }),
     ).toBeVisible();
     await restarting;
 

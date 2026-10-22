@@ -8,6 +8,7 @@ import {
   FRIEND_REFUSALS,
   MOVE_REJECTIONS,
   NAME_REFUSALS,
+  PASSWORD_REFUSALS,
   ROOM_JOIN_REFUSALS,
   ROOM_LIMIT_REASONS,
   ROOM_REQUEST_REFUSALS,
@@ -94,6 +95,7 @@ describe("A4: no raw server words in an error (CC-350, CL-02)", () => {
       NAME_REFUSALS,
       FRIEND_REFUSALS,
       ACCOUNT_REFUSALS,
+      PASSWORD_REFUSALS,
     }).flatMap(([list, reasons]) => Object.values(reasons).map((reason) => [list, reason])),
   )("has words of its own for every reason in %s (%s)", (_list, reason) => {
     const codes = Object.keys(REASON_WORDS).filter((code) => Object.hasOwn(REASON_WORDS[code], reason));

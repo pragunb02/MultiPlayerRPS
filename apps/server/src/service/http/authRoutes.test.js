@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
-import { ERROR_CODES, NAME_REFUSALS, SOCKET_EVENTS } from "@classicade/shared";
+import { ERROR_CODES, NAME_REFUSALS, PASSWORD_REFUSALS, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, send } from "../../testing/socketClients.js";
 import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { startTestServer } from "../../testing/testApp.js";
@@ -81,17 +81,17 @@ describe("auth routes", () => {
   });
 
   it.each([
-    [{ ...RIYA, username: "x" }, 400, "username"],
-    [{ ...RIYA, password: "short" }, 400, "password"],
-    [{ ...RIYA, isAdmin: true }, 400, undefined],
-  ])("validates signup input (%#)", async (body, status, field) => {
+    [{ ...RIYA, username: "x" }, 400, "username", undefined],
+    [{ ...RIYA, password: "short" }, 400, "password", PASSWORD_REFUSALS.LENGTH],
+    [{ ...RIYA, isAdmin: true }, 400, undefined, undefined],
+  ])("validates signup input (%#)", async (body, status, field, reason) => {
     server = await startTestServer();
 
     const res = await post("/api/auth/signup", body);
 
     expect(res.status).toBe(status);
     if (field) {
-      expect(res.body.error.details).toEqual({ field });
+      expect(res.body.error.details).toEqual(reason === undefined ? { field } : { field, reason });
     }
   });
 

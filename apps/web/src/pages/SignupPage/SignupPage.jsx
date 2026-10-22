@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ERROR_CODES, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
+import { ACCOUNT_REFUSALS, ERROR_CODES, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
@@ -84,7 +84,7 @@ export function SignupPage() {
         setFieldErrors({
           [field]: unavailable ? <EmailUnavailable next={next} /> : fieldWords(field, err, form[field]),
         });
-        if (err.details.reason === "too-young") setTooYoung(true);
+        if (err.details.reason === ACCOUNT_REFUSALS.TOO_YOUNG) setTooYoung(true);
       }
     },
     { id: "auth.signup" },

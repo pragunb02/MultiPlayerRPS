@@ -4,6 +4,7 @@ import {
   ageGroupFor,
   IDENTITY_KINDS,
   isTooYoungForAccount,
+  PASSWORD_REFUSALS,
   TOO_YOUNG_MESSAGE,
 } from "@classicade/shared";
 import { parseBirthYear } from "../../models/birthYear.js";
@@ -61,14 +62,20 @@ function statedBirthYear(value, now) {
   const currentYear = yearOf(now);
   const birthYear = parseBirthYear(value, { currentYear });
   if (isTooYoungForAccount({ birthYear, currentYear })) {
-    throw new ValidationError(TOO_YOUNG_MESSAGE, { details: { field: "birthYear", reason: "too-young" } });
+    throw new ValidationError(TOO_YOUNG_MESSAGE, {
+      details: { field: "birthYear", reason: ACCOUNT_REFUSALS.TOO_YOUNG },
+    });
   }
   return birthYear;
 }
 
 /** A field error for the password form, so the page can show it next to the right box. */
-const passwordFieldError = (field, message, cause) =>
-  new ValidationError(message, { details: { field }, ...(cause !== undefined && { cause }) });
+/**
+ * A refused new password at `field`, keeping the reason the refusal named (PASSWORD_REFUSALS), so the page says it in
+ * its own words (CC-350).
+ */
+const passwordFieldError = ({ field, message, reason, cause }) =>
+  new ValidationError(message, { details: { field, reason }, ...(cause !== undefined && { cause }) });
 /** A password that is not the account's, with the reason the page says in its own words (CC-350). */
 const wrongPassword = ({ field, message, reason }) =>
   new ValidationError(message, { details: { field, reason } });
@@ -404,7 +411,12 @@ export function createAccountComponent({
       try {
         next = parsePassword(newPassword);
       } catch (err) {
-        throw passwordFieldError("newPassword", err.message, err);
+        throw passwordFieldError({
+          field: "newPassword",
+          message: err.message,
+          reason: err.details.reason,
+          cause: err,
+        });
       }
       const account = await accountAccessor.getById(accountId);
       const current = typeof currentPassword === "string" ? currentPassword : "";
@@ -416,7 +428,11 @@ export function createAccountComponent({
         });
       }
       if (next === current) {
-        throw passwordFieldError("newPassword", "Choose a password different from your current one");
+        throw passwordFieldError({
+          field: "newPassword",
+          message: "Choose a password different from your current one",
+          reason: PASSWORD_REFUSALS.SAME_AS_CURRENT,
+        });
       }
       // Only once the current password is right, so a borrowed signed-in browser cannot test passwords with it.
       await passwordScreen.check({ password: next, field: "newPassword" });

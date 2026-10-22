@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
+import { ACCOUNT_REFUSALS, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { useServices } from "../../app/servicesContext.js";
 import { Button } from "../../components/Button/Button.jsx";
@@ -51,7 +51,7 @@ function BirthYear({ account }) {
             await account.setBirthYear(Number(year));
             await reload();
           } catch (err) {
-            if (err.details?.reason === "too-young") setTooYoung(true);
+            if (err.details?.reason === ACCOUNT_REFUSALS.TOO_YOUNG) setTooYoung(true);
             throw err;
           }
         },

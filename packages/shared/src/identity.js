@@ -25,6 +25,20 @@ export const ACCOUNT_REFUSALS = Object.freeze({
   WRONG_PASSWORD: "wrong-password",
   /** the current password given to change it is not the account's */
   WRONG_CURRENT_PASSWORD: "wrong-current-password",
+  /** the year of birth says the player is under 13, so they keep playing as a guest (CC-152) */
+  TOO_YOUNG: "too-young",
+});
+
+/** Why the server refused a new password, at sign-up or on a change, in `details.reason` (CC-350). */
+export const PASSWORD_REFUSALS = Object.freeze({
+  /** attackers already know it: it is on the common list or in a breach (CC-261) */
+  EASY: "easy-password",
+  /** it is shorter or longer than a password may be */
+  LENGTH: "password-length",
+  /** it is only spaces */
+  ONLY_SPACES: "password-only-spaces",
+  /** a change to the same password the account has */
+  SAME_AS_CURRENT: "same-as-current",
 });
 
 /**

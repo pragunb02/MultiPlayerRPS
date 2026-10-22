@@ -251,6 +251,21 @@ describe("MatchShell action bar", () => {
     }
   });
 
+  it("says the clock may still run while reconnecting in a game with a turn limit (CC-350)", () => {
+    const timed = roomView();
+    mount(
+      { ...timed, game: { ...timed.game, turnEndsAt: T + 60_000 } },
+      { game: { Board: FakeBoard, actions: chessActions }, reconnecting: true },
+    );
+
+    expect(screen.getByRole("button", { name: "Resign" })).toHaveAccessibleDescription(
+      "Reconnecting… Your clock may still be running.",
+    );
+    expect(screen.getByTestId("board-reason")).toHaveTextContent(
+      "Reconnecting… Your clock may still be running.",
+    );
+  });
+
   it("asks first for an action that needs it, in the shell's dialog, and sends it on confirm", async () => {
     const user = userEvent.setup();
     const { calls } = mount(roomView(), { game: { Board: FakeBoard, actions: chessActions } });
