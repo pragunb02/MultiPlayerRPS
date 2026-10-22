@@ -85,7 +85,8 @@ export function createLeaderboardAccessor({ leaderboardDao }) {
       leaderboardDao.extendLifetime({ ...change, expiresAt: new Date(expiresAt) }),
 
     /**
-     * @param {BoardRef & { limit: number }} query
+     * @param {BoardRef & { limit: number, excluding?: ReadonlyArray<string> }} query  `excluding`: players whose
+     *   rows are hidden (suspended accounts, CC-334)
      * @returns {Promise<ReadonlyArray<Readonly<LeaderboardEntry>>>} best first
      */
     async listTop(query) {
@@ -95,11 +96,12 @@ export function createLeaderboardAccessor({ leaderboardDao }) {
     /**
      * A player's rank (1 = best) and score on a board.
      *
-     * @param {BoardRef & { playerId: string }} query
+     * @param {BoardRef & { playerId: string, excluding?: ReadonlyArray<string> }} query  `excluding`: players
+     *   whose rows are hidden and do not count ahead (CC-334)
      * @returns {Promise<Readonly<{ rank: number, score: number }>>}
      * @throws {NotFoundError} when the player is not on the board
      */
-    async getStanding({ board, period, playerId }) {
+    async getStanding({ board, period, playerId, excluding = [] }) {
       let entry;
       try {
         entry = await leaderboardDao.getEntry({ board, period, playerId });
@@ -109,7 +111,7 @@ export function createLeaderboardAccessor({ leaderboardDao }) {
         }
         throw err;
       }
-      const ahead = await leaderboardDao.countAhead({ board, period, ...entry });
+      const ahead = await leaderboardDao.countAhead({ board, period, ...entry, excluding });
       return Object.freeze({ rank: ahead + 1, score: entry.score });
     },
 

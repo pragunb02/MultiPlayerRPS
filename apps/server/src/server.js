@@ -14,6 +14,7 @@ import { createPrivacyAccessor } from "./data/privacyAccessor.js";
 import { createFeatureFlagAccessor } from "./data/featureFlagAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
 import { createReportAccessor } from "./data/reportAccessor.js";
+import { createSuspensionAccessor } from "./data/suspensionAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
 import { createProfileAccessor } from "./data/profileAccessor.js";
@@ -48,6 +49,7 @@ import { createProfileComponent } from "./domain/profiles/profileComponent.js";
 import { createSafetyComponent } from "./domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
 import { createReportComponent, REPORT_EVENTS } from "./domain/reports/reportComponent.js";
+import { createSuspensionComponent, SUSPENSION_EVENTS } from "./domain/suspensions/suspensionComponent.js";
 import { createFlagComponent } from "./domain/flags/flagComponent.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
@@ -88,6 +90,7 @@ import { createPrivacyDao } from "./persistence/privacyDao.js";
 import { createFeatureFlagDao } from "./persistence/featureFlagDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
 import { createReportDao } from "./persistence/reportDao.js";
+import { createSuspensionDao } from "./persistence/suspensionDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
 import { createLeaderboardDao } from "./persistence/leaderboardDao.js";
@@ -622,6 +625,60 @@ export function cutSocketsOnRename({ domainEvents, disconnectPlayer }) {
 }
 
 /**
+ * Account suspension (CC-334, ADR-078), composed: every session of the account ends through its session version,
+ * and the rooms, challenges and friends let go of the player, in that order. They are given as getters because
+ * those components are made after the report component that needs this one. Admin accounts cannot be suspended.
+ *
+ * @param {{
+ *   suspensionAccessor: ReturnType<typeof createSuspensionAccessor>,
+ *   accountComponent: Pick<ReturnType<typeof createAccountComponent>, "signOutOtherDevices" | "usernamesOf">,
+ *   domainEvents: import("node:events").EventEmitter,
+ *   adminAccountIds: ReadonlyArray<string>,
+ *   rooms: () => Pick<ReturnType<typeof createRoomComponent>, "removePlayer">,
+ *   challenges: () => { playerSuspended: (input: { playerId: string, now: number }) => Promise<unknown> },
+ *   friends: () => { playerSuspended: (input: { playerId: string, now: number }) => Promise<unknown> },
+ * }} deps
+ */
+export function wireSuspensions({
+  suspensionAccessor,
+  accountComponent,
+  domainEvents,
+  adminAccountIds,
+  rooms,
+  challenges,
+  friends,
+}) {
+  const admins = new Set(adminAccountIds);
+  return createSuspensionComponent({
+    suspensionAccessor,
+    // Counting the version up ends every session of the account at its next request or handshake (ADR-030.4).
+    accounts: {
+      endSessions: ({ playerId }) => accountComponent.signOutOtherDevices({ playerId }),
+      usernamesOf: (query) => accountComponent.usernamesOf(query),
+    },
+    events: domainEvents,
+    // Challenges and friends first: a challenge taken while the rooms were being left would seat the player again
+    // (review of CC-334). Taking one from a suspended creator is refused too.
+    followers: [
+      { name: "challenges", playerSuspended: (input) => challenges().playerSuspended(input) },
+      { name: "friends", playerSuspended: (input) => friends().playerSuspended(input) },
+      { name: "rooms", playerSuspended: (input) => rooms().removePlayer(input) },
+    ],
+    isProtected: (playerId) => admins.has(playerId),
+  });
+}
+
+/**
+ * Cuts the sockets of an account the owner suspended (CC-334): its sessions ended a moment before, so its open tabs
+ * show it signed out at once, as after a rename.
+ *
+ * @param {{ domainEvents: import("node:events").EventEmitter, disconnectPlayer: (playerId: string) => void }} deps
+ */
+export function cutSocketsOnSuspension({ domainEvents, disconnectPlayer }) {
+  domainEvents.on(SUSPENSION_EVENTS.STARTED, ({ playerId }) => disconnectPlayer(playerId));
+}
+
+/**
  * Friends and their presence (CC-052, ADR-066). The presence tracker hears about every room change, so friends see
  * "in a game" while a game is on, and the friend component reads it. The gateway tells the tracker about tabs and
  * pushes what the friend component announces.
@@ -747,6 +804,7 @@ export async function startServer({
   const blockDao = createBlockDao({ connection: database.connection });
   const feedbackDao = createFeedbackDao({ connection: database.connection });
   const reportDao = createReportDao({ connection: database.connection });
+  const suspensionDao = createSuspensionDao({ connection: database.connection });
   const dailyPuzzleAttemptDao = createDailyPuzzleAttemptDao({ connection: database.connection });
   const chessRatingDao = createChessRatingDao({ connection: database.connection });
   const profileDao = createProfileDao({ connection: database.connection });
@@ -773,6 +831,7 @@ export async function startServer({
       blockDao,
       feedbackDao,
       reportDao,
+      suspensionDao,
       dailyPuzzleAttemptDao,
       chessRatingDao,
       profileDao,
@@ -802,6 +861,7 @@ export async function startServer({
   const blockAccessor = createBlockAccessor({ blockDao });
   const feedbackAccessor = createFeedbackAccessor({ feedbackDao });
   const reportAccessor = createReportAccessor({ reportDao });
+  const suspensionAccessor = createSuspensionAccessor({ suspensionDao });
   const chessPuzzles = loadChessPuzzles();
   const dailyPuzzleAccessor = createDailyPuzzleAccessor({
     attemptDao: dailyPuzzleAttemptDao,
@@ -880,6 +940,8 @@ export async function startServer({
     transfers: playerTransferAccessor,
     safety: safetyComponent,
     cards: profileCards,
+    // A suspended account's rows are hidden while it lasts (CC-334, ADR-078).
+    hidden: suspensionAccessor,
   });
   const chessRatingComponent = createChessRatingComponent({ chessRatingAccessor, events: domainEvents });
   const profileComponent = createProfileComponent({
@@ -893,6 +955,16 @@ export async function startServer({
   // Rooms read blocks, which read reports, so the room component is made after them. A rename reaches the rooms
   // through this, which gets the room component's rename as soon as it exists (long before any owner can rename).
   const roomsToRename = /** @type {Pick<ReturnType<typeof createRoomComponent>, "renamePlayer">} */ ({});
+  // Rooms, challenges and friends are made further down; nobody can be suspended before the server listens.
+  const suspensionComponent = wireSuspensions({
+    suspensionAccessor,
+    accountComponent,
+    domainEvents,
+    adminAccountIds: config.adminAccountIds,
+    rooms: () => roomComponent,
+    challenges: () => challengeComponent,
+    friends: () => friends.friendComponent,
+  });
   const reportComponent = createReportComponent({
     reportAccessor,
     coPlayers: createCoPlayers({
@@ -911,6 +983,7 @@ export async function startServer({
       leaderboardComponent,
       domainEvents,
     }),
+    suspensions: suspensionComponent,
   });
   const blockComponent = createBlockComponent({
     blockAccessor,
@@ -990,6 +1063,7 @@ export async function startServer({
     blocks: blockComponent,
     safety: safetyComponent,
     events: domainEvents,
+    suspended: suspensionComponent,
   });
   const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const friends = wireFriends({
@@ -1087,6 +1161,11 @@ export async function startServer({
         exportPlayer: reportComponent.exportPlayer,
       },
       {
+        name: "suspensions",
+        erasePlayer: suspensionComponent.erasePlayer,
+        exportPlayer: suspensionComponent.exportPlayer,
+      },
+      {
         name: "friends",
         erasePlayer: friends.friendComponent.erasePlayer,
         exportPlayer: friends.friendComponent.exportPlayer,
@@ -1134,7 +1213,7 @@ export async function startServer({
   });
   const sessionEvents = new EventEmitter();
   // HTTP and realtime ask the same question of every signed-in session (CC-116).
-  const checkSession = createSessionCheck({ accountComponent, now });
+  const checkSession = createSessionCheck({ accountComponent, suspensions: suspensionComponent, now });
   const networkKey = createNetworkKey({ now });
   const app = createHttpApp({
     config,
@@ -1157,6 +1236,7 @@ export async function startServer({
     feedbackComponent,
     reportLimits: limits.reports,
     reportComponent,
+    suspensionComponent,
     dailyPuzzleComponent,
     safetyComponent,
     flagComponent,
@@ -1202,6 +1282,7 @@ export async function startServer({
   sessionEvents.on(OTHER_SESSIONS_ENDED, (which) => gateway.disconnectOtherSessions(which));
   sessionEvents.on(ACCOUNT_DELETED, (playerId) => gateway.disconnectPlayer(playerId));
   cutSocketsOnRename({ domainEvents, disconnectPlayer: gateway.disconnectPlayer });
+  cutSocketsOnSuspension({ domainEvents, disconnectPlayer: gateway.disconnectPlayer });
 
   const housekeeping = startHousekeeping({
     roomComponent,

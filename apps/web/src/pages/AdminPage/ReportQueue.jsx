@@ -17,6 +17,8 @@ import { useReportQueue } from "../../hooks/useReportQueue.js";
 import { isNotFound, isRetryable } from "../../lib/errors.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import { ConsoleTabs } from "./ConsoleTabs.jsx";
+import { SuspendButton } from "./SuspendDialog.jsx";
+import { CurrentSuspensions, HistoryButton } from "./SuspensionHistory.jsx";
 import consoleStyles from "./AdminPage.module.css";
 import styles from "./FeedbackInbox.module.css";
 import queueStyles from "./ReportQueue.module.css";
@@ -149,8 +151,11 @@ function Pages({ status, page, more }) {
   );
 }
 
-/** One reported player: the names seen, counts by reason, every report, and the actions. */
-function Group({ group, open, act, onDone }) {
+/**
+ * One reported player: the names seen, counts by reason, every report, and the actions. An account can be
+ * suspended from any status, since a rename may not have been enough (CC-334).
+ */
+function Group({ group, open, act, suspend, onDone }) {
   const name = group.names.join(" / ");
   const dismiss = useAction(
     async () => {
@@ -189,14 +194,18 @@ function Group({ group, open, act, onDone }) {
           <Item key={item.reportId} item={item} />
         ))}
       </ol>
-      {open && (
-        <div className={styles.actions}>
+      <div className={styles.actions}>
+        {open && (
           <Button control="admin.reports.dismiss" variant="secondary" action={dismiss}>
             Dismiss
           </Button>
-          {group.canRename && <RenameButton name={name} run={rename} />}
-        </div>
-      )}
+        )}
+        {open && group.canRename && <RenameButton name={name} run={rename} />}
+        {group.canSuspend && (
+          <SuspendButton name={name} suspend={(choice) => suspend(group.groupId, choice)} onDone={onDone} />
+        )}
+        {group.canSuspend && <HistoryButton groupId={group.groupId} name={name} />}
+      </div>
     </article>
   );
 }
@@ -213,6 +222,13 @@ export function ReportQueue() {
   const page = search.get("page") ?? undefined;
   const queue = useReportQueue({ status, page });
   const [notice, setNotice] = useState("");
+  // Counts suspensions made here, so the "Suspended now" list reads them again (CC-334).
+  const [suspensions, setSuspensions] = useState(0);
+  const suspend = async (groupId, choice) => {
+    const done = await queue.suspend(groupId, choice);
+    setSuspensions((n) => n + 1);
+    return done;
+  };
 
   if (queue.status === "error" && isNotFound(queue.error)) {
     return <NotFoundPage />;
@@ -277,12 +293,13 @@ export function ReportQueue() {
         <ol className={styles.list}>
           {queue.groups.map((group) => (
             <li key={group.groupId}>
-              <Group group={group} open={open} act={queue.act} onDone={setNotice} />
+              <Group group={group} open={open} act={queue.act} suspend={suspend} onDone={setNotice} />
             </li>
           ))}
         </ol>
       )}
       <Pages status={status} page={queue.page} more={queue.more} />
+      {queue.status !== "error" && <CurrentSuspensions onDone={setNotice} refresh={suspensions} />}
     </section>
   );
 }

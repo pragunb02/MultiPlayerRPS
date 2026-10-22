@@ -104,6 +104,20 @@ export function runLeaderboardDaoContract(createDao) {
     ]);
   });
 
+  it("leaves out the players it is told to, in the list and in the count ahead (CC-334)", async () => {
+    const dao = await createDao();
+    await dao.raiseScore({ ...XP, ...player("user_top"), score: 90, at: at(0) });
+    await dao.raiseScore({ ...XP, ...player("user_mid"), score: 50, at: at(0) });
+    await dao.raiseScore({ ...XP, ...player("user_low"), score: 10, at: at(0) });
+
+    const top = await dao.top({ ...XP, limit: 2, excluding: ["user_top"] });
+    const low = await dao.getEntry({ ...XP, playerId: "user_low" });
+
+    expect(top.map((entry) => entry.playerId)).toEqual(["user_mid", "user_low"]);
+    expect(await dao.countAhead({ ...XP, ...low, excluding: ["user_top"] })).toBe(1);
+    expect(await dao.countAhead({ ...XP, ...low, excluding: [] })).toBe(2);
+  });
+
   it("lists every entry of one player, on every board and period (CC-035)", async () => {
     const dao = await createDao();
     await dao.raiseScore({ ...XP, ...player("user_a", "alice", 2), score: 80, at: at() });

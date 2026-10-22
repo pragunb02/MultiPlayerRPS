@@ -5,6 +5,7 @@ import {
   connectLeaderboardBonuses,
   connectMatchPipeline,
   cutSocketsOnRename,
+  cutSocketsOnSuspension,
   handleFatalErrors,
   handleShutdownSignals,
   identityFollowers,
@@ -15,7 +16,10 @@ import {
   reportOldEmailSpellings,
   roomErasure,
   startHousekeeping,
+  wireSuspensions,
 } from "./server.js";
+import { createSuspensionAccessor } from "./data/suspensionAccessor.js";
+import { createInMemorySuspensionDao } from "./testing/inMemorySuspensionDao.js";
 import { createPendingMatchAccessor } from "./data/pendingMatchAccessor.js";
 import { GUEST_ROW_LIFETIME_MS } from "./domain/leaderboards/boards.js";
 import { SESSION_TTL_SECONDS } from "./service/http/session.js";
@@ -908,6 +912,43 @@ describe("roomErasure (CC-035)", () => {
     expect(roomComponent.erasePlayer).toHaveBeenCalledWith(
       expect.objectContaining({ playerId: "user_x", now: 7 }),
     );
+  });
+});
+
+describe("wireSuspensions and cutSocketsOnSuspension (CC-334, ADR-078)", () => {
+  it("ends the sessions, cuts the sockets, then lets challenges and friends go before rooms, and names the account as it is now", async () => {
+    const BOB = "user_0123456789abcdef01234567";
+    const calls = [];
+    const domainEvents = new EventEmitter();
+    cutSocketsOnSuspension({
+      domainEvents,
+      disconnectPlayer: (playerId) => calls.push(["sockets", playerId]),
+    });
+    const follower = (name) => ({ playerSuspended: async () => calls.push([name]) });
+    const suspensions = wireSuspensions({
+      suspensionAccessor: createSuspensionAccessor({ suspensionDao: createInMemorySuspensionDao() }),
+      accountComponent: {
+        signOutOtherDevices: async ({ playerId }) => calls.push(["sessions", playerId]),
+        usernamesOf: async () => new Map([[BOB, "Player_K7QM2X"]]),
+      },
+      domainEvents,
+      adminAccountIds: [],
+      rooms: () => ({ removePlayer: async () => calls.push(["rooms"]) }),
+      challenges: () => follower("challenges"),
+      friends: () => follower("friends"),
+    });
+
+    const { suspension } = await suspensions.suspend({
+      playerId: BOB,
+      duration: "24h",
+      reason: "other",
+      by: { id: "user_aaaaaaaaaaaaaaaaaaaaaaaa", name: "Owner" },
+      now: 0,
+    });
+
+    // Challenges first, so nobody takes one into a room with the player while their rooms are being left.
+    expect(calls).toEqual([["sessions", BOB], ["sockets", BOB], ["challenges"], ["friends"], ["rooms"]]);
+    expect(suspension.nameThen).toBe("Player_K7QM2X");
   });
 });
 

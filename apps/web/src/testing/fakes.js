@@ -154,6 +154,11 @@ export function fakeApi(overrides = {}) {
     reportPlayer: vi.fn(),
     getReportQueue: vi.fn(() => new Promise(() => {})),
     actOnReports: vi.fn(),
+    suspendAccount: vi.fn(),
+    getSuspensionHistory: vi.fn().mockResolvedValue([]),
+    getCurrentSuspensions: vi.fn().mockResolvedValue([]),
+    liftSuspension: vi.fn(),
+    exportSuspendedData: vi.fn(),
     unblockPlayer: vi.fn().mockResolvedValue(undefined),
     // An empty friends view, so a page that shows friends draws instead of failing on a missing answer (CC-052).
     getFriends: vi.fn().mockResolvedValue(NO_FRIENDS),

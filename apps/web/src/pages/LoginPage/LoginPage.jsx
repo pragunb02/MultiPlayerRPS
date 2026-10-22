@@ -8,6 +8,8 @@ import { useSaveProgress } from "../../components/SaveProgress/saveProgressConte
 import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "../authForms.module.css";
+import { isSuspendedAnswer } from "./suspendedAnswer.js";
+import { SuspendedNotice } from "./SuspendedNotice.jsx";
 
 export function LoginPage() {
   const session = useSession();
@@ -15,10 +17,21 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
   const [form, setForm] = useState({ email: "", password: "" });
+  // A suspended account's answer, with what it typed, so it can download its data (CC-334).
+  const [paused, setPaused] = useState(undefined);
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
   const login = useAction(
     async () => {
-      const { carriedOver } = await session.login(form);
+      setPaused(undefined);
+      let signedIn;
+      try {
+        signedIn = await session.login(form);
+      } catch (err) {
+        if (!isSuspendedAnswer(err)) throw err;
+        setPaused({ endsAt: err.details.endsAt, credentials: { ...form } });
+        return;
+      }
+      const { carriedOver } = signedIn;
       // One confirmation, with the account's numbers, when guest games came along (CC-097).
       saveProgress.confirmSaved(carriedOver);
       // Signed in: the redirect below takes over on the next render.
@@ -40,6 +53,7 @@ export function LoginPage() {
     <section className={styles.page}>
       <PageTitle>Log in</PageTitle>
       <h1>Log in</h1>
+      {paused !== undefined && <SuspendedNotice endsAt={paused.endsAt} credentials={paused.credentials} />}
       <form className={styles.form} onSubmit={submit} noValidate>
         <Field
           label="Email"

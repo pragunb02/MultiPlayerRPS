@@ -107,20 +107,35 @@ describe("createSessionRenewals (CC-116)", () => {
 });
 
 describe("createSessionCheck (CC-116)", () => {
-  function setup({ version = 0, failure } = {}) {
+  function setup({ version = 0, failure, suspended = [] } = {}) {
     let time = T0;
     const sessionVersionOf = vi.fn(async () => {
       if (failure) throw failure;
       return version;
     });
-    const check = createSessionCheck({ accountComponent: { sessionVersionOf }, now: () => time });
-    return { check, sessionVersionOf, advance: (ms) => (time += ms) };
+    const isSuspended = vi.fn(async ({ playerId }) => suspended.includes(playerId));
+    const check = createSessionCheck({
+      accountComponent: { sessionVersionOf },
+      suspensions: { isSuspended },
+      now: () => time,
+    });
+    return { check, sessionVersionOf, isSuspended, advance: (ms) => (time += ms) };
   }
   const reasonOf = (promise) =>
     promise.then(
       () => "accepted",
       (err) => (err instanceof UnauthorizedError ? err.details.reason : err),
     );
+
+  it("ends an account session at its current version while the account is suspended (CC-334)", async () => {
+    const { check, isSuspended } = setup({ version: 2, suspended: [USER.id] });
+
+    const refusal = await check({ identity: USER, sessionVersion: 2, signedInAt: T0 }).catch((err) => err);
+    expect(refusal.details.reason).toBe("suspended");
+    // The same words as any sign-out: nothing tells the other tabs why.
+    expect(refusal.message).toBe("You were signed out on this device, please log in again");
+    expect(isSuspended).toHaveBeenCalledWith({ playerId: USER.id, now: T0 });
+  });
 
   it("accepts a guest session without asking about any account", async () => {
     const { check, sessionVersionOf } = setup();

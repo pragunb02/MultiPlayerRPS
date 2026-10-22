@@ -50,6 +50,16 @@ export {
   REPORT_STATUSES,
 } from "./reports.js";
 export {
+  SUSPENDED_REASON,
+  SUSPENSION_DURATION,
+  SUSPENSION_DURATION_MS,
+  SUSPENSION_DURATIONS,
+  SUSPENSION_KEEP_DAYS,
+  SUSPENSION_REASON,
+  SUSPENSION_REASONS,
+  SUSPENSION_REPORT_ACTION,
+} from "./suspensions.js";
+export {
   assertClientFlag,
   assertFlagRegistry,
   FLAG_AUDIENCES,

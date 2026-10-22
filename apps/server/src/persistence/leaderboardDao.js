@@ -155,11 +155,15 @@ export function createLeaderboardDao({ connection }) {
     },
 
     /**
-     * @param {BoardRef & { limit: number }} query
+     * @param {BoardRef & { limit: number, excluding?: ReadonlyArray<string> }} query  `excluding`: players whose
+     *   rows are hidden, such as suspended accounts (CC-334)
      * @returns {Promise<LeaderboardEntryDoc[]>} best first
      */
-    top: ({ board, period, limit }) =>
-      Entry.find({ board, period }, FIELDS)
+    top: ({ board, period, limit, excluding = [] }) =>
+      Entry.find(
+        { board, period, ...(excluding.length > 0 && { playerId: { $nin: [...excluding] } }) },
+        FIELDS,
+      )
         .sort({ score: -1, updatedAt: 1, playerId: 1 })
         .limit(limit)
         .lean(),
@@ -180,13 +184,15 @@ export function createLeaderboardDao({ connection }) {
     /**
      * How many entries rank above this one (higher score; on a tie, earlier — then lower player id).
      *
-     * @param {BoardRef & Pick<LeaderboardEntryDoc, "playerId" | "score" | "updatedAt">} entry
+     * @param {BoardRef & Pick<LeaderboardEntryDoc, "playerId" | "score" | "updatedAt"> & { excluding?: ReadonlyArray<string> }} entry
+     *   `excluding`: players whose rows are hidden, who are not counted (CC-334)
      * @returns {Promise<number>}
      */
-    countAhead: ({ board, period, playerId, score, updatedAt }) =>
+    countAhead: ({ board, period, playerId, score, updatedAt, excluding = [] }) =>
       Entry.countDocuments({
         board,
         period,
+        ...(excluding.length > 0 && { playerId: { $nin: [...excluding] } }),
         $or: [
           { score: { $gt: score } },
           { score, updatedAt: { $lt: updatedAt } },

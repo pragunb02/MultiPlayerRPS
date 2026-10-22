@@ -39,7 +39,9 @@ import { createWebAppRouter } from "./webApp.js";
  *   friendLimits?: Parameters<typeof import("./friendRoutes.js").createFriendRoutes>[0]["limits"],
  *   feedbackComponent: ReturnType<typeof import("../../domain/feedback/feedbackComponent.js").createFeedbackComponent>,
  *   feedbackLimits?: Parameters<typeof import("./feedbackRoutes.js").createFeedbackRoutes>[0]["limits"],
- *   reportComponent: Parameters<typeof import("./reportRoutes.js").createReportRoutes>[0]["reportComponent"],
+ *   reportComponent: Parameters<typeof import("./routes.js").apiRouter>[0]["reportComponent"],
+ *   suspensionComponent: Parameters<typeof import("./routes.js").apiRouter>[0]["suspensionComponent"],  account
+ *     suspensions in the console and at sign-in (CC-334)
  *   reportLimits?: Parameters<typeof import("./reportRoutes.js").createReportRoutes>[0]["limits"],
  *   dailyPuzzleComponent: ReturnType<typeof import("../../domain/dailyPuzzles/dailyPuzzleComponent.js").createDailyPuzzleComponent>,
  *   dailyPuzzleLimit?: { windowMs: number, limit: number },   moves and hints per player (CC-144)
@@ -89,6 +91,7 @@ export function createHttpApp({
   feedbackLimits,
   reportComponent,
   reportLimits,
+  suspensionComponent,
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   safetyComponent,
@@ -188,6 +191,7 @@ export function createHttpApp({
       feedbackLimits,
       reportComponent,
       reportLimits,
+      suspensionComponent,
       dailyPuzzleComponent,
       dailyPuzzleLimit,
       safetyComponent,

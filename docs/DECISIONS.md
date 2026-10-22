@@ -103,6 +103,67 @@ the owner may change it.
   The web app makes no new request, so the CSP's `connect-src` is unchanged. A long run of `unavailable` in the
   counter means the breach half is off and needs a look.
 
+### ADR-078 — Account suspension: owner only, by a report's id, sessions ended, a neutral sign-in message, nothing deleted
+
+- **Status:** Accepted · 2026-10-21 (design lead, owner-delegated 2026-10-21, the most conservative safe default for
+  each open decision; [CC-334](tickets/CC-334.md), research there). Amends ADR-071.6.
+- **Context.** The report console could only dismiss or rename (ADR-071.6). A player who keeps harassing others
+  signs in again under the safe name and goes on. Every player counts as a minor until they give a year (ADR-028.1),
+  no client may get another person's player id (ADR-057), the owner is the only moderator (ADR-051), and reporters
+  must never learn the outcome (ADR-071.4).
+- **Decision.**
+  1. **Owner only, by reference.** From a group of `/admin/reports` (ADR-036.1 allowlist and 404) the owner suspends
+     the account the group is about, by the report's id: `POST /api/admin/reports/:reportId/suspension` with
+     `{ duration, reason }`. Durations `24h`, `7d`, `30d`, `until-lifted`; reasons a closed list (`cheating`,
+     `harassment`, `name`, `other`, `SUSPENSION_REASONS`), no free text. Guests, admin accounts and an account
+     suspended already are refused with 409. The group's open reports close as acted on, action `suspend`.
+  2. **One store.** `account_suspensions` (`suspensionId`, `playerId`, `nameThen`, `duration`, `reason`,
+     `startedAt`, `endsAt` or null, `byId`, `byName`, and on a lift `liftedAt`, `liftedById`, `liftedByName`), the one
+     source of truth, the history and the audit. `accounts` is not changed. Kept 180 days after the end or the lift
+     (`deleteAt`, TTL, `SUSPENSION_KEEP_DAYS`); a suspension until lifted has no `deleteAt` while it lasts.
+  3. **Effect, in order.** The record is written, then the account's session version counts up (ADR-030.4), so every
+     session ends at its next request or handshake, and `SUSPENSION_EVENTS.STARTED` cuts its sockets. Then the
+     followers, each best effort and logged: rooms (`removePlayer`: the account leaves each open room as itself, a
+     running game forfeited as any leave; no stand-in, which would show "Deleted player" and tell the opponent
+     something happened), challenges (its own open ones are withdrawn), friends (its waiting requests withdrawn, its
+     friend links removed; friendships kept, friends see it offline because its tabs are gone). Leaderboards hide
+     its rows at read time while it lasts and ranks close up (`hidden.activePlayerIds`, `excluding` on the DAO), so
+     nothing needs a job when it ends.
+  4. **Sign-in.** Only after the right password, `POST /api/auth/login` answers 403 `FORBIDDEN` with
+     `details: { reason: "suspended", endsAt? }` and no session. A wrong password is the usual 401, so the refusal
+     tells nobody who has an account or who is suspended. The page says "Your account is paused until … (India
+     time)" or "until the ClassiCade team lifts it", and "If you think this is a mistake, tell us through the
+     feedback form" with a button that opens it. No reason, report, count or name is shown.
+  5. **Data kept.** Nothing is deleted. A suspended account downloads its export with its email and password,
+     `POST /api/auth/suspended-export`, under the login's limits; its own suspensions are in it (reason, duration,
+     times, never who acted). Account deletion removes its suspensions; a suspended player cannot delete while
+     suspended (no session) and asks through the feedback form.
+  6. **The console.** A group's History lists the account's suspensions (`GET
+/api/admin/reports/:reportId/suspensions`), and "Suspended now" lists those in effect (`GET
+/api/admin/suspensions`) with Lift (`POST /api/admin/suspensions/:suspensionId/lift`). Admins are shown by name,
+     never by id. Each action logs the admin's id, the suspension id, the duration and the reason.
+  7. **Nobody else is told.** No event, view, push or export changes for any reporter. Counts never suspend anyone.
+  8. **Guests are not suspended.** A guest has no password to be refused at and its id dies with its cookie, so a
+     suspended player can play as a guest or make a new account. Address-level options (a daily network hash denylist
+     on top of ADR-035's limits) are written down in CC-334 §3.5, not built; IP bans are refused (shared addresses in
+     schools and carrier NAT).
+  9. **No flag.** A safety tool only the owner uses.
+- **Amends ADR-071.6.** The console's actions are dismiss, rename and suspend; suspension is no longer a follow-up.
+- **Consequences.** One new collection and three small followers; one read of the suspensions per sign-in and per
+  board read. Opponents' ratings are not refunded (a follow-up with CC-042 if wanted). A reason is not shown at
+  sign-in, which Santa Clara 2.0 asks for: it is in the player's export and given on appeal. The DPDP grievance path
+  for children is checked by the lawyer with ADR-028.9.
+- **Amended after the review of the branch (2026-10-21).** (1) The session check (every request and handshake)
+  refuses a suspended account first, with a reason of its own that gets no renewal grace, and a password change or
+  "sign out other devices" on its way checks the suspension after its own version bump, so neither mints a session.
+  (2) The effects are idempotent: asking again for an account suspended already applies them again (sessions,
+  sockets, followers, the group's reports) and answers 409 with `details.appliedAgain`, so a first try that failed
+  halfway is finished by a retry. (3) The store holds one suspension in effect per player: `activeFor`, the player
+  id, under a unique partial index, freed when the suspension ends by time or is lifted; two at once give one record
+  and one 409. (4) The followers run challenges, friends, then rooms, and taking a challenge from a suspended creator
+  answers as a withdrawn one, so nobody is seated with the player while their rooms are left. (5) The suspension
+  keeps the account's name as it is then, not the name a report saw.
+
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 
 - **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner
@@ -386,6 +447,10 @@ the owner may change it.
   6 and 7 read without the note from now on, and the report component no longer uses the feedback masker. A note may
   come later behind a CC-312 flag, masked as feedback is (ADR-059.2), by a decision of its own. The other defaults
   (180 days, the limits, the safe-name rename with sign-out, the Hinglish drafts, no flag) are accepted.
+- **Amended 2026-10-21 (CC-334, [ADR-078](#adr-078--account-suspension-owner-only-by-a-reports-id-sessions-ended-a-neutral-sign-in-message-nothing-deleted)).**
+  Point 6 gains a third action, **suspend**, with a duration and a closed reason, which closes the group's open
+  reports as acted on with action `suspend`. Groups answer `canSuspend` (any account, from any status). The
+  "suspension is a follow-up" sentences of point 6 and of the consequences no longer hold.
 
 ### ADR-069 — Challenges: their own random link for a day, silent blocks, and requests that never interrupt a game
 

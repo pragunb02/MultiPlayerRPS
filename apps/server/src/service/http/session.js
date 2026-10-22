@@ -25,6 +25,8 @@ export const SESSION_END_REASONS = Object.freeze({
   SIGNED_OUT: "signed-out",
   /** the session is older than SESSION_ABSOLUTE_LIFETIME_MS */
   EXPIRED: "expired",
+  /** the account is suspended (CC-334): no renewal grace applies */
+  SUSPENDED: "suspended",
 });
 
 /**
@@ -173,8 +175,19 @@ const signedOut = (cause) =>
   });
 
 /**
+ * The account is suspended (CC-334). The player is told the same words as any sign-out, but the reason is its own,
+ * so the few seconds of grace a renewing session gets never let a suspended account through.
+ */
+const suspendedSession = () =>
+  new UnauthorizedError("You were signed out on this device, please log in again", {
+    details: { reason: SESSION_END_REASONS.SUSPENDED },
+  });
+
+/**
  * Whether a session may still be used, beyond holding a valid identity. A guest session always may. An account's
- * session may while its session version is the account's current one and it is younger than 90 days.
+ * session may while its session version is the account's current one, it is younger than 90 days, and the
+ * account is not suspended (CC-334, ADR-078): a session made by a request that was already on its way when the
+ * suspension started is refused here too, on every request and every socket handshake.
  *
  * Sessions made before CC-116 carry no version, and every account started at version 0, so they count as version
  * 0. They carry no sign-in time either. The HTTP check stamps the moment it first sees one, so its 90 days start
@@ -182,6 +195,7 @@ const signedOut = (cause) =>
  *
  * @param {{
  *   accountComponent: Pick<ReturnType<typeof import("../../domain/accounts/accountComponent.js").createAccountComponent>, "sessionVersionOf">,
+ *   suspensions: { isSuspended: (query: { playerId: string, now: number }) => Promise<boolean> },
  *   now: () => number,
  *   absoluteLifetimeMs?: number,
  * }} deps
@@ -190,10 +204,12 @@ const signedOut = (cause) =>
  */
 export function createSessionCheck({
   accountComponent,
+  suspensions,
   now,
   absoluteLifetimeMs = SESSION_ABSOLUTE_LIFETIME_MS,
 }) {
   assertDefined(accountComponent, "accountComponent");
+  assertFunction(suspensions?.isSuspended, "suspensions.isSuspended");
   assertFunction(now, "now");
   return async (sessionData) => {
     const identity = requireIdentity(sessionData);
@@ -204,6 +220,11 @@ export function createSessionCheck({
       throw new UnauthorizedError("Your session has expired, please log in again", {
         details: { reason: SESSION_END_REASONS.EXPIRED },
       });
+    }
+    // First, so a suspended account is refused even while its session id is renewing (the grace below is only for
+    // a plain sign-out). Worded like any sign-out, so other tabs and the socket learn nothing more (ADR-033).
+    if (await suspensions.isSuspended({ playerId: identity.id, now: now() })) {
+      throw suspendedSession();
     }
     let current;
     try {

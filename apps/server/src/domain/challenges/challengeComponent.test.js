@@ -30,7 +30,13 @@ const DAY = 24 * 60 * MINUTE;
 const CHESS = Object.freeze({ timeControl: "5+0" });
 
 /** Riya is an adult account. Everyone named in `to` targets is found by that name. */
-function setup({ blocked = [], adults = [RIYA.id], rooms: roomOverrides = {}, named = true } = {}) {
+function setup({
+  blocked = [],
+  adults = [RIYA.id],
+  rooms: roomOverrides = {},
+  named = true,
+  suspended = [],
+} = {}) {
   const emitted = [];
   const madeRooms = [];
   let ids = 0;
@@ -67,6 +73,7 @@ function setup({ blocked = [], adults = [RIYA.id], rooms: roomOverrides = {}, na
       },
     }),
     newId: () => `c${String(++ids).padStart(19, "0")}`,
+    suspended: { isSuspended: async ({ playerId }) => suspended.includes(playerId) },
   });
   const make = (fields = {}) =>
     challenges.create({ from: RIYA, gameId: "chess", options: CHESS, now: T0, ...fields });
@@ -658,5 +665,46 @@ describe("challengeComponent: a player's data", () => {
 
     expect(await challenges.erasePlayer({ playerId: RIYA.id })).toEqual({ erased: { challenges: 1 } });
     expect(await challenges.erasePlayer({ playerId: RIYA.id })).toEqual({ erased: { challenges: 0 } });
+  });
+});
+
+describe("challengeComponent.playerSuspended (CC-334, ADR-078 decision 5)", () => {
+  it("refuses taking a challenge whose creator is suspended, as a withdrawn one, and makes no room", async () => {
+    const { make, accept, madeRooms } = setup({ suspended: [RIYA.id] });
+    const { id } = await make();
+
+    const refusal = await accept(id).catch((err) => err);
+
+    expect(refusal).toBeInstanceOf(GoneError);
+    expect(refusal.details).toEqual({ state: CHALLENGE_STATES.WITHDRAWN });
+    expect(madeRooms).toEqual([]);
+  });
+
+  it("withdraws every open challenge a suspended player made, and leaves the ones sent to them", async () => {
+    const { make, challenges, accessor, emitted } = setup();
+    const link = await make();
+    const toArjun = await make({ to: "Arjun", now: T0 + 1 });
+    const taken = await make({ now: T0 + 2 });
+    await challenges.accept({ challengeId: taken.id, player: GUEST, network: "net-g", now: T0 + 3 });
+    const fromArjun = await challenges.create({
+      from: ARJUN,
+      gameId: "chess",
+      options: CHESS,
+      to: "Riya",
+      now: T0 + 4,
+    });
+    emitted.length = 0;
+
+    const ended = await challenges.playerSuspended({ playerId: RIYA.id, now: T0 + 5 });
+
+    expect(ended).toBe(2);
+    const stateOf = async (id) => stateAt(await accessor.get(id), T0 + 6);
+    expect(await stateOf(link.id)).toBe(CHALLENGE_STATES.WITHDRAWN);
+    expect(await stateOf(toArjun.id)).toBe(CHALLENGE_STATES.WITHDRAWN);
+    expect(await stateOf(taken.id)).toBe(CHALLENGE_STATES.ACCEPTED);
+    // Sent to the suspended player: it waits and expires, as for anyone who does not answer.
+    expect(await stateOf(fromArjun.id)).toBe(CHALLENGE_STATES.OPEN);
+    // Arjun sees the challenge for him end as a take-back, the same as any withdrawal.
+    expect(emitted.map((event) => event.challenge.challengeId).sort()).toEqual([link.id, toArjun.id].sort());
   });
 });

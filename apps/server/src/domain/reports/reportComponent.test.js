@@ -84,6 +84,7 @@ let ids = 0;
 function setup({ rooms = { ROOM22: room() }, matches = {}, profiles = fakeProfiles(), moves = {} } = {}) {
   const dao = createInMemoryReportDao();
   const renamed = [];
+  const suspended = [];
   const reports = createReportComponent({
     reportAccessor: createReportAccessor({ reportDao: dao }),
     coPlayers: createCoPlayers({
@@ -102,6 +103,21 @@ function setup({ rooms = { ROOM22: room() }, matches = {}, profiles = fakeProfil
         return "Player_ABCDEF";
       },
     },
+    suspensions: {
+      async suspend(input) {
+        suspended.push(input);
+        // The suspension component names the account as it is now, whatever the reports say (review of CC-334).
+        if (suspended.length > 1) {
+          throw new ConflictError("This account is suspended already. Lift it first", {
+            details: { appliedAgain: true },
+          });
+        }
+        return { suspension: { suspensionId: "s-1", nameThen: "Arjun now" }, failed: [] };
+      },
+      historyOf: async ({ playerId }) => [
+        { suspensionId: `history of ${playerId === ARJUN.id ? "Arjun" : "?"}` },
+      ],
+    },
     newReportId: () => `00000000-0000-4000-d000-${String(++ids).padStart(12, "0")}`,
     newUuid: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, "0")}`,
   });
@@ -110,7 +126,7 @@ function setup({ rooms = { ROOM22: room() }, matches = {}, profiles = fakeProfil
     seat: index,
     seatId: SEAT_IDS.seatIdOf(rooms[code] ?? room(), (rooms[code] ?? room()).seats[index]?.playerId ?? ""),
   });
-  return { reports, dao, renamed, inRoom };
+  return { reports, dao, renamed, suspended, inRoom };
 }
 
 const stringsIn = (value) =>
@@ -386,22 +402,22 @@ describe("reportComponent.reportedBy: the one-tap block after a report (ADR-071.
   });
 });
 
-describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
-  async function threeReports() {
-    const fixture = setup({
-      rooms: {
-        ROOM22: room(),
-        ROOM33: room({ code: "ROOM33", seats: [seat(MEERA), seat(ARJUN)] }),
-        ROOM44: room({ code: "ROOM44", seats: [seat(RIYA), seat(GUEST)], requests: [] }),
-      },
-    });
-    const { reports, inRoom } = fixture;
-    await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 });
-    await reports.report({ reporter: MEERA, target: inRoom(1, "ROOM33"), reason: "cheating", now: T0 + 10 });
-    await reports.report({ reporter: RIYA, target: inRoom(1, "ROOM44"), reason: "other", now: T0 + 20 });
-    return fixture;
-  }
+async function threeReports() {
+  const fixture = setup({
+    rooms: {
+      ROOM22: room(),
+      ROOM33: room({ code: "ROOM33", seats: [seat(MEERA), seat(ARJUN)] }),
+      ROOM44: room({ code: "ROOM44", seats: [seat(RIYA), seat(GUEST)], requests: [] }),
+    },
+  });
+  const { reports, inRoom } = fixture;
+  await reports.report({ reporter: RIYA, target: inRoom(1), reason: "name", now: T0 });
+  await reports.report({ reporter: MEERA, target: inRoom(1, "ROOM33"), reason: "cheating", now: T0 + 10 });
+  await reports.report({ reporter: RIYA, target: inRoom(1, "ROOM44"), reason: "other", now: T0 + 20 });
+  return fixture;
+}
 
+describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
   it("groups open reports by reported player, counts reasons and reporters, and sends no player id", async () => {
     const { reports } = await threeReports();
 
@@ -487,6 +503,106 @@ describe("reportComponent.queue and act: the owner's view (ADR-071.6)", () => {
       reports.act({ reportId: "00000000-0000-4000-d000-ffffffffffff", action: "dismiss", now: T0 }),
     ).rejects.toBeInstanceOf(NotFoundError);
     expect(renamed).toEqual([]);
+  });
+});
+
+describe("reportComponent.suspend: the owner suspends a group's account (CC-334, ADR-078)", () => {
+  const OWNER = Object.freeze({ id: MEERA.id, name: "Meera" });
+
+  it("suspends the account behind a group, with the duration and reason, and closes its open reports as acted on", async () => {
+    const { reports, suspended } = await threeReports();
+    const { groups } = await reports.queue({ status: "open", page: 0 });
+    const arjun = groups.find((group) => group.names.includes("Arjun"));
+
+    const result = await reports.suspend({
+      reportId: arjun.groupId,
+      duration: "7d",
+      reason: "harassment",
+      by: OWNER,
+      now: T0 + 99,
+    });
+
+    expect(result).toEqual({
+      suspension: { suspensionId: "s-1", nameThen: "Arjun now" },
+      failed: [],
+      closed: 2,
+    });
+    // No name from the reports is passed on: the suspension takes the account's own (review of CC-334).
+    expect(suspended).toEqual([
+      {
+        playerId: ARJUN.id,
+        duration: "7d",
+        reason: "harassment",
+        by: OWNER,
+        now: T0 + 99,
+      },
+    ]);
+    const actioned = await reports.queue({ status: "actioned", page: 0 });
+    expect(actioned.groups[0].items.every((item) => item.action === "suspend")).toBe(true);
+    expect(groups.find((group) => group.kind === "guest").canSuspend).toBe(false);
+    expect(arjun.canSuspend).toBe(true);
+  });
+
+  it("closes the group's open reports when a retry applies a suspension's effects again, and passes the 409 on", async () => {
+    const { reports } = await threeReports();
+    const { groups } = await reports.queue({ status: "open", page: 0 });
+    const arjun = groups.find((group) => group.names.includes("Arjun"));
+    const input = { reportId: arjun.groupId, duration: "7d", reason: "harassment", by: OWNER };
+    await reports.suspend({ ...input, now: T0 + 99 });
+    // A new report came in after the first try, and the owner presses Suspend on it.
+    const { reportId } = await reports.report({
+      reporter: RIYA,
+      target: { roomCode: "ROOM22", seat: 1, seatId: SEAT_IDS.seatIdOf(room(), ARJUN.id) },
+      reason: "other",
+      now: T0 + DAY_MS,
+    });
+
+    const again = await reports.suspend({ ...input, reportId, now: T0 + DAY_MS + 1 }).catch((err) => err);
+
+    expect(again).toBeInstanceOf(ConflictError);
+    expect(again.details).toEqual({ appliedAgain: true });
+    expect((await reports.queue({ status: "open", page: 0 })).groups.map((group) => group.names)).toEqual([
+      ["Guest-T001"],
+    ]);
+  });
+
+  it("can suspend from a group that is closed already, and shows the player's history by the report's id", async () => {
+    const { reports, suspended } = await threeReports();
+    const { groups } = await reports.queue({ status: "open", page: 0 });
+    const arjun = groups.find((group) => group.names.includes("Arjun"));
+    await reports.act({ reportId: arjun.groupId, action: "rename", now: T0 + 50 });
+
+    const result = await reports.suspend({
+      reportId: arjun.groupId,
+      duration: "24h",
+      reason: "name",
+      by: OWNER,
+      now: T0 + 99,
+    });
+
+    expect(result.closed).toBe(0);
+    expect(suspended).toHaveLength(1);
+    expect(await reports.suspensionsOf({ reportId: arjun.groupId, now: T0 + 99 })).toEqual([
+      { suspensionId: "history of Arjun" },
+    ]);
+  });
+
+  it("refuses a guest's group, and an unknown report", async () => {
+    const { reports, suspended } = await threeReports();
+    const { groups } = await reports.queue({ status: "open", page: 0 });
+    const guest = groups.find((group) => group.kind === "guest");
+    const input = { duration: "24h", reason: "other", by: OWNER, now: T0 };
+
+    await expect(reports.suspend({ ...input, reportId: guest.groupId })).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+    await expect(
+      reports.suspend({ ...input, reportId: "00000000-0000-4000-d000-ffffffffffff" }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      reports.suspensionsOf({ reportId: "00000000-0000-4000-d000-ffffffffffff", now: T0 }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(suspended).toEqual([]);
   });
 });
 

@@ -598,6 +598,33 @@ export function createFriendComponent({
     },
 
     /**
+     * The owner suspended the player's account (CC-334, ADR-078 decision 5): every request they sent that still
+     * waits is withdrawn, as if they took it back, and their friend links stop working. Their friendships stay
+     * (their data is kept), and friends see them offline because their tabs are gone. Requests sent to them run out
+     * as unanswered ones do.
+     *
+     * @param {{ playerId: string, now: number }} input
+     * @returns {Promise<{ requests: number, links: number }>}
+     */
+    async playerSuspended({ playerId, now }) {
+      const sent = await friendAccessor.sentBy({ senderId: playerId, statuses: WAITING, now });
+      let requests = 0;
+      for (const request of sent) {
+        const withdrawn = await friendAccessor.updateRequest({
+          requestId: request.requestId,
+          statuses: WAITING,
+          set: { status: FRIEND_REQUEST_STATUS.WITHDRAWN },
+        });
+        if (withdrawn) {
+          requests += 1;
+          changed(...(request.status === FRIEND_REQUEST_STATUS.PENDING ? [request.recipientId] : []));
+        }
+      }
+      const links = await friendAccessor.keepNewestLinks({ creatorId: playerId, keep: 0 });
+      return { requests, links };
+    },
+
+    /**
      * The player's friends data for their export (CC-035): their friends and the requests they sent, by name and
      * date, their open friend links by date, and their switch. Never an id or a token.
      *
