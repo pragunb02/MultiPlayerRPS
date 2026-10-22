@@ -8,7 +8,6 @@ import {
 } from "./chess/chessAlerts.js";
 import { ChessOptions } from "./chess/ChessOptions.jsx";
 import { chessTurnLabel } from "./chess/chessPassAndPlay.js";
-import { CHESS_HOW_TO_PLAY, RPS_HOW_TO_PLAY, TICTACTOE_HOW_TO_PLAY } from "./howToPlay.js";
 import { lazyBoard, lazyEngine } from "./lazyBoard.js";
 import { RPS_OUTCOME_TEXT, rpsReasonPhrase, rpsSounds } from "./rps/rpsAlerts.js";
 import { rpsHandOverNote } from "./rps/rpsPassAndPlay.js";
@@ -23,6 +22,10 @@ import {
 const RpsBoard = lazyBoard(() => import("./rps/RpsBoard.jsx"), "RpsBoard");
 const TicTacToeBoard = lazyBoard(() => import("./tictactoe/TicTacToeBoard.jsx"), "TicTacToeBoard");
 const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard");
+
+// How to play loads with the pages that show it (a lobby, an invite, a match), not with the first page, because the
+// registry is in the first download for the request banners (CC-349).
+const howToPlayOf = (gameId) => () => import("./howToPlay.js").then((module) => module.howToPlayFor(gameId));
 
 // The engines for pass and play load the same way, only when two people start a game on one phone (CC-223).
 const RPS_PASS_AND_PLAY = Object.freeze({
@@ -55,8 +58,9 @@ const CHESS_PASS_AND_PLAY = Object.freeze({
  *   in the result headline, such as "by checkmate" (CC-162)
  * @property {import("./outcomeLine.js").OutcomeText} [outcomeText]  the words of the game's endings in the
  *   outcome moment, and a computer character's tip after a loss (CC-163). Without it the moment uses plain words
- * @property {ReadonlyArray<import("./howToPlay.js").HowToPlayStep>} [howToPlay]  the lobby's three short steps
- *   for a first-time player (CC-259)
+ * @property {() => Promise<ReadonlyArray<import("./howToPlay.js").HowToPlayStep>>} [loadHowToPlay]  the game's
+ *   How to play, 1 to 3 short steps for a first-time player (CC-259, CC-349), loaded on demand. The pages draw them
+ *   from `games/howToPlay.js`, which only the pages that show them import
  * @property {(room: any) => ReadonlyArray<import("../components/MatchShell/matchShell.js").GameAction>} [actions]
  *   the game's buttons in the action bar while a seated player plays, at most three (Leave takes the fourth place)
  * @property {(room: any) => { text: string } | undefined} [inGameScore]  the score inside one game, such as the
@@ -106,7 +110,7 @@ export const GAME_VIEWS = Object.freeze({
     soundsFor: rpsSounds,
     reasonPhrase: rpsReasonPhrase,
     outcomeText: RPS_OUTCOME_TEXT,
-    howToPlay: RPS_HOW_TO_PLAY,
+    loadHowToPlay: howToPlayOf(GAME_IDS.RPS),
     passAndPlay: RPS_PASS_AND_PLAY,
   }),
   [GAME_IDS.TIC_TAC_TOE]: Object.freeze({
@@ -114,7 +118,7 @@ export const GAME_VIEWS = Object.freeze({
     soundsFor: tictactoeSounds,
     reasonPhrase: tictactoeReasonPhrase,
     outcomeText: TICTACTOE_OUTCOME_TEXT,
-    howToPlay: TICTACTOE_HOW_TO_PLAY,
+    loadHowToPlay: howToPlayOf(GAME_IDS.TIC_TAC_TOE),
     passAndPlay: TICTACTOE_PASS_AND_PLAY,
   }),
   [GAME_IDS.CHESS]: Object.freeze({
@@ -124,7 +128,7 @@ export const GAME_VIEWS = Object.freeze({
     requestTexts: CHESS_REQUEST_TEXTS,
     reasonPhrase: chessReasonPhrase,
     outcomeText: CHESS_OUTCOME_TEXT,
-    howToPlay: CHESS_HOW_TO_PLAY,
+    loadHowToPlay: howToPlayOf(GAME_IDS.CHESS),
     actions: chessActions,
     passAndPlay: CHESS_PASS_AND_PLAY,
   }),

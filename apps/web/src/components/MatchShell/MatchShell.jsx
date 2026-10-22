@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { getGame, ROOM_STATUS } from "@classicade/shared";
 import { outcomeMoment } from "../../games/outcomeMoment.js";
 import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
 import { gameNumber, matchPhase, PLAY_REASONS } from "../../games/roomView.js";
+import { useServices } from "../../app/servicesContext.js";
 import { useAction } from "../../hooks/useAction.js";
+import { useFlag } from "../../hooks/useFlag.js";
 import { ResultCelebration } from "../Celebrations/ResultCelebration.jsx";
 import { ClaimWin } from "../ClaimWin/ClaimWin.jsx";
 import { ComputerNote } from "../ComputerNote/ComputerNote.jsx";
@@ -33,6 +35,26 @@ function useSawItEnd(room) {
 function requestState(room) {
   if (incomingRequests(room).length > 0) return "incoming";
   return outgoingRequests(room).length > 0 ? "outgoing" : "none";
+}
+
+/**
+ * The match bar's How to play, while the `how_to_play` flag is on (CC-349). Its first opening on this page counts
+ * once as the flag's success, with no id of anyone.
+ *
+ * @returns {{ onOpen: () => void } | undefined} undefined while the flag is off
+ */
+function useHowToPlay() {
+  const { api } = useServices();
+  const on = useFlag("how_to_play");
+  const counted = useRef(false);
+  if (!on) return undefined;
+  return {
+    onOpen: () => {
+      if (counted.current) return;
+      counted.current = true;
+      api.sendFlagSuccess("how_to_play").catch(() => undefined);
+    },
+  };
 }
 
 /**
@@ -89,6 +111,7 @@ export function MatchShell({
   const moment = layout.result ? outcomeMoment(room) : undefined;
   const dimmed = moment?.effect === "dim";
   const sawItEnd = useSawItEnd(room);
+  const howToPlay = useHowToPlay();
 
   /** What a request button does (RoomAction): a game move, asking for something, or answering a request. */
   function act(action) {
@@ -126,6 +149,7 @@ export function MatchShell({
         </>
       }
       score={score?.text}
+      howToPlay={howToPlay}
       result={
         moment === undefined
           ? undefined

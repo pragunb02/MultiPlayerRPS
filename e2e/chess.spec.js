@@ -14,7 +14,7 @@ const isMobile = (testInfo) => formFactor(testInfo) === "mobile";
 async function startChess(players, { timeControl = "blitz-5+0" } = {}) {
   const alice = await players.open("alice");
   await alice.page.goto("/games/chess");
-  await alice.page.getByRole("combobox", { name: "Time control" }).selectOption(timeControl);
+  await alice.page.getByRole("combobox", { name: "Clock for each player" }).selectOption(timeControl);
   await alice.page.getByRole("button", { name: "Create room" }).click();
   const invite = await alice.page.getByRole("textbox", { name: "Invite link" }).inputValue();
   const bob = await players.open("bob");

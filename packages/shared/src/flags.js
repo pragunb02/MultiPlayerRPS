@@ -91,6 +91,18 @@ export const FLAGS = Object.freeze([
     client: true,
     success: "The owner opened a dialog on the Design page.",
   }),
+  Object.freeze({
+    name: "how_to_play",
+    description:
+      "Shows How to play as one line near the top of each game's lobby, on an invite and a challenge link, and as a How to play button in every match.",
+    ticket: "CC-349",
+    default: false,
+    removeBy: "2027-01-15",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: true,
+    success: "A player opened How to play during a match.",
+  }),
 ]);
 
 const NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;

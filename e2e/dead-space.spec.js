@@ -83,16 +83,18 @@ for (const form of Object.keys(SIZES)) {
         }
       });
 
-      screen("lobby: a How to play strip of three steps under the cards", async ({ page }) => {
+      screen("lobby: How to play above the cards, opening to three steps", async ({ page }) => {
         for (const slug of ["rock-paper-scissors", "tic-tac-toe", "chess"]) {
           await page.goto(`/games/${slug}`);
-          const strip = page.getByRole("region", { name: "How to play" });
+          // One line under the title that opens in place (CC-349, the how_to_play flag is on in browser tests).
+          const strip = page.locator("[data-cc-slot='how-to-play']");
+          await page.getByText("How to play: 3 steps").click();
           const steps = strip.getByRole("listitem");
 
           await expect(steps).toHaveCount(3);
-          const cards = await page.getByRole("heading", { level: 2, name: "Join a friend" }).boundingBox();
+          const cards = await page.getByRole("heading", { level: 2, name: "Play a friend" }).boundingBox();
           const stripBox = await strip.boundingBox();
-          expect(stripBox.y, slug).toBeGreaterThan(cards.y);
+          expect(stripBox.y, slug).toBeLessThan(cards.y);
           if (form === "desktop") {
             // Three steps side by side, across the page.
             expect(await trackCount(strip.getByRole("list")), slug).toBe(3);

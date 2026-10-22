@@ -227,7 +227,7 @@ test("a guest's home and lobby, and a room waiting for a friend", async ({ playe
   await matchesBaselines(page, "home-guest");
 
   await page.goto("/games/chess");
-  await expect(page.getByRole("combobox", { name: /time control/i })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: /clock for each player/i })).toBeVisible();
   await matchesBaselines(page, "lobby-chess");
 
   await createRoom(host, "tic-tac-toe");

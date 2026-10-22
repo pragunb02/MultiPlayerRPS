@@ -8,6 +8,7 @@ import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { CHALLENGE_COPY } from "../../components/Challenges/challengeCopy.js";
+import { HowToPlayFold } from "../../components/HowToPlay/HowToPlay.jsx";
 import { useChallengeInbox } from "../../components/Challenges/challengesContext.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { Bilingual } from "../../components/Profile/Bilingual.jsx";
@@ -15,6 +16,7 @@ import { useToast } from "../../components/Toast/toastContext.js";
 import { WhatsAppLink } from "../../components/WhatsAppLink/WhatsAppLink.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { useChallenge } from "../../hooks/useChallenge.js";
+import { useFlag } from "../../hooks/useFlag.js";
 import { useSession } from "../../hooks/useSession.js";
 import { challengeText, shareMessage } from "../../lib/shareText.js";
 import styles from "./ChallengePage.module.css";
@@ -117,7 +119,7 @@ function Yours({ challenge, onChange }) {
 /**
  * Someone else's open challenge: who sent it (by name only for an adult account, ADR-028.7) and Accept and play.
  * A visitor first chooses to play as a guest or to log in, as on a room link (CC-086), and nothing is made for them
- * until they choose.
+ * until they choose. With the `how_to_play` flag on, the game's How to play is there before they choose (CC-349).
  */
 function Theirs({ challenge }) {
   const { api } = useServices();
@@ -128,6 +130,7 @@ function Theirs({ challenge }) {
   const heading = useRef(null);
   const game = gameName(challenge.gameId);
   const visitor = session.status === "anonymous";
+  const howToPlayOn = useFlag("how_to_play");
   // A visitor becomes a guest first. The page then reads the challenge again as that guest and offers Accept.
   const join = useAction(session.ensurePlayer, { id: "challenge.guest" });
   const accept = useAction(
@@ -154,6 +157,7 @@ function Theirs({ challenge }) {
         </h1>
         <Bilingual copy={CHALLENGE_COPY.challengesYou(challenge.fromName, game)} />
         <p className={styles.time}>{hoursLeft(challenge.expiresAt)}</p>
+        {howToPlayOn && <HowToPlayFold gameId={challenge.gameId} bilingual />}
         {visitor && <Bilingual copy={CHALLENGE_COPY.signInFirst} />}
         <div className={styles.actions}>
           {visitor ? (

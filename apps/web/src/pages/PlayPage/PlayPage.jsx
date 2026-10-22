@@ -7,11 +7,13 @@ import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { PlayComputer } from "../../components/PlayComputer/PlayComputer.jsx";
+import { HowToPlayFold, HowToPlayStrip } from "../../components/HowToPlay/HowToPlay.jsx";
+import { gameLeadFor } from "../../games/howToPlay.js";
 import { gameView } from "../../games/registry.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useCreateRoom } from "../../hooks/useCreateRoom.js";
+import { useFlag } from "../../hooks/useFlag.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
-import { HowToPlay } from "./HowToPlay.jsx";
 import styles from "./PlayPage.module.css";
 
 /**
@@ -19,6 +21,8 @@ import styles from "./PlayPage.module.css";
  * (CC-221). Below it: create a room with the game's options to invite a friend, or a challenge link with the same
  * options that lasts a day (CC-139), join a friend's room by code, or
  * play with someone beside you on this phone, which is not counted (CC-223).
+ * With the `how_to_play` flag on, How to play is one line under the title that opens in place, so a player can
+ * read the rules before choosing how to play (CC-349). With it off, the steps are under the cards as before.
  * Each button shows a spinner while the server works and explains a failure under it. Join room says what is
  * missing while the code is not complete (CC-164).
  */
@@ -30,6 +34,7 @@ export function PlayPage() {
   const createRoom = useCreateRoom();
   const [options, setOptions] = useState({});
   const [code, setCode] = useState("");
+  const howToPlayOn = useFlag("how_to_play");
   const create = useAction(
     async () => {
       const roomCode = await createRoom.create(game.id, options);
@@ -70,14 +75,23 @@ export function PlayPage() {
     <section className={styles.page}>
       <PageTitle>{game.name}</PageTitle>
       <div className={`${styles.banner} ${styles[gameArtFor(game.id).tone]}`}>
-        <h1>{game.name}</h1>
+        <div className={styles.titles}>
+          <h1>{game.name}</h1>
+          <p className={styles.lead}>
+            {`${gameLeadFor(game.id)} Play the computer now, or invite a friend.`.trim()}
+          </p>
+        </div>
         <GameArt gameId={game.id} className={styles.art} />
       </div>
+      {howToPlayOn && <HowToPlayFold gameId={game.id} className={styles.howToPlay} />}
       <div className={styles.panels}>
         <PlayComputer character={character} action={playComputer} />
         <div className={styles.panel}>
           <h2>Play a friend</h2>
           {Options && <Options value={options} onChange={setOptions} />}
+          <p className={styles.note}>
+            Friend online now? You get a link to send. The game starts when they open it.
+          </p>
           <Button
             control="lobby.create"
             variant="secondary"
@@ -94,6 +108,9 @@ export function PlayPage() {
         </div>
         <form className={styles.panel} onSubmit={join}>
           <h2>Join a friend</h2>
+          <p className={styles.note}>
+            Your friend sees a {ROOM_CODE_LENGTH}-character code on their invite. Type it here.
+          </p>
           <label>
             Room code
             <input
@@ -123,7 +140,9 @@ export function PlayPage() {
         {passAndPlay && (
           <div className={styles.panel}>
             <h2>Pass and play</h2>
-            <p className={styles.note}>Two players, one phone. Not counted, nothing is sent or saved.</p>
+            <p className={styles.note}>
+              Two players, one phone. Nothing is sent or saved, and it gives no XP.
+            </p>
             <Link
               to={paths.passAndPlay(game.id)}
               className={styles.link}
@@ -134,7 +153,7 @@ export function PlayPage() {
           </div>
         )}
       </div>
-      <HowToPlay gameId={game.id} />
+      {!howToPlayOn && <HowToPlayStrip gameId={game.id} />}
     </section>
   );
 }

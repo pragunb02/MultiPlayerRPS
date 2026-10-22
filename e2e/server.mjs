@@ -41,6 +41,10 @@ await seed.db.collection("accounts").insertOne({
 const week = seededWeek();
 await seed.db.collection("matches").insertMany(week.matches);
 await seed.db.collection("player_transfers").insertMany(week.transfers);
+// Features still ramping behind a flag are on in every browser test, so the suite tests what will ship (CC-349).
+await seed.db
+  .collection("feature_flags")
+  .insertOne({ name: "how_to_play", rollout: "on", updatedAt: new Date("2026-10-22T00:00:00.000Z") });
 await seed.close();
 
 resetControl();

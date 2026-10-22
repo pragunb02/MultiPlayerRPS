@@ -232,10 +232,21 @@ const askNobody = () => Promise.resolve();
  *   names: ReadonlyArray<string>,
  *   options: object,
  *   onLeave: () => void,
+ *   howToPlay?: boolean,
  * }} props  `game` is the game's registry entry, with `passAndPlay`. `names` and `options` are read once.
- *   `onLeave` opens the game's lobby
+ *   `onLeave` opens the game's lobby. `howToPlay` shows the How to play button (CC-349). Opening it sends
+ *   nothing, as nothing else here does
  */
-export function PassAndPlayShell({ gameId, gameName, game, engine, names, options, onLeave }) {
+export function PassAndPlayShell({
+  gameId,
+  gameName,
+  game,
+  engine,
+  names,
+  options,
+  onLeave,
+  howToPlay = false,
+}) {
   const match = useLocalMatch({ engine, names, options });
   const { room, holder } = match;
   const finished = room.status === ROOM_STATUS.FINISHED;
@@ -253,6 +264,7 @@ export function PassAndPlayShell({ gameId, gameName, game, engine, names, option
       gameName={gameName}
       phase={phase}
       score={turn}
+      howToPlay={howToPlay ? {} : undefined}
       result={
         finished
           ? {

@@ -79,7 +79,7 @@ test.describe("game lobby", () => {
     await page.goto("/games/rock-paper-scissors");
     await expect(page.getByRole("combobox", { name: /match length/i })).toHaveValue("3");
     await page.goto("/games/chess");
-    await expect(page.getByRole("combobox", { name: /time control/i })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: /clock for each player/i })).toBeVisible();
     await page.goto("/games/tic-tac-toe");
     await expect(page.getByRole("combobox")).toHaveCount(0);
   });

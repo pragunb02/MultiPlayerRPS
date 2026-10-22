@@ -55,7 +55,7 @@ const networkCalls = ({ api, socket }) =>
     globalThis.fetch.mock.calls.length,
   );
 
-function renderShell() {
+function renderShell({ howToPlay = false } = {}) {
   const services = { api: fakeApi(), socket: fakeSocket() };
   render(
     <ServicesProvider services={services}>
@@ -68,6 +68,7 @@ function renderShell() {
           names={["Asha", "Ben"]}
           options={{}}
           onLeave={() => {}}
+          howToPlay={howToPlay}
         />
       </MemoryRouter>
     </ServicesProvider>,
@@ -90,6 +91,23 @@ describe("PassAndPlayShell", () => {
 
     expect(networkCalls(services)).toBe(0);
     expect(screen.getByText("Board for player-1")).toBeInTheDocument();
+  });
+
+  it("shows How to play in the match bar when it is on, and opening it sends nothing (CC-349)", async () => {
+    const user = userEvent.setup();
+    const services = renderShell({ howToPlay: true });
+
+    await user.click(await screen.findByRole("button", { name: "How to play" }));
+
+    expect(screen.getByRole("dialog", { name: "How to play Tic Tac Toe" })).toBeInTheDocument();
+    expect(networkCalls(services)).toBe(0);
+  });
+
+  it("shows no How to play when it is off", async () => {
+    renderShell();
+
+    expect(await screen.findByText("Board for player-1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "How to play" })).toBeNull();
   });
 
   it("notices a request to the server when one is made on purpose, so the test above can fail", async () => {

@@ -51,8 +51,8 @@ export function PlayComputer({ character, action }) {
         Play {character.name}
       </Button>
       <p className={styles.note}>
-        Games against the computer count for quests and up to {BOT_DAILY_XP} XP a day. They never count on
-        leaderboards.
+        Wins here earn XP (points that level you up), up to {BOT_DAILY_XP} a day, and count for daily quests.
+        They never count on leaderboards.
       </p>
     </section>
   );

@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeSocket } from "../../testing/fakes.js";
+import { flagPaths } from "../../testing/flagPaths.js";
 import { renderApp } from "../../testing/render.jsx";
 
 describe("PlayPage", () => {
@@ -41,7 +42,7 @@ describe("PlayPage", () => {
   it("shows the game's banner with its art and accent", () => {
     renderApp({ path: "/games/tic-tac-toe" });
 
-    const banner = screen.getByRole("heading", { level: 1, name: "Tic Tac Toe" }).parentElement;
+    const banner = screen.getByRole("heading", { level: 1, name: "Tic Tac Toe" }).parentElement.parentElement;
     expect(banner).toHaveClass("tictactoe");
     expect(banner.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
@@ -49,7 +50,9 @@ describe("PlayPage", () => {
   it("offers chess time controls", () => {
     renderApp({ path: "/games/chess" });
 
-    expect(screen.getByRole("combobox", { name: /time control/i })).toHaveDisplayValue("Blitz 5 min");
+    expect(screen.getByRole("combobox", { name: /clock for each player/i })).toHaveDisplayValue(
+      "Blitz: 5 min each",
+    );
   });
 
   it("creates a chess room with the chosen time control", async () => {
@@ -60,7 +63,10 @@ describe("PlayPage", () => {
     );
     renderApp({ path: "/games/chess", socket });
 
-    await user.selectOptions(screen.getByRole("combobox", { name: /time control/i }), "Rapid 15 min + 10 s");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: /clock for each player/i }),
+      "Rapid: 15 min each, +10 s a move",
+    );
     await user.click(screen.getByRole("button", { name: "Create room" }));
 
     expect(socket.request).toHaveBeenCalledWith("room:create", {
@@ -145,7 +151,11 @@ describe("PlayPage", () => {
 
       expect(screen.getByRole("heading", { name: "Play Queen Vee" })).toBeInTheDocument();
       expect(screen.getByText("Computer")).toBeInTheDocument();
-      expect(screen.getByText(/count for quests and up to 100 XP a day/)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Wins here earn XP \(points that level you up\), up to 100 a day, and count for daily quests/,
+        ),
+      ).toBeInTheDocument();
       expect(screen.getByText(/never count on leaderboards/)).toBeInTheDocument();
     });
 
@@ -204,6 +214,70 @@ describe("PlayPage", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Slow down");
     });
+  });
+
+  it("says under the title what the game is and the two ways to start (CC-349)", () => {
+    renderApp({ path: "/games/chess" });
+
+    expect(
+      screen.getByText("Checkmate the other king to win. Play the computer now, or invite a friend."),
+    ).toBeInTheDocument();
+  });
+
+  it("says what each way to play a friend does and where a code comes from (CC-349)", () => {
+    renderApp({ path: "/games/tic-tac-toe" });
+
+    expect(
+      screen.getByText("Friend online now? You get a link to send. The game starts when they open it."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Your friend sees a 6-character code on their invite. Type it here."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Two players, one phone. Nothing is sent or saved, and it gives no XP."),
+    ).toBeInTheDocument();
+  });
+
+  it("names the rounds and the chess clocks in plain words (CC-349)", () => {
+    renderApp({ path: "/games/rock-paper-scissors" });
+
+    const rounds = screen.getByRole("combobox", { name: /match length/i });
+    expect(
+      within(rounds)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["1 round", "Best of 3 (first to 2)", "Best of 5 (first to 3)", "Best of 7 (first to 4)"]);
+  });
+
+  flagPaths("how_to_play", (on) => {
+    const lobby = (slug) =>
+      renderApp({
+        path: `/games/${slug}`,
+        api: fakeApi({ getFlags: vi.fn().mockResolvedValue({ how_to_play: on }) }),
+      });
+
+    it(
+      on
+        ? "shows How to play as one line between the title and the cards"
+        : "keeps the steps under the cards",
+      async () => {
+        const { container } = lobby("chess");
+
+        if (on) {
+          const line = await screen.findByText("How to play: 3 steps");
+          const panels = screen.getByRole("heading", { level: 2, name: "Play a friend" });
+          // Before the cards in the page's order, so it is the first thing under the title.
+          expect(line.compareDocumentPosition(panels) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+          expect(container.querySelector("details")).not.toHaveAttribute("open");
+          expect(screen.queryByRole("region", { name: "How to play" })).not.toBeInTheDocument();
+        } else {
+          await vi.waitFor(() =>
+            expect(screen.getByRole("region", { name: "How to play" })).toBeInTheDocument(),
+          );
+          expect(screen.queryByText("How to play: 3 steps")).not.toBeInTheDocument();
+        }
+      },
+    );
   });
 
   it("shows not-found for an unknown game", () => {

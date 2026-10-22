@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
+import { flagPaths } from "../../testing/flagPaths.js";
 import { renderApp } from "../../testing/render.jsx";
 
 const BOB = { playerId: "guest_b", displayName: "Bob", connected: true };
@@ -664,6 +665,30 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     expect(document.title).toBe("Tic Tac Toe · Room AB2CD3 · ClassiCade");
     expect(api.startGuest).not.toHaveBeenCalled();
     expect(socket.request).not.toHaveBeenCalled();
+  });
+
+  flagPaths("how_to_play", (on) => {
+    it(
+      on
+        ? "shows the game's How to play before the friend chooses how to join (CC-349)"
+        : "shows no How to play on the invite",
+      async () => {
+        const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ how_to_play: on }) });
+        openInvite({ api });
+
+        await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" });
+        await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["how_to_play"]));
+        if (on) {
+          const line = await screen.findByText("How to play: 3 steps");
+          const choice = screen.getByRole("button", { name: "Play as guest" });
+          expect(line.compareDocumentPosition(choice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+          expect(within(line.closest("details")).getAllByRole("listitem")).toHaveLength(3);
+        } else {
+          await act(async () => {});
+          expect(screen.queryByText("How to play: 3 steps")).not.toBeInTheDocument();
+        }
+      },
+    );
   });
 
   it("joins as a guest after choosing to", async () => {
