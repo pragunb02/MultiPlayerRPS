@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -184,6 +185,29 @@ describe("MatchShell with a game that brings only a Board (CC-157)", () => {
     expect(within(slot("stage")).getByText("Invite here")).toBeInTheDocument();
     expect(screen.queryByText(/Board for game/)).toBeNull();
     expect(controlsIn(slot("action-bar"))).toEqual(["room.leave"]);
+  });
+
+  it("shows Leave under the stage only once the board is here, so it never moves when the board comes (CC-346)", async () => {
+    let arrive;
+    const LazyBoard = lazy(
+      () =>
+        new Promise((resolve) => {
+          arrive = () => resolve({ default: FakeBoard });
+        }),
+    );
+    const { update } = mount(roomView({ status: "waiting", seats: [ME], game: undefined }), {
+      game: { Board: LazyBoard },
+    });
+    expect(screen.getByRole("button", { name: "Leave room" })).toBeVisible();
+
+    update(roomView());
+
+    expect(screen.getByText("Loading the board…")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Leave room" })).toBeNull();
+    await act(async () => arrive());
+    expect(within(slot("stage")).getByText("Board for game 1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Leave room" })).toBeVisible();
+    expect(screen.queryByText("Loading the board…")).toBeNull();
   });
 
   it("says so when the game has no board in the web app yet", () => {

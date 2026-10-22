@@ -9,7 +9,8 @@ import styles from "./MatchShell.module.css";
 
 /**
  * The game's board, loaded on demand. A new game (a rematch, or Play again on one phone) is a fresh board, not the
- * last one's, because the board is keyed by the game's number.
+ * last one's, because the board is keyed by the game's number. It waits for its download in MatchFrame's loading
+ * boundary, together with the action bar under it (CC-346).
  *
  * @param {{
  *   room: any,
@@ -27,15 +28,13 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
     );
   }
   return (
-    <Suspense fallback={<p aria-busy="true">Loading the board…</p>}>
-      <Board
-        key={gameNumber(room)}
-        room={room}
-        onMove={onMove}
-        onAsk={onAsk}
-        reason={playReason(room, { reconnecting })}
-      />
-    </Suspense>
+    <Board
+      key={gameNumber(room)}
+      room={room}
+      onMove={onMove}
+      onAsk={onAsk}
+      reason={playReason(room, { reconnecting })}
+    />
   );
 }
 
@@ -123,10 +122,21 @@ export function MatchFrame({
                 {result.footer}
               </section>
             )}
-            <div className={styles.stage} data-cc-slot="stage">
-              {stage}
-            </div>
-            {!result && actionBar}
+            {/* The board downloads when it is first shown (CC-322). Until it is here the stage says so, and the
+                action bar under it waits too: drawn above a board still on its way, Leave room moved down when the
+                board came, and a press on it landed on the board (CC-346). */}
+            <Suspense
+              fallback={
+                <div className={styles.stage} data-cc-slot="stage">
+                  <p aria-busy="true">Loading the board…</p>
+                </div>
+              }
+            >
+              <div className={styles.stage} data-cc-slot="stage">
+                {stage}
+              </div>
+              {!result && actionBar}
+            </Suspense>
           </div>
           <aside className={styles.side}>{side}</aside>
         </div>

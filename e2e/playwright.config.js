@@ -65,6 +65,11 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
     // Chromium accepts it during the handshake instead of restarting each request after the error (CC-319).
     ...(engine === "chromium" ? { launchOptions: { args: [...CHROMIUM_ACCEPTS_TEST_CERTIFICATE] } } : {}),
+    // Firefox's bounce tracking protection classified localhost as a bounce tracker now and then and said so in the
+    // console, which fails the test (CC-347). Every test player is on this one site, so it has no trackers to find.
+    ...(engine === "firefox"
+      ? { launchOptions: { firefoxUserPrefs: { "privacy.bounceTrackingProtection.mode": 0 } } }
+      : {}),
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
