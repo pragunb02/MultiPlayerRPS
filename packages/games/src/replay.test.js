@@ -37,6 +37,22 @@ describe("replayGame", () => {
     expect(tictactoeEngine.getOutcome(state).winners).toEqual(["bob"]);
   });
 
+  it("reproduces a rematch whose starter was named, against what the seed alone would give (CC-091)", () => {
+    const log = [0, 3, 1, 4, 2].map((cell, i) => ({
+      kind: "move",
+      playerId: i % 2 === 0 ? "alice" : "bob",
+      move: { cell },
+      at: T0 + i,
+    }));
+
+    const state = replayGame(tictactoeEngine, { players, options: {}, seed: 42, starter: "alice", log });
+
+    expect(tictactoeEngine.getOutcome(state).winners).toEqual(["alice"]);
+    expect(() => replayGame(tictactoeEngine, { players, options: {}, seed: 42, log })).toThrow(
+      /not a legal move/,
+    );
+  });
+
   it("reproduces timed events: a chess flag that fell while nobody moved", () => {
     const log = [
       { kind: "move", playerId: "bob", move: { type: "move", from: "e2", to: "e4" }, at: T0 },

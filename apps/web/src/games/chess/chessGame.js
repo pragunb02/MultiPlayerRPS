@@ -1,5 +1,6 @@
 import { Chess } from "chess.js";
 import { CHESS_END_REASONS as END, CHESS_TIME_CONTROLS } from "@classicade/shared";
+import { colourName, opposite } from "./chessColours.js";
 
 /**
  * Pure chess helpers for the board: geometry, history replay, material and PGN. The server decides every rule
@@ -16,8 +17,8 @@ export const PIECE_NAMES = Object.freeze({
   k: "king",
 });
 export const PROMOTION_PIECES = Object.freeze(["q", "n", "r", "b"]);
-export const colourName = (colour) => (colour === "w" ? "white" : "black");
-export const opposite = (colour) => (colour === "w" ? "b" : "w");
+// In their own module, so screens without a board use them without chess.js (CC-322).
+export { colourName, opposite };
 export const pieceImage = (colour, type) => `/pieces/${colour}${type.toUpperCase()}.png`;
 
 const PIECE_VALUES = Object.freeze({ p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 });

@@ -61,9 +61,6 @@
   gap: var(--space-4);
   outline: none;
 }
-.handOver h2:focus {
-  outline: none;
-}
 .choices {
   display: grid;
   gap: var(--space-2);
