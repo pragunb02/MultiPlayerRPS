@@ -113,13 +113,24 @@ export function runAccountDaoContract(createDao) {
     await expect(dao.getById("not-an-id")).rejects.toThrow(RangeError);
   });
 
-  it("updates the password hash", async () => {
+  it("updates the password hash when it is still the one read", async () => {
     const dao = await createDao();
     const { accountId } = await dao.insert(account());
 
-    await dao.updatePasswordHash(accountId, "scrypt$new");
+    await dao.updatePasswordHash(accountId, { from: account().passwordHash, to: "scrypt$new" });
 
     expect((await dao.getById(accountId)).passwordHash).toBe("scrypt$new");
+  });
+
+  it("leaves a password hash that changed since it was read (CC-260)", async () => {
+    const dao = await createDao();
+    const { accountId } = await dao.insert(account());
+    await dao.updatePasswordHash(accountId, { from: account().passwordHash, to: "scrypt$changed" });
+
+    await dao.updatePasswordHash(accountId, { from: account().passwordHash, to: "scrypt$stale" });
+    await dao.updatePasswordHash("0123456789abcdef01234567", { from: "x", to: "scrypt$nobody" });
+
+    expect((await dao.getById(accountId)).passwordHash).toBe("scrypt$changed");
   });
 
   it("starts every account at session version 0 and reads only that by id (CC-116)", async () => {

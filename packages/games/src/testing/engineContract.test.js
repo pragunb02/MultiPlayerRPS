@@ -219,6 +219,41 @@ describe("checkEngineContract catches broken engines", () => {
     });
   });
 
+  describe("starter hook (CC-091)", () => {
+    // A variant that takes a starter: the named player moves first, otherwise the seed decides.
+    const withStarter = (overrides) =>
+      broken({
+        init: (setup) => ({
+          ...raceEngine.init(setup),
+          ...(setup.starter !== undefined && { turn: setup.players.indexOf(setup.starter) }),
+        }),
+        starterOf: (state) => state.players[state.turn],
+        ...overrides,
+      });
+    const STARTER_CHECK = "lets a named starter move first, and starterOf names who started";
+
+    it("accepts a well-behaved hook", () => {
+      expect(violatedChecks(withStarter({}))).toEqual([]);
+    });
+
+    it("catches an init that ignores the starter it was given", () => {
+      expect(violatedChecks(withStarter({ init: raceEngine.init }))).toContain(STARTER_CHECK);
+    });
+
+    it("catches a starterOf that names someone outside the game", () => {
+      expect(violatedChecks(withStarter({ starterOf: () => "not-a-player" }))).toContain(STARTER_CHECK);
+    });
+
+    it("catches a starter who is named but does not move first", () => {
+      const both = withStarter({ activePlayers: (state) => [...state.players] });
+
+      expect(checkEngineContract(both, scenario)).toContainEqual({
+        check: STARTER_CHECK,
+        message: "alice was named the starter but is not the only player to move",
+      });
+    });
+  });
+
   it("collects every violation instead of stopping at the first", () => {
     const veryBroken = broken({ validateMove: () => ok({ add: 1 }) });
 
@@ -226,6 +261,6 @@ describe("checkEngineContract catches broken engines", () => {
   });
 
   it("exposes the list of checks", () => {
-    expect(CONTRACT_CHECK_NAMES).toHaveLength(15);
+    expect(CONTRACT_CHECK_NAMES).toHaveLength(16);
   });
 });

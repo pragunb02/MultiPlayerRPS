@@ -6,6 +6,7 @@ node_modules
 coverage
 apps/server/build-info.json
 dist
+apps/web/bundle-report.json
 *.log
 .idea/
 .claude/settings.local.json
