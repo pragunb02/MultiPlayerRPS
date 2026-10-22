@@ -84,6 +84,9 @@ the text grows and shrinks with the picture.
 | `--elevation-2` | `--shadow-md`                      | A raised panel, a toast    |
 | `--elevation-3` | `--shadow-md` and `--glow-primary` | A dialog over the page     |
 
+`--glow-current` (CC-324) is the soft halo on the current item of the header and its menus, quieter than
+`--glow-primary`. It marks where the player is, never a status, and always comes with `aria-current`.
+
 ### Layers
 
 Every `z-index` is one of these. The order is the one the app had before CC-314, written once.

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "react-router";
 import { FRIEND_ANSWERS, SHARE_CHANNELS } from "@classicade/shared";
 import { paths, withShareChannel } from "../../app/paths.js";
@@ -30,6 +30,36 @@ function GuestPrompt() {
         </Link>
       </p>
     </div>
+  );
+}
+
+/**
+ * Someone with no session at all (CC-324): what friends are for, and one way in, back to this page after. Shaped as
+ * the contract's empty state: what this is, how it fills, one button (CONTRACT.md §2).
+ *
+ * TODO(CC-323): use the shared EmptyState once CC-323 merges it, and delete this local one and its styles.
+ */
+function VisitorEmpty() {
+  const titleId = useId();
+  return (
+    <section className={styles.empty} aria-labelledby={titleId}>
+      <h2 id={titleId} className={styles.emptyTitle}>
+        {FRIENDS_COPY.visitor.title}
+      </h2>
+      <Bilingual copy={FRIENDS_COPY.visitor} />
+      <p className={styles.actions}>
+        <Link
+          to={paths.signup(paths.friends())}
+          className={styles.emptyCta}
+          data-cc-control="friends.visitor_signup"
+        >
+          Sign up
+        </Link>
+        <Link to={paths.login(paths.friends())} data-cc-control="friends.visitor_login">
+          Log in
+        </Link>
+      </p>
+    </section>
   );
 }
 
@@ -293,6 +323,8 @@ export function FriendsPage() {
   let body;
   if (friends.status === "loading") {
     body = <p>Loading…</p>;
+  } else if (friends.status === "visitor") {
+    body = <VisitorEmpty />;
   } else if (friends.status === "guest") {
     body = <GuestPrompt />;
   } else if (friends.status === "error") {
@@ -300,7 +332,7 @@ export function FriendsPage() {
       <p role="alert">
         Couldn&apos;t load your friends. {friends.error.message}{" "}
         <Button control="friends.retry" variant="secondary" onClick={friends.retry}>
-          Retry
+          Try again
         </Button>
       </p>
     );

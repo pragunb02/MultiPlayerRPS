@@ -17,6 +17,7 @@ export const SessionContext = createContext(null);
  *   signup: (credentials: object) => Promise<SignedIn>,
  *   login: (credentials: object) => Promise<SignedIn>,
  *   logout: () => Promise<void>,
+ *   recheck: () => void,
  * }}
  */
 export function useSession() {

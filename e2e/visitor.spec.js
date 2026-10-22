@@ -13,9 +13,10 @@ test.describe("first-time visitor", () => {
     await page.getByRole("link", { name: "Chess" }).click();
     await expect(page).toHaveURL("/games/chess");
     await expect(page).toHaveTitle("Chess · ClassiCade");
-    await expect(
-      page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Games" }),
-    ).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("banner").locator('[data-cc-control="header.games"]')).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
 
     await page.goBack();
     await expect(page).toHaveURL("/");

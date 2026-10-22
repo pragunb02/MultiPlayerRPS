@@ -107,3 +107,38 @@
   align-items: center;
   gap: var(--space-4);
 }
+/* TODO(CC-323): the visitor's empty state, until the shared EmptyState replaces it (CC-324). */
+.empty {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevation-1);
+}
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-title);
+  line-height: var(--leading-tight);
+}
+.empty .actions {
+  justify-content: center;
+}
+.emptyCta {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-primary-contrast);
+  box-shadow: var(--shadow-press-accent);
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.emptyCta:hover {
+  transform: translateY(-2px);
+}

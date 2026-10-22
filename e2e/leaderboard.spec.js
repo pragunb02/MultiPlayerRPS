@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.js";
+import { expect, header, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
 
 // Leaderboards (CC-053): public boards with one URL each. Accounts climb them, and so do guests under the name the
@@ -42,7 +42,7 @@ test.describe("leaderboards", () => {
     const { page } = visitor;
     await page.goto("/");
 
-    await page.getByRole("banner").getByRole("link", { name: "Leaderboards" }).click();
+    await (await header(page)).getByRole("link", { name: "Leaderboards" }).click();
     await at(page, "/leaderboards/overall", "Overall XP");
     const tabs = boardTabs(page).getByRole("link");
     await expect(tabs).toHaveCount(TABS.length);
@@ -123,6 +123,16 @@ test.describe("leaderboards", () => {
     }).toPass({ timeout: 10_000 });
     await expect(guestRow(bob.page)).toHaveAttribute("aria-current", "true");
     await expect(guestRow(bob.page)).toContainText(`${bobName}you`);
+    // The "you" tag stays one word on one line on a phone, wider than it is tall (CC-324: at 390 it stacked Y, O, U).
+    const viewport = bob.page.viewportSize();
+    await bob.page.setViewportSize({ width: 390, height: 844 });
+    const tag = guestRow(bob.page).getByText("you", { exact: true });
+    await expect(async () => {
+      const box = await tag.boundingBox();
+      expect(box.height, "the tag is one line").toBeLessThanOrEqual(24);
+      expect(box.width, "the tag is wider than it is tall").toBeGreaterThan(box.height);
+    }).toPass({ timeout: 2_000 });
+    await bob.page.setViewportSize(viewport);
     const nudge = bob.page.getByText(/to keep your place on the boards/);
     await expect(nudge).toBeVisible();
     // A win is 30 XP and the day's quests may add a bonus (CC-089). The guest earned all of it this week.

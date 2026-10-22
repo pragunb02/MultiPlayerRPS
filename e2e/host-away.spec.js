@@ -1,4 +1,4 @@
-import { createRoom, expect, joinAsGuest, test } from "./fixtures.js";
+import { createRoom, expect, header, joinAsGuest, test } from "./fixtures.js";
 
 // BUG-17: a game started after the host had left the waiting room (CC-112). A game now starts only with everyone
 // there, and leaving the room page leaves a waiting room.
@@ -9,7 +9,7 @@ test.describe("a host who is not there any more", () => {
     const host = await players.open("host");
     const room = await createRoom(host, "tic-tac-toe");
 
-    await host.page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Games" }).click();
+    await (await header(host.page)).getByRole("link", { name: "Games" }).click();
     await expect(host.page).toHaveURL("/");
 
     const friend = await players.open("friend");

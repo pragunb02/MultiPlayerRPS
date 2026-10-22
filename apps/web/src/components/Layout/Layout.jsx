@@ -1,17 +1,15 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { paths, returnPathFor } from "../../app/paths.js";
 import { Logo, LogoMark } from "../../art/Logo.jsx";
 import { Svg } from "../../art/Svg.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { useDisclosureMenu } from "../../hooks/useDisclosureMenu.js";
+import { useMediaQuery } from "../../hooks/useMediaQuery.js";
 import { useSession } from "../../hooks/useSession.js";
-import { Button } from "../Button/Button.jsx";
 import { ChallengesProvider } from "../Challenges/ChallengesProvider.jsx";
 import { ConnectionBanner } from "../ConnectionBanner/ConnectionBanner.jsx";
-import { FeedbackDialog } from "../Feedback/FeedbackDialog.jsx";
-import { FEEDBACK_TEXT } from "../Feedback/feedbackText.js";
 import { Inbox } from "../Inbox/Inbox.jsx";
 import { SiteFooter } from "../Footer/SiteFooter.jsx";
 import { LevelChip } from "../LevelChip/LevelChip.jsx";
@@ -19,8 +17,12 @@ import { PageAnnouncer } from "../PageAnnouncer/PageAnnouncer.jsx";
 import { useSaveProgress } from "../SaveProgress/saveProgressContext.js";
 import { InGameProvider } from "../SiteRequests/InGameProvider.jsx";
 import { SiteRequests } from "../SiteRequests/SiteRequests.jsx";
-import { SoundControl } from "../SoundControl/SoundControl.jsx";
+import { SoundPopover } from "../SoundControl/SoundControl.jsx";
 import { WakingUp } from "../WakingUp/WakingUp.jsx";
+import { AccountMenu } from "./AccountMenu.jsx";
+import { currentIf, HEADER_ROW_LINKS, HEADER_WIDE, SECTIONS, sectionOf } from "./headerLayout.js";
+import { HeaderMenu, PlayLinks } from "./HeaderMenu.jsx";
+import { LazyFeedbackDialog } from "./LazyFeedbackDialog.jsx";
 import styles from "./Layout.module.css";
 
 /** Three bars: the menu button's picture. */
@@ -43,10 +45,13 @@ function identityAnnouncement(identity) {
 /**
  * App shell: header with brand, navigation and who you are. Pages render into <Outlet />. Under the header sit the
  * player's own connection (CC-158) and the requests other players sent them from rooms they are not looking at
- * (CC-207), so both reach them on every page. On a phone the header is one row (CC-259): the sound controls, your
- * level and name, Log in and Sign up move into a menu behind one button. On a wider screen the same controls sit in
- * the row and the button is not shown. A player has an inbox in the header row on every screen size, for the
- * challenges that wait for them (CC-139, CC-207).
+ * (CC-207), so both reach them on every page.
+ *
+ * The header (CC-324, rebuilt from the October audit) fits every width from 320 to 1440 px without scrolling
+ * sideways. From 64rem it is one row: the game links, the inbox, the sound pill, the level and the account menu.
+ * Under 64rem it is compact: the brand, the game links (from 40rem), the inbox and a Menu button, with everything
+ * else in the menu's groups. Which one shows is read during render (useMediaQuery), so each control is in the page
+ * once.
  */
 export function Layout() {
   return (
@@ -63,19 +68,24 @@ function Shell() {
   const session = useSession();
   const navigate = useNavigate();
   const location = useLocation();
+  const wide = useMediaQuery(HEADER_WIDE);
+  const rowLinks = useMediaQuery(HEADER_ROW_LINKS);
   const next = returnPathFor(location);
-  // "Games" covers the catalog and everything inside a game (lobby, rooms).
-  const inGames = location.pathname === paths.home() || location.pathname.startsWith("/games/");
+  const section = sectionOf(location.pathname);
   const identity = session.identity;
-  const adminAccess = useAdminAccess();
+  const admin = useAdminAccess() === ADMIN_ACCESS.ADMIN;
   // A guest with XP has something to lose: the same sign-up link, worded as what it does for them (CC-097).
   const save = useSaveProgress();
   const hasProgress = save.guest && (save.progress?.xp ?? 0) > 0;
   const { open: menuOpen, toggle: toggleMenu, close: closeMenu, buttonRef, panelRef } = useDisclosureMenu();
+  // A tablet turned to a wide screen has no menu any more: it closes, so nothing listens for its panel.
+  useEffect(() => {
+    if (wide) closeMenu();
+  }, [wide, closeMenu]);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const openFeedback = () => setFeedbackOpen(true);
-  // From the phone's menu: the menu closes first and its button takes the focus, so the dialog gives the focus
-  // back to a button that is still on screen when it closes (CC-290).
+  // From the menu: the menu closes first and its button takes the focus, so the dialog gives the focus back to a
+  // button that is still on screen when it closes (CC-290).
   const openFeedbackFromMenu = () => {
     if (menuOpen) {
       closeMenu();
@@ -92,100 +102,103 @@ function Shell() {
     { id: "header.logout" },
   );
 
+  const signedOutLinks = session.status !== "loading" && identity?.kind !== "user" && (
+    <>
+      <Link to={paths.login(next)} className={styles.login} data-cc-control="header.login">
+        Log in
+      </Link>
+      {/* The name starts with the words on screen (label in name) and still says where it goes. */}
+      <Link
+        to={paths.signup(next)}
+        className={styles.cta}
+        data-cc-control="header.signup"
+        aria-label={hasProgress ? "Save progress — sign up" : undefined}
+      >
+        {hasProgress ? "Save progress" : "Sign up"}
+      </Link>
+    </>
+  );
+
   return (
     <div className={styles.shell}>
       <a className={styles.skip} href="#main" data-cc-control="header.skip">
         Skip to content
       </a>
-      <header className={styles.header}>
-        <Link
-          to={paths.home()}
-          className={styles.brand}
-          aria-label="ClassiCade home"
-          data-cc-control="header.home"
-        >
-          <Logo className={styles.wordmark} />
-          <LogoMark className={styles.mark} />
-        </Link>
-        <nav aria-label="Main" className={styles.nav}>
-          <Link to={paths.home()} aria-current={inGames ? "page" : undefined} data-cc-control="header.games">
-            Games
+      <header className={`${styles.header} ${wide ? styles.wide : styles.compact}`}>
+        <div className={styles.row}>
+          <Link
+            to={paths.home()}
+            className={styles.brand}
+            aria-label="ClassiCade home"
+            data-cc-control="header.home"
+          >
+            {rowLinks ? <Logo className={styles.wordmark} /> : <LogoMark className={styles.mark} />}
           </Link>
-          <NavLink to={paths.leaderboards()} data-cc-control="header.leaderboards">
-            Leaderboards
-          </NavLink>
-          {identity && (
-            <NavLink to={paths.profile()} data-cc-control="header.profile">
-              Profile
-            </NavLink>
-          )}
-          {/* Shown to admins only. Everyone else never sees a sign of the console (CC-233). */}
-          {adminAccess === ADMIN_ACCESS.ADMIN && (
-            <NavLink to={paths.admin()} data-cc-control="header.admin">
-              Console
-            </NavLink>
-          )}
-        </nav>
-        {identity && <Inbox key={identity.id} />}
-        <button
-          type="button"
-          ref={buttonRef}
-          className={styles.menuButton}
-          aria-label={hasProgress ? "Menu, with Save progress" : "Menu"}
-          title={hasProgress ? "Save your progress: sign up from this menu" : undefined}
-          aria-expanded={menuOpen}
-          aria-controls="header-menu"
-          data-cc-control="header.menu"
-          onClick={toggleMenu}
-        >
-          <MenuIcon />
-          {/* A guest with XP sees a dot on the button, so the Save progress nudge inside is not missed (CC-097). */}
-          {hasProgress && <span className={styles.menuDot} aria-hidden="true" />}
-        </button>
-        <div id="header-menu" ref={panelRef} className={`${styles.player} ${menuOpen ? styles.open : ""}`}>
-          {/* The laptop's row has no room for a fourth link, so Friends is on the profile there, and in the phone's
-              menu here (CC-052). A guest finds there how to save their progress to add friends. */}
-          {identity && (
-            <NavLink to={paths.friends()} className={styles.menuOnly} data-cc-control="header.menu_friends">
-              Friends
-            </NavLink>
-          )}
-          <SoundControl />
-          {identity && <LevelChip key={identity.id} />}
-          <div className={styles.identity}>
-            {identity && (
-              <span className={styles.name} title={identity.kind === "guest" ? "Guest" : "Account"}>
-                {identity.displayName}
-              </span>
-            )}
-            {session.status !== "loading" && identity?.kind !== "user" && (
-              <>
-                <Link to={paths.login(next)} data-cc-control="header.login">
-                  Log in
-                </Link>
-                {/* The name starts with the words on screen (label in name) and still says where it goes. */}
+          {rowLinks && (
+            <nav aria-label="Main" className={styles.nav}>
+              <PlayLinks section={section} />
+              {wide && admin && (
                 <Link
-                  to={paths.signup(next)}
-                  className={styles.cta}
-                  data-cc-control="header.signup"
-                  aria-label={hasProgress ? "Save progress — sign up" : undefined}
+                  to={paths.admin()}
+                  aria-current={currentIf(SECTIONS.ADMIN, section)}
+                  data-cc-control="header.admin"
                 >
-                  {hasProgress ? "Save progress" : "Sign up"}
+                  Console
                 </Link>
+              )}
+            </nav>
+          )}
+          <div className={styles.end}>
+            {identity && <Inbox key={identity.id} />}
+            {wide ? (
+              <>
+                <SoundPopover />
+                {identity && <LevelChip key={identity.id} />}
+                {identity && (
+                  <AccountMenu
+                    identity={identity}
+                    section={section}
+                    logout={logout}
+                    onFeedback={openFeedback}
+                  />
+                )}
+                {signedOutLinks}
               </>
-            )}
-            {identity?.kind === "user" && (
-              <Button control="header.logout" variant="ghost" action={logout}>
-                Log out
-              </Button>
+            ) : (
+              <button
+                type="button"
+                ref={buttonRef}
+                className={styles.menuButton}
+                aria-label={hasProgress ? "Menu, with Save progress" : "Menu"}
+                title={hasProgress ? "Save your progress: sign up from this menu" : undefined}
+                aria-expanded={menuOpen}
+                aria-controls="header-menu"
+                data-cc-control="header.menu"
+                onClick={toggleMenu}
+              >
+                <MenuIcon />
+                {/* A guest with XP sees a dot on the button, so the Save progress nudge inside is not missed (CC-097). */}
+                {hasProgress && <span className={styles.menuDot} aria-hidden="true" />}
+              </button>
             )}
           </div>
-          <Button control="header.feedback" variant="ghost" onClick={openFeedbackFromMenu}>
-            {FEEDBACK_TEXT.open}
-          </Button>
         </div>
+        {!wide && (
+          <HeaderMenu
+            id="header-menu"
+            panelRef={panelRef}
+            open={menuOpen}
+            withPlay={!rowLinks}
+            section={section}
+            identity={identity}
+            signedOutLinks={signedOutLinks}
+            logout={logout}
+            admin={admin}
+            onFeedback={openFeedbackFromMenu}
+          />
+        )}
       </header>
-      {/* Outside the menu, which a phone hides while it is closed: a hidden region is never read out (CC-259). */}
+      {/* Outside the menu, which is hidden while it is closed: a hidden region is never read out (CC-259). */}
       <p className="visually-hidden" aria-live="polite">
         {identityAnnouncement(identity)}
       </p>
@@ -199,7 +212,7 @@ function Shell() {
       <SiteFooter onFeedback={openFeedback} />
       {/* Outside the menu, which a phone hides while it is closed, so the footer can open it too. */}
       {/* A new dialog for each player: a draft and its email never pass to whoever uses the phone next. */}
-      <FeedbackDialog
+      <LazyFeedbackDialog
         key={identity?.id ?? "visitor"}
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}

@@ -154,6 +154,14 @@ the owner may change it.
   `--type-board-*` tokens instead of exceptions. The pop-up list has 18 files, seven of them announcers. "Escape waits
   while a destructive action runs" is not built.
 
+**Amended · 2026-10-21** ([CC-324](tickets/CC-324.md), design lead, owner-delegated). The header has two
+breakpoints, 40rem and 64rem (`components/Layout/headerLayout.js`), chosen in render so each control is in the page
+once. Its panels (the sound options, the account menu, the compact menu and the inbox) are disclosures, `position:
+absolute` under `--layer-menu`, so they are not pop-ups in the contract's sense and the pop-up list does not change.
+The current header item uses a new elevation token, `--glow-current`, a halo quieter than `--glow-primary`, in both
+themes (CONTRACT.md §1, Elevation). Motion in the header stays in ADR-075's simple tier: token transitions and
+`@starting-style` entrances, no keyframes.
+
 ### ADR-075 — Effects and animation stack: CSS for simple, Motion for intermediate, our own canvas module behind one effect registry for advanced
 
 - **Status:** Accepted · 2026-10-21 (design lead, owner-delegated: the owner said on 2026-10-21 "make the

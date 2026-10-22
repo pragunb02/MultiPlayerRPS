@@ -584,6 +584,9 @@ describe("background tab (CC-104)", () => {
 });
 
 describe("sound control in the header (CC-103, CC-208)", () => {
+  // On a wide screen the volume and the settings are in the sound pill's panel (CC-324).
+  const openSoundOptions = (user) => user.click(screen.getByRole("button", { name: "Sound options" }));
+
   it("mutes and unmutes, named for what you hear", async () => {
     const user = userEvent.setup();
     const sound = fakeSound();
@@ -591,6 +594,7 @@ describe("sound control in the header (CC-103, CC-208)", () => {
 
     await user.click(screen.getByRole("button", { name: "Sound on" }));
     expect(sound.setMuted).toHaveBeenLastCalledWith(true);
+    await openSoundOptions(user);
     expect(screen.getByRole("slider", { name: "Volume" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Sound off" }));
@@ -598,9 +602,11 @@ describe("sound control in the header (CC-103, CC-208)", () => {
     expect(screen.getByRole("button", { name: "Sound on" })).toBeInTheDocument();
   });
 
-  it("sets the volume and plays a sample at the new level", () => {
+  it("sets the volume and plays a sample at the new level", async () => {
+    const user = userEvent.setup();
     const sound = fakeSound();
     renderApp({ sound });
+    await openSoundOptions(user);
 
     const slider = screen.getByRole("slider", { name: "Volume" });
     expect(slider).toHaveValue("60");
@@ -641,6 +647,7 @@ describe("sound control in the header (CC-103, CC-208)", () => {
     const sound = fakeSound();
     renderApp({ sound });
 
+    await openSoundOptions(user);
     await user.click(screen.getByRole("button", { name: "Sound settings" }));
     const dialog = screen.getByRole("dialog", { name: "Sound settings" });
     expect(within(dialog).getAllByRole("checkbox", { name: "Sound on" })).toHaveLength(6);
@@ -663,6 +670,7 @@ describe("sound control in the header (CC-103, CC-208)", () => {
     const user = userEvent.setup();
     renderApp({ sound: fakeSound({ muted: true }) });
 
+    await openSoundOptions(user);
     await user.click(screen.getByRole("button", { name: "Sound settings" }));
 
     expect(screen.getByText("All sound is off. Turn it on with the speaker button.")).toBeInTheDocument();

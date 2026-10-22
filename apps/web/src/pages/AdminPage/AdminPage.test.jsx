@@ -5,6 +5,9 @@ import { AppRequestError } from "../../lib/errors.js";
 import REPORT from "../../testing/analyticsReport.json";
 import { fakeApi, GUEST } from "../../testing/fakes.js";
 import { renderApp } from "../../testing/render.jsx";
+import { CONSOLE_PAGES, CONSOLE_VIEWS } from "./consolePages.js";
+
+const TOTALS_PAGES = CONSOLE_PAGES.filter((page) => page.view === CONSOLE_VIEWS.TOTALS);
 
 const OWNER = { kind: "user", id: "user_65f0c2a1b2c3d4e5f6a7b8c9", displayName: "Site_Owner" };
 const PLAYER = { kind: "user", id: "user_652f1c2e9b1e8a3d4c5b6a79", displayName: "Riya" };
@@ -401,4 +404,27 @@ describe("owner console pages", () => {
 
     expect(await screen.findByText("Active players")).toBeVisible();
   });
+});
+
+// CC-324, the audit's axe finding heading-order on six console pages: each chart's h3 came straight after the
+// page's h1. Every totals page now names its section in an h2, so no level is skipped.
+describe("the console's headings (CC-324)", () => {
+  const levels = () =>
+    within(screen.getByRole("main"))
+      .getAllByRole("heading")
+      .map((heading) => Number(heading.tagName.slice(1)));
+
+  it.each(TOTALS_PAGES.map((page) => [page.name, page.section]))(
+    "never skip a level on %s",
+    async (name, section) => {
+      await openConsole(`${section === undefined ? "/admin" : `/admin/${section}`}?${WEEK}`);
+      await screen.findByRole("heading", { level: 2, name });
+
+      const found = levels();
+      found.forEach((level, index) => {
+        if (index > 0)
+          expect(level, `heading ${index} in ${found.join(",")}`).toBeLessThanOrEqual(found[index - 1] + 1);
+      });
+    },
+  );
 });

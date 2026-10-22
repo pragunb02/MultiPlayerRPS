@@ -55,6 +55,49 @@ describe("the friends page (CC-052)", () => {
     expect(api.getFriends).not.toHaveBeenCalled();
   });
 
+  // CC-324, the audit's bug 1: with no session at all the page said "Loading…" for ever and asked nothing.
+  it("shows a visitor what friends are for and how to sign in, instead of loading for ever", async () => {
+    const api = fakeApi({ getSession: vi.fn(async () => undefined) });
+    renderApp({ path: "/friends", api });
+
+    const empty = await screen.findByRole("region", { name: "Play with your friends" });
+    expect(within(empty).getByRole("link", { name: "Sign up" })).toHaveAttribute(
+      "href",
+      "/signup?next=%2Ffriends",
+    );
+    expect(within(empty).getByRole("link", { name: "Log in" })).toHaveAttribute(
+      "href",
+      "/login?next=%2Ffriends",
+    );
+    expect(screen.queryByText("Loading…")).toBeNull();
+    expect(api.getFriends).not.toHaveBeenCalled();
+  });
+
+  // CC-324 review: a session check that failed for another reason than a 401 told a signed-in player to sign up.
+  it("says the check failed, with Try again, when the session could not be read, and never offers to sign up", async () => {
+    const getSession = vi
+      .fn()
+      .mockRejectedValueOnce(new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" }))
+      .mockResolvedValue(USER);
+    const api = fakeApi({ getSession, getFriends: vi.fn().mockResolvedValue(VIEW) });
+    renderApp({ path: "/friends", api });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Can't reach ClassiCade");
+    expect(screen.queryByRole("region", { name: "Play with your friends" })).toBeNull();
+
+    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText("Arjun")).toBeInTheDocument();
+  });
+
+  it("says Loading while the session is still unknown", async () => {
+    const api = fakeApi({ getSession: vi.fn(() => new Promise(() => {})) });
+    renderApp({ path: "/friends", api });
+
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
+  });
+
   it("says so when an account has no friends yet", async () => {
     renderApp({ path: "/friends", api: friendsApi({ getFriends: vi.fn().mockResolvedValue(NO_FRIENDS) }) });
 
@@ -253,7 +296,7 @@ describe("the friends page (CC-052)", () => {
     renderApp({ path: "/friends", api });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load your friends. Server down");
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByText("Abhi tumhare koi friends nahi hain.")).toBeVisible();
   });

@@ -14,6 +14,8 @@
   --shadow-press-accent-small: 0 2px 0 #8c1a43;
   --shadow-press-neutral-small: 0 2px 0 #c9cbe6;
   --glow-you: 0 4px 14px rgb(10 102 168 / 30%);
+  /* The current header item (CC-324): a soft halo, quieter than --glow-primary. */
+  --glow-current: 0 2px 10px rgb(91 76 240 / 22%);
   /* Elevation (CC-314): how high a thing sits above the page. Aliases of the shadows above. */
   --elevation-1: var(--shadow-sm);
   --elevation-2: var(--shadow-md);
@@ -33,5 +35,6 @@
     --shadow-press-accent-small: 0 2px 0 #b8326f;
     --shadow-press-neutral-small: 0 2px 0 #0b0c1d;
     --glow-you: 0 0 0 1px rgb(58 215 255 / 50%), 0 0 24px rgb(58 215 255 / 40%);
+    --glow-current: 0 0 14px rgb(138 125 255 / 35%);
   }
 }

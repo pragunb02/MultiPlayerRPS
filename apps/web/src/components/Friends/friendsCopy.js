@@ -17,6 +17,12 @@ export const FRIENDS_COPY = Object.freeze({
     hi: "Friends banane ke liye apni progress save karo.",
     en: "Save your progress to add friends. It's free, and your level and wins come with you.",
   }),
+  // Someone with no session at all (CC-324): the page used to say Loading for ever.
+  visitor: Object.freeze({
+    title: "Play with your friends",
+    hi: "Friends ke saath khelne ke liye sign up karo.",
+    en: "Sign up to add friends and see when they're online.",
+  }),
   empty: Object.freeze({
     hi: "Abhi tumhare koi friends nahi hain.",
     en: "No friends yet. Add someone you played with, or send a friend your link.",

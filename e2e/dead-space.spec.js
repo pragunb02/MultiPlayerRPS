@@ -1,6 +1,4 @@
 import { expect, formFactor, test } from "./fixtures.js";
-import { OWNER } from "./ownerConsole.js";
-import { newAccount } from "./personas.js";
 
 // No screen leaves a large empty area (CC-259). Each check measures the page instead of comparing pictures: grid
 // tracks against the number of items, card heights against their content, and how much of the width the content
@@ -155,87 +153,7 @@ for (const form of Object.keys(SIZES)) {
         },
       );
 
-      screen("header: one row, with Log in and Sign up in the menu on a phone", async ({ page }) => {
-        await page.goto("/");
-        const banner = page.getByRole("banner");
-        const toggle = banner.getByRole("button", { name: "Menu" });
-        const login = banner.getByRole("link", { name: "Log in" });
-        await expect(banner.getByRole("navigation", { name: "Main" })).toBeVisible();
-
-        if (form === "desktop") {
-          await expect(toggle).toBeHidden();
-          await expect(login).toBeVisible();
-          await expect(banner.getByRole("link", { name: "Sign up" })).toBeVisible();
-          return;
-        }
-        // One row: the header is no taller than its tallest item plus its padding.
-        expect((await banner.boundingBox()).height).toBeLessThanOrEqual(64);
-        await expect(login).toBeHidden();
-        const nav = await banner.getByRole("navigation", { name: "Main" }).boundingBox();
-        expect(nav.x + nav.width).toBeLessThanOrEqual((await toggle.boundingBox()).x);
-
-        await toggle.click();
-        await expect(toggle).toHaveAttribute("aria-expanded", "true");
-        await expect(banner.getByRole("button", { name: /^Sound o/ })).toBeFocused();
-        await expect(login).toBeVisible();
-        await expect(banner.getByRole("link", { name: "Sign up" })).toBeVisible();
-        await expect(banner.getByRole("slider", { name: "Volume" })).toBeVisible();
-
-        await page.keyboard.press("Escape");
-        await expect(toggle).toHaveAttribute("aria-expanded", "false");
-        await expect(toggle).toBeFocused();
-        await expect(login).toBeHidden();
-      });
+      // The header's own checks, one row and the menu, are in header.spec.js (CC-324).
     });
   }
 }
-
-/** Logs a person in from the login page, and waits for the home page. */
-async function logIn(page, { email, password }) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL("/");
-}
-
-/** The phone header's height, and whether the menu button shares the row with the navigation. */
-async function headerRow(page) {
-  const banner = page.getByRole("banner");
-  const nav = await banner.getByRole("navigation", { name: "Main" }).boundingBox();
-  const toggle = await banner.getByRole("button", { name: /^Menu/ }).boundingBox();
-  return { height: (await banner.boundingBox()).height, sameRow: Math.abs(nav.y - toggle.y) < toggle.height };
-}
-
-test.describe("phone header with more links, at 360 x 800", () => {
-  const SMALLEST = { width: 360, height: 800 };
-
-  test("stays one row for an account holder (three links) and for an admin (four links)", async ({
-    players,
-  }, testInfo) => {
-    test.skip(formFactor(testInfo) !== "mobile", "the phone header is checked on the mobile project");
-    const account = newAccount();
-    const riya = await players.open("riya", { secrets: [account.email, account.password] });
-    await riya.page.setViewportSize(SMALLEST);
-    await riya.page.goto("/signup");
-    await riya.page.getByLabel("Username").fill(account.username);
-    await riya.page.getByLabel("Email").fill(account.email);
-    await riya.page.getByLabel("Password").fill(account.password);
-    await riya.page.getByRole("button", { name: "Create account" }).click();
-    await expect(riya.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveCount(3);
-
-    const owner = await players.open("owner", { secrets: [OWNER.email, OWNER.password] });
-    await owner.page.setViewportSize(SMALLEST);
-    await logIn(owner.page, OWNER);
-    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveCount(4);
-
-    for (const [who, page] of [
-      ["account holder", riya.page],
-      ["admin", owner.page],
-    ]) {
-      const row = await headerRow(page);
-      expect(row.height, who).toBeLessThanOrEqual(64);
-      expect(row.sameRow, who).toBe(true);
-    }
-  });
-});

@@ -198,6 +198,48 @@ test.describe("dialogs and the chess board in use", () => {
   });
 });
 
+// The header's pop-ups (CC-324). The October audit found axe's label-content-name-mismatch on the Inbox button in
+// three states this tour never reached: the challenge popup, the inbox open and a taken challenge.
+test.describe("the header's pop-ups", () => {
+  test("the challenge taken popup, the inbox open, the sound options and the account menu", async ({
+    players,
+  }, testInfo) => {
+    desktopOnly(testInfo);
+    test.setTimeout(90_000);
+    const alice = await players.open("alice");
+    await alice.page.goto("/games/rock-paper-scissors");
+    await alice.page.getByRole("combobox", { name: /match length/i }).selectOption("1");
+    await alice.page.getByRole("button", { name: "Make a challenge link" }).click();
+    const link = await alice.page.getByRole("textbox", { name: "Challenge link" }).inputValue();
+    await alice.page.goto("/");
+
+    const bob = await players.open("bob");
+    await bob.page.goto(new URL(link).pathname);
+    await bob.page.getByRole("button", { name: "Play as guest" }).click();
+    await bob.page.getByRole("button", { name: "Accept and play" }).click();
+    await expect(bob.page).toHaveURL(/\/rooms\//);
+
+    const popup = alice.page.getByRole("region", { name: "Challenge taken" });
+    await expect(popup).toBeVisible();
+    await scan(alice, "the challenge taken popup");
+
+    await popup.getByRole("button", { name: "Not now" }).click();
+    await alice.page.getByRole("button", { name: "Inbox 1 waiting" }).click();
+    await expect(alice.page.getByRole("region", { name: "Inbox" })).toBeVisible();
+    await scan(alice, "the inbox open");
+    await alice.page.keyboard.press("Escape");
+
+    await alice.page.getByRole("button", { name: "Sound options" }).click();
+    await expect(alice.page.getByRole("slider", { name: "Volume" })).toBeVisible();
+    await scan(alice, "the sound options");
+    await alice.page.keyboard.press("Escape");
+
+    await alice.page.locator('[data-cc-control="header.account"]').click();
+    await expect(alice.page.getByRole("banner").getByRole("link", { name: "Profile" })).toBeVisible();
+    await scan(alice, "the account menu");
+  });
+});
+
 test.describe("page changes", () => {
   const announcer = (page) => page.locator("[aria-live='polite'][aria-atomic='true']").last();
 

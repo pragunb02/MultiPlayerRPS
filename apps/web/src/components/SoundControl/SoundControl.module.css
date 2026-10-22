@@ -1,11 +1,16 @@
-/* The sound switch, the volume slider and the sound settings button in the header (CC-103, CC-208). */
+/*
+ * The sound controls (CC-103, CC-208, CC-324): in a row inside the header's menu on a phone or a tablet, and as a pill
+ * with a small panel in the wide header.
+ */
 .control {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 .toggle,
-.settings {
+.settings,
+.more {
   display: inline-grid;
   place-items: center;
   width: 2.25rem;
@@ -16,14 +21,20 @@
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-out);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 .toggle:hover,
-.settings:hover {
+.settings:hover,
+.more:hover,
+.more[aria-expanded="true"] {
   border-color: var(--color-primary);
 }
 .toggle:focus-visible,
-.settings:focus-visible {
+.settings:focus-visible,
+.more:focus-visible,
+.settingsLabelled:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
@@ -38,9 +49,11 @@
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .volume {
-  width: 5.5rem;
+  flex: 1;
+  min-width: 4rem;
   accent-color: var(--color-primary);
   cursor: pointer;
 }
@@ -48,9 +61,70 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-/* On a phone the controls sit in the header's menu (CC-259), where the slider has the width left over. */
-@media (max-width: 40rem) {
-  .volume {
-    flex: 1;
+/* The wide header's pill: the switch and the chevron joined, one shape in the row. */
+.pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.pill .toggle {
+  border-right-width: 1px;
+  border-radius: var(--radius-full) 0 0 var(--radius-full);
+}
+.pill .more {
+  width: 1.75rem;
+  border-left-width: 1px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+}
+.more svg {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+/* The panel under the pill: the slider with room to move, and the settings with their words. */
+.popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--layer-menu);
+  display: grid;
+  gap: var(--space-3);
+  width: 14rem;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-3);
+  transition:
+    opacity var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+.popover[hidden] {
+  display: none;
+}
+@starting-style {
+  .popover {
+    opacity: 0;
+    transform: translateY(-0.25rem);
   }
+}
+.settingsLabelled {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 700;
+  font-size: var(--type-label);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.settingsLabelled:hover {
+  border-color: var(--color-primary);
 }

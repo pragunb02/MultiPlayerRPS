@@ -29,7 +29,7 @@ test.describe("history: browsing", () => {
     await page.goForward();
     await at(page, ...CHESS);
 
-    await page.getByRole("link", { name: "Games" }).click();
+    await (await header(page)).getByRole("link", { name: "Games" }).click();
     await at(page, ...HOME);
     await page.getByRole("link", { name: "Tic Tac Toe" }).click();
     await at(page, ...TTT);

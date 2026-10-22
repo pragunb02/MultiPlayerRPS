@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { FRIEND_LINK_MAKER_NAME, SOCKET_EVENTS } from "@classicade/shared";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
+import { installMatchMedia } from "../../testing/matchMedia.js";
 import { renderApp } from "../../testing/render.jsx";
 import { FRIENDS_COPY, linkInviteCopy } from "./friendsCopy.js";
 
@@ -73,6 +74,7 @@ describe("Add friend in match history (CC-052)", () => {
   });
 
   it("is not offered to a guest in history, who finds how to save progress on the Friends page", async () => {
+    installMatchMedia({ width: 390 });
     renderApp({ path: "/profile", api: historyApi({ getSession: vi.fn(async () => GUEST) }) });
 
     expect(await screen.findByRole("list", { name: "Match history" })).toHaveTextContent("Arjun");
