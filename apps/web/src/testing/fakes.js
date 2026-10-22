@@ -220,6 +220,8 @@ export function fakeSocket() {
       connected = false;
     }),
     isConnected: () => connected,
+    // The real client downloads Socket.IO when this is called (CC-333). The fake has nothing to download.
+    needNow: vi.fn(),
     // Like a real request the server has not answered yet; tests override with mockResolvedValue etc.
     request: vi.fn(() => new Promise(() => {})),
     on: vi.fn((event, handler) => {
