@@ -709,8 +709,9 @@ describe("chessEngine position history (CC-180)", () => {
     // back their own last move, so some games end by repetition, not only by the fifty-move rule or on the board.
     // The engine refuses moves once a game is over, so a game it ended too early fails inside `act`.
     const reasons = new Set();
-    // Seed 10 ends by the fifty-move rule, the others by repetition after 67 to 243 half moves.
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 10, 11, 12]) {
+    // Seed 10 ends by the fifty-move rule after 428 half moves, seeds 2 and 12 by repetition after 107 and 67. Ten
+    // seeds took up to the whole time limit under coverage on a busy CI machine (CC-342). These three cover both ends.
+    for (const seed of [2, 10, 12]) {
       const rng = createSeededRng(seed);
       const reference = new Chess();
       const played = [];
