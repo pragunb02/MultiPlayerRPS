@@ -20,7 +20,7 @@ export function SiteFooter({ onFeedback }) {
         <span>Play the classics with anyone, anywhere.</span>
       </p>
       <p className={styles.cookies}>
-        One cookie keeps you signed in. No ads, no trackers.{" "}
+        One cookie keeps you signed in. No ads, no third-party trackers.{" "}
         <Link to={paths.privacy()} data-cc-control="footer.data">
           How we use your data
         </Link>

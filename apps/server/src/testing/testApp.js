@@ -37,6 +37,9 @@ import { createReportAccessor } from "../data/reportAccessor.js";
 import { createFlagComponent } from "../domain/flags/flagComponent.js";
 import { createFeatureFlagAccessor } from "../data/featureFlagAccessor.js";
 import { createInMemoryFeatureFlagDao } from "./inMemoryFeatureFlagDao.js";
+import { createTelemetryAccessor } from "../data/telemetryAccessor.js";
+import { createTelemetryComponent } from "../domain/telemetry/telemetryComponent.js";
+import { createInMemoryTelemetryCountDao } from "./inMemoryTelemetryCountDao.js";
 import { createKeyedIds, KEYED_ID_LABELS, keyedIdSecretFrom } from "../utils/keyedIds.js";
 import { createChessKind } from "../domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "../domain/dailyPuzzles/dailyPuzzleComponent.js";
@@ -158,6 +161,9 @@ import { testConfig } from "./testConfig.js";
  *   dailyPuzzleAttemptDao?: ReturnType<typeof createInMemoryDailyPuzzleAttemptDao>,   lets a test make a change conflict
  *   metrics?: Partial<import("../utils/operationsMetrics.js").OperationsMetrics>,   a fake of operations telemetry,
  *     to see what the service layer records (ADR-055)
+ *   telemetryLimits?: object,   the limits on usage counts (CC-175)
+ *   telemetryCountDao?: ReturnType<typeof createInMemoryTelemetryCountDao>,   where usage counts are stored, which a
+ *     test reads (CC-175)
  *   pwnedPasswordsFetch?: typeof fetch,   how Have I Been Pwned is asked about a new password (CC-261). By default
  *     it always fails, as when the service cannot be reached, so no test touches the network
  * }} [options]
@@ -193,6 +199,8 @@ export function createTestApp({
   chessPuzzles = TEST_CHESS_PUZZLES,
   dailyPuzzleAttemptDao = createInMemoryDailyPuzzleAttemptDao(),
   metrics = {},
+  telemetryLimits = {},
+  telemetryCountDao = createInMemoryTelemetryCountDao(),
   pwnedPasswordsFetch = NO_NETWORK_FETCH,
 } = {}) {
   const config = testConfig(env, { buildInfoText });
@@ -270,6 +278,13 @@ export function createTestApp({
     safety: safetyComponent,
     logger: capture.logger,
     now,
+  });
+  const telemetryComponent = createTelemetryComponent({
+    telemetryAccessor: createTelemetryAccessor({ telemetryCountDao }),
+    now,
+    limits: telemetryLimits,
+    ...(metrics.recordTelemetryDropped && { onDropped: metrics.recordTelemetryDropped }),
+    serverBuild: config.build.version,
   });
   const leaderboardComponent = createLeaderboardComponent({
     leaderboardAccessor: createLeaderboardAccessor({ leaderboardDao: createInMemoryLeaderboardDao() }),
@@ -553,6 +568,7 @@ export function createTestApp({
     safetyComponent,
     dailyPuzzleLimit,
     flagComponent,
+    telemetryComponent,
     analyticsComponent: createAnalyticsComponent({
       analyticsAccessor: createAnalyticsAccessor({ analyticsDao }),
       cache: createTtlCache({ ttlMs: 1, maxEntries: 1 }),
@@ -598,6 +614,8 @@ export function createTestApp({
     reportComponent,
     dailyPuzzleComponent,
     flagComponent,
+    telemetryComponent,
+    telemetryCountDao,
     matchPipeline,
     playerDataComponent,
     tasks,

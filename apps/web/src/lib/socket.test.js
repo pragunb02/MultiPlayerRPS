@@ -508,4 +508,46 @@ describe("socket client", () => {
       message: "Something went wrong",
     });
   });
+
+  describe("what usage counts hear of (CC-174)", () => {
+    it("tells of each request and of the first move this page acknowledged, with its game, once", async () => {
+      const ack = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, data: { code: "AB2CD3" } })
+        .mockResolvedValue({ ok: true, data: { code: "AB2CD3", gameId: "chess" } });
+      const io = fakeIo(ack);
+      const onRequest = vi.fn();
+      const onFirstMove = vi.fn();
+      const client = createSocketClient({ load: async () => io.connect, onRequest, onFirstMove });
+
+      await client.request("game:move", { move: {} });
+      await client.request("room:join", { code: "AB2CD3" });
+      await client.request("game:move", { move: {} });
+      await client.request("game:move", { move: {} });
+
+      expect(onRequest).toHaveBeenCalledTimes(4);
+      expect(onFirstMove.mock.calls).toEqual([["chess"]]);
+      const quiet = fakeIo(ack);
+      await createSocketClient({ load: async () => quiet.connect }).request("game:move", {});
+    });
+
+    it("tells of the connection dropping, failing and coming back with how long it was gone", async () => {
+      const io = fakeIo();
+      const onChange = vi.fn();
+      let clock = 0;
+      await loadedClient(io, { onChange, now: () => clock });
+
+      io.emit("connect");
+      io.emit("disconnect", "ping timeout");
+      clock = 700_000;
+      io.emit("connect");
+      io.emit("connect_error", { data: { code: "UNAUTHORIZED" } });
+
+      expect(onChange.mock.calls.map(([change]) => change)).toEqual([
+        { state: "dropped", reason: "ping timeout" },
+        { state: "restored", reason: "ping timeout", afterS: "600+" },
+        { state: "connect_failed", reason: { data: { code: "UNAUTHORIZED" } } },
+      ]);
+    });
+  });
 });

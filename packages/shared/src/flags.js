@@ -56,6 +56,30 @@ export const FLAGS = Object.freeze([
     success: "The owner pressed It works on that line.",
   }),
   Object.freeze({
+    name: "telemetry_ingest",
+    description:
+      "The server keeps anonymous usage counts sent to POST /api/telemetry and records its own (sign-ups, logins, errors). Off drops every batch, and the answer is the same 204 either way.",
+    ticket: "CC-175",
+    default: false,
+    removeBy: "2027-01-31",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: false,
+    success: "A batch with at least one event stored.",
+  }),
+  Object.freeze({
+    name: "telemetry_client",
+    description:
+      "The browser counts pages, presses, dead and rage clicks, errors, connection changes and page speed, with no id, and sends them to our own server. Never with the privacy switch off, Global Privacy Control or Do Not Track.",
+    ticket: "CC-174",
+    default: false,
+    removeBy: "2027-01-31",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: true,
+    success: "A batch the server accepted (204).",
+  }),
+  Object.freeze({
     name: "design_page",
     description:
       "Shows the console's Design page: every token of the design contract and the real components in their states, light or dark as the device shows them.",

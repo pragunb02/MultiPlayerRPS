@@ -6,6 +6,7 @@ import { useServices } from "../../app/servicesContext.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
+import { UsageCountsSwitch } from "../../components/UsageCounts/UsageCountsSwitch.jsx";
 import { AGE_COPY } from "../../components/YearSelect/ageCopy.js";
 import { YEAR_NOT_SAID, YearSelect } from "../../components/YearSelect/YearSelect.jsx";
 import { useAccount } from "../../hooks/useAccount.js";
@@ -254,13 +255,20 @@ function DeleteAccount() {
   );
 }
 
-/** Year of birth, the data download and deleting the account, for a signed-in player (CC-035, CC-152). */
+/**
+ * Year of birth, usage counts, the data download and deleting the account, for a signed-in player (CC-035, CC-152,
+ * CC-174).
+ */
 export function PrivacySettings() {
   const account = useAccount();
   return (
     <section className={styles.account} aria-labelledby="privacy-settings">
       <h2 id="privacy-settings">Your data and privacy</h2>
       <BirthYear account={account} />
+      <div className={styles.part}>
+        <h3>Usage counts</h3>
+        <UsageCountsSwitch control="profile.privacy.usage_counts" />
+      </div>
       <DataExport />
       <DeleteAccount />
     </section>

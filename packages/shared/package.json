@@ -5,6 +5,8 @@
   "description": "Constants and helpers shared by the ClassiCade server and web app",
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
-  }
+    ".": "./src/index.js",
+    "./testing": "./src/testing/telemetryExamples.js"
+  },
+  "sideEffects": false
 }

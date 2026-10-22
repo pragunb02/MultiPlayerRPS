@@ -1,0 +1,173 @@
+/**
+ * The small part of usage counts that is in the page from the start (CC-174): the first page's stub (CC-322). Code
+ * anywhere calls `track`, and the facade holds the events in memory until the client, loaded when the browser is
+ * idle, takes them, or drops them all when counts turn out to be off. It also counts requests, so the click watcher
+ * can tell a press that did something from one that did nothing. Nothing here is kept beyond the page.
+ *
+ * It knows no screen names and no API templates, which load with the client: it keeps the address each event
+ * happened at, which the client turns into its screen, and an event may give its fields as a function of what the
+ * client loads (`endpointOf`), which the client calls.
+ *
+ * @typedef {{ path?: string, playerKind?: string }} TelemetryContext   where the player is, as the address the client
+ *   turns into a screen, and who, never an id. No `path` before the app has said where it is, and no `playerKind`
+ *   while the session is still asked: an event counted then waits, and takes the kind the session settles on
+ *
+ * @typedef {Record<string, string | number | boolean>} TelemetryFields
+ * @typedef {TelemetryFields | ((loaded: { endpointOf: (path: string) => string }) => TelemetryFields)} HeldFields
+ *   the fields, or how to make them from what loads with the client
+ *
+ * @typedef {Object} TelemetrySink   the loaded client (index.js)
+ * @property {(name: string, fields: HeldFields, context: TelemetryContext) => void} track
+ * @property {() => void} stop
+ */
+
+/** How many events wait at most for the client. A page that loads slowly loses the rest, never the page's speed. */
+export const MAX_WAITING = 100;
+
+const TRANSPORTS = Object.freeze(["http", "socket"]);
+
+const NO_ENTRY = Object.freeze({ entry: "direct", via: "" });
+
+/**
+ * @param {{
+ *   isOff: () => boolean,
+ *   landing?: Readonly<{ entry: string, via: string }>,
+ *   quietly?: <T>(run: () => Promise<T>) => Promise<T>,
+ * }} deps  `isOff` is the opt-out (optOut.js), checked before anything is held. `landing` is how this page load
+ *   arrived (entry.js). `quietly` runs a download of usage counts' own files, whose failure must never reload the
+ *   tab (`recoverFromStaleBuild`'s, CC-333)
+ */
+export function createTelemetryFacade({ isOff, landing = NO_ENTRY, quietly = (run) => run() }) {
+  const listeners = new Set();
+  let arrived = landing;
+  /** @type {"waiting" | "on" | "off"} */
+  let state = "waiting";
+  /** @type {TelemetrySink | undefined} */
+  let sink;
+  /** @type {TelemetryContext} */
+  // Until the app says where it is and who: the composition root sets the address before anything else.
+  let context = {};
+  /** @type {Array<[string, object, TelemetryContext]>} */
+  let waiting = [];
+  const sent = { http: 0, socket: 0 };
+  // Once counts are on and the kind of player is known, the client takes what waits, in order.
+  const handOver = () => {
+    if (state !== "on" || sink === undefined || context.playerKind === undefined) return;
+    const held = waiting;
+    waiting = [];
+    held.forEach(([name, fields, at]) => sink.track(name, fields, at));
+  };
+
+  return Object.freeze({
+    /**
+     * Counts one event. Off, it does nothing. A name or field the catalogue does not have throws once the client
+     * is loaded, in tests and development.
+     *
+     * @param {string} name
+     * @param {HeldFields} [fields]
+     */
+    track(name, fields = {}) {
+      if (state === "off" || isOff()) return;
+      if (state === "on" && sink !== undefined && context.playerKind !== undefined) {
+        sink.track(name, fields, context);
+        return;
+      }
+      if (waiting.length < MAX_WAITING) waiting.push([name, fields, context]);
+    },
+
+    /** @param {TelemetryContext} next  the address and the kind of player from now on */
+    setContext(next) {
+      context = Object.freeze({ ...next });
+      const { playerKind } = context;
+      if (playerKind === undefined) return;
+      // What was counted before the session said who this is takes the kind it settled on.
+      waiting = waiting.map(([name, fields, at]) => [
+        name,
+        fields,
+        at.playerKind === undefined ? Object.freeze({ ...at, playerKind }) : at,
+      ]);
+      handOver();
+    },
+
+    /** @returns {TelemetryContext} */
+    context: () => context,
+
+    /**
+     * Notes a request the app sent, so a press followed by one is not a dead click.
+     *
+     * @param {"http" | "socket"} transport
+     */
+    noteRequest(transport) {
+      if (TRANSPORTS.includes(transport)) sent[transport] += 1;
+    },
+
+    /** @returns {Readonly<{ http: number, socket: number }>} requests sent so far on this page */
+    requestsSent: () => Object.freeze({ ...sent }),
+
+    /**
+     * The client is loaded and counts are on: it takes the waiting events, in order, with the address each was at.
+     *
+     * @param {TelemetrySink} client
+     */
+    attach(client) {
+      sink = client;
+      state = "on";
+      handOver();
+    },
+
+    /**
+     * Counts are off for now (the flag is off for this player, or they switched counts off): the waiting events are
+     * dropped and nothing more is held until a client is attached again.
+     */
+    detach() {
+      state = "off";
+      waiting = [];
+      sink?.stop();
+      sink = undefined;
+    },
+
+    /** Whether the client has taken over. */
+    isAttached: () => state === "on",
+
+    /** Whether nothing may be counted now (the switch, GPC, DNT, a test or a laptop). */
+    isOff,
+
+    /** Runs a download of usage counts' own files so that its failure never reloads the tab. */
+    quietly,
+
+    /** How this page load arrived: the landing `entry` and, for a shared link, its channel. */
+    get landing() {
+      return arrived;
+    },
+
+    /** @param {Readonly<{ entry: string, via: string }>} next  how this page load arrived, once it is known */
+    setLanding(next) {
+      arrived = Object.freeze({ ...next });
+    },
+
+    /**
+     * Tells whoever listens that the switch changed, so counts stop or start at once.
+     */
+    switched() {
+      if (isOff()) {
+        state = "off";
+        waiting = [];
+        sink?.stop();
+        sink = undefined;
+      }
+      listeners.forEach((listener) => listener());
+    },
+
+    /**
+     * @param {() => void} listener  told when the switch changed
+     * @returns {() => void} stops telling it
+     */
+    onSwitched(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  });
+}
+
+/** A facade that counts nothing, for tests and pages that wire no telemetry. */
+export const NO_TELEMETRY = createTelemetryFacade({ isOff: () => true });
