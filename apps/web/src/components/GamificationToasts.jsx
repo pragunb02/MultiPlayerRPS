@@ -36,6 +36,7 @@ export function GamificationToasts() {
       // result or a question holds the screen), they wait too, so nothing celebrates over a loss (CC-163).
       achievements.forEach((achievement, index) =>
         toast.show(`Achievement unlocked: ${achievement.name}`, {
+          surface: "toast.achievement",
           tone: "success",
           category: CATEGORIES.REWARD,
           art: (
@@ -60,6 +61,7 @@ export function GamificationToasts() {
       toast.show(
         key.endsWith(SWEEP_SUFFIX) ? `Daily sweep! +${xpGained} XP` : `Quest complete! +${xpGained} XP`,
         {
+          surface: "toast.quest",
           tone: "success",
           category: CATEGORIES.REWARD,
           art: <AchievementIcon name="scroll" tier="gold" />,

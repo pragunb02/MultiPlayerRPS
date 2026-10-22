@@ -80,7 +80,7 @@ describe("ReportDialog (CC-044)", () => {
 
     expect(api.blockPlayer).toHaveBeenCalledWith({ reportId: "r1" });
     expect(onBlocked).toHaveBeenCalled();
-    expect(toast.show).toHaveBeenCalledWith("You blocked Bob.", { tone: "info" });
+    expect(toast.show).toHaveBeenCalledWith("You blocked Bob.", { surface: "toast.blocked", tone: "info" });
     expect(within(dialog()).queryByRole("button", { name: "Block Bob too" })).toBeNull();
     expect(dialog()).toHaveTextContent("You blocked Bob.");
   });

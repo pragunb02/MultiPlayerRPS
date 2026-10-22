@@ -30,7 +30,7 @@ export function ShareRoom({ code, gameId, origin = siteOrigin() }) {
       // Shown under the button. The browser's own reason means nothing to a player.
       throw new Error("Couldn't copy. Select the link and copy it", { cause });
     }
-    toast.show("Link copied", { tone: "success" });
+    toast.show("Link copied", { surface: "toast.copied", tone: "success" });
   };
 
   const copy = useAction(copyLink, { id: "invite.copy" });

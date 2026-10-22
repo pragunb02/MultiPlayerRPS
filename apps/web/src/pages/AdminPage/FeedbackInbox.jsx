@@ -94,6 +94,7 @@ function DeleteButton({ item, remove }) {
         Delete
       </Button>
       <Modal
+        surface="dialog.delete_feedback"
         open={asking}
         title="Delete this feedback?"
         onClose={() => setAsking(false)}

@@ -206,8 +206,9 @@ export function PrivacyPage() {
         </p>
         <ul>
           <li>
-            We count which pages are opened, which buttons are pressed, where presses do nothing, errors and
-            how long things take, so we can fix what is slow or confusing.
+            We count which pages are opened, which buttons are pressed, where presses do nothing, errors, how
+            long things take, which messages and pop-ups showed and how they were closed, and how many words a
+            screen shows, so we can fix what is slow, confusing or in the way.
           </li>
           <li>
             These counts go only to our own server and our own database. They never include your name, email,

@@ -86,7 +86,8 @@ export function RoomPage() {
   const reconnecting = useReconnecting();
   const gameId = room.room?.gameId ?? urlGame?.id;
   const notify = useCallback(
-    (message) => toast.show(message, { tone: "info", category: CATEGORIES.SOCIAL }),
+    (message) =>
+      toast.show(message, { surface: "toast.room_notice", tone: "info", category: CATEGORIES.SOCIAL }),
     [toast],
   );
   useRoomAlerts(room.room, { notify, dismiss: toast.dismiss });

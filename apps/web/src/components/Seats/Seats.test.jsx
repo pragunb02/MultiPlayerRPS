@@ -220,7 +220,7 @@ describe("Seats: blocking from a seat (CC-044)", () => {
 
     expect(api.blockPlayer).toHaveBeenCalledWith({ roomCode: "ROOM22", seat: 0, seatId: "guest_a" });
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(toast.show).toHaveBeenCalledWith("You blocked Alice.", { tone: "info" });
+    expect(toast.show).toHaveBeenCalledWith("You blocked Alice.", { surface: "toast.blocked", tone: "info" });
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("Alicehostconnectedblocked");
     expect(blockButton()).toBeNull();
   });

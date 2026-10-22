@@ -41,6 +41,7 @@ export const sinkOf = (client, routeOf) =>
  *   strict: boolean,
  *   wasWaking: boolean,
  *   onAccepted: () => void,
+ *   onBatchAccepted?: (events: ReadonlyArray<{ name: string }>) => void,
  *   surfaceOf?: (element: Element) => string | undefined,
  *   routeOf: (path: string) => string,
  * }} deps  `routeOf` turns an address into its screen (routeOf.js)
@@ -54,6 +55,7 @@ export function startTelemetry({
   strict,
   wasWaking,
   onAccepted,
+  onBatchAccepted,
   surfaceOf,
   routeOf,
 }) {
@@ -65,6 +67,7 @@ export function startTelemetry({
     isOff,
     strict,
     onAccepted,
+    ...(onBatchAccepted && { onBatchAccepted }),
     setTimer,
     clearTimer,
     viewportWidth: () => window.innerWidth,

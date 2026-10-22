@@ -35,6 +35,7 @@ export function ConfirmDialog({
 }) {
   return (
     <Modal
+      surface="dialog.confirm_leave"
       open={open}
       title={title}
       onClose={onClose}

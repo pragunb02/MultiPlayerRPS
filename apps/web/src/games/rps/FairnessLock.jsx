@@ -132,6 +132,7 @@ export function FairnessLock({ room, opponent }) {
         How we keep it fair
       </Button>
       <Modal
+        surface="dialog.fairness"
         open={explaining}
         title="How we keep it fair"
         onClose={() => setExplaining(false)}

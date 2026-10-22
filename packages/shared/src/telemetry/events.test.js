@@ -9,12 +9,16 @@ import {
   CONTROL_PATTERN,
   endpointOf,
   fitsTelemetryField,
+  FUNNEL_STEP_IDS,
   GAMES,
+  isSurfaceId,
   isTelemetryBuild,
   OTHER_ENDPOINT,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   roundMs,
+  SURFACE_IDS,
+  surfaceNamed,
   TELEMETRY_EVENT_NAMES,
   TELEMETRY_EVENTS,
   TELEMETRY_ROUTES,
@@ -203,5 +207,57 @@ describe("endpoints and buckets (CC-174)", () => {
   it("has an example value for every kind of field, and no value fits a kind it does not know", () => {
     expect(() => exampleValue({ kind: "nothing", optional: false })).toThrow(RangeError);
     expect(fitsTelemetryField({ kind: "nothing", optional: false }, "anything")).toBe(false);
+  });
+});
+
+describe("CC-313's events and fields", () => {
+  const NEW_EVENTS = [
+    "interruption_ended",
+    "interruption_counted",
+    "screen_text_measured",
+    "funnel_step_reached",
+  ];
+  const NEW_FIELDS = [
+    ["gameplay_started", "interruptions_before"],
+    ["control_pressed", "surface"],
+    ["dead_clicked", "surface"],
+    ["rage_clicked", "surface"],
+  ];
+
+  // AC-14 (CC-313)
+  it("interruption events carry only closed values", () => {
+    NEW_EVENTS.forEach((name) => {
+      expect(CATALOGUE_DOC).toContain(`\`${name}\``);
+      Object.entries(TELEMETRY_EVENTS[name].fields).forEach(([field, spec]) =>
+        expect({ name, field, kind: spec.kind }).toEqual({
+          name,
+          field,
+          kind: expect.stringMatching(/^(list|flag)$/),
+        }),
+      );
+    });
+    NEW_FIELDS.forEach(([name, field]) => {
+      expect(TELEMETRY_EVENTS[name].fields[field].kind).toBe("list");
+      expect(CATALOGUE_DOC).toContain(`\`${field}\``);
+    });
+
+    const ended = exampleTelemetryEvent("interruption_ended");
+    expect(checkTelemetryEvent(ended, "client").ok).toBe(true);
+    expect(checkTelemetryEvent({ ...ended, surface: "toast.made_up" }, "client").ok).toBe(false);
+    expect(checkTelemetryEvent({ ...ended, text: "Level up! You reached level 4" }, "client").ok).toBe(false);
+    const steps = exampleTelemetryEvent("funnel_step_reached");
+    expect(checkTelemetryEvent({ ...steps, step: "paid" }, "client").ok).toBe(false);
+    const press = exampleTelemetryEvent("control_pressed");
+    expect(checkTelemetryEvent({ ...press, surface: "toast.xp" }, "client").ok).toBe(true);
+    expect(checkTelemetryEvent({ ...press, surface: "Riya's toast" }, "client").ok).toBe(false);
+  });
+
+  it("the registries have one entry per id, and every surface and step is named once", () => {
+    expect(new Set(SURFACE_IDS).size).toBe(SURFACE_IDS.length);
+    expect(surfaceNamed("toast.xp")).toMatchObject({ kind: "toast", class: "optional", opens: "system" });
+    expect(() => surfaceNamed("toast.made_up")).toThrow(RangeError);
+    expect(isSurfaceId("dialog.feedback")).toBe(true);
+    expect(isSurfaceId(7)).toBe(false);
+    expect(FUNNEL_STEP_IDS).toContain("first_move");
   });
 });

@@ -83,6 +83,7 @@ function RemoveDialog({ friend, onClose, onRemove }) {
   );
   return (
     <Modal
+      surface="dialog.remove_friend"
       open
       title={`Remove ${friend.displayName}?`}
       onClose={onClose}
@@ -174,7 +175,7 @@ function FriendLink({ origin = siteOrigin() }) {
       } catch (cause) {
         throw new Error("Couldn't copy. Select the link and copy it", { cause });
       }
-      toast.show("Link copied", { tone: "success" });
+      toast.show("Link copied", { surface: "toast.copied", tone: "success" });
     },
     { id: "friends.link.copy" },
   );

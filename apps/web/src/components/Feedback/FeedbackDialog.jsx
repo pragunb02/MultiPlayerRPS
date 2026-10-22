@@ -110,6 +110,7 @@ export function FeedbackDialog({ open, onClose }) {
     return (
       // A dialog of its own, so the focus moves to its first button: the one that was pressed has gone.
       <Modal
+        surface="dialog.feedback"
         key="sent"
         open={open}
         title={<Lines text={FEEDBACK_TEXT.sentTitle} />}
@@ -134,6 +135,7 @@ export function FeedbackDialog({ open, onClose }) {
 
   return (
     <Modal
+      surface="dialog.feedback"
       key="form"
       open={open}
       title={<Lines text={FEEDBACK_TEXT.title} />}

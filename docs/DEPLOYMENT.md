@@ -613,6 +613,10 @@ section 4a and the footer's "no third-party trackers".
    `await fetch("/api/admin/telemetry?before=2026-11-01", { method: "DELETE" }).then((r) => r.json())` deletes
    everything that arrived before that India day and answers `{ deleted }`. Anyone else gets the console's 404.
 5. **Flag removal:** both flags by 2027-01-31 (their own small PR, PROCESS.md).
+6. **Interruption counts (CC-313):** the `interruption_counts` flag follows `telemetry_client` one step behind
+   (admins, 10 %, 50 %, 100 %, two days each), and sends nothing unless `telemetry_client` is on too. Rollback: Off.
+   Remove by 2027-02-28. The CI text budget (`e2e/textBudget.spec.js`) and the friction guardrail rule of the
+   decision gate apply from the merge, with no flag.
 
 ## Known operational risks
 

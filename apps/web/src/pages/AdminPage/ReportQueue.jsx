@@ -99,6 +99,7 @@ function RenameButton({ name, run }) {
         Rename
       </Button>
       <Modal
+        surface="dialog.report_review"
         open={asking}
         title={`Rename ${name}?`}
         onClose={() => setAsking(false)}

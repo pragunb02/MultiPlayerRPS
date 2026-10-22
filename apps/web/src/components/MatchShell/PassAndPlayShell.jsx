@@ -87,6 +87,7 @@ function ForWhomDialog({ room, action, outcomeIf, onClose, onMoveAs }) {
   const labelFor = (seat) => `${confirm.confirmLabel} for ${seat.displayName}`;
   return (
     <Modal
+      surface="dialog.pass_and_play"
       open
       title={confirm.title}
       onClose={onClose}

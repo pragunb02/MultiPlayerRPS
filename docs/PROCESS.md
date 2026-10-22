@@ -108,7 +108,8 @@ rollout in the console's Flags tab, `/admin/flags`, without a deploy.
 5. **Merge with the flag off.** Production does not change. The ticket's Status becomes Rolling out.
 6. **Ramp.** In the console: admins only first (or On for an admins audience), then 5 %, 25 %, 50 % and On, a day
    or more apart. Compare successes per time shown on the on and off sides at each step. A ramp only adds players:
-   everyone who had it at 5 % still has it at 25 %.
+   everyone who had it at 5 % still has it at 25 %. A step goes on only when the ticket's **Friction guardrail**
+   (CC-313 section 6) is not red with the flag on against off.
 7. **Roll back** by setting Off in the console. It applies at once on that server and within 30 seconds anywhere
    else. If the database is unreachable, each server keeps the last overrides for 5 minutes, then uses the code's
    rollout, which is off.

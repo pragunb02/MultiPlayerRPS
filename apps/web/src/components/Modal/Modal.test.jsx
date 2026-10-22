@@ -21,6 +21,7 @@ function Page({ dialogs }) {
       ))}
       {dialogs.map((title, index) => (
         <Modal
+          surface="dialog.feedback"
           key={title}
           open={open[index]}
           title={title}
@@ -115,7 +116,7 @@ describe("Modal", () => {
   it("holds Tab on the dialog itself when it has nothing to focus", async () => {
     const user = userEvent.setup();
     render(
-      <Modal open title="Saving" onClose={vi.fn()} actions={null}>
+      <Modal surface="dialog.feedback" open title="Saving" onClose={vi.fn()} actions={null}>
         <p>One moment.</p>
       </Modal>,
     );
@@ -134,6 +135,7 @@ describe("Modal", () => {
       return (
         <>
           <Modal
+            surface="dialog.feedback"
             open={first}
             title="First"
             onClose={() => setFirst(false)}
@@ -151,6 +153,7 @@ describe("Modal", () => {
             <p>One</p>
           </Modal>
           <Modal
+            surface="dialog.feedback"
             open={second}
             title="Second"
             onClose={() => setSecond(false)}

@@ -5,6 +5,7 @@ import { WAITED_CLASS } from "../../app/wakingUp.js";
 import { FLAG_STATES, useFlagState } from "../../hooks/useFlag.js";
 import { whenIdle } from "../idle.js";
 import { NO_TELEMETRY } from "./facade.js";
+import { countFlagSuccesses } from "./flagSuccess.js";
 import { routeOf } from "./routeOf.js";
 
 /** Loads the client in its own file, so the page's first paint never waits for it (CC-174, AC-9). */
@@ -59,7 +60,9 @@ export function TelemetryHost({ load = loadClient }) {
             strict: !import.meta.env.PROD,
             wasWaking: document.documentElement.classList.contains(WAITED_CLASS),
             routeOf,
-            onAccepted: () => services.api.sendFlagSuccess("telemetry_client").catch(() => undefined),
+            onAccepted: () => undefined,
+            onBatchAccepted: countFlagSuccesses(services.api),
+            ...(services.interruptions && { surfaceOf: services.interruptions.surfaceOf }),
           });
         })
         .catch(() => {

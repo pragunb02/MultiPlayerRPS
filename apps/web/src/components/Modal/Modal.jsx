@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useInterruption } from "../../hooks/useInterruption.js";
 import { dialogQueue } from "./dialogQueue.js";
 import styles from "./Modal.module.css";
 
@@ -55,17 +56,27 @@ function holdTab(event, dialog) {
  *
  * One dialog is open at a time. A dialog opened while another is open waits, drawing nothing, until the first closes.
  *
- * @param {{ open: boolean, title: import("react").ReactNode, onClose: () => void, children: import("react").ReactNode, actions: import("react").ReactNode }} props
+ * Every dialog names its registered `surface` (CC-313) and is counted while open: closed with Escape or the backdrop
+ * it was dismissed, closed by one of its own buttons it was answered.
+ *
+ * @param {{ open: boolean, surface: string, title: import("react").ReactNode, onClose: () => void, children: import("react").ReactNode, actions: import("react").ReactNode }} props
  */
-export function Modal({ open, title, onClose, children, actions }) {
+export function Modal({ open, surface, title, onClose, children, actions }) {
   const dialog = useRef(null);
   const titleId = useId();
   const id = useId();
   // Callers often pass a new `onClose` on every render. Reading it here keeps the focus where it is when the page
   // behind the dialog updates, instead of moving it back to the first button (CC-254).
-  const close = useEffectEvent(() => onClose());
   const front = useSyncExternalStore(dialogQueue.subscribe, dialogQueue.front, dialogQueue.front);
   const shown = open && front === id;
+  // Counted while it is on screen: a dialog waiting behind another one is not showing yet (CC-313, CC-314).
+  const interruption = useInterruption(surface, { open: shown });
+  /** Escape or the backdrop: the dialog was put away without an answer (CC-313). */
+  const dismiss = () => {
+    interruption.dismissed();
+    onClose();
+  };
+  const close = useEffectEvent(() => dismiss());
 
   // Before paint, so the first dialog of a page shows in the same frame it was asked for.
   useLayoutEffect(() => {
@@ -104,13 +115,14 @@ export function Modal({ open, title, onClose, children, actions }) {
   // loss, a filter) would otherwise become the frame of the fixed backdrop: the dialog would be greyed with it and
   // cover only that part, leaving the buttons around it pressable (review of #113, CC-163).
   return createPortal(
-    <div className={styles.backdrop} onClick={onClose} data-cc-modal-backdrop="">
+    <div className={styles.backdrop} onClick={dismiss} data-cc-modal-backdrop="">
       <div
         ref={dialog}
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-cc-surface={surface}
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >

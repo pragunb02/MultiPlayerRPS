@@ -33,13 +33,14 @@ function Thanks({ name, reportId, canBlock, onBlocked, onClose }) {
     async () => {
       await api.blockPlayer({ reportId });
       setBlocked(true);
-      toast.show(text.blocked.english, { tone: "info" });
+      toast.show(text.blocked.english, { surface: "toast.blocked", tone: "info" });
       onBlocked();
     },
     { id: "report.block" },
   );
   return (
     <Modal
+      surface="dialog.report"
       key="sent"
       open
       title={<Lines text={text.sentTitle} />}
@@ -127,6 +128,7 @@ export function ReportDialog({ name, target, canBlock, onBlocked, onClose }) {
 
   return (
     <Modal
+      surface="dialog.report"
       key="form"
       open
       title={<Lines text={text.title} />}

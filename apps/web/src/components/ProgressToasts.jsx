@@ -47,11 +47,16 @@ export function ProgressToasts() {
   const onProgress = useEffectEvent((update) => {
     const { source, xpGained, leveledUp, progress } = update;
     if (isUncountedMatch(update)) {
-      toast.show(notCountedMessage(update.notCountedReason), { tone: "info", category: CATEGORIES.REWARD });
+      toast.show(notCountedMessage(update.notCountedReason), {
+        surface: "toast.not_counted",
+        tone: "info",
+        category: CATEGORIES.REWARD,
+      });
     } else if (leveledUp) {
       // The burst and the fanfare come with the toast. When the toast waits (a result or a question holds the
       // screen), they wait too, so one beat plays at a time (CC-163).
       toast.show(`Level up! You reached level ${progress.level}`, {
+        surface: "toast.level_up",
         tone: "success",
         category: CATEGORIES.REWARD,
         ...saveOffer(),
@@ -61,9 +66,13 @@ export function ProgressToasts() {
         },
       });
     } else if (isComputerGame(update)) {
-      toast.show(computerXpMessage(update), { tone: "info", category: CATEGORIES.REWARD });
+      toast.show(computerXpMessage(update), {
+        surface: "toast.computer_xp",
+        tone: "info",
+        category: CATEGORIES.REWARD,
+      });
     } else if (xpGained > 0 && source !== "quest") {
-      toast.show(`+${xpGained} XP`, { tone: "info", category: CATEGORIES.REWARD });
+      toast.show(`+${xpGained} XP`, { surface: "toast.xp", tone: "info", category: CATEGORIES.REWARD });
     }
   });
 

@@ -205,6 +205,7 @@ function Pops() {
           Open a dialog
         </Button>
         <Modal
+          surface="dialog.design_sample"
           open={open}
           title="Block Riya?"
           onClose={() => setOpen(false)}
@@ -227,7 +228,9 @@ function Pops() {
         <Button
           control="admin.design.toast"
           variant="secondary"
-          onClick={() => toast.show("Saved. This is a toast.", { tone: "success" })}
+          onClick={() =>
+            toast.show("Saved. This is a toast.", { surface: "toast.design_sample", tone: "success" })
+          }
         >
           Show a toast
         </Button>

@@ -60,6 +60,7 @@ export function SoundSettings({ open, onClose }) {
   const { muted } = useSoundSettings();
   return (
     <Modal
+      surface="dialog.sound"
       open={open}
       title="Sound settings"
       onClose={onClose}

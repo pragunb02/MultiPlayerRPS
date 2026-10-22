@@ -48,6 +48,8 @@ export function deviceOf(width) {
  *   strict: boolean,   throw on an event the catalogue does not allow (tests and development). Off in production,
  *     where such an event is dropped instead, so a mistake never breaks the page
  *   onAccepted?: () => void,   told once, the first time the server took a batch (the flag's success, CC-312)
+ *   onBatchAccepted?: (events: ReadonlyArray<Readonly<Record<string, string | number | boolean>>>) => void,  told of
+ *     each batch the server took, with its events (the flags' successes, review of #162)
  * }} deps
  */
 export function createTelemetryClient({
@@ -60,6 +62,7 @@ export function createTelemetryClient({
   clearTimer,
   strict,
   onAccepted = () => undefined,
+  onBatchAccepted = () => undefined,
 }) {
   /** @type {Array<Readonly<Record<string, string | number | boolean>>>} */
   let queue = [];
@@ -80,8 +83,11 @@ export function createTelemetryClient({
     const body = bodyOf(events);
     send(body).then(
       (ok) => {
-        if (ok) accept();
-        else if (triesLeft > 0) setTimer(() => deliver(events, triesLeft - 1), TELEMETRY_BATCH.retryAfterMs);
+        if (ok) {
+          accept();
+          onBatchAccepted(events);
+        } else if (triesLeft > 0)
+          setTimer(() => deliver(events, triesLeft - 1), TELEMETRY_BATCH.retryAfterMs);
       },
       () => {
         if (triesLeft > 0) setTimer(() => deliver(events, triesLeft - 1), TELEMETRY_BATCH.retryAfterMs);

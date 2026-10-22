@@ -1,4 +1,10 @@
 import { useSession } from "../../hooks/useSession.js";
+import { useEffect, useState } from "react";
+import { WAITED_CLASS } from "../../app/wakingUp.js";
+import { useInterruption } from "../../hooks/useInterruption.js";
+
+/** The stylesheet holds the screen back this long, so a fast load never flashes it (wakingUp.css). */
+const SHOWN_AFTER_MS = 600;
 
 /**
  * The arcade cabinet of the waking up screen. The same drawing is in index.html, where it shows before the app
@@ -38,10 +44,21 @@ export function WakingUpCabinet() {
  */
 export function WakingUp() {
   const session = useSession();
-  if (session.status !== "loading") return null;
+  const loading = session.status === "loading";
+  const [visible, setVisible] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains(WAITED_CLASS),
+  );
+  useEffect(() => {
+    if (!loading) return undefined;
+    const timer = setTimeout(() => setVisible(true), SHOWN_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [loading]);
+  // Counted only once it can be seen, so a fast load that never shows it is not an interruption (CC-313).
+  useInterruption("screen.waking_up", { open: loading && visible });
+  if (!loading) return null;
   return (
     <div className="wake-holder">
-      <div className="wake wake--inline" role="status" data-wake="app">
+      <div className="wake wake--inline" role="status" data-wake="app" data-cc-surface="screen.waking_up">
         <WakingUpCabinet />
         <p className="wake-title">Waking up the arcade…</p>
         <p className="wake-detail">Free servers take a moment to wake up.</p>

@@ -11,7 +11,9 @@ import {
   TELEMETRY_SOCKET_CODES,
 } from "./early.js";
 import { fits, flag, list, ms, optional, pattern, ratio } from "./fields.js";
+import { FUNNEL_IDS, FUNNEL_STEP_IDS } from "./funnels.js";
 import { API_ENDPOINTS, OTHER_ENDPOINT, TELEMETRY_ROUTES } from "./routes.js";
+import { SURFACE_CLASSES, SURFACE_IDS, SURFACE_KINDS, SURFACE_OPENERS } from "./surfaces.js";
 
 // The small values the page needs early live in early.js (CC-322). The catalogue still offers them.
 export {
@@ -43,6 +45,23 @@ export const TELEMETRY_TIER = "counts";
 export const TELEMETRY_DEVICES = Object.freeze({ PHONE: "phone", TABLET: "tablet", DESKTOP: "desktop" });
 /** The widths in CSS pixels at which a tablet and a desktop start. */
 export const DEVICE_WIDTHS = Object.freeze({ TABLET: 600, DESKTOP: 1024 });
+
+/** How an interruption ended (CC-313). */
+export const INTERRUPTION_OUTCOMES = Object.freeze({
+  ACTED: "acted",
+  DISMISSED: "dismissed",
+  TIMED_OUT: "timed_out",
+  COVERED: "covered",
+  PAGE_LEFT: "page_left",
+});
+
+/** Where in a visit an interruption showed (CC-313). */
+export const INTERRUPTION_PHASES = Object.freeze({
+  BEFORE_PLAY: "before_play",
+  PLAYING: "playing",
+  RESULT: "result",
+  ELSEWHERE: "elsewhere",
+});
 
 /** Error codes a client event may carry, besides `network`, `timeout` and `unknown`. */
 const CODES = Object.freeze([...Object.values(ERROR_CODES), "network", "timeout", "unknown"]);
@@ -90,6 +109,8 @@ const ELEMENTS = Object.freeze([
 export const BUILD_PATTERN = /^(?:\d{1,4}\.\d{1,2}\.\d{1,2}\+(?:[0-9a-f]{7}|local)|dev|unknown)$/;
 
 const control = pattern(CONTROL_PATTERN, CONTROL_MAX);
+const surfaceId = list(SURFACE_IDS);
+const interruptions = list(TELEMETRY_BUCKETS.INTERRUPTIONS);
 const element = list(ELEMENTS);
 const entries = list(Object.values(TELEMETRY_ENTRIES));
 const wait = ms(TELEMETRY_MAX_WAIT_MS);
@@ -141,10 +162,18 @@ export const TELEMETRY_EVENTS = Object.freeze({
     presses: list(TELEMETRY_BUCKETS.VISIT_PRESSES),
   }),
   // 3.2 Presses
-  control_pressed: client({ control, has_reason: flag() }),
-  dead_clicked: client({ control: optional(control), element: optional(element) }, { oneOf: pressedOn }),
+  control_pressed: client({ control, has_reason: flag(), surface: optional(surfaceId) }),
+  dead_clicked: client(
+    { control: optional(control), element: optional(element), surface: optional(surfaceId) },
+    { oneOf: pressedOn },
+  ),
   rage_clicked: client(
-    { control: optional(control), element: optional(element), presses: list(TELEMETRY_BUCKETS.RAGE_PRESSES) },
+    {
+      control: optional(control),
+      element: optional(element),
+      presses: list(TELEMETRY_BUCKETS.RAGE_PRESSES),
+      surface: optional(surfaceId),
+    },
     { oneOf: pressedOn },
   ),
   action_waited: client({
@@ -167,7 +196,32 @@ export const TELEMETRY_EVENTS = Object.freeze({
     game_id: gameIds,
     entry: entries,
     since_load_ms: ms(TELEMETRY_MAX_SINCE_LOAD_MS),
+    interruptions_before: optional(list(TELEMETRY_BUCKETS.INTERRUPTIONS_BEFORE)),
   }),
+  // Interruptions, text and steps (CC-313)
+  interruption_ended: client({
+    surface: surfaceId,
+    kind: list(SURFACE_KINDS),
+    class: list(Object.values(SURFACE_CLASSES)),
+    blocking: flag(),
+    outcome: list(Object.values(INTERRUPTION_OUTCOMES)),
+    shown_ms: list(TELEMETRY_BUCKETS.SHOWN_MS),
+    phase: list(Object.values(INTERRUPTION_PHASES)),
+    trigger: list(Object.values(SURFACE_OPENERS)),
+    stack: list(TELEMETRY_BUCKETS.STACK),
+  }),
+  interruption_counted: client({
+    scope: list(["visit", "game"]),
+    game_id: optional(gameIds),
+    optional: interruptions,
+    blocking_optional: list(TELEMETRY_BUCKETS.BLOCKING_INTERRUPTIONS),
+    essential: interruptions,
+  }),
+  screen_text_measured: client({
+    words: list(TELEMETRY_BUCKETS.WORDS),
+    fold_words: list(TELEMETRY_BUCKETS.WORDS),
+  }),
+  funnel_step_reached: client({ funnel: list(FUNNEL_IDS), step: list(FUNNEL_STEP_IDS) }),
   // 3.5 Errors and connection
   client_errored: client({
     kind: list(["render", "unhandled", "chunk_load", "stale_build_reload"]),

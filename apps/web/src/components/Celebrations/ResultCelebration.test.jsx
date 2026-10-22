@@ -148,8 +148,8 @@ describe("ResultCelebration", () => {
   it("keeps lower toasts waiting while the moment plays, then lets them through (CC-099 beat 1)", async () => {
     await celebrate(finished(), { beforeResult: () => vi.useFakeTimers() });
 
-    act(() => toasts.show("+30 XP", { category: "reward" }));
-    act(() => toasts.show("Bob left the room", { category: "social" }));
+    act(() => toasts.show("+30 XP", { surface: "toast.xp", category: "reward" }));
+    act(() => toasts.show("Bob left the room", { surface: "toast.xp", category: "social" }));
     expect(toastText()).toBe("");
 
     act(() => vi.advanceTimersByTime(1_199));
@@ -162,7 +162,7 @@ describe("ResultCelebration", () => {
   it("holds nothing for a result that was already over when the page opened (a reload)", async () => {
     await celebrate(finished(), { beforeResult: () => vi.useFakeTimers(), live: false });
 
-    act(() => toasts.show("+30 XP", { category: "reward" }));
+    act(() => toasts.show("+30 XP", { surface: "toast.xp", category: "reward" }));
 
     expect(toastText()).toBe("+30 XP");
   });
@@ -170,14 +170,14 @@ describe("ResultCelebration", () => {
   it("never holds back what matters more than the result: a lost connection shows at once", async () => {
     await celebrate(finished(), { beforeResult: () => vi.useFakeTimers() });
 
-    act(() => toasts.show("Connection lost", { category: "system" }));
+    act(() => toasts.show("Connection lost", { surface: "toast.xp", category: "system" }));
 
     expect(toastText()).toBe("Connection lost");
   });
 
   it("lets the waiting toasts through when the result goes before the moment is over (a quick rematch)", async () => {
     const { hide } = await celebrate(finished(), { beforeResult: () => vi.useFakeTimers() });
-    act(() => toasts.show("+30 XP", { category: "reward" }));
+    act(() => toasts.show("+30 XP", { surface: "toast.xp", category: "reward" }));
 
     hide();
 
