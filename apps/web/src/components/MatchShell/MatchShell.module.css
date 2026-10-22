@@ -160,3 +160,38 @@
     transform: translateY(0.5rem);
   }
 }
+
+/* The board's place while its code downloads (CC-346): as tall as the smallest board of the game at this width, so
+   the action bar under the stage does not move when the board comes. The numbers are each board's height on the
+   stage at its turn, measured across widths (docs/tickets/CC-346.md); 100cqi is the stage's width. A game that is
+   not listed keeps no space. e2e/match-shell.spec.js checks that Leave room stays put. */
+.boardSpace {
+  container-type: inline-size;
+}
+.boardSpaceFill {
+  margin: 0;
+}
+.boardSpace[data-cc-board-space="tictactoe"] .boardSpaceFill {
+  min-height: min(calc(100cqi + 137px), 541px);
+}
+.boardSpace[data-cc-board-space="rps"] .boardSpaceFill {
+  min-height: 402px;
+}
+@container (max-width: 539px) {
+  .boardSpace[data-cc-board-space="rps"] .boardSpaceFill {
+    min-height: 432px;
+  }
+}
+@container (max-width: 309px) {
+  .boardSpace[data-cc-board-space="rps"] .boardSpaceFill {
+    min-height: 456px;
+  }
+}
+.boardSpace[data-cc-board-space="chess"] .boardSpaceFill {
+  min-height: max(calc(100cqi - 38px), 472px);
+}
+@media (max-width: 48rem) {
+  .boardSpace[data-cc-board-space="chess"] .boardSpaceFill {
+    min-height: calc(100cqi + 410px);
+  }
+}

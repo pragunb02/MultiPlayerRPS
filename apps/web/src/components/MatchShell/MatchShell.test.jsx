@@ -187,7 +187,8 @@ describe("MatchShell with a game that brings only a Board (CC-157)", () => {
     expect(controlsIn(slot("action-bar"))).toEqual(["room.leave"]);
   });
 
-  it("shows Leave under the stage only once the board is here, so it never moves when the board comes (CC-346)", async () => {
+  it("keeps Leave room pressable and focused while the board downloads, and keeps the board's place (CC-346)", async () => {
+    const user = userEvent.setup();
     let arrive;
     const LazyBoard = lazy(
       () =>
@@ -198,16 +199,23 @@ describe("MatchShell with a game that brings only a Board (CC-157)", () => {
     const { update } = mount(roomView({ status: "waiting", seats: [ME], game: undefined }), {
       game: { Board: LazyBoard },
     });
-    expect(screen.getByRole("button", { name: "Leave room" })).toBeVisible();
+    const leave = screen.getByRole("button", { name: "Leave room" });
+    leave.focus();
 
     update(roomView());
 
-    expect(screen.getByText("Loading the board…")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Leave room" })).toBeNull();
+    // The game started and its board is on its way: its place is kept, and Leave room is the same button, focused.
+    expect(
+      within(slot("stage")).getByText("Loading the board…").closest("[data-cc-board-space]"),
+    ).toHaveAttribute("data-cc-board-space", "chess");
+    expect(screen.getByRole("button", { name: "Leave room" })).toBe(leave);
+    expect(leave).toHaveFocus();
+    await user.click(leave);
+    expect(screen.getByRole("dialog", { name: "Leave the game?" })).toBeInTheDocument();
+
     await act(async () => arrive());
     expect(within(slot("stage")).getByText("Board for game 1")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Leave room" })).toBeVisible();
-    expect(screen.queryByText("Loading the board…")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Leave the game?" })).toBeInTheDocument();
   });
 
   it("says so when the game has no board in the web app yet", () => {

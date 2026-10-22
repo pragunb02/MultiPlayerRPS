@@ -1,6 +1,21 @@
 import { AppRequestError, networkError } from "./errors.js";
 
 /**
+ * How long a request may take, answer included, before it is given up as a network failure (CC-346). Every answer
+ * of the API is small and quick, so a request still open after this is lost, and it must not hold anything that
+ * waits for it.
+ */
+export const REQUEST_TIMEOUT_MS = 15_000;
+/** The data export is the one big answer (CC-035): a whole account's history, on a slow phone connection too. */
+export const EXPORT_TIMEOUT_MS = 120_000;
+/**
+ * How long a renewal of the session id waits for the requests already on their way before it is sent anyway
+ * (CC-346). They are usually answered in well under a second; one that never is must not hold the renewal, nor
+ * every request after it.
+ */
+export const RENEWAL_WAIT_MS = 3_000;
+
+/**
  * The HTTP API client — the only place the web app calls `fetch`. Same-origin requests carry the session
  * cookie automatically; errors become AppRequestError with the server's code.
  *
@@ -16,11 +31,11 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
    * Sends a request. While the session id is being renewed it waits until the renewal is answered, so it carries
    * the new id, never the old one the server is about to drop (CC-346).
    */
-  async function request(method, path, body) {
+  async function request(method, path, body, { timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
     while (renewal !== undefined) {
       await renewal.catch(() => undefined);
     }
-    const sent = send(method, path, body);
+    const sent = send(method, path, body, timeoutMs);
     onTheirWay.add(sent);
     const done = () => onTheirWay.delete(sent);
     sent.then(done, done);
@@ -32,13 +47,13 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
    * other devices" (CC-116). It waits for the requests already on their way, and the requests made meanwhile wait
    * for it. Otherwise the server could read a request of this page with the old id after it was dropped, and answer
    * it as from a visitor: "No active session", or "signed out" for "who am I?", which showed this page signed out
-   * (CC-346).
+   * (CC-346). It waits at most RENEWAL_WAIT_MS: a request that is never answered does not hold it.
    */
   async function renewingRequest(method, path, body) {
     while (renewal !== undefined) {
       await renewal.catch(() => undefined);
     }
-    const mine = Promise.allSettled([...onTheirWay]).then(() => send(method, path, body));
+    const mine = settledOrLate([...onTheirWay]).then(() => send(method, path, body, REQUEST_TIMEOUT_MS));
     renewal = mine;
     try {
       return await mine;
@@ -47,7 +62,31 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     }
   }
 
-  async function send(method, path, body) {
+  /** Resolves once every one of `requests` has settled, or after RENEWAL_WAIT_MS, whichever comes first. */
+  function settledOrLate(requests) {
+    let timer;
+    const late = new Promise((resolve) => {
+      timer = setTimeout(resolve, RENEWAL_WAIT_MS);
+    });
+    return Promise.race([Promise.allSettled(requests), late]).finally(() => clearTimeout(timer));
+  }
+
+  async function send(method, path, body, timeoutMs) {
+    // Given up after its time, answer included, so nothing waits for it for ever (CC-346). A timer of the page's
+    // own rather than AbortSignal.timeout, so tests can move the clock.
+    const limit = new AbortController();
+    const timer = setTimeout(
+      () => limit.abort(new DOMException("The request took too long", "TimeoutError")),
+      timeoutMs,
+    );
+    try {
+      return await answerOf(method, path, body, limit.signal);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function answerOf(method, path, body, signal) {
     let res;
     try {
       res = await fetchImpl(`${baseUrl}/api${path}`, {
@@ -55,6 +94,7 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
         credentials: "same-origin",
         headers: body === undefined ? {} : { "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
       });
     } catch (err) {
       throw networkError(err);
@@ -68,7 +108,7 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     } catch (err) {
       // A success whose answer never fully arrived is a failed request, not an empty answer. WebKit cuts the
       // answer off when the player leaves the page while it is still arriving, and an empty answer made the
-      // page read data that was not there (CC-184).
+      // page read data that was not there (CC-184). An answer that took too long is cut off the same way.
       if (res.ok) {
         throw networkError(err);
       }
@@ -131,7 +171,8 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     correctBirthYear: async (correction) =>
       (await request("PUT", "/admin/accounts/birth-year", correction)).account,
     /** Everything ClassiCade holds about the account, as JSON, after the password is given again (CC-035). */
-    exportData: (password) => request("POST", "/account/export", { password }),
+    exportData: (password) =>
+      request("POST", "/account/export", { password }, { timeoutMs: EXPORT_TIMEOUT_MS }),
     /** Deletes the account and everything linked to it. This browser is signed out (CC-035). */
     deleteAccount: async (password) => {
       await request("POST", "/account/delete", { password });
