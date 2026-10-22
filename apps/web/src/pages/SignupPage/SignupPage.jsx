@@ -3,6 +3,7 @@ import { ERROR_CODES, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicad
 import { Link, Navigate, useSearchParams } from "react-router";
 import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { YEAR_NOT_SAID, YearSelect } from "../../components/YearSelect/YearSelect.jsx";
@@ -104,7 +105,7 @@ export function SignupPage() {
     <section className={styles.page}>
       <PageTitle>Sign up</PageTitle>
       <h1>Create your account</h1>
-      <form className={styles.form} onSubmit={submit} noValidate>
+      <Card as="form" variant="accent" tone="primary" className={styles.form} onSubmit={submit} noValidate>
         <Field
           label="Username"
           autoComplete="username"
@@ -145,14 +146,16 @@ export function SignupPage() {
           locked={tooYoung}
         />
         {tooYoung && (
-          <p className={styles.note}>
-            <Link to={paths.home()} data-cc-control="auth.signup.play_as_guest">
+          <div>
+            <Button as="link" to={paths.home()} control="auth.signup.play_as_guest" variant="secondary">
               Play as a guest
-            </Link>
-          </p>
+            </Button>
+          </div>
         )}
         {session.identity?.kind === "guest" && (
-          <p className={styles.note}>Your guest XP, level and match history will move to your new account.</p>
+          <Card as="p" variant="notice" tone="info">
+            Your guest XP, level and match history will move to your new account.
+          </Card>
         )}
         <Button
           control="auth.signup"
@@ -163,7 +166,7 @@ export function SignupPage() {
         >
           Create account
         </Button>
-      </form>
+      </Card>
       <p className={styles.switch}>
         Already have an account?{" "}
         <Link to={paths.login(next)} data-cc-control="auth.to_login">

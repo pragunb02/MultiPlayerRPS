@@ -288,7 +288,7 @@
 }
 .burstLabel {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-size: var(--text-xl);
   letter-spacing: 0.04em;
   color: var(--color-gold);
@@ -299,7 +299,7 @@
 .xpPop {
   display: inline-block;
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-size: var(--text-lg);
   font-variant-numeric: tabular-nums;
   color: var(--color-xp);
@@ -331,7 +331,7 @@
   gap: var(--space-1);
   color: var(--color-streak);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
 }
 .flame {

@@ -279,6 +279,25 @@ describe("Chess on one phone", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Ben won by resignation" })).toBeInTheDocument();
   });
 
+  it("asks who resigns as a destructive confirm: a click beside it keeps it open, each choice is danger (CC-323)", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    await startGame(user, { slug: "chess" });
+
+    await user.click(await screen.findByRole("button", { name: "Resign" }));
+    const backdrop = document.querySelector("[data-cc-modal-backdrop]");
+    expect(backdrop).toHaveAttribute("data-cc-modal-backdrop", "destructive");
+    await user.click(backdrop);
+    const dialog = screen.getByRole("dialog");
+    for (const name of ["Resign for Asha", "Resign for Ben"]) {
+      expect(within(dialog).getByRole("button", { name })).toHaveAttribute("data-cc-variant", "danger");
+    }
+    expect(within(dialog).getByRole("button", { name: "Keep playing" })).toHaveAttribute(
+      "data-cc-variant",
+      "secondary",
+    );
+  });
+
   it("lets the player who is not to move resign as well", async () => {
     const user = userEvent.setup();
     vi.spyOn(Math, "random").mockReturnValue(0);
@@ -321,5 +340,23 @@ describe("Chess on one phone", () => {
     await user.click(screen.getByRole("button", { name: "Accept" }));
 
     expect(document.getElementById("result-heading")).toHaveTextContent("Draw by agreement");
+  });
+});
+
+describe("the pass and play setup's parts (CC-323)", () => {
+  it("is one card with the shared page title and a field for each name", async () => {
+    renderApp({ path: "/games/tic-tac-toe/pass-and-play" });
+
+    const form = await screen.findByRole("form", { name: "Players" });
+    expect(form).toHaveAttribute("data-cc-card", "surface");
+    expect(screen.getByRole("heading", { level: 1, name: "Tic Tac Toe: pass and play" })).toHaveClass(
+      "pageTitle",
+    );
+    for (const name of ["Player 1", "Player 2"]) {
+      expect(within(form).getByRole("textbox", { name }).closest("[data-cc-field]")).toHaveAttribute(
+        "data-cc-field",
+        "text",
+      );
+    }
   });
 });

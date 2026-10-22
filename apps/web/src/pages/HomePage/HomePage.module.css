@@ -46,7 +46,7 @@
   border-radius: var(--radius-full);
   background: var(--color-backdrop);
   color: var(--color-on-hero);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 
 .games {
@@ -58,102 +58,42 @@
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--space-6);
 }
-/* A game tile: its own accent colour, illustrated, lifts on hover and keyboard focus (the whole tile is the link). */
-.card {
-  --accent: var(--color-primary);
-  position: relative;
-  display: grid;
-  gap: var(--space-1);
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-bottom-width: 6px;
-  border-bottom-color: var(--accent);
-  border-radius: var(--radius-xl);
-  padding: var(--space-4) var(--space-6) var(--space-6);
-  box-shadow: var(--shadow-sm);
-  transition:
-    transform var(--duration-base) var(--ease-out),
-    border-color var(--duration-base) var(--ease-out),
-    box-shadow var(--duration-base) var(--ease-out);
+/* The tile's art runs to the card's edges (CardMedia) and grows a little when the tile lifts (CC-323). */
+.art {
+  padding: var(--space-4) var(--space-6) var(--space-2);
 }
-.rps {
-  --accent: var(--color-game-rps);
-}
-.tictactoe {
-  --accent: var(--color-game-tictactoe);
-}
-.chess {
-  --accent: var(--color-game-chess);
-}
-.primary {
-  --accent: var(--color-primary);
-}
-.card:hover,
-.card:focus-within {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: var(--shadow-md);
-}
-.cardArt {
-  margin: 0 calc(-1 * var(--space-2)) var(--space-2);
-  padding: var(--space-2);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
+.art > svg {
   transition: transform var(--duration-base) var(--ease-out);
 }
-.card:hover .cardArt,
-.card:focus-within .cardArt {
+li:hover > .art > svg,
+li:focus-within > .art > svg {
   transform: scale(1.04);
 }
-.cardLink {
-  color: var(--color-text);
-  text-decoration: none;
-}
-/* The whole card is clickable via the heading link. */
-.cardLink::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-xl);
-}
-.cardLink:focus-visible {
-  outline: none;
-}
-.cardLink:focus-visible::after {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 3px;
-}
-.card h3 {
-  margin: 0;
-  font-size: var(--text-lg);
-}
-.meta {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-.play {
-  position: absolute;
-  right: var(--space-4);
-  bottom: var(--space-4);
-  padding: var(--space-1) var(--space-4);
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  color: var(--color-primary-contrast);
+.go {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-primary);
   font-family: var(--font-display);
-  font-weight: 800;
-  font-size: var(--text-sm);
-  transition: transform var(--duration-base) var(--ease-spring);
+  font-size: var(--type-label);
+  font-weight: var(--weight-heavy);
 }
-.card:hover .play,
-.card:focus-within .play {
-  transform: scale(1.08);
+.arrow {
+  transition: transform var(--duration-base) var(--ease-out);
+}
+li:hover .arrow,
+li:focus-within .arrow {
+  transform: translateX(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  li:hover > .art > svg,
+  li:focus-within > .art > svg,
+  li:hover .arrow,
+  li:focus-within .arrow {
+    transform: none;
+  }
 }
 
-/* The daily puzzle card (CC-144) has words instead of art, so it keeps room under them for its Solve badge. */
 .daily {
   margin-top: var(--space-8);
-}
-.daily .card {
-  padding-bottom: var(--space-12);
 }

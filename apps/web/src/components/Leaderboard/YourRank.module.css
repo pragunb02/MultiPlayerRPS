@@ -1,20 +1,8 @@
-/* Your standing on the XP boards, as two scoreboard tiles (CC-087 arcade look). */
-.card {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-6);
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-}
+/* Your standing on the XP boards, two numbers side by side with their board's name (CC-087, CC-323). */
 .heading {
-  margin: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-family: var(--font-display);
-  font-weight: 800;
 }
 .trophy {
   width: 2rem;
@@ -23,23 +11,26 @@
 .muted {
   margin: 0;
   color: var(--color-text-muted);
+  font-size: var(--type-label);
 }
 .stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-2);
   margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
 }
 .stat {
+  display: grid;
+  gap: var(--space-1);
   text-align: center;
-  background: var(--color-surface-raised);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2);
+}
+.stat + .stat {
+  border-left: 1px solid var(--color-border);
 }
 .stat dt {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
@@ -47,8 +38,7 @@
 .stat dd {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 800;
+  font-size: var(--type-section-title);
+  font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
-  color: var(--color-gold);
 }

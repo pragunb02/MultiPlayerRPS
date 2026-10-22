@@ -7,11 +7,11 @@ import { Button } from "../../components/Button/Button.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
 import { useToast } from "../../components/Toast/toastContext.js";
 import { TurnBanner } from "../../components/TurnBanner/TurnBanner.jsx";
-import { useAction } from "../../hooks/useAction.js";
 import { useFlag } from "../../hooks/useFlag.js";
 import { contrastRatio } from "../../styles/contrast.js";
 import {
   BRAND_COLOURS,
+  BREAKPOINTS,
   colourTokensOf,
   ELEVATIONS,
   LAYERS,
@@ -19,8 +19,17 @@ import {
   PLAYER_ROLES,
   STATUS_ROLES,
   TYPE_ROLES,
+  WEIGHTS,
 } from "../../styles/tokenRoles.js";
 import { ConsoleTabs } from "./ConsoleTabs.jsx";
+import {
+  ButtonStates,
+  CardStates,
+  FieldStates,
+  RegionStates,
+  SectionPatterns,
+  TabStates,
+} from "./DesignComponents.jsx";
 import consoleStyles from "./AdminPage.module.css";
 import styles from "./DesignPage.module.css";
 
@@ -110,7 +119,7 @@ function ColourRoles() {
 function TypeAndElevation() {
   return (
     <section aria-labelledby="design-type">
-      <h2 id="design-type">Type, elevation and layers</h2>
+      <h2 id="design-type">Type, weight, breakpoints, elevation and layers</h2>
       <ul className={styles.stack}>
         {[...TYPE_ROLES, ...LEADING_ROLES].map(({ token, use }) => (
           <li key={token}>
@@ -119,6 +128,34 @@ function TypeAndElevation() {
           </li>
         ))}
       </ul>
+      <ul className={styles.stack}>
+        {WEIGHTS.map(({ token, use }) => (
+          <li key={token}>
+            <p className={styles[token.slice(2)]}>The quick move wins the round</p>
+            <code>{token}</code> <span className={styles.use}>{use}</span>
+          </li>
+        ))}
+      </ul>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th scope="col">Breakpoint</th>
+            <th scope="col">Width</th>
+            <th scope="col">Use</th>
+          </tr>
+        </thead>
+        <tbody>
+          {BREAKPOINTS.map(({ token, use }) => (
+            <tr key={token}>
+              <th scope="row">
+                <code>{token}</code>
+              </th>
+              <td>{tokenValue(token) || "–"}</td>
+              <td>{use}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <ul className={styles.cards}>
         {ELEVATIONS.map(({ token, use }) => (
           <li key={token} className={`${styles.card} ${styles[token.slice(2)]}`}>
@@ -151,43 +188,6 @@ function TypeAndElevation() {
   );
 }
 
-/** Waits a moment and then answers, so the waiting state shows. */
-const later = (ms, outcome) =>
-  new Promise((resolve, reject) => setTimeout(() => outcome(resolve, reject), ms));
-
-function Buttons() {
-  const waits = useAction(() => later(1_200, (resolve) => resolve()), { id: "admin.design.waiting" });
-  const fails = useAction(() => later(0, (_, reject) => reject(new Error("The server did not answer."))), {
-    id: "admin.design.failed",
-  });
-  return (
-    <div className={styles.example} data-cc-component="button">
-      <h3>Button</h3>
-      <div className={styles.row}>
-        <Button control="admin.design.primary">Play now</Button>
-        <Button control="admin.design.secondary" variant="secondary">
-          Invite a friend
-        </Button>
-        <Button control="admin.design.ghost" variant="ghost">
-          Leave
-        </Button>
-        <Button control="admin.design.accent" variant="accent">
-          Delete account
-        </Button>
-        <Button control="admin.design.reason" reason="Wait for your turn.">
-          Resign
-        </Button>
-        <Button control="admin.design.waiting" variant="secondary" action={waits} doneLabel="Sent">
-          Press to see waiting
-        </Button>
-        <Button control="admin.design.failed" variant="secondary" action={fails}>
-          Press to see failed
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function Pops() {
   const [open, setOpen] = useState(false);
   const toast = useToast();
@@ -206,6 +206,7 @@ function Pops() {
         </Button>
         <Modal
           open={open}
+          destructive
           title="Block Riya?"
           onClose={() => setOpen(false)}
           actions={
@@ -213,7 +214,7 @@ function Pops() {
               <Button control="admin.design.dialog.cancel" variant="secondary" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button control="admin.design.dialog.confirm" variant="accent" onClick={() => setOpen(false)}>
+              <Button control="admin.design.dialog.confirm" variant="danger" onClick={() => setOpen(false)}>
                 Block
               </Button>
             </>
@@ -247,26 +248,6 @@ function Pops() {
 function StaticParts() {
   return (
     <>
-      <div className={styles.example} data-cc-component="card">
-        <h3>Card</h3>
-        <div className={styles.cards}>
-          <article className={`${styles.card} ${styles["elevation-1"]}`} aria-labelledby="design-card-rest">
-            <h4 id="design-card-rest">Rock Paper Scissors</h4>
-            <p className={styles.use}>A card at rest, with one button.</p>
-            <Button control="admin.design.card" variant="secondary">
-              Play
-            </Button>
-          </article>
-          <article
-            className={`${styles.card} ${styles.featured} ${styles["elevation-2"]}`}
-            aria-labelledby="design-card-featured"
-          >
-            <h4 id="design-card-featured">Today&apos;s puzzle</h4>
-            <p className={styles.use}>The one featured card of a screen.</p>
-            <Button control="admin.design.card.featured">Solve</Button>
-          </article>
-        </div>
-      </div>
       <div className={styles.example} data-cc-component="badge">
         <h3>Badge</h3>
         <p className={styles.row}>
@@ -276,15 +257,6 @@ function StaticParts() {
             3
           </span>
         </p>
-      </div>
-      <div className={styles.example} data-cc-component="empty state">
-        <h3>Empty state</h3>
-        <div className={styles.empty}>
-          <p>
-            <strong>No friends yet.</strong> Friends you add show up here, with who is online.
-          </p>
-          <Button control="admin.design.empty">Add a friend</Button>
-        </div>
       </div>
     </>
   );
@@ -301,9 +273,14 @@ function Contract() {
       <TypeAndElevation />
       <section aria-labelledby="design-components">
         <h2 id="design-components">Components</h2>
-        <Buttons />
+        <ButtonStates />
         <Pops />
+        <CardStates />
         <StaticParts />
+        <RegionStates />
+        <FieldStates />
+        <TabStates />
+        <SectionPatterns />
       </section>
     </>
   );

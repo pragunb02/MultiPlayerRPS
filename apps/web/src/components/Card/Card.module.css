@@ -1,0 +1,184 @@
+/*
+ * The one card (CC-323): the same surface, border, radius, padding and elevation everywhere. The padding is one
+ * custom property, so the media slot can run out to the edges by exactly that much.
+ */
+.card {
+  --card-pad: var(--space-4);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--card-pad);
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--elevation-1);
+}
+@media (min-width: 48rem) {
+  .card {
+    --card-pad: var(--space-6);
+  }
+}
+.surface {
+  box-shadow: var(--elevation-1);
+}
+.raised {
+  border-color: var(--color-primary-soft);
+  box-shadow: var(--elevation-2);
+}
+/* A strip of colour along the top edge, drawn inside the border so the card keeps its size. */
+.accent {
+  border-top-width: var(--space-2);
+  box-shadow: var(--elevation-2);
+}
+.tone-primary {
+  border-top-color: var(--color-primary);
+}
+.tone-rps {
+  border-top-color: var(--color-game-rps);
+}
+.tone-tictactoe {
+  border-top-color: var(--color-game-tictactoe);
+}
+.tone-chess {
+  border-top-color: var(--color-game-chess);
+}
+.tone-gold {
+  border-top-color: var(--color-gold);
+  box-shadow: var(--elevation-2), var(--glow-gold);
+}
+/* A notice: the status's pale background and its colour on the border. Its words carry the meaning. */
+.notice {
+  box-shadow: none;
+}
+.tone-info {
+  border-color: var(--color-info);
+  background: var(--color-info-soft);
+}
+.tone-success {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+}
+.tone-warning {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+.tone-danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+/* Simple tier (ADR-075): a lift and the brand glow on hover and focus, in CSS on the motion tokens. */
+.interactive {
+  cursor: pointer;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+.interactive:hover,
+.interactive:focus-within {
+  transform: translateY(-4px);
+  border-color: var(--color-primary);
+  box-shadow: var(--elevation-hover);
+}
+.interactive:active {
+  transform: translateY(-1px);
+  transition-duration: var(--duration-instant);
+}
+.selected {
+  border-color: var(--color-primary);
+  box-shadow: var(--elevation-1), var(--glow-primary);
+}
+.blocked {
+  opacity: 0.7;
+}
+.reason {
+  margin: 0;
+  font-size: var(--type-label);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-muted);
+}
+/* Art that runs to the card's edges: out by the padding on three sides, square at the bottom. */
+.media {
+  display: grid;
+  place-items: center;
+  margin: calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad)) 0;
+  overflow: hidden;
+  background: var(--color-surface-raised);
+}
+.media > svg,
+.media > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.header {
+  display: grid;
+  gap: var(--space-1);
+}
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.title {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-title);
+  font-weight: var(--weight-heavy);
+  line-height: var(--leading-tight);
+  overflow-wrap: break-word;
+}
+.aside {
+  flex: none;
+}
+.description {
+  margin: 0;
+  font-size: var(--type-label);
+  line-height: var(--leading-body);
+  color: var(--color-text-muted);
+}
+.link {
+  color: inherit;
+  text-decoration: none;
+}
+/* The one link covers the whole card, so a press anywhere follows it. The focus ring is drawn on the card. */
+.link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.link:focus-visible {
+  outline: none;
+}
+.link:focus-visible::after {
+  outline: 3px solid var(--color-focus);
+  outline-offset: -3px;
+}
+.body {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .interactive:hover,
+  .interactive:focus-within,
+  .interactive:active {
+    transform: none;
+  }
+}

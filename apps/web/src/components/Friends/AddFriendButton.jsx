@@ -32,7 +32,7 @@ export function AddFriendButton({ target, name, control }) {
     <Button
       control={control}
       variant="ghost"
-      className={styles.add}
+      size="sm"
       action={add}
       pendingLabel="Sending…"
       aria-label={`Add friend ${name}`}

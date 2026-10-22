@@ -2,7 +2,9 @@ import { useState } from "react";
 import { SITE_NAME } from "@classicade/shared";
 import { useServices } from "../../app/servicesContext.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
 import { Field } from "../../components/Field/Field.jsx";
+import { PageHeader, Section } from "../../components/Page/Page.jsx";
 import { YEAR_NOT_SAID, YearSelect } from "../../components/YearSelect/YearSelect.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { ConsoleTabs } from "./ConsoleTabs.jsx";
@@ -37,44 +39,54 @@ export function AgeCorrections() {
     <section className={consoleStyles.page} aria-labelledby="ages-title">
       <title>{`Ages · Owner console · ${SITE_NAME}`}</title>
       <meta name="robots" content="noindex, nofollow" />
-      <header className={consoleStyles.header}>
-        <h1 id="ages-title">Birth year corrections</h1>
-        <p className={consoleStyles.lede}>
-          Players set their year once. Correct it only after checking the request, such as a message from the
-          account&apos;s own email. The year is never logged.
-        </p>
-      </header>
+      <PageHeader
+        id="ages-title"
+        title="Birth year corrections"
+        lede="Players set their year once. Correct it only after checking the request, such as a message from the account's own email. The year is never logged."
+      />
       <ConsoleTabs current="ages" />
-      <form className={consoleStyles.range} onSubmit={(event) => event.preventDefault()} noValidate>
-        <Field
-          label="Account email"
-          type="email"
-          autoComplete="off"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <YearSelect
-          control="admin.ages.year"
-          currentYear={new Date().getFullYear()}
-          value={year}
-          onChange={setYear}
-        />
-        <Button
-          control="admin.ages.correct"
-          action={correct}
-          reason={noEmail || (year === YEAR_NOT_SAID ? "Choose a year first" : "")}
+      <Section
+        title="Correct one account"
+        description="Find the account by its email, then set or clear its year of birth."
+      >
+        <Card
+          as="form"
+          onSubmit={(event) => event.preventDefault()}
+          noValidate
+          aria-label="Correct one account"
         >
-          Correct the year
-        </Button>
-        <Button control="admin.ages.clear" variant="secondary" action={clear} reason={noEmail}>
-          Clear the year
-        </Button>
-      </form>
-      {done !== "" && (
-        <p role="status" data-cc-slot="ages-result">
-          {done}
-        </p>
-      )}
+          <div className={consoleStyles.rangeFields}>
+            <Field
+              label="Account email"
+              type="email"
+              autoComplete="off"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <YearSelect
+              control="admin.ages.year"
+              currentYear={new Date().getFullYear()}
+              value={year}
+              onChange={setYear}
+            />
+            <Button
+              control="admin.ages.correct"
+              action={correct}
+              reason={noEmail || (year === YEAR_NOT_SAID ? "Choose a year first" : "")}
+            >
+              Correct the year
+            </Button>
+            <Button control="admin.ages.clear" variant="secondary" action={clear} reason={noEmail}>
+              Clear the year
+            </Button>
+          </div>
+        </Card>
+        {done !== "" && (
+          <p role="status" data-cc-slot="ages-result">
+            {done}
+          </p>
+        )}
+      </Section>
     </section>
   );
 }

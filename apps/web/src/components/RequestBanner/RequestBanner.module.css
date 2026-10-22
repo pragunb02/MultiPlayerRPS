@@ -63,10 +63,7 @@
 .time {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-.link {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 @keyframes slide-in {
   from {

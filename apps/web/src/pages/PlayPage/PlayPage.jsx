@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { characterForGame, ROOM_CODE_LENGTH } from "@classicade/shared";
 import { gameForSlug, paths } from "../../app/paths.js";
 import { GameArt } from "../../art/games/GameArt.jsx";
 import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardBody, CardHeader } from "../../components/Card/Card.jsx";
+import { Field } from "../../components/Field/Field.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { PlayComputer } from "../../components/PlayComputer/PlayComputer.jsx";
 import { gameView } from "../../games/registry.js";
@@ -67,36 +69,48 @@ export function PlayPage() {
   }
 
   return (
-    <section className={styles.page}>
+    <section>
       <PageTitle>{game.name}</PageTitle>
-      <div className={`${styles.banner} ${styles[gameArtFor(game.id).tone]}`}>
+      <Card as="div" variant="accent" tone={gameArtFor(game.id).tone} className={styles.banner}>
         <h1>{game.name}</h1>
         <GameArt gameId={game.id} className={styles.art} />
-      </div>
+      </Card>
       <div className={styles.panels}>
         <PlayComputer character={character} action={playComputer} />
-        <div className={styles.panel}>
-          <h2>Play a friend</h2>
-          {Options && <Options value={options} onChange={setOptions} />}
-          <Button
-            control="lobby.create"
-            variant="secondary"
-            size="lg"
-            action={create}
-            pendingLabel="Creating…"
-          >
-            Create room
-          </Button>
-          <p className={styles.note}>Friend not online now? Send a challenge link. It lasts 24 hours.</p>
-          <Button control="lobby.challenge" variant="secondary" action={challenge} pendingLabel="Making it…">
-            Make a challenge link
-          </Button>
-        </div>
-        <form className={styles.panel} onSubmit={join}>
-          <h2>Join a friend</h2>
-          <label>
-            Room code
-            <input
+        <Card as="section" aria-labelledby="lobby-friend">
+          <CardHeader id="lobby-friend" title="Play a friend" titleAs="h2" />
+          <CardBody>
+            {Options && (
+              <div className={styles.options}>
+                <Options value={options} onChange={setOptions} />
+              </div>
+            )}
+            <Button
+              control="lobby.create"
+              variant="secondary"
+              size="lg"
+              action={create}
+              pendingLabel="Creating…"
+            >
+              Create room
+            </Button>
+            <p className={styles.note}>Friend not online now? Send a challenge link. It lasts 24 hours.</p>
+            <Button
+              control="lobby.challenge"
+              variant="secondary"
+              action={challenge}
+              pendingLabel="Making it…"
+            >
+              Make a challenge link
+            </Button>
+          </CardBody>
+        </Card>
+        <Card as="form" onSubmit={join} aria-labelledby="lobby-join">
+          <CardHeader id="lobby-join" title="Join a friend" titleAs="h2" />
+          <CardBody>
+            <Field
+              label="Room code"
+              className={styles.code}
               value={code}
               onChange={(event) => setCode(event.target.value)}
               maxLength={ROOM_CODE_LENGTH}
@@ -105,33 +119,41 @@ export function PlayPage() {
               spellCheck={false}
               placeholder="AB2CD3"
             />
-          </label>
-          <Button
-            control="lobby.join"
-            type="submit"
-            variant="secondary"
-            size="lg"
-            reason={
-              code.trim().length === ROOM_CODE_LENGTH
-                ? ""
-                : `Enter the ${ROOM_CODE_LENGTH}-character room code`
-            }
-          >
-            Join room
-          </Button>
-        </form>
-        {passAndPlay && (
-          <div className={styles.panel}>
-            <h2>Pass and play</h2>
-            <p className={styles.note}>Two players, one phone. Not counted, nothing is sent or saved.</p>
-            <Link
-              to={paths.passAndPlay(game.id)}
-              className={styles.link}
-              data-cc-control="lobby.pass_and_play"
+            <Button
+              control="lobby.join"
+              type="submit"
+              variant="secondary"
+              size="lg"
+              reason={
+                code.trim().length === ROOM_CODE_LENGTH
+                  ? ""
+                  : `Enter the ${ROOM_CODE_LENGTH}-character room code`
+              }
             >
-              Play on this phone
-            </Link>
-          </div>
+              Join room
+            </Button>
+          </CardBody>
+        </Card>
+        {passAndPlay && (
+          <Card as="section" aria-labelledby="lobby-pass">
+            <CardHeader
+              id="lobby-pass"
+              title="Pass and play"
+              titleAs="h2"
+              description="Two players, one phone. Not counted, nothing is sent or saved."
+            />
+            <CardBody>
+              <Button
+                as="link"
+                to={paths.passAndPlay(game.id)}
+                control="lobby.pass_and_play"
+                variant="secondary"
+                size="lg"
+              >
+                Play on this phone
+              </Button>
+            </CardBody>
+          </Card>
         )}
       </div>
       <HowToPlay gameId={game.id} />

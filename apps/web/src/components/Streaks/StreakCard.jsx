@@ -1,7 +1,8 @@
 import { useId } from "react";
 import { StreakFlame } from "../../art/effects/StreakFlame.jsx";
 import { useStreaks } from "../../hooks/useStreaks.js";
-import { Button } from "../Button/Button.jsx";
+import { Card, CardHeader } from "../Card/Card.jsx";
+import { ErrorState, Skeleton } from "../States/States.jsx";
 import styles from "./StreakCard.module.css";
 
 const days = (n) => `${n} ${n === 1 ? "day" : "days"}`;
@@ -25,15 +26,14 @@ export function StreakCard() {
 
   let body;
   if (streaks.status === "loading") {
-    body = <p>Loading streaks…</p>;
+    body = <Skeleton label="Loading streaks" shape="tile" count={2} />;
   } else if (streaks.status === "error") {
     body = (
-      <div role="alert" className={styles.problem}>
-        <p>Couldn't load streaks. {streaks.error.message}</p>
-        <Button control="streaks.retry" variant="secondary" onClick={streaks.retry}>
-          Try again
-        </Button>
-      </div>
+      <ErrorState
+        title={`Couldn't load streaks. ${streaks.error.message}`}
+        control="streaks"
+        onRetry={streaks.retry}
+      />
     );
   } else {
     const { daily, win } = streaks.data;
@@ -69,11 +69,9 @@ export function StreakCard() {
   }
 
   return (
-    <section className={styles.card} aria-labelledby={headingId}>
-      <h3 id={headingId} className={styles.heading}>
-        Streaks
-      </h3>
+    <Card as="section" aria-labelledby={headingId}>
+      <CardHeader id={headingId} title="Streaks" description="Days in a row you played, and wins in a row." />
       {body}
-    </section>
+    </Card>
   );
 }

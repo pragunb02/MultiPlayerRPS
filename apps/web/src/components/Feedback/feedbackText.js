@@ -47,11 +47,3 @@ export const FEEDBACK_TEXT = Object.freeze({
   another: "Send another",
   close: "Close",
 });
-
-/**
- * The live count under the message: how much of the longest message is used.
- *
- * @param {number} used
- * @param {number} max
- */
-export const countText = (used, max) => `${used} / ${max}`;

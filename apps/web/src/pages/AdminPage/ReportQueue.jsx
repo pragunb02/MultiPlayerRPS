@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import {
   REPORT_ACTION,
   REPORT_CONTEXT,
@@ -10,7 +10,11 @@ import {
 } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardFooter } from "../../components/Card/Card.jsx";
+import { Field } from "../../components/Field/Field.jsx";
 import { Modal } from "../../components/Modal/Modal.jsx";
+import { PageHeader } from "../../components/Page/Page.jsx";
+import { EmptyState, ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { REPORT_REASON_LABELS } from "../../components/Report/reportText.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useReportQueue } from "../../hooks/useReportQueue.js";
@@ -66,14 +70,14 @@ function Recent({ recent }) {
  */
 function Item({ item }) {
   return (
-    <li className={styles.entry}>
-      <header className={styles.entryHeader}>
+    <Card as="li" className={styles.entry}>
+      <div className={styles.entryHeader}>
         <span className={styles.badge}>{REPORT_REASON_LABELS[item.reason].english}</span>
         {item.setAside && <span className={`${styles.badge} ${styles.status}`}>set aside</span>}
         <time dateTime={new Date(item.createdAt).toISOString()} className={styles.time}>
           {madeAt(item.createdAt)}
         </time>
-      </header>
+      </div>
       <dl className={styles.context}>
         <div>
           <dt>Where</dt>
@@ -85,7 +89,7 @@ function Item({ item }) {
         </div>
       </dl>
       <Recent recent={item.context.recent} />
-    </li>
+    </Card>
   );
 }
 
@@ -134,16 +138,16 @@ function Pages({ status, page, more }) {
   const at = (number) => paths.adminReports({ status, page: number === 0 ? undefined : String(number) });
   if (page === 0 && !more) return null;
   return (
-    <nav aria-label="Report pages" className={styles.actions}>
+    <nav aria-label="Report pages" className={queueStyles.pages}>
       {page > 0 && (
-        <Link to={at(page - 1)} data-cc-control="admin.reports.previous">
+        <Button as="link" to={at(page - 1)} control="admin.reports.previous" variant="secondary" size="sm">
           Previous page
-        </Link>
+        </Button>
       )}
       {more && (
-        <Link to={at(page + 1)} data-cc-control="admin.reports.next">
+        <Button as="link" to={at(page + 1)} control="admin.reports.next" variant="secondary" size="sm">
           Next page
-        </Link>
+        </Button>
       )}
     </nav>
   );
@@ -164,14 +168,14 @@ function Group({ group, open, act, onDone }) {
     onDone(`${name} is now ${displayName}.`);
   };
   return (
-    <article className={styles.entry} aria-labelledby={`group-${group.groupId}`}>
-      <header className={styles.entryHeader}>
+    <Card aria-labelledby={`group-${group.groupId}`}>
+      <div className={styles.entryHeader}>
         <h2 id={`group-${group.groupId}`}>{name}</h2>
         <span className={`${styles.badge} ${styles.status}`}>{group.kind}</span>
         <time dateTime={new Date(group.lastAt).toISOString()} className={styles.time}>
           {madeAt(group.lastAt)}
         </time>
-      </header>
+      </div>
       <p className={styles.message}>
         {`${plural(group.reports, "report")} from ${plural(group.reporters, "person").replace("persons", "people")}`}
         {group.setAside > 0 && ` · ${group.setAside} set aside`}
@@ -190,14 +194,14 @@ function Group({ group, open, act, onDone }) {
         ))}
       </ol>
       {open && (
-        <div className={styles.actions}>
+        <CardFooter>
           <Button control="admin.reports.dismiss" variant="secondary" action={dismiss}>
             Dismiss
           </Button>
           {group.canRename && <RenameButton name={name} run={rename} />}
-        </div>
+        </CardFooter>
       )}
-    </article>
+    </Card>
   );
 }
 
@@ -222,19 +226,17 @@ export function ReportQueue() {
     <section className={consoleStyles.page} aria-labelledby="reports-title">
       <title>{`Reports · Owner console · ${SITE_NAME}`}</title>
       <meta name="robots" content="noindex, nofollow" />
-      <header className={consoleStyles.header}>
-        <h1 id="reports-title">Reports</h1>
-        <p className={consoleStyles.lede}>
-          Reports players made about other players, one group per player, the most reporters first. Who
-          reported is never shown, nobody is ever told, and every report is deleted 180 days after it was
-          made.
-        </p>
-      </header>
+      <PageHeader
+        id="reports-title"
+        title="Reports"
+        lede="Reports players made about other players, one group per player, the most reporters first. Who reported is never shown, nobody is ever told, and every report is deleted 180 days after it was made."
+      />
       <ConsoleTabs current="reports" />
-      <div className={consoleStyles.range} role="group" aria-label="Filters">
-        <label className={consoleStyles.rangeField}>
-          Status
-          <select
+      <Card as="div" role="group" aria-label="Filters">
+        <div className={queueStyles.filters}>
+          <Field
+            label="Status"
+            kind="select"
             value={status ?? REPORT_STATUS.OPEN}
             onChange={(event) =>
               navigate(
@@ -250,24 +252,25 @@ export function ReportQueue() {
                 {STATUS_LABELS[value]}
               </option>
             ))}
-          </select>
-        </label>
-      </div>
+          </Field>
+        </div>
+      </Card>
       <p role="status" className={consoleStyles.status}>
         {notice}
       </p>
-      {queue.status === "loading" && <p className={consoleStyles.status}>Loading…</p>}
+      {queue.status === "loading" && <Skeleton label="Loading the reports" shape="card" count={2} />}
       {queue.status === "error" && (
-        <div className={consoleStyles.status} role="alert">
-          <p>{queue.error.message}</p>
-          {isRetryable(queue.error) && (
-            <Button control="admin.reports.retry" variant="secondary" onClick={queue.retry}>
-              Try again
-            </Button>
-          )}
-        </div>
+        <ErrorState
+          title={queue.error.message}
+          control="admin.reports"
+          onRetry={isRetryable(queue.error) ? queue.retry : undefined}
+        />
       )}
-      {queue.status === "ready" && queue.groups.length === 0 && <p>No reports here.</p>}
+      {queue.status === "ready" && queue.groups.length === 0 && (
+        <EmptyState title="No reports here.">
+          Reports players make about other players show up here.
+        </EmptyState>
+      )}
       {queue.status === "ready" && queue.groups.length > 0 && (
         <p className={consoleStyles.lede}>
           {`Players ${queue.page * PAGE_SIZE + 1} to ${queue.page * PAGE_SIZE + queue.groups.length} of ${queue.total} reported.`}

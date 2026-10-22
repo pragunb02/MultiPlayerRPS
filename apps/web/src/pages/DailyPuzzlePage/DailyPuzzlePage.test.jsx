@@ -303,9 +303,22 @@ describe("the daily chess puzzle page (CC-144)", () => {
     });
     renderApp({ path: "/daily/chess", api });
 
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load today's puzzle.offline");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByRole("grid", { name: "Chess board" })).toBeVisible();
+  });
+
+  it("keeps the board's room while today's puzzle loads, and the panel is the chess accent card (CC-323)", async () => {
+    renderApp({ path: "/daily/chess", api: fakeApi({ getDailyPuzzle: vi.fn().mockResolvedValue(view()) }) });
+
+    const loading = document.querySelector('[data-cc-state="loading"]');
+    expect(loading).toHaveAttribute("role", "status");
+    expect(loading).toHaveAttribute("aria-busy", "true");
+    expect(loading).toHaveTextContent("Loading today's puzzle");
+    expect(loading.querySelector(".bone")).toHaveClass("bone-board");
+    const panel = await screen.findByRole("complementary", { name: "Today's puzzle" });
+    expect(panel).toHaveClass("card", "accent", "tone-chess");
   });
 
   it("is the not found page for a kind of puzzle there is none of", async () => {

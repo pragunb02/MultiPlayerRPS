@@ -1,12 +1,18 @@
+/* One look for every form control (CC-323): text, select, textarea, date and a read-only value to copy. */
 .field {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
 }
 .field label {
-  font-weight: 700;
+  font-size: var(--type-label);
+  font-weight: var(--weight-bold);
 }
-.field input {
+.control {
+  width: 100%;
+  min-height: 2.75rem;
   font: inherit;
+  font-size: var(--type-body);
   padding: var(--space-2) var(--space-3);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -14,23 +20,68 @@
   color: var(--color-text);
   transition: border-color var(--duration-fast) var(--ease-out);
 }
-.field input:hover {
+.control:hover {
   border-color: var(--color-primary-soft);
 }
-.field input:focus-visible {
+.control:focus-visible {
   border-color: var(--color-primary);
 }
-.field input[aria-invalid="true"] {
+.control[aria-invalid="true"] {
   border-color: var(--color-danger);
 }
-.hint {
+.control:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.select .control {
+  cursor: pointer;
+}
+.textarea .control {
+  min-height: 7rem;
+  resize: vertical;
+  line-height: var(--leading-body);
+}
+/* A date shows the device's own picker. Its icon takes the text colour in both themes. */
+.date .control {
+  color-scheme: light dark;
+}
+.copy .control {
+  font-family: var(--font-mono);
+  font-size: var(--type-label);
+  text-overflow: ellipsis;
+}
+.copyRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.copyRow > .control {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.under {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+.hint,
+.count {
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--type-label);
   color: var(--color-text-muted);
+}
+.count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.full {
+  font-weight: var(--weight-bold);
+  color: var(--color-warning);
 }
 .error {
   margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 700;
+  font-size: var(--type-label);
+  font-weight: var(--weight-bold);
   color: var(--color-danger);
 }

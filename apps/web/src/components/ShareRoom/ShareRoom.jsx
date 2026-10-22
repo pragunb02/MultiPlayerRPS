@@ -4,6 +4,7 @@ import { siteOrigin } from "../../app/siteOrigin.js";
 import { useAction } from "../../hooks/useAction.js";
 import { inviteText, shareMessage, shareWasCancelled } from "../../lib/shareText.js";
 import { Button } from "../Button/Button.jsx";
+import { Field } from "../Field/Field.jsx";
 import { useToast } from "../Toast/toastContext.js";
 import { WhatsAppLink } from "../WhatsAppLink/WhatsAppLink.jsx";
 import styles from "./ShareRoom.module.css";
@@ -12,7 +13,8 @@ import styles from "./ShareRoom.module.css";
  * Invite a friend: the room link, copy to clipboard, WhatsApp (CC-217), and the device's share sheet where
  * available. The message names the actual game (the legacy app said "Tic Tac Toe" for every game, BUG-12). The link
  * is on the site's own address, whichever address this page was opened at. Each way out marks the link with its own
- * channel (CC-279): the box and Copy link with `copy`, WhatsApp with `wa`, the share sheet with `share`.
+ * channel (CC-279): the box and Copy link with `copy`, WhatsApp with `wa`, the share sheet with `share`. The link
+ * and its Copy button are the shared copy field (CC-323).
  *
  * @param {{ code: string, gameId: string, origin?: string }} props  origin: the site's own address
  */
@@ -32,8 +34,6 @@ export function ShareRoom({ code, gameId, origin = siteOrigin() }) {
     }
     toast.show("Link copied", { tone: "success" });
   };
-
-  const copy = useAction(copyLink, { id: "invite.copy" });
 
   const share = useAction(
     async () => {
@@ -57,14 +57,17 @@ export function ShareRoom({ code, gameId, origin = siteOrigin() }) {
       <p className={styles.code}>
         Room code <strong aria-label={`Room code ${code.split("").join(" ")}`}>{code}</strong>
       </p>
-      <label className={styles.label}>
-        <span>Invite link</span>
-        <input readOnly value={copied} onFocus={(event) => event.target.select()} />
-      </label>
+      <Field
+        label="Invite link"
+        kind="copy"
+        value={copied}
+        control="invite.copy"
+        copyLabel="Copy link"
+        copyVariant="primary"
+        copyFailure="Couldn't copy. Select the link and copy it"
+        onCopied={() => toast.show("Link copied", { tone: "success" })}
+      />
       <div className={styles.buttons}>
-        <Button control="invite.copy" action={copy} doneLabel="Copied">
-          Copy link
-        </Button>
         <WhatsAppLink
           message={shareMessage({ text, url: withShareChannel(room, SHARE_CHANNELS.WHATSAPP) })}
           control="invite.whatsapp"

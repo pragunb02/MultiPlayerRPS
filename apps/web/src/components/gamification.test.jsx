@@ -139,7 +139,7 @@ describe("DailyQuests", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn't load quests. Can't reach ClassiCade",
     );
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await user.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByText("0/3 done")).toBeInTheDocument();
     expect(getQuests).toHaveBeenCalledTimes(2);
@@ -270,7 +270,7 @@ describe("StreakCard", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn't load streaks. Can't reach ClassiCade",
     );
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await user.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByText(/No streak yet/)).toBeInTheDocument();
   });
@@ -351,7 +351,7 @@ describe("AchievementGrid", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn't load achievements. Can't reach ClassiCade",
     );
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await user.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByText("0/0 unlocked")).toBeInTheDocument();
   });

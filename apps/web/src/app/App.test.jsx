@@ -40,7 +40,7 @@ describe("App", () => {
       "href",
       "/daily/chess",
     );
-    expect(within(daily).getByRole("listitem")).toHaveClass("chess");
+    expect(within(daily).getByRole("listitem")).toHaveClass("card", "accent", "tone-chess", "interactive");
   });
 
   it("names the daily puzzle's link so it is never taken for a game's own link", async () => {
@@ -71,8 +71,10 @@ describe("App", () => {
 
     const games = await gameList();
     const [rps, chess] = within(games).getAllByRole("listitem");
-    expect(rps).toHaveClass("rps");
-    expect(chess).toHaveClass("chess");
+    expect(rps).toHaveClass("card", "accent", "tone-rps", "interactive");
+    expect(chess).toHaveClass("tone-chess");
+    // The art runs to the card's edges, with no box of its own inside the card (CC-323).
+    expect(rps.querySelector("svg").parentElement).toHaveClass("media", "art");
     expect(rps.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
     expect(within(rps).getByRole("link")).toHaveAccessibleName("Rock Paper Scissors");
   });
@@ -84,7 +86,7 @@ describe("App", () => {
       }),
     });
 
-    expect((await within(await gameList()).findByRole("listitem")).className).toContain("primary");
+    expect((await within(await gameList()).findByRole("listitem")).className).toContain("tone-primary");
   });
 
   it("shows the arcade scene in the hero once it has loaded", async () => {
@@ -138,12 +140,24 @@ describe("App", () => {
     expect(screen.getByText("2–4 players")).toBeInTheDocument();
   });
 
+  it("holds the room of three game cards while the catalog loads, so nothing below jumps (CC-323)", async () => {
+    renderApp();
+
+    const loading = within(screen.getByRole("region", { name: "Games" })).getByRole("status");
+    expect(loading).toHaveAttribute("aria-busy", "true");
+    expect(loading).toHaveTextContent("Loading the games");
+    expect(loading.querySelectorAll(".bone.bone-card")).toHaveLength(3);
+    await gameList();
+  });
+
   it("explains when the catalog cannot load", async () => {
     renderApp({
       api: fakeApi({ getGames: async () => Promise.reject(new Error("Can't reach ClassiCade")) }),
     });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach ClassiCade");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't load the games.Can't reach ClassiCade",
+    );
   });
 
   it("shows a not-found page for unknown URLs", async () => {

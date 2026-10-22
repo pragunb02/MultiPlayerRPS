@@ -59,30 +59,46 @@ solid one, `--color-on-<role>`. In both themes each solid colour is at least 4.5
 | `--leading-tight` | 1.2          | Headings and one-line labels           |
 | `--leading-body`  | 1.5          | Reading text                           |
 
+**Page and section titles (CC-323).** `--type-page-title` (`--text-2xl`) is the one `h1` style, set once in
+`global.css`; on a phone (up to `--breakpoint-sm`) it steps down to `--type-title`. No page module styles its own
+`h1`: use `PageHeader`. `--type-section-title` (`--text-lg`) is the title of a `Section` and of a card. A hero's
+display line is the one exception.
+
+**Weights (CC-323).** `--weight-regular` (400) for reading text, `--weight-medium` (600) for a quiet emphasis,
+`--weight-bold` (700) for labels, links and numbers, `--weight-heavy` (800) for headings and buttons. The header
+(CC-324) and the match stage still hold 46 raw weights; the check refuses raw weights once those move.
+
 The seven sizes `--text-xs` to `--text-3xl` stay. Two families are for drawings, not text blocks:
 `--type-board-*` (the Tic-Tac-Toe mark, the chess coordinates) and `--type-svg-*`, written in the SVG's own units so
 the text grows and shrinks with the picture.
 
 ### Space and radius
 
-| Token                        | Use                                                       |
-| ---------------------------- | --------------------------------------------------------- |
-| `--space-1`, `--space-2`     | Inside a control: an icon and its label, a chip's padding |
-| `--space-3`, `--space-4`     | Between controls, a card's padding                        |
-| `--space-6`, `--space-8`     | Between groups and sections                               |
-| `--space-12`                 | Between the big parts of a page                           |
-| `--radius-sm`                | A small control, a tooltip                                |
-| `--radius-md`                | A control, a seat, a game square                          |
-| `--radius-lg`, `--radius-xl` | A card, a sheet, a dialog                                 |
-| `--radius-full`              | A pill, a dot, an avatar                                  |
+| Token                        | Use                                                        |
+| ---------------------------- | ---------------------------------------------------------- |
+| `--space-1`, `--space-2`     | Inside a control: an icon and its label, a chip's padding  |
+| `--space-3`, `--space-4`     | Between controls, a card's padding                         |
+| `--space-6`, `--space-8`     | Between groups and sections                                |
+| `--space-12`                 | Between the big parts of a page                            |
+| `--radius-sm`                | A small control, a tooltip                                 |
+| `--radius-md`                | A control, a seat, a game square                           |
+| `--radius-lg`, `--radius-xl` | A card, a sheet, a dialog                                  |
+| `--radius-full`              | A pill, a dot, an avatar                                   |
+| `--target-min`               | 24 px, the smallest tap target anywhere (WCAG 2.5.8)       |
+| `--target-touch`             | 44 px, our own floor on a touch screen (`pointer: coarse`) |
+
+**Breakpoints (CC-323).** A media query cannot read `var()`, so the four widths are tokens by name and the check
+refuses any other width in `@media`: `--breakpoint-sm` 30rem (a phone upright), `--breakpoint-md` 40rem (a large
+phone), `--breakpoint-lg` 48rem (a tablet upright), `--breakpoint-xl` 64rem (a laptop).
 
 ### Elevation
 
-| Token           | Is                                 | Use                        |
-| --------------- | ---------------------------------- | -------------------------- |
-| `--elevation-1` | `--shadow-sm`                      | A card resting on the page |
-| `--elevation-2` | `--shadow-md`                      | A raised panel, a toast    |
-| `--elevation-3` | `--shadow-md` and `--glow-primary` | A dialog over the page     |
+| Token               | Is                                 | Use                                                     |
+| ------------------- | ---------------------------------- | ------------------------------------------------------- |
+| `--elevation-1`     | `--shadow-sm`                      | A card resting on the page                              |
+| `--elevation-2`     | `--shadow-md`                      | A raised panel, a toast                                 |
+| `--elevation-3`     | `--shadow-md` and `--glow-primary` | A dialog over the page                                  |
+| `--elevation-hover` | `--shadow-md` and `--glow-primary` | An interactive card under the pointer or focus (CC-323) |
 
 ### Layers
 
@@ -131,6 +147,38 @@ look-alike.
 | Badge       | A short label or count on something else (level, tier, "New", unread count)                                                                                                                       | neutral, status role, count                                                                                                       | Not interactive. Text, not colour alone. 4.5:1. A count says what it counts to screen readers                                                                                                       | One per item. At most 3 "New" badges per screen                |
 | Empty state | A region with nothing to show yet (CC-259): what this is, how it fills, one button                                                                                                                | empty, empty with Bit (CC-153b)                                                                                                   | Art `aria-hidden`, the meaning in text                                                                                                                                                              | One per region                                                 |
 
+### The shared components (CC-323)
+
+Each lives in `apps/web/src/components/`, and its choices are listed in `components/looks.js`, so a typo fails the
+first test that renders it. `/admin/design` draws every one in every state.
+
+| Component                           | API                                                                                                                                                                                                                                                                                                                                                                                  | States                                                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `Button`                            | `control`, `variant` (`primary`, `secondary`, `ghost`, `danger`, and `accent`: the primary's look on the hero art only), `size` (`sm`, `md`, `lg`), `as="link"` with `to` (a router link) or `href` (an `<a>`), `icon`, `label` (the name of an icon-only button, required), `action`, `reason`, `pendingLabel`, `doneLabel`                                                         | default, hover, focus-visible, pressed, waiting (after 400 ms), done, cannot act with its reason, failed with Retry |
+| `Card` and its parts                | `as`, `variant` (`surface`, `raised`, `accent` with a game tone (that game's colour) or a brand or gold tone (the one featured card of a screen), `notice` with a status `tone`), `interactive`, `selected`, `reason`. Parts in order: `CardMedia` (art to the edges), `CardHeader` (`title`, `description`, `aside`), `CardLink` (the one stretched link), `CardBody`, `CardFooter` | rest, hover and focus (lift and glow, CSS only), pressed, selected, cannot act with its reason                      |
+| `PageHeader`, `Section`, `Sections` | `PageHeader`: `title`, `lede`, `aside`. `Section`: `title`, `description` (one line), `headingLevel`, `actions`. `Sections` spaces them and draws the divider                                                                                                                                                                                                                        | (layout)                                                                                                            |
+| `EmptyState`                        | `title`, one line as children, `art` (hidden from readers), `action` (one button), `secondary`, `headingLevel` (1 on a dead-end page)                                                                                                                                                                                                                                                | empty, dead end                                                                                                     |
+| `ErrorState`                        | `title`, one line as children, `control`, `onRetry` (only when trying again can help). An alert                                                                                                                                                                                                                                                                                      | failed, failed with Retry                                                                                           |
+| `Skeleton`                          | `label` (read once as a status), `shape` (`line`, `row`, `tile`, `card`, `board`, `block`, each the height of what it stands in for), `count`                                                                                                                                                                                                                                        | loading. Reserves the room, so nothing jumps. Pulses on opacity ten times, then rests; still under reduced motion   |
+| `Field`                             | `label`, `kind` (`text`, `select`, `textarea`, `date`, `copy`), `hint`, `error`, `maxLength` with `showCount` (on for a textarea), and for `copy` `control`, `copyLabel`, `onCopied`                                                                                                                                                                                                 | default, hover, focus-visible, invalid, disabled, counted, full, copied, copy failed                                |
+| `Tabs`                              | `label`, `items` (`id`, `label`, `to`, `icon`), `current`, `control`. Navigation links with `aria-current="page"`, not an ARIA tab list, because each tab is its own page                                                                                                                                                                                                            | rest, hover, focus-visible, current                                                                                 |
+
+**Rules that go with them:**
+
+1. **One primary per region**: a page, a dialog, a card or a sheet. Every button carries `data-cc-variant`, so a
+   reviewer (or a test) can count them. A second main action is `secondary`.
+2. **No underlined text link as an action.** An action that goes somewhere is `<Button as="link">`.
+3. **Danger only where the player may lose something they made**, never for a lost game (ADR-050).
+4. **A destructive confirm** (resign, leave a game in progress, block, remove a friend, delete) is a `Modal` with
+   `destructive`: a click on the backdrop does nothing; Escape and its own buttons still close it.
+5. **Focus.** Controls draw the ring on `:focus-visible` only. A heading, `main` or a dialog that script focuses so
+   a screen reader reads it (`tabindex="-1"`) draws no ring, because browsers treat focus moved by script on a new
+   page as keyboard focus and the ring showed to mouse and touch players. No module writes `:focus` for a ring.
+6. **Tap targets.** Every button, link and control is at least `--target-min` tall, and a button is at least
+   `--target-touch` on a touch screen.
+7. **No bare "Loading…".** Loading is a `Skeleton` of the content's shape, failing is an `ErrorState`, nothing to
+   show is an `EmptyState`.
+
 **Whose turn it is** is a banner with a player role: "Your turn" in `--color-you` and "Waiting for Riya" in
 `--color-opponent`, each with the word and the seat marker's dot (`TurnBanner`). The seats use the same two
 colours for the viewer's own seat and everyone else's (`Seats`). A spectator, who has no seat, sees the seats in
@@ -144,7 +192,27 @@ alone, which Chromium matches on page load. A target whose ring another element 
 region) may turn its own off. The app's focus rules are in `@layer focus`, below every component style, so a
 component's own focus style or opt-out always wins.
 
-## 3. Most per screen (D5)
+## 3. Pages, sections and data (owner, 2026-10-21)
+
+The owner likes interfaces where everything is written cleanly and in detail, colour is precise and meaningful,
+and sections are clearly separated. These rules hold on every page, and most of all on the dense ones: the profile,
+the leaderboards, the owner console and the game rules.
+
+1. **Every page is built from titled sections.** A `PageHeader`, then `Sections` of `Section`s. Each section has a
+   heading, one line saying what it holds, then its content. Sections are separated by the same space
+   (`--space-8`) and a thin divider. Nothing floats on its own between sections.
+2. **Colour always carries meaning.** A colour is a status role or a player role from the tokens, never a hue for
+   decoration (brand colours stay on art and identity). Every number or state that has a colour also has a word or
+   an icon, such as "▲ 12% up" in `success`.
+3. **Data shows its unit, its time window and its empty state.** "Games, last 7 days, India time", not a bare
+   number. A list or chart with nothing in it shows an `EmptyState`, never a blank box.
+4. **Short, precise labels and aligned numbers.** Numbers use `tabular-nums` and line up on the right. A dense table
+   or list has a header row in `--type-caption`, heavy and muted.
+5. **One rhythm.** The same paddings (a card's `--space-4`, `--space-6` from `--breakpoint-lg`), the same title sizes
+   (`--type-page-title`, `--type-section-title`) and the same gaps on every page, from the type roles and space
+   tokens. No page invents its own.
+
+## 4. Most per screen (D5)
 
 At most, at the same time:
 
@@ -154,7 +222,7 @@ At most, at the same time:
 3. **One toast on a phone, two on desktop** (CC-315 enforces).
 4. **One primary button per region**: a page, a dialog, a card or a sheet.
 
-## 4. Copy limits (D6)
+## 5. Copy limits (D6)
 
 One line per language, Hinglish first where we use it (CC-217). Checked in the CC-316 review, not by CI, because
 Hinglish lines vary.
@@ -168,7 +236,7 @@ Hinglish lines vary.
 | Dialog body  | 2 sentences   |
 | Badge        | 12 characters |
 
-## 5. Pop-ups
+## 6. Pop-ups
 
 A **pop-up** is anything that draws over the page or speaks in a live region: a portal, `position: fixed`,
 `role="dialog"` or `role="alertdialog"`, or `aria-live` (other than `"off"`). Only the files below may make one.
@@ -212,7 +280,7 @@ names files that exist, so the row is added then.
 The banners that do not need a live region of their own (`RequestBanner`, `SiteRequests`, `ConnectionBanner`,
 `StreakAtRisk`, `SaveProgressCard`, `ComputerNote`) use `role="status"` or `role="alert"`, which the rule allows.
 
-## 6. The check
+## 7. The check
 
 `npm run lint` runs `scripts/check-css-tokens.mjs` over every CSS file of the web app except the token files. It refuses:
 
@@ -227,6 +295,13 @@ The banners that do not need a live region of their own (`RequestBanner`, `SiteR
    `[data-event-theme="…"]`, so its custom properties may hold raw values. Every other declaration in it follows
    these rules.
 5. **`position: fixed`** outside the pop-up components above.
+6. **An unknown custom property** (CC-323): a `var(--name)` that no stylesheet declares, which made the
+   declaration do nothing (`--text-base` and `--space-5` did). Names declared in any of the app's stylesheets count,
+   so a theme set on a parent still works.
+7. **A media query width that is not a breakpoint token** (CC-323).
+
+A unit test also fails when a component names a CSS module class that its module does not define
+(`styles/classNames.test.js`), which found three (`cookies`, `shell`, `page`).
 
 Each message names the file, the line and the token to use. When a token already holds the raw value, the message
 names it, for example `z-index: 40 is not a layer. Use var(--layer-effect)`.
@@ -261,19 +336,13 @@ a `style` attribute.
 
 ## Known gaps (from [AUDIT-2026-10](AUDIT-2026-10.md), "Since CC-314")
 
-The contract says what should hold. The code does not hold it yet in these places, each waiting for a ticket:
+CC-323 closed the four gaps listed here when ADR-076 was written: a destructive confirm no longer closes on a
+backdrop click, the check refuses a `var()` that names no custom property (`--text-base` and `--space-5` are
+replaced), weights and breakpoints have tokens, and `Card`, `EmptyState` and Button's danger look and link form
+exist. Still open: no letter-spacing tokens yet, and 46 raw weights in the header (CC-324) and the match stage,
+which the check refuses once those files move.
 
-1. **A click on the backdrop closes every dialog**, destructive confirms included. The dialog row above means a
-   destructive confirm closes only by its own buttons or Escape.
-2. **The check does not refuse a `var()` that names no token.** `--text-base` (`PublicProfilePage.module.css`) and
-   `--space-5` (`AccountSettings.module.css`) are used and never defined, so those declarations do nothing. Fixing
-   them changes what those screens look like, so it needs its own before and after.
-3. **No tokens yet for font weight, letter-spacing or breakpoints** (the audit's RC-9). They join `type.css` and a
-   new role file when the premium redesign needs them, under section 1's rules.
-4. **No shared Card, EmptyState or Button danger variant and link form** (RC-2 to RC-4). The contracts in section 2
-   are written; the components that carry them are the redesign's work.
-
-## 7. Changing the contract
+## 8. Changing the contract
 
 1. Change this file first, in the same pull request as the code: a new role, a new pop-up row, a new exception.
 2. A new token goes in its role's file under `styles/tokens/`, in both themes, and in `tokenRoles.js` if it is a role, so the token test checks

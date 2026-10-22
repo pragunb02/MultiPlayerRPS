@@ -4,11 +4,15 @@ import { paths } from "../../app/paths.js";
 import { Avatar } from "../../art/avatars/Avatar.jsx";
 import { LevelBadge } from "../../art/badges/LevelBadge.jsx";
 import { rankForLevel } from "../../art/badges/ranks.js";
+import { GameOver404 } from "../../art/illustrations/GameOver404.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
+import { Section } from "../../components/Page/Page.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { Bilingual } from "../../components/Profile/Bilingual.jsx";
 import { PROFILE_COPY } from "../../components/Profile/profileCopy.js";
 import { ReportDialog } from "../../components/Report/ReportDialog.jsx";
+import { EmptyState, ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { usePlayerProfile } from "../../hooks/useProfile.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./PublicProfilePage.module.css";
@@ -20,31 +24,33 @@ const chessRating = ({ rating, provisional, games }) =>
 /** The public part of an adult's profile: level, games, wins and the chess rating (CC-034). Nothing else. */
 function PublicStats({ player }) {
   return (
-    <div className={styles.card}>
-      <div className={styles.levelRow}>
-        <LevelBadge level={player.level} size="md" decorative />
-        <div>
-          <p className={styles.level}>Level {player.level}</p>
-          <p className={styles.rank}>{rankForLevel(player.level).name} rank</p>
+    <Section id="player-stats" title="Stats" description="Level, games played and won, and rating, all time.">
+      <Card variant="raised" as="div">
+        <div className={styles.levelRow}>
+          <LevelBadge level={player.level} size="md" decorative />
+          <div>
+            <p className={styles.level}>Level {player.level}</p>
+            <p className={styles.rank}>{rankForLevel(player.level).name} rank</p>
+          </div>
         </div>
-      </div>
-      <dl className={styles.stats}>
-        <div>
-          <dt>Played</dt>
-          <dd>{player.stats.gamesPlayed}</dd>
-        </div>
-        <div>
-          <dt>Won</dt>
-          <dd>{player.stats.wins}</dd>
-        </div>
-        <div>
-          <dt>Chess rating</dt>
-          <dd className={player.chess.games === 0 ? styles.unrated : undefined}>
-            {chessRating(player.chess)}
-          </dd>
-        </div>
-      </dl>
-    </div>
+        <dl className={styles.stats}>
+          <div>
+            <dt>Played</dt>
+            <dd>{player.stats.gamesPlayed}</dd>
+          </div>
+          <div>
+            <dt>Won</dt>
+            <dd>{player.stats.wins}</dd>
+          </div>
+          <div>
+            <dt>Chess rating</dt>
+            <dd className={player.chess.games === 0 ? styles.unrated : undefined}>
+              {chessRating(player.chess)}
+            </dd>
+          </div>
+        </dl>
+      </Card>
+    </Section>
   );
 }
 
@@ -72,6 +78,7 @@ function ReportFromProfile({ player }) {
       <Button
         control="player.report"
         variant="ghost"
+        size="sm"
         className={styles.report}
         aria-label={`Report ${player.displayName}`}
         onClick={() => setOpen(true)}
@@ -104,7 +111,7 @@ export function PublicProfilePage() {
     return (
       <section className={styles.page}>
         <PageTitle>Player profile</PageTitle>
-        <p aria-busy="true">Loading the profile…</p>
+        <Skeleton label="Loading the profile" shape="card" />
       </section>
     );
   }
@@ -112,11 +119,18 @@ export function PublicProfilePage() {
     return (
       <section className={styles.page}>
         <PageTitle>Player not found</PageTitle>
-        <h1>Player not found</h1>
-        <Bilingual copy={PROFILE_COPY.notFound} />
-        <Link to={paths.leaderboards()} data-cc-control="player.leaderboards">
-          See the leaderboards
-        </Link>
+        <EmptyState
+          title="Player not found"
+          headingLevel={1}
+          art={<GameOver404 />}
+          action={
+            <Button as="link" to={paths.leaderboards()} control="player.leaderboards">
+              See the leaderboards
+            </Button>
+          }
+        >
+          <Bilingual copy={PROFILE_COPY.notFound} as="span" />
+        </EmptyState>
       </section>
     );
   }
@@ -124,12 +138,11 @@ export function PublicProfilePage() {
     return (
       <section className={styles.page}>
         <PageTitle>Player profile</PageTitle>
-        <div role="alert" className={styles.problem}>
-          <p>Couldn&apos;t load the profile. {profile.error.message}</p>
-          <Button control="player.retry" variant="secondary" onClick={profile.retry}>
-            Try again
-          </Button>
-        </div>
+        <ErrorState
+          title={`Couldn't load the profile. ${profile.error.message}`}
+          control="player"
+          onRetry={profile.retry}
+        />
       </section>
     );
   }
@@ -139,12 +152,14 @@ export function PublicProfilePage() {
       <PageTitle>{player.displayName}</PageTitle>
       <Header player={player} />
       {player.own && (
-        <p className={styles.own}>
-          <Bilingual copy={PROFILE_COPY.own} as="span" />{" "}
-          <Link to={paths.profile()} data-cc-control="player.own_profile">
-            Your profile
-          </Link>
-        </p>
+        <Card variant="notice" tone="info" as="div">
+          <p className={styles.own}>
+            <Bilingual copy={PROFILE_COPY.own} as="span" />{" "}
+            <Link to={paths.profile()} data-cc-control="player.own_profile">
+              Your profile
+            </Link>
+          </p>
+        </Card>
       )}
       {player.hidden && <Bilingual copy={PROFILE_COPY.hidden} />}
       {player.private && <Bilingual copy={PROFILE_COPY.private} />}

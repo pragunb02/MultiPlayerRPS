@@ -10,7 +10,7 @@
   padding: var(--space-2) var(--space-4);
   background: var(--color-warning);
   color: var(--color-primary-contrast);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .spinner {
   width: 1em;

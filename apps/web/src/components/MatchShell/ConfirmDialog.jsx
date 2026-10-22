@@ -3,7 +3,8 @@ import { Modal } from "../Modal/Modal.jsx";
 
 /**
  * The shell's one confirmation dialog, for leaving a game that is still on and for any game action that asks
- * first (resigning a chess game). Keep is the first button, so a stray Enter keeps the game going.
+ * first (resigning a chess game). Keep is the first button, so a stray Enter keeps the game going. Both lose a game
+ * in progress, so the confirm is a danger button and a click beside the dialog does not close it (CC-323).
  *
  * @param {{
  *   open: boolean,
@@ -38,12 +39,19 @@ export function ConfirmDialog({
       open={open}
       title={title}
       onClose={onClose}
+      destructive
       actions={
         <>
           <Button control={keepControl} variant="secondary" onClick={onClose}>
             {keepLabel}
           </Button>
-          <Button control={confirmControl} action={action} reason={reason} onClick={onConfirm}>
+          <Button
+            control={confirmControl}
+            variant="danger"
+            action={action}
+            reason={reason}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </>

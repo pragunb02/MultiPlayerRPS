@@ -5,7 +5,7 @@
   gap: var(--space-1);
 }
 .hinglish {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .english {
   color: var(--color-text-muted);
@@ -20,29 +20,30 @@
 .done {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .error {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-danger);
 }
 
+/* The picker sits in a shared card on the profile, so the fieldset draws no box of its own. */
 .picker {
   display: grid;
   gap: var(--space-3);
   margin: 0;
-  padding: var(--space-4);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  padding: 0;
+  border: 0;
   min-width: 0;
 }
 .legend {
-  padding: 0 var(--space-2);
+  padding: 0;
+  margin-bottom: var(--space-1);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-size: var(--type-section-title);
+  font-weight: var(--weight-heavy);
 }
 /* Four across on a phone, six on a laptop. Each choice is at least 44 px to tap. */
 .choices {
@@ -59,7 +60,7 @@
   border: 2px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  min-height: 44px;
+  min-height: var(--target-touch);
 }
 .choice:hover {
   background: var(--color-surface-raised);
@@ -96,4 +97,5 @@
 }
 .visibility h3 {
   margin: 0;
+  font-size: var(--type-section-title);
 }

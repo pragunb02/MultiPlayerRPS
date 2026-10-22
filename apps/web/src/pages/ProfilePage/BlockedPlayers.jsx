@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
+import { Section } from "../../components/Page/Page.jsx";
+import { EmptyState, ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { useBlockedPlayers } from "../../hooks/useBlocks.js";
 import styles from "./BlockedPlayers.module.css";
@@ -43,30 +46,43 @@ export function BlockedPlayers() {
 
   let body;
   if (blocked.status === "loading") {
-    body = <p>Loading…</p>;
+    body = <Skeleton label="Loading your blocked players" shape="row" />;
   } else if (blocked.status === "error") {
-    body = <p role="alert">Couldn&apos;t load your blocked players. {blocked.error.message}</p>;
+    body = (
+      <ErrorState
+        title={`Couldn't load your blocked players. ${blocked.error.message}`}
+        control="profile.blocks"
+      />
+    );
   } else if (blocked.blocks.length === 0) {
-    body = <p className={styles.muted}>You haven&apos;t blocked anyone.</p>;
+    body = (
+      <EmptyState title="You haven't blocked anyone." headingLevel={3}>
+        Block a player from their seat in a room. They are never told.
+      </EmptyState>
+    );
   } else {
     body = (
-      <ul className={styles.list} aria-label="Blocked players">
-        {blocked.blocks.map((block) => (
-          <BlockedPlayer key={block.blockId} block={block} onUnblock={unblock} />
-        ))}
-      </ul>
+      <Card as="div">
+        <ul className={styles.list} aria-label="Blocked players">
+          {blocked.blocks.map((block) => (
+            <BlockedPlayer key={block.blockId} block={block} onUnblock={unblock} />
+          ))}
+        </ul>
+      </Card>
     );
   }
   return (
-    <section className={styles.section} aria-labelledby="blocked-players">
-      <h2 id="blocked-players">Blocked players</h2>
-      <p className={styles.muted}>Blocked players are never put in a room with you. Nobody is told.</p>
+    <Section
+      id="blocked-players"
+      title="Blocked players"
+      description="Blocked players are never put in a room with you. Nobody is told."
+    >
       {body}
       {unblocked !== "" && (
         <p role="status" className={styles.muted}>
           {unblocked}
         </p>
       )}
-    </section>
+    </Section>
   );
 }

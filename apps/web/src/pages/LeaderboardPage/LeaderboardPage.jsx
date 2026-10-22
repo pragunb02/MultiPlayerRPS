@@ -14,7 +14,11 @@ import { Medal } from "../../art/badges/Medal.jsx";
 import { rankForLevel } from "../../art/badges/ranks.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
+import { PageHeader } from "../../components/Page/Page.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { EmptyState, ErrorState, Skeleton } from "../../components/States/States.jsx";
+import { Tabs } from "../../components/Tabs/Tabs.jsx";
 import { useLeaderboard } from "../../hooks/useLeaderboard.js";
 import { formatTimeLeft, useNow } from "../../hooks/useNow.js";
 import { useSession } from "../../hooks/useSession.js";
@@ -26,6 +30,8 @@ const MEDALS = Object.freeze({ 1: "gold", 2: "silver", 3: "bronze" });
 // it. It is the leaderboard threshold of ADR-029, until its switch is built (CC-228).
 const FEW_ENTRIES = 25;
 const MINUTE_MS = 60_000;
+/** How many row shapes show while a board loads, so the card already has about the height of a short board. */
+const LOADING_ROWS = 6;
 /** The picture on each tab: the game's glyph for a game board, a medal for the XP boards (a star if new). Decoration. */
 const TAB_ICONS = Object.freeze({ overall: "trophy", weekly: "calendar" });
 
@@ -79,6 +85,24 @@ function RowName({ entry, you }) {
   );
 }
 
+/** The unit every score on a board is in, which heads the score column. */
+const scoreUnit = (metric) => (metric === LEADERBOARD_METRICS.XP ? "XP" : "Wins");
+
+/**
+ * The header row over the rankings, so each column says what it holds. Each row already reads as place, name,
+ * level and score to a screen reader, so this row is drawn for the eye only.
+ */
+function HeaderRow({ metric }) {
+  return (
+    <div className={styles.head} aria-hidden="true">
+      <span>#</span>
+      <span>Player</span>
+      <span className={styles.headLevel}>Level</span>
+      <span className={styles.headScore}>{scoreUnit(metric)}</span>
+    </div>
+  );
+}
+
 /** "560 XP", "1 win", "12 wins". */
 function formatScore(metric, score) {
   if (metric === LEADERBOARD_METRICS.XP) return `${score} XP`;
@@ -112,14 +136,14 @@ function YouRow({ you, metric, listedRanks }) {
       </p>
     );
   }
-  return <p className={styles.unlisted}>You're not on this board yet. Win a match to get ranked.</p>;
+  return <p className={styles.note}>You're not on this board yet. Win a match to get ranked.</p>;
 }
 
 /** A guest is ranked under its Guest name, and its rows move to the account it signs up for (ADR-060). */
 function KeepYourPlace() {
   const location = useLocation();
   return (
-    <p className={styles.unlisted}>
+    <p className={styles.note}>
       <Link to={paths.signup(returnPathFor(location))} data-cc-control="leaderboard.signup">
         Sign up
       </Link>{" "}
@@ -142,32 +166,41 @@ function whatCounts(info) {
  */
 function HowToGetOn({ info }) {
   return (
-    <aside className={styles.howTo} aria-labelledby="how-to-get-on">
-      <h2 id="how-to-get-on">How to get on the board</h2>
+    <Card as="aside" aria-labelledby="how-to-get-on">
+      <h2 id="how-to-get-on" className={styles.cardTitle}>
+        How to get on the board
+      </h2>
       <ol className={styles.steps}>
         <li>Play as a guest or with an account. Guests are ranked under their Guest name.</li>
         <li>{whatCounts(info)}</li>
         <li>Games against the computer never count here.</li>
       </ol>
-      <Link
-        to={info.gameId === undefined ? paths.home() : paths.game(info.gameId)}
-        className={styles.play}
-        data-cc-control="leaderboard.play"
-      >
-        {info.gameId === undefined ? "Play a game" : `Play ${info.name}`}
-      </Link>
-    </aside>
+      <div>
+        <Button
+          as="link"
+          to={info.gameId === undefined ? paths.home() : paths.game(info.gameId)}
+          control="leaderboard.play"
+        >
+          {info.gameId === undefined ? "Play a game" : `Play ${info.name}`}
+        </Button>
+      </div>
+    </Card>
   );
 }
 
-/** The board's card: its name and what it counts, with the list (or its loading and error states) inside. */
+/**
+ * The board's card: its name, what it counts and over which time, with the list (or its loading and error states)
+ * inside. The heading sits directly in the card, so the card's top lines up with the panel beside it.
+ */
 function BoardCard({ info, children }) {
   return (
-    <div className={styles.card}>
-      <h2>{info.metric === LEADERBOARD_METRICS.WINS ? `${info.name} wins` : info.name}</h2>
+    <Card as="div" variant="raised">
+      <h2 className={styles.cardTitle}>
+        {info.metric === LEADERBOARD_METRICS.WINS ? `${info.name} wins` : info.name}
+      </h2>
       <p className={styles.muted}>{describeBoard(info)}</p>
       {children}
-    </div>
+    </Card>
   );
 }
 
@@ -177,19 +210,16 @@ function Board({ info }) {
   if (board.status === "loading") {
     return (
       <BoardCard info={info}>
-        <p aria-busy="true">Loading the leaderboard…</p>
+        <Skeleton label="Loading the leaderboard…" shape="row" count={LOADING_ROWS} />
       </BoardCard>
     );
   }
   if (board.status === "error") {
     return (
       <BoardCard info={info}>
-        <div role="alert" className={styles.problem}>
-          <p>Couldn't load the leaderboard. {board.error.message}</p>
-          <Button control="leaderboard.retry" variant="secondary" onClick={board.retry}>
-            Try again
-          </Button>
-        </div>
+        <ErrorState title="Couldn't load the leaderboard." control="leaderboard" onRetry={board.retry}>
+          {board.error.message}
+        </ErrorState>
       </BoardCard>
     );
   }
@@ -201,24 +231,29 @@ function Board({ info }) {
       <BoardCard info={info}>
         {board.data.board.resetsAt !== undefined && <ResetsIn resetsAt={board.data.board.resetsAt} />}
         {entries.length === 0 ? (
-          <p className={styles.empty}>No ranked players yet. Win a match to claim #1!</p>
+          <EmptyState title="No ranked players yet." headingLevel={3}>
+            Win a match to claim #1!
+          </EmptyState>
         ) : (
-          <ol className={styles.list} aria-label={`${info.name} rankings`}>
-            {entries.map((entry) => (
-              <li
-                key={entry.rank}
-                className={[styles.row, styles[MEDALS[entry.rank]], entry.rank === yourRank && styles.you]
-                  .filter(Boolean)
-                  .join(" ")}
-                aria-current={entry.rank === yourRank ? "true" : undefined}
-              >
-                <Place rank={entry.rank} />
-                <RowName entry={entry} you={entry.rank === yourRank} />
-                <Level level={entry.level} />
-                <span className={styles.score}>{formatScore(info.metric, entry.score)}</span>
-              </li>
-            ))}
-          </ol>
+          <div className={styles.table}>
+            <HeaderRow metric={info.metric} />
+            <ol className={styles.list} aria-label={`${info.name} rankings`}>
+              {entries.map((entry) => (
+                <li
+                  key={entry.rank}
+                  className={[styles.row, styles[MEDALS[entry.rank]], entry.rank === yourRank && styles.you]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-current={entry.rank === yourRank ? "true" : undefined}
+                >
+                  <Place rank={entry.rank} />
+                  <RowName entry={entry} you={entry.rank === yourRank} />
+                  <Level level={entry.level} />
+                  <span className={styles.score}>{formatScore(info.metric, entry.score)}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         )}
         {entries.some((entry) => entry.hidden) && (
           <p className={styles.muted}>
@@ -235,9 +270,9 @@ function Board({ info }) {
 }
 
 /**
- * Leaderboards (CC-053): one URL per board (overall XP, this week, and wins per game) with tabs as plain links,
- * so Back and Forward move between boards. Guests are ranked under their Guest name and are invited to sign up to
- * keep their place (ADR-060).
+ * Leaderboards (CC-053): one URL per board (overall XP, this week, and wins per game) with the shared tabs as plain
+ * links, so Back and Forward move between boards. Guests are ranked under their Guest name and are invited to sign
+ * up to keep their place (ADR-060).
  */
 export function LeaderboardPage() {
   const { board: boardId } = useParams();
@@ -248,24 +283,22 @@ export function LeaderboardPage() {
   return (
     <section className={styles.page}>
       <PageTitle>{`${info.name} · Leaderboards`}</PageTitle>
-      <h1>Leaderboards</h1>
-      <nav aria-label="Leaderboards">
-        <ul className={styles.tabs}>
-          {LEADERBOARDS.map((tab) => (
-            <li key={tab.id}>
-              <Link
-                to={paths.leaderboards(tab.id)}
-                className={styles.tab}
-                data-cc-control="leaderboard.tab"
-                aria-current={tab.id === info.id ? "page" : undefined}
-              >
-                <TabIcon board={tab} />
-                {tab.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <PageHeader
+        title="Leaderboards"
+        lede="Ranked games against other players: one board for XP, and one for each game's wins."
+        className={styles.header}
+      />
+      <Tabs
+        label="Leaderboards"
+        control="leaderboard.tab"
+        current={info.id}
+        items={LEADERBOARDS.map((tab) => ({
+          id: tab.id,
+          label: tab.name,
+          to: paths.leaderboards(tab.id),
+          icon: <TabIcon board={tab} />,
+        }))}
+      />
       <Board key={info.id} info={info} />
     </section>
   );

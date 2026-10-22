@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { Skeleton } from "../../components/States/States.jsx";
 import { lazyBoard } from "../../games/lazyBoard.js";
 import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
@@ -20,10 +21,11 @@ const PAGES = Object.freeze({
   [CONSOLE_VIEWS.DESIGN]: DesignPage,
 });
 
+// The shape of a console page while its code or the access check comes, so the page does not jump when it shows.
 const Waiting = () => (
-  <p role="status" aria-live="polite">
-    Loading…
-  </p>
+  <div aria-live="polite">
+    <Skeleton label="Loading the owner console" shape="block" />
+  </div>
 );
 
 /**

@@ -1,3 +1,4 @@
+import { Section } from "../../components/Page/Page.jsx";
 import { BarChart, ChartFigure } from "./charts.jsx";
 import { formatCount } from "./format.js";
 import styles from "./AdminPage.module.css";
@@ -71,24 +72,21 @@ export function Statuses({ report }) {
   const statuses = Object.keys(moves.rows[0].to);
   return (
     <>
-      <section className={styles.coming} aria-labelledby="status-rules">
-        <h2 id="status-rules" className={styles.comingTitle}>
-          How a status is worked out
-        </h2>
-        <p className={styles.comingNote}>
-          Each India day, from the matches that counted for a player, guests and accounts alike. Today is day
-          1, so the last 7 days are today and the 6 before. The first rule that fits wins.
-        </p>
-        <ul className={styles.comingList}>
+      <Section
+        title="How a status is worked out"
+        description="Each India day, from the matches that counted for a player, guests and accounts alike. Today is day 1, so the last 7 days are today and the 6 before. The first rule that fits wins."
+      >
+        <ul className={styles.list}>
           {RULES.map(([name, rule]) => (
             <li key={name}>
               <strong>{name}</strong>: {rule}.
             </li>
           ))}
         </ul>
-      </section>
+      </Section>
       <ChartFigure
         id="player-statuses"
+        unit="players"
         title="Player statuses by week"
         note="Statuses on the last day of each week, Monday to Sunday, or today for a week still going on. Came back and went dormant count the whole week. Regular plus Core is the North Star. Players who stayed dormant are not counted."
         range={range}
@@ -106,6 +104,7 @@ export function Statuses({ report }) {
       </ChartFigure>
       <ChartFigure
         id="status-moves"
+        unit="players"
         title="Moves between statuses"
         note={`Each player's status from Sunday ${moves.from} to Sunday ${moves.to}, the full week from ${moves.week}. Rows are where they came from, columns where they went. Players who stayed dormant are never read, so that cell is not counted.`}
         range={range}

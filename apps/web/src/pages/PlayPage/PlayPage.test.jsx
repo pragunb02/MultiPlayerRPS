@@ -42,8 +42,26 @@ describe("PlayPage", () => {
     renderApp({ path: "/games/tic-tac-toe" });
 
     const banner = screen.getByRole("heading", { level: 1, name: "Tic Tac Toe" }).parentElement;
-    expect(banner).toHaveClass("tictactoe");
+    expect(banner).toHaveClass("card", "accent", "tone-tictactoe");
     expect(banner.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("builds the lobby from cards with one primary button, the picked level pressed, not primary (CC-323)", () => {
+    renderApp({ path: "/games/tic-tac-toe" });
+
+    const main = screen.getByRole("main");
+    expect(main.querySelectorAll('[data-cc-variant="primary"]')).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Play Pip" })).toHaveAttribute("data-cc-variant", "primary");
+    const easy = within(screen.getByRole("group", { name: "Level" })).getByRole("button", { name: "Easy" });
+    expect(easy).toHaveClass("secondary", "picked");
+    for (const name of ["Play Pip", "Play a friend", "Pass and play"]) {
+      expect(screen.getByRole("region", { name })).toHaveAttribute("data-cc-card");
+    }
+    expect(screen.getByRole("form", { name: "Join a friend" })).toHaveAttribute("data-cc-card", "surface");
+    expect(screen.getByRole("textbox", { name: "Room code" }).closest("[data-cc-field]")).not.toBeNull();
+    const pass = screen.getByRole("link", { name: "Play on this phone" });
+    expect(pass).toHaveAttribute("href", "/games/tic-tac-toe/pass-and-play");
+    expect(pass).toHaveClass("button", "secondary", "lg");
   });
 
   it("offers chess time controls", () => {
