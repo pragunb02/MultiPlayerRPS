@@ -119,6 +119,32 @@ describe("the stub when the host's file fails to download (review of #161)", () 
   });
 });
 
+describe("the stub once it is gone (CC-353)", () => {
+  it("never downloads again or touches the page after it unmounts, even when a download fails", async () => {
+    const loadHost = vi.fn().mockRejectedValue(new TypeError("Failed to fetch dynamically imported module"));
+    const { view, runIdle, idle } = renderStub({ loadHost });
+
+    runIdle();
+    await tick();
+    view.unmount();
+    runIdle();
+    await tick();
+
+    expect(loadHost).toHaveBeenCalledOnce();
+    expect(idle).toHaveLength(0);
+  });
+
+  it("does not load at all when it unmounts before the browser is idle", async () => {
+    const loadHost = vi.fn(() => new Promise(() => {}));
+    const { view, runIdle } = renderStub({ loadHost });
+
+    view.unmount();
+    runIdle();
+
+    expect(loadHost).not.toHaveBeenCalled();
+  });
+});
+
 describe("the first page's telemetry stub (CC-174, CC-322)", () => {
   it("tells the facade the address and the kind of player, and holds the first page view", async () => {
     const loadHost = vi.fn(() => new Promise(() => {}));
