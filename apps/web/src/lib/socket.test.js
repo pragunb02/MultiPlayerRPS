@@ -518,7 +518,7 @@ describe("socket client", () => {
       const io = fakeIo(ack);
       const onRequest = vi.fn();
       const onFirstMove = vi.fn();
-      const client = createSocketClient({ connect: io.connect, onRequest, onFirstMove });
+      const client = createSocketClient({ load: async () => io.connect, onRequest, onFirstMove });
 
       await client.request("game:move", { move: {} });
       await client.request("room:join", { code: "AB2CD3" });
@@ -527,22 +527,21 @@ describe("socket client", () => {
 
       expect(onRequest).toHaveBeenCalledTimes(4);
       expect(onFirstMove.mock.calls).toEqual([["chess"]]);
-      await createSocketClient({ connect: fakeIo(ack).connect }).request("game:move", {});
+      const quiet = fakeIo(ack);
+      await createSocketClient({ load: async () => quiet.connect }).request("game:move", {});
     });
 
-    it("tells of the connection dropping, failing and coming back with how long it was gone", () => {
+    it("tells of the connection dropping, failing and coming back with how long it was gone", async () => {
       const io = fakeIo();
-      const handlers = new Map();
-      io.socket.on = vi.fn((event, handler) => handlers.set(event, handler));
       const onChange = vi.fn();
       let clock = 0;
-      createSocketClient({ connect: io.connect, onChange, now: () => clock });
+      await loadedClient(io, { onChange, now: () => clock });
 
-      handlers.get("connect")();
-      handlers.get("disconnect")("ping timeout");
+      io.emit("connect");
+      io.emit("disconnect", "ping timeout");
       clock = 700_000;
-      handlers.get("connect")();
-      handlers.get("connect_error")({ data: { code: "UNAUTHORIZED" } });
+      io.emit("connect");
+      io.emit("connect_error", { data: { code: "UNAUTHORIZED" } });
 
       expect(onChange.mock.calls.map(([change]) => change)).toEqual([
         { state: "dropped", reason: "ping timeout" },
