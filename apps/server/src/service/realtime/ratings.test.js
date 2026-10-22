@@ -127,12 +127,15 @@ describe("chess ratings over sockets", () => {
     expect(answer.error.code).toBe(ERROR_CODES.VALIDATION_FAILED);
   });
 
+  // Queen Vee plays White and moves at once. The test server thinks on its own event loop, and her Strong level
+  // took about 350 ms with coverage for that first move, more on a busy runner, so the ratings call could wait
+  // behind it past the 2 s answer limit. Her easiest level thinks in a moment, and any level is left out (CC-345).
   it("leaves the computer player out of a game against Queen Vee", async () => {
     server = await startTestServer({ engines: ENGINES });
     const alice = await clients.player();
     const { data: room } = await send(alice.socket, SOCKET_EVENTS.ROOM_PLAY_COMPUTER, {
       gameId: "chess",
-      level: "hard",
+      level: "easy",
     });
 
     const answer = await send(alice.socket, SOCKET_EVENTS.RATING_ROOM, { code: room.code });
