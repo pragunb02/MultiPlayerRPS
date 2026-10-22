@@ -1,5 +1,6 @@
 import { expect, header, test } from "./fixtures.js";
 import { newAccount } from "./personas.js";
+import { realtimeConnects } from "./realtime.js";
 
 // Friends (CC-052, ADR-066). Riya and Arjun, adults, play a game and become friends from the result screen: Arjun
 // hears about the request on another page and accepts it, and each sees the other online, then offline once Arjun
@@ -49,6 +50,7 @@ const friendsList = (page) => page.getByRole("list", { name: "Friends" });
 const friendsFrames = (player) => player.record.socketFrames.filter((frame) => frame.includes('"friends:'));
 const requestPushes = (player) =>
   player.record.socketFrames.filter((frame) => frame.startsWith('42["friends:request"'));
+const connects = (player) => realtimeConnects(player.record.socketFrames);
 
 test.describe("friends", () => {
   test("two adults become friends from the result screen and see each other's presence", async ({
@@ -59,7 +61,11 @@ test.describe("friends", () => {
     const riyaName = await signUp(riya, "1990");
     const arjunName = await signUp(arjun, "1990");
     await playOneGame(riya, arjun);
+    const arjunConnects = connects(arjun);
     await arjun.page.goto("/leaderboards");
+    // A push only reaches a page that is connected, and a new page connects a little after it loads. Arjun is on
+    // the page once his browser is connected again: before that, Riya's request would reach nobody, on any build.
+    await expect.poll(() => connects(arjun)).toBeGreaterThan(arjunConnects);
 
     // Riya adds Arjun from his seat on the result screen. Arjun hears about it on the page he is on.
     await riya.page.getByRole("button", { name: `Add friend ${arjunName}` }).click();
