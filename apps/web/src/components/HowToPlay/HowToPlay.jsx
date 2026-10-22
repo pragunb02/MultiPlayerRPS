@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Svg } from "../../art/Svg.jsx";
 import { gameArtFor } from "../../art/games/gameArt.js";
 import artStyles from "../../art/games/gameArt.module.css";
-import { howToPlayFor, stepCount } from "../../games/howToPlay.js";
+import { stepCount } from "../../games/howToPlay.js";
 import { Button } from "../Button/Button.jsx";
 import { Modal } from "../Modal/Modal.jsx";
 import styles from "./HowToPlay.module.css";
+import { useHowToPlay } from "./useHowToPlay.js";
 
 /**
  * A game's How to play steps as a numbered list, each beside a glyph in the game's colour (CC-259). The glyphs are
@@ -47,10 +48,10 @@ function Steps({ gameId, steps, bilingual = false }) {
  * The lobby's "How to play" strip under the cards, as it was before CC-349. It stays while the `how_to_play` flag
  * is off. A game with no steps shows nothing.
  *
- * @param {{ gameId: string }} props
+ * @param {{ gameId: string, steps: ReadonlyArray<import("../../games/howToPlay.js").HowToPlayStep> }} props  the
+ *   steps from `useHowToPlay`
  */
-export function HowToPlayStrip({ gameId }) {
-  const steps = howToPlayFor(gameId);
+export function HowToPlayStrip({ gameId, steps }) {
   if (steps.length === 0) {
     return null;
   }
@@ -67,11 +68,15 @@ export function HowToPlayStrip({ gameId }) {
  * of a lobby and under the question on an invite or a challenge, so a player reads the rules before choosing, and
  * it takes one line of a phone's screen until opened. A game with no steps shows nothing.
  *
- * @param {{ gameId: string, bilingual?: boolean, className?: string }} props  `bilingual` for a page that speaks
- *   Hinglish. `className` places it on its page
+ * @param {{
+ *   gameId: string,
+ *   steps: ReadonlyArray<import("../../games/howToPlay.js").HowToPlayStep>,
+ *   bilingual?: boolean,
+ *   className?: string,
+ * }} props  `steps` from `useHowToPlay`. `bilingual` for a page that speaks Hinglish. `className` places it on its
+ *   page
  */
-export function HowToPlayFold({ gameId, bilingual = false, className = "" }) {
-  const steps = howToPlayFor(gameId);
+export function HowToPlayFold({ gameId, steps, bilingual = false, className = "" }) {
   if (steps.length === 0) {
     return null;
   }
@@ -88,15 +93,17 @@ export function HowToPlayFold({ gameId, bilingual = false, className = "" }) {
 /**
  * The "How to play" button of a match (CC-349). It opens the app's one dialog with the game's steps. The game goes
  * on behind it: nothing is sent and no clock stops. Escape, a tap outside or "Back to the game" closes it, and the
- * focus comes back to the button. A game with no steps shows no button.
+ * focus comes back to the button. The steps load through the registry when the button first shows. A game with no
+ * steps shows no button.
  *
  * @param {{ gameId: string, gameName: string, onOpen?: () => void }} props  `onOpen` is told each time the dialog
  *   opens
  */
 export function HowToPlayButton({ gameId, gameName, onOpen }) {
   const [open, setOpen] = useState(false);
-  const steps = howToPlayFor(gameId);
-  if (steps.length === 0) {
+  const steps = useHowToPlay(gameId);
+  // Drawn once the steps are here. The match bar keeps its place meanwhile (MatchFrame).
+  if (steps === undefined || steps.length === 0) {
     return null;
   }
 

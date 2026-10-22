@@ -59,7 +59,58 @@ async function checkInGame(page, gameName, whileOpen = async () => {}) {
   expect(await place(page)).toEqual(before);
 }
 
+/**
+ * Records where `selector` is on the page in every frame, from the first paint, so a test can say it never moved.
+ * The page's flags are answered `delayMs` late, as on a slow connection.
+ */
+async function watchPlace(page, selector, delayMs) {
+  await page.route("**/api/flags?**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    await route.continue();
+  });
+  await page.addInitScript((watched) => {
+    window.ccPlaces = [];
+    const tick = () => {
+      const element = document.querySelector(watched);
+      if (element) window.ccPlaces.push(Math.round(element.getBoundingClientRect().top + window.scrollY));
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, selector);
+  return async () => [...new Set(await page.evaluate(() => window.ccPlaces))];
+}
+
 test.describe("How to play (CC-349)", () => {
+  test("nothing moves when the flags answer late: the lobby's first card and the invite's Play as guest", async ({
+    players,
+  }, testInfo) => {
+    const alice = await players.open("alice");
+    const bob = await players.open("bob");
+    if (formFactor(testInfo) === "mobile") await bob.page.setViewportSize({ width: 390, height: 844 });
+    const flagsAnswered = (page) =>
+      page.waitForResponse((res) => new URL(res.url()).pathname === "/api/flags");
+
+    const lobbyPlaces = await watchPlace(bob.page, "main h2", 1_500);
+    const lobbyAnswer = flagsAnswered(bob.page);
+    await bob.page.goto("/games/chess");
+    await lobbyAnswer;
+    await expect(summary(bob.page)).toBeVisible();
+    await bob.page.waitForTimeout(300);
+    expect(await lobbyPlaces()).toHaveLength(1);
+
+    const { path } = await createRoom(alice, "tic-tac-toe");
+    const carol = await players.open("carol");
+    const invite = carol.page;
+    if (formFactor(testInfo) === "mobile") await invite.setViewportSize({ width: 390, height: 844 });
+    const invitePlaces = await watchPlace(invite, "[data-cc-control='join.guest']", 1_500);
+    const inviteAnswer = flagsAnswered(invite);
+    await invite.goto(path);
+    await inviteAnswer;
+    await expect(summary(invite)).toBeVisible();
+    await invite.waitForTimeout(300);
+    expect(await invitePlaces()).toHaveLength(1);
+  });
+
   test("the lobby shows How to play as one line above the fold, which opens in place", async ({
     players,
   }, testInfo) => {

@@ -1,4 +1,5 @@
 import { screen, within } from "@testing-library/react";
+import { CLIENT_FLAG_NAMES } from "../../app/flagStore.js";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeApi } from "../../testing/fakes.js";
@@ -32,10 +33,8 @@ async function startGame(user, { slug, names = ["Asha", "Ben"], api = fakeApi() 
   await vi.waitFor(() => expect(screen.queryByText("Loading the board…")).not.toBeInTheDocument(), {
     timeout: 5_000,
   });
-  // The usage counts host loads once the page is idle and asks its flag then (CC-322): that is the page's start.
-  await vi.waitFor(() => expect(app.api.getFlags).toHaveBeenCalledWith(["telemetry_client"]), {
-    timeout: 5_000,
-  });
+  // The app asks for its flags once, when it knows who this is (CC-349): that is before the game starts.
+  expect(app.api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES);
   return { app, before: networkCalls(app) };
 }
 
@@ -56,7 +55,7 @@ describe("the lobby's way in", () => {
     const user = userEvent.setup();
     const { url } = renderApp({ path: `/games/${slug}` });
 
-    await user.click(screen.getByRole("link", { name: "Play on this phone" }));
+    await user.click(await screen.findByRole("link", { name: "Play on this phone" }));
 
     expect(url()).toBe(`/games/${slug}/pass-and-play`);
     expect(screen.getByRole("heading", { level: 1, name: `${name}: pass and play` })).toBeInTheDocument();

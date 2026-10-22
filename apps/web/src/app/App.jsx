@@ -8,13 +8,31 @@ import { ProgressToasts } from "../components/ProgressToasts.jsx";
 import { SaveProgressProvider } from "../components/SaveProgress/SaveProgressProvider.jsx";
 import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
+import { useSession } from "../hooks/useSession.js";
 import { countRenderErrors } from "../lib/telemetry/errorFields.js";
 import { NO_TELEMETRY } from "../lib/telemetry/facade.js";
 import { TelemetryStub } from "../lib/telemetry/TelemetryStub.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
+import { flagStoreFor } from "./flagStore.js";
 import { prefetchOnIntent } from "./routePrefetch.js";
 import { APP_ROUTES, needsSocketNow, prefetchRouteFor } from "./routePages.js";
 import { ServicesProvider } from "./ServicesProvider.jsx";
+
+/**
+ * Asks for the person's flags as soon as the app knows who they are, before any page that reads one has downloaded,
+ * so those pages draw with the answer and nothing on them moves when it comes (CC-349).
+ *
+ * @param {{ api: object }} props
+ */
+function FlagLoader({ api }) {
+  const session = useSession();
+  const who = session.identity?.id ?? "";
+  const settled = session.status !== "loading";
+  useEffect(() => {
+    if (settled) flagStoreFor(api).load(who);
+  }, [api, who, settled]);
+  return null;
+}
 
 /**
  * The app, independent of the browser entry point (router and services are passed in), so tests can render it
@@ -39,6 +57,7 @@ export function App({ services }) {
     <ErrorBoundary onError={countRenderErrors(services.telemetry ?? NO_TELEMETRY)}>
       <ServicesProvider services={services}>
         <SessionProvider>
+          <FlagLoader api={services.api} />
           <TelemetryStub />
           <ToastProvider>
             <SaveProgressProvider>

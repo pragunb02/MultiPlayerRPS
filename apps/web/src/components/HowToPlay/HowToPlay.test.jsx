@@ -2,7 +2,12 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { GAME_IDS } from "@classicade/shared";
+import { gameView } from "../../games/registry.js";
 import { HowToPlayButton, HowToPlayFold, HowToPlayStrip } from "./HowToPlay.jsx";
+
+const STEPS = Object.fromEntries(
+  await Promise.all(Object.values(GAME_IDS).map(async (id) => [id, await gameView(id).loadHowToPlay()])),
+);
 
 const RPS_STEPS = [
   "You both pick rock, paper or scissors in secret.",
@@ -18,7 +23,7 @@ const texts = (list) =>
 describe("How to play (CC-259, CC-349)", () => {
   describe("the strip under the lobby's cards", () => {
     it("shows the game's steps in order under a heading", () => {
-      render(<HowToPlayStrip gameId={GAME_IDS.RPS} />);
+      render(<HowToPlayStrip gameId={GAME_IDS.RPS} steps={STEPS[GAME_IDS.RPS]} />);
 
       const strip = screen.getByRole("region", { name: "How to play" });
       expect(texts(strip)).toEqual(RPS_STEPS);
@@ -29,7 +34,7 @@ describe("How to play (CC-259, CC-349)", () => {
       [GAME_IDS.TIC_TAC_TOE, "tictactoe"],
       [GAME_IDS.CHESS, "chess"],
     ])("draws each step's glyph for %s in the game's colour, hidden from screen readers", (gameId, tone) => {
-      render(<HowToPlayStrip gameId={gameId} />);
+      render(<HowToPlayStrip gameId={gameId} steps={STEPS[gameId]} />);
 
       for (const step of screen.getAllByRole("listitem")) {
         const glyph = step.querySelector("svg");
@@ -40,7 +45,7 @@ describe("How to play (CC-259, CC-349)", () => {
     });
 
     it("shows nothing for a game the web app has no steps for", () => {
-      const { container } = render(<HowToPlayStrip gameId="ludo" />);
+      const { container } = render(<HowToPlayStrip gameId="ludo" steps={[]} />);
 
       expect(container).toBeEmptyDOMElement();
     });
@@ -48,7 +53,7 @@ describe("How to play (CC-259, CC-349)", () => {
 
   describe("the one line that opens in place", () => {
     it("is closed at first and says how many steps there are", () => {
-      const { container } = render(<HowToPlayFold gameId={GAME_IDS.CHESS} />);
+      const { container } = render(<HowToPlayFold gameId={GAME_IDS.CHESS} steps={STEPS[GAME_IDS.CHESS]} />);
 
       const fold = container.querySelector("details");
       expect(fold).not.toHaveAttribute("open");
@@ -57,7 +62,7 @@ describe("How to play (CC-259, CC-349)", () => {
 
     it("opens to the steps when the line is pressed", async () => {
       const user = userEvent.setup();
-      const { container } = render(<HowToPlayFold gameId={GAME_IDS.RPS} className="placed" />);
+      const { container } = render(<HowToPlayFold gameId={GAME_IDS.RPS} steps={STEPS[GAME_IDS.RPS]} className="placed" />);
 
       await user.click(screen.getByText("How to play: 3 steps"));
 
@@ -68,7 +73,7 @@ describe("How to play (CC-259, CC-349)", () => {
     });
 
     it("puts each step's Hinglish first and the English under it on a page that speaks Hinglish", () => {
-      render(<HowToPlayFold gameId={GAME_IDS.TIC_TAC_TOE} bilingual />);
+      render(<HowToPlayFold gameId={GAME_IDS.TIC_TAC_TOE} steps={STEPS[GAME_IDS.TIC_TAC_TOE]} bilingual />);
 
       const [first] = screen.getAllByRole("listitem");
       const [hinglish, english] = first.querySelectorAll("[lang]");
@@ -79,7 +84,7 @@ describe("How to play (CC-259, CC-349)", () => {
     });
 
     it("shows nothing for a game the web app has no steps for", () => {
-      const { container } = render(<HowToPlayFold gameId="ludo" />);
+      const { container } = render(<HowToPlayFold gameId="ludo" steps={[]} />);
 
       expect(container).toBeEmptyDOMElement();
     });
@@ -91,7 +96,7 @@ describe("How to play (CC-259, CC-349)", () => {
       const onOpen = vi.fn();
       render(<HowToPlayButton gameId={GAME_IDS.CHESS} gameName="Chess" onOpen={onOpen} />);
 
-      await user.click(screen.getByRole("button", { name: "How to play" }));
+      await user.click(await screen.findByRole("button", { name: "How to play" }));
 
       const dialog = screen.getByRole("dialog", { name: "How to play Chess" });
       expect(within(dialog).getAllByRole("listitem")).toHaveLength(3);
@@ -106,7 +111,7 @@ describe("How to play (CC-259, CC-349)", () => {
     ])("closes with %s and gives the focus back to the button", async (_how, close) => {
       const user = userEvent.setup();
       render(<HowToPlayButton gameId={GAME_IDS.RPS} gameName="Rock Paper Scissors" />);
-      const button = screen.getByRole("button", { name: "How to play" });
+      const button = await screen.findByRole("button", { name: "How to play" });
 
       await user.click(button);
       await close(user);

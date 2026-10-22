@@ -4,6 +4,7 @@ import { outcomeMoment } from "../../games/outcomeMoment.js";
 import { forWhomLine } from "../../games/passAndPlay/forWhomLine.js";
 import { textsFor } from "../../games/roomUpdates.js";
 import { nameOf } from "../../games/roomView.js";
+import { FLAG_STATES } from "../../hooks/useFlag.js";
 import { useLocalMatch } from "../../hooks/useLocalMatch.js";
 import { Button } from "../Button/Button.jsx";
 import { Modal } from "../Modal/Modal.jsx";
@@ -232,9 +233,9 @@ const askNobody = () => Promise.resolve();
  *   names: ReadonlyArray<string>,
  *   options: object,
  *   onLeave: () => void,
- *   howToPlay?: boolean,
+ *   howToPlay?: string,
  * }} props  `game` is the game's registry entry, with `passAndPlay`. `names` and `options` are read once.
- *   `onLeave` opens the game's lobby. `howToPlay` shows the How to play button (CC-349). Opening it sends
+ *   `onLeave` opens the game's lobby. `howToPlay` is the How to play flag's state (FLAG_STATES, CC-349). Opening it sends
  *   nothing, as nothing else here does
  */
 export function PassAndPlayShell({
@@ -245,7 +246,7 @@ export function PassAndPlayShell({
   names,
   options,
   onLeave,
-  howToPlay = false,
+  howToPlay = FLAG_STATES.OFF,
 }) {
   const match = useLocalMatch({ engine, names, options });
   const { room, holder } = match;
@@ -264,7 +265,7 @@ export function PassAndPlayShell({
       gameName={gameName}
       phase={phase}
       score={turn}
-      howToPlay={howToPlay ? {} : undefined}
+      howToPlay={{ state: howToPlay }}
       result={
         finished
           ? {

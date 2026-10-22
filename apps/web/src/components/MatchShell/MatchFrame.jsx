@@ -1,8 +1,10 @@
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { getGame } from "@classicade/shared";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { momentAnnouncement } from "../../games/outcomeMoment.js";
+import { gameView } from "../../games/registry.js";
 import { gameNumber, playReason } from "../../games/roomView.js";
+import { FLAG_STATES } from "../../hooks/useFlag.js";
 import { HowToPlayButton } from "../HowToPlay/HowToPlay.jsx";
 import { PageTitle } from "../PageTitle.jsx";
 import { MatchAnnouncer } from "./MatchAnnouncer.jsx";
@@ -63,7 +65,7 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  *   request?: string,
  *   banner?: import("react").ReactNode,
  *   score?: string,
- *   howToPlay?: { onOpen?: () => void },
+ *   howToPlay?: { state: string, onOpen?: () => void },
  *   result?: {
  *     moment: Readonly<import("../../games/outcomeMoment.js").OutcomeMoment>,
  *     celebration?: import("react").ReactNode,
@@ -75,8 +77,9 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  *   side: import("react").ReactNode,
  * }} props  `phase` and `request` are written on the frame for tests and telemetry. `result` is given once the
  *   game is over, with the game's outcome moment (outcomeMoment), whose tone colours the card. Its `footer` goes
- *   under the action bar inside the card, such as the share buttons. `howToPlay` shows the How to play button, and
- *   its `onOpen` is told each time the player opens it
+ *   under the action bar inside the card, such as the share buttons. `howToPlay` is the How to play button's flag
+ *   state (FLAG_STATES) and its `onOpen`, told each time the player opens it. While the state is unknown the bar
+ *   keeps the button's place, and once kept the place stays, so a late answer never moves the board (CC-349)
  */
 export function MatchFrame({
   pageTitle,
@@ -93,6 +96,11 @@ export function MatchFrame({
   side,
 }) {
   const scoreLine = score !== undefined && <p className={styles.score}>{score}</p>;
+  const helpState = howToPlay?.state ?? FLAG_STATES.OFF;
+  const [keptPlace, setKeptPlace] = useState(false);
+  const helpPlace =
+    gameView(gameId).loadHowToPlay !== undefined && (helpState !== FLAG_STATES.OFF || keptPlace);
+  if (helpPlace && !keptPlace) setKeptPlace(true);
   return (
     <MatchAnnouncer urgent={result ? momentAnnouncement(result.moment) : ""}>
       <section className={styles.shell} data-cc-phase={phase} data-cc-request={request}>
@@ -103,10 +111,14 @@ export function MatchFrame({
             <GameIcon gameId={gameId} size={32} />
             {gameName}
           </h1>
-          {howToPlay ? (
+          {helpPlace ? (
             <div className={styles.barEnd}>
               {scoreLine}
-              <HowToPlayButton gameId={gameId} gameName={gameName} onOpen={howToPlay.onOpen} />
+              <div className={styles.barHelp} data-cc-slot="how-to-play-place">
+                {helpState === FLAG_STATES.ON && (
+                  <HowToPlayButton gameId={gameId} gameName={gameName} onOpen={howToPlay.onOpen} />
+                )}
+              </div>
             </div>
           ) : (
             scoreLine

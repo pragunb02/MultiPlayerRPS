@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { CLIENT_FLAG_NAMES } from "../../app/flagStore.js";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
@@ -235,7 +236,7 @@ flagPaths("console_flag_check", (on) => {
     const { user } = await openFlags(api);
     await screen.findByRole("article", { name: "new_lobby" });
 
-    expect(api.getFlags).toHaveBeenCalledWith(["console_flag_check"]);
+    expect(api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES);
     const line = screen.queryByText(/The console_flag_check flag is on for you/);
     if (!on) {
       expect(line).toBeNull();

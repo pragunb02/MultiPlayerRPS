@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GAME_IDS, GAMES } from "@classicade/shared";
-import { gameLeadFor, HOW_TO_PLAY_LIMITS, howToPlayFor, stepCount } from "./howToPlay.js";
+import { HOW_TO_PLAY_LIMITS, stepCount } from "./howToPlay.js";
 import { GAME_VIEWS, gameView } from "./registry.js";
 import { describeGameViewContract } from "./testing/gameViewContract.js";
 
@@ -82,17 +82,15 @@ describe("How to play on every game (A2, CC-349)", () => {
     }
   });
 
-  it.each(Object.keys(GAME_VIEWS))("gives the pages the registry's steps for %s", async (gameId) => {
-    expect(howToPlayFor(gameId)).toBe(await GAME_VIEWS[gameId].loadHowToPlay());
+  it.each(GAMES.map((game) => [game.name, game.id]))("gives %s one line for the lobby", (_name, gameId) => {
+    const { lead } = gameView(gameId);
+
+    expect(lead.length).toBeLessThan(HOW_TO_PLAY_LIMITS.characters);
+    expect(lead).toMatch(/^[A-Z].*\.$/);
   });
 
   it("allows three steps of under 90 characters", () => {
     expect(HOW_TO_PLAY_LIMITS).toEqual({ steps: 3, characters: 90 });
-  });
-
-  it("gives no steps and no lobby line for a game the web app has nothing for yet", () => {
-    expect(howToPlayFor("ludo")).toEqual([]);
-    expect(gameLeadFor("ludo")).toBe("");
   });
 
   it("counts the steps in plain words", () => {

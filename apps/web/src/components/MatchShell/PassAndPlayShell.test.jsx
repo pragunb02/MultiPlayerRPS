@@ -55,7 +55,7 @@ const networkCalls = ({ api, socket }) =>
     globalThis.fetch.mock.calls.length,
   );
 
-function renderShell({ howToPlay = false } = {}) {
+function renderShell({ howToPlay = "off" } = {}) {
   const services = { api: fakeApi(), socket: fakeSocket() };
   render(
     <ServicesProvider services={services}>
@@ -95,7 +95,7 @@ describe("PassAndPlayShell", () => {
 
   it("shows How to play in the match bar when it is on, and opening it sends nothing (CC-349)", async () => {
     const user = userEvent.setup();
-    const services = renderShell({ howToPlay: true });
+    const services = renderShell({ howToPlay: "on" });
 
     await user.click(await screen.findByRole("button", { name: "How to play" }));
 
@@ -108,6 +108,8 @@ describe("PassAndPlayShell", () => {
 
     expect(await screen.findByText("Board for player-1")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "How to play" })).toBeNull();
+    // Off from the start, as the setup screen knew: no place is kept for the button (CC-349).
+    expect(document.querySelector("[data-cc-slot='how-to-play-place']")).toBeNull();
   });
 
   it("notices a request to the server when one is made on purpose, so the test above can fail", async () => {

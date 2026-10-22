@@ -1,4 +1,5 @@
 import { act, render, screen, within } from "@testing-library/react";
+import { flagStoreFor } from "../../app/flagStore.js";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -592,8 +593,8 @@ describe("How to play in the match bar (CC-349)", () => {
           game: { Board: FakeBoard, inGameScore: () => ({ text: "1 to 0" }) },
         });
 
-        const button = await within(slot("match-bar")).findByRole("button", { name: "How to play" });
-        expect(button.closest("div")).toHaveTextContent("1 to 0");
+        await within(slot("match-bar")).findByRole("button", { name: "How to play" });
+        expect(slot("how-to-play-place").parentElement).toHaveTextContent("1 to 0");
       });
 
       it("never lets a failed count reach the player", async () => {
@@ -611,10 +612,38 @@ describe("How to play in the match bar (CC-349)", () => {
         const api = flagApi();
         mount(roomView(), { api });
 
-        await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["how_to_play"]));
+        await vi.waitFor(() => expect(flagStoreFor(api).stateOf(GUEST.id, "how_to_play")).toBe("off"));
         await act(async () => {});
         expect(within(slot("match-bar")).queryByRole("button", { name: "How to play" })).toBeNull();
       });
     }
+
+    it("keeps the button's place while the answer is on its way, and keeps it after, so the board never moves", async () => {
+      let answer;
+      const api = fakeApi({
+        getSession: async () => GUEST,
+        getFlags: vi.fn(() => new Promise((resolve) => (answer = resolve))),
+      });
+      mount(roomView(), { api });
+
+      await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+      expect(slot("how-to-play-place")).toBeInTheDocument();
+      expect(within(slot("match-bar")).queryByRole("button", { name: "How to play" })).toBeNull();
+      await act(async () => answer({ how_to_play: on }));
+
+      expect(slot("how-to-play-place")).toBeInTheDocument();
+      if (on) {
+        await within(slot("how-to-play-place")).findByRole("button", { name: "How to play" });
+      } else {
+        expect(slot("how-to-play-place")).toBeEmptyDOMElement();
+      }
+    });
+  });
+
+  it("keeps no place for How to play in a game that has none", async () => {
+    mount(roomView({ gameId: "ludo" }), { game: {} });
+
+    await act(async () => {});
+    expect(slot("how-to-play-place")).toBeNull();
   });
 });

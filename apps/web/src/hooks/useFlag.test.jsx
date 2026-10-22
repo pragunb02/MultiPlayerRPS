@@ -2,7 +2,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ServicesContext } from "../app/servicesContext.js";
 import { fakeApi, GUEST } from "../testing/fakes.js";
-import { useFlag } from "./useFlag.js";
+import { CLIENT_FLAG_NAMES } from "../app/flagStore.js";
+import { FLAG_STATES, useFlag, useSteadyFlagState } from "./useFlag.js";
 import { SessionContext } from "./useSession.js";
 
 // The web side of feature flags (CC-312): a component asks for one flag and gets a boolean, off until the server
@@ -33,7 +34,7 @@ describe("useFlag (CC-312)", () => {
     expect(result.current).toBe(false);
     answer({ console_flag_check: true });
     await waitFor(() => expect(result.current).toBe(true));
-    expect(api.getFlags).toHaveBeenCalledWith(["console_flag_check"]);
+    expect(api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES);
   });
 
   it("asks for a visitor with no session too, and follows the answer", async () => {
@@ -72,6 +73,48 @@ describe("useFlag (CC-312)", () => {
 
     expect(result.current).toBe(false);
     expect(api.getFlags).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks once for the whole app, so a page that opens later has its answer at once (CC-349)", async () => {
+    const api = fakeApi({
+      getFlags: vi.fn().mockResolvedValue({ console_flag_check: true, design_page: true }),
+    });
+    const first = renderHook(() => useFlag("console_flag_check"), {
+      wrapper: wrapperFor(api, sessionOf(OWNER)),
+    });
+    await waitFor(() => expect(first.result.current).toBe(true));
+
+    const later = renderHook(() => useFlag("design_page"), { wrapper: wrapperFor(api, sessionOf(OWNER)) });
+
+    expect(later.result.current).toBe(true);
+    expect(api.getFlags).toHaveBeenCalledOnce();
+  });
+
+  it("waits to ask until the app knows who the person is (CC-349)", () => {
+    const api = fakeApi();
+
+    const { result } = renderHook(() => useFlag("console_flag_check"), {
+      wrapper: wrapperFor(api, { current: { status: "loading", identity: undefined } }),
+    });
+
+    expect(result.current).toBe(false);
+    expect(api.getFlags).not.toHaveBeenCalled();
+  });
+
+  it("keeps a layout's last answer while a new person's answer is on its way (CC-349)", async () => {
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ how_to_play: true }) });
+    const session = { current: { status: "anonymous", identity: undefined } };
+    const { result, rerender } = renderHook(() => useSteadyFlagState("how_to_play"), {
+      wrapper: wrapperFor(api, session),
+    });
+
+    expect(result.current).toBe(FLAG_STATES.UNKNOWN);
+    await waitFor(() => expect(result.current).toBe(FLAG_STATES.ON));
+    api.getFlags.mockReturnValue(new Promise(() => {}));
+    session.current = sessionOf(GUEST).current;
+    rerender();
+
+    expect(result.current).toBe(FLAG_STATES.ON);
   });
 
   it("an unknown flag name throws", () => {

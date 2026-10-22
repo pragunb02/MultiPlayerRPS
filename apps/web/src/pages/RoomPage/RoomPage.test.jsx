@@ -1,4 +1,5 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
+import { CLIENT_FLAG_NAMES } from "../../app/flagStore.js";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
@@ -653,7 +654,7 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     expect(heading.previousElementSibling.tagName).toBe("svg");
     expect(heading.previousElementSibling).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByText("AB2CD3").parentElement.querySelector("svg")).toHaveClass("tictactoe");
-    expect(screen.getByRole("button", { name: "Play as guest" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Play as guest" })).toBeEnabled();
     expect(within(screen.getByRole("main")).getByRole("link", { name: "Log in" })).toHaveAttribute(
       "href",
       `/login?next=${encodeURIComponent(INVITE)}`,
@@ -677,18 +678,33 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
         openInvite({ api });
 
         await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" });
-        await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["how_to_play"]));
+        await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES));
         if (on) {
           const line = await screen.findByText("How to play: 3 steps");
           const choice = screen.getByRole("button", { name: "Play as guest" });
           expect(line.compareDocumentPosition(choice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
           expect(within(line.closest("details")).getAllByRole("listitem")).toHaveLength(3);
         } else {
-          await act(async () => {});
+          // The choice comes with the flag's answer, so this is checked after the answer.
+          await screen.findByRole("button", { name: "Play as guest" });
           expect(screen.queryByText("How to play: 3 steps")).not.toBeInTheDocument();
         }
       },
     );
+  });
+
+  it("draws the choice only with the flag's answer, so How to play never pushes the buttons down (CC-349)", async () => {
+    let answer;
+    const api = fakeApi({ getFlags: vi.fn(() => new Promise((resolve) => (answer = resolve))) });
+    openInvite({ api });
+
+    await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" });
+    await waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Play as guest" })).not.toBeInTheDocument();
+    answer({ how_to_play: true });
+
+    expect(await screen.findByRole("button", { name: "Play as guest" })).toBeInTheDocument();
+    expect(screen.getByText("How to play: 3 steps")).toBeInTheDocument();
   });
 
   it("joins as a guest after choosing to", async () => {
@@ -715,7 +731,7 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     await user.click(await screen.findByRole("button", { name: "Play as guest" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests, try again later");
-    expect(screen.getByRole("button", { name: "Play as guest" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Play as guest" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Play as guest" }));
     expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
   });

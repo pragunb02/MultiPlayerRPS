@@ -5,7 +5,7 @@ import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
 import { gameNumber, matchPhase, PLAY_REASONS } from "../../games/roomView.js";
 import { useServices } from "../../app/servicesContext.js";
 import { useAction } from "../../hooks/useAction.js";
-import { useFlag } from "../../hooks/useFlag.js";
+import { useSteadyFlagState } from "../../hooks/useFlag.js";
 import { ResultCelebration } from "../Celebrations/ResultCelebration.jsx";
 import { ClaimWin } from "../ClaimWin/ClaimWin.jsx";
 import { ComputerNote } from "../ComputerNote/ComputerNote.jsx";
@@ -41,14 +41,14 @@ function requestState(room) {
  * The match bar's How to play, while the `how_to_play` flag is on (CC-349). Its first opening on this page counts
  * once as the flag's success, with no id of anyone.
  *
- * @returns {{ onOpen: () => void } | undefined} undefined while the flag is off
+ * @returns {{ state: string, onOpen: () => void }} `state` is the flag's FLAG_STATES value
  */
 function useHowToPlay() {
   const { api } = useServices();
-  const on = useFlag("how_to_play");
+  const state = useSteadyFlagState("how_to_play");
   const counted = useRef(false);
-  if (!on) return undefined;
   return {
+    state,
     onOpen: () => {
       if (counted.current) return;
       counted.current = true;

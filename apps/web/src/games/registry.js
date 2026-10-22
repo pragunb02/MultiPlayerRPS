@@ -23,9 +23,14 @@ const RpsBoard = lazyBoard(() => import("./rps/RpsBoard.jsx"), "RpsBoard");
 const TicTacToeBoard = lazyBoard(() => import("./tictactoe/TicTacToeBoard.jsx"), "TicTacToeBoard");
 const ChessBoard = lazyBoard(() => import("./chess/ChessBoard.jsx"), "ChessBoard");
 
-// How to play loads with the pages that show it (a lobby, an invite, a match), not with the first page, because the
-// registry is in the first download for the request banners (CC-349).
-const howToPlayOf = (gameId) => () => import("./howToPlay.js").then((module) => module.howToPlayFor(gameId));
+// How to play loads with the pages that show it (a lobby, an invite, a challenge, a match), not with the first page,
+// because the registry is in the first download for the request banners (CC-349).
+const RPS_HOW_TO_PLAY = lazyEngine(() => import("./rps/rpsHowToPlay.js"), "RPS_HOW_TO_PLAY");
+const TICTACTOE_HOW_TO_PLAY = lazyEngine(
+  () => import("./tictactoe/tictactoeHowToPlay.js"),
+  "TICTACTOE_HOW_TO_PLAY",
+);
+const CHESS_HOW_TO_PLAY = lazyEngine(() => import("./chess/chessHowToPlay.js"), "CHESS_HOW_TO_PLAY");
 
 // The engines for pass and play load the same way, only when two people start a game on one phone (CC-223).
 const RPS_PASS_AND_PLAY = Object.freeze({
@@ -59,8 +64,9 @@ const CHESS_PASS_AND_PLAY = Object.freeze({
  * @property {import("./outcomeLine.js").OutcomeText} [outcomeText]  the words of the game's endings in the
  *   outcome moment, and a computer character's tip after a loss (CC-163). Without it the moment uses plain words
  * @property {() => Promise<ReadonlyArray<import("./howToPlay.js").HowToPlayStep>>} [loadHowToPlay]  the game's
- *   How to play, 1 to 3 short steps for a first-time player (CC-259, CC-349), loaded on demand. The pages draw them
- *   from `games/howToPlay.js`, which only the pages that show them import
+ *   How to play, 1 to 3 short steps for a first-time player (CC-259, CC-349), loaded on demand by every page that
+ *   shows them (`components/HowToPlay/useHowToPlay.js`)
+ * @property {string} [lead]  what the game is, in one sentence under the lobby's title (CC-349)
  * @property {(room: any) => ReadonlyArray<import("../components/MatchShell/matchShell.js").GameAction>} [actions]
  *   the game's buttons in the action bar while a seated player plays, at most three (Leave takes the fourth place)
  * @property {(room: any) => { text: string } | undefined} [inGameScore]  the score inside one game, such as the
@@ -110,7 +116,8 @@ export const GAME_VIEWS = Object.freeze({
     soundsFor: rpsSounds,
     reasonPhrase: rpsReasonPhrase,
     outcomeText: RPS_OUTCOME_TEXT,
-    loadHowToPlay: howToPlayOf(GAME_IDS.RPS),
+    lead: "Pick rock, paper or scissors and beat the other pick.",
+    loadHowToPlay: RPS_HOW_TO_PLAY,
     passAndPlay: RPS_PASS_AND_PLAY,
   }),
   [GAME_IDS.TIC_TAC_TOE]: Object.freeze({
@@ -118,7 +125,8 @@ export const GAME_VIEWS = Object.freeze({
     soundsFor: tictactoeSounds,
     reasonPhrase: tictactoeReasonPhrase,
     outcomeText: TICTACTOE_OUTCOME_TEXT,
-    loadHowToPlay: howToPlayOf(GAME_IDS.TIC_TAC_TOE),
+    lead: "Get three in a row before the other player.",
+    loadHowToPlay: TICTACTOE_HOW_TO_PLAY,
     passAndPlay: TICTACTOE_PASS_AND_PLAY,
   }),
   [GAME_IDS.CHESS]: Object.freeze({
@@ -128,7 +136,8 @@ export const GAME_VIEWS = Object.freeze({
     requestTexts: CHESS_REQUEST_TEXTS,
     reasonPhrase: chessReasonPhrase,
     outcomeText: CHESS_OUTCOME_TEXT,
-    loadHowToPlay: howToPlayOf(GAME_IDS.CHESS),
+    lead: "Checkmate the other king to win.",
+    loadHowToPlay: CHESS_HOW_TO_PLAY,
     actions: chessActions,
     passAndPlay: CHESS_PASS_AND_PLAY,
   }),
