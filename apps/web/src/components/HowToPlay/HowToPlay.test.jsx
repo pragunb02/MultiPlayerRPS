@@ -62,7 +62,9 @@ describe("How to play (CC-259, CC-349)", () => {
 
     it("opens to the steps when the line is pressed", async () => {
       const user = userEvent.setup();
-      const { container } = render(<HowToPlayFold gameId={GAME_IDS.RPS} steps={STEPS[GAME_IDS.RPS]} className="placed" />);
+      const { container } = render(
+        <HowToPlayFold gameId={GAME_IDS.RPS} steps={STEPS[GAME_IDS.RPS]} className="placed" />,
+      );
 
       await user.click(screen.getByText("How to play: 3 steps"));
 

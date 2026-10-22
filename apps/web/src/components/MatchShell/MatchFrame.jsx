@@ -65,7 +65,7 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  *   request?: string,
  *   banner?: import("react").ReactNode,
  *   score?: string,
- *   howToPlay?: { state: string, onOpen?: () => void },
+ *   howToPlay: { state: string, onOpen?: () => void },
  *   result?: {
  *     moment: Readonly<import("../../games/outcomeMoment.js").OutcomeMoment>,
  *     celebration?: import("react").ReactNode,
@@ -96,7 +96,7 @@ export function MatchFrame({
   side,
 }) {
   const scoreLine = score !== undefined && <p className={styles.score}>{score}</p>;
-  const helpState = howToPlay?.state ?? FLAG_STATES.OFF;
+  const helpState = howToPlay.state;
   const [keptPlace, setKeptPlace] = useState(false);
   const helpPlace =
     gameView(gameId).loadHowToPlay !== undefined && (helpState !== FLAG_STATES.OFF || keptPlace);
