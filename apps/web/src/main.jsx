@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
+import { followInputModality } from "./app/inputModality.js";
 import { takeLanding } from "./app/landing.js";
 import { needsSocketNow, preloadRouteFor } from "./app/routePages.js";
 import { removeServerHead } from "./app/serverHead.js";
@@ -40,6 +41,8 @@ const services = {
   download: createDownload({ document, URL: window.URL }),
 };
 removeServerHead(document);
+// Focus moved in code shows its ring only for keyboard players (CC-100).
+followInputModality(document);
 
 // A page that downloads on demand, opened by its address, is fetched before the first render, as the router's own
 // lazy routes do. The first render then shows the page itself and not its skeleton, so nothing moves (CC-322).
