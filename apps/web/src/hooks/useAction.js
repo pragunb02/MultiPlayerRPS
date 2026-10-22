@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { roundMs, TELEMETRY_MAX_WAIT_MS } from "@classicade/shared";
+import { ServicesContext } from "../app/servicesContext.js";
 import { isRetryable } from "../lib/errors.js";
+import { codeOf } from "../lib/telemetry/errorFields.js";
+import { NO_TELEMETRY } from "../lib/telemetry/facade.js";
 
 /**
  * How a button answers a press (docs/ux/MATCH_EXPERIENCE.md, button feedback standard). The press and the click
@@ -72,7 +76,9 @@ function call(fn, args) {
  * }}
  */
 export function useAction(fn, { id }) {
+  const telemetry = useContext(ServicesContext)?.telemetry ?? NO_TELEMETRY;
   const [state, setState] = useState(IDLE);
+  const spinnerShown = useRef(false);
   const latest = useRef(fn);
   const timer = useRef(0);
   const holdTimer = useRef(0);
@@ -149,6 +155,7 @@ export function useAction(fn, { id }) {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       show({ phase: ACTION_PHASES.PENDING, error: undefined, labelHeld: false });
+      spinnerShown.current = true;
       holding.current = true;
       holdTimer.current = window.setTimeout(release, ACTION_TIMING.PENDING_AT_LEAST_MS);
     }, ACTION_TIMING.PENDING_AFTER_MS);
@@ -162,14 +169,39 @@ export function useAction(fn, { id }) {
       lastArgs.current = args;
       stopHolding();
       show({ phase: ACTION_PHASES.SENDING, error: undefined, labelHeld: false });
+      spinnerShown.current = false;
       startWaiting();
+      const pressedAt = window.performance.now();
+      const before = telemetry.requestsSent();
+      // How long the press waited for its answer, by the transport it went over (CC-240's browser slice, CC-174).
+      // A press that sent nothing is not counted.
+      const waited = (outcome) => {
+        const after = telemetry.requestsSent();
+        const transport =
+          (after.socket > before.socket && "socket") || (after.http > before.http && "http") || undefined;
+        if (transport === undefined) return;
+        try {
+          telemetry.track("action_waited", {
+            control: id,
+            transport,
+            wait_ms: roundMs(window.performance.now() - pressedAt, TELEMETRY_MAX_WAIT_MS),
+            outcome,
+            showed_spinner: spinnerShown.current,
+          });
+        } catch {
+          // A control name the catalogue refuses is a mistake in code, which a test of every name in the source
+          // catches (telemetry/events.test.js). Here it must never change how the press ends.
+        }
+      };
       const answer = call(latest.current, args);
       const attempt = (async () => {
         try {
           const value = await answer;
+          waited("ok");
           settle({ phase: ACTION_PHASES.DONE, error: undefined });
           return { ok: true, value };
         } catch (error) {
+          waited(codeOf(error));
           const failure = {
             message: error?.message ?? String(error),
             retryable: isRetryable(error),
@@ -184,7 +216,7 @@ export function useAction(fn, { id }) {
       running.current = attempt;
       return attempt;
     },
-    [settle, show, startWaiting, stopHolding],
+    [settle, show, startWaiting, stopHolding, telemetry, id],
   );
 
   const run = useCallback((...args) => start(args), [start]);

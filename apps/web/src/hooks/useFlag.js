@@ -15,6 +15,21 @@ import { useSession } from "./useSession.js";
  * @throws {RangeError} for a name that is not registered, or a flag only the server may read
  */
 export function useFlag(name) {
+  return useFlagState(name) === FLAG_STATES.ON;
+}
+
+/** Where the answer about a flag stands: not answered yet for this person, on or off. */
+export const FLAG_STATES = Object.freeze({ UNKNOWN: "unknown", ON: "on", OFF: "off" });
+
+/**
+ * The same question as `useFlag`, for code that must tell "not answered yet" from "off", such as usage counts
+ * (CC-174), which hold the first events of a page until the answer comes. A failed question is off.
+ *
+ * @param {string} name  a flag in packages/shared/src/flags.js that is marked `client`
+ * @returns {string} a FLAG_STATES value
+ * @throws {RangeError} for a name that is not registered, or a flag only the server may read
+ */
+export function useFlagState(name) {
   assertClientFlag(flagNamed(name));
   const { api } = useServices();
   const session = useSession();
@@ -32,5 +47,6 @@ export function useFlag(name) {
     };
   }, [api, name, who]);
 
-  return answer.who === who && answer.on;
+  if (answer.who !== who) return FLAG_STATES.UNKNOWN;
+  return answer.on ? FLAG_STATES.ON : FLAG_STATES.OFF;
 }
