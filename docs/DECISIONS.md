@@ -451,9 +451,14 @@ system }`. It is the only name the browser gets for a session. A session id is n
      challenge to one person in a blocked pair is never delivered to them: the sender sees it wait and then expire,
      like a challenge nobody answered.
   6. **Limits:** at most **3 open challenges per sender**, and at most **one every 10 minutes to the same person**,
-     in the domain (409 with `details.reason`). They are checked after the new challenge is stored, over the
-     sender's challenges in one order (oldest first, then by id), and a new one past a limit is deleted again, so
-     challenges made at the same moment can never get past them. Rate limits on the routes: 10 made per player and 50 per address in
+     in the domain (409 with `details.reason`). Storage holds both in the write itself (amended by CC-337): each
+     open challenge holds one of its sender's 3 places (`openSlot`), and each challenge to a person holds that
+     sender's one mark for that person (`recentTo`) for 10 minutes. Two unique partial indexes, `open_slot` on
+     `{ fromId, openSlot }` and `recent_to` on `{ fromId, toId }`, let only one challenge hold each, so challenges
+     made at the same moment can never get past them. A place is let go once its challenge can never be open again,
+     and a mark once it is 10 minutes old. Challenges with no place or mark (stored before CC-337, or brought by a
+     guest to an account that held them already) are still counted after the write, and a new one past a limit is
+     deleted again. Rate limits on the routes: 10 made per player and 50 per address in
      10 minutes, 60 answers per player in 10 minutes, and 60 reads per player and 300 per address a minute. The
      address counts only what the player's own limit let through.
   7. **API.** `POST /api/challenges` `{ gameId, options?, to? }`, `GET /api/challenges` (the inbox),
@@ -481,11 +486,12 @@ system }`. It is the only name the browser gets for a session. A session id is n
 - **Amended 2026-10-20 (review of #152).** (1) A view tells `createdAt` to the creator only, so a blocked
   player's "expired" view is the same, byte for byte, as a real expired one: `forYou` and `later` as for anyone,
   and no time from which its age could be told. (2) A popup's minute counts only while the tab is in front. (3)
-  The claim lease of point 2. (4) The limits are checked after storing, as in point 6. (5) The export shows each
+  The claim lease of point 2. (4) The limits are held by the unique places and marks of point 6 (CC-337), and challenges without them
+  are still counted after storing. (5) The export shows each
   challenge's state now, and leaves out challenges sent by someone in a block with the player. (6) The creator's
   view of a taken challenge carries `until`, and the web app drops open challenges at `expiresAt` and taken ones
   at `until`.
-- **Consequences.** One new collection with five indexes, nothing existing changed or migrated. A challenger who
+- **Consequences.** One new collection with seven indexes (two unique partial ones for the limits since CC-337), nothing existing changed or migrated. A challenger who
   is offline when someone takes their challenge leaves the taker in a waiting room that closes after 30 minutes;
   CC-052 scenario 4 adds "keep it for later". A blocked person who compares the page with a friend's can guess,
   which ADR-053 accepts. Presence for friends ("In a game") is CC-052's.
