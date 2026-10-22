@@ -23,6 +23,11 @@ const DUPLICATE_KEY_CODE = 11000;
  * @property {string} roomCode      the room made for both, "" until it is made
  * @property {string[]} laterBy     the players who moved it from a popup to their inbox
  * @property {Date} deleteAt        when MongoDB deletes the record by itself
+ * @property {number} [openSlot]    which of the sender's places for open challenges it holds, from 0. Unique per
+ *   sender, so two challenges made at the same moment can never take one place (CC-337). It is let go only once
+ *   the challenge can never be open again (`freeSlots`)
+ * @property {boolean} [recentTo]  true while it is the sender's challenge to `toId` of the last ten minutes. Unique
+ *   per sender and recipient, so two challenges to one person at the same moment can never both be made (CC-337)
  */
 
 const challengeSchema = new mongoose.Schema(
@@ -44,12 +49,24 @@ const challengeSchema = new mongoose.Schema(
     roomCode: { type: String, default: "" },
     laterBy: { type: [String], default: [] },
     deleteAt: { type: Date, required: true },
+    openSlot: { type: Number },
+    recentTo: { type: Boolean },
   },
   { collection: "challenges", versionKey: false, minimize: false },
 );
 challengeSchema.index({ challengeId: 1 }, { unique: true });
 // The sender's own challenges, newest first: their inbox, the limit of open ones and the one in ten minutes rule.
 challengeSchema.index({ fromId: 1, createdAt: -1 });
+// One challenge per place for open challenges of each sender: the limit of open ones holds in one write (CC-337).
+challengeSchema.index(
+  { fromId: 1, openSlot: 1 },
+  { unique: true, name: "open_slot", partialFilterExpression: { openSlot: { $exists: true } } },
+);
+// One recent challenge from each sender to each person: the one in ten minutes rule holds in one write (CC-337).
+challengeSchema.index(
+  { fromId: 1, toId: 1 },
+  { unique: true, name: "recent_to", partialFilterExpression: { recentTo: { $exists: true } } },
+);
 // The challenges sent to one player, for their inbox.
 challengeSchema.index({ toId: 1, createdAt: -1 });
 // The challenges a player took, so deleting their account or moving a guest finds them.
@@ -58,9 +75,22 @@ challengeSchema.index({ acceptedBy: 1 });
 challengeSchema.index({ deleteAt: 1 }, { expireAfterSeconds: 0 });
 
 const FIELDS =
-  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt";
+  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt openSlot recentTo";
 const PLAYER_FIELDS = Object.freeze(["fromId", "toId", "acceptedBy"]);
 const isDuplicate = (err) => err.code === DUPLICATE_KEY_CODE;
+const duplicateField = ({ keyPattern }) =>
+  Object.hasOwn(keyPattern, "openSlot")
+    ? "openSlot"
+    : Object.hasOwn(keyPattern, "toId")
+      ? "recentTo"
+      : "challengeId";
+/** Each field held by one challenge at most, with the key of the unique index that holds it (CC-337). */
+const HELD_KEYS = Object.freeze([
+  ["openSlot", { fromId: "$fromId", openSlot: "$openSlot" }],
+  ["recentTo", { fromId: "$fromId", toId: "$toId" }],
+]);
+/** What a moved challenge gives up when its new player holds its place or mark already, in the order tried. */
+const MARKS_DROPPED = Object.freeze([{}, { recentTo: 1 }, { recentTo: 1, openSlot: 1 }]);
 
 /**
  * Challenges in MongoDB (CC-139, ADR-069). Every change of state is one conditional update, so two people taking
@@ -83,23 +113,72 @@ export function createChallengeDao({ connection }) {
   });
 
   const dao = Object.freeze({
-    ensureIndexes: () => Challenge.syncIndexes(),
+    /**
+     * Builds the indexes. A server without the two unique ones (a rollback to before CC-337: its `syncIndexes`
+     * drops them) can leave two holders of one place or mark, and building the index would then fail with E11000
+     * and stop the start. So first the oldest holder of each keeps it and the others give it up. The checks after
+     * each write still count challenges with no place or mark.
+     */
+    async ensureIndexes() {
+      for (const [field, key] of HELD_KEYS) {
+        const groups = await Challenge.aggregate([
+          { $match: { [field]: { $exists: true } } },
+          { $sort: { createdAt: 1, challengeId: 1 } },
+          { $group: { _id: key, ids: { $push: "$challengeId" } } },
+          { $match: { "ids.1": { $exists: true } } },
+        ]);
+        const extra = groups.flatMap(({ ids }) => ids.slice(1));
+        await Challenge.updateMany({ challengeId: { $in: extra } }, { $unset: { [field]: 1 } });
+      }
+      await Challenge.syncIndexes();
+    },
 
     /**
      * @param {ChallengeDoc} challenge
      * @returns {Promise<ChallengeDoc>}
-     * @throws {DuplicateKey} when a challenge with that id exists
+     * @throws {DuplicateKey} with `field` "challengeId" when a challenge with that id exists, "openSlot" when
+     *   another challenge of the sender holds that place, or "recentTo" when another one to the same person does
      */
     async insert(challenge) {
       try {
         await Challenge.create(challenge);
       } catch (err) {
         if (isDuplicate(err)) {
-          throw new DuplicateKey(`challenge ${challenge.challengeId} exists`, { cause: err });
+          const field = duplicateField(err);
+          throw Object.assign(new DuplicateKey(`challenge ${field} taken`, { cause: err }), { field });
         }
         throw err;
       }
       return dao.get(challenge.challengeId);
+    },
+
+    /**
+     * Lets go of the places held by the sender's challenges that can never be open again at `at` or later:
+     * expired, declined, withdrawn, or taken with their room made. A hold whose room is not made yet keeps its
+     * place, since the challenge opens again if the room cannot be made. Lets go of the marks of its challenges to
+     * one person made at `recentBefore` or earlier, too.
+     *
+     * @param {{ fromId: string, at: Date, recentBefore: Date }} query
+     * @returns {Promise<number>} places and marks let go
+     */
+    async freeSlots({ fromId, at, recentBefore }) {
+      const places = await Challenge.updateMany(
+        {
+          fromId,
+          openSlot: { $exists: true },
+          $or: [
+            { expiresAt: { $lte: at } },
+            { state: { $in: [CHALLENGE_STATES.DECLINED, CHALLENGE_STATES.WITHDRAWN] } },
+            { state: CHALLENGE_STATES.ACCEPTED, roomCode: { $ne: "" } },
+          ],
+        },
+        { $unset: { openSlot: 1 } },
+      );
+      const marks = await Challenge.updateMany(
+        { fromId, recentTo: { $exists: true }, createdAt: { $lte: recentBefore } },
+        { $unset: { recentTo: 1 } },
+      );
+      return places.modifiedCount + marks.modifiedCount;
     },
 
     /**
@@ -185,13 +264,40 @@ export function createChallengeDao({ connection }) {
     addLater: ({ challengeId, playerId }) => changed({ challengeId }, { $addToSet: { laterBy: playerId } }),
 
     /**
-     * Gives every mention of player `from` to `to`, in every field that names a player.
+     * Gives every mention of player `from` to `to`, in every field that names a player. A challenge keeps its place
+     * for open challenges and its mark as a recent one to its person unless `to` holds them already. Then it gives
+     * up its mark first and its place next, and the checks read from the stored challenges cover it (CC-337).
      *
      * @param {{ from: string, to: string }} transfer
      * @returns {Promise<number>} records changed
      */
     async movePlayer({ from, to }) {
+      const marked = await Challenge.find(
+        {
+          $and: [
+            { $or: [{ fromId: from }, { toId: from }] },
+            { $or: [{ openSlot: { $exists: true } }, { recentTo: { $exists: true } }] },
+          ],
+        },
+        "challengeId fromId toId",
+      ).lean();
       let moved = 0;
+      for (const doc of marked) {
+        const fields = ["fromId", "toId"].filter((field) => doc[field] === from);
+        const $set = Object.fromEntries(fields.map((field) => [field, to]));
+        moved += fields.length;
+        for (const $unset of MARKS_DROPPED) {
+          const update = Object.keys($unset).length === 0 ? { $set } : { $set, $unset };
+          const done = await Challenge.updateOne({ challengeId: doc.challengeId }, update).then(
+            () => true,
+            (err) => {
+              if (!isDuplicate(err)) throw err;
+              return false;
+            },
+          );
+          if (done) break;
+        }
+      }
       for (const field of PLAYER_FIELDS) {
         moved += (await Challenge.updateMany({ [field]: from }, { $set: { [field]: to } })).modifiedCount;
       }
