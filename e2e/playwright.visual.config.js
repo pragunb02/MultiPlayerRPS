@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL } from "./personas.js";
+import { CHROMIUM_MUTES_AUDIO } from "./testAudio.js";
 import { CHROMIUM_ACCEPTS_TEST_CERTIFICATE } from "./tlsFront.js";
 
 // Screenshot baselines of the main screens (CC-155). Pixels depend on the fonts, the browser build and the CPU, so
@@ -37,8 +38,8 @@ export default defineConfig({
     baseURL: BASE_URL,
     ignoreHTTPSErrors: true,
     // Both projects are Chromium. It accepts the certificate during the handshake instead of restarting each
-    // request after the error (CC-319).
-    launchOptions: { args: [...CHROMIUM_ACCEPTS_TEST_CERTIFICATE] },
+    // request after the error (CC-319), and it is muted (CC-344).
+    launchOptions: { args: [...CHROMIUM_ACCEPTS_TEST_CERTIFICATE, ...CHROMIUM_MUTES_AUDIO] },
     trace: "retain-on-failure",
     video: "retain-on-failure",
     screenshot: "only-on-failure",
