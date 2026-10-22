@@ -98,6 +98,8 @@ const MAIN_CONTROLS = Object.freeze({
 /**
  * States whose layout the layout ticket CC-172 still has to fix. They are marked as expected to fail, so the suite
  * stays green and a fix shows up as "expected to fail, but passed", which means this list needs updating.
+ * Playwright's list reporter marks an expected failure with a ✘ like a real one, and counts it as passed: these six
+ * show ✘ on every run, Firefox included (it is a laptop here), and are not flaky (CC-346).
  */
 const CHESS_LAPTOP = "your own clock and the bottom rank are under the fold at 1280×720 (A8)";
 const CHESS_PHONE = "Offer draw and Resign are under the fold at 390×844 (A8)";

@@ -7,7 +7,47 @@ import { AppRequestError, networkError } from "./errors.js";
  * @param {{ fetchImpl?: typeof fetch, baseUrl?: string }} [options]  injectable for tests
  */
 export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseUrl = "" } = {}) {
+  /** The requests on their way, so a renewal of the session id can wait for them. */
+  const onTheirWay = new Set();
+  /** The renewal of the session id on its way, or undefined. Every request made meanwhile waits for it. */
+  let renewal;
+
+  /**
+   * Sends a request. While the session id is being renewed it waits until the renewal is answered, so it carries
+   * the new id, never the old one the server is about to drop (CC-346).
+   */
   async function request(method, path, body) {
+    while (renewal !== undefined) {
+      await renewal.catch(() => undefined);
+    }
+    const sent = send(method, path, body);
+    onTheirWay.add(sent);
+    const done = () => onTheirWay.delete(sent);
+    sent.then(done, done);
+    return sent;
+  }
+
+  /**
+   * A request that gives this browser's session a new id and drops the old one: a password change or "sign out
+   * other devices" (CC-116). It waits for the requests already on their way, and the requests made meanwhile wait
+   * for it. Otherwise the server could read a request of this page with the old id after it was dropped, and answer
+   * it as from a visitor: "No active session", or "signed out" for "who am I?", which showed this page signed out
+   * (CC-346).
+   */
+  async function renewingRequest(method, path, body) {
+    while (renewal !== undefined) {
+      await renewal.catch(() => undefined);
+    }
+    const mine = Promise.allSettled([...onTheirWay]).then(() => send(method, path, body));
+    renewal = mine;
+    try {
+      return await mine;
+    } finally {
+      if (renewal === mine) renewal = undefined;
+    }
+  }
+
+  async function send(method, path, body) {
     let res;
     try {
       res = await fetchImpl(`${baseUrl}/api${path}`, {
@@ -65,11 +105,11 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
      * @param {{ currentPassword: string, newPassword: string }} passwords
      */
     changePassword: async (passwords) => {
-      await request("POST", "/auth/password", passwords);
+      await renewingRequest("POST", "/auth/password", passwords);
     },
     /** Signs out every other browser of this account. This one stays signed in (CC-116). */
     signOutOtherDevices: async () => {
-      await request("POST", "/auth/sign-out-others");
+      await renewingRequest("POST", "/auth/sign-out-others");
     },
     /**
      * The signed-in player's own account: username, when it was made, the birth year if stated, and the age group

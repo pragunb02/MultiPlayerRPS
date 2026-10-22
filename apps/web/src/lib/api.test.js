@@ -86,6 +86,74 @@ describe("api client", () => {
     ]);
   });
 
+  describe("a renewal of the session id (CC-346)", () => {
+    /** A fetch whose answers are given by the test, one call at a time, with every call's path in order. */
+    function heldFetch() {
+      const calls = [];
+      const fetchImpl = vi.fn(
+        (url, init) =>
+          new Promise((resolve) => {
+            calls.push({
+              path: `${init.method} ${url}`,
+              answer: (status, body) => resolve({ status, ok: status < 300, json: async () => body }),
+            });
+          }),
+      );
+      return { fetchImpl, calls, sent: () => calls.map((call) => call.path) };
+    }
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    it.each([
+      ["signs out other devices", (api) => api.signOutOtherDevices(), "POST /api/auth/sign-out-others"],
+      [
+        "changes the password",
+        (api) => api.changePassword({ currentPassword: "old one 1", newPassword: "new one 1" }),
+        "POST /api/auth/password",
+      ],
+    ])(
+      "%s only once the requests on their way are answered, and holds the new ones until it is",
+      async (_, renew, renewalPath) => {
+        const { fetchImpl, calls, sent } = heldFetch();
+        const api = createApiClient({ fetchImpl });
+        const progress = api.getProgress();
+        const renewed = renew(api);
+        const session = api.getSession();
+        await settle();
+
+        // The page's request is on its way with the old id, so the renewal waits, and so does "who am I?".
+        expect(sent()).toEqual(["GET /api/progress"]);
+        calls[0].answer(200, { progress: { xp: 1 } });
+        await settle();
+        expect(sent()).toEqual(["GET /api/progress", renewalPath]);
+        calls[1].answer(204);
+        await settle();
+
+        expect(sent()).toEqual(["GET /api/progress", renewalPath, "GET /api/session"]);
+        calls[2].answer(200, { authenticated: true, identity: { id: "user_x" } });
+        await expect(progress).resolves.toEqual({ xp: 1 });
+        await expect(renewed).resolves.toBeUndefined();
+        await expect(session).resolves.toEqual({ id: "user_x" });
+      },
+    );
+
+    it("lets the held requests go when the renewal is refused, and still refuses it", async () => {
+      const { fetchImpl, calls, sent } = heldFetch();
+      const api = createApiClient({ fetchImpl });
+      const renewed = api.changePassword({ currentPassword: "wrong one", newPassword: "new one 1" });
+      const session = api.getSession();
+      await settle();
+      calls[0].answer(400, {
+        error: { code: "VALIDATION_ERROR", message: "That is not your current password" },
+      });
+      await expect(renewed).rejects.toMatchObject({ status: 400 });
+      await settle();
+
+      expect(sent()).toEqual(["POST /api/auth/password", "GET /api/session"]);
+      calls[1].answer(200, { authenticated: true, identity: { id: "user_x" } });
+      await expect(session).resolves.toEqual({ id: "user_x" });
+    });
+  });
+
   it("sends JSON bodies", async () => {
     const fetchImpl = respond(200, { identity: { id: "user_x" } });
 
