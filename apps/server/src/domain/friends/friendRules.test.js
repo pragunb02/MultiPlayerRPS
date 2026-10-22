@@ -13,6 +13,7 @@ describe("friend rules (CC-052, ADR-066)", () => {
       linksKept: 5,
       incomingShown: 50,
       ringAgainAfterMs: 15 * 60 * 1000,
+      missedRingWithinMs: 15 * 60 * 1000,
     });
     expect(Object.isFrozen(FRIEND_LIMITS)).toBe(true);
   });

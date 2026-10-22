@@ -642,6 +642,7 @@ export function cutSocketsOnRename({ domainEvents, disconnectPlayer }) {
  *   accountComponent: Pick<ReturnType<typeof createAccountComponent>, "usernamesOf">,
  *   safety: Pick<ReturnType<typeof createSafetyComponent>, "policiesFor">,
  *   domainEvents: import("node:events").EventEmitter,
+ *   sessionAccessor: Pick<ReturnType<typeof createSessionAccessor>, "addHeardRings" | "heardRings">,
  *   limits?: Parameters<typeof createFriendComponent>[0]["limits"],
  * }} deps  `limits` is for tests only
  */
@@ -658,6 +659,7 @@ export function wireFriends({
   accountComponent,
   safety,
   domainEvents,
+  sessionAccessor,
   limits,
 }) {
   const presence = createPresenceTracker({ rooms: roomComponent, events: domainEvents });
@@ -673,6 +675,8 @@ export function wireFriends({
     safety,
     presence,
     events: domainEvents,
+    // Which rings each browser heard lives beside its session, so a restart does not forget them (CC-341).
+    sessions: sessionAccessor,
     ...(limits !== undefined && { limits }),
   });
   return Object.freeze({ presence, friendComponent });
@@ -1018,6 +1022,7 @@ export async function startServer({
     accountComponent,
     safety: safetyComponent,
     domainEvents,
+    sessionAccessor,
   });
   // Heavy computer thinking runs on worker threads, off the event loop (ADR-067).
   const thinkingWorkers = (bots.thinkingWorkers ?? createBotThinkingClient)({

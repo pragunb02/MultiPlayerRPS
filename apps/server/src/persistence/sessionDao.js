@@ -21,5 +21,46 @@ export function createSessionDao({ client }) {
       const { deletedCount } = await sessions().deleteMany({ "session.identity.id": playerId });
       return deletedCount;
     },
+
+    /**
+     * Notes friend request rings that a tab of this browser heard (CC-341), and drops those that rang at or before
+     * `since` in the same write. They sit beside the session, in `heardRings`, not in it: the store saves a session
+     * with `$set` of its own fields only, so an answer that saves the session keeps them, and nothing here ever
+     * writes the session itself, which a socket holds only as it was at its handshake (CC-326). A session that
+     * ended is never written again: the update matches an existing session only.
+     *
+     * @param {{ sessionId: string, rings: ReadonlyArray<{ requestId: string, ringAt: number }>, since: number }} heard
+     */
+    async addHeardRings({ sessionId, rings, since }) {
+      const added = rings.map(({ requestId, ringAt }) => ({ requestId, ringAt }));
+      await sessions().updateOne({ _id: sessionId }, [
+        {
+          $set: {
+            heardRings: {
+              $concatArrays: [
+                {
+                  $filter: {
+                    input: { $ifNull: ["$heardRings", []] },
+                    cond: { $gt: ["$$this.ringAt", since] },
+                  },
+                },
+                { $literal: added },
+              ],
+            },
+          },
+        },
+      ]);
+    },
+
+    /**
+     * @param {{ sessionId: string, since: number }} query
+     * @returns {Promise<Array<{ requestId: string, ringAt: number }>>} the rings heard that rang after `since`
+     */
+    async heardRings({ sessionId, since }) {
+      const found = await sessions().findOne({ _id: sessionId }, { projection: { heardRings: 1 } });
+      return (found?.heardRings ?? [])
+        .filter((ring) => ring.ringAt > since)
+        .map(({ requestId, ringAt }) => ({ requestId, ringAt }));
+    },
   });
 }

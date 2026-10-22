@@ -135,7 +135,12 @@ describe("asking, answering and the pushes (CC-052)", () => {
     expect(sent.status).toBe(200);
     expect(sent.headers.get("cache-control")).toBe("no-store");
     expect(sent.body).toEqual({ result: "sent" });
-    expect(await toasted).toEqual({ requestId: expect.any(String), displayName: "RiyaTest", via: "game" });
+    expect(await toasted).toEqual({
+      requestId: expect.any(String),
+      displayName: "RiyaTest",
+      via: "game",
+      ringAt: expect.any(Number),
+    });
     const [request] = (await view(arjun)).incoming;
     expect(request).toEqual({
       requestId: expect.any(String),
@@ -155,6 +160,49 @@ describe("asking, answering and the pushes (CC-052)", () => {
         handle: expect.stringMatching(/^[0-9a-hjkmnp-tv-z]{16}$/),
       }),
     ]);
+  });
+
+  it("tells a browser that had no connection as the request rang, once it connects (CC-341)", async () => {
+    server = await startTestServer();
+    const riya = await account("RiyaTest");
+    const arjun = await account("ArjunTest");
+    const { bobSeat } = await together(riya, arjun);
+    arjun.socket.disconnect();
+
+    expect((await ask(riya, bobSeat)).body).toEqual({ result: "sent" });
+    let toasted;
+    await clients.openSocket(arjun.cookie, {
+      listen: (socket) => {
+        toasted = eventWhere(socket, () => true, SOCKET_EVENTS.FRIEND_REQUESTED);
+      },
+    });
+
+    expect(await toasted).toEqual({
+      requestId: (await view(arjun)).incoming[0].requestId,
+      displayName: "RiyaTest",
+      via: "game",
+      ringAt: expect.any(Number),
+    });
+  });
+
+  it("tells the next socket of a browser whose socket got the ring but never answered it (CC-341)", async () => {
+    server = await startTestServer();
+    const riya = await account("RiyaTest");
+    const arjun = await account("ArjunTest");
+    const { bobSeat } = await together(riya, arjun);
+    // Arjun's first socket stays in his channel and gets the push, but never answers it, as a dead one would not.
+    const pushed = eventWhere(arjun.socket, () => true, SOCKET_EVENTS.FRIEND_REQUESTED);
+
+    expect((await ask(riya, bobSeat)).body).toEqual({ result: "sent" });
+    await pushed;
+    let toasted;
+    await clients.openSocket(arjun.cookie, {
+      listen: (socket) => {
+        toasted = eventWhere(socket, () => true, SOCKET_EVENTS.FRIEND_REQUESTED);
+      },
+    });
+
+    expect(await toasted).toMatchObject({ displayName: "RiyaTest" });
   });
 
   it("sends a request from match history, by match and seat", async () => {

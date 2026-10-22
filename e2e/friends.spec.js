@@ -48,6 +48,11 @@ async function playOneGame(host, other) {
 
 const friendsList = (page) => page.getByRole("list", { name: "Friends" });
 const friendsFrames = (player) => player.record.socketFrames.filter((frame) => frame.includes('"friends:'));
+// A push that asks for an answer carries its number after "42".
+const requestPushes = (player) =>
+  player.record.socketFrames.filter((frame) => /^42\d*\["friends:request"/.test(frame));
+const viewPushes = (player) =>
+  player.record.socketFrames.filter((frame) => frame.startsWith('42["friends:updated"'));
 const connects = (player) => realtimeConnects(player.record.socketFrames);
 
 test.describe("friends", () => {
@@ -91,6 +96,55 @@ test.describe("friends", () => {
       expect(friendsFrames(player).length).toBeGreaterThan(0);
       expect(friendsFrames(player).join("\n")).not.toMatch(PLAYER_ID);
     }
+  });
+
+  test("a friend request sent while the other's page has no connection yet still shows its toast, once", async ({
+    players,
+  }) => {
+    const riya = await players.open("riya");
+    const arjun = await players.open("arjun");
+    const riyaName = await signUp(riya, "1990");
+    const arjunName = await signUp(arjun, "1990");
+    await playOneGame(riya, arjun);
+    // Arjun's next page cannot reach the realtime server until the request has rung (CC-341).
+    let release;
+    const released = new Promise((resolve) => {
+      release = resolve;
+    });
+    let held;
+    const holding = new Promise((resolve) => {
+      held = resolve;
+    });
+    await arjun.page.routeWebSocket(/\/socket\.io\//, async (socket) => {
+      held();
+      await released;
+      socket.connectToServer();
+    });
+    await arjun.page.goto("/leaderboards");
+    await holding;
+
+    await riya.page.getByRole("button", { name: `Add friend ${arjunName}` }).click();
+    await expect(riya.page.getByRole("list", { name: "Players" }).getByText("request sent")).toBeVisible();
+    release();
+
+    const toast = arjun.page.getByText(`${riyaName} wants to be your friend`);
+    await expect(toast).toBeVisible();
+    await arjun.page.getByRole("button", { name: "Close" }).click();
+    await expect(toast).toBeHidden();
+
+    // A new page of the same browser shows no second toast: the request waits on the friends page instead.
+    const pushesBefore = requestPushes(arjun).length;
+    const connectsBefore = connects(arjun);
+    await arjun.page.goto("/friends");
+    await expect.poll(() => connects(arjun)).toBeGreaterThan(connectsBefore);
+    await expect(arjun.page.getByRole("list", { name: "Friend requests" }).getByText(riyaName)).toBeVisible();
+    // A settle point: appearing offline pushes Arjun's friends view to this socket, after whatever the server sent
+    // it as it connected.
+    const viewsBefore = viewPushes(arjun).length;
+    await arjun.page.getByRole("button", { name: "Appear offline: off" }).click();
+    await expect.poll(() => viewPushes(arjun).length).toBeGreaterThan(viewsBefore);
+    expect(requestPushes(arjun)).toHaveLength(pushesBefore);
+    await expect(toast).toHaveCount(0);
   });
 
   test("a guest is offered no Add friend, and the friends page tells them to save their progress", async ({

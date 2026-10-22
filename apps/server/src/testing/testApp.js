@@ -426,6 +426,7 @@ export function createTestApp({
     accountComponent,
     safety: safetyComponent,
     domainEvents,
+    sessionAccessor,
     limits: friendRules,
   });
   // Computer players act at once in tests, so a test only waits for the server, never for a pause.

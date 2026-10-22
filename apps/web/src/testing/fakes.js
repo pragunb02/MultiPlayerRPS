@@ -231,9 +231,9 @@ export function fakeSocket() {
       endedHandlers.add(handler);
       return () => endedHandlers.delete(handler);
     }),
-    /** Test helper: simulate a server push. */
-    push(event, payload) {
-      (handlers.get(event) ?? []).forEach((handler) => handler(payload));
+    /** Test helper: simulate a server push. A push that asks for an answer passes its callback after the payload. */
+    push(event, payload, ...answer) {
+      (handlers.get(event) ?? []).forEach((handler) => handler(payload, ...answer));
     },
     /** Test helper: the server ends this socket on purpose, as after a sign out elsewhere (CC-234). */
     endByServer() {

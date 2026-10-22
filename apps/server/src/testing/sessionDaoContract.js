@@ -42,4 +42,58 @@ export function runSessionDaoContract(createPair) {
 
     expect(await read(store, "empty")).toBeTruthy();
   });
+
+  // CC-341: which friend request rings a browser heard, kept beside its session so a restart does not forget them.
+  const RING = { requestId: "00000000-0000-4000-9000-000000000001", ringAt: 1_000 };
+
+  it("keeps the rings a session heard, newer than asked, and only for that session", async () => {
+    const { dao, store } = await createPair();
+    await put(store, "phone", sessionOf("user_0123456789abcdef01234567"));
+    await put(store, "laptop", sessionOf("user_0123456789abcdef01234567"));
+
+    await dao.addHeardRings({ sessionId: "phone", rings: [RING], since: 0 });
+    await dao.addHeardRings({ sessionId: "phone", rings: [{ ...RING, ringAt: 2_000 }], since: 0 });
+
+    expect(await dao.heardRings({ sessionId: "phone", since: 0 })).toEqual([
+      RING,
+      { ...RING, ringAt: 2_000 },
+    ]);
+    expect(await dao.heardRings({ sessionId: "phone", since: 1_000 })).toEqual([{ ...RING, ringAt: 2_000 }]);
+    expect(await dao.heardRings({ sessionId: "laptop", since: 0 })).toEqual([]);
+  });
+
+  it("drops the rings too old to matter whenever it adds one", async () => {
+    const { dao, store } = await createPair();
+    await put(store, "phone", sessionOf("user_0123456789abcdef01234567"));
+    await dao.addHeardRings({ sessionId: "phone", rings: [RING], since: 0 });
+
+    await dao.addHeardRings({ sessionId: "phone", rings: [{ ...RING, ringAt: 5_000 }], since: 1_000 });
+
+    expect(await dao.heardRings({ sessionId: "phone", since: 0 })).toEqual([{ ...RING, ringAt: 5_000 }]);
+  });
+
+  it("keeps the heard rings when the session itself is saved again, as every answer may do", async () => {
+    const { dao, store } = await createPair();
+    await put(store, "phone", sessionOf("user_0123456789abcdef01234567"));
+    await dao.addHeardRings({ sessionId: "phone", rings: [RING], since: 0 });
+
+    await put(store, "phone", { ...sessionOf("user_0123456789abcdef01234567"), signedInAt: 5 });
+
+    expect(await dao.heardRings({ sessionId: "phone", since: 0 })).toEqual([RING]);
+    expect((await read(store, "phone")).signedInAt).toBe(5);
+  });
+
+  it("never brings back a session that ended, and keeps nothing for one that does not exist", async () => {
+    const { dao, store } = await createPair();
+    await put(store, "phone", sessionOf("user_0123456789abcdef01234567"));
+    await new Promise((resolve, reject) => store.destroy("phone", (err) => (err ? reject(err) : resolve())));
+
+    await dao.addHeardRings({ sessionId: "phone", rings: [RING], since: 0 });
+    await dao.addHeardRings({ sessionId: "never", rings: [RING], since: 0 });
+
+    expect(await read(store, "phone")).toBeFalsy();
+    expect(await read(store, "never")).toBeFalsy();
+    expect(await dao.heardRings({ sessionId: "phone", since: 0 })).toEqual([]);
+    expect(await dao.heardRings({ sessionId: "never", since: 0 })).toEqual([]);
+  });
 }

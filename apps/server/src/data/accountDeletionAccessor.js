@@ -62,9 +62,9 @@ export function createAccountDeletionAccessor({ accountDeletionDao }) {
 }
 
 /**
- * Stored sessions, by who they belong to (CC-035).
+ * Stored sessions, by who they belong to (CC-035), and the friend request rings each browser heard (CC-341).
  *
- * @param {{ sessionDao: { deleteByPlayer: (playerId: string) => Promise<number> } }} deps
+ * @param {{ sessionDao: Pick<ReturnType<typeof import("../persistence/sessionDao.js").createSessionDao>, "deleteByPlayer" | "addHeardRings" | "heardRings"> }} deps
  */
 export function createSessionAccessor({ sessionDao }) {
   assertDefined(sessionDao, "sessionDao");
@@ -72,5 +72,9 @@ export function createSessionAccessor({ sessionDao }) {
   return Object.freeze({
     /** @param {string} playerId @returns {Promise<number>} sessions removed */
     removePlayer: (playerId) => sessionDao.deleteByPlayer(playerId),
+    /** @param {{ sessionId: string, rings: ReadonlyArray<{ requestId: string, ringAt: number }>, since: number }} heard */
+    addHeardRings: (heard) => sessionDao.addHeardRings(heard),
+    /** @param {{ sessionId: string, since: number }} query */
+    heardRings: (query) => sessionDao.heardRings(query),
   });
 }
