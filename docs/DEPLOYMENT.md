@@ -471,6 +471,37 @@ the **Deployment impact** section of the PR template. If anything below changes,
 3. **Data** — schema or collection changes, migrations, anything that touches existing documents.
 4. **Sessions/cookies** — changes can log users out.
 
+### Merge policy and required checks
+
+Moved here from CLAUDE.md workflow rule 7 in CC-302. CLAUDE.md keeps the short rule.
+
+1. **Every required check must be green before merging**, on a branch that is up to date with `main`. The ruleset
+   "main: required checks, branch up to date" (owner, 2026-10-20) requires the seven checks listed in the merge queue
+   section below (lint, format, audit, unit + integration with coverage gates; the Docker build; the browser suites
+   on Chromium desktop + mobile and on Firefox; the backup round trip; actionlint; the changelog fragments). CodeQL for
+   JavaScript and for Actions runs from GitHub's own setup, not from ci.yml, and is required through the ruleset's
+   code scanning rule rather than as a status check (step 3 below). The older wording listed eight required checks,
+   CodeQL among them.
+2. **WebKit** runs nightly, on demand and on PRs that change `apps/web`, `packages/shared` or `e2e`. It is advisory
+   until its open flakes (CC-273) are fixed.
+3. **`Visual baselines (advisory)`** (CC-155) runs on every PR and was not required during its first week; the owner
+   decides whether to require it. A PR need not regenerate the baselines: after each merge that changes `apps`,
+   `packages`, `e2e` or the lockfile, `visual-refresh.yml` opens or updates one bot PR, `visual-baselines/refresh`,
+   with main's changed images for a person to review and merge (CC-300). A PR that touches none of those files passes
+   the visual check with "baselines on main are stale; a refresh PR is pending". A PR may still make its own images
+   (`npm run test:visual:update` or the update workflow).
+4. **Merging to `main` deploys to production** (Render). Fill in the PR template's _Deployment impact_. If
+   start/build, dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging
+   (the list above).
+5. **How the coordinator merges:** `gh pr update-branch <n>` then `gh pr merge <n> --merge --auto`. GitHub merges
+   once CI passes on the newest `main` (about 10 minutes). GitHub offers merge queues only to organization
+   repositories, so ADR-074's queue is not available here. Bot PRs opened with `GITHUB_TOKEN` (the visual refresh)
+   start no CI: close and reopen them so the required checks run.
+6. **History.** Fast mode ended 2026-10-18 (owner): every check required again. On 2026-10-20 the owner briefly
+   allowed merges without waiting for CI during the feature phase (branch protection required no checks, CI still
+   ran, Render deployed only commits whose checks passed). The same day the ruleset above restored the required
+   checks and replaced that temporary rule.
+
 ## After merging
 
 1. Watch the deploy in Render → Events/Logs until it is **Live**.

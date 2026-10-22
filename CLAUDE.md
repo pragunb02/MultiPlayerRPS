@@ -1,161 +1,95 @@
 # CLAUDE.md
 
-Guidance for Claude Code (and humans) working in this repository.
+Guidance for Claude Code (and humans) working in this repository. This file is a map: short rules, the commands,
+and where the detail lives. Detail goes in the linked docs, not here (CC-302).
 
 ## Project
 
-**ClassiCade** — a real-time, social, skill-based platform for classic multiplayer games
-(Rock Paper Scissors, Tic-Tac-Toe, Chess today; Ludo and more planned). Treated as a company/product,
-not a college project. Vision and business goals: [docs/BRD.md](docs/BRD.md).
+**ClassiCade** — a real-time, social, skill-based platform for classic multiplayer games (Rock Paper Scissors,
+Tic-Tac-Toe, Chess today; Ludo and more planned). Treated as a company/product, not a college project. An
+npm-workspaces monorepo in JavaScript ES modules with JSDoc types: `apps/server` (Express 5, Socket.IO, MongoDB),
+`apps/web` (React + Vite), `packages/games` (pure engines), `packages/shared` (event names, constants). Vision:
+[docs/BRD.md](docs/BRD.md). Structure: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Where things are tracked
+## Always
 
-| File                                             | Purpose                                                                                          | Update when                     |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------- |
-| [docs/BRD.md](docs/BRD.md)                       | Business requirements: vision, users, business model, KPIs                                       | Business direction changes      |
-| [docs/PRD.md](docs/PRD.md)                       | Product requirements per stage, with requirement IDs (`FR-*`, `NFR-*`)                           | Scope of a feature changes      |
-| [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) | Accepted product vision: personas, loops, phases and order of work, metrics (North Star WRP)     | Direction changes               |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)     | Current vs. target architecture                                                                  | Structure changes               |
-| [docs/BACKLOG.md](docs/BACKLOG.md)               | **Ticket board** — every task as `CC-###` with type, priority, status                            | Tickets added/started/completed |
-| [docs/tickets/](docs/tickets/)                   | One file per ticket (`CC-###.md`) from `TEMPLATE.md`, small ones included                        | Ticket started / progressed     |
-| [docs/PROGRESS.md](docs/PROGRESS.md)             | Current phase, in-flight work, dated changelog                                                   | **Every working session**       |
-| [docs/changes/](docs/changes/README.md)          | Changelog fragments: one `CC-###.md` per PR, folded into PROGRESS.md and the board (CC-299)      | Every PR that changes a ticket  |
-| [docs/DECISIONS.md](docs/DECISIONS.md)           | Architecture/product decision records (ADRs)                                                     | A decision is made or reversed  |
-| [docs/PROCESS.md](docs/PROCESS.md)               | Ticket process, shaping to review (CC-311). Open decisions for the owner: `DECISIONS-PENDING.md` | The process changes             |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)         | **Production**: Render settings, env vars, pre/post-merge checks, rollback, incidents            | Deploy setup changes            |
-| [docs/ENGINEERING.md](docs/ENGINEERING.md)       | **How to write code**: layers, principles, patterns, coding/testing standards, dependency policy | Standards change                |
-| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)     | Audit findings (`BUG-*`, `SEC-*`, `DEBT-*`)                                                      | Issue found or fixed            |
+Each rule names the check that enforces it, where one exists.
 
-### ID scheme
+1. **No secrets in the repository**, in logs or in responses: no `.env`, keys, tokens, passwords, session ids or
+   emails. Check: GitHub secret scanning with push protection (DEPLOYMENT.md "Repository protection"), the `players`
+   fixture in browser tests. Detail: ENGINEERING.md §3 rules 8 and 9.
+2. **Never delete the legacy collections** (`users`, `sessions`, `chessdatas`, `rpsdatas`, `tictactoedatas`, `book`
+   in `GameArena`). `users` is read, never written (CC-078, CC-251). Check: `legacyUserDao.integration.test.js`
+   ("never writes to the legacy collection"). Detail: [docs/DATA.md](docs/DATA.md).
+3. **Bind to 127.0.0.1.** The server's `HOST` defaults to `127.0.0.1` and Docker publishes on `127.0.0.1` only. Only
+   Render sets `0.0.0.0` (CC-287). Check: `apps/server/src/config/index.test.js`. Detail: DEPLOYMENT.md "Listen
+   address".
+4. **Commit identity:** `git -c user.email=pragun.bhutani897@gmail.com -c user.name="Pragun Bhutani" commit …`.
+5. **Test first.** Every bug fix starts with a failing test that reproduces it, and every change has its tests
+   beside the code. Check: coverage gates in `npm run test:coverage` (100 % lines and functions, 99 % branches).
+   Detail: ENGINEERING.md §4.
+6. **Read [docs/ENGINEERING.md](docs/ENGINEERING.md) before writing code.** It is binding for `apps/` and
+   `packages/`: five server layers, server-authoritative games, pure core, composition root, typed errors, comment
+   style, inclusive language, dependency policy. Check: `npm run lint` (layers, comment style, CSS tokens, pop-ups).
+   Screens follow [docs/design/CONTRACT.md](docs/design/CONTRACT.md).
 
-- `CC-###` — **tickets** (units of work). Sequential, permanent, never reused. Next free ID is at the top of `BACKLOG.md`.
-- `FR-*` / `NFR-*` — requirements (PRD). `SEC-*` / `BUG-*` / `DEBT-*` — audit findings. `ADR-*` — decisions.
-- Tickets link to requirements/findings/ADRs; every finding is linked from at least one ticket.
-- **Who assigns numbers (CC-299, ADR-068).** The coordinator assigns ticket (`CC-###`) and ADR numbers when it
-  dispatches a builder, writes them in the builder's brief, and bumps the "next free" lines itself (top of
-  `BACKLOG.md`, top of `DECISIONS.md`, the Process row of `PROGRESS.md`). **Builders never edit the next free
-  lines.** A builder who needs a new ticket or ADR asks the coordinator for a number, so two builders never take
-  the same one.
+## Working agreement (owner, 17 October 2026)
 
-### Working agreement (owner, 17 October 2026)
+These rules come first. Where they differ from anything else, they win. Full text:
+[docs/PROCESS.md](docs/PROCESS.md#the-working-agreement-in-full-owner-17-october-2026).
 
-These rules come first. Where they differ from anything below, they win.
+1. **Feature freeze.** No new feature or idea tickets until the board is closed. Ideas go in `docs/IDEAS.md` only.
+2. **Allowed new tickets:** security, testing, and bugs in things that already exist.
+3. **Security is P0 by default**, P1 only while a higher P0 is in progress. Never cut or deferred without the owner.
+4. **Research before code**, in the ticket's Research section, small fixes included.
+5. **Document everything.** Nothing decided only in chat.
+6. **Steady, not frantic.** At most 5 builders (rule 9), independent work only. A red `main` is fixed first.
+7. **Launch is by word of mouth**, when the owner decides.
+8. **Reviews before every merge**: code, security and (for anything players see) design reviewers, each finding
+   checked by a skeptic. Confirmed findings are fixed or written down with a reason.
 
-1. **Feature freeze.** No new feature or idea tickets until every ticket already on the board is closed, across all
-   phases, in the order set by `docs/PRODUCT_VISION.md`. New ideas are written down in `docs/IDEAS.md` only, not as
-   tickets, and are not started.
-2. **Allowed new tickets:** security (always), testing (unit, integration, browser), and bugs in things that already
-   exist. These are fixes, not new ideas.
-3. **Security is P0 by default.** It drops to P1 only when a higher priority P0 is already in progress. A security
-   issue is never cut or deferred without the owner.
-4. **Research before code.** Every ticket starts with a Research section in its ticket file before any code: how our
-   code does it today, how other products do it (with sources), and what is best for ClassiCade. Coding starts after
-   that section is written. A small fix under an hour (one-line hotfix, test fix) still gets a ticket file with Root
-   cause and a short Research note, written before the PR is merged.
-5. **Document everything.** Decisions go in `docs/DECISIONS.md`, research in the ticket or `docs/investigations/`,
-   changes in `docs/PROGRESS.md` (through a fragment in `docs/changes/`, workflow rule 5). Nothing decided only in chat.
-6. **Steady, not frantic.** At most six builders run at once, and only on independent work (no shared files).
-   Builders run lint, format, coverage and only their own browser tests locally; CI runs the full browser suite.
-   `main` stays green: a red `main` is fixed before anything else merges. **Fast mode ended 2026-10-18 (owner):** every check is required again, branches must be up to date, and builders run their own gates in full.
-7. **Launch is by word of mouth among friends**, when the owner decides. Sharing (the growth plan, `docs/GROWTH.md`,
-   added by PR #60) and the owner's admin console are in scope.
-8. **Reviews before every merge.** Every pull request is reviewed before merge by reviewer agents in parallel: a
-   code reviewer (correctness, tests, the working agreement and comment style, regressions), a security reviewer
-   (auth, sessions, sockets, input, data exposure, secrets) and, for any change players can see, a design reviewer
-   (phone and desktop layouts, plain words, accessibility, the look and feel domain). Each finding is checked by a second
-   agent that tries to refute it. Confirmed findings are fixed, or written down with a reason, before the merge.
-
-### Decision-first tickets (owner, 2026-10-20, CC-311, ADR-072)
+## Decision-first tickets (owner, 2026-10-20, CC-311, ADR-072)
 
 Detail in [docs/PROCESS.md](docs/PROCESS.md).
 
-1. **Decision gate.** No builder starts until every open decision in the ticket is answered by the owner or its
-   default date has passed. CI checks tickets at Ready or later.
-2. **Owner decision list.** The coordinator batches open decisions from all tickets into `docs/DECISIONS-PENDING.md`,
-   each with options and a recommended default. The owner answers once; answers go into the ticket and the ADR.
-3. **Shaping interview.** The coordinator asks the owner all of a ticket's questions together (copy, defaults,
-   privacy) before writing the spec.
-4. **Spec review.** The review lenses (code, security, design, then a skeptic) review the filled ticket before
-   build, and the code after it against the ticket's acceptance criteria. Block only on correctness, security or a
-   missing requirement.
-5. **Appetite.** Going over the appetite means cutting scope, not extending the build.
-6. **Files touched.** The coordinator never runs two builders on overlapping areas.
-7. **Flags.** New player-facing features ship behind a flag (CC-312, coming), each with a removal date.
+1. **Decision gate.** No builder starts until every open decision is answered or its default day has passed.
+   Check: `node scripts/bin/check-tickets.mjs` in the `Changelog fragments` job.
+2. **Owner decision list** in `docs/DECISIONS-PENDING.md`, kept by the coordinator.
+3. **Shaping interview**: all of a ticket's questions to the owner at once.
+4. **Spec review** of the ticket before build, code review against its acceptance criteria after.
+5. **Appetite.** Going over means cutting scope, not extending the build.
+6. **Files touched.** Never two builders on overlapping areas.
+7. **Flags.** New player-facing features ship behind a flag, off by default, with a removal date. Check:
+   `packages/shared/src/flags.test.js` (well formed, not past `removeBy`), `apps/server/src/flagNames.test.js`
+   (registered, read, and a `flagPaths` suite). How: PROCESS.md "How a feature ships behind a flag".
 
-### Workflow rules
+## Workflow rules
 
-1. Before starting work, read `docs/PROGRESS.md` and the ticket on `docs/BACKLOG.md`.
-2. **No untracked work**: anything new (including bugs found along the way) gets a ticket with the next free ID first.
-3. Starting a ticket: create `docs/tickets/CC-###.md` from `TEMPLATE.md`, or `TEMPLATE-lite.md` for work you can
-   describe in one sentence (CC-311). Every ticket gets a file; a small one
-   (under about an hour) gets Root cause and a short Research note (working agreement rule 4). The board's 🟦
-   comes from the PR's fragment (rule 5), or from the coordinator at dispatch.
-4. Branch `cc-###-short-name`. Every commit message starts with the ticket ID: `CC-007: fix RPS Scissors mismatch (BUG-01)`.
-   Multi-ticket commits list all IDs: `CC-003, CC-004: …`.
-   Every PR fills the template's **Evidence** section: screenshots for UI changes (desktop and phone, before and
-   after), request and response for API or socket changes, and the tests added (owner, 2026-10-19; ADR-039).
-   Screenshots go on the `pr-evidence` branch, never on `main`, and show test accounts only.
-5. Finishing: add **one changelog fragment**, `docs/changes/CC-###.md` (format in `docs/changes/README.md`): front
-   matter with `ticket`, `date`, `type`, `status` (the board status after merge, usually `done`) and `adrs`, then
-   the changelog text, and optionally the ticket's whole board row when it is new or its title changed. Update
-   linked findings in `KNOWN_ISSUES.md`. **Builders do not edit `PROGRESS.md`'s changelog, the board rows in
-   `BACKLOG.md` or any next free line**: CI's `Changelog fragments` job fails a PR that edits the changelog by hand.
-   The coordinator runs `node scripts/bin/collect-changes.mjs` on a fresh `main` after a batch of merges and opens
-   the result as a docs PR: it writes each fragment's dated line newest first, sets the board's status and links
-   (`done in #PR`, the ADRs), and deletes the fragments. The coordinator also keeps the stage counters and the
-   Status table. A PR that only allocates numbers or notes owner answers puts that text in a fragment too.
+1. Before starting, read `docs/PROGRESS.md` and the ticket on `docs/BACKLOG.md`.
+2. **No untracked work.** Anything new, bugs found along the way included, gets a ticket first.
+3. Every ticket gets `docs/tickets/CC-###.md` from `TEMPLATE.md`, or `TEMPLATE-lite.md` for one-sentence work.
+4. Branch `cc-###-short-name`. Every commit message starts with the ticket ID (`CC-007: fix …`, `CC-003, CC-004: …`).
+   Every PR fills the template's Evidence section; images go on the `pr-evidence` branch, test accounts only.
+5. **Fragments.** Finish with one `docs/changes/CC-###.md` ([format](docs/changes/README.md)). **Never edit
+   `PROGRESS.md`'s changelog, the board rows in `BACKLOG.md` or any next free line**; ask the coordinator for new
+   numbers ([PROCESS.md](docs/PROCESS.md#ticket-and-adr-numbers)). Check: `collect-changes.mjs --check` in the
+   `Changelog fragments` job (the changelog only).
 6. Non-trivial decisions (library, pattern, data model) get an ADR in `DECISIONS.md` first.
-7. **Every required check must be green before merging**, on a branch that is up to date with `main`. Branch
-   protection requires eight: lint, format, audit, unit + integration (coverage gates); the Docker build; the browser
-   suites on Chromium (desktop + mobile) and Firefox; the backup round trip; actionlint (all in
-   `.github/workflows/ci.yml`); and CodeQL for JavaScript and for Actions (GitHub's CodeQL setup, not ci.yml). WebKit
-   runs nightly, on demand and on PRs that change `apps/web`, `packages/shared` or `e2e`; it is advisory until its
-   open flakes (CC-273) are fixed. `Visual baselines (advisory)` (CC-155) runs on every PR and is not required
-   during its first week; the owner decides whether to require it. A PR need not regenerate the baselines: after each
-   merge that changes `apps`, `packages`, `e2e` or the lockfile, `visual-refresh.yml` opens or updates one bot PR,
-   `visual-baselines/refresh`, with main's changed images for a person to review and merge (CC-300). A PR that
-   touches none of those files passes the visual check with "baselines on main are stale; a refresh PR is pending".
-   A PR may still make its own images (`npm run test:visual:update` or the update workflow). **Merging to `main` deploys to
-   production** (Render). Fill in the PR template's _Deployment impact_; if start/build,
-   dependencies or env vars change, rehearse Render's build and start from a fresh clone before merging (DEPLOYMENT.md).
-   **Temporary (owner, 2026-10-20):** during the feature phase merges do not wait for CI and branch protection
-   requires no checks. CI still runs on every PR and push, and Render deploys only commits whose checks pass. The
-   owner restores the required checks after the feature phase.
-   **Required checks again (owner, 2026-10-20, ruleset "main: required checks, branch up to date"):** seven checks
-   must pass on a branch that is up to date with `main`, which replaces the temporary rule above. GitHub offers merge
-   queues only to organization repositories, so ADR-074's queue is not available here. The coordinator merges with
-   `gh pr update-branch <n>` then `gh pr merge <n> --merge --auto`; GitHub merges once CI passes on the newest
-   `main` (about 10 minutes). Bot PRs opened with `GITHUB_TOKEN` (the visual refresh) start no CI: close and reopen
-   them so the required checks run.
-8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless explicitly agreed).
-9. **Parallel agents (owner, 2026-10-20, from research):** at most 5 builders at once on one machine. Each starts
-   from fresh `main` (never another open PR) with the files and APIs it owns listed in its brief. Locally a builder
-   runs only the tests its change touches (`vitest related … --maxWorkers=2`, one or two Playwright specs with
-   `--workers=1`); CI runs everything and is the source of truth. Reviews block only on correctness, security or a
-   missing requirement; design findings below high severity become follow-up tickets.
-
-## History
-
-The original app (Express 4 monolith, EJS, client-authoritative games) ran production until 2026-10-16 and was deleted
-in CC-029. Its audit findings and how each was fixed are in `docs/KNOWN_ISSUES.md`; the code is in git history before
-the CC-029 merge. Its MongoDB `users` collection is still read (never written) so legacy players can log in (CC-078).
-
-## Structure (ADR-001/002/004/006)
-
-npm-workspaces monorepo, JavaScript ES modules with JSDoc types, React + Vite frontend:
-`apps/server`, `apps/web`, `packages/games` (pure engines), `packages/shared` (event names, constants).
-Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-Built so far: `apps/web` — React app (session, home, lobby `/play/:gameId`, room `/room/:code`, `/login`, `/signup`, `/profile`, client game registry `src/games/registry.js` with lazy-loaded boards for RPS / Tic-Tac-Toe / Chess, share/seats/modal/toasts; ADR-009); `apps/server` — composition root, config, MongoDB + session store, identity model/component, HTTP app (request logging, error translation, `/api/session`), Socket.IO gateway (session-authenticated, origin-checked, rate-limited, standard acks, room handlers), room manager (domain state machine + accessor + MongoDB DAO, rooms survive restarts, lifetimes in `roomLifetimes.js`, CC-101), match history (MongoDB, replayable via `replayGame`), progression (XP/levels, exactly-once, pushed via `progress:updated`), accounts (scrypt, `/api/auth/signup|login`), background tasks for post-game work, gamification (achievements, streaks, daily quests — ADR-013), leaderboards for accounts and for guests under their server-given name, and rematch (ADR-015, ADR-060), player data following a guest who signs in (`playerTransferComponent`, ADR-014), typed errors, pino logger; `packages/shared` — game catalog, error codes, socket events, identity kinds, move rejections; `packages/games` — engine contract, registry, seeded RNG, contract test kit (`@classicade/games/testing`), engines: RPS, Tic-Tac-Toe, Chess (server clocks via the optional `deadline`/`expire` time hooks). Integration tests use an in-memory MongoDB (`testing/memoryMongo.js`).
-New code: ES modules, JSDoc types, Express 5, pure functions where possible, a `*.test.js` beside every module,
-dependencies passed in (e.g. `createApp({ config })`) rather than imported globals.
+7. **Merge policy.** Every required check green, on a branch up to date with `main`. Check: the ruleset "main:
+   required checks, branch up to date" (seven checks, plus CodeQL). **Merging to `main` deploys to production**
+   (Render): fill in _Deployment impact_. Detail: DEPLOYMENT.md "Merge policy and required checks".
+8. Don't start a stage until the previous stage's exit criteria in `BACKLOG.md` are met (unless agreed).
+9. **Parallel agents:** at most 5 builders, each from fresh `main` with its files listed in its brief. **Locally run
+   only the tests your change touches** (`npx vitest related <files> --run --maxWorkers=2`, one or two Playwright
+   specs with `--workers=1`); CI runs everything. Reviews block only on correctness, security or a missing
+   requirement.
 
 ## Commands
 
 ```bash
 nvm use && npm install
 cp apps/server/.env.example apps/server/.env   # MONGO_URI (non-production DB!), SESSION_SECRET
-npm run dev:server     # server (apps/server) on :4000
+npm run dev:server     # server (apps/server) on 127.0.0.1:4000
 npm run dev:web        # web app (apps/web) on :5173, proxies /api and /socket.io to :4000
 npm run build:web      # production build → apps/web/dist
 npm start              # production: the server, serving apps/web/dist (WEB_DIST_DIR)
@@ -169,22 +103,30 @@ E2E_BROWSER=webkit npm run test:e2e   # the same on firefox or webkit (npx playw
 npm run test:visual    # screenshot baselines, in the pinned Playwright image through Docker (CC-155)
 npm run test:visual:update  # optional: rewrite the baselines that changed (main's are refreshed after merge, CC-300)
 npm audit              # must be 0 high/critical
+node scripts/bin/check-tickets.mjs          # the decision gate on ticket files
+node scripts/bin/collect-changes.mjs --check   # check the fragments, write nothing
 ./scripts/issue-counts.sh  # issue counts for PROGRESS.md (never hand-edit them)
 ```
 
 No local MongoDB? `docker compose up mongo` (or the whole app: `docker compose up --build`, http://localhost:4000).
 A throwaway `mongodb-memory-server` instance in a temp dir also works for smoke tests.
 
-## Engineering principles
+## Where things are
 
-**Read [docs/ENGINEERING.md](docs/ENGINEERING.md) before writing code.** It is binding for `apps/` and `packages/`. Key points:
-
-- **Five layers** in the server (service → domain → data → persistence | dependency), adjacent and top-down only — `npm run lint` fails on violations.
-- **Server-authoritative games.** Clients send intents; the server validates, applies, decides results. Identity comes from the session.
-- **Pure core**: game engines and rule maths are pure functions; time, randomness and I/O are injected.
-- **Composition root** (`apps/server/src/server.js`) wires everything; factories receive dependencies; no globals.
-- **Extensible by addition**: new games/bots/storage plug in via registries and contracts (open/closed).
-- **Typed errors**, no `null` results, value objects for ids, named parameters, no silent fallbacks, immutable data.
-- **Tests**: behaviour-focused unit tests beside code, fakes over mocks, deterministic; coverage gates via `npm run test:coverage`.
-- **Dependencies**: latest stable only, minimal, `npm audit` 0 high/critical.
-- Inclusive language (allowlist/denylist, primary/replica).
+| File                                               | Holds                                                                      |
+| -------------------------------------------------- | -------------------------------------------------------------------------- |
+| [docs/BRD.md](docs/BRD.md)                         | Business requirements: vision, users, business model, KPIs                 |
+| [docs/PRD.md](docs/PRD.md)                         | Product requirements per stage (`FR-*`, `NFR-*`)                           |
+| [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md)   | Personas, loops, phases and order of work, metrics (North Star WRP)        |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Current vs. target architecture, what is built                             |
+| [docs/ENGINEERING.md](docs/ENGINEERING.md)         | How to write code: layers, patterns, coding and testing standards          |
+| [docs/design/CONTRACT.md](docs/design/CONTRACT.md) | Design tokens, components, pop-ups, copy limits                            |
+| [docs/DATA.md](docs/DATA.md)                       | What is stored where, who reads it, how long it is kept                    |
+| [docs/PROCESS.md](docs/PROCESS.md)                 | Ticket stages, working agreement in full, ticket and ADR numbers, flags    |
+| [docs/BACKLOG.md](docs/BACKLOG.md)                 | The ticket board, `CC-###`, and the next free ID                           |
+| [docs/tickets/](docs/tickets/)                     | One file per ticket, from `TEMPLATE.md` or `TEMPLATE-lite.md`              |
+| [docs/changes/](docs/changes/README.md)            | Changelog fragments, one per PR (CC-299)                                   |
+| [docs/PROGRESS.md](docs/PROGRESS.md)               | Current phase, in-flight work, dated changelog (folded from fragments)     |
+| [docs/DECISIONS.md](docs/DECISIONS.md)             | Decision records (`ADR-*`); open owner questions in `DECISIONS-PENDING.md` |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Production: Render, env vars, merge policy, before/after merge, rollback   |
+| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)       | Audit findings (`BUG-*`, `SEC-*`, `DEBT-*`), legacy history                |
