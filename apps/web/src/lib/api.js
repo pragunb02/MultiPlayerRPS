@@ -65,7 +65,8 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     try {
       return await mine;
     } finally {
-      if (renewal === mine) renewal = undefined;
+      // Still this one: a second renewal waits until this one is over before it starts.
+      renewal = undefined;
     }
   }
 

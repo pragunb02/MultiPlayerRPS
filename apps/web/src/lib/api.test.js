@@ -138,6 +138,24 @@ describe("api client", () => {
       },
     );
 
+    it("sends a second renewal only once the first is answered, even when the first is refused", async () => {
+      const { fetchImpl, calls, sent } = heldFetch();
+      const api = createApiClient({ fetchImpl });
+      const changed = api.changePassword({ currentPassword: "wrong one", newPassword: "new one 1" });
+      const signedOut = api.signOutOtherDevices();
+      await settle();
+      expect(sent()).toEqual(["POST /api/auth/password"]);
+
+      calls[0].answer(400, {
+        error: { code: "VALIDATION_ERROR", message: "That is not your current password" },
+      });
+      await expect(changed).rejects.toMatchObject({ status: 400 });
+      await settle();
+      expect(sent()).toEqual(["POST /api/auth/password", "POST /api/auth/sign-out-others"]);
+      calls[1].answer(204);
+      await expect(signedOut).resolves.toBeUndefined();
+    });
+
     it("lets the held requests go when the renewal is refused, and still refuses it", async () => {
       const { fetchImpl, calls, sent } = heldFetch();
       const api = createApiClient({ fetchImpl });
