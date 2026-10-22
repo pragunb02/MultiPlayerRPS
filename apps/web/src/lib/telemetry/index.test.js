@@ -80,7 +80,7 @@ describe("the hand-over from the first page's stub (CC-174, CC-322)", () => {
       .flatMap(({ events: sent }) => sent)
       .filter(({ name }) => name !== "page_speed_measured");
     expect(events.map(({ name, route, player_kind: kind }) => [name, route, kind])).toEqual([
-      ["client_errored", "not_found", "visitor"],
+      ["client_errored", "not_found", "guest"],
       ["request_failed", "/games/chess/rooms/:code", "guest"],
       ["page_viewed", "/games/chess/rooms/:code", "guest"],
       ["page_viewed", "not_found", "account"],

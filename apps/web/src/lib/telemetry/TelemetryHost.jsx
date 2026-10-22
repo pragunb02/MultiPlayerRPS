@@ -3,12 +3,10 @@ import { APP_BUILD } from "../../app/build.js";
 import { ServicesContext } from "../../app/servicesContext.js";
 import { WAITED_CLASS } from "../../app/wakingUp.js";
 import { FLAG_STATES, useFlagState } from "../../hooks/useFlag.js";
+import { whenIdle } from "../idle.js";
 import { NO_TELEMETRY } from "./facade.js";
 import { countFlagSuccesses } from "./flagSuccess.js";
 import { routeOf } from "./routeOf.js";
-
-/** The client loads after the first paint, when the browser is idle, or after this long at most. */
-const LOAD_WITHIN_MS = 2000;
 
 /** Loads the client in its own file, so the page's first paint never waits for it (CC-174, AC-9). */
 const loadClient = () => import("./index.js");
@@ -27,7 +25,7 @@ export function TelemetryHost({ load = loadClient }) {
   const flag = useFlagState("telemetry_client");
   const [switches, setSwitches] = useState(0);
   // Started once, and kept while the flag is asked again for a new session.
-  const running = useRef({ started: undefined, loading: false });
+  const running = useRef({ started: undefined, loading: false, retries: 1 });
   // The flag's answer now, read when the client's file arrives: it may have turned off while the file was on its way.
   const flagNow = useRef(flag);
   useLayoutEffect(() => {
@@ -46,25 +44,36 @@ export function TelemetryHost({ load = loadClient }) {
     }
     if (current.started !== undefined || current.loading) return;
     current.loading = true;
+    // The client's file never reloads the tab, and a failed download is tried once more (review of #161).
     const begin = () =>
-      load().then(({ startTelemetry }) => {
-        current.loading = false;
-        if (current.started !== undefined || telemetry.isOff() || flagNow.current !== FLAG_STATES.ON) return;
-        current.started = startTelemetry({
-          window,
-          facade: telemetry,
-          isOff: telemetry.isOff,
-          build: APP_BUILD,
-          strict: !import.meta.env.PROD,
-          wasWaking: document.documentElement.classList.contains(WAITED_CLASS),
-          routeOf,
-          onAccepted: () => undefined,
-          onBatchAccepted: countFlagSuccesses(services.api),
-          ...(services.interruptions && { surfaceOf: services.interruptions.surfaceOf }),
+      telemetry
+        .quietly(load)
+        .then(({ startTelemetry }) => {
+          current.loading = false;
+          if (current.started !== undefined || telemetry.isOff() || flagNow.current !== FLAG_STATES.ON)
+            return;
+          current.started = startTelemetry({
+            window,
+            facade: telemetry,
+            isOff: telemetry.isOff,
+            build: APP_BUILD,
+            strict: !import.meta.env.PROD,
+            wasWaking: document.documentElement.classList.contains(WAITED_CLASS),
+            routeOf,
+            onAccepted: () => undefined,
+            onBatchAccepted: countFlagSuccesses(services.api),
+            ...(services.interruptions && { surfaceOf: services.interruptions.surfaceOf }),
+          });
+        })
+        .catch(() => {
+          current.loading = false;
+          if (current.retries === 0) return;
+          current.retries -= 1;
+          current.loading = true;
+          whenIdle({ window, run: begin });
         });
-      });
-    if (window.requestIdleCallback === undefined) window.setTimeout(begin, 0);
-    else window.requestIdleCallback(begin, { timeout: LOAD_WITHIN_MS });
+    // After the first paint, when the browser is idle.
+    whenIdle({ window, run: begin });
   }, [flag, telemetry, load, services, switches]);
 
   useEffect(() => {
