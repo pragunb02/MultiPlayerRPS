@@ -45,22 +45,24 @@ export const AdminRoute = lazyRoute(() => import("../pages/AdminPage/AdminRoute.
  * Every route of the app, in one table that both `App.jsx` (to draw the page) and `preloadRouteFor` (to fetch it
  * early) read, so the two can never disagree (CC-322). An entry has a `page` and the `props` it gets, or a
  * `redirect` to the address that replaces it. Order does not matter: the router ranks the paths itself.
+ * `socketNow` marks a page that cannot show anything without the realtime connection, so Socket.IO downloads at
+ * once there instead of when the browser is idle (CC-333).
  *
  * @type {ReadonlyArray<Readonly<{ path?: string, index?: true, page?: import("react").ComponentType<any>,
- *   props?: object, redirect?: () => string }>>}
+ *   props?: object, redirect?: () => string, socketNow?: true }>>}
  */
 export const APP_ROUTES = Object.freeze(
   [
     { index: true, page: HomePage },
     { path: ROUTES.GAME, page: PlayPage },
-    { path: ROUTES.ROOM, page: RoomPage },
+    { path: ROUTES.ROOM, page: RoomPage, socketNow: true },
     { path: ROUTES.PASS_AND_PLAY, page: PassAndPlayPage },
     { path: ROUTES.LOGIN, page: LoginPage },
     { path: ROUTES.SIGNUP, page: SignupPage },
     { path: ROUTES.PROFILE, page: ProfilePage },
     { path: ROUTES.PLAYER, page: PublicProfilePage },
-    { path: ROUTES.CHALLENGE, page: ChallengePage },
-    { path: ROUTES.FRIENDS, page: FriendsPage },
+    { path: ROUTES.CHALLENGE, page: ChallengePage, socketNow: true },
+    { path: ROUTES.FRIENDS, page: FriendsPage, socketNow: true },
     { path: ROUTES.FRIEND_LINK, page: FriendLinkPage },
     { path: ROUTES.DAILY, page: DailyPuzzlePage },
     { path: ROUTES.LEADERBOARD, page: LeaderboardPage },
@@ -70,7 +72,7 @@ export const APP_ROUTES = Object.freeze(
     ...CONSOLE_ROUTES.map(({ path, view }) => ({ path, page: AdminRoute, props: { view } })),
     // Old URLs stay valid: each page replaces them with its canonical URL.
     { path: LEGACY_ROUTES.GAME, page: PlayPage },
-    { path: LEGACY_ROUTES.ROOM, page: RoomPage },
+    { path: LEGACY_ROUTES.ROOM, page: RoomPage, socketNow: true },
     { path: LEGACY_ROUTES.PROFILE, redirect: () => paths.profile() },
     { path: LEGACY_ROUTES.AUTH, redirect: () => paths.login() },
     { path: "*", page: NotFoundPage },
@@ -87,6 +89,17 @@ export const APP_ROUTES = Object.freeze(
 export function pageFor(pathname) {
   const { route } = matchRoutes(APP_ROUTES, pathname)[0];
   return route.redirect ? pageFor(new URL(route.redirect(), "https://app.invalid").pathname) : route.page;
+}
+
+/**
+ * Whether the page at an address needs the realtime connection at once: a room joins over it, a challenge page
+ * watches a challenge that can be taken any moment, and the friends page shows presence as it changes (CC-333).
+ * Every other page connects when the browser is idle after the first render.
+ *
+ * @param {string} pathname
+ */
+export function needsSocketNow(pathname) {
+  return matchRoutes(APP_ROUTES, pathname)[0].route.socketNow === true;
 }
 
 /**
