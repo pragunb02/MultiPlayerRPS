@@ -4,20 +4,27 @@ import { paths } from "../../app/paths.js";
 import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { useCountdown } from "../../hooks/useCountdown.js";
+import { useFlag } from "../../hooks/useFlag.js";
 import { useQuests } from "../../hooks/useQuests.js";
 import { Button } from "../Button/Button.jsx";
 import { StreakAtRisk } from "../SaveProgress/StreakAtRisk.jsx";
 import styles from "./DailyQuests.module.css";
+import { clockTime } from "./clockTime.js";
 import { resetsIn } from "./resetsIn.js";
 
 const isDone = (item) => item.completedAt !== null;
 
-/** "Resets in 5h 12m"; reloads the quests when the day is over. Not announced: it changes every minute. */
+/**
+ * "Resets in 5h 12m"; reloads the quests when the day is over. Not announced: it changes every minute. With local
+ * days on it also says the clock time, in the browser's own zone (CC-146).
+ */
 function ResetsIn({ at, onElapsed }) {
   const remaining = useCountdown({ target: at, onElapsed });
+  const local = useFlag("local_days");
   return (
     <p className={styles.muted} aria-live="off">
       {resetsIn(remaining)}
+      {local && remaining > 0 && ` · at ${clockTime(at)}`}
     </p>
   );
 }

@@ -103,6 +103,55 @@ the owner may change it.
   The web app makes no new request, so the CSP's `connect-src` is unchanged. A long run of `unavailable` in the
   counter means the breach half is off and needs a look.
 
+### ADR-077 — Local days from the browser, one zone change in 7 days, and free streak freezes
+
+- **Status:** Accepted by default (owner may change) · 2026-10-21 ([CC-146](tickets/CC-146.md),
+  [CC-145](tickets/CC-145.md), research there). The open decisions of both tickets were answered by the design lead,
+  owner-delegated 2026-10-21.
+- **Context.** ADR-013 (amended 2026-10-17) moves the daily streak and quests to the player's local day, and
+  ADR-026.5 promises one free freeze a week, at most 2. The daily puzzle follows India days through an injected
+  calendar (ADR-061.3). Streaks counted UTC days, so production data has UTC day keys.
+- **Decision.**
+  1. **One calendar per player.** `domain/playerDays/zoneCalendar.js` works out a player's day and next midnight
+     from an IANA zone with `Intl` (no library), summer time included; a day starts at its first moment when
+     midnight does not exist. No zone means India time. The play streak, the quests and the daily puzzle use it.
+     Analytics, the console, flag counts and the anti-farm caps stay on India days (ADR-034, ADR-021).
+  2. **The zone comes from the browser**, `PUT /api/time-zone { zone }`, once a visit when it differs. Only names
+     `Intl` knows, at most 64 characters, stored by their canonical name in `player_time_zones`.
+  3. **At most one change in 7 days**, the first set included. A change inside the 7 days is refused with 409
+     `zone-locked` and `changeableAt`. The same zone again is a no-op and starts no lock.
+  4. **A change never repeats or skips a day.** The old zone keeps the day until its own midnight; from then the
+     new zone applies, never earlier than the day after the old one. So a zone change can neither replay a day
+     (a second set of quests, a repaired streak) nor skip one, for zones under 24 hours apart.
+  5. **Old UTC streaks migrate on read.** `dailyStreak.days` marks the calendar its keys belong to (missing means
+     UTC). On local days an old key is read as the latest local day its UTC day overlaps, never after today, so the
+     switch never breaks a streak and gives at most one day once. Quest and puzzle days keep their keys. Nothing is
+     rewritten in bulk; legacy collections are never touched.
+  6. **Weekly boards turn at Monday 00:00 India time** (ADR-015 amended 2026-10-17) once `local_days` is fully on,
+     for everyone at once, asked without counting a flag exposure (`isFullyOn`). Once switched, a server stays on
+     India weeks until it restarts, so a rollback or stale overrides cannot show a started week twice. The week id
+     format stays.
+  7. **Freezes** (ADR-026.5). The first counted match of a week (Monday to Sunday, the player's own days) earns one,
+     at most 2 held. A counted match after missed days spends one per missed day, automatically, only when the
+     freezes cover them all; otherwise none is spent and the streak starts at 1. A frozen day keeps the streak and
+     adds nothing to it; `best` never goes down. A second counted match on the day the streak carries on earns one
+     back, once per cover. Reading the streak spends nothing: it shows the cover that the next match makes. Only
+     the play streak has freezes.
+  8. **Honest copy.** Facts only: no countdown on the streak, no loss words, no exclamation marks, for every age. A
+     test reads the copy.
+  9. **Guests and data** (ADR-014, ADR-048). The account keeps its own zone. One without takes the guest's zone as a
+     fresh change made at the sign-in on the account's own days (point 4), so the account's past days are never
+     rewritten and the 7 day lock starts then. Freezes: the larger holding of the two, at most 2, and the frozen days joined, so the rebuild from the
+     history treats them as covered. The zone and the freezes are in the export and erased with the account.
+  10. **Two flags**, both audience everyone, off, removed by 2027-01-31: `local_days` (CC-146) and
+      `streak_freezes` (CC-145), so each ramps and rolls back on its own. Off, the code behaves as before: UTC days
+      for streaks and quests, India for the puzzle, no freezes, and the time zone endpoints answer 404.
+- **Consequences.** One new collection, `player_time_zones`, a few small fields on `player_stats.dailyStreak`. Players
+  in different zones can be on different daily puzzles for some hours, as on Wordle. A guest rebuild replays the
+  history in the account's current zone, so a player who changed zones may see a day moved in that rebuild.
+  Turning `local_days` off can, once, show the streak of a player west of UTC who was at risk as broken; freezes
+  are kept as they are when `streak_freezes` is off.
+
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 
 - **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner
@@ -1652,6 +1701,8 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
   is Regular plus Core on the last full week's Sunday against the Sunday before, and the console shows the moves
   between those two days. The 3-day weekly returning players number (PRODUCT_VISION.md 7.1) stays on the
   Overview without the North Star label, and 7.1 needs the owner's rewording (CC-268).
+- **Amended 2026-10-21 (CC-146, ADR-077.1).** Players' own streaks, quests and puzzles move to their local day.
+  Point 2 is unchanged: every analytics and console day stays an India day, so the counts keep one day for everyone.
 
 ### ADR-033 — Every tab follows the session: server disconnects and a message without identity
 
@@ -2225,6 +2276,9 @@ XP; if progression is ever recomputed downwards, boards keep the higher value un
 leagues, reset on Monday at 00:00 India time instead of 00:00 UTC. The ISO week key ("2026-W42") stays, worked out
 in India time. Revisit if players from other regions grow. Built with CC-146. Until then the code uses UTC.
 
+**Amended · 2026-10-21** (CC-146, ADR-077.6). Built: the weeks turn at Monday 00:00 India time once the `local_days`
+flag is fully on, for everyone at once. Until then, and when it is off, they stay on UTC.
+
 **Amended · 2026-10-20** (owner, [ADR-060](#adr-060--guests-on-the-leaderboards-under-their-server-given-name),
 CC-291). Point 1 no longer holds: guests are on the boards under their server-given name, their rows last as long
 as a guest session can, and the guest transfer adds a guest's weekly rows to the account once, quest XP included.
@@ -2319,6 +2373,12 @@ read from `matches` (rejected: grows with history; kept as the rebuild path for 
 quests move from the UTC day to the player's local day (CC-146). The time zone comes from the browser, a player can
 change it at most once in 7 days so it cannot be gamed, and India time is used when it is unknown. Until CC-146
 ships, days stay in UTC. The anti-farm caps stay on the server clock (ADR-021 amendment).
+
+**Amended · 2026-10-21** ([ADR-077](#adr-077--local-days-from-the-browser-one-zone-change-in-7-days-and-free-streak-freezes),
+CC-146, CC-145, accepted by default). Point 2's match day and point 3's daily streak follow the player's own day
+behind the `local_days` flag, with the zone rules of ADR-077 (one change in 7 days, no day repeated or skipped,
+India when unknown) and old UTC keys read through a marker. Point 3 gains freezes behind `streak_freezes`
+(ADR-077.7): a missed day is covered automatically when a freeze can cover it, and a frozen day adds nothing.
 
 ### ADR-012 — Visual identity: "neon arcade"
 

@@ -62,6 +62,26 @@ export function runStatsDaoContract(createDao) {
       expect(await dao.findByPlayer("guest_a")).toEqual({ ...statsDoc(), version: 1 });
     });
 
+    it("keeps the local day and freeze fields of the daily streak, and adds none to an old one (CC-145, CC-146)", async () => {
+      const dao = await createDao();
+      const dailyStreak = {
+        current: 3,
+        best: 4,
+        lastDay: "2026-10-22",
+        lastAt: AT.getTime(),
+        days: "local",
+        freezes: 1,
+        freezeWeek: "2026-10-19",
+        frozenDays: ["2026-10-21"],
+        earnBack: { day: "2026-10-22", matches: 1 },
+      };
+      await dao.save({ doc: statsDoc({ dailyStreak }), expectedVersion: 0 });
+      await dao.save({ doc: statsDoc({ playerId: "guest_old" }), expectedVersion: 0 });
+
+      expect((await dao.findByPlayer("guest_a")).dailyStreak).toEqual(dailyStreak);
+      expect((await dao.findByPlayer("guest_old")).dailyStreak).toEqual({ current: 0, best: 0, lastDay: "" });
+    });
+
     it("refuses to create stats that already exist", async () => {
       const dao = await createDao();
       await dao.save({ doc: statsDoc(), expectedVersion: 0 });

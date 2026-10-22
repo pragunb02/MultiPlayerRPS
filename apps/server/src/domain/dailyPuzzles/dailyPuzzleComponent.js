@@ -31,11 +31,19 @@ const isoOrEmpty = (ms) => (ms > 0 ? new Date(ms).toISOString() : "");
  *   dailyPuzzleAccessor: ReturnType<typeof import("../../data/dailyPuzzleAccessor.js").createDailyPuzzleAccessor>,
  *   kinds: ReadonlyArray<Readonly<PuzzleKind>>,
  *   calendar: Readonly<import("./schedule.js").PuzzleCalendar>,  which day a moment falls on, and when the next starts
- * }} deps
+ *   calendarFor?: (query: { playerId: string, fallback: Readonly<import("./schedule.js").PuzzleCalendar> }) => Promise<Readonly<import("./schedule.js").PuzzleCalendar>>,
+ * }} deps  `calendar` is the visitors' days and the fallback. `calendarFor` gives a player their own days (CC-146);
+ *   without it everyone has `calendar`
  */
-export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calendar }) {
+export function createDailyPuzzleComponent({
+  dailyPuzzleAccessor,
+  kinds,
+  calendar,
+  calendarFor = async ({ fallback }) => fallback,
+}) {
   assertDefined(dailyPuzzleAccessor, "dailyPuzzleAccessor");
   assertDefined(calendar, "calendar");
+  const calendarOf = (playerId) => calendarFor({ playerId, fallback: calendar });
   const byId = new Map(kinds.map((kind) => [kind.id, kind]));
 
   function kindOf(id) {
@@ -60,7 +68,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
   }
 
   /** What a player sees of a puzzle. The solution and its source only once the attempt has ended. */
-  function viewOf({ kind, day, number, puzzle, attempt, streak, now }) {
+  function viewOf({ kind, day, number, puzzle, attempt, streak, now, days = calendar }) {
     const steps = kind.steps(puzzle);
     const hintsTaken = sum(attempt.hints);
     const ended = isEnded(attempt);
@@ -68,7 +76,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
       kind: kind.id,
       day,
       number,
-      nextAt: calendar.nextDayAt(now),
+      nextAt: days.nextDayAt(now),
       rating: kind.rating(puzzle),
       steps,
       maxMistakes: kind.maxMistakes,
@@ -100,9 +108,9 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
     return { number, puzzle: kind.puzzleById(attempt.puzzleId), attempt, stored: true };
   }
 
-  async function playerView({ kind, playerId, today, number, puzzle, attempt, now }) {
+  async function playerView({ kind, playerId, today, number, puzzle, attempt, now, days }) {
     const streak = await streakOf({ kind, playerId, today, attempt });
-    return viewOf({ kind, day: today, number, puzzle, attempt, streak, now });
+    return viewOf({ kind, day: today, number, puzzle, attempt, streak, now, days });
   }
 
   /**
@@ -110,7 +118,8 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
    * is accepted (see `store`). Refuses a day that is over and an attempt that has ended.
    */
   async function openAttempt({ kind, playerId, day, now }) {
-    const today = calendar.dayOf(now);
+    const days = await calendarOf(playerId);
+    const today = days.dayOf(now);
     if (day !== today) {
       throw new ConflictError("A new puzzle is out", { details: { reason: DAILY_PUZZLE_REFUSALS.DAY_OVER } });
     }
@@ -130,7 +139,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
         details: { reason: DAILY_PUZZLE_REFUSALS.FINISHED },
       });
     }
-    return { ...state, today, attempt };
+    return { ...state, today, attempt, days };
   }
 
   /**
@@ -205,8 +214,9 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
      */
     async todayFor({ kind: kindId, playerId, now }) {
       const kind = kindOf(kindId);
-      const today = calendar.dayOf(now);
-      return playerView({ kind, playerId, today, now, ...(await stateFor({ kind, playerId, today })) });
+      const days = await calendarOf(playerId);
+      const today = days.dayOf(now);
+      return playerView({ kind, playerId, today, now, days, ...(await stateFor({ kind, playerId, today })) });
     },
 
     /**
@@ -221,7 +231,12 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
      */
     async play({ kind: kindId, playerId, day, move, now }) {
       const kind = kindOf(kindId);
-      const { today, number, puzzle, attempt, stored } = await openAttempt({ kind, playerId, day, now });
+      const { today, number, puzzle, attempt, stored, days } = await openAttempt({
+        kind,
+        playerId,
+        day,
+        now,
+      });
       const judged = kind.judge({ puzzle, found: attempt.found, move });
       if (!judged.legal) {
         throw new ValidationError("That move is not possible here", {
@@ -249,7 +264,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
         outcome: next.outcome,
         played: { san: judged.played.san },
         ...(reply !== undefined && { reply: { from: reply.from, to: reply.to, san: reply.san } }),
-        puzzle: await playerView({ kind, playerId, today, number, puzzle, attempt: saved, now }),
+        puzzle: await playerView({ kind, playerId, today, number, puzzle, attempt: saved, now, days }),
       };
     },
 
@@ -264,7 +279,12 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
      */
     async takeHint({ kind: kindId, playerId, day, now }) {
       const kind = kindOf(kindId);
-      const { today, number, puzzle, attempt, stored } = await openAttempt({ kind, playerId, day, now });
+      const { today, number, puzzle, attempt, stored, days } = await openAttempt({
+        kind,
+        playerId,
+        day,
+        now,
+      });
       if (sum(attempt.hints) >= kind.maxHints) {
         throw new ConflictError("No hints left today", {
           details: { reason: DAILY_PUZZLE_REFUSALS.NO_HINTS_LEFT },
@@ -273,7 +293,7 @@ export function createDailyPuzzleComponent({ dailyPuzzleAccessor, kinds, calenda
       const saved = await store({ attempt: afterHint({ attempt, now }), stored });
       return {
         hint: kind.hint({ puzzle, found: saved.found, level: hintsAt(saved) }),
-        puzzle: await playerView({ kind, playerId, today, number, puzzle, attempt: saved, now }),
+        puzzle: await playerView({ kind, playerId, today, number, puzzle, attempt: saved, now, days }),
       };
     },
 

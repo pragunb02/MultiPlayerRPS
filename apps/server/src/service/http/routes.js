@@ -32,6 +32,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { feedbackComponent: Parameters<typeof createFeedbackRoutes>[0]["feedbackComponent"], feedbackLimits?: Parameters<typeof createFeedbackRoutes>[0]["limits"] }
  *   & { reportComponent: Parameters<typeof createReportRoutes>[0]["reportComponent"], reportLimits?: Parameters<typeof createReportRoutes>[0]["limits"] }
  *   & { flagComponent: Parameters<typeof createFlagRoutes>[0]["flagComponent"] }
+ *   & { playerDaysComponent?: Parameters<typeof createGamificationRoutes>[0]["playerDaysComponent"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { safetyComponent: Parameters<typeof createSafetyRoutes>[0]["safetyComponent"] }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
@@ -70,6 +71,7 @@ export function apiRouter({
   dailyPuzzleLimit,
   safetyComponent,
   flagComponent,
+  playerDaysComponent,
   build,
   ...sessionDeps
 }) {
@@ -119,7 +121,7 @@ export function apiRouter({
   router.use(createFriendRoutes({ friendComponent, now, ...(friendLimits && { limits: friendLimits }) }));
   router.use(createSafetyRoutes({ safetyComponent, now }));
   router.use(createProgressRoutes({ progressionComponent }));
-  router.use(createGamificationRoutes({ gamificationComponent, now }));
+  router.use(createGamificationRoutes({ gamificationComponent, playerDaysComponent, now }));
   router.use(
     createDailyPuzzleRoutes({
       dailyPuzzleComponent,

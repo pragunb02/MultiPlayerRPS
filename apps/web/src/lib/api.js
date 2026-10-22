@@ -205,8 +205,12 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     getAchievements: async () => (await request("GET", "/achievements")).achievements,
     /** Your win streak and daily play streak (CC-054). */
     getStreaks: async () => (await request("GET", "/streaks")).streaks,
-    /** Today's quests (UTC day), the sweep bonus and when they reset (CC-089). */
+    /** Today's quests (your own day with local days on, CC-146), the sweep bonus and when they reset (CC-089). */
     getQuests: async () => (await request("GET", "/quests")).quests,
+    /** Your time zone as the server uses it, and when it may change (CC-146). 404 while local days are off. */
+    getTimeZone: async () => (await request("GET", "/time-zone")).timeZone,
+    /** Tells the server the browser's time zone. At most one change in 7 days (409 `zone-locked`). */
+    setTimeZone: async (zone) => (await request("PUT", "/time-zone", { zone })).timeZone,
     /** Today's daily puzzle of a kind, with your attempt and streak once you have a session (CC-144). */
     getDailyPuzzle: async (kind) => (await request("GET", `/daily/${encodeURIComponent(kind)}`)).puzzle,
     /**

@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,12 +15,14 @@ import {
   NO_STREAKS,
   QUESTS,
 } from "../testing/fakes.js";
+import { flagPaths } from "../testing/flagPaths.js";
 import { installMatchMedia } from "../testing/matchMedia.js";
 import { AchievementGrid } from "./Achievements/AchievementGrid.jsx";
 import { CELEBRATION_MS, GamificationToasts } from "./GamificationToasts.jsx";
 import { ProgressToasts } from "./ProgressToasts.jsx";
 import { SaveProgressProvider } from "./SaveProgress/SaveProgressProvider.jsx";
 import { DailyQuests } from "./Quests/DailyQuests.jsx";
+import { clockTime } from "./Quests/clockTime.js";
 import { resetsIn } from "./Quests/resetsIn.js";
 import { StreakCard } from "./Streaks/StreakCard.jsx";
 import { ToastProvider } from "./Toast/ToastProvider.jsx";
@@ -273,6 +275,94 @@ describe("StreakCard", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByText(/No streak yet/)).toBeInTheDocument();
+  });
+
+  // Freezes (CC-145): the server sends them only with streak_freezes on, so the card shows what it is given.
+  const FREEZES = { held: 1, max: 2, covering: 0, earnBackLeft: 0 };
+
+  it("shows the freezes beside the streak", async () => {
+    renderWith(<StreakCard />, {
+      api: fakeApi({
+        getStreaks: vi
+          .fn()
+          .mockResolvedValue(
+            streaks({ current: 5, best: 5, playedToday: true, freezes: FREEZES, nextMilestone: 7 }),
+          ),
+      }),
+    });
+
+    expect(await screen.findByText(/1 of 2 freezes/)).toHaveTextContent(
+      "1 of 2 freezes. A freeze covers a day you miss, by itself. You earn one each week you play.",
+    );
+    expect(screen.getByText("Next milestone: 7 days")).toBeInTheDocument();
+  });
+
+  it("says when a freeze covered a missed day, and how to earn it back", async () => {
+    renderWith(<StreakCard />, {
+      api: fakeApi({
+        getStreaks: vi
+          .fn()
+          .mockResolvedValue(
+            streaks({ current: 5, best: 5, freezes: { held: 0, max: 2, covering: 1, earnBackLeft: 2 } }),
+          ),
+      }),
+    });
+
+    expect(
+      await screen.findByText(
+        "A freeze covered yesterday, so your 5-day streak carries on when you play today. 2 matches today earn it back.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/0 of 2 freezes/)).toBeInTheDocument();
+  });
+
+  it("shows when the player's day ends, in local time", async () => {
+    const resetsAt = Date.UTC(2026, 9, 21, 18, 30);
+    renderWith(<StreakCard />, {
+      api: fakeApi({ getStreaks: vi.fn().mockResolvedValue(streaks({ current: 1, best: 1, resetsAt })) }),
+    });
+
+    expect(await screen.findByText(`Your day ends at ${clockTime(resetsAt)}.`)).toBeInTheDocument();
+  });
+
+  it("uses no pressure words in the streak lines", async () => {
+    const cases = [
+      { current: 0 },
+      { current: 3, playedToday: true, freezes: { ...FREEZES, earnBackLeft: 1 } },
+      { current: 3, atRisk: true, freezes: { ...FREEZES, held: 0 } },
+      { current: 3, freezes: FREEZES },
+      { current: 3, freezes: { held: 0, max: 2, covering: 2, earnBackLeft: 2 } },
+    ];
+    for (const daily of cases) {
+      renderWith(<StreakCard />, {
+        api: fakeApi({ getStreaks: vi.fn().mockResolvedValue(streaks({ best: 3, ...daily })) }),
+      });
+      const card = await screen.findByRole("region", { name: "Streaks" });
+      await within(card).findByText("Daily streak");
+      expect(card.textContent).not.toMatch(/lose|lost|hurry|don't let|before it's too late|!/i);
+      cleanup();
+    }
+  });
+});
+
+describe("DailyQuests on local days (CC-146)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  flagPaths("local_days", (on) => {
+    it(on ? "shows the quest reset as a local clock time" : "shows only the countdown", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.UTC(2026, 9, 16, 12));
+      renderWith(<DailyQuests />, {
+        api: fakeApi({ getFlags: vi.fn(async (names) => Object.fromEntries(names.map((n) => [n, on]))) }),
+      });
+
+      const line = await screen.findByText(/^Resets in 12h 0m/);
+      if (on) {
+        await within(line).findByText(new RegExp(`at ${clockTime(QUESTS.resetsAt)}`));
+      } else {
+        expect(line).toHaveTextContent(/^Resets in 12h 0m$/);
+      }
+    });
   });
 });
 

@@ -1,6 +1,7 @@
 import {
   assertFlagRegistry,
   FLAG_AUDIENCES,
+  FLAG_ROLLOUT,
   FLAG_SIDES,
   FLAGS,
   IDENTITY_KINDS,
@@ -252,6 +253,16 @@ export function createFlagComponent({
 
   return Object.freeze({
     isOn,
+
+    /**
+     * Whether a flag's rollout in use is on for everyone, for a rule that applies to everyone at once rather than to
+     * one player (the weekly boards' week, CC-146). It asks no audience and counts no exposure.
+     *
+     * @param {string} name  a flag in the registry
+     * @returns {boolean}
+     * @throws {RangeError} for a name not in the registry
+     */
+    isFullyOn: (name) => rolloutOf(flagOf(name)) === FLAG_ROLLOUT.ON,
     refresh,
     flush,
 

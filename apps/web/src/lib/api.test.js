@@ -176,6 +176,7 @@ describe("api client", () => {
     ["getAchievements", "/api/achievements", { achievements: [{ id: "first-win" }] }, [{ id: "first-win" }]],
     ["getStreaks", "/api/streaks", { streaks: { win: { current: 1 } } }, { win: { current: 1 } }],
     ["getQuests", "/api/quests", { quests: { day: "2026-10-16" } }, { day: "2026-10-16" }],
+    ["getTimeZone", "/api/time-zone", { timeZone: { zone: "Asia/Dubai" } }, { zone: "Asia/Dubai" }],
   ])("%s reads %s and unwraps it", async (method, path, body, expected) => {
     const fetchImpl = respond(200, body);
 
@@ -422,6 +423,21 @@ describe("api client, the account's data and age (CC-035, CC-152)", () => {
     expect(fetchImpl.mock.calls.map(([url, init]) => [url, init.method, init.body])).toEqual([
       ["/api/account", "GET", undefined],
       ["/api/account/birth-year", "PUT", JSON.stringify({ birthYear: 1990 })],
+    ]);
+  });
+
+  it("sends the browser's time zone and unwraps the answer (CC-146)", async () => {
+    const fetchImpl = respond(200, { timeZone: { zone: "Asia/Dubai", chosen: true } });
+
+    expect(await createApiClient({ fetchImpl }).setTimeZone("Asia/Dubai")).toEqual({
+      zone: "Asia/Dubai",
+      chosen: true,
+    });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect([url, init.method, init.body]).toEqual([
+      "/api/time-zone",
+      "PUT",
+      JSON.stringify({ zone: "Asia/Dubai" }),
     ]);
   });
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, nextEvent, send, startRoom } from "../../testing/socketClients.js";
 import { clockOn, startTestServer } from "../../testing/testApp.js";
+import { flagPaths } from "../../testing/flagPaths.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 
 // Race engine, seed 42: bob moves first. Bob +1, Alice +2 → Alice wins.
@@ -123,5 +124,90 @@ describe("achievements, streaks and quests end to end", () => {
   it("checks its dependencies at construction", () => {
     expect(() => createGamificationRoutes({ now: Date.now })).toThrow(TypeError);
     expect(() => createGamificationRoutes({ gamificationComponent: {} })).toThrow(TypeError);
+  });
+});
+
+// The time zone and local reset times (CC-146). A fixed clock: nothing here reads the real time (CC-325).
+const FIXED_NOW = Date.parse("2026-10-21T10:00:00.000Z");
+
+const put = async (path, body, cookie) => {
+  const res = await fetch(`${server.baseUrl}/api${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...(cookie && { cookie }) },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json(), cacheControl: res.headers.get("cache-control") };
+};
+
+describe("time zone routes (CC-146)", () => {
+  flagPaths("local_days", (on) => {
+    it(on ? "sets the zone from the browser, once in 7 days" : "answers 404 and keeps UTC days", async () => {
+      server = await startTestServer({ now: () => FIXED_NOW });
+      if (on) {
+        await server.flagComponent.setRollout({ name: "local_days", rollout: "on" });
+      }
+      const carol = await clients.player();
+
+      if (!on) {
+        expect((await get("/time-zone", carol.cookie)).status).toBe(404);
+        expect((await put("/time-zone", { zone: "America/New_York" }, carol.cookie)).status).toBe(404);
+        const { streaks } = (await get("/streaks", carol.cookie)).body;
+        expect(streaks.daily).not.toHaveProperty("resetsAt");
+        expect((await get("/quests", carol.cookie)).body.quests.resetsAt).toBe(
+          Date.parse("2026-10-22T00:00:00Z"),
+        );
+        return;
+      }
+      expect((await get("/time-zone", carol.cookie)).body.timeZone).toMatchObject({ chosen: false });
+
+      const set = await put("/time-zone", { zone: "America/New_York" }, carol.cookie);
+      expect(set.status).toBe(200);
+      expect(set.cacheControl).toBe("no-store");
+      expect(set.body.timeZone).toEqual({
+        zone: "America/New_York",
+        chosen: true,
+        changeableAt: FIXED_NOW + 7 * 24 * 60 * 60 * 1000,
+        // The change applies from India's midnight, then New York's days follow.
+        dayEndsAt: Date.parse("2026-10-21T18:30:00Z"),
+      });
+
+      const locked = await put("/time-zone", { zone: "Europe/London" }, carol.cookie);
+      expect(locked.status).toBe(409);
+      expect(locked.body.error.details).toEqual({
+        reason: "zone-locked",
+        changeableAt: FIXED_NOW + 7 * 24 * 60 * 60 * 1000,
+      });
+      expect((await put("/time-zone", { zone: "Mars/Base" }, carol.cookie)).status).toBe(400);
+      expect((await put("/time-zone", { zone: "America/New_York" }, carol.cookie)).status).toBe(200);
+
+      const { streaks } = (await get("/streaks", carol.cookie)).body;
+      expect(streaks.daily).toMatchObject({ current: 0, resetsAt: Date.parse("2026-10-21T18:30:00Z") });
+      expect(streaks.daily).not.toHaveProperty("freezes");
+    });
+  });
+
+  it("requires a session", async () => {
+    server = await startTestServer({ now: () => FIXED_NOW });
+    expect((await get("/time-zone")).status).toBe(401);
+    expect((await put("/time-zone", { zone: "UTC" })).status).toBe(401);
+  });
+});
+
+describe("streak freezes over the API (CC-145)", () => {
+  flagPaths("streak_freezes", (on) => {
+    it(on ? "shows the freezes beside the daily streak" : "shows no freezes", async () => {
+      server = await startTestServer({ now: () => FIXED_NOW });
+      if (on) {
+        await server.flagComponent.setRollout({ name: "streak_freezes", rollout: "on" });
+      }
+      const carol = await clients.player();
+      const { daily } = (await get("/streaks", carol.cookie)).body.streaks;
+      if (on) {
+        expect(daily.freezes).toEqual({ held: 0, max: 2, covering: 0, earnBackLeft: 0 });
+        expect(daily.nextMilestone).toBe(3);
+      } else {
+        expect(daily).toEqual({ current: 0, best: 0, lastDay: "", playedToday: false, atRisk: false });
+      }
+    });
   });
 });
