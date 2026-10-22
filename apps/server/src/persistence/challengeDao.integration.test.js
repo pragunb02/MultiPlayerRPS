@@ -81,8 +81,10 @@ describe("MongoDB challenge DAO honours the challenge DAO contract (integration)
 
   it("starts after a rollback left two holders of one place or mark: the oldest keeps it (CC-337)", async () => {
     // A server without the unique indexes (a rollback) can store two of each. The next start must still build them.
+    // A database of its own: the file's shared one has the unique indexes already, which refuse the duplicates.
+    ownDatabaseNext();
     const database = await connectDatabase({
-      uri: mongo.uri(`challenges-${++counter}`),
+      uri: await databaseUri(mongo, "challenges"),
       logger: captureLogger().logger,
     });
     databases.push(database);
