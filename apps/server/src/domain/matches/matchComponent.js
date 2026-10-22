@@ -111,8 +111,8 @@ export function createMatchComponent({
   }
 
   /**
-   * The match a finished room holds, as it is recorded: players, seed, moves, result and times, never the
-   * engine's state. Nothing is stored here, so the match pipeline can keep it until it is recorded (CC-111).
+   * The match a finished room holds, as it is recorded: players, seed, the starter a rematch named (CC-091), moves,
+   * result and times, never the engine's state. Nothing is stored here, so the match pipeline can keep it until it is recorded (CC-111).
    *
    * @param {{ room: Readonly<import("../../data/roomAccessor.js").Room>, outcome: { result: string, winners: string[], reason: string } }} event
    * @returns {Readonly<import("../../data/matchAccessor.js").Match>}
@@ -124,6 +124,7 @@ export function createMatchComponent({
       gameId: room.gameId,
       options: room.options,
       seed: room.game.seed,
+      ...(room.game.starter !== undefined && { starter: room.game.starter }),
       players: room.seats.map(({ playerId, displayName }) => ({ playerId, displayName })),
       log: room.game.log,
       result: { result: outcome.result, winners: outcome.winners, reason: outcome.reason },

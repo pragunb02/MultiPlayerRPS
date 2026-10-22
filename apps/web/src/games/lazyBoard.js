@@ -1,7 +1,7 @@
 import { lazy } from "react";
 
 /** Never settles: the page is about to reload, so the board just keeps waiting. */
-const RELOADING = new Promise(() => {});
+export const RELOADING = new Promise(() => {});
 
 /**
  * A board component that is downloaded the first time it is shown, so a player only downloads the games they open.

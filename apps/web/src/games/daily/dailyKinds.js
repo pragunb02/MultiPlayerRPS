@@ -1,5 +1,5 @@
 import { DAILY_PUZZLE_KINDS, DAILY_PUZZLE_OUTCOMES } from "@classicade/shared";
-import { colourName, opposite } from "../chess/chessGame.js";
+import { colourName, opposite } from "../chess/chessColours.js";
 import { lazyBoard } from "../lazyBoard.js";
 
 // The chess puzzle's board loads on demand, with chess.js, the first time a player opens it.

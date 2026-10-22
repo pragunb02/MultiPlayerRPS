@@ -1,0 +1,28 @@
+/*
+ * A page's place while its code downloads (CC-322). It is at least as tall as the screen under the header, so the
+ * footer stays out of view and does not move when the page arrives. Still shapes, no shimmer: it shows for a moment.
+ * The shared Skeleton of CC-323 replaces these shapes.
+ */
+.skeleton {
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+  min-height: 100dvh;
+}
+.title {
+  height: var(--space-12);
+  max-width: 24rem;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-raised);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-6);
+}
+.card {
+  height: 16rem;
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+}
