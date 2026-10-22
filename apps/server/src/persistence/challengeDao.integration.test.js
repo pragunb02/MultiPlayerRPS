@@ -63,8 +63,60 @@ describe("MongoDB challenge DAO honours the challenge DAO contract (integration)
         expect.objectContaining({ key: { fromId: 1, createdAt: -1 } }),
         expect.objectContaining({ key: { toId: 1, createdAt: -1 } }),
         expect.objectContaining({ key: { acceptedBy: 1 } }),
+        // One challenge per place for open challenges of each sender (CC-337).
+        expect.objectContaining({
+          key: { fromId: 1, openSlot: 1 },
+          unique: true,
+          partialFilterExpression: { openSlot: { $exists: true } },
+        }),
+        expect.objectContaining({
+          key: { fromId: 1, toId: 1 },
+          unique: true,
+          partialFilterExpression: { recentTo: { $exists: true } },
+        }),
         expect.objectContaining({ key: { deleteAt: 1 }, expireAfterSeconds: 0 }),
       ]),
     );
+  });
+
+  it("starts after a rollback left two holders of one place or mark: the oldest keeps it (CC-337)", async () => {
+    // A server without the unique indexes (a rollback) can store two of each. The next start must still build them.
+    const database = await connectDatabase({
+      uri: mongo.uri(`challenges-${++counter}`),
+      logger: captureLogger().logger,
+    });
+    databases.push(database);
+    const RIYA = "user_0123456789abcdef01234567";
+    const ARJUN = "user_ffffffffffffffffffffffff";
+    const placeA = challengeRecord({ fromId: RIYA, openSlot: 0, seconds: 0 });
+    const placeB = challengeRecord({ fromId: RIYA, openSlot: 0, seconds: 5 });
+    const markA = {
+      ...challengeRecord({ fromId: RIYA, toId: ARJUN, openSlot: 1, seconds: 1 }),
+      recentTo: true,
+    };
+    const markB = {
+      ...challengeRecord({ fromId: RIYA, toId: ARJUN, openSlot: 2, seconds: 6 }),
+      recentTo: true,
+    };
+    const other = challengeRecord({ fromId: ARJUN, openSlot: 0, seconds: 7 });
+    await database.connection.db.collection("challenges").insertMany([placeB, markB, placeA, markA, other]);
+    const dao = createChallengeDao({ connection: database.connection });
+
+    await dao.ensureIndexes();
+
+    const held = async ({ challengeId }) => {
+      const { openSlot, recentTo } = await dao.get(challengeId);
+      return { openSlot, recentTo };
+    };
+    expect(await Promise.all([placeA, placeB, markA, markB, other].map(held))).toEqual([
+      { openSlot: 0, recentTo: undefined },
+      { openSlot: undefined, recentTo: undefined },
+      { openSlot: 1, recentTo: true },
+      { openSlot: 2, recentTo: undefined },
+      { openSlot: 0, recentTo: undefined },
+    ]);
+    await expect(dao.insert(challengeRecord({ fromId: RIYA, openSlot: 0 }))).rejects.toMatchObject({
+      field: "openSlot",
+    });
   });
 });
