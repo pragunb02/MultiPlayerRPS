@@ -130,7 +130,7 @@ describe("createSwarm against the real server", () => {
   // for the recorder to see the names, not on a timer. It used to grow 24 players with random plans, one of them
   // against the Strong chess computer, whose searches (up to 0.5 s each with coverage) ran on the test server's
   // own event loop and held up every other player: about 3.5 s here, over the 30 s limit on a busy runner (CC-309).
-  it("records each kind of call by name", async () => {
+  it("records each kind of call by name", async ({ signal }) => {
     const server = await realServer();
     const expected = [
       "computer reply chess",
@@ -169,10 +169,19 @@ describe("createSwarm against the real server", () => {
       },
     };
     const only = (gameId) => ({ [gameId]: 1 });
+    // Every name comes within a few moves. The friends who rematch play chess and resign at their first move,
+    // since drawn Rock Paper Scissors rounds are replayed and a match had no end in sight. Tic-tac-toe ends
+    // within nine moves, and each computer replies to the first move, which never ends a game (CC-340).
     const plans = [
-      { ...QUICK, computerShare: 0, gameShare: only(GAME_IDS.RPS), rematchShare: 1 },
+      {
+        ...QUICK,
+        computerShare: 0,
+        gameShare: only(GAME_IDS.CHESS),
+        rematchShare: 1,
+        chessOwnMoves: { min: 0, max: 0 },
+      },
       { ...QUICK, computerShare: 0, gameShare: only(GAME_IDS.TIC_TAC_TOE), rematchShare: 0 },
-      { ...QUICK, computerShare: 0, gameShare: only(GAME_IDS.CHESS), rematchShare: 0 },
+      { ...QUICK, computerShare: 0, gameShare: only(GAME_IDS.RPS), rematchShare: 0 },
       { ...QUICK, computerShare: 1, gameShare: only(GAME_IDS.RPS), rematchShare: 0 },
       { ...QUICK, computerShare: 1, gameShare: only(GAME_IDS.TIC_TAC_TOE), rematchShare: 0 },
       { ...QUICK, computerShare: 1, gameShare: only(GAME_IDS.CHESS), rematchShare: 0 },
@@ -181,11 +190,22 @@ describe("createSwarm against the real server", () => {
 
     // One pair of friends or one player each.
     await Promise.all(swarms.map((swarm, index) => swarm.grow(plans[index].computerShare === 1 ? 1 : 2, 0)));
-    while (failures.size === 0 && !expected.every((name) => names.has(name))) {
+    // When the test times out, it says what it was doing, which names never came and what failed, so a slow run
+    // can be read (CC-340).
+    let doing = "waiting for the names";
+    signal.addEventListener("abort", () => {
+      const missing = JSON.stringify(expected.filter((name) => !names.has(name)));
+      process.stderr.write(
+        `timed out ${doing}: missing ${missing}, failures ${JSON.stringify([...failures])}\n`,
+      );
+      wake();
+    });
+    while (!signal.aborted && failures.size === 0 && !expected.every((name) => names.has(name))) {
       await new Promise((resolve) => {
         wake = resolve;
       });
     }
+    doing = "stopping the swarms";
     await Promise.all(swarms.map((swarm) => swarm.stop()));
 
     expect([...failures]).toEqual([]);
@@ -344,6 +364,40 @@ describe("createSwarm when it stops", () => {
     expect(recorder.take().failures).toEqual({});
   });
 
+  // The run that records each name stopped once the last one came. When that was a call followed at once by
+  // another, such as opening a room before the friend joins, the next call went out on the closed socket and
+  // waited the whole `waitMs` for an answer, so `stop` hung and the test timed out (CC-340).
+  it("resolves at once when it stops between two calls, and sends nothing after", async () => {
+    const joins = [];
+    const base = await fakeServer({
+      handlers: {
+        [SOCKET_EVENTS.ROOM_CREATE]: ({ ack }) => ack({ ok: true, data: waitingRoom }),
+        [SOCKET_EVENTS.ROOM_JOIN]: ({ ack }) => {
+          joins.push(SOCKET_EVENTS.ROOM_JOIN);
+          ack({ ok: true, data: waitingRoom });
+        },
+      },
+    });
+    const inner = createRecorder();
+    let stopped;
+    const recorder = {
+      ...inner,
+      time(name, ms) {
+        inner.time(name, ms);
+        if (name.startsWith(SOCKET_EVENTS.ROOM_CREATE)) stopped = swarm.stop();
+      },
+    };
+    const { swarm } = swarmOn(base, { model: { ...QUICK, computerShare: 0 }, recorder, waitMs: 30_000 });
+
+    await swarm.grow(2, 0);
+    await until(() => stopped !== undefined);
+    await stopped;
+
+    expect(joins).toEqual([]);
+    expect(swarm.players()).toBe(0);
+    expect(inner.take().failures).toEqual({});
+  });
+
   it("stops players who have not arrived yet, so nobody connects after the end", async () => {
     const server = await realServer();
     const { recorder, swarm } = swarmOn(server.baseUrl);
@@ -403,5 +457,44 @@ describe("createSwarm when a game ends while the player thinks", () => {
     });
 
     expect(counts).toEqual({ "games tictactoe computer": 1 });
+  });
+});
+
+describe("createSwarm when the computer replies at once", () => {
+  // The test server's computers do not pause, so a reply often came in the same read as the answer to the move,
+  // and the player saw the reply first. The reply then went untimed, about half the time in chess, and the run
+  // that waits for "computer reply chess" waited for a lucky move (CC-340).
+  it("times the reply when it overtakes the answer to the move", async () => {
+    const room = (revision, activePlayers) => ({
+      code: "CCCCCC",
+      status: ROOM_STATUS.PLAYING,
+      revision,
+      you: "p1",
+      game: { number: 1, activePlayers, view: { board: Array(9).fill("") } },
+    });
+    let revision = 1;
+    const base = await fakeServer({
+      handlers: {
+        [SOCKET_EVENTS.ROOM_PLAY_COMPUTER]: ({ ack }) => ack({ ok: true, data: room(revision, ["p1"]) }),
+        [SOCKET_EVENTS.GAME_MOVE]: ({ socket, ack }) => {
+          revision += 2;
+          socket.emit(SOCKET_EVENTS.ROOM_UPDATED, room(revision, ["p1"]));
+          ack({ ok: true, data: room(revision - 1, ["bot"]) });
+        },
+      },
+    });
+    const model = { ...QUICK, computerShare: 1, gameShare: { [GAME_IDS.TIC_TAC_TOE]: 1 } };
+    const { recorder, swarm } = swarmOn(base, { model });
+    const calls = {};
+
+    await swarm.grow(1, 0);
+    await until(() => {
+      const step = recorder.take();
+      Object.entries(step.times).forEach(([name, { count }]) => (calls[name] = (calls[name] ?? 0) + count));
+      return (calls["game:move tictactoe"] ?? 0) >= 2;
+    });
+    await swarm.stop();
+
+    expect(calls["computer reply tictactoe"]).toBeGreaterThanOrEqual(1);
   });
 });
