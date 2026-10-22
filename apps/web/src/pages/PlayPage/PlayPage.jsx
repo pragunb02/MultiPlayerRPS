@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
-import { characterForGame, ROOM_CODE_LENGTH } from "@classicade/shared";
+import { characterForGame, QUICK_MATCH_OUTCOMES, ROOM_CODE_LENGTH } from "@classicade/shared";
 import { gameForSlug, paths } from "../../app/paths.js";
 import { GameArt } from "../../art/games/GameArt.jsx";
 import { gameArtFor } from "../../art/games/gameArt.js";
@@ -8,15 +8,18 @@ import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { PlayComputer } from "../../components/PlayComputer/PlayComputer.jsx";
 import { gameView } from "../../games/registry.js";
+import { useToast } from "../../components/Toast/toastContext.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useCreateRoom } from "../../hooks/useCreateRoom.js";
+import { useFlag } from "../../hooks/useFlag.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import { HowToPlay } from "./HowToPlay.jsx";
 import styles from "./PlayPage.module.css";
 
 /**
  * One game's lobby. The main action plays the game's computer character at once, at the level picked with one tap
- * (CC-221). Below it: create a room with the game's options to invite a friend, or a challenge link with the same
+ * (CC-221). With quick match on (CC-051, the `quick_match` flag) it looks for a person first, for a few seconds,
+ * and plays the character when nobody is free; leaving or hiding the page cancels the search. Below it: create a room with the game's options to invite a friend, or a challenge link with the same
  * options that lasts a day (CC-139), join a friend's room by code, or
  * play with someone beside you on this phone, which is not counted (CC-223).
  * Each button shows a spinner while the server works and explains a failure under it. Join room says what is
@@ -44,13 +47,59 @@ export function PlayPage() {
     },
     { id: "lobby.challenge" },
   );
+  const quickMatchOn = useFlag("quick_match");
+  const toast = useToast();
+  const searching = useRef(false);
+  const cancelledBeforeSent = useRef(false);
+  const [searchStarted, setSearchStarted] = useState(false);
+  const { cancelQuickMatch } = createRoom;
   const playComputer = useAction(
     async (level) => {
-      const roomCode = await createRoom.playComputer({ gameId: game.id, level, options: {} });
-      navigate(paths.room(game.id, roomCode));
+      if (!quickMatchOn) {
+        const roomCode = await createRoom.playComputer({ gameId: game.id, level, options: {} });
+        navigate(paths.room(game.id, roomCode));
+        return;
+      }
+      searching.current = true;
+      cancelledBeforeSent.current = false;
+      // A visitor becomes a guest on this press, and the flag is asked again for the guest. The search started
+      // under the flag keeps showing as one meanwhile.
+      setSearchStarted(true);
+      try {
+        const { outcome, code: roomCode } = await createRoom.quickMatch({
+          gameId: game.id,
+          level,
+          // A page hidden or left while the guest was being made sent its cancel before any search existed.
+          shouldStart: () => !cancelledBeforeSent.current,
+        });
+        if (outcome === QUICK_MATCH_OUTCOMES.CANCELLED) return;
+        if (outcome === QUICK_MATCH_OUTCOMES.CHARACTER) {
+          toast.show(`Nobody was free just now, so you're playing ${characterForGame(game.id).name}.`, {
+            tone: "info",
+          });
+        }
+        navigate(paths.room(game.id, roomCode));
+      } finally {
+        searching.current = false;
+        setSearchStarted(false);
+      }
     },
     { id: "lobby.play_computer" },
   );
+  // A search ends when the page is left or hidden (CC-051): a player who is not looking must not be paired.
+  useEffect(() => {
+    const cancelIfSearching = () => {
+      if (!searching.current) return;
+      cancelledBeforeSent.current = true;
+      cancelQuickMatch();
+    };
+    const onVisibility = () => document.visibilityState === "hidden" && cancelIfSearching();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      cancelIfSearching();
+    };
+  }, [cancelQuickMatch]);
 
   if (game === undefined) {
     return <NotFoundPage />;
@@ -74,7 +123,11 @@ export function PlayPage() {
         <GameArt gameId={game.id} className={styles.art} />
       </div>
       <div className={styles.panels}>
-        <PlayComputer character={character} action={playComputer} />
+        <PlayComputer
+          character={character}
+          action={playComputer}
+          quickMatch={quickMatchOn || searchStarted ? { onCancel: cancelQuickMatch } : undefined}
+        />
         <div className={styles.panel}>
           <h2>Play a friend</h2>
           {Options && <Options value={options} onChange={setOptions} />}

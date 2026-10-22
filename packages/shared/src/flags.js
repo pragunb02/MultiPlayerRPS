@@ -67,6 +67,18 @@ export const FLAGS = Object.freeze([
     client: true,
     success: "The owner opened a dialog on the Design page.",
   }),
+  Object.freeze({
+    name: "quick_match",
+    description:
+      "The main Play button looks for a person for up to 4 seconds while the computer character's game is made ready, and plays the character when nobody is free (CC-051).",
+    ticket: "CC-051",
+    default: false,
+    removeBy: "2027-01-15",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: true,
+    success: "A quick match search found a person.",
+  }),
 ]);
 
 const NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;

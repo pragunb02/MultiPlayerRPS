@@ -82,6 +82,20 @@ export const SOCKET_EVENTS = Object.freeze({
    */
   ROOM_PLAY_COMPUTER: "room:play-computer",
   /**
+   * Client sends `QuickMatchPayload` `{ gameId, level }` (CC-051, behind the `quick_match` flag). The server looks
+   * for a person searching the same game for at most QUICK_MATCH_RULES.searchMs while it makes the computer
+   * character's room ready. Answer, exactly once per search: `{ outcome, room }`, where `outcome` is a
+   * QUICK_MATCH_OUTCOMES value and `room` the `RoomView` of the game that started (`person` or `character`), or
+   * `{ outcome: "cancelled" }` when the search was cancelled, replaced by a newer one or the tab left.
+   */
+  MATCH_QUICK: "match:quick",
+  /**
+   * Client sends no payload. Ends the player's quick match search, if it is still looking (leaving the page or
+   * hiding it). Answer: `{ cancelled }`, false when the search had already found its game, which its own answer
+   * then gives.
+   */
+  MATCH_CANCEL: "match:cancel",
+  /**
    * Client sends `RoomCodePayload`. Answer: `RoomView`. Also used to rejoin after a reconnect. For a day after a
    * room closed, joining it answers GONE with details `{ reason, gameId, closedAt }`, where `reason` is a
    * ROOM_CLOSE_REASONS value (CC-101).

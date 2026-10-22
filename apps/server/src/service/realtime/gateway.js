@@ -14,6 +14,7 @@ import { addressKey, clientAddress } from "../http/rateLimits.js";
 import { requireIdentity } from "../http/session.js";
 import { registerHandlers } from "./acknowledgements.js";
 import { createBotHandlers } from "./botHandlers.js";
+import { createMatchHandlers } from "./matchHandlers.js";
 import { createRatingHandlers, pushRoomRatings } from "./ratingHandlers.js";
 import { trackConnections } from "./connections.js";
 import { connectFriendPushes } from "./friendPushes.js";
@@ -59,6 +60,8 @@ const playerRoom = playerChannel;
  *   botComponent?: ReturnType<typeof import("../../domain/bots/botComponent.js").createBotComponent>,
  *   chessRatingComponent?: Pick<ReturnType<typeof import("../../domain/ratings/chessRatingComponent.js").createChessRatingComponent>, "ratingsOf">,
  *   recordSocketEvent?: import("../../utils/operationsMetrics.js").OperationsMetrics["recordSocketEvent"],
+ *   matchmaking?: Parameters<typeof createMatchHandlers>[0]["matchmaking"],
+ *   flags?: Parameters<typeof createMatchHandlers>[0]["flags"],
  *   challengeComponent: Pick<ReturnType<typeof import("../../domain/challenges/challengeComponent.js").createChallengeComponent>, "viewFor">,
  *   friends: {
  *     presence: Pick<ReturnType<typeof import("../../domain/friends/presenceTracker.js").createPresenceTracker>, "connected" | "disconnected">,
@@ -68,7 +71,8 @@ const playerRoom = playerChannel;
  *   `chessRatingComponent` no tab can ask for a room's ratings (CC-042). Without `recordSocketEvent` socket
  *   events are not timed for operations telemetry (ADR-055). `friends` is the presence tracker, told about every
  *   tab, and the friend component, whose changes are pushed (CC-052). `challengeComponent` gives each player their own view of a challenge
- *   that changed (CC-139)
+ *   that changed (CC-139). Without `matchmaking` and `flags` (and `botComponent`) nobody can start a quick match
+ *   (CC-051)
  */
 export function createRealtimeGateway({
   httpServer,
@@ -87,6 +91,8 @@ export function createRealtimeGateway({
   recordSocketEvent = NO_OPERATIONS_METRICS.recordSocketEvent,
   challengeComponent,
   friends,
+  matchmaking,
+  flags,
 }) {
   assertDefined(httpServer, "httpServer");
   assertDefined(sessionMiddleware, "sessionMiddleware");
@@ -239,6 +245,20 @@ export function createRealtimeGateway({
         ...(botComponent &&
           createBotHandlers({ socket, botComponent, roomComponent, networkOf, now, logger: socketLogger })),
         ...(chessRatingComponent && createRatingHandlers({ socket, roomComponent, chessRatingComponent })),
+        ...(matchmaking &&
+          flags &&
+          botComponent &&
+          createMatchHandlers({
+            socket,
+            matchmaking,
+            botComponent,
+            roomComponent,
+            flags,
+            networkOf,
+            onlinePlayers: () => admission.counts().players,
+            now,
+            logger: socketLogger,
+          })),
       },
       socketLogger,
       { allow: () => admission.allowEvent(identity.id), recordEvent: recordSocketEvent },

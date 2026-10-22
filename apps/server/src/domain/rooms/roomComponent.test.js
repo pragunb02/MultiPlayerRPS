@@ -100,6 +100,23 @@ describe("roomComponent", () => {
       expect(Object.isFrozen(room.seats[0])).toBe(true);
     });
 
+    it("marks a room quick match made, and no other room (CC-051), and never shows the mark in a view", async () => {
+      const { rooms } = setup();
+
+      const room = await rooms.createRoom({
+        network: "net-a",
+        host: ALICE,
+        gameId: "race",
+        options: { target: 3 },
+        now: T0,
+        quickMatch: true,
+      });
+
+      expect(room.quickMatch).toBe(true);
+      expect(rooms.viewFor(room, ALICE.id)).not.toHaveProperty("quickMatch");
+      expect(await createRace(rooms)).not.toHaveProperty("quickMatch");
+    });
+
     it.each([["chess"], ["unknown"], [undefined], [42]])(
       "rejects an unavailable game (%o)",
       async (gameId) => {

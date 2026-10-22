@@ -5,6 +5,7 @@ import {
   parseGameMove,
   parseLeaveRoom,
   parsePlayComputer,
+  parseQuickMatch,
   parseRoomAnswer,
   parseRoomRef,
   parseRoomRequest,
@@ -106,6 +107,24 @@ describe("socket payload validation", () => {
       { gameId: "rps", level: "easy", options: [] },
     ])("rejects %j", (raw) => {
       expect(() => parsePlayComputer(raw)).toThrow(ValidationError);
+    });
+  });
+
+  describe("parseQuickMatch (CC-051)", () => {
+    it("accepts a game and the character's level, and nothing else", () => {
+      expect(parseQuickMatch({ gameId: "chess", level: "easy" })).toEqual({ gameId: "chess", level: "easy" });
+    });
+
+    it.each([
+      undefined,
+      { gameId: "rps" },
+      { gameId: "rps", level: "Easy" },
+      { gameId: "RPS!", level: "easy" },
+      // The pool's options are the server's (ADR-051.6), and a seat or a player is never the client's to name.
+      { gameId: "chess", level: "easy", options: { timeControl: "bullet-1+0" } },
+      { gameId: "rps", level: "easy", playerId: "guest_x" },
+    ])("rejects %j", (raw) => {
+      expect(() => parseQuickMatch(raw)).toThrow(ValidationError);
     });
   });
 

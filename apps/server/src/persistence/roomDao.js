@@ -17,6 +17,7 @@ const CLOSING = Object.freeze({ closing: { $exists: true } });
  * @property {string} status
  * @property {string} hostId
  * @property {string} [network]        an opaque name of the network the room was opened from (rooms before CC-107 have none)
+ * @property {true} [quickMatch]     made by quick match (CC-051): its players met as strangers. Older rooms leave it out
  * @property {Array<{ playerId: string, displayName: string, connected: boolean }>} seats
  * @property {Record<string, unknown>} [game]
  * @property {Record<string, unknown>} [result]

@@ -117,6 +117,25 @@ export function createBotComponent({ roomComponent, roomAccessor, events }) {
     },
 
     /**
+     * Seats the game's computer character in a room the person made and still waits in alone, which starts the
+     * game: quick match (CC-051) makes that room ready while it looks for a person, and plays the character in it
+     * when nobody is free. The person's oldest games against computers then end as for any new one.
+     *
+     * @param {{ code: string, host: import("../../models/identity.js").Identity, gameId: string, level: string, now: number }} input
+     * @returns {Promise<Readonly<import("../../data/roomAccessor.js").Room>>} the room, its game already started
+     * @throws {import("../../utils/errors.js").ValidationError} for a game without a character or an unknown level
+     * @throws {import("../../utils/errors.js").ConflictError} when someone else took the seat first
+     */
+    async seatComputer({ code, host, gameId, level, now }) {
+      const bot = botIdentity({ gameId, level });
+      return inTurn(host.id, async () => {
+        const started = await roomComponent.joinRoom({ code, player: bot, now });
+        await endOldestGames({ playerId: host.id, keep: code, now });
+        return started;
+      });
+    },
+
+    /**
      * A computer player says yes to the rematch the person asked for (CC-159), which starts the new game. The
      * person's oldest games against computers then end as for any new one, so a rematch never takes them past
      * MAX_COMPUTER_GAMES.

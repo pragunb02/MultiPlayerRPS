@@ -220,6 +220,47 @@ describe("botComponent.playComputer", () => {
   });
 });
 
+describe("botComponent.seatComputer (CC-051)", () => {
+  it("seats the character in the person's waiting room, which starts the game", async () => {
+    const { rooms, botComponent } = botRooms();
+    const waiting = await rooms.createRoom({
+      host: PERSON,
+      network: NETWORK,
+      gameId: "rps",
+      options: {},
+      now: 1,
+    });
+
+    const room = await botComponent.seatComputer({
+      code: waiting.code,
+      host: PERSON,
+      gameId: "rps",
+      level: "hard",
+      now: 2,
+    });
+
+    expect(room.code).toBe(waiting.code);
+    expect(room.status).toBe("playing");
+    expect(room.seats.map((seat) => seat.playerId)).toEqual([PERSON.id, "bot_rocky_hard"]);
+  });
+
+  it("refuses when someone took the seat first", async () => {
+    const { rooms, botComponent } = botRooms();
+    const waiting = await rooms.createRoom({
+      host: PERSON,
+      network: NETWORK,
+      gameId: "rps",
+      options: {},
+      now: 1,
+    });
+    await rooms.joinRoom({ code: waiting.code, player: FRIEND, now: 2 });
+
+    await expect(
+      botComponent.seatComputer({ code: waiting.code, host: PERSON, gameId: "rps", level: "easy", now: 3 }),
+    ).rejects.toThrow(ConflictError);
+  });
+});
+
 describe("assertCharactersPlayable", () => {
   const bots = createBotRegistry(BOTS);
 

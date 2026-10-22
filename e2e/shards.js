@@ -6,10 +6,11 @@
 // exactly these parts, so a new file fails CI until it is given a part.
 
 /**
- * The tests that restart the server (CC-101), or run it with short room times for a while (CC-207). They run on
- * their own, one at a time, so they cut off nothing else.
+ * The tests that restart the server (CC-101), or run it with short room times for a while (CC-207), and the quick
+ * match tests (CC-051), which turn on a flag every Play press reads, so two other tests' players could meet. They
+ * run on their own, one at a time, so they cut off nothing else.
  */
-export const RESTARTS = /restart[a-z-]*\.spec\.js$/;
+export const RESTARTS = /(restart[a-z-]*|quick-match)\.spec\.js$/;
 
 /**
  * The parts, with each file's test time on CI in seconds, desktop and mobile together, three workers per machine,

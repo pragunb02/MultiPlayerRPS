@@ -37,6 +37,7 @@ import { DuplicateKey, VersionConflict } from "../persistence/errors.js";
  * @property {"waiting" | "playing" | "finished"} status
  * @property {string} hostId
  * @property {string} [network]        an opaque name of the network the room was opened from, for the cap per network
+ * @property {true} [quickMatch]     made by quick match (CC-051): its players met as strangers. Older rooms leave it out
  * @property {ReadonlyArray<Readonly<Seat>>} seats
  * @property {{ matchId: string, number?: number, seed: number, starter?: string, startedAt: number, state: unknown, log: ReadonlyArray<LogEntry>, asked?: Record<string, Record<string, number>>, resumedAt?: number, turnCredit?: { entries: number, ms: number } }} [game]
  *   present once the game has started. Its `seed`, `starter` and `log` reproduce the game exactly (see replayGame).
