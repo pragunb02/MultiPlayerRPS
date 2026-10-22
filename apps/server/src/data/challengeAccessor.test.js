@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { CHALLENGE_STATES } from "@classicade/shared";
 import { createInMemoryChallengeDao } from "../testing/inMemoryChallengeDao.js";
-import { NotFoundError } from "../utils/errors.js";
+import { DuplicateKey } from "../persistence/errors.js";
+import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { createChallengeAccessor } from "./challengeAccessor.js";
 
 const RIYA = "user_0123456789abcdef01234567";
 const GUEST = "guest_00000000-0000-4000-8000-000000000001";
 const T0 = Date.UTC(2026, 9, 20, 12);
+const SLOTS = Object.freeze({ openSlots: 3, recentMs: 600_000 });
 
 const accessor = () => createChallengeAccessor({ challengeDao: createInMemoryChallengeDao() });
 const fresh = (fields = {}) => ({
@@ -32,7 +34,7 @@ describe("challenge accessor", () => {
   it("stores an open challenge and gives it back frozen, with times in milliseconds", async () => {
     const challenges = accessor();
 
-    const stored = await challenges.add(fresh());
+    const stored = await challenges.add(fresh(), SLOTS);
 
     expect(stored).toEqual({
       challengeId: "0123456789abcdefghjk",
@@ -76,7 +78,7 @@ describe("challenge accessor", () => {
 
   it("takes, answers, lists, moves and removes challenges through storage", async () => {
     const challenges = accessor();
-    const { challengeId } = await challenges.add(fresh());
+    const { challengeId } = await challenges.add(fresh(), SLOTS);
 
     expect(
       await challenges.claim({
@@ -107,7 +109,61 @@ describe("challenge accessor", () => {
     expect(await challenges.listTo(RIYA)).toEqual([]);
     expect(await challenges.movePlayer({ from: GUEST, to: "user_ffffffffffffffffffffffff" })).toBe(1);
     expect(await challenges.removeInvolving(RIYA)).toBe(1);
-    const other = await challenges.add(fresh({ challengeId: "0123456789abcdefghjm" }));
+    const other = await challenges.add(fresh({ challengeId: "0123456789abcdefghjm" }), SLOTS);
     expect(await challenges.remove(other.challengeId)).toBe(true);
+  });
+
+  it("stores each open challenge of a sender in a place of its own, and refuses one when every place is held (CC-337)", async () => {
+    const challenges = accessor();
+    const ids = ["0123456789abcdefghj0", "0123456789abcdefghj1", "0123456789abcdefghj2"];
+
+    const made = await Promise.allSettled(
+      ids.map((challengeId) => challenges.add(fresh({ challengeId }), { openSlots: 2, recentMs: 600_000 })),
+    );
+
+    expect(made.map((result) => result.status)).toEqual(["fulfilled", "fulfilled", "rejected"]);
+    expect(made[2].reason).toBeInstanceOf(ConflictError);
+    expect(made[2].reason.details).toEqual({ field: "openSlot", openSlots: 2 });
+    expect(made[0].value).not.toHaveProperty("openSlot");
+    // Withdrawn, the first lets go of its place for the next one.
+    await challenges.end({
+      challengeId: ids[0],
+      state: CHALLENGE_STATES.WITHDRAWN,
+      at: T0 + 1,
+      staleBefore: T0,
+    });
+    expect(
+      (
+        await challenges.add(fresh({ challengeId: ids[2], createdAt: T0 + 2 }), {
+          openSlots: 2,
+          recentMs: 600_000,
+        })
+      ).challengeId,
+    ).toBe(ids[2]);
+  });
+
+  it("passes on a duplicate id, which is not a full place", async () => {
+    const challenges = accessor();
+    await challenges.add(fresh(), SLOTS);
+
+    await expect(challenges.add(fresh(), SLOTS)).rejects.toMatchObject({
+      constructor: DuplicateKey,
+      field: "challengeId",
+    });
+  });
+
+  it("keeps one recent challenge to each person, and lets go of its mark once it is old (CC-337)", async () => {
+    const challenges = accessor();
+    const toArjun = (challengeId, createdAt) =>
+      fresh({ challengeId, toId: "user_ffffffffffffffffffffffff", toName: "Arjun", createdAt });
+    await challenges.add(toArjun("0123456789abcdefghj0", T0), SLOTS);
+
+    const refused = await challenges.add(toArjun("0123456789abcdefghj1", T0 + 1), SLOTS).catch((err) => err);
+
+    expect(refused).toBeInstanceOf(ConflictError);
+    expect(refused.details).toEqual({ field: "recentTo" });
+    expect(refused.cause).toMatchObject({ constructor: DuplicateKey, field: "recentTo" });
+    const later = await challenges.add(toArjun("0123456789abcdefghj1", T0 + 600_000), SLOTS);
+    expect(later).not.toHaveProperty("recentTo");
   });
 });
