@@ -13,6 +13,7 @@ import { createFriendAccessor } from "./data/friendAccessor.js";
 import { createPrivacyAccessor } from "./data/privacyAccessor.js";
 import { createFeatureFlagAccessor } from "./data/featureFlagAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
+import { createTelemetryAccessor } from "./data/telemetryAccessor.js";
 import { createReportAccessor } from "./data/reportAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
@@ -49,6 +50,7 @@ import { createSafetyComponent } from "./domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
 import { createReportComponent, REPORT_EVENTS } from "./domain/reports/reportComponent.js";
 import { createFlagComponent } from "./domain/flags/flagComponent.js";
+import { createTelemetryComponent } from "./domain/telemetry/telemetryComponent.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "./domain/dailyPuzzles/schedule.js";
@@ -87,6 +89,7 @@ import { createFriendshipDao } from "./persistence/friendshipDao.js";
 import { createPrivacyDao } from "./persistence/privacyDao.js";
 import { createFeatureFlagDao } from "./persistence/featureFlagDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
+import { createTelemetryCountDao } from "./persistence/telemetryCountDao.js";
 import { createReportDao } from "./persistence/reportDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
@@ -756,6 +759,7 @@ export async function startServer({
   const friendLinkDao = createFriendLinkDao({ connection: database.connection });
   const privacyDao = createPrivacyDao({ connection: database.connection });
   const featureFlagDao = createFeatureFlagDao({ connection: database.connection });
+  const telemetryCountDao = createTelemetryCountDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -782,6 +786,7 @@ export async function startServer({
       friendLinkDao,
       privacyDao,
       featureFlagDao,
+      telemetryCountDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -813,6 +818,7 @@ export async function startServer({
   const friendAccessor = createFriendAccessor({ friendshipDao, friendRequestDao, friendLinkDao });
   const privacyAccessor = createPrivacyAccessor({ privacyDao });
   const featureFlagAccessor = createFeatureFlagAccessor({ featureFlagDao });
+  const telemetryAccessor = createTelemetryAccessor({ telemetryCountDao });
   const breachedPasswordAccessor = createBreachedPasswordAccessor({
     pwnedPasswords: createPwnedPasswordsClient({ fetch: pwnedPasswordsFetch }),
     commonPasswords: loadCommonPasswords(),
@@ -856,6 +862,13 @@ export async function startServer({
     now,
   });
   await flagComponent.refresh();
+  // Anonymous usage counts (CC-175, ADR-034): only what the catalogue allows, at most 100 000 a day, kept 30 days.
+  const telemetryComponent = createTelemetryComponent({
+    telemetryAccessor,
+    now,
+    onDropped: metrics.recordTelemetryDropped,
+    serverBuild: config.build.version,
+  });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
     matchAccessor,
@@ -1160,6 +1173,7 @@ export async function startServer({
     dailyPuzzleComponent,
     safetyComponent,
     flagComponent,
+    telemetryComponent,
     leaderboardComponent,
     analyticsComponent,
     sessionMiddleware,
