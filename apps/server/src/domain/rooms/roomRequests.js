@@ -1,4 +1,4 @@
-import { REQUEST_STATES, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
+import { REQUEST_STATES, ROOM_REQUEST_REFUSALS, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
 import { ConflictError, ForbiddenError, ValidationError } from "../../utils/errors.js";
 
 /**
@@ -157,28 +157,40 @@ export function addRequest(room, { playerId, type, now, rule, lifetimes }) {
     throw new ValidationError("You cannot ask that in this game", { details: { field: "type" } });
   }
   if (rule.status !== room.status) {
+    const afterGame = rule.status === ROOM_STATUS.FINISHED;
     throw new ConflictError(
-      rule.status === ROOM_STATUS.FINISHED
+      afterGame
         ? "A rematch is only possible after the game is over"
         : "That is only possible while the game is on",
+      {
+        details: {
+          reason: afterGame ? ROOM_REQUEST_REFUSALS.AFTER_GAME_ONLY : ROOM_REQUEST_REFUSALS.DURING_GAME_ONLY,
+        },
+      },
     );
   }
   const others = room.seats.filter((seat) => seat.playerId !== playerId);
   if (others.length !== 1) {
-    throw new ConflictError("A request needs one other player in the room");
+    throw new ConflictError("A request needs one other player in the room", {
+      details: { reason: ROOM_REQUEST_REFUSALS.NO_OPPONENT },
+    });
   }
   if (openRequest(room, type) !== undefined) {
-    throw new ConflictError("You already asked. Wait for the answer");
+    throw new ConflictError("You already asked. Wait for the answer", {
+      details: { reason: ROOM_REQUEST_REFUSALS.ALREADY_ASKED },
+    });
   }
   const last = requestsOf(room).findLast((request) => request.type === type && request.from === playerId);
   if (last !== undefined && coolsDown(last) && now < last.endedAt + lifetimes.reaskCooldownMs) {
     throw new ConflictError("Wait a few seconds before asking again", {
-      details: { retryAt: last.endedAt + lifetimes.reaskCooldownMs },
+      details: { reason: ROOM_REQUEST_REFUSALS.TOO_SOON, retryAt: last.endedAt + lifetimes.reaskCooldownMs },
     });
   }
   const asked = askedInGame(room, type, playerId);
   if (asked >= rule.limitPerPlayer) {
-    throw new ConflictError(`You can ask that ${rule.limitPerPlayer} times a game`);
+    throw new ConflictError(`You can ask that ${rule.limitPerPlayer} times a game`, {
+      details: { reason: ROOM_REQUEST_REFUSALS.ASK_LIMIT, limit: rule.limitPerPlayer },
+    });
   }
   const request = {
     type,
@@ -225,6 +237,11 @@ export function requireAnswerer({ request, playerId, byAsker }) {
   if (allowed !== playerId) {
     throw new ForbiddenError(
       byAsker ? "Only the player who asked can withdraw it" : "That was not asked of you",
+      {
+        details: {
+          reason: byAsker ? ROOM_REQUEST_REFUSALS.NOT_ASKER : ROOM_REQUEST_REFUSALS.NOT_ASKED_OF_YOU,
+        },
+      },
     );
   }
 }

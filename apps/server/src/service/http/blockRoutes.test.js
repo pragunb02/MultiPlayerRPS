@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
+import { ERROR_CODES, ROOM_JOIN_REFUSALS, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, send, startRoom } from "../../testing/socketClients.js";
 import { startTestServer } from "../../testing/testApp.js";
 
@@ -221,7 +221,11 @@ describe("POST /api/blocks (CC-044)", () => {
       expect(matches).toHaveLength(1);
       expect(tooLate).toEqual({
         ok: false,
-        error: { code: ERROR_CODES.CONFLICT, message: "This room is full" },
+        error: {
+          code: ERROR_CODES.CONFLICT,
+          message: "This room is full",
+          details: { reason: ROOM_JOIN_REFUSALS.FULL },
+        },
       });
       expect(refused).toEqual(tooLate);
     });
@@ -352,7 +356,11 @@ describe("blocks follow a guest who signs in, and go with a deleted account (ADR
     expect((await list({ cookie: aliceAccount.cookie })).map((each) => each.displayName).sort()).toEqual(
       [bob.identity.displayName, carol.identity.displayName].sort(),
     );
-    expect(refused.error).toEqual({ code: ERROR_CODES.CONFLICT, message: "This room is full" });
+    expect(refused.error).toEqual({
+      code: ERROR_CODES.CONFLICT,
+      message: "This room is full",
+      details: { reason: ROOM_JOIN_REFUSALS.FULL },
+    });
   });
 
   it("exports the blocks an account made and erases every block on either side when it is deleted", async () => {

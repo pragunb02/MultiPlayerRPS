@@ -125,14 +125,20 @@ describe("SiteRequests (CC-207)", () => {
     const user = userEvent.setup();
     const { push, url } = await openHome({
       answer: async () => {
-        throw new AppRequestError({ code: "CONFLICT", message: "That request is no longer open" });
+        throw new AppRequestError({
+          code: "CONFLICT",
+          message: "That request is no longer open",
+          details: { reason: "request-closed" },
+        });
       },
     });
     push(pushed([request()]));
 
     await user.click(within(question()).getByRole("button", { name: "Accept and go" }));
 
-    expect(await screen.findByText("That request is no longer open")).toBeInTheDocument();
+    expect(
+      await screen.findByText("That request has ended, so it can't be answered now."),
+    ).toBeInTheDocument();
     expect(url()).toBe("/");
   });
 

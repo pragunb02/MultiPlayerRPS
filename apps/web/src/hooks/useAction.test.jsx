@@ -156,7 +156,12 @@ describe("useAction (CC-164)", () => {
   });
 
   it("keeps a failure with its reason, and offers Retry only when trying again can help", async () => {
-    const refused = new AppRequestError({ code: "VALIDATION_FAILED", message: "Cell taken", status: 400 });
+    const refused = new AppRequestError({
+      code: "VALIDATION_FAILED",
+      message: "Cell taken",
+      details: { reason: "ILLEGAL_MOVE" },
+      status: 400,
+    });
     const timedOut = new AppRequestError({ code: "TIMEOUT", message: "The server took too long to answer" });
     const fn = vi.fn().mockRejectedValueOnce(refused).mockRejectedValueOnce(timedOut);
     const { result } = renderHook(() => useAction(fn, { id: "x" }));
@@ -166,7 +171,11 @@ describe("useAction (CC-164)", () => {
       outcome = await result.current.run();
     });
     expect(outcome).toEqual({ ok: false, error: refused });
-    expect(result.current.error).toEqual({ message: "Cell taken", retryable: false, cause: refused });
+    expect(result.current.error).toEqual({
+      message: "That move isn't allowed. Choose another one.",
+      retryable: false,
+      cause: refused,
+    });
     act(() => vi.advanceTimersByTime(ACTION_TIMING.DONE_FOR_MS * 2));
     expect(result.current.phase).toBe(ACTION_PHASES.FAILED);
 

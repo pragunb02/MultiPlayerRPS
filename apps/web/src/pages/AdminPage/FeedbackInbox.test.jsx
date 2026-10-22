@@ -156,7 +156,9 @@ describe("the feedback inbox (CC-290)", () => {
 
     await user.click(within(entry).getByRole("button", { name: "Details" }));
 
-    expect(await within(entry).findByRole("alert")).toHaveTextContent("No such feedback");
+    expect(await within(entry).findByRole("alert")).toHaveTextContent(
+      "We couldn't find that. It may have been removed. Go back and try again.",
+    );
   });
 
   it("deletes an item after a confirmation, and Cancel keeps it", async () => {
@@ -285,7 +287,9 @@ describe("the feedback inbox (CC-290)", () => {
     });
     const { user } = await openInbox({ api });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Something broke");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That didn't work on our side. Try again in a moment.",
+    );
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByText("Back again")).toBeInTheDocument();

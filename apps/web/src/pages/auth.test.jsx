@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ACCOUNT_MESSAGES } from "@classicade/shared";
+import { ACCOUNT_MESSAGES, PASSWORD_REFUSALS } from "@classicade/shared";
 import { AppRequestError } from "../lib/errors.js";
 import { fakeApi, GUEST, PROGRESS } from "../testing/fakes.js";
 import { renderApp } from "../testing/render.jsx";
@@ -26,7 +26,15 @@ describe("LoginPage", () => {
     expect(within(screen.getByRole("banner")).getByText("Riya")).toBeInTheDocument();
   });
 
-  it("shows the server's generic message for bad credentials", async () => {
+  it("says why to log in (CL-93)", () => {
+    renderApp({ path: "/login" });
+
+    expect(
+      screen.getByText("Log in to keep your XP, streaks and friends on any device."),
+    ).toBeInTheDocument();
+  });
+
+  it("says plainly that the email and password don't match, and offers to play as a guest (CL-91)", async () => {
     const user = userEvent.setup();
     const api = fakeApi({
       login: async () => {
@@ -37,13 +45,40 @@ describe("LoginPage", () => {
         });
       },
     });
+    renderApp({ path: "/login?next=%2Fgames%2Fchess", api });
+
+    await user.type(screen.getByLabelText("Email"), "riya@example.com");
+    await user.type(screen.getByLabelText("Password"), "wrong-password");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That email and password don't match. Check them and try again.",
+    );
+    expect(screen.queryByText(/Invalid email or password/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveValue("riya@example.com");
+    expect(screen.getByRole("link", { name: "Play as a guest instead" })).toHaveAttribute(
+      "href",
+      "/games/chess",
+    );
+  });
+
+  it("gives any other failure its plain words and no guest link", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      login: async () => {
+        throw new AppRequestError({ code: "RATE_LIMITED", message: "Too many requests", status: 429 });
+      },
+    });
     renderApp({ path: "/login", api });
 
     await user.type(screen.getByLabelText("Email"), "riya@example.com");
     await user.type(screen.getByLabelText("Password"), "wrong-password");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Too many tries in a row. Wait a minute, then try again.",
+    );
+    expect(screen.queryByRole("link", { name: "Play as a guest instead" })).not.toBeInTheDocument();
   });
 });
 
@@ -79,8 +114,32 @@ describe("SignupPage", () => {
     await user.type(screen.getByLabelText("Password"), "correct horse battery");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(await screen.findByText("That username is taken")).toBeInTheDocument();
+    expect(await screen.findByText("That username is taken. Try another one.")).toBeInTheDocument();
     expect(screen.getByLabelText("Username")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("says why the server refused a password the form accepted, with what to do (CC-350)", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      signup: async () => {
+        throw new AppRequestError({
+          code: "VALIDATION_FAILED",
+          message: "That password is too easy to guess. Choose a different one.",
+          details: { field: "password", reason: PASSWORD_REFUSALS.EASY },
+        });
+      },
+    });
+    renderApp({ path: "/signup", api });
+
+    await user.type(screen.getByLabelText("Username"), "Riya");
+    await user.type(screen.getByLabelText("Email"), "riya@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(
+      await screen.findByText("That password is too easy to guess. Try a longer phrase only you would know."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toHaveAttribute("aria-invalid", "true");
   });
 
   it.each([
@@ -103,6 +162,7 @@ describe("SignupPage", () => {
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(error.message);
+    expect(screen.queryByText(error.serverMessage)).not.toBeInTheDocument();
     for (const label of ["Username", "Email", "Password"]) {
       expect(screen.getByLabelText(label)).not.toHaveAttribute("aria-invalid", "true");
     }
@@ -134,6 +194,9 @@ describe("SignupPage", () => {
 
       const email = screen.getByLabelText("Email");
       await waitFor(() => expect(email).toHaveAttribute("aria-invalid", "true"));
+      expect(email).toHaveAccessibleDescription(
+        "That email can't be used. If it's yours, log in. Forgot your password? Tell us with Feedback and we'll help.",
+      );
       expect(email).toHaveAccessibleDescription(ACCOUNT_MESSAGES.EMAIL_UNAVAILABLE);
       const logIn = within(screen.getByText(/If it's yours/)).getByRole("link", { name: "log in" });
       expect(logIn).toHaveAttribute("href", "/login?next=%2Fgames%2Fchess");
@@ -392,7 +455,9 @@ describe("header", () => {
 
     await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "Log out" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach ClassiCade");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't reach ClassiCade. Check your connection, then try again.",
+    );
     expect(within(screen.getByRole("banner")).getByText("Riya")).toBeInTheDocument();
     expect(url()).toBe("/games/chess");
   });
@@ -535,7 +600,7 @@ describe("ProfilePage", () => {
     await user.click(screen.getByRole("button", { name: "Load more" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't load more matches. Can't reach ClassiCade",
+      "Couldn't load more matches. We couldn't reach ClassiCade. Check your connection, then try again.",
     );
     expect(within(list).getAllByRole("listitem")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled();

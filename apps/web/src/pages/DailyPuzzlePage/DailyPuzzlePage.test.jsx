@@ -293,7 +293,7 @@ describe("the daily chess puzzle page (CC-144)", () => {
     await user.click(square("f8"));
     await user.click(square("d8"));
 
-    expect(await screen.findByText("Too many puzzle moves, wait a minute")).toBeVisible();
+    expect(await screen.findByText("Too many tries in a row. Wait a minute, then try again.")).toBeVisible();
     expect(api.getDailyPuzzle).toHaveBeenCalledTimes(1);
   });
 

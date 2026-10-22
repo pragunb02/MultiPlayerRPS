@@ -51,7 +51,7 @@ describe("RoomPage", () => {
   it("waits for players with an invite and the seat list", async () => {
     openRoom();
 
-    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveValue(
       `${window.location.origin}/games/tic-tac-toe/rooms/AB2CD3?via=copy`,
     );
@@ -65,15 +65,15 @@ describe("RoomPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Waiting for Bob" })).toBeInTheDocument();
     expect(screen.getByText("Bob is away. The game starts as soon as they are back.")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Invite a friend" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Waiting for a friend to join" })).not.toBeInTheDocument();
   });
 
   it("follows pushed updates for this room only", async () => {
     const { socket } = openRoom();
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     act(() => socket.push("room:updated", playing({ code: "OTHER2" })));
-    expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
 
     act(() => socket.push("room:updated", playing()));
     expect(await screen.findByText(/board is not available yet/)).toBeInTheDocument();
@@ -201,19 +201,19 @@ describe("RoomPage", () => {
 
     const title = await screen.findByRole("heading", { level: 1, name: "Tic Tac Toe" });
     expect(title.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByRole("heading", { name: "Invite a friend" }).previousElementSibling.tagName).toBe(
-      "svg",
-    );
+    expect(
+      screen.getByRole("heading", { name: "Waiting for a friend to join" }).previousElementSibling.tagName,
+    ).toBe("svg");
   });
 
   it("explains a closed room", async () => {
     const { socket } = openRoom();
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     act(() => socket.push("room:closed", { code: "AB2CD3", reason: "expired" }));
 
     expect(await screen.findByText("Nobody joined in time, so the room closed.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Start a new Tic Tac Toe game" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Start a new game" })).toHaveAttribute(
       "href",
       "/games/tic-tac-toe",
     );
@@ -239,10 +239,8 @@ describe("RoomPage", () => {
 
       expect(await screen.findByRole("heading", { name: "Room closed" })).toBeInTheDocument();
       expect(screen.getByText(text)).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Start a new Chess game" })).toHaveAttribute(
-        "href",
-        "/games/chess",
-      );
+      expect(screen.getByRole("link", { name: "Start a new game" })).toHaveAttribute("href", "/games/chess");
+      expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/");
       expect(screen.queryByText(/no room with the code/)).not.toBeInTheDocument();
       expect(document.title).toBe("Room closed · ClassiCade");
     },
@@ -263,7 +261,7 @@ describe("RoomPage", () => {
     expect(
       await screen.findByText("Everyone was away from the game for too long, so the room closed."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Start a new Tic Tac Toe game" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Start a new game" })).toBeInTheDocument();
   });
 
   it("offers the link's game when the closed room's game is not known to this build", async () => {
@@ -275,7 +273,10 @@ describe("RoomPage", () => {
       }),
     });
 
-    expect(await screen.findByRole("link", { name: "Start a new Tic Tac Toe game" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Start a new game" })).toHaveAttribute(
+      "href",
+      "/games/tic-tac-toe",
+    );
   });
 
   it("offers no particular game when neither the link nor the room names one", async () => {
@@ -290,21 +291,63 @@ describe("RoomPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Room closed" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Start a new/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to the games" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to home" })).toBeInTheDocument();
   });
 
   it.each([
-    [new AppRequestError({ code: "NOT_FOUND", message: "Room not found" }), "Room not found"],
-    [new AppRequestError({ code: "CONFLICT", message: "Room is full" }), "Can't join this room"],
-  ])("explains why joining failed (%s)", async (error, heading) => {
-    openRoom({ joined: error });
+    [
+      new AppRequestError({ code: "NOT_FOUND", message: "No room AB2CD3 in the store" }),
+      "Room not found",
+      "There's no room with the code AB2CD3. The game may have ended, or the code has a typo. Check it with your friend, or start a new game.",
+    ],
+    [
+      new AppRequestError({
+        code: "CONFLICT",
+        message: "This game has already started",
+        details: { reason: "started" },
+      }),
+      "Can't join this room",
+      "This game started without you, so you can't join it. Ask your friend for a new link, or start your own game.",
+    ],
+    [
+      new AppRequestError({ code: "CONFLICT", message: "This room is full", details: { reason: "full" } }),
+      "Can't join this room",
+      "Two players are already in this room. Ask your friend for a new link, or start your own game.",
+    ],
+    [
+      new AppRequestError({ code: "INTERNAL", message: "Internal server error" }),
+      "Can't join this room",
+      "That didn't work on our side. Try again in a moment.",
+    ],
+  ])(
+    "explains why joining failed, in its own words, with the next step (%s)",
+    async (error, heading, words) => {
+      openRoom({ joined: error });
 
-    expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+      expect(screen.getByText(words)).toBeInTheDocument();
+      expect(screen.queryByText(error.serverMessage)).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Start a new game" })).toHaveAttribute(
+        "href",
+        "/games/tic-tac-toe",
+      );
+      expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/");
+    },
+  );
+
+  it("says what the waiting host waits for and that the game starts by itself (CL-29)", async () => {
+    openRoom();
+
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
+
+    expect(
+      screen.getByText("Send them this link. The game starts as soon as they open it."),
+    ).toBeInTheDocument();
   });
 
   it("rejoins after the connection comes back", async () => {
     const { socket } = openRoom();
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     act(() => socket.push("connect"));
 
@@ -333,7 +376,7 @@ describe("RoomPage", () => {
   it("leaves a waiting room without asking", async () => {
     const user = userEvent.setup();
     const { socket } = openRoom();
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     await user.click(screen.getByRole("button", { name: "Leave room" }));
 
@@ -346,7 +389,7 @@ describe("RoomPage: every other state and path", () => {
   it("leaving replaces the room in history, so Back doesn't lead into the room you left", async () => {
     const user = userEvent.setup();
     const { socket, url, back, forward } = openRoom({ history: ["/", "/games/tic-tac-toe"] });
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     await user.click(screen.getByRole("button", { name: "Leave room" }));
     await vi.waitFor(() => expect(url()).toBe("/games/tic-tac-toe"));
@@ -364,7 +407,7 @@ describe("RoomPage: every other state and path", () => {
   it("keeps you in the room and says why when leaving fails", async () => {
     const user = userEvent.setup();
     const { socket, url } = openRoom();
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
     socket.request.mockImplementation(async (event) => {
       if (event === "room:leave")
         throw new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" });
@@ -373,7 +416,9 @@ describe("RoomPage: every other state and path", () => {
 
     await user.click(screen.getByRole("button", { name: "Leave room" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach ClassiCade");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't reach ClassiCade. Check your connection, then try again.",
+    );
     expect(url()).toBe("/games/tic-tac-toe/rooms/AB2CD3");
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(socket.request.mock.calls.filter(([event]) => event === "room:leave")).toHaveLength(2);
@@ -382,7 +427,7 @@ describe("RoomPage: every other state and path", () => {
   it("explains every room control while the connection is being restored (CC-164)", async () => {
     const user = userEvent.setup();
     const { socket } = openRoom();
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     act(() => socket.push("disconnect"));
     const leave = screen.getByRole("button", { name: "Leave room" });
@@ -390,7 +435,7 @@ describe("RoomPage: every other state and path", () => {
 
     expect(leave).toHaveAttribute("aria-disabled", "true");
     expect(socket.request).not.toHaveBeenCalledWith("room:leave", expect.anything());
-    expect(screen.getAllByText("Reconnecting").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Reconnecting. Your move can wait.").length).toBeGreaterThan(0);
 
     act(() => socket.push("connect"));
     expect(screen.getByRole("button", { name: "Leave room" })).not.toHaveAttribute("aria-disabled");
@@ -430,7 +475,7 @@ describe("RoomPage: every other state and path", () => {
 
   it("explains a room closed for a reason this build doesn't know", async () => {
     const { socket } = openRoom();
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     act(() => socket.push("room:closed", { code: "AB2CD3", reason: "maintenance" }));
 
@@ -440,11 +485,11 @@ describe("RoomPage: every other state and path", () => {
 
   it("ignores another room closing", async () => {
     const { socket } = openRoom();
-    await screen.findByRole("heading", { name: "Invite a friend" });
+    await screen.findByRole("heading", { name: "Waiting for a friend to join" });
 
     act(() => socket.push("room:closed", { code: "OTHER2", reason: "expired" }));
 
-    expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
   });
 
   it("waits for the connection before joining", async () => {
@@ -465,7 +510,7 @@ describe("RoomPage: every other state and path", () => {
 
     act(() => socket.push("connect"));
 
-    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
   });
 
   it("sends a move and shows the board the server answers with", async () => {
@@ -624,7 +669,7 @@ describe("progress toasts", () => {
     });
 
     expect(await screen.findByRole("heading", { name: "Can't join this room" })).toBeInTheDocument();
-    const link = screen.queryByRole("link", { name: "Start a new Tic Tac Toe game" });
+    const link = screen.queryByRole("link", { name: "Start a new game" });
     if (offered) expect(link).toHaveAttribute("href", "/games/tic-tac-toe");
     else expect(link).toBeNull();
   });
@@ -672,7 +717,7 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
 
     await user.click(await screen.findByRole("button", { name: "Play as guest" }));
 
-    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
     expect(api.startGuest).toHaveBeenCalledOnce();
     expect(socket.request).toHaveBeenCalledWith("room:join", { code: "AB2CD3" });
   });
@@ -689,10 +734,12 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
 
     await user.click(await screen.findByRole("button", { name: "Play as guest" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests, try again later");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Too many tries in a row. Wait a minute, then try again.",
+    );
     expect(screen.getByRole("button", { name: "Play as guest" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Play as guest" }));
-    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
   });
 
   it("names no game for an old link, and logging in returns to that link", async () => {
@@ -726,8 +773,28 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     });
 
     expect(await screen.findByRole("heading", { name: "Can't join this room" })).toBeInTheDocument();
-    expect(screen.getByText("Can't reach ClassiCade")).toBeInTheDocument();
+    expect(
+      screen.getByText("We couldn't reach ClassiCade. Check your connection, then try again."),
+    ).toBeInTheDocument();
     expect(api.startGuest).not.toHaveBeenCalled();
+  });
+
+  it("tries again from the page when the session can't be loaded (CL-28)", async () => {
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    const user = userEvent.setup();
+    openInvite({
+      api: fakeApi({
+        getSession: async () => {
+          throw new AppRequestError({ code: "NETWORK", message: "Can't reach ClassiCade" });
+        },
+      }),
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+
+    expect(reload).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
   });
 
   it("goes to log in, and Back from there shows the choice again", async () => {
@@ -747,7 +814,7 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
   it("someone who already has a session skips the choice", async () => {
     openRoom();
 
-    expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Waiting for a friend to join" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Play as guest" })).toBeNull();
   });
 });

@@ -154,7 +154,9 @@ test.describe("a full server (CC-107)", () => {
       await bob.page.goto("/games/rock-paper-scissors");
       await bob.page.getByRole("button", { name: "Create room" }).click();
 
-      await expect(bob.page.getByRole("alert")).toHaveText("The server is busy, try again in a minute");
+      await expect(bob.page.getByRole("alert")).toHaveText(
+        "ClassiCade has as many games as it can hold. Wait a minute, then try again.",
+      );
       await expect(bob.page).toHaveURL("/games/rock-paper-scissors");
       await bob.leave();
     } finally {
@@ -229,7 +231,7 @@ test.describe("a long wait on the result screen", () => {
       await expect(
         friend.page.getByText("The time for a rematch is over, so the room closed."),
       ).toBeVisible();
-      await friend.page.getByRole("link", { name: "Start a new Rock Paper Scissors game" }).click();
+      await friend.page.getByRole("link", { name: "Start a new game" }).click();
       await expect(friend.page).toHaveURL(RPS);
       await expect(friend.page.getByRole("button", { name: "Create room" })).toBeVisible();
       await friend.leave();

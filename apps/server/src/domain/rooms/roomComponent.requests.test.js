@@ -1,3 +1,4 @@
+import { ROOM_REQUEST_REFUSALS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { createEngineRegistry, defineEngine, ENGINES } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
@@ -213,6 +214,10 @@ describe("roomComponent requests of a game (CC-159)", () => {
 
     await expect(
       rooms.askRequest({ code, playerId: ALICE.id, type: "rematch", now: T0 + 5 }),
-    ).rejects.toThrow(new ConflictError("A request needs one other player in the room"));
+    ).rejects.toThrow(
+      new ConflictError("A request needs one other player in the room", {
+        details: { reason: ROOM_REQUEST_REFUSALS.NO_OPPONENT },
+      }),
+    );
   });
 });

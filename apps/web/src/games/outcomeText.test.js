@@ -100,7 +100,25 @@ describe("where the match stands and why the board is closed (CC-164)", () => {
   });
 
   it("says Reconnecting before anything else while the connection is being restored", () => {
-    expect(playReason(room(), { reconnecting: true })).toBe("Reconnecting");
-    expect(playReason(room({ you: "" }), { reconnecting: true })).toBe("Reconnecting");
+    expect(playReason(room(), { reconnecting: true })).toBe("Reconnecting. Your move can wait.");
+    expect(playReason(room({ you: "" }), { reconnecting: true })).toBe("Reconnecting. Your move can wait.");
+  });
+
+  it.each([
+    ["a turn limit", room({ game: { activePlayers: ["a"], turnEndsAt: 90_000 } })],
+    [
+      "a running chess clock",
+      room({ game: { activePlayers: ["a"], view: { clocks: { w: 60_000, b: 60_000 }, lastMoveAt: 5_000 } } }),
+    ],
+  ])("never says the move can wait while %s runs (CC-350)", (_case, view) => {
+    expect(playReason(view, { reconnecting: true })).toBe("Reconnecting… Your clock may still be running.");
+  });
+
+  it("says the move can wait when the clock has not started and no turn limit applies", () => {
+    const view = room({
+      game: { activePlayers: ["a"], turnEndsAt: 0, view: { clocks: { w: 1, b: 1 }, lastMoveAt: 0 } },
+    });
+
+    expect(playReason(view, { reconnecting: true })).toBe("Reconnecting. Your move can wait.");
   });
 });

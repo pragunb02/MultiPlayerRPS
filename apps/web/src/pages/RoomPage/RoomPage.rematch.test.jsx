@@ -233,6 +233,7 @@ describe("RoomPage rematch (CC-037, CC-159)", () => {
         throw new AppRequestError({
           code: "CONFLICT",
           message: "Your opponent left, so a rematch is no longer possible",
+          details: { reason: "opponent-left" },
         });
       }),
     );
@@ -240,8 +241,13 @@ describe("RoomPage rematch (CC-037, CC-159)", () => {
     await user.click(await screen.findByRole("button", { name: "Rematch" }));
 
     expect(
-      await screen.findByText("Your opponent left, so a rematch is no longer possible"),
+      await screen.findByText(
+        "Your opponent left, so a rematch is no longer possible. Start a new game instead.",
+      ),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Your opponent left, so a rematch is no longer possible"),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rematch" })).toBeEnabled();
   });
 
@@ -292,7 +298,7 @@ describe("RoomPage rematch (CC-037, CC-159)", () => {
     expect(
       await screen.findByText("The time for a rematch is over, so the room closed.", {}, { timeout: 3_000 }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Start a new Tic Tac Toe game" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Start a new game" })).toBeInTheDocument();
     expect(joins).toBe(2);
   });
 

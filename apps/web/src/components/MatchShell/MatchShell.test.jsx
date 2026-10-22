@@ -162,7 +162,7 @@ describe("MatchShell with a game that brings only a Board (CC-157)", () => {
     expect(screen.getByTestId("board-reason")).toHaveTextContent("Not your turn");
 
     update(roomView(), { reconnecting: true });
-    expect(screen.getByTestId("board-reason")).toHaveTextContent("Reconnecting");
+    expect(screen.getByTestId("board-reason")).toHaveTextContent("Reconnecting. Your move can wait.");
   });
 
   it("writes the match phase and the request state on the frame, for tests and telemetry", () => {
@@ -245,8 +245,25 @@ describe("MatchShell action bar", () => {
     mount(roomView(), { game: { Board: FakeBoard, actions: chessActions }, reconnecting: true });
 
     for (const name of ["Offer draw", "Resign", "Leave room"]) {
-      expect(screen.getByRole("button", { name })).toHaveAccessibleDescription("Reconnecting");
+      expect(screen.getByRole("button", { name })).toHaveAccessibleDescription(
+        "Reconnecting. Your move can wait.",
+      );
     }
+  });
+
+  it("says the clock may still run while reconnecting in a game with a turn limit (CC-350)", () => {
+    const timed = roomView();
+    mount(
+      { ...timed, game: { ...timed.game, turnEndsAt: T + 60_000 } },
+      { game: { Board: FakeBoard, actions: chessActions }, reconnecting: true },
+    );
+
+    expect(screen.getByRole("button", { name: "Resign" })).toHaveAccessibleDescription(
+      "Reconnecting… Your clock may still be running.",
+    );
+    expect(screen.getByTestId("board-reason")).toHaveTextContent(
+      "Reconnecting… Your clock may still be running.",
+    );
   });
 
   it("asks first for an action that needs it, in the shell's dialog, and sends it on confirm", async () => {

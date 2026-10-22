@@ -1,3 +1,4 @@
+import { ROOM_JOIN_REFUSALS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
@@ -68,10 +69,10 @@ describe("roomComponent: blocked players are never seated together (CC-044)", ()
 
     const refusal = await rooms.joinRoom({ code, player: BOB, now: T0 + 1 }).catch((err) => err);
 
-    const full = new ConflictError("This room is full");
+    const full = new ConflictError("This room is full", { details: { reason: ROOM_JOIN_REFUSALS.FULL } });
     expect(refusal).toEqual(full);
     expect(refusal.code).toBe(full.code);
-    expect(refusal.details).toEqual({});
+    expect(refusal.details).toEqual(full.details);
     expect((await rooms.getRoom(code)).seats.map((seat) => seat.playerId)).toEqual([ALICE.id]);
   });
 
@@ -103,7 +104,7 @@ describe("roomComponent: blocked players are never seated together (CC-044)", ()
     await rooms.joinRoom({ code, player: BOB, now: T0 + 1 });
 
     await expect(rooms.joinRoom({ code, player: CAROL, now: T0 + 2 })).rejects.toEqual(
-      new ConflictError("This game has already started"),
+      new ConflictError("This game has already started", { details: { reason: ROOM_JOIN_REFUSALS.STARTED } }),
     );
   });
 });

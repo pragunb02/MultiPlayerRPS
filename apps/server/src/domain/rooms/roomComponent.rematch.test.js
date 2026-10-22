@@ -1,3 +1,4 @@
+import { ROOM_REQUEST_REFUSALS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
@@ -203,7 +204,10 @@ describe("roomComponent rematch (CC-037, CC-159)", () => {
 
     expect(room.rematch).toEqual({ available: false, leftName: BOB.displayName });
     expect(room.requests).toEqual([]);
-    await expect(ask(rooms, { code, playerId: ALICE.id, now: T0 + 6 })).rejects.toThrow(/opponent left/);
+    await expect(ask(rooms, { code, playerId: ALICE.id, now: T0 + 6 })).rejects.toMatchObject({
+      message: expect.stringMatching(/opponent left/),
+      details: { reason: ROOM_REQUEST_REFUSALS.OPPONENT_LEFT },
+    });
   });
 
   it("tells the player still there who left the finished game, though the seat is gone (CC-162)", async () => {

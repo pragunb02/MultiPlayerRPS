@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ERROR_CODES } from "@classicade/shared";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
@@ -20,9 +21,21 @@ export function LoginPage() {
   const telemetry = useServices().telemetry ?? NO_TELEMETRY;
   const [form, setForm] = useState({ email: "", password: "" });
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
+  // Set when the email and password didn't match, so the page can offer to play as a guest instead (CL-91).
+  const [mismatch, setMismatch] = useState(false);
   const login = useAction(
     async () => {
-      const { carriedOver } = await session.login(form);
+      setMismatch(false);
+      let answer;
+      try {
+        answer = await session.login(form);
+      } catch (err) {
+        if (err.code !== ERROR_CODES.UNAUTHORIZED) throw err;
+        setMismatch(true);
+        // The server says only that the pair is wrong, never which half, so the words don't either.
+        throw new Error("That email and password don't match. Check them and try again.", { cause: err });
+      }
+      const { carriedOver } = answer;
       // One confirmation, with the account's numbers, when guest games came along (CC-097).
       saveProgress.confirmSaved(carriedOver);
       // Signed in: the redirect below takes over on the next render.
@@ -51,6 +64,7 @@ export function LoginPage() {
     <section className={styles.page}>
       <PageTitle>Log in</PageTitle>
       <h1>Log in</h1>
+      <p className={styles.note}>Log in to keep your XP, streaks and friends on any device.</p>
       <form className={styles.form} onSubmit={submit} noValidate>
         <Field
           label="Email"
@@ -74,6 +88,13 @@ export function LoginPage() {
         <Button control="auth.login" type="submit" size="lg" action={login}>
           Log in
         </Button>
+        {mismatch && (
+          <p className={styles.note}>
+            <Link to={next} data-cc-control="auth.login.play_as_guest">
+              Play as a guest instead
+            </Link>
+          </p>
+        )}
       </form>
       <p className={styles.switch}>
         New here?{" "}

@@ -1,3 +1,4 @@
+import { PASSWORD_REFUSALS } from "@classicade/shared";
 import { assertDefined } from "../../utils/assert.js";
 import { ValidationError } from "../../utils/errors.js";
 import { NO_OPERATIONS_METRICS, PASSWORD_CHECK_OUTCOMES } from "../../utils/operationsMetrics.js";
@@ -29,7 +30,8 @@ export function createPasswordScreen({
 }) {
   assertDefined(breachedPasswords, "breachedPasswords");
 
-  const refuse = (field) => new ValidationError(EASY_PASSWORD, { details: { field } });
+  const refuse = (field) =>
+    new ValidationError(EASY_PASSWORD, { details: { field, reason: PASSWORD_REFUSALS.EASY } });
 
   return Object.freeze({
     /**

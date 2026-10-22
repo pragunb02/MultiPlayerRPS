@@ -29,7 +29,7 @@ test("nobody can sign up with a legacy player's email", async ({ players }) => {
 
   // The same one message as for an account's email, so nobody learns who played the old app (CC-238).
   await expect(page.getByText("If it's yours")).toHaveText(
-    "That email can't be used. If it's yours, log in or reset your password.",
+    "That email can't be used. If it's yours, log in. Forgot your password? Tell us with Feedback and we'll help.",
   );
   await expect(page).toHaveURL("/signup");
 });

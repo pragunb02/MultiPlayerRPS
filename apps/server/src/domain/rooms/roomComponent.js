@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import {
   GAME_STATUS,
+  isAvatarId,
   PRESENCE,
   REQUEST_ANSWERS,
   REQUEST_STATES,
@@ -8,10 +9,11 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   ROOM_END_REASONS,
+  ROOM_JOIN_REFUSALS,
   ROOM_LIMIT_REASONS,
+  ROOM_REQUEST_REFUSALS,
   ROOM_REQUEST_TYPES,
   ROOM_STATUS,
-  isAvatarId,
 } from "@classicade/shared";
 import { createSeededRng, renamePlayer } from "@classicade/games";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
@@ -858,14 +860,16 @@ export function createRoomComponent({
             return waiting ? startWhenReady(back, now) : back;
           }
           if (!waiting) {
-            throw new ConflictError("This game has already started");
+            throw new ConflictError("This game has already started", {
+              details: { reason: ROOM_JOIN_REFUSALS.STARTED },
+            });
           }
           // Every seat is taken, and the game waits for a player who is away. Or someone here is blocked with them.
           if (
             room.seats.length === engineFor(room).players.max ||
             room.seats.some((seat) => blocked.has(seat.playerId))
           ) {
-            throw new ConflictError(FULL);
+            throw new ConflictError(FULL, { details: { reason: ROOM_JOIN_REFUSALS.FULL } });
           }
           const seated = withSeats(
             room,
@@ -900,9 +904,12 @@ export function createRoomComponent({
         decide(room) {
           requireSeat(room, playerId);
           if (room.status !== ROOM_STATUS.PLAYING) {
-            throw new ConflictError(
-              room.status === ROOM_STATUS.WAITING ? "The game has not started yet" : "The game is over",
-            );
+            const waiting = room.status === ROOM_STATUS.WAITING;
+            throw new ConflictError(waiting ? "The game has not started yet" : "The game is over", {
+              details: {
+                reason: waiting ? ROOM_REQUEST_REFUSALS.NOT_STARTED : ROOM_REQUEST_REFUSALS.GAME_OVER,
+              },
+            });
           }
           botTurns.checkMove({ room, playerId, move });
           const engine = engineFor(room);
@@ -978,7 +985,9 @@ export function createRoomComponent({
             room.status === ROOM_STATUS.FINISHED &&
             !room.rematch.available
           ) {
-            throw new ConflictError("Your opponent left, so a rematch is no longer possible");
+            throw new ConflictError("Your opponent left, so a rematch is no longer possible", {
+              details: { reason: ROOM_REQUEST_REFUSALS.OPPONENT_LEFT },
+            });
           }
           const rule = rulesOf(room)(type);
           return { ...addRequest(room, { playerId, type, now, rule, lifetimes }), lastActivityAt: now };
@@ -1012,7 +1021,9 @@ export function createRoomComponent({
           const room = settled(stored, now);
           const request = openRequest(room, type);
           if (request === undefined) {
-            throw new ConflictError("That request is no longer open");
+            throw new ConflictError("That request is no longer open", {
+              details: { reason: ROOM_REQUEST_REFUSALS.REQUEST_CLOSED },
+            });
           }
           requireAnswerer({ request, playerId, byAsker: answer === REQUEST_ANSWERS.WITHDRAW });
           const blockedEnd =
@@ -1094,14 +1105,23 @@ export function createRoomComponent({
         decide(room) {
           requireSeat(room, playerId);
           if (room.status !== ROOM_STATUS.PLAYING) {
-            throw new ConflictError("The game is not on");
+            throw new ConflictError("The game is not on", {
+              details: {
+                reason:
+                  room.status === ROOM_STATUS.WAITING
+                    ? ROOM_REQUEST_REFUSALS.NOT_STARTED
+                    : ROOM_REQUEST_REFUSALS.GAME_OVER,
+              },
+            });
           }
           const gone = room.seats.find((seat) => {
             const until = graceUntil(room, seat, lifetimes);
             return seat.playerId !== playerId && until > 0 && now >= until;
           });
           if (gone === undefined) {
-            throw new ConflictError("Your opponent can still come back");
+            throw new ConflictError("Your opponent can still come back", {
+              details: { reason: ROOM_REQUEST_REFUSALS.OPPONENT_MAY_RETURN },
+            });
           }
           return forfeited(room, gone.playerId, now);
         },

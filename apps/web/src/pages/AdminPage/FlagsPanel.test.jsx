@@ -214,7 +214,9 @@ describe("the console's flags (CC-312)", () => {
       .mockResolvedValue(view());
     const { user } = await openFlags(ownerApi({ getAdminFlags }), { listed: false });
 
-    expect(await screen.findByText("Can't reach the server")).toBeVisible();
+    expect(
+      await screen.findByText("We couldn't reach ClassiCade. Check your connection, then try again."),
+    ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByRole("article", { name: "new_lobby" })).toBeVisible();

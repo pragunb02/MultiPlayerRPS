@@ -236,7 +236,7 @@ describe("the report queue's other states (CC-044)", () => {
     renderApp({ path: "/admin/reports", api: ownerApi({ getReportQueue }) });
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("The network failed");
+    expect(alert).toHaveTextContent("We couldn't reach ClassiCade. Check your connection, then try again.");
     await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
 
     expect(await screen.findAllByRole("article")).toHaveLength(1);

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ERROR_CODES } from "@classicade/shared";
+import { ERROR_CODES, NAME_REFUSALS } from "@classicade/shared";
 import { RESERVED_NAME, UNSUITABLE_NAME } from "./models/credentials.js";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
@@ -71,7 +71,10 @@ describe("public names (integration)", () => {
       expect.objectContaining({
         code: ERROR_CODES.VALIDATION_FAILED,
         message,
-        details: { field: "username" },
+        details: {
+          field: "username",
+          reason: message === RESERVED_NAME ? NAME_REFUSALS.RESERVED : NAME_REFUSALS.UNSUITABLE,
+        },
       }),
     );
     expect(await accountsWithEmail(emailFor(username))).toEqual([]);

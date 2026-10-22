@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { PASSWORD_REFUSALS, SOCKET_EVENTS } from "@classicade/shared";
 import { ENGINES, replayGame } from "@classicade/games";
 import { connectDatabase } from "./persistence/database.js";
 import { createSessionStore, SESSION_COLLECTION } from "./persistence/sessionStore.js";
@@ -494,7 +494,10 @@ describe("accounts through the real composition root (integration)", () => {
       const fine = await signup("correct horse battery", 2);
 
       expect(common.status).toBe(400);
-      expect((await common.json()).error.details).toEqual({ field: "password" });
+      expect((await common.json()).error.details).toEqual({
+        field: "password",
+        reason: PASSWORD_REFUSALS.EASY,
+      });
       expect(fine.status).toBe(201);
       expect(asked).toEqual([
         {

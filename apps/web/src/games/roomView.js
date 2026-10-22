@@ -34,12 +34,35 @@ export function matchPhase(room) {
 
 /** The reasons a board can be closed to the viewer, in their words (CC-164). */
 export const PLAY_REASONS = Object.freeze({
-  RECONNECTING: "Reconnecting",
+  // Says the game waits too, so a player who lost the connection knows their turn is not lost (CL-37).
+  RECONNECTING: "Reconnecting. Your move can wait.",
+  // A chess clock or a turn limit keeps counting on the server, so the move cannot be said to wait (CC-350).
+  RECONNECTING_TIMED: "Reconnecting… Your clock may still be running.",
   WATCHING: "You are watching this game",
   WAITING: "Waiting for an opponent to join",
   OVER: "The game is over",
   NOT_YOUR_TURN: "Not your turn",
 });
+
+/**
+ * Whether time runs out for someone while the game goes on: a turn limit on the move due, or a chess clock that has
+ * started. The server keeps counting while a player is reconnecting.
+ *
+ * @param {any} room  RoomView
+ */
+const timeRuns = (room) =>
+  room.status === ROOM_STATUS.PLAYING &&
+  ((room.game?.turnEndsAt ?? 0) > 0 ||
+    (room.game?.view?.clocks !== undefined && (room.game.view.lastMoveAt ?? 0) > 0));
+
+/**
+ * What the board and the controls say while the connection is being restored: that the move can wait, unless a clock
+ * or a turn limit is running, which the server does not stop.
+ *
+ * @param {any} room  RoomView
+ */
+export const reconnectingReason = (room) =>
+  timeRuns(room) ? PLAY_REASONS.RECONNECTING_TIMED : PLAY_REASONS.RECONNECTING;
 
 /**
  * Why the viewer cannot play on the board right now, in their words (CC-164). Empty when they can. A board adds
@@ -49,7 +72,7 @@ export const PLAY_REASONS = Object.freeze({
  * @param {{ reconnecting: boolean }} connection  whether the connection to the server is being restored
  */
 export function playReason(room, { reconnecting }) {
-  if (reconnecting) return PLAY_REASONS.RECONNECTING;
+  if (reconnecting) return reconnectingReason(room);
   const phase = matchPhase(room);
   if (phase === "watching") return PLAY_REASONS.WATCHING;
   if (phase === "waiting") return PLAY_REASONS.WAITING;

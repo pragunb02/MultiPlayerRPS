@@ -76,7 +76,7 @@ test.describe("an account holder's data (CC-035)", () => {
       .getByRole("dialog", { name: "Delete your account?" })
       .getByRole("button", { name: "Delete for good" })
       .click();
-    await expect(privacy.getByText("That is not your password")).toBeVisible();
+    await expect(privacy.getByText("That isn't your password. Check it and try again.")).toBeVisible();
 
     // The real deletion: the question says what goes and what stays, then the browser is signed out.
     await privacy.getByLabel("Password for deleting").fill(account.password);
@@ -107,7 +107,9 @@ test.describe("an account holder's data (CC-035)", () => {
     await riya.page.getByLabel("Email").fill(account.email);
     await riya.page.getByLabel("Password").fill(account.password);
     await riya.page.getByRole("button", { name: "Log in" }).click();
-    await expect(riya.page.getByRole("alert")).toHaveText("Invalid email or password");
+    await expect(riya.page.getByRole("alert")).toHaveText(
+      "That email and password don't match. Check them and try again.",
+    );
   });
 });
 

@@ -3,6 +3,7 @@ import {
   FRIEND_ANSWERS,
   FRIEND_LINK_MAKER_NAME,
   FRIEND_PRESENCE,
+  FRIEND_REFUSALS,
   FRIEND_REQUEST_RESULTS,
   FRIEND_REQUEST_VIA,
   isAvatarId,
@@ -29,14 +30,20 @@ const WAITING = Object.freeze([FRIEND_REQUEST_STATUS.PENDING, FRIEND_REQUEST_STA
 const PENDING = Object.freeze([FRIEND_REQUEST_STATUS.PENDING]);
 const ANSWERS = new Set(Object.values(FRIEND_ANSWERS));
 
-const guestsCannot = () => new ForbiddenError("Save your progress to add friends");
+const guestsCannot = () =>
+  new ForbiddenError("Save your progress to add friends", { details: { reason: FRIEND_REFUSALS.GUEST } });
+/** A refusal that names its reason and keeps what caused it, when there is a cause. */
+const why = (reason, cause) => ({ details: { reason }, ...(cause === undefined ? {} : { cause }) });
 const notPlayedWith = (cause) =>
-  new NotFoundError("You can only add someone you played with", cause === undefined ? {} : { cause });
+  new NotFoundError("You can only add someone you played with", why(FRIEND_REFUSALS.NOT_PLAYED_WITH, cause));
 const noSuchRequest = (cause) =>
-  new NotFoundError("This request is no longer open", cause === undefined ? {} : { cause });
+  new NotFoundError("This request is no longer open", why(FRIEND_REFUSALS.REQUEST_CLOSED, cause));
 const noSuchFriend = (cause) => new NotFoundError("No such friend", cause === undefined ? {} : { cause });
 const noSuchLink = (cause) =>
-  new NotFoundError("This friend link has run out or was used already", cause === undefined ? {} : { cause });
+  new NotFoundError(
+    "This friend link has run out or was used already",
+    why(FRIEND_REFUSALS.LINK_USED, cause),
+  );
 const avatarField = (profile) => (isAvatarId(profile.avatar) ? { avatar: profile.avatar } : {});
 
 /** For a failed read: the caller's own refusal when nothing was found, and any other failure as it is. */
@@ -247,7 +254,9 @@ export function createFriendComponent({
   /** The player's own friend count must leave room for one more. */
   async function requireRoomForFriend(playerId) {
     if ((await friendAccessor.countFriends(playerId)) >= rules.maxFriends) {
-      throw new ConflictError(`You have ${rules.maxFriends} friends. Remove one to add another.`);
+      throw new ConflictError(`You have ${rules.maxFriends} friends. Remove one to add another.`, {
+        details: { reason: FRIEND_REFUSALS.MAX_FRIENDS },
+      });
     }
   }
 
@@ -283,6 +292,7 @@ export function createFriendComponent({
     if (!waiting && sent.length >= rules.maxWaiting) {
       throw new ConflictError(
         `You have ${rules.maxWaiting} requests waiting. Cancel one, or wait for an answer.`,
+        { details: { reason: FRIEND_REFUSALS.MAX_WAITING } },
       );
     }
     return { mutual: false, waiting };
@@ -388,6 +398,7 @@ export function createFriendComponent({
       if (!mayHaveFriends(await safety.policyFor({ playerId: person.playerId, now }))) {
         throw new ConflictError(
           `${person.displayName} needs to save their progress before you can be friends`,
+          { details: { reason: FRIEND_REFUSALS.THEY_ARE_GUEST } },
         );
       }
       return ask({
@@ -549,7 +560,9 @@ export function createFriendComponent({
       const tokenHash = hashFriendLinkToken(token);
       const link = await friendAccessor.getLiveLink({ tokenHash, now }).catch(missingAs(noSuchLink));
       if (link.creatorId === playerId) {
-        throw new ConflictError("This is your own friend link. Send it to a friend.");
+        throw new ConflictError("This is your own friend link. Send it to a friend.", {
+          details: { reason: FRIEND_REFUSALS.OWN_LINK },
+        });
       }
       if (await friendAccessor.areFriends({ a: playerId, b: link.creatorId })) {
         return { result: FRIEND_REQUEST_RESULTS.FRIENDS };

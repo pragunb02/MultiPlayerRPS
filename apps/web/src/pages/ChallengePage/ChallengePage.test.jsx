@@ -71,17 +71,21 @@ describe("ChallengePage (CC-139)", () => {
   it("says why taking it failed, under the button", async () => {
     const { user } = openPage({
       api: {
-        acceptChallenge: vi
-          .fn()
-          .mockRejectedValue(
-            new AppRequestError({ code: "GONE", message: "Someone already took this challenge" }),
-          ),
+        acceptChallenge: vi.fn().mockRejectedValue(
+          new AppRequestError({
+            code: "GONE",
+            message: "Someone already took this challenge",
+            details: { state: "accepted" },
+          }),
+        ),
       },
     });
 
     await user.click(await screen.findByRole("button", { name: "Accept and play" }));
 
-    expect(await screen.findByText("Someone already took this challenge")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Someone already took this challenge. Send a new one, or start a game."),
+    ).toBeInTheDocument();
   });
 
   it("lets a visitor play as a guest first, or log in and come back", async () => {
@@ -208,7 +212,9 @@ describe("ChallengePage (CC-139)", () => {
       view: new AppRequestError({ code: "INTERNAL", message: "Server down" }),
     });
 
-    expect(await screen.findByText("Server down")).toBeInTheDocument();
+    expect(
+      await screen.findByText("That didn't work on our side. Try again in a moment."),
+    ).toBeInTheDocument();
     api.getChallenge.mockResolvedValue(challenge());
     await user.click(screen.getByRole("button", { name: "Try again" }));
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ERROR_CODES } from "@classicade/shared";
 import { createLocalMatch } from "../games/passAndPlay/localMatch.js";
 import { AppRequestError } from "../lib/errors.js";
 
@@ -6,6 +7,13 @@ import { AppRequestError } from "../lib/errors.js";
 const PHONE_CLOCK = Object.freeze({ now: () => Date.now() });
 /** Who starts and the chess colours. Nothing rides on it, so the browser's own random numbers are enough. */
 const PHONE_RNG = () => Math.random();
+
+/**
+ * A move the phone's own engine refused, as the server would refuse it online, so the board says the same plain
+ * words in both (CC-350).
+ */
+const refused = ({ code, message }) =>
+  new AppRequestError({ code: ERROR_CODES.VALIDATION_FAILED, message, details: { reason: code } });
 
 /**
  * One pass and play game on this phone (CC-223): the session, the RoomView the board draws, and the calls the shell
@@ -35,7 +43,7 @@ export function useLocalMatch({ engine, names, options }) {
   const move = useCallback(
     async (raw) => {
       const result = match.move(session, raw);
-      if (!result.ok) throw new AppRequestError(result.error);
+      if (!result.ok) throw refused(result.error);
       setSession(result.session);
     },
     [match, session],
@@ -45,7 +53,7 @@ export function useLocalMatch({ engine, names, options }) {
   const moveAs = useCallback(
     async (playerId, raw) => {
       const result = match.moveAs(session, { playerId, move: raw });
-      if (!result.ok) throw new AppRequestError(result.error);
+      if (!result.ok) throw refused(result.error);
       setSession(result.session);
     },
     [match, session],

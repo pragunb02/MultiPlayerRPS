@@ -86,7 +86,9 @@ test.describe("pages", () => {
     await visitor.page.getByLabel("Email").fill("nobody.here@example.com");
     await visitor.page.getByLabel("Password").fill("not my password");
     await visitor.page.getByRole("button", { name: "Log in" }).click();
-    await expect(visitor.page.getByRole("alert")).toHaveText("Invalid email or password");
+    await expect(visitor.page.getByRole("alert")).toHaveText(
+      "That email and password don't match. Check them and try again.",
+    );
     await scan(visitor, "login with a wrong password");
 
     await visitor.page.goto("/signup");

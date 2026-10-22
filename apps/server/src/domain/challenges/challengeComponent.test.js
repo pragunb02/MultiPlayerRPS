@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CHALLENGE_LIMIT_REASONS, CHALLENGE_STATES, isChallengeId } from "@classicade/shared";
+import {
+  CHALLENGE_LIMIT_REASONS,
+  CHALLENGE_REFUSALS,
+  CHALLENGE_STATES,
+  isChallengeId,
+} from "@classicade/shared";
 import { createChallengeAccessor } from "../../data/challengeAccessor.js";
 import { safetyFromAdults } from "../../testing/fakeSafety.js";
 import { createInMemoryChallengeDao } from "../../testing/inMemoryChallengeDao.js";
@@ -178,6 +183,11 @@ describe("challengeComponent: a challenge to one person (ready for CC-052)", () 
     await expect(challenges.decline({ challengeId: id, playerId: GUEST.id, now: T0 + 1 })).rejects.toThrow(
       ForbiddenError,
     );
+    await expect(
+      challenges.decline({ challengeId: id, playerId: GUEST.id, now: T0 + 1 }),
+    ).rejects.toMatchObject({
+      details: { reason: CHALLENGE_REFUSALS.NOT_FOR_YOU },
+    });
     const declined = await challenges.decline({ challengeId: id, playerId: ARJUN.id, now: T0 + 2 });
 
     expect(declined.state).toBe(CHALLENGE_STATES.DECLINED);
@@ -203,6 +213,9 @@ describe("challengeComponent: a challenge to one person (ready for CC-052)", () 
     const { id } = await make({ to: "Arjun" });
 
     await expect(accept(id, GUEST)).rejects.toThrow(ForbiddenError);
+    await expect(accept(id, GUEST)).rejects.toMatchObject({
+      details: { reason: CHALLENGE_REFUSALS.NOT_FOR_YOU },
+    });
     await expect(accept(id, ARJUN)).resolves.toMatchObject({ room: { code: "ROOM01" } });
   });
 
@@ -333,6 +346,7 @@ describe("challengeComponent: taking a challenge", () => {
     const { id } = await make();
 
     await expect(accept(id, RIYA)).rejects.toThrow(ForbiddenError);
+    await expect(accept(id, RIYA)).rejects.toMatchObject({ details: { reason: CHALLENGE_REFUSALS.OWN } });
     await accept(id, GUEST);
     const second = await accept(id, CARA).catch((err) => err);
 
@@ -363,6 +377,7 @@ describe("challengeComponent: taking a challenge", () => {
     dao.claim = async () => false;
 
     await expect(accept(id)).rejects.toThrow(ConflictError);
+    await expect(accept(id)).rejects.toMatchObject({ details: { reason: CHALLENGE_REFUSALS.BEING_TAKEN } });
     await dao.end({ challengeId: id, state: CHALLENGE_STATES.WITHDRAWN, at: new Date(T0 + 1) });
     const lost = await accept(id).catch((err) => err);
     expect(lost).toBeInstanceOf(GoneError);
@@ -377,6 +392,11 @@ describe("challengeComponent: withdrawing", () => {
     await expect(challenges.withdraw({ challengeId: id, playerId: GUEST.id, now: T0 + 1 })).rejects.toThrow(
       ForbiddenError,
     );
+    await expect(
+      challenges.withdraw({ challengeId: id, playerId: GUEST.id, now: T0 + 1 }),
+    ).rejects.toMatchObject({
+      details: { reason: CHALLENGE_REFUSALS.NOT_YOURS },
+    });
     const withdrawn = await challenges.withdraw({ challengeId: id, playerId: RIYA.id, now: T0 + 2 });
     expect(withdrawn.state).toBe(CHALLENGE_STATES.WITHDRAWN);
 
@@ -483,6 +503,11 @@ describe("challengeComponent: the inbox (CC-207, the minimal CC-147)", () => {
     await expect(challenges.later({ challengeId: id, playerId: GUEST.id, now: T0 + 3 })).rejects.toThrow(
       ForbiddenError,
     );
+    await expect(
+      challenges.later({ challengeId: id, playerId: GUEST.id, now: T0 + 3 }),
+    ).rejects.toMatchObject({
+      details: { reason: CHALLENGE_REFUSALS.NOT_FOR_YOU },
+    });
     expect((await challenges.later({ challengeId: id, playerId: RIYA.id, now: T0 + 4 })).later).toBe(true);
   });
 

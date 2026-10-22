@@ -60,6 +60,7 @@ describe("Add friend in match history (CC-052)", () => {
     const refused = new AppRequestError({
       code: "CONFLICT",
       message: "You have 10 requests waiting.",
+      details: { reason: "max-waiting" },
       status: 409,
     });
     renderApp({
@@ -69,7 +70,11 @@ describe("Add friend in match history (CC-052)", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Add friend Arjun" }));
 
-    expect(await screen.findByText("You have 10 requests waiting.")).toBeVisible();
+    expect(
+      await screen.findByText(
+        "You have too many friend requests waiting. Cancel one, or wait for an answer.",
+      ),
+    ).toBeVisible();
   });
 
   it("is not offered to a guest in history, who finds how to save progress on the Friends page", async () => {

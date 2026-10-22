@@ -84,7 +84,9 @@ describe("blocked players on the profile (CC-044)", () => {
 
     await userEvent.click(await within(section).findByRole("button", { name: "Unblock Bob" }));
 
-    expect(await within(section).findByRole("alert")).toHaveTextContent("No such block");
+    expect(await within(section).findByRole("alert")).toHaveTextContent(
+      "We couldn't find that. It may have been removed. Go back and try again.",
+    );
     expect(within(section).getByRole("button", { name: "Unblock Bob" })).toBeVisible();
   });
 
@@ -93,7 +95,7 @@ describe("blocked players on the profile (CC-044)", () => {
     const section = await openBlocked(profileApi({ getBlocks: vi.fn().mockRejectedValue(failure) }));
 
     expect(await within(section).findByRole("alert")).toHaveTextContent(
-      "Couldn't load your blocked players. Check your connection.",
+      "Couldn't load your blocked players. We couldn't reach ClassiCade. Check your connection, then try again.",
     );
   });
 

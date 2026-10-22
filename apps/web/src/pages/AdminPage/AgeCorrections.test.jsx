@@ -88,6 +88,8 @@ describe("year of birth corrections in the owner console (CC-152)", () => {
     await user.selectOptions(screen.getByLabelText("Year of birth"), "1990");
     await user.click(screen.getByRole("button", { name: "Correct the year" }));
 
-    expect(await screen.findByText("No account has that email")).toBeVisible();
+    expect(
+      await screen.findByText("We couldn't find that. It may have been removed. Go back and try again."),
+    ).toBeVisible();
   });
 });

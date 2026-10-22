@@ -50,6 +50,10 @@ test.describe("a host who is not there any more", () => {
     await joinAsGuest(stranger, room.path);
 
     await expect(stranger.page.getByRole("heading", { name: "Can't join this room" })).toBeVisible();
-    await expect(stranger.page.getByText("This room is full")).toBeVisible();
+    await expect(
+      stranger.page.getByText(
+        "Two players are already in this room. Ask your friend for a new link, or start your own game.",
+      ),
+    ).toBeVisible();
   });
 });

@@ -89,7 +89,7 @@ describe("LeaderboardPage", () => {
     renderApp({ path: "/leaderboards/overall", api: fake });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't load the leaderboard. You're offline.",
+      "Couldn't load the leaderboard. We couldn't reach ClassiCade. Check your connection, then try again.",
     );
     await user.click(screen.getByRole("button", { name: "Try again" }));
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { getGame, ROOM_STATUS } from "@classicade/shared";
 import { outcomeMoment } from "../../games/outcomeMoment.js";
 import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
-import { gameNumber, matchPhase, PLAY_REASONS } from "../../games/roomView.js";
+import { gameNumber, matchPhase, reconnectingReason } from "../../games/roomView.js";
 import { useAction } from "../../hooks/useAction.js";
 import { ResultCelebration } from "../Celebrations/ResultCelebration.jsx";
 import { ClaimWin } from "../ClaimWin/ClaimWin.jsx";
@@ -83,7 +83,7 @@ export function MatchShell({
   const layout = shellLayout(room);
   const catalogName = getGame(room.gameId)?.name;
   const gameName = catalogName ?? room.gameId;
-  const offline = reconnecting ? PLAY_REASONS.RECONNECTING : "";
+  const offline = reconnecting ? reconnectingReason(room) : "";
   const score = layout.stage === "waiting" ? undefined : game.inGameScore?.(room);
   const { Panel } = game;
   const moment = layout.result ? outcomeMoment(room) : undefined;

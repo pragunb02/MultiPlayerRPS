@@ -2,6 +2,7 @@ import {
   CHALLENGE_LIFETIME_MS,
   CHALLENGE_LIMIT_REASONS,
   CHALLENGE_LIMITS,
+  CHALLENGE_REFUSALS,
   CHALLENGE_STATES,
 } from "@classicade/shared";
 import { newChallengeId } from "../../models/challengeId.js";
@@ -220,7 +221,9 @@ export function createChallengeComponent({
   async function endedSince(challengeId, now) {
     const state = stateAt(await challengeAccessor.get(challengeId), now);
     return state === CHALLENGE_STATES.OPEN
-      ? new ConflictError("Someone else was taking this challenge just now. Try again")
+      ? new ConflictError("Someone else was taking this challenge just now. Try again", {
+          details: { reason: CHALLENGE_REFUSALS.BEING_TAKEN },
+        })
       : ended(state);
   }
 
@@ -362,11 +365,15 @@ export function createChallengeComponent({
     async accept({ challengeId, player, network, earlierNetworks = [], now }) {
       const stored = await challengeAccessor.get(challengeId);
       if (stored.fromId === player.id) {
-        throw new ForbiddenError("This is your own challenge");
+        throw new ForbiddenError("This is your own challenge", {
+          details: { reason: CHALLENGE_REFUSALS.OWN },
+        });
       }
       const challenge = await openFor(challengeId, player.id, now);
       if (challenge.toId !== "" && challenge.toId !== player.id) {
-        throw new ForbiddenError("This challenge is for someone else");
+        throw new ForbiddenError("This challenge is for someone else", {
+          details: { reason: CHALLENGE_REFUSALS.NOT_FOR_YOU },
+        });
       }
       const claim = { challengeId, acceptedBy: player.id };
       const claimed = await challengeAccessor.claim({
@@ -417,7 +424,9 @@ export function createChallengeComponent({
     async decline({ challengeId, playerId, now }) {
       const stored = await challengeAccessor.get(challengeId);
       if (stored.toId === "" || stored.toId !== playerId) {
-        throw new ForbiddenError("That challenge was not sent to you");
+        throw new ForbiddenError("That challenge was not sent to you", {
+          details: { reason: CHALLENGE_REFUSALS.NOT_FOR_YOU },
+        });
       }
       await openFor(challengeId, playerId, now);
       const end = { challengeId, state: CHALLENGE_STATES.DECLINED, at: now, staleBefore: staleBefore(now) };
@@ -440,7 +449,9 @@ export function createChallengeComponent({
     async withdraw({ challengeId, playerId, now }) {
       const stored = await challengeAccessor.get(challengeId);
       if (stored.fromId !== playerId) {
-        throw new ForbiddenError("Only the player who made it can take it back");
+        throw new ForbiddenError("Only the player who made it can take it back", {
+          details: { reason: CHALLENGE_REFUSALS.NOT_YOURS },
+        });
       }
       if (stateAt(stored, now) !== CHALLENGE_STATES.OPEN) {
         throw ended(stateAt(stored, now));
@@ -465,7 +476,9 @@ export function createChallengeComponent({
     async later({ challengeId, playerId, now }) {
       const stored = await challengeAccessor.get(challengeId);
       if (stored.fromId !== playerId && stored.toId !== playerId) {
-        throw new ForbiddenError("That challenge is not in your inbox");
+        throw new ForbiddenError("That challenge is not in your inbox", {
+          details: { reason: CHALLENGE_REFUSALS.NOT_FOR_YOU },
+        });
       }
       const blocked = stored.fromId !== playerId && (await blockedBetween(playerId, stored.fromId));
       if (!blocked && (await challengeAccessor.addLater({ challengeId, playerId }))) {

@@ -95,7 +95,9 @@ describe("PublicProfilePage (CC-034)", () => {
       return PUBLIC;
     });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load the profile. Server down");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't load the profile. That didn't work on our side. Try again in a moment.",
+    );
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "RiyaTest" })).toBeInTheDocument();

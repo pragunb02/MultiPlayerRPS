@@ -1,3 +1,4 @@
+import { PASSWORD_REFUSALS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../utils/errors.js";
 import {
@@ -127,7 +128,16 @@ describe("credentials", () => {
     expect(parsePassword("  spaced out  ")).toBe("  spaced out  ");
   });
 
-  it.each(["short", "x".repeat(129), "        ", 12345678, undefined])("rejects password %j", (raw) => {
+  it.each([
+    ["short", PASSWORD_REFUSALS.LENGTH],
+    ["x".repeat(129), PASSWORD_REFUSALS.LENGTH],
+    ["        ", PASSWORD_REFUSALS.ONLY_SPACES],
+    [12345678, PASSWORD_REFUSALS.LENGTH],
+    [undefined, PASSWORD_REFUSALS.LENGTH],
+  ])("rejects password %j, naming why", (raw, reason) => {
     expect(fieldOf(() => parsePassword(raw))).toBe("password");
+    expect(() => parsePassword(raw)).toThrow(
+      expect.objectContaining({ details: { field: "password", reason } }),
+    );
   });
 });

@@ -1,3 +1,4 @@
+import { ACCOUNT_REFUSALS } from "@classicade/shared";
 import bcrypt from "bcryptjs";
 import { describe, expect, it } from "vitest";
 import { createAccountAccessor } from "../../data/accountAccessor.js";
@@ -298,7 +299,7 @@ describe("accountComponent password checks and closing (CC-035)", () => {
     await expect(accounts.confirmPassword({ playerId: identity.id, password })).rejects.toMatchObject({
       constructor: ValidationError,
       message: "That is not your password",
-      details: { field: "password" },
+      details: { field: "password", reason: ACCOUNT_REFUSALS.WRONG_PASSWORD },
     });
   });
 

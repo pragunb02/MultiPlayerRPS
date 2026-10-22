@@ -17,7 +17,7 @@ const wrongPassword = new AppRequestError({
   code: "VALIDATION_FAILED",
   message: "That is not your password",
   status: 400,
-  details: { field: "password" },
+  details: { field: "password", reason: "wrong-password" },
 });
 
 async function openPrivacy(options) {
@@ -101,7 +101,9 @@ describe("year of birth on the profile (CC-152)", () => {
     await userEvent.selectOptions(await within(privacy).findByLabelText("Year of birth"), "1990");
     await userEvent.click(within(privacy).getByRole("button", { name: "Save year" }));
 
-    expect(await within(privacy).findByRole("alert")).toHaveTextContent("Something else");
+    expect(await within(privacy).findByRole("alert")).toHaveTextContent(
+      "That can't be done right now. Reload the page to see what changed, then try again.",
+    );
   });
 
   it("says when the account could not be loaded", async () => {
@@ -143,7 +145,9 @@ describe("downloading your data (CC-035)", () => {
     await userEvent.type(within(privacy).getByLabelText("Password for the download"), "nope");
     await userEvent.click(within(privacy).getByRole("button", { name: "Download my data" }));
 
-    expect(await within(privacy).findByText("That is not your password")).toBeInTheDocument();
+    expect(
+      await within(privacy).findByText("That isn't your password. Check it and try again."),
+    ).toBeInTheDocument();
     expect(within(privacy).getByLabelText("Password for the download")).toHaveAttribute(
       "aria-invalid",
       "true",
@@ -222,7 +226,9 @@ describe("deleting your account (CC-035)", () => {
     await userEvent.click(within(privacy).getByRole("button", { name: "Delete my account" }));
     await userEvent.click(await screen.findByRole("button", { name: "Delete for good" }));
 
-    expect(await within(privacy).findByText("That is not your password")).toBeInTheDocument();
+    expect(
+      await within(privacy).findByText("That isn't your password. Check it and try again."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("region", { name: "Your data and privacy" })).toBeInTheDocument();
   });
@@ -241,6 +247,8 @@ describe("deleting your account (CC-035)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Delete for good" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Too many attempts, try again later");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Too many tries in a row. Wait a minute, then try again.",
+    );
   });
 });

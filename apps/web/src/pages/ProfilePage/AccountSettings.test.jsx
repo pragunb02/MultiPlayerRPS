@@ -14,8 +14,13 @@ async function openAccount(api) {
   return screen.findByRole("region", { name: "Account" });
 }
 
-const fieldError = (message, field) =>
-  new AppRequestError({ code: "VALIDATION_FAILED", message, status: 400, details: { field } });
+const fieldError = (message, field, reason) =>
+  new AppRequestError({
+    code: "VALIDATION_FAILED",
+    message,
+    status: 400,
+    details: { field, reason },
+  });
 
 describe("account settings on the profile (CC-116)", () => {
   it("changes the password, clears the form and says the other devices are signed out", async () => {
@@ -38,19 +43,58 @@ describe("account settings on the profile (CC-116)", () => {
   });
 
   it.each([
-    ["Current password", "currentPassword", "That is not your current password"],
-    ["New password", "newPassword", "Passwords are 8–128 characters"],
-  ])("shows a refusal of the %s next to that box", async (label, field, message) => {
-    const api = profileApi(USER, { changePassword: vi.fn().mockRejectedValue(fieldError(message, field)) });
-    const account = await openAccount(api);
+    [
+      "Current password",
+      "currentPassword",
+      "That is not your current password",
+      "That isn't your current password. Check it and try again.",
+      "wrong-current-password",
+    ],
+    [
+      "New password",
+      "newPassword",
+      "Passwords are 8–128 characters",
+      "A password needs 8 to 128 characters. Change its length and try again.",
+      "password-length",
+    ],
+    [
+      "New password",
+      "newPassword",
+      "Passwords cannot be only spaces",
+      "A password can't be only spaces. Add letters or numbers.",
+      "password-only-spaces",
+    ],
+    [
+      "New password",
+      "newPassword",
+      "That password is too easy to guess. Choose a different one.",
+      "That password is too easy to guess. Try a longer phrase only you would know.",
+      "easy-password",
+    ],
+    [
+      "New password",
+      "newPassword",
+      "Choose a password different from your current one",
+      "That's your current password. Choose a new one.",
+      "same-as-current",
+    ],
+  ])(
+    "shows a refusal of the %s next to that box, in plain words",
+    async (label, field, message, words, reason) => {
+      const api = profileApi(USER, {
+        changePassword: vi.fn().mockRejectedValue(fieldError(message, field, reason)),
+      });
+      const account = await openAccount(api);
 
-    await userEvent.click(within(account).getByRole("button", { name: "Change password" }));
+      await userEvent.click(within(account).getByRole("button", { name: "Change password" }));
 
-    const input = within(account).getByLabelText(label);
-    await vi.waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
-    expect(within(account).getByText(message)).toBeInTheDocument();
-    expect(within(account).queryByRole("alert")).toBeNull();
-  });
+      const input = within(account).getByLabelText(label);
+      await vi.waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+      expect(within(account).getByText(words)).toBeInTheDocument();
+      expect(within(account).queryByText(message)).toBeNull();
+      expect(within(account).queryByRole("alert")).toBeNull();
+    },
+  );
 
   it("shows any other refusal for the whole form", async () => {
     const tooMany = new AppRequestError({
@@ -64,7 +108,9 @@ describe("account settings on the profile (CC-116)", () => {
 
     await userEvent.click(within(account).getByRole("button", { name: "Change password" }));
 
-    expect(await within(account).findByRole("alert")).toHaveTextContent("Too many attempts, try again later");
+    expect(await within(account).findByRole("alert")).toHaveTextContent(
+      "Too many tries in a row. Wait a minute, then try again.",
+    );
   });
 
   it("signs out the other devices and says so", async () => {
@@ -87,7 +133,9 @@ describe("account settings on the profile (CC-116)", () => {
 
     await userEvent.click(within(account).getByRole("button", { name: "Sign out other devices" }));
 
-    expect(await within(account).findByRole("alert")).toHaveTextContent("Internal server error");
+    expect(await within(account).findByRole("alert")).toHaveTextContent(
+      "That didn't work on our side. Try again in a moment.",
+    );
   });
 
   it("is not shown to a guest, who has no password", async () => {

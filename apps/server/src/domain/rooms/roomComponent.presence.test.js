@@ -1,3 +1,4 @@
+import { ROOM_REQUEST_REFUSALS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { createEngineRegistry, defineEngine, ENGINES } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
@@ -222,7 +223,10 @@ describe("roomComponent claiming the win from an opponent who stays offline (CC-
     await rooms.playerDisconnected({ code, playerId: BOB.id, now: T0 + 5 });
     await expect(
       rooms.claimWin({ code, playerId: ALICE.id, now: T0 + 4 + reconnectGraceMs }),
-    ).rejects.toThrow("Your opponent can still come back");
+    ).rejects.toMatchObject({
+      message: "Your opponent can still come back",
+      details: { reason: ROOM_REQUEST_REFUSALS.OPPONENT_MAY_RETURN },
+    });
 
     const room = await rooms.claimWin({ code, playerId: ALICE.id, now: T0 + 5 + reconnectGraceMs });
 

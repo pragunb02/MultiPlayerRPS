@@ -99,7 +99,7 @@ test.describe("the server restarts", () => {
 
     // Down for a few seconds, so the second before the banner shows has passed for certain.
     const restarting = restartServer({ crash: true, downMs: 6_000 });
-    await expect(connection(alice)).toHaveText("Reconnecting…");
+    await expect(connection(alice)).toHaveText("Connection lost. Reconnecting… Your game is kept.");
     const rock = choices(alice).getByRole("button", { name: /Rock/ });
     await expect(rock).toHaveAttribute("aria-disabled", "true");
     await pressAnswers(alice, rock);
@@ -108,7 +108,7 @@ test.describe("the server restarts", () => {
       alice.page
         .getByRole("main")
         .getByRole("status")
-        .filter({ hasText: /^Reconnecting$/ }),
+        .filter({ hasText: /^Reconnecting… Your clock may still be running\.$/ }),
     ).toBeVisible();
     await restarting;
 

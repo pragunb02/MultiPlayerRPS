@@ -1,3 +1,4 @@
+import { PASSWORD_REFUSALS } from "@classicade/shared";
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../../utils/errors.js";
 import { createPasswordScreen, EASY_PASSWORD } from "./passwordScreen.js";
@@ -46,7 +47,7 @@ describe("passwordScreen", () => {
     await expect(refused).rejects.toThrow(ValidationError);
     await expect(refused).rejects.toMatchObject({
       message: EASY_PASSWORD,
-      details: { field: "newPassword" },
+      details: { field: "newPassword", reason: PASSWORD_REFUSALS.EASY },
     });
     expect(asked).toEqual([]);
     expect(outcomes).toEqual(["common"]);
@@ -59,7 +60,7 @@ describe("passwordScreen", () => {
       screen.check({ password: "not-a-real-secret-phrase", field: "password" }),
     ).rejects.toMatchObject({
       message: EASY_PASSWORD,
-      details: { field: "password" },
+      details: { field: "password", reason: PASSWORD_REFUSALS.EASY },
     });
     expect(outcomes).toEqual(["breached"]);
   });

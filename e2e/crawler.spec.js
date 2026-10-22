@@ -64,7 +64,7 @@ test.describe("crawler and link preview bot", () => {
     expect(tag(html, "property", "og:image")).toMatch(/\/og\/chess\.[0-9a-f]{8}\.jpg$/);
     expect(tag(html, "name", "robots")).toBe("noindex");
     // The preview neither took a seat nor said anything about who is in the room.
-    await expect(host.page.getByRole("heading", { name: "Invite a friend" })).toBeVisible();
+    await expect(host.page.getByRole("heading", { name: "Waiting for a friend to join" })).toBeVisible();
     expect(html).not.toContain("Guest-");
   });
 

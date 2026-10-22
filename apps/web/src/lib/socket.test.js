@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RELOAD_GUARD_MS, RELOADED_PARAM, recoverFromStaleBuild } from "../app/staleBuild.js";
-import { AppRequestError } from "./errors.js";
+import { AppRequestError, FALLBACK_WORDS, PLAYER_WORDS } from "./errors.js";
 import { createSocketClient } from "./socket.js";
 
 const realIo = vi.hoisted(() => ({ connect: vi.fn() }));
@@ -91,7 +91,11 @@ describe("socket client", () => {
     const error = await (await loadedClient(io)).request("room:join", {}).catch((err) => err);
 
     expect(error).toBeInstanceOf(AppRequestError);
-    expect(error).toMatchObject({ code: "CONFLICT", message: "Room is full" });
+    expect(error).toMatchObject({
+      code: "CONFLICT",
+      message: PLAYER_WORDS.CONFLICT,
+      serverMessage: "Room is full",
+    });
   });
 
   it("rejects with TIMEOUT when the server does not answer", async () => {
@@ -505,7 +509,7 @@ describe("socket client", () => {
 
     await expect((await loadedClient(io)).request("room:join", {})).rejects.toMatchObject({
       code: "UNKNOWN",
-      message: "Something went wrong",
+      message: FALLBACK_WORDS,
     });
   });
 
