@@ -273,7 +273,43 @@ The contract says what should hold. The code does not hold it yet in these place
 4. **No shared Card, EmptyState or Button danger variant and link form** (RC-2 to RC-4). The contracts in section 2
    are written; the components that carry them are the redesign's work.
 
-## 7. Changing the contract
+## 7. Clarity (CC-348)
+
+The owner's rule (2026-10-22): on every feature, every page and every small thing, a first-time player can tell what
+to do, how to do it and how to play along. This is the checklist for it. The audit that scored every screen against
+it, with the sources behind each line, is [CLARITY-AUDIT.md](CLARITY-AUDIT.md).
+
+**Every screen and every state answers three questions in plain words,** without scrolling on a 390 × 844 phone:
+
+- **Q1. What is this?** A heading that names the screen or the state ("Waiting for Riya to join"), not only the
+  game or the site.
+- **Q2. What can I do here?** One obvious primary action (section 3, rule 4) whose label says what it does.
+- **Q3. What happens next, or how do I get back?** A line that says what happens after the action or while you wait,
+  and a way back that is not the browser's Back button.
+
+**And these, on every screen they apply to:**
+
+| #   | Rule                                                                                                                                                                                                                    | Source                                    |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| C1  | **How to play.** Every game has three short steps (the registry's `howToPlay`), shown near the top of its lobby and one press away in the game, on the invite screen and in pass and play. No more than three sentences | Apple HIG Onboarding, Nielsen 10          |
+| C2  | **Buttons say what they do.** A verb and its object ("Copy link", "Accept the draw"), at most three words (section 4). Never "OK", "Submit" or a word that names a state                                                | GOV.UK button, Nielsen 4                  |
+| C3  | **Empty states** say what will be here, why it is empty and the one thing to do about it, with that thing as a button (section 2, Empty state)                                                                          | NN/g empty states, Material empty states  |
+| C4  | **Errors** say what went wrong in the player's words and the next step. Never a raw server message, a code or "Something went wrong" alone. Keep what the player typed                                                  | NN/g error messages, GOV.UK error message |
+| C5  | **Waits** say what they wait for and what happens when it ends ("Waiting for Riya to answer. 0:30 left, then the offer ends")                                                                                           | Nielsen 1, Apple HIG Loading              |
+| C6  | **Icons have words.** A visible word beside every icon whose meaning is not universal. An `aria-label` alone is for screen readers and is not enough for everyone else                                                  | NN/g icon usability                       |
+| C7  | **No jargon.** A game or site term ("host", "seat", "rematch request", "time control", "PGN", "provisional", "XP", "quest") is replaced by plain words, or explained the first time it shows                            | Nielsen 2, GOV.UK writing guidelines      |
+| C8  | **First-time hints** teach by doing, one at a time, at the moment they matter, and go away once the player has done the thing. They never block play and never come back after                                          | Apple HIG Onboarding, Hodent (GDC 2015)   |
+| C9  | **Hinglish** uses "tum", never "aap", everywhere Hinglish exists (CC-217). The Hinglish line says the same thing as the English one, including any number or next step                                                  | Owner (CC-217)                            |
+| C10 | **One h1** per settled screen, which answers Q1. A loading screen has one too ("Opening the room…")                                                                                                                     | WCAG 2.4.6, Nielsen 1                     |
+| C11 | **Timers say what they count.** A countdown always has its words: what ends at zero and what happens then                                                                                                               | Nielsen 1                                 |
+| C12 | **One question, one place.** The same question or result is asked or shown once on a screen, with one timer                                                                                                             | Nielsen 8, section 3 (one banner)         |
+
+**How it is checked.** C2 to C9 and Q1 to Q3 are the design lens's job in review (CC-316), with this section to
+point at. The parts a machine can see are proposed as checks in the audit's [Automatic checks](CLARITY-AUDIT.md#automatic-checks):
+one h1 per screen, `howToPlay` on every game, a name on every icon-only control, no raw server text in an error, and
+"tum" in every Hinglish line. Each joins this section when it is built.
+
+## 8. Changing the contract
 
 1. Change this file first, in the same pull request as the code: a new role, a new pop-up row, a new exception.
 2. A new token goes in its role's file under `styles/tokens/`, in both themes, and in `tokenRoles.js` if it is a role, so the token test checks
