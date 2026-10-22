@@ -7,6 +7,7 @@ import {
   APP_ROUTES,
   LeaderboardPage,
   LoginPage,
+  needsSocketNow,
   NotFoundPage,
   pageFor,
   PlayPage,
@@ -58,6 +59,28 @@ describe("APP_ROUTES: the one route table App.jsx draws and the early downloads 
     expect(pageFor("/admin/flags")).toBe(AdminRoute);
     expect(pageFor("/nope/at/all")).toBe(NotFoundPage);
     expect(pageFor("/")).toBe(HomePage);
+  });
+});
+
+describe("needsSocketNow: the pages that cannot wait for an idle moment to connect (CC-333)", () => {
+  it.each([
+    ["a room", "/games/chess/rooms/AB2CD3"],
+    ["a room by its old address", "/room/AB2CD3"],
+    ["a challenge", "/challenge/abcdefghijklmnopqrst"],
+    ["the friends page", "/friends"],
+  ])("says %s needs the realtime connection at once", (_case, address) => {
+    expect(needsSocketNow(address)).toBe(true);
+  });
+
+  it.each([
+    ["home", "/"],
+    ["a lobby", "/games/chess"],
+    ["a friend link", "/friends/add/sometoken"],
+    ["the profile", "/profile"],
+    ["a leaderboard, through its redirect", "/leaderboards"],
+    ["an unknown address", "/nope/at/all"],
+  ])("lets %s connect when the browser is idle", (_case, address) => {
+    expect(needsSocketNow(address)).toBe(false);
   });
 });
 

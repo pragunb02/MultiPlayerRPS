@@ -4,6 +4,12 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 
 ## Resolution notes
 
+- **2026-10-21 — SEC-23 and SEC-24 fixed:** SEC-23 by CC-260: new hashes use scrypt N=2^15, r=8, p=3, and older
+  ones are made again at the next successful login, best effort (ADR-080). SEC-24 by CC-261: sign-up and password
+  change refuse a password on the bundled SecLists list of common passwords or in Have I Been Pwned's Pwned
+  Passwords (only a 5 character hash prefix leaves the server, padded, 1.5 s timeout, fail open after the local
+  check).
+
 - **2026-10-18 — docs sync after #65 to #91:**
   - BUG-16 and BUG-17 fixed by CC-111 and CC-112 (#78): finished games go through a stored outbox with named steps
     and retries (ADR-047), and a game starts only when every seated player is connected.
@@ -87,8 +93,8 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | SEC-17 | 🟡     | Signup reveals which emails have accounts (accepted trade-off until email verification)                                               | `accountComponent.js`                                                | CC-118         |
 | SEC-18 | ✅     | No reserved-name or abuse filter on public usernames                                                                                  | `credentials.js`, `leaderboardComponent.js`                          | CC-119         |
 | SEC-19 | ✅     | Wins and XP can be farmed through instant forfeits and repeated games against the same opponent                                       | `roomComponent.js`, `progression.js`, `leaderboardComponent.js`      | CC-095         |
-| SEC-23 | 🔴     | Password hashes use scrypt N=2^15, r=8, p=1, below OWASP's minimum (N=2^17 with p=1, or N=2^15 with p=3)                              | `utils/passwordHasher.js`                                            | CC-260         |
-| SEC-24 | 🔴     | Sign-up and password change accept breached and common passwords                                                                      | `models/credentials.js`, `authRoutes.js`                             | CC-261         |
+| SEC-23 | ✅     | Password hashes use scrypt N=2^15, r=8, p=1, below OWASP's minimum (N=2^17 with p=1, or N=2^15 with p=3)                              | `utils/passwordHasher.js`                                            | CC-260         |
+| SEC-24 | ✅     | Sign-up and password change accept breached and common passwords                                                                      | `models/credentials.js`, `authRoutes.js`                             | CC-261         |
 
 ## Bugs (`BUG-*`)
 
@@ -116,7 +122,7 @@ Status: 🔴 open · 🟡 in progress · ✅ fixed. Line numbers refer to commit
 | BUG-20 | ✅     | Other tabs go dead after signing in or out                                                                                                                                     | `SessionProvider.jsx`, `socket.js`                                     | CC-115         |
 | BUG-21 | 🔴     | The chess clock shows "0:010.0" just under 10 seconds                                                                                                                          | `useChessClocks.js` `formatClock`                                      | CC-120         |
 | BUG-22 | ✅     | Games with an idle opponent never end                                                                                                                                          | `roomComponent.js`, `chessEngine.js`                                   | CC-036         |
-| BUG-23 | 🔴     | The comment says a rematch alternates who moves first, but the first mover comes from the seed                                                                                 | `roomComponent.js` `requestRematch`                                    | CC-091         |
+| BUG-23 | ✅     | The comment says a rematch alternates who moves first, but the first mover comes from the seed                                                                                 | `roomComponent.js` `requestRematch`                                    | CC-091         |
 | BUG-24 | ✅     | After a game "Play again", the biggest button, opens the lobby: the opponent waiting for a rematch is never told                                                               | `RoomPage.jsx` result (UX audit A1)                                    | CC-162         |
 | BUG-25 | 🟡     | Rematch requests and the series score are easy to miss: no countdown on a request, the series hidden during play                                                               | `RematchPanel.jsx`, `RoomRequests.jsx` (UX audit A2, A4)               | CC-160, CC-161 |
 | BUG-26 | ✅     | Your own connection drops or the server restarts: clicks do nothing visible and there is no connection indicator                                                               | `useRoom.js`, `RoomPage.jsx` (UX audit A5)                             | CC-158         |

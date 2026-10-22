@@ -43,7 +43,8 @@ const pathOf = (url) => `${url.pathname}${url.search}${url.hash}`;
  *   window: Pick<Window, "location" | "history" | "addEventListener" | "removeEventListener">,
  *   now: () => number,
  * }} deps
- * @returns {() => void} stops listening
+ * @returns {(() => void) & { quietly: <T>(run: () => Promise<T>) => Promise<T> }} stops listening, and runs a
+ *   download that failed before without reloading for it
  */
 export function recoverFromStaleBuild({ window, now }) {
   const address = new URL(window.location.href);
@@ -62,8 +63,14 @@ export function recoverFromStaleBuild({ window, now }) {
     leaving = false;
   };
 
+  // Downloads on their way that were tried before and failed (`quietly` below).
+  let quiet = 0;
+
   /** @param {Event} event */
   function onPreloadError(event) {
+    if (!reloading && quiet > 0) {
+      return;
+    }
     if (!reloading && cameFromReload && now() - startedAt < RELOAD_GUARD_MS) {
       return;
     }
@@ -82,9 +89,27 @@ export function recoverFromStaleBuild({ window, now }) {
   window.addEventListener(PRELOAD_ERROR, onPreloadError);
   window.addEventListener(LEAVING, onLeaving);
   STAYING.forEach((type) => window.addEventListener(type, onStaying));
-  return () => {
+  const stop = () => {
     window.removeEventListener(PRELOAD_ERROR, onPreloadError);
     window.removeEventListener(LEAVING, onLeaving);
     STAYING.forEach((type) => window.removeEventListener(type, onStaying));
   };
+  /**
+   * Runs a download that already failed once, such as Socket.IO's (CC-333). While it is on its way a failed load
+   * neither reloads the tab nor is swallowed, so the caller sees it fail. Its file is most likely missing for another
+   * reason than a deploy (a filter, a gap at the CDN), and reloading for it again and again would never end.
+   *
+   * @template T
+   * @param {() => Promise<T>} run
+   * @returns {Promise<T>}
+   */
+  const quietly = (run) => {
+    quiet += 1;
+    return Promise.resolve()
+      .then(run)
+      .finally(() => {
+        quiet -= 1;
+      });
+  };
+  return Object.assign(stop, { quietly });
 }

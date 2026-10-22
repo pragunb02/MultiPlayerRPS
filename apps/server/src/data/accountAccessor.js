@@ -123,8 +123,13 @@ export function createAccountAccessor({ accountDao }) {
       return "rewritten";
     },
 
-    /** @param {string} accountId @param {string} passwordHash */
-    updatePasswordHash: (accountId, passwordHash) => accountDao.updatePasswordHash(accountId, passwordHash),
+    /**
+     * Replaces the hash only while it is still `from`. A password changed in between is kept (CC-260).
+     *
+     * @param {string} accountId
+     * @param {{ from: string, to: string }} change
+     */
+    updatePasswordHash: (accountId, change) => accountDao.updatePasswordHash(accountId, change),
 
     /**
      * @param {string} accountId
