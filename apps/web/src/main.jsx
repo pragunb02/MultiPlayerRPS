@@ -15,13 +15,37 @@ import { createSessionBroadcast } from "./lib/sessionBroadcast.js";
 import { createSocketClient } from "./lib/socket.js";
 import { createSoundPlayer } from "./lib/sound/soundPlayer.js";
 import { createSoundPreferences } from "./lib/sound/soundPreferences.js";
+import { entryOf } from "./lib/telemetry/entry.js";
+import { codeOf, socketCodeOf } from "./lib/telemetry/errorFields.js";
+import { createTelemetryFacade } from "./lib/telemetry/facade.js";
+import { isSwitchedOff, isTelemetryOff } from "./lib/telemetry/optOut.js";
+import { roundMs, TELEMETRY_MAX_SINCE_LOAD_MS } from "@classicade/shared";
 import "./styles/global.css";
 
 // Composition root of the web app: the only place real clients are created.
-// First of all, because it may change the address before the router reads it (CC-181).
-const recovery = recoverFromStaleBuild({ window, now: () => Date.now() });
+// Usage counts first (CC-174): they hold events in memory until the flag says whether to send them, and send
+// nothing when the switch, GPC or DNT says no.
+const isOff = () =>
+  isTelemetryOff({ getStorage: () => window.localStorage, navigator, location: window.location });
+// Its own files download through the stale build's `quietly`, so a missing one never reloads the tab (CC-333).
+const telemetry = createTelemetryFacade({ isOff, quietly: (run) => recovery.quietly(run) });
+// The kind of player comes once the session has answered (TelemetryStub.jsx).
+telemetry.setContext({ path: window.location.pathname });
+// Before the router, because it may change the address before the router reads it (CC-181).
+const recovery = recoverFromStaleBuild({
+  window,
+  now: () => Date.now(),
+  onFailedLoad: (kind) => telemetry.track("client_errored", { kind, error_type: "other" }),
+});
 // Also before the router, which must never see the share channel marker or keep it in the history (CC-279).
-takeLanding({ window, document });
+telemetry.setLanding(
+  entryOf({
+    landing: takeLanding({ window, document }),
+    pathname: window.location.pathname,
+    referrer: document.referrer,
+    origin: window.location.origin,
+  }),
+);
 const sound = createSoundPlayer({
   // Older Safari only has the prefixed name. Without either, creating the context throws and the app stays silent.
   createContext: () => new (window.AudioContext ?? window.webkitAudioContext)(),
@@ -31,9 +55,36 @@ const sound = createSoundPlayer({
 });
 sound.listen(window);
 const services = {
-  api: createApiClient(),
+  telemetry,
+  api: createApiClient({
+    // The server hears the switch too, so it records no sign-up, login or error about this browser (CC-174).
+    countsOff: () => isSwitchedOff(() => window.localStorage),
+    onRequest: () => telemetry.noteRequest("http"),
+    // The API's templates load with the client (CC-322), which names the endpoint.
+    onFailure: ({ path, status, error }) =>
+      telemetry.track("request_failed", ({ endpointOf }) => ({
+        endpoint: endpointOf(`/api${path}`),
+        status,
+        code: codeOf(error),
+      })),
+  }),
   // A download of Socket.IO tried again after it failed never reloads the tab for a newer version (CC-333).
-  socket: createSocketClient({ quietly: recovery.quietly }),
+  socket: createSocketClient({
+    quietly: recovery.quietly,
+    onRequest: () => telemetry.noteRequest("socket"),
+    onChange: ({ state, reason, afterS }) =>
+      telemetry.track("socket_changed", {
+        state,
+        code: socketCodeOf(reason),
+        ...(afterS !== undefined && { after_s: afterS }),
+      }),
+    onFirstMove: (gameId) =>
+      telemetry.track("gameplay_started", {
+        game_id: gameId,
+        entry: telemetry.landing.entry,
+        since_load_ms: roundMs(window.performance.now(), TELEMETRY_MAX_SINCE_LOAD_MS),
+      }),
+  }),
   sound,
   // Tabs of this browser tell each other the session changed (ADR-033). Older browsers without it get none.
   sessionBroadcast: createSessionBroadcast({ Channel: window.BroadcastChannel }),

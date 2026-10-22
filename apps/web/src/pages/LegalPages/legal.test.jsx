@@ -20,7 +20,7 @@ describe("footer", () => {
   it("tells people about the one cookie in words, with no banner to dismiss", () => {
     renderApp({ path: "/" });
 
-    expect(footer()).toHaveTextContent("One cookie keeps you signed in. No ads, no trackers.");
+    expect(footer()).toHaveTextContent("One cookie keeps you signed in. No ads, no third-party trackers.");
     expect(within(footer()).getByRole("link", { name: "How we use your data" })).toHaveAttribute(
       "href",
       "/privacy",

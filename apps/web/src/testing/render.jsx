@@ -23,6 +23,7 @@ await Promise.all(APP_ROUTES.map(({ page }) => page?.preload?.()));
  *   sound?: object,
  *   sessionBroadcast?: object,
  *   download?: object,
+ *   telemetry?: object,   usage counts (CC-174): none unless a test gives a facade
  * }} [options]
  */
 export function renderApp({
@@ -33,6 +34,7 @@ export function renderApp({
   sound = fakeSound(),
   sessionBroadcast = fakeSessionBroadcast(),
   download = fakeDownload(),
+  telemetry = undefined,
 } = {}) {
   let current = path;
   let navigate;
@@ -44,7 +46,7 @@ export function renderApp({
   };
   const view = render(
     <MemoryRouter initialEntries={[...history, path]} initialIndex={history.length}>
-      <App services={{ api, socket, sound, sessionBroadcast, download }} />
+      <App services={{ api, socket, sound, sessionBroadcast, download, ...(telemetry && { telemetry }) }} />
       <LocationProbe onChange={record} onNavigator={keepNavigator} />
     </MemoryRouter>,
   );
