@@ -1,6 +1,9 @@
 import { screen, within } from "@testing-library/react";
+import { CLIENT_FLAG_NAMES } from "../../app/flagStore.js";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fakeApi } from "../../testing/fakes.js";
+import { flagPaths } from "../../testing/flagPaths.js";
 import { renderApp } from "../../testing/render.jsx";
 
 /**
@@ -19,8 +22,8 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 /** Opens the setup, types the names and starts. Returns the app and how many calls it had made by then. */
-async function startGame(user, { slug, names = ["Asha", "Ben"] }) {
-  const app = renderApp({ path: `/games/${slug}/pass-and-play` });
+async function startGame(user, { slug, names = ["Asha", "Ben"], api = fakeApi() }) {
+  const app = renderApp({ path: `/games/${slug}/pass-and-play`, api });
   const start = await screen.findByRole("button", { name: "Start game" });
   if (names[0] !== "") await user.type(screen.getByRole("textbox", { name: "Player 1" }), names[0]);
   if (names[1] !== "") await user.type(screen.getByRole("textbox", { name: "Player 2" }), names[1]);
@@ -30,10 +33,8 @@ async function startGame(user, { slug, names = ["Asha", "Ben"] }) {
   await vi.waitFor(() => expect(screen.queryByText("Loading the board…")).not.toBeInTheDocument(), {
     timeout: 5_000,
   });
-  // The usage counts host loads once the page is idle and asks its flag then (CC-322): that is the page's start.
-  await vi.waitFor(() => expect(app.api.getFlags).toHaveBeenCalledWith(["telemetry_client"]), {
-    timeout: 5_000,
-  });
+  // The app asks for its flags once, when it knows who this is (CC-349): that is before the game starts.
+  expect(app.api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES);
   return { app, before: networkCalls(app) };
 }
 
@@ -54,7 +55,7 @@ describe("the lobby's way in", () => {
     const user = userEvent.setup();
     const { url } = renderApp({ path: `/games/${slug}` });
 
-    await user.click(screen.getByRole("link", { name: "Play on this phone" }));
+    await user.click(await screen.findByRole("link", { name: "Play on this phone" }));
 
     expect(url()).toBe(`/games/${slug}/pass-and-play`);
     expect(screen.getByRole("heading", { level: 1, name: `${name}: pass and play` })).toBeInTheDocument();
@@ -325,5 +326,24 @@ describe("Chess on one phone", () => {
     await user.click(screen.getByRole("button", { name: "Accept" }));
 
     expect(document.getElementById("result-heading")).toHaveTextContent("Draw by agreement");
+  });
+});
+
+describe("How to play in a game on one phone (CC-349)", () => {
+  flagPaths("how_to_play", (on) => {
+    it(on ? "is one press away, and opening it sends nothing" : "is not in the match bar", async () => {
+      const user = userEvent.setup();
+      const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ how_to_play: on }) });
+      const { app, before } = await startGame(user, { slug: "chess", api });
+
+      const button = screen.queryByRole("button", { name: "How to play" });
+      if (on) {
+        await user.click(button);
+        expect(screen.getByRole("dialog", { name: "How to play Chess" })).toBeInTheDocument();
+      } else {
+        expect(button).toBeNull();
+      }
+      expect(networkCalls(app)).toBe(before);
+    });
   });
 });

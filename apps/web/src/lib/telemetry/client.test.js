@@ -1,4 +1,5 @@
 import { act, render, waitFor } from "@testing-library/react";
+import { CLIENT_FLAG_NAMES } from "../../app/flagStore.js";
 import { createElement as h } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -529,7 +530,7 @@ describe("the telemetry_client flag (CC-174)", () => {
         ),
       );
 
-      await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["telemetry_client"]));
+      await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES));
       if (on) await waitFor(() => expect(telemetry.isAttached()).toBe(true));
       else {
         // Long enough for an idle load to have started, had the flag's answer let it.

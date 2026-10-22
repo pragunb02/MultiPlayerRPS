@@ -1,4 +1,5 @@
 import { act, render, waitFor } from "@testing-library/react";
+import { CLIENT_FLAG_NAMES } from "../../app/flagStore.js";
 import { createElement as h } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -164,7 +165,7 @@ describe("the first page's telemetry stub (CC-174, CC-322)", () => {
     runIdle();
     expect(loadHost).toHaveBeenCalledOnce();
     // The host waits for an idle moment of its own before the client's file.
-    await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["telemetry_client"]));
+    await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES));
     await waitFor(() => {
       runIdle();
       expect(telemetry.isAttached()).toBe(true);

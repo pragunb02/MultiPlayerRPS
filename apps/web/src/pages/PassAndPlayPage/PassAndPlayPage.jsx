@@ -6,6 +6,7 @@ import { NOT_COUNTED_NOTE, PassAndPlayShell } from "../../components/MatchShell/
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { checkNames, MAX_NAME_LENGTH } from "../../games/passAndPlay/localMatch.js";
 import { gameView } from "../../games/registry.js";
+import { useSteadyFlagState } from "../../hooks/useFlag.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
 import styles from "./PassAndPlayPage.module.css";
 
@@ -49,6 +50,8 @@ function PassAndPlay({ game, entry }) {
   const [typed, setTyped] = useState(["", ""]);
   const [options, setOptions] = useState({});
   const [started, setStarted] = useState(undefined);
+  // Asked on the setup screen, so the game itself never talks to the server (CC-349).
+  const howToPlay = useSteadyFlagState("how_to_play");
   const { Options } = entry;
   const names = checkNames(typed);
   const reason = startReason({ load, names });
@@ -66,6 +69,7 @@ function PassAndPlay({ game, entry }) {
         names={started.names}
         options={started.options}
         onLeave={leave}
+        howToPlay={howToPlay}
       />
     );
   }

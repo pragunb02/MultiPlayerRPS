@@ -32,9 +32,9 @@ const tests = files.filter(([file]) => isTest(file));
 
 describe("feature flag names in the source (CC-312)", () => {
   it("finds the flag names code reads and the flags a suite runs on and off", () => {
-    const text = `await flags.isOn("a_flag", player); useFlag('b_flag'); recordSuccess("c_flag", player);`;
+    const text = `await flags.isOn("a_flag", player); useFlag('b_flag'); recordSuccess("c_flag", player); useSteadyFlagState("d_flag");`;
 
-    expect(flagNamesIn(text)).toEqual(["a_flag", "b_flag", "c_flag"]);
+    expect(flagNamesIn(text)).toEqual(["a_flag", "b_flag", "c_flag", "d_flag"]);
     expect(flagPathsIn(`flagPaths("a_flag", (on) => {});`)).toEqual(["a_flag"]);
   });
 

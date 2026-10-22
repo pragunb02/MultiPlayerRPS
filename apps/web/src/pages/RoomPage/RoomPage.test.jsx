@@ -1,8 +1,10 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
+import { CLIENT_FLAG_NAMES } from "../../app/flagStore.js";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
+import { flagPaths } from "../../testing/flagPaths.js";
 import { renderApp } from "../../testing/render.jsx";
 
 const BOB = { playerId: "guest_b", displayName: "Bob", connected: true };
@@ -652,7 +654,7 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     expect(heading.previousElementSibling.tagName).toBe("svg");
     expect(heading.previousElementSibling).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByText("AB2CD3").parentElement.querySelector("svg")).toHaveClass("tictactoe");
-    expect(screen.getByRole("button", { name: "Play as guest" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Play as guest" })).toBeEnabled();
     expect(within(screen.getByRole("main")).getByRole("link", { name: "Log in" })).toHaveAttribute(
       "href",
       `/login?next=${encodeURIComponent(INVITE)}`,
@@ -664,6 +666,46 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     expect(document.title).toBe("Tic Tac Toe · Room AB2CD3 · ClassiCade");
     expect(api.startGuest).not.toHaveBeenCalled();
     expect(socket.request).not.toHaveBeenCalled();
+  });
+
+  flagPaths("how_to_play", (on) => {
+    it(
+      on
+        ? "shows the game's How to play before the friend chooses how to join (CC-349)"
+        : "shows no How to play on the invite",
+      async () => {
+        const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ how_to_play: on }) });
+        openInvite({ api });
+
+        await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" });
+        await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES));
+        if (on) {
+          const line = await screen.findByText("How to play: 3 steps");
+          const choice = screen.getByRole("button", { name: "Play as guest" });
+          expect(line.compareDocumentPosition(choice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+          expect(within(line.closest("details")).getAllByRole("listitem")).toHaveLength(3);
+        } else {
+          // The choice comes with the flag's answer, so this is checked after the answer.
+          await screen.findByRole("button", { name: "Play as guest" });
+          expect(screen.queryByText("How to play: 3 steps")).not.toBeInTheDocument();
+        }
+      },
+    );
+  });
+
+  it("draws the choice at once and keeps the closed line's space until the answer comes (CC-349)", async () => {
+    let answer;
+    const api = fakeApi({ getFlags: vi.fn(() => new Promise((resolve) => (answer = resolve))) });
+    const { container } = openInvite({ api });
+
+    await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" });
+    expect(await screen.findByRole("button", { name: "Play as guest" })).toBeInTheDocument();
+    await waitFor(() => expect(answer).toBeDefined());
+    expect(container.querySelector("[data-cc-slot='how-to-play-space']")).toBeInTheDocument();
+    await act(async () => answer({ how_to_play: true }));
+
+    expect(await screen.findByText("How to play: 3 steps")).toBeInTheDocument();
+    expect(container.querySelector("[data-cc-slot='how-to-play-space']")).not.toBeInTheDocument();
   });
 
   it("joins as a guest after choosing to", async () => {
@@ -690,7 +732,7 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     await user.click(await screen.findByRole("button", { name: "Play as guest" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests, try again later");
-    expect(screen.getByRole("button", { name: "Play as guest" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Play as guest" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Play as guest" }));
     expect(await screen.findByRole("heading", { name: "Invite a friend" })).toBeInTheDocument();
   });

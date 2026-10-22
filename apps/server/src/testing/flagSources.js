@@ -1,6 +1,6 @@
 // How code names a feature flag (CC-312): by a quoted string in a call to one of these. A name built at run time
 // is not found here, which is why flags are always written out in full.
-const READS = /\b(?:isOn|useFlag|useFlagState|recordSuccess)\(\s*["']([a-z0-9_]+)["']/g;
+const READS = /\b(?:isOn|useFlag|useFlagState|useSteadyFlagState|recordSuccess)\(\s*["']([a-z0-9_]+)["']/g;
 const PATHS = /\bflagPaths\(\s*["']([a-z0-9_]+)["']/g;
 
 const namesOf = (pattern, text) => [...text.matchAll(pattern)].map((match) => match[1]);

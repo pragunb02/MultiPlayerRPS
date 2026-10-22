@@ -2,6 +2,12 @@ import { vi } from "vitest";
 import { AppRequestError } from "../lib/errors.js";
 import { DEFAULT_SOUND_SETTINGS } from "../lib/sound/soundPreferences.js";
 
+/**
+ * The flags a fake server answers on, so the tests of every page see the feature as it will ship. A flagPaths suite
+ * gives its own answer for the off side (CC-349).
+ */
+export const ON_IN_TESTS = new Set(["how_to_play"]);
+
 export const GUEST = Object.freeze({
   kind: "guest",
   id: "guest_00000000-0000-4000-8000-000000000001",
@@ -193,7 +199,7 @@ export function fakeApi(overrides = {}) {
     setFeedbackStatus: vi.fn(),
     getFeedbackItem: vi.fn(),
     deleteFeedback: vi.fn().mockResolvedValue(undefined),
-    getFlags: vi.fn(async (names) => Object.fromEntries(names.map((name) => [name, false]))),
+    getFlags: vi.fn(async (names) => Object.fromEntries(names.map((name) => [name, ON_IN_TESTS.has(name)]))),
     sendFlagSuccess: vi.fn().mockResolvedValue(undefined),
     getAdminFlags: vi.fn(() => new Promise(() => {})),
     setFlagRollout: vi.fn(),

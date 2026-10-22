@@ -7,6 +7,23 @@
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
 }
+/* With How to play on, the score and the How to play button sit together at the end of the match bar, on the
+   title's line when they fit (CC-349). */
+.barEnd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+/* The button's place has its own size, so the bar is as tall and wraps the same before the button comes, with it,
+   and without it once the place was kept (CC-349). The button is at most this big in every theme. */
+.barHelp {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 8.5rem;
+  height: 2.75rem;
+}
 .matchBar h1 {
   margin: 0;
   font-size: var(--text-xl);

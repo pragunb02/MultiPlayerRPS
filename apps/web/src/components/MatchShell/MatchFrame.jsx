@@ -1,8 +1,11 @@
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { getGame } from "@classicade/shared";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { momentAnnouncement } from "../../games/outcomeMoment.js";
+import { gameView } from "../../games/registry.js";
 import { gameNumber, playReason } from "../../games/roomView.js";
+import { FLAG_STATES } from "../../hooks/useFlag.js";
+import { HowToPlayButton } from "../HowToPlay/HowToPlay.jsx";
 import { PageTitle } from "../PageTitle.jsx";
 import { MatchAnnouncer } from "./MatchAnnouncer.jsx";
 import styles from "./MatchShell.module.css";
@@ -45,7 +48,8 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  * the same. Its slots, top to bottom:
  *
  * 1. Banner: whatever must sit above the match bar, such as the request banner.
- * 2. Match bar: the game's icon and name, and a short score line when there is one.
+ * 2. Match bar: the game's icon and name, a short score line when there is one, and How to play when it is on
+ *    (CC-349). How to play opens a dialog over the page and never changes the board's place.
  * 3. Result: at the end, the outcome moment (CC-163): its celebration, the headline and the line under it, and a
  *    note, in the tone of how the game ended, with the action bar inside the card.
  * 4. Stage: the board, or whatever covers it.
@@ -61,6 +65,7 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  *   request?: string,
  *   banner?: import("react").ReactNode,
  *   score?: string,
+ *   howToPlay: { state: string, onOpen?: () => void },
  *   result?: {
  *     moment: Readonly<import("../../games/outcomeMoment.js").OutcomeMoment>,
  *     celebration?: import("react").ReactNode,
@@ -72,7 +77,9 @@ export function MatchStage({ room, game, onMove, onAsk, reconnecting }) {
  *   side: import("react").ReactNode,
  * }} props  `phase` and `request` are written on the frame for tests and telemetry. `result` is given once the
  *   game is over, with the game's outcome moment (outcomeMoment), whose tone colours the card. Its `footer` goes
- *   under the action bar inside the card, such as the share buttons
+ *   under the action bar inside the card, such as the share buttons. `howToPlay` is the How to play button's flag
+ *   state (FLAG_STATES) and its `onOpen`, told each time the player opens it. While the state is unknown the bar
+ *   keeps the button's place, and once kept the place stays, so a late answer never moves the board (CC-349)
  */
 export function MatchFrame({
   pageTitle,
@@ -82,11 +89,18 @@ export function MatchFrame({
   request = "none",
   banner,
   score,
+  howToPlay,
   result,
   stage,
   actionBar,
   side,
 }) {
+  const scoreLine = score !== undefined && <p className={styles.score}>{score}</p>;
+  const helpState = howToPlay.state;
+  const [keptPlace, setKeptPlace] = useState(false);
+  const helpPlace =
+    gameView(gameId).loadHowToPlay !== undefined && (helpState !== FLAG_STATES.OFF || keptPlace);
+  if (helpPlace && !keptPlace) setKeptPlace(true);
   return (
     <MatchAnnouncer urgent={result ? momentAnnouncement(result.moment) : ""}>
       <section className={styles.shell} data-cc-phase={phase} data-cc-request={request}>
@@ -97,7 +111,18 @@ export function MatchFrame({
             <GameIcon gameId={gameId} size={32} />
             {gameName}
           </h1>
-          {score !== undefined && <p className={styles.score}>{score}</p>}
+          {helpPlace ? (
+            <div className={styles.barEnd}>
+              {scoreLine}
+              <div className={styles.barHelp} data-cc-slot="how-to-play-place">
+                {helpState === FLAG_STATES.ON && (
+                  <HowToPlayButton gameId={gameId} gameName={gameName} onOpen={howToPlay.onOpen} />
+                )}
+              </div>
+            </div>
+          ) : (
+            scoreLine
+          )}
         </header>
 
         <div className={styles.layout}>

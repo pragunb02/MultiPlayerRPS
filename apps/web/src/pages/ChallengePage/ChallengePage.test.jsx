@@ -1,9 +1,11 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
+import { CLIENT_FLAG_NAMES } from "../../app/flagStore.js";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CHALLENGE_COPY } from "../../components/Challenges/challengeCopy.js";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, fakeSocket, GUEST } from "../../testing/fakes.js";
+import { flagPaths } from "../../testing/flagPaths.js";
 import { renderApp } from "../../testing/render.jsx";
 
 // CC-139: a challenge's own page, the link sent on WhatsApp, and the honest pages for a link that leads nowhere.
@@ -55,7 +57,7 @@ describe("ChallengePage (CC-139)", () => {
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText("Riya challenges you to Chess.")).toBeInTheDocument();
     expect(screen.getByText("Open for 24 more hours.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Accept and play" }));
+    await user.click(await screen.findByRole("button", { name: "Accept and play" }));
 
     expect(api.acceptChallenge).toHaveBeenCalledWith(ID);
     await waitFor(() => expect(url()).toBe("/games/chess/rooms/AB2CD3"));
@@ -84,6 +86,54 @@ describe("ChallengePage (CC-139)", () => {
     expect(await screen.findByText("Someone already took this challenge")).toBeInTheDocument();
   });
 
+  flagPaths("how_to_play", (on) => {
+    it(
+      on
+        ? "shows the game's How to play, in Hinglish and English, before the friend chooses (CC-349)"
+        : "shows no How to play on a challenge",
+      async () => {
+        const { api } = openPage({
+          session: "visitor",
+          api: { getFlags: vi.fn().mockResolvedValue({ how_to_play: on }) },
+        });
+
+        await screen.findByRole("heading", { name: "You've been challenged to Chess" });
+        await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(CLIENT_FLAG_NAMES));
+        if (on) {
+          const line = await screen.findByText("How to play: 3 steps");
+          const choice = screen.getByRole("button", { name: "Play as guest" });
+          expect(line.compareDocumentPosition(choice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+          const steps = within(line.closest("details")).getAllByRole("listitem");
+          expect(steps).toHaveLength(3);
+          expect(steps[0].querySelector('[lang="hi-Latn"]')).toHaveTextContent(
+            "Mohra tap karo, phir woh square jahan le jaana hai. Ya drag karo.",
+          );
+        } else {
+          // The choice comes with the flag's answer, so this is checked after the answer.
+          await screen.findByRole("button", { name: "Play as guest" });
+          expect(screen.queryByText("How to play: 3 steps")).not.toBeInTheDocument();
+        }
+      },
+    );
+  });
+
+  it("draws the choice at once and keeps the closed line's space until the answer comes (CC-349)", async () => {
+    let answer;
+    const { container } = openPage({
+      session: "visitor",
+      api: { getFlags: vi.fn(() => new Promise((resolve) => (answer = resolve))) },
+    });
+
+    await screen.findByRole("heading", { name: "You've been challenged to Chess" });
+    expect(await screen.findByRole("button", { name: "Play as guest" })).toBeInTheDocument();
+    await waitFor(() => expect(answer).toBeDefined());
+    expect(container.querySelector("[data-cc-slot='how-to-play-space']")).toBeInTheDocument();
+    await act(async () => answer({ how_to_play: true }));
+
+    expect(await screen.findByText("How to play: 3 steps")).toBeInTheDocument();
+    expect(container.querySelector("[data-cc-slot='how-to-play-space']")).not.toBeInTheDocument();
+  });
+
   it("lets a visitor play as a guest first, or log in and come back", async () => {
     const { user, api } = openPage({ session: "visitor" });
 
@@ -92,7 +142,7 @@ describe("ChallengePage (CC-139)", () => {
       "href",
       `/login?next=%2Fchallenge%2F${ID}`,
     );
-    await user.click(screen.getByRole("button", { name: "Play as guest" }));
+    await user.click(await screen.findByRole("button", { name: "Play as guest" }));
 
     expect(api.startGuest).toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: "Accept and play" })).toBeInTheDocument();

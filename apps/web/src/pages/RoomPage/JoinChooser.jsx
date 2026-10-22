@@ -4,13 +4,18 @@ import { paths } from "../../app/paths.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { HowToPlayLine } from "../../components/HowToPlay/HowToPlay.jsx";
+import { useHowToPlay } from "../../components/HowToPlay/useHowToPlay.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { useAction } from "../../hooks/useAction.js";
+import { useSteadyFlagState } from "../../hooks/useFlag.js";
 import styles from "./JoinChooser.module.css";
 
 /**
  * Someone opened a room link without a session (CC-086): before anything is created for them, they choose how
  * to join — as a guest right away, or with an account (log in or sign up, then straight back to this room).
+ * With the `how_to_play` flag on, the game's How to play is there before they choose, because a friend who comes by
+ * a link never sees the lobby (CC-349).
  *
  * @param {{
  *   code: string,
@@ -23,6 +28,8 @@ export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
   const heading = useRef(null);
   // The page joins the room as soon as the guest session exists, and this chooser goes away.
   const playAsGuest = useAction(onPlayAsGuest, { id: "join.guest" });
+  const howToPlay = useSteadyFlagState("how_to_play");
+  const steps = useHowToPlay(game?.id ?? "");
 
   // Announce the choice: screen readers start here, keyboard users tab on to the three ways in.
   useEffect(() => {
@@ -42,6 +49,7 @@ export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
           {game && <GameIcon gameId={game.id} className={styles.gameIcon} />}
           Room code <strong className={styles.code}>{code}</strong>
         </p>
+        {game && <HowToPlayLine gameId={game.id} state={howToPlay} steps={steps} />}
         <p className={styles.lead}>How do you want to join?</p>
         <div className={styles.actions}>
           <Button control="join.guest" size="lg" action={playAsGuest}>

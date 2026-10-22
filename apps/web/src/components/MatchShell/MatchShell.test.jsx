@@ -1,4 +1,5 @@
 import { act, render, screen, within } from "@testing-library/react";
+import { flagStoreFor } from "../../app/flagStore.js";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +7,7 @@ import { ServicesProvider } from "../../app/ServicesProvider.jsx";
 import { chessActions } from "../../games/chess/chessActions.js";
 import { SessionProvider } from "../../hooks/SessionProvider.jsx";
 import { fakeApi, fakeSessionBroadcast, fakeSocket, fakeSound, GUEST } from "../../testing/fakes.js";
+import { flagPaths } from "../../testing/flagPaths.js";
 import { MatchProgressProvider } from "../Celebrations/MatchProgressProvider.jsx";
 import { SaveProgressProvider } from "../SaveProgress/SaveProgressProvider.jsx";
 import { ToastProvider } from "../Toast/ToastProvider.jsx";
@@ -92,7 +94,15 @@ const toastsOf = () => caughtToasts;
 const toastRegion = () => document.querySelector("[role='status'][aria-live='polite']");
 
 /** Renders the shell inside the app's providers, with every call it can make as a spy. */
-function mount(room, { game = BOARD_ONLY, reconnecting = false, waiting = <p>Invite here</p> } = {}) {
+function mount(
+  room,
+  {
+    game = BOARD_ONLY,
+    reconnecting = false,
+    waiting = <p>Invite here</p>,
+    api = fakeApi({ getSession: async () => GUEST }),
+  } = {},
+) {
   const calls = {
     onMove: vi.fn(async () => ({})),
     onAsk: vi.fn(async () => ({})),
@@ -102,7 +112,7 @@ function mount(room, { game = BOARD_ONLY, reconnecting = false, waiting = <p>Inv
     onLeave: vi.fn(async () => ({})),
   };
   const services = {
-    api: fakeApi({ getSession: async () => GUEST }),
+    api,
     socket: fakeSocket(),
     sound: fakeSound(),
     sessionBroadcast: fakeSessionBroadcast(),
@@ -548,5 +558,92 @@ describe("MatchShell announcer", () => {
 
     expect(() => render(<TalkingBoard />)).toThrow(/only for parts of the match/);
     quiet.mockRestore();
+  });
+});
+
+describe("How to play in the match bar (CC-349)", () => {
+  flagPaths("how_to_play", (on) => {
+    const flagApi = () =>
+      fakeApi({ getSession: async () => GUEST, getFlags: vi.fn().mockResolvedValue({ how_to_play: on }) });
+
+    if (on) {
+      it("opens the game's steps from the match bar, sends nothing to the room and counts the first opening once", async () => {
+        const user = userEvent.setup();
+        const api = flagApi();
+        const { calls } = mount(roomView(), { api });
+        const button = await within(slot("match-bar")).findByRole("button", { name: "How to play" });
+
+        await user.click(button);
+        expect(screen.getByRole("dialog", { name: "How to play Chess" })).toBeInTheDocument();
+        expect(within(slot("stage")).getByText("Board for game 1")).toBeInTheDocument();
+        await user.keyboard("{Escape}");
+        await user.click(button);
+        await user.keyboard("{Escape}");
+
+        expect(button).toHaveFocus();
+        expect(api.sendFlagSuccess).toHaveBeenCalledOnce();
+        expect(api.sendFlagSuccess).toHaveBeenCalledWith("how_to_play");
+        expect(calls.onMove).not.toHaveBeenCalled();
+        expect(calls.onAsk).not.toHaveBeenCalled();
+      });
+
+      it("keeps the game's score beside it", async () => {
+        mount(roomView(), {
+          api: flagApi(),
+          game: { Board: FakeBoard, inGameScore: () => ({ text: "1 to 0" }) },
+        });
+
+        await within(slot("match-bar")).findByRole("button", { name: "How to play" });
+        expect(slot("how-to-play-place").parentElement).toHaveTextContent("1 to 0");
+      });
+
+      it("never lets a failed count reach the player", async () => {
+        const user = userEvent.setup();
+        const api = flagApi();
+        api.sendFlagSuccess.mockRejectedValue(new Error("offline"));
+        mount(roomView(), { api });
+
+        await user.click(await within(slot("match-bar")).findByRole("button", { name: "How to play" }));
+
+        expect(screen.getByRole("dialog", { name: "How to play Chess" })).toBeInTheDocument();
+      });
+    } else {
+      it("shows no How to play in the match bar", async () => {
+        const api = flagApi();
+        mount(roomView(), { api });
+
+        await vi.waitFor(() => expect(flagStoreFor(api).stateOf(GUEST.id, "how_to_play")).toBe("off"));
+        await act(async () => {});
+        expect(within(slot("match-bar")).queryByRole("button", { name: "How to play" })).toBeNull();
+      });
+    }
+
+    it("keeps the button's place while the answer is on its way, and keeps it after, so the board never moves", async () => {
+      let answer;
+      const api = fakeApi({
+        getSession: async () => GUEST,
+        getFlags: vi.fn(() => new Promise((resolve) => (answer = resolve))),
+      });
+      mount(roomView(), { api });
+
+      await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+      expect(slot("how-to-play-place")).toBeInTheDocument();
+      expect(within(slot("match-bar")).queryByRole("button", { name: "How to play" })).toBeNull();
+      await act(async () => answer({ how_to_play: on }));
+
+      expect(slot("how-to-play-place")).toBeInTheDocument();
+      if (on) {
+        await within(slot("how-to-play-place")).findByRole("button", { name: "How to play" });
+      } else {
+        expect(slot("how-to-play-place")).toBeEmptyDOMElement();
+      }
+    });
+  });
+
+  it("keeps no place for How to play in a game that has none", async () => {
+    mount(roomView({ gameId: "ludo" }), { game: {} });
+
+    await act(async () => {});
+    expect(slot("how-to-play-place")).toBeNull();
   });
 });
