@@ -17,6 +17,7 @@ const SECRET = "riya@example.com lost room AB2CD3";
 function recording() {
   const tracked = [];
   const facade = createTelemetryFacade({ isOff: () => false });
+  facade.setContext({ path: "/", playerKind: "visitor" });
   const recorder = { track: (name, fields) => tracked.push([name, fields]), stop: () => {} };
   facade.attach(recorder);
   return { facade, tracked, recorder };

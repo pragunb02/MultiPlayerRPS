@@ -8,8 +8,9 @@
  * happened at, which the client turns into its screen, and an event may give its fields as a function of what the
  * client loads (`endpointOf`), which the client calls.
  *
- * @typedef {{ path?: string, playerKind: string }} TelemetryContext   where the player is, as the address the client
- *   turns into a screen, and who, never an id. No `path` before the app has said where it is
+ * @typedef {{ path?: string, playerKind?: string }} TelemetryContext   where the player is, as the address the client
+ *   turns into a screen, and who, never an id. No `path` before the app has said where it is, and no `playerKind`
+ *   while the session is still asked: an event counted then waits, and takes the kind the session settles on
  *
  * @typedef {Record<string, string | number | boolean>} TelemetryFields
  * @typedef {TelemetryFields | ((loaded: { endpointOf: (path: string) => string }) => TelemetryFields)} HeldFields
@@ -28,10 +29,15 @@ const TRANSPORTS = Object.freeze(["http", "socket"]);
 const NO_ENTRY = Object.freeze({ entry: "direct", via: "" });
 
 /**
- * @param {{ isOff: () => boolean, landing?: Readonly<{ entry: string, via: string }> }} deps  `isOff` is the opt-out
- *   (optOut.js), checked before anything is held. `landing` is how this page load arrived (entry.js)
+ * @param {{
+ *   isOff: () => boolean,
+ *   landing?: Readonly<{ entry: string, via: string }>,
+ *   quietly?: <T>(run: () => Promise<T>) => Promise<T>,
+ * }} deps  `isOff` is the opt-out (optOut.js), checked before anything is held. `landing` is how this page load
+ *   arrived (entry.js). `quietly` runs a download of usage counts' own files, whose failure must never reload the
+ *   tab (`recoverFromStaleBuild`'s, CC-333)
  */
-export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
+export function createTelemetryFacade({ isOff, landing = NO_ENTRY, quietly = (run) => run() }) {
   const listeners = new Set();
   let arrived = landing;
   /** @type {"waiting" | "on" | "off"} */
@@ -39,11 +45,18 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
   /** @type {TelemetrySink | undefined} */
   let sink;
   /** @type {TelemetryContext} */
-  // Until the app says where it is: the composition root sets it from the address before anything else.
-  let context = { playerKind: "visitor" };
+  // Until the app says where it is and who: the composition root sets the address before anything else.
+  let context = {};
   /** @type {Array<[string, object, TelemetryContext]>} */
   let waiting = [];
   const sent = { http: 0, socket: 0 };
+  // Once counts are on and the kind of player is known, the client takes what waits, in order.
+  const handOver = () => {
+    if (state !== "on" || sink === undefined || context.playerKind === undefined) return;
+    const held = waiting;
+    waiting = [];
+    held.forEach(([name, fields, at]) => sink.track(name, fields, at));
+  };
 
   return Object.freeze({
     /**
@@ -55,7 +68,7 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
      */
     track(name, fields = {}) {
       if (state === "off" || isOff()) return;
-      if (state === "on" && sink !== undefined) {
+      if (state === "on" && sink !== undefined && context.playerKind !== undefined) {
         sink.track(name, fields, context);
         return;
       }
@@ -65,6 +78,15 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
     /** @param {TelemetryContext} next  the address and the kind of player from now on */
     setContext(next) {
       context = Object.freeze({ ...next });
+      const { playerKind } = context;
+      if (playerKind === undefined) return;
+      // What was counted before the session said who this is takes the kind it settled on.
+      waiting = waiting.map(([name, fields, at]) => [
+        name,
+        fields,
+        at.playerKind === undefined ? Object.freeze({ ...at, playerKind }) : at,
+      ]);
+      handOver();
     },
 
     /** @returns {TelemetryContext} */
@@ -90,9 +112,7 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
     attach(client) {
       sink = client;
       state = "on";
-      const held = waiting;
-      waiting = [];
-      held.forEach(([name, fields, at]) => client.track(name, fields, at));
+      handOver();
     },
 
     /**
@@ -111,6 +131,9 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
 
     /** Whether nothing may be counted now (the switch, GPC, DNT, a test or a laptop). */
     isOff,
+
+    /** Runs a download of usage counts' own files so that its failure never reloads the tab. */
+    quietly,
 
     /** How this page load arrived: the landing `entry` and, for a shared link, its channel. */
     get landing() {

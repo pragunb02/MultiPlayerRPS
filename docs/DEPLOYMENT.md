@@ -620,8 +620,8 @@ section 4a and the footer's "no third-party trackers".
    3. Set `telemetry_client` for **admins** (two days): your own browser sends batches (the network tab shows
       `POST /api/telemetry` with only catalogue fields), and the server drops them as `admin`, so still nothing is
       stored. Check `telemetry.dropped{reason="admin"}` rises in Grafana.
-   4. **Before 10 %, measure the storage** on a copy (CC-175 Rabbit holes): insert 100 000 events shaped like
-      `apps/server/src/testing/telemetryEventDaoContract.js`'s `storedEvent` into a scratch database and read
+   4. **Before 10 %, measure the storage** on a copy (CC-175 Rabbit holes): insert 100 000 counter rows shaped like
+      `apps/server/src/testing/telemetryCountDaoContract.js`'s `countRow` into a scratch database and read
       `db.telemetry_counts.stats().storageSize`. Thirty days of that must stay under the 150 MB guardrail. If it does
       not, lower `storedPerDay`, never raise the 30 days.
    5. Then 10 %, 50 % and 100 %, at least two days apart, comparing the guardrails of CC-174 (time to first move and

@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
+import { followInputModality } from "./app/inputModality.js";
 import { takeLanding } from "./app/landing.js";
 import { needsSocketNow, preloadRouteFor } from "./app/routePages.js";
 import { removeServerHead } from "./app/serverHead.js";
@@ -27,8 +28,10 @@ import "./styles/global.css";
 // nothing when the switch, GPC or DNT says no.
 const isOff = () =>
   isTelemetryOff({ getStorage: () => window.localStorage, navigator, location: window.location });
-const telemetry = createTelemetryFacade({ isOff });
-telemetry.setContext({ path: window.location.pathname, playerKind: "visitor" });
+// Its own files download through the stale build's `quietly`, so a missing one never reloads the tab (CC-333).
+const telemetry = createTelemetryFacade({ isOff, quietly: (run) => recovery.quietly(run) });
+// The kind of player comes once the session has answered (TelemetryStub.jsx).
+telemetry.setContext({ path: window.location.pathname });
 // Before the router, because it may change the address before the router reads it (CC-181).
 const recovery = recoverFromStaleBuild({
   window,
@@ -100,6 +103,8 @@ const services = {
   download: createDownload({ document, URL: window.URL }),
 };
 removeServerHead(document);
+// Focus moved in code shows its ring only for keyboard players (CC-100).
+followInputModality(document);
 
 // A page that downloads on demand, opened by its address, is fetched before the first render, as the router's own
 // lazy routes do. The first render then shows the page itself and not its skeleton, so nothing moves (CC-322).
