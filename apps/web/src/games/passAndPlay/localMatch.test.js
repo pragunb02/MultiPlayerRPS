@@ -323,4 +323,25 @@ describe("playing again", () => {
     expect(again.state.board.every((cell) => cell === "")).toBe(true);
     expect(match.roomView(again).game.number).toBe(2);
   });
+
+  // The same random number every game would give the same player the first move each time (CC-091).
+  it.each([
+    [tictactoeEngine, {}],
+    [chessEngine, { timeControl: "blitz-5+0" }],
+  ])("hands the first move to the other player in each game after the first ($id)", (engine, options) => {
+    const { match } = controllerFor(engine, { rng: fixedRng(0) });
+    const first = match.start({ names: NAMES, options });
+
+    const second = match.playAgain(first);
+    const third = match.playAgain(second);
+
+    expect([first, second, third].map((session) => match.holder(session))).toEqual([P1, P2, P1]);
+  });
+
+  it("leaves Rock Paper Scissors as it was, where both players choose at once", () => {
+    const { match } = controllerFor(rpsEngine);
+    const first = match.start({ names: NAMES, options: { bestOf: 3 } });
+
+    expect(match.playAgain(first).state).toEqual(first.state);
+  });
 });

@@ -1,4 +1,5 @@
 import { createRoom, expect, header, joinAsGuest, test } from "./fixtures.js";
+import { realtimeConnects } from "./realtime.js";
 import { restartServer } from "./serverControl.js";
 
 // The server restarts under the players' feet (CC-101): every deploy does it, so does a crash, and the hosting
@@ -56,7 +57,7 @@ async function restartDuring(roomPlayers, options) {
 }
 
 /** How often the server has accepted this browser's realtime connection (Socket.IO's "connected" packet). */
-const connects = (player) => player.record.socketFrames.filter((frame) => frame.startsWith("40{")).length;
+const connects = (player) => realtimeConnects(player.record.socketFrames);
 
 /** The two Tic-Tac-Toe players in turn order: X moves first. */
 async function inTurnOrder(host, friend) {

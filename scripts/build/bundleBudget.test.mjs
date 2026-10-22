@@ -90,6 +90,21 @@ describe("checkBundle: the bundle size check (CC-135, CC-322, ADR-075)", () => {
     ]);
   });
 
+  it.each([
+    "node_modules/socket.io-client/build/esm/socket.js",
+    "node_modules/engine.io-client/build/esm/socket.js",
+    "node_modules/socket.io-parser/build/esm/index.js",
+    "node_modules/engine.io-parser/build/esm/index.js",
+    "node_modules/@socket.io/component-emitter/lib/esm/index.js",
+  ])("fails when Socket.IO is on the first route again: %s (CC-333)", (name) => {
+    const chunks = [chunk("assets/index-a.js", { modules: [{ name, gzip: 2_000 }] })];
+
+    const result = build({ sizes: { "assets/index-a.js": 50 }, chunks });
+
+    expect(result.ok).toBe(false);
+    expect(result.lines[0]).toMatch(new RegExp(`^FAIL ${name} is on the first route`));
+  });
+
   it("fails an effect scene or theme on the first route, and a registry over 0.5 kB there", () => {
     const chunks = [
       chunk("assets/index-a.js", {

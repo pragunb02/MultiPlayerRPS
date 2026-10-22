@@ -116,7 +116,7 @@ describe("sessions of an account (integration, CC-116)", { timeout: 20_000 }, ()
 
     const after = await withDatabase((db) => db.collection("accounts").findOne());
     expect(changed.status).toBe(204);
-    expect(after.passwordHash).toMatch(/^scrypt\$32768\$8\$1\$/);
+    expect(after.passwordHash).toMatch(/^scrypt\$32768\$8\$3\$/);
     expect(after.passwordHash).not.toBe(before.passwordHash);
     expect(after.sessionVersion).toBe(1);
     const oldLogin = await call("POST", "/api/auth/login", {

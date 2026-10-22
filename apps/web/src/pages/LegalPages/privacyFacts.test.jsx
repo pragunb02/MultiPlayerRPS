@@ -132,6 +132,11 @@ const FACTS = [
     page: /Grafana Labs.*receives counts and timings about how the server runs, and the names of its warnings and errors\. Never your IP address, email, player id, name, room code, cookies or session/,
   },
   {
+    fact: "a new password's check sends Have I Been Pwned only the first 5 characters of its SHA-1, from the server (CC-261)",
+    data: "| [Breached password check](#breached-password-check) | no: the first 5 hex characters of a new password's SHA-1, sent by the server, never the password, its full hash, an email, an id or the player's IP address |",
+    page: /Have I Been Pwned.*When you choose a password.*our server sends it the first 5 characters of a scrambled form of the password.*never receives the password itself, the rest of the scrambled form, your email or anything else about you/,
+  },
+  {
     fact: "operations telemetry is kept 14 days",
     data: "14 days (Grafana Cloud free tier)",
     page: /Counts and timings about how the server runs are kept for 14 days by Grafana Labs/,
@@ -145,6 +150,7 @@ const NO_LONGER_TRUE = [
   /for a few minutes/,
   /Two services run the site/,
   /Three services run the site/,
+  /Four services run the site/,
   /never written to the database/,
 ];
 

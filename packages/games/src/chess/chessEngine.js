@@ -12,7 +12,7 @@ import {
 } from "@classicade/shared";
 import { defineEngine } from "../engine.js";
 import { ok, reject } from "../result.js";
-import { randomIndex } from "../rng.js";
+import { chooseStarter } from "../starter.js";
 
 const SQUARE = /^[a-h][1-8]$/;
 const ACTIONS = new Set(Object.values(CHESS_ACTIONS));
@@ -174,9 +174,9 @@ export const chessEngine = defineEngine({
     return ok({ timeControl });
   },
 
-  /** @returns {ChessState} */
-  init({ players, options, rng }) {
-    const white = players[randomIndex(rng, players.length)];
+  /** @returns {ChessState} the starter plays White. A rematch names them, game 1 draws them from the seed */
+  init({ players, options, rng, starter }) {
+    const white = chooseStarter({ players, rng, starter });
     const black = players.find((p) => p !== white);
     const board = new Chess();
     const { initialSeconds, incrementSeconds } = CHESS_TIME_CONTROLS[options.timeControl];
@@ -285,6 +285,9 @@ export const chessEngine = defineEngine({
       lastMoveAt: state.lastMoveAt,
     };
   },
+
+  /** White always moves first (CC-091). */
+  starterOf: (state) => state.byColor.w,
 
   playersOf: (state) => [...state.players],
 

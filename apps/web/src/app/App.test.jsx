@@ -9,6 +9,28 @@ import { PlayPage } from "./routePages.js";
 const gameList = () => within(screen.getByRole("region", { name: "Games" })).findByRole("list");
 
 describe("App", () => {
+  describe("the realtime connection (CC-333)", () => {
+    it("leaves the download of Socket.IO to an idle moment on a page that can wait", () => {
+      const { socket } = renderApp({ path: "/" });
+
+      expect(socket.needNow).not.toHaveBeenCalled();
+    });
+
+    it("needs it at once on a page that cannot wait", () => {
+      const { socket } = renderApp({ path: "/friends" });
+
+      expect(socket.needNow).toHaveBeenCalled();
+    });
+
+    it("needs it at once when the player goes to such a page", () => {
+      const { socket, back } = renderApp({ path: "/", history: ["/challenge/abcdefghijklmnopqrst"] });
+
+      back();
+
+      expect(socket.needNow).toHaveBeenCalled();
+    });
+  });
+
   it("links to the daily chess puzzle from the home page (CC-144)", async () => {
     renderApp();
 
