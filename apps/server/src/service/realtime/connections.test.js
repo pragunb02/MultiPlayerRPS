@@ -86,10 +86,13 @@ describe("trackConnections", () => {
   });
 
   it("lets a request in flight finish, then ends its connection", async () => {
-    const { port, connections, release, closed } = await start();
+    const { server, port, connections, release, closed } = await start();
     const socket = await connect(port);
+    // The request is in flight once the server has it. A 50 ms wait used to stand in for that, and on a busy
+    // runner closing began first, so the connection had no request yet and was ended unanswered (CC-345).
+    const arrived = new Promise((resolve) => server.once("request", resolve));
     const answer = ask(socket, "/slow");
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await arrived;
     const socketEnded = ended(socket);
 
     const finished = closed();

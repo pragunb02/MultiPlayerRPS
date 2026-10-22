@@ -126,7 +126,11 @@ describe("Chess over sockets", () => {
 
   it("tells the opponent when the offerer withdraws, and refuses accepting afterwards (CC-104, CC-159)", async () => {
     const { alice, bob, code } = await chessGame();
+    // Alice hears of the offer on her own socket, which may come after Bob's answer. Listening only then could
+    // catch the offer and take it for the withdrawal, so she sees the offer first (CC-345).
+    const aliceSeesOffer = nextEvent(alice.socket);
     await send(bob.socket, SOCKET_EVENTS.ROOM_REQUEST, { code, type: "draw" });
+    expect((await aliceSeesOffer).requests).toEqual([expect.objectContaining({ state: "open" })]);
     const aliceSeesWithdrawal = nextEvent(alice.socket);
 
     await send(bob.socket, SOCKET_EVENTS.ROOM_ANSWER, { code, type: "draw", answer: "withdraw" });
