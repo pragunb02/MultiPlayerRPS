@@ -8,7 +8,7 @@ import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { CHALLENGE_COPY } from "../../components/Challenges/challengeCopy.js";
-import { HowToPlayFold } from "../../components/HowToPlay/HowToPlay.jsx";
+import { HowToPlayLine } from "../../components/HowToPlay/HowToPlay.jsx";
 import { useHowToPlay } from "../../components/HowToPlay/useHowToPlay.js";
 import { useChallengeInbox } from "../../components/Challenges/challengesContext.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
@@ -17,7 +17,7 @@ import { useToast } from "../../components/Toast/toastContext.js";
 import { WhatsAppLink } from "../../components/WhatsAppLink/WhatsAppLink.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { useChallenge } from "../../hooks/useChallenge.js";
-import { FLAG_STATES, useSteadyFlagState } from "../../hooks/useFlag.js";
+import { useSteadyFlagState } from "../../hooks/useFlag.js";
 import { useSession } from "../../hooks/useSession.js";
 import { challengeText, shareMessage } from "../../lib/shareText.js";
 import styles from "./ChallengePage.module.css";
@@ -133,9 +133,6 @@ function Theirs({ challenge }) {
   const visitor = session.status === "anonymous";
   const howToPlay = useSteadyFlagState("how_to_play");
   const steps = useHowToPlay(challenge.gameId);
-  // The choice waits for the flag's answer, and for the steps when it is on, so How to play never pushes the
-  // buttons down after they are drawn (CC-349).
-  const settled = howToPlay === FLAG_STATES.OFF || (howToPlay === FLAG_STATES.ON && steps !== undefined);
   // A visitor becomes a guest first. The page then reads the challenge again as that guest and offers Accept.
   const join = useAction(session.ensurePlayer, { id: "challenge.guest" });
   const accept = useAction(
@@ -162,37 +159,33 @@ function Theirs({ challenge }) {
         </h1>
         <Bilingual copy={CHALLENGE_COPY.challengesYou(challenge.fromName, game)} />
         <p className={styles.time}>{hoursLeft(challenge.expiresAt)}</p>
-        {settled && howToPlay === FLAG_STATES.ON && (
-          <HowToPlayFold gameId={challenge.gameId} steps={steps} bilingual />
-        )}
-        {settled && visitor && <Bilingual copy={CHALLENGE_COPY.signInFirst} />}
-        {settled && (
-          <div className={styles.actions}>
-            {visitor ? (
-              <Button control="challenge.guest" size="lg" action={join}>
-                Play as guest
-              </Button>
-            ) : (
-              <Button control="challenge.accept" size="lg" action={accept}>
-                Accept and play
-              </Button>
-            )}
-            {visitor ? (
-              <>
-                <Link to={paths.login(location.pathname)} data-cc-control="challenge.login">
-                  Log in
-                </Link>
-                <Link to={paths.signup(location.pathname)} data-cc-control="challenge.signup">
-                  Sign up
-                </Link>
-              </>
-            ) : (
-              <Link to={paths.home()} data-cc-control="challenge.not_now">
-                Not now
+        <HowToPlayLine gameId={challenge.gameId} state={howToPlay} steps={steps} bilingual />
+        {visitor && <Bilingual copy={CHALLENGE_COPY.signInFirst} />}
+        <div className={styles.actions}>
+          {visitor ? (
+            <Button control="challenge.guest" size="lg" action={join}>
+              Play as guest
+            </Button>
+          ) : (
+            <Button control="challenge.accept" size="lg" action={accept}>
+              Accept and play
+            </Button>
+          )}
+          {visitor ? (
+            <>
+              <Link to={paths.login(location.pathname)} data-cc-control="challenge.login">
+                Log in
               </Link>
-            )}
-          </div>
-        )}
+              <Link to={paths.signup(location.pathname)} data-cc-control="challenge.signup">
+                Sign up
+              </Link>
+            </>
+          ) : (
+            <Link to={paths.home()} data-cc-control="challenge.not_now">
+              Not now
+            </Link>
+          )}
+        </div>
       </div>
     </section>
   );

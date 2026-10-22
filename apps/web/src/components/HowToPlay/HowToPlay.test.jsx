@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { GAME_IDS } from "@classicade/shared";
 import { gameView } from "../../games/registry.js";
-import { HowToPlayButton, HowToPlayFold, HowToPlayStrip } from "./HowToPlay.jsx";
+import { HowToPlayButton, HowToPlayFold, HowToPlayLine, HowToPlayStrip } from "./HowToPlay.jsx";
 
 const STEPS = Object.fromEntries(
   await Promise.all(Object.values(GAME_IDS).map(async (id) => [id, await gameView(id).loadHowToPlay()])),
@@ -87,6 +87,38 @@ describe("How to play (CC-259, CC-349)", () => {
 
     it("shows nothing for a game the web app has no steps for", () => {
       const { container } = render(<HowToPlayFold gameId="ludo" steps={[]} />);
+
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  describe("the line for the flag's state", () => {
+    const space = (container) => container.querySelector("[data-cc-slot='how-to-play-space']");
+
+    it.each([
+      ["unknown", STEPS[GAME_IDS.CHESS]],
+      ["on", undefined],
+    ])(
+      "keeps the closed line's space, hidden, while the state is %s and the steps are %s",
+      (state, steps) => {
+        const { container } = render(<HowToPlayLine gameId={GAME_IDS.CHESS} state={state} steps={steps} />);
+
+        expect(space(container)).toHaveAttribute("aria-hidden", "true");
+        expect(container.querySelector("details")).toBeNull();
+      },
+    );
+
+    it("is the closed line once the answer is on and the steps are here", () => {
+      const { container } = render(
+        <HowToPlayLine gameId={GAME_IDS.CHESS} state="on" steps={STEPS[GAME_IDS.CHESS]} className="placed" />,
+      );
+
+      expect(space(container)).toBeNull();
+      expect(container.querySelector("details")).toHaveClass("placed");
+    });
+
+    it("is nothing when the answer is off", () => {
+      const { container } = render(<HowToPlayLine gameId={GAME_IDS.CHESS} state="off" steps={undefined} />);
 
       expect(container).toBeEmptyDOMElement();
     });

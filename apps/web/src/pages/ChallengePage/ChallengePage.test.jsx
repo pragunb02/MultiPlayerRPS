@@ -117,20 +117,21 @@ describe("ChallengePage (CC-139)", () => {
     );
   });
 
-  it("draws the choice only with the flag's answer, so How to play never pushes the buttons down (CC-349)", async () => {
+  it("draws the choice at once and keeps the closed line's space until the answer comes (CC-349)", async () => {
     let answer;
-    openPage({
+    const { container } = openPage({
       session: "visitor",
       api: { getFlags: vi.fn(() => new Promise((resolve) => (answer = resolve))) },
     });
 
     await screen.findByRole("heading", { name: "You've been challenged to Chess" });
-    await waitFor(() => expect(answer).toBeDefined());
-    expect(screen.queryByRole("button", { name: "Play as guest" })).not.toBeInTheDocument();
-    answer({ how_to_play: true });
-
     expect(await screen.findByRole("button", { name: "Play as guest" })).toBeInTheDocument();
-    expect(screen.getByText("How to play: 3 steps")).toBeInTheDocument();
+    await waitFor(() => expect(answer).toBeDefined());
+    expect(container.querySelector("[data-cc-slot='how-to-play-space']")).toBeInTheDocument();
+    await act(async () => answer({ how_to_play: true }));
+
+    expect(await screen.findByText("How to play: 3 steps")).toBeInTheDocument();
+    expect(container.querySelector("[data-cc-slot='how-to-play-space']")).not.toBeInTheDocument();
   });
 
   it("lets a visitor play as a guest first, or log in and come back", async () => {

@@ -3,6 +3,7 @@ import { Svg } from "../../art/Svg.jsx";
 import { gameArtFor } from "../../art/games/gameArt.js";
 import artStyles from "../../art/games/gameArt.module.css";
 import { stepCount } from "../../games/howToPlay.js";
+import { FLAG_STATES } from "../../hooks/useFlag.js";
 import { Button } from "../Button/Button.jsx";
 import { Modal } from "../Modal/Modal.jsx";
 import styles from "./HowToPlay.module.css";
@@ -87,6 +88,36 @@ export function HowToPlayFold({ gameId, steps, bilingual = false, className = ""
       </summary>
       <Steps gameId={gameId} steps={steps} bilingual={bilingual} />
     </details>
+  );
+}
+
+/**
+ * How to play's line near the top of a page, for the `how_to_play` flag's state (CC-349). Everything else on the page
+ * draws at once. While the answer or the steps are on their way, the closed line's exact space is kept, empty, so
+ * when the answer is on the line fills that space and nothing moves. When it is off the space goes, which only
+ * happens during the flag's first day for admins.
+ *
+ * @param {{
+ *   gameId: string,
+ *   state: string,
+ *   steps: ReadonlyArray<import("../../games/howToPlay.js").HowToPlayStep> | undefined,
+ *   bilingual?: boolean,
+ *   className?: string,
+ * }} props  `state` is the flag's FLAG_STATES value. `steps` from `useHowToPlay`, undefined while they load
+ */
+export function HowToPlayLine({ gameId, state, steps, bilingual = false, className = "" }) {
+  if (state === FLAG_STATES.OFF) return null;
+  if (state === FLAG_STATES.ON && steps !== undefined) {
+    return <HowToPlayFold gameId={gameId} steps={steps} bilingual={bilingual} className={className} />;
+  }
+  return (
+    <div
+      className={`${styles.fold} ${styles.space} ${className}`.trim()}
+      aria-hidden="true"
+      data-cc-slot="how-to-play-space"
+    >
+      <span className={styles.summary}>How to play</span>
+    </div>
   );
 }
 

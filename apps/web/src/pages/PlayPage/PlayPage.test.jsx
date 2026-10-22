@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeSocket } from "../../testing/fakes.js";
@@ -265,11 +265,14 @@ describe("PlayPage", () => {
         const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ how_to_play: on }) });
         const { container } = renderApp({ path: "/games/chess", api });
 
-        // The cards come with the flag's answer, so everything below is checked after the answer.
         const panels = await screen.findByRole("heading", { level: 2, name: "Play a friend" });
+        // Checked once the flag has answered and the closed line's space is gone.
+        await vi.waitFor(() =>
+          expect(container.querySelector("[data-cc-slot='how-to-play-space']")).not.toBeInTheDocument(),
+        );
         expect(api.getFlags).toHaveBeenCalledOnce();
         if (on) {
-          const line = screen.getByText("How to play: 3 steps");
+          const line = await screen.findByText("How to play: 3 steps");
           // Before the cards in the page's order, so it is the first thing under the title.
           expect(line.compareDocumentPosition(panels) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
           expect(container.querySelector("details")).not.toHaveAttribute("open");
@@ -281,18 +284,19 @@ describe("PlayPage", () => {
       },
     );
 
-    it("draws the cards only with the flag's answer, so How to play never pushes them down", async () => {
+    it("draws the cards at once and keeps the closed line's space until the answer comes", async () => {
       let answer;
       const api = fakeApi({ getFlags: vi.fn(() => new Promise((resolve) => (answer = resolve))) });
-      renderApp({ path: "/games/rock-paper-scissors", api });
-
-      await screen.findByRole("heading", { level: 1, name: "Rock Paper Scissors" });
-      await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
-      expect(screen.queryByRole("heading", { level: 2, name: "Play a friend" })).not.toBeInTheDocument();
-      expect(screen.queryByText("How to play: 3 steps")).not.toBeInTheDocument();
-      answer({ how_to_play: on });
+      const { container } = renderApp({ path: "/games/rock-paper-scissors", api });
 
       await screen.findByRole("heading", { level: 2, name: "Play a friend" });
+      await vi.waitFor(() => expect(api.getFlags).toHaveBeenCalled());
+      expect(container.querySelector("[data-cc-slot='how-to-play-space']")).toBeInTheDocument();
+      await act(async () => answer({ how_to_play: on }));
+
+      await vi.waitFor(() =>
+        expect(container.querySelector("[data-cc-slot='how-to-play-space']")).not.toBeInTheDocument(),
+      );
       expect(screen.queryAllByText("How to play: 3 steps")).toHaveLength(on ? 1 : 0);
     });
   });

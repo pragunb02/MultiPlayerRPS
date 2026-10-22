@@ -4,11 +4,11 @@ import { paths } from "../../app/paths.js";
 import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
-import { HowToPlayFold } from "../../components/HowToPlay/HowToPlay.jsx";
+import { HowToPlayLine } from "../../components/HowToPlay/HowToPlay.jsx";
 import { useHowToPlay } from "../../components/HowToPlay/useHowToPlay.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { useAction } from "../../hooks/useAction.js";
-import { FLAG_STATES, useSteadyFlagState } from "../../hooks/useFlag.js";
+import { useSteadyFlagState } from "../../hooks/useFlag.js";
 import styles from "./JoinChooser.module.css";
 
 /**
@@ -30,9 +30,6 @@ export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
   const playAsGuest = useAction(onPlayAsGuest, { id: "join.guest" });
   const howToPlay = useSteadyFlagState("how_to_play");
   const steps = useHowToPlay(game?.id ?? "");
-  // The choice waits for the flag's answer, and for the steps when it is on, so How to play never pushes the
-  // buttons down after they are drawn (CC-349).
-  const settled = howToPlay === FLAG_STATES.OFF || (howToPlay === FLAG_STATES.ON && steps !== undefined);
 
   // Announce the choice: screen readers start here, keyboard users tab on to the three ways in.
   useEffect(() => {
@@ -52,26 +49,22 @@ export function JoinChooser({ code, game, returnTo, onPlayAsGuest }) {
           {game && <GameIcon gameId={game.id} className={styles.gameIcon} />}
           Room code <strong className={styles.code}>{code}</strong>
         </p>
-        {settled && howToPlay === FLAG_STATES.ON && game && <HowToPlayFold gameId={game.id} steps={steps} />}
-        {settled && (
-          <>
-            <p className={styles.lead}>How do you want to join?</p>
-            <div className={styles.actions}>
-              <Button control="join.guest" size="lg" action={playAsGuest}>
-                Play as guest
-              </Button>
-              <Link className={styles.link} to={paths.login(returnTo)} data-cc-control="join.login">
-                Log in
-              </Link>
-              <Link className={styles.link} to={paths.signup(returnTo)} data-cc-control="join.signup">
-                Sign up
-              </Link>
-            </div>
-            <p className={styles.hint}>
-              Playing as a guest? Sign up later and your XP and match history come with you.
-            </p>
-          </>
-        )}
+        {game && <HowToPlayLine gameId={game.id} state={howToPlay} steps={steps} />}
+        <p className={styles.lead}>How do you want to join?</p>
+        <div className={styles.actions}>
+          <Button control="join.guest" size="lg" action={playAsGuest}>
+            Play as guest
+          </Button>
+          <Link className={styles.link} to={paths.login(returnTo)} data-cc-control="join.login">
+            Log in
+          </Link>
+          <Link className={styles.link} to={paths.signup(returnTo)} data-cc-control="join.signup">
+            Sign up
+          </Link>
+        </div>
+        <p className={styles.hint}>
+          Playing as a guest? Sign up later and your XP and match history come with you.
+        </p>
       </div>
     </section>
   );

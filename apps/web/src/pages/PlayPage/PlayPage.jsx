@@ -7,7 +7,7 @@ import { gameArtFor } from "../../art/games/gameArt.js";
 import { Button } from "../../components/Button/Button.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { PlayComputer } from "../../components/PlayComputer/PlayComputer.jsx";
-import { HowToPlayFold, HowToPlayStrip } from "../../components/HowToPlay/HowToPlay.jsx";
+import { HowToPlayLine, HowToPlayStrip } from "../../components/HowToPlay/HowToPlay.jsx";
 import { useHowToPlay } from "../../components/HowToPlay/useHowToPlay.js";
 import { gameView } from "../../games/registry.js";
 import { useAction } from "../../hooks/useAction.js";
@@ -65,9 +65,6 @@ export function PlayPage() {
     return <Navigate to={paths.game(game.id)} replace />;
   }
   const { Options, passAndPlay, lead = "" } = gameView(game.id);
-  // Everything under the title waits for the flag's answer, and for the steps when it is on, so How to play never
-  // pushes the cards down after they are drawn. The app asked for the flags early, so this is usually no wait.
-  const settled = howToPlay === FLAG_STATES.OFF || (howToPlay === FLAG_STATES.ON && steps !== undefined);
   const character = characterForGame(game.id);
 
   function join(event) {
@@ -85,85 +82,76 @@ export function PlayPage() {
         </div>
         <GameArt gameId={game.id} className={styles.art} />
       </div>
-      {settled && howToPlay === FLAG_STATES.ON && (
-        <HowToPlayFold gameId={game.id} steps={steps} className={styles.howToPlay} />
-      )}
-      {settled && (
-        <div className={styles.panels}>
-          <PlayComputer character={character} action={playComputer} />
-          <div className={styles.panel}>
-            <h2>Play a friend</h2>
-            {Options && <Options value={options} onChange={setOptions} />}
-            <p className={styles.note}>
-              Friend online now? You get a link to send. The game starts when they open it.
-            </p>
-            <Button
-              control="lobby.create"
-              variant="secondary"
-              size="lg"
-              action={create}
-              pendingLabel="Creating…"
-            >
-              Create room
-            </Button>
-            <p className={styles.note}>Friend not online now? Send a challenge link. It lasts 24 hours.</p>
-            <Button
-              control="lobby.challenge"
-              variant="secondary"
-              action={challenge}
-              pendingLabel="Making it…"
-            >
-              Make a challenge link
-            </Button>
-          </div>
-          <form className={styles.panel} onSubmit={join}>
-            <h2>Join a friend</h2>
-            <p className={styles.note}>
-              Your friend sees a {ROOM_CODE_LENGTH}-character code on their invite. Type it here.
-            </p>
-            <label>
-              Room code
-              <input
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                maxLength={ROOM_CODE_LENGTH}
-                autoCapitalize="characters"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="AB2CD3"
-              />
-            </label>
-            <Button
-              control="lobby.join"
-              type="submit"
-              variant="secondary"
-              size="lg"
-              reason={
-                code.trim().length === ROOM_CODE_LENGTH
-                  ? ""
-                  : `Enter the ${ROOM_CODE_LENGTH}-character room code`
-              }
-            >
-              Join room
-            </Button>
-          </form>
-          {passAndPlay && (
-            <div className={styles.panel}>
-              <h2>Pass and play</h2>
-              <p className={styles.note}>
-                Two players, one phone. Nothing is sent or saved, and it gives no XP.
-              </p>
-              <Link
-                to={paths.passAndPlay(game.id)}
-                className={styles.link}
-                data-cc-control="lobby.pass_and_play"
-              >
-                Play on this phone
-              </Link>
-            </div>
-          )}
+      <HowToPlayLine gameId={game.id} state={howToPlay} steps={steps} className={styles.howToPlay} />
+      <div className={styles.panels}>
+        <PlayComputer character={character} action={playComputer} />
+        <div className={styles.panel}>
+          <h2>Play a friend</h2>
+          {Options && <Options value={options} onChange={setOptions} />}
+          <p className={styles.note}>
+            Friend online now? You get a link to send. The game starts when they open it.
+          </p>
+          <Button
+            control="lobby.create"
+            variant="secondary"
+            size="lg"
+            action={create}
+            pendingLabel="Creating…"
+          >
+            Create room
+          </Button>
+          <p className={styles.note}>Friend not online now? Send a challenge link. It lasts 24 hours.</p>
+          <Button control="lobby.challenge" variant="secondary" action={challenge} pendingLabel="Making it…">
+            Make a challenge link
+          </Button>
         </div>
-      )}
+        <form className={styles.panel} onSubmit={join}>
+          <h2>Join a friend</h2>
+          <p className={styles.note}>
+            Your friend sees a {ROOM_CODE_LENGTH}-character code on their invite. Type it here.
+          </p>
+          <label>
+            Room code
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              maxLength={ROOM_CODE_LENGTH}
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="AB2CD3"
+            />
+          </label>
+          <Button
+            control="lobby.join"
+            type="submit"
+            variant="secondary"
+            size="lg"
+            reason={
+              code.trim().length === ROOM_CODE_LENGTH
+                ? ""
+                : `Enter the ${ROOM_CODE_LENGTH}-character room code`
+            }
+          >
+            Join room
+          </Button>
+        </form>
+        {passAndPlay && (
+          <div className={styles.panel}>
+            <h2>Pass and play</h2>
+            <p className={styles.note}>
+              Two players, one phone. Nothing is sent or saved, and it gives no XP.
+            </p>
+            <Link
+              to={paths.passAndPlay(game.id)}
+              className={styles.link}
+              data-cc-control="lobby.pass_and_play"
+            >
+              Play on this phone
+            </Link>
+          </div>
+        )}
+      </div>
       {howToPlay === FLAG_STATES.OFF && steps !== undefined && (
         <HowToPlayStrip gameId={game.id} steps={steps} />
       )}

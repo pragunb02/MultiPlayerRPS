@@ -693,18 +693,19 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     );
   });
 
-  it("draws the choice only with the flag's answer, so How to play never pushes the buttons down (CC-349)", async () => {
+  it("draws the choice at once and keeps the closed line's space until the answer comes (CC-349)", async () => {
     let answer;
     const api = fakeApi({ getFlags: vi.fn(() => new Promise((resolve) => (answer = resolve))) });
-    openInvite({ api });
+    const { container } = openInvite({ api });
 
     await screen.findByRole("heading", { name: "You're invited to play Tic Tac Toe" });
-    await waitFor(() => expect(api.getFlags).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: "Play as guest" })).not.toBeInTheDocument();
-    answer({ how_to_play: true });
-
     expect(await screen.findByRole("button", { name: "Play as guest" })).toBeInTheDocument();
-    expect(screen.getByText("How to play: 3 steps")).toBeInTheDocument();
+    await waitFor(() => expect(answer).toBeDefined());
+    expect(container.querySelector("[data-cc-slot='how-to-play-space']")).toBeInTheDocument();
+    await act(async () => answer({ how_to_play: true }));
+
+    expect(await screen.findByText("How to play: 3 steps")).toBeInTheDocument();
+    expect(container.querySelector("[data-cc-slot='how-to-play-space']")).not.toBeInTheDocument();
   });
 
   it("joins as a guest after choosing to", async () => {

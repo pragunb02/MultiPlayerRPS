@@ -85,3 +85,10 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+/* The closed line's place while the flag's answer is on its way: the same box and line, drawn invisibly (CC-349). */
+.space {
+  visibility: hidden;
+}
+.space > .summary {
+  display: block;
+}
