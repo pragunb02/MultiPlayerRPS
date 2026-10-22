@@ -1,7 +1,9 @@
-import { ERROR_CODES } from "@classicade/shared";
+import { bucketOf, ERROR_CODES, SOCKET_EVENTS, TELEMETRY_BUCKETS } from "@classicade/shared";
 import { AppRequestError } from "./errors.js";
 
 const ACK_TIMEOUT_MS = 8_000;
+/** The lower ends of the `after_s` buckets after the first: 10 s, a minute, 10 minutes (EVENTS.md 3.5). */
+const AWAY_EDGES_S = Object.freeze([10, 60, 600]);
 /** Socket.IO's reason when the server disconnected the socket on purpose. It does not reconnect after it. */
 const SERVER_DISCONNECT = "io server disconnect";
 /** A new object each time: Socket.IO writes to the options it is given while it sets itself up. */
@@ -42,11 +44,18 @@ const loadSocketIo = () => import("socket.io-client").then((module) => module?.i
  * (`needNow`, a request, a connect). Only the first try may reload the tab for a newer version (`staleBuild.js`):
  * every later one runs through `quietly`, so a file that stays missing never reloads the tab over and over.
  *
+ * Usage counts (CC-174) hear of each request (`onRequest`), of the connection failing, dropping and coming back
+ * (`onChange`, with Socket.IO's reason and, when back, how long it was gone as a bucket) and of the first move this
+ * page sent (`onFirstMove`, with the game's id).
+ *
  * @param {{
  *   load?: () => Promise<typeof import("socket.io-client").io | undefined>,
  *   url?: string,
  *   now?: () => number,
  *   quietly?: <T>(run: () => Promise<T>) => Promise<T>,
+ *   onRequest?: () => void,
+ *   onChange?: (change: { state: "connect_failed" | "dropped" | "restored", reason: unknown, afterS?: string }) => void,
+ *   onFirstMove?: (gameId: string) => void,
  * }} [options]  `quietly` runs a download whose failure must not reload the tab (`recoverFromStaleBuild`'s);
  *   `load`, `url` and `now` are injectable for tests
  */
@@ -55,6 +64,9 @@ export function createSocketClient({
   url = undefined,
   now = () => Date.now(),
   quietly = (run) => run(),
+  onRequest = () => undefined,
+  onChange = () => undefined,
+  onFirstMove = () => undefined,
 } = {}) {
   /** @type {import("socket.io-client").Socket | undefined} the socket, once Socket.IO is here */
   let socket;
@@ -109,6 +121,27 @@ export function createSocketClient({
     };
   };
 
+  // What usage counts hear of the connection (CC-174), subscribed first so they are attached before any other.
+  let droppedAt;
+  let lastReason;
+  let moved = false;
+  on("disconnect", (reason) => {
+    droppedAt = now();
+    lastReason = reason;
+    onChange({ state: "dropped", reason });
+  });
+  on("connect_error", (error) => onChange({ state: "connect_failed", reason: error }));
+  on("connect", () => {
+    if (droppedAt === undefined) return;
+    const awayS = (now() - droppedAt) / 1000;
+    droppedAt = undefined;
+    onChange({
+      state: "restored",
+      reason: lastReason,
+      afterS: bucketOf(awayS, AWAY_EDGES_S, TELEMETRY_BUCKETS.AFTER_S),
+    });
+  });
+
   return Object.freeze({
     /** Downloads Socket.IO now, if it is not here yet. A failure is tried again as described above. */
     needNow: () => {
@@ -135,6 +168,7 @@ export function createSocketClient({
      * @param {unknown} [payload]
      */
     async request(event, payload) {
+      onRequest();
       const sentAt = now();
       let ack;
       try {
@@ -145,6 +179,10 @@ export function createSocketClient({
       }
       if (!ack?.ok) {
         throw new AppRequestError(ack?.error ?? { code: "UNKNOWN", message: "Something went wrong" });
+      }
+      if (event === SOCKET_EVENTS.GAME_MOVE && !moved && typeof ack.data?.gameId === "string") {
+        moved = true;
+        onFirstMove(ack.data.gameId);
       }
       return ack.data;
     },

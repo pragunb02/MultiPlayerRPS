@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ERROR_CODES, isTooYoungForAccount, TOO_YOUNG_MESSAGE } from "@classicade/shared";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { paths, safeNext } from "../../app/paths.js";
@@ -9,6 +9,9 @@ import { YEAR_NOT_SAID, YearSelect } from "../../components/YearSelect/YearSelec
 import { useSaveProgress } from "../../components/SaveProgress/saveProgressContext.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
+import { useServices } from "../../app/servicesContext.js";
+import { NO_TELEMETRY } from "../../lib/telemetry/facade.js";
+import { nextKindOf, ruleOf } from "../../lib/telemetry/authForms.js";
 import styles from "../authForms.module.css";
 
 // Mirrors the server's rules (models/credentials.js) for instant feedback; the server still decides.
@@ -48,6 +51,7 @@ export function SignupPage() {
   const saveProgress = useSaveProgress();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
+  const telemetry = useServices().telemetry ?? NO_TELEMETRY;
   const [form, setForm] = useState({ username: "", email: "", password: "", birthYear: "" });
   // Set when the server refused the year (under 13). The choice then stays as it is for this visit (CC-152).
   const [tooYoung, setTooYoung] = useState(false);
@@ -77,6 +81,12 @@ export function SignupPage() {
     { id: "auth.signup" },
   );
 
+  // The top of the sign-up funnel (CC-174): which form, and where next points as a kind, never the path.
+  const nextKind = nextKindOf(next);
+  useEffect(() => {
+    telemetry.track("auth_form_viewed", { form: "signup", next_kind: nextKind });
+  }, [telemetry, nextKind]);
+
   function submit(event) {
     event.preventDefault();
     setTouched({ username: true, email: true, password: true });
@@ -90,7 +100,13 @@ export function SignupPage() {
       setTooYoung(true);
       return;
     }
-    if (Object.keys(RULES).every((field) => RULES[field](form[field]) === "")) {
+    const broken = Object.keys(RULES).filter((field) => RULES[field](form[field]) !== "");
+    // Which field and rule stopped the form, never what was typed (CC-174).
+    broken.forEach((field) =>
+      telemetry.track("auth_form_rejected", { form: "signup", field, rule: ruleOf(field, form[field]) }),
+    );
+    if (broken.length === 0) {
+      telemetry.track("auth_form_submitted", { form: "signup" });
       signup.run();
     }
   }

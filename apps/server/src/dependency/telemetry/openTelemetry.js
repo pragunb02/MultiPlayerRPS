@@ -176,6 +176,9 @@ function createOperationsMetrics(meter) {
     METRICS.BOT_THINKING_DURATION,
     "Time a computer player took to choose a move, waiting for a thread included.",
   );
+  const telemetryDropped = meter.createCounter(METRICS.TELEMETRY_DROPPED, {
+    description: "Usage counts (CC-175) not stored, by reason only.",
+  });
   const passwordChecks = meter.createCounter(METRICS.PASSWORD_CHECKS, {
     description: "Checks of a new password against the common and breached passwords, by outcome.",
   });
@@ -198,6 +201,9 @@ function createOperationsMetrics(meter) {
     },
     recordBotThinking({ game, outcome, durationMs }) {
       thinkingDuration.record(durationMs, { game, outcome });
+    },
+    recordTelemetryDropped({ reason, count }) {
+      telemetryDropped.add(count, { reason });
     },
     recordPasswordCheck({ outcome }) {
       passwordChecks.add(1, { outcome });
