@@ -40,6 +40,11 @@ describe("defineEngine", () => {
     expect(() => defineEngine(engine)).toThrow(/deadline and expire must be provided together/);
   });
 
+  it("accepts a starterOf hook and refuses one that is not a function (CC-091)", () => {
+    expect(typeof defineEngine({ ...valid, starterOf: () => "a" }).starterOf).toBe("function");
+    expect(() => defineEngine({ ...valid, starterOf: "a" })).toThrow(/starterOf must be a function/);
+  });
+
   it("accepts a turn limit and request types with what accepting them does, and freezes the rules", () => {
     const engine = defineEngine({
       ...valid,

@@ -179,6 +179,9 @@ function createOperationsMetrics(meter) {
   const telemetryDropped = meter.createCounter(METRICS.TELEMETRY_DROPPED, {
     description: "Usage counts (CC-175) not stored, by reason only.",
   });
+  const passwordChecks = meter.createCounter(METRICS.PASSWORD_CHECKS, {
+    description: "Checks of a new password against the common and breached passwords, by outcome.",
+  });
   const methods = new Set(HTTP_METHODS);
 
   return Object.freeze({
@@ -201,6 +204,9 @@ function createOperationsMetrics(meter) {
     },
     recordTelemetryDropped({ reason, count }) {
       telemetryDropped.add(count, { reason });
+    },
+    recordPasswordCheck({ outcome }) {
+      passwordChecks.add(1, { outcome });
     },
     watch({ rooms, connections }) {
       const open = meter.createObservableGauge(METRICS.ROOMS_OPEN, {
