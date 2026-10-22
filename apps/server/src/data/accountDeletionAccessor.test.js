@@ -69,6 +69,23 @@ describe("sessionAccessor", () => {
     expect(await sessions.removePlayer(PLAYER)).toBe(0);
   });
 
+  it("notes and reads the friend request rings a session heard (CC-341)", async () => {
+    const calls = [];
+    const ring = { requestId: "r", ringAt: 2 };
+    const sessions = createSessionAccessor({
+      sessionDao: {
+        deleteByPlayer: async () => 0,
+        addHeardRings: async (heard) => calls.push(heard),
+        heardRings: async ({ since }) => [{ requestId: "r", ringAt: since + 1 }],
+      },
+    });
+
+    await sessions.addHeardRings({ sessionId: "phone", rings: [ring], since: 1 });
+
+    expect(calls).toEqual([{ sessionId: "phone", rings: [ring], since: 1 }]);
+    expect(await sessions.heardRings({ sessionId: "phone", since: 1 })).toEqual([ring]);
+  });
+
   it("fails fast without its DAO", () => {
     expect(() => createSessionAccessor({})).toThrow(TypeError);
   });

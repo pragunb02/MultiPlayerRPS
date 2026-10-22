@@ -14,7 +14,7 @@ const sessionOf = (playerId) => `session of ${playerId}`;
 
 /**
  * A tab's socket as the server holds it. A live page answers each push that asks for an answer; `dead` stands for
- * a socket whose browser went away and that has not timed out yet, which never answers (CC-341).
+ * a socket whose browser went away, whose answer is Socket.IO's timeout error (CC-341).
  */
 function fakeTab(sessionId, { dead = false } = {}) {
   const emitted = [];
@@ -24,7 +24,8 @@ function fakeTab(sessionId, { dead = false } = {}) {
     timeout: (ms) => ({
       emit: (event, payload, answered) => {
         emitted.push({ event, payload, ms });
-        setImmediate(() => (dead ? answered(new Error("operation has timed out")) : answered(null)));
+        // Answered at once, never on a timer, so no answer can arrive after its test has ended.
+        answered(dead ? new Error("operation has timed out") : null);
       },
     }),
     emit: (event, payload) => emitted.push({ event, payload }),
@@ -61,6 +62,8 @@ function setup({ online = [RIYA, ARJUN], friendComponent = {}, presence = {}, cl
     friendComponent: {
       viewFor: async ({ playerId }) => ({ friends: [], for: playerId }),
       presenceAudience: async () => ({ handle: "hhhhhhhhhhhhhhh1", presence: "online", friendIds: [ARJUN] }),
+      missedRings: async () => [],
+      ringsHeard: async () => undefined,
       ...friendComponent,
     },
     presence: { connected: async () => undefined, disconnected: () => undefined, ...presence },
