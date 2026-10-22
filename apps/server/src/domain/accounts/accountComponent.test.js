@@ -14,6 +14,8 @@ import {
 } from "../../utils/errors.js";
 import { createLegacyPasswordChecker } from "../../utils/legacyPassword.js";
 import { createPasswordHasher } from "../../utils/passwordHasher.js";
+import { ACCEPT_EVERY_PASSWORD, refusingPasswords } from "../../testing/fakePasswordScreen.js";
+import { EASY_PASSWORD } from "./passwordScreen.js";
 import { createAccountDeletionAccessor } from "../../data/accountDeletionAccessor.js";
 import { createInMemoryAccountDeletionDao } from "../../testing/inMemoryAccountDeletionDao.js";
 import { parseUsername } from "../../models/credentials.js";
@@ -38,7 +40,7 @@ const noDeletions = () =>
 const legacyAccessor = (legacyUsers = []) =>
   createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao(legacyUsers) });
 
-function setup({ params = FAST, legacyUsers = [] } = {}) {
+function setup({ params = FAST, legacyUsers = [], passwordScreen = ACCEPT_EVERY_PASSWORD } = {}) {
   const accountDao = createInMemoryAccountDao();
   const passwordHasher = createPasswordHasher({ params });
   const accountAccessor = createAccountAccessor({ accountDao });
@@ -48,6 +50,7 @@ function setup({ params = FAST, legacyUsers = [] } = {}) {
     legacyUserAccessor,
     passwordHasher,
     legacyPasswords: LEGACY_PASSWORDS,
+    passwordScreen,
     accountDeletionAccessor: noDeletions(),
   });
   return { accounts, accountDao, accountAccessor, legacyUserAccessor, passwordHasher };
@@ -90,6 +93,27 @@ describe("accountComponent", () => {
         constructor: ValidationError,
         details: { field },
       });
+    });
+
+    it("refuses a password attackers already know at the password field, and creates no account (CC-261)", async () => {
+      const screen = refusingPasswords(["qwertyuiop"]);
+      const { accounts, accountDao } = setup({ passwordScreen: screen });
+
+      await expect(accounts.signup({ ...RIYA, password: "qwertyuiop", now: NOW })).rejects.toMatchObject({
+        constructor: ValidationError,
+        message: EASY_PASSWORD,
+        details: { field: "password" },
+      });
+      expect(screen.asked).toEqual(["qwertyuiop"]);
+      await expect(accountDao.getByEmail("riya@example.com")).rejects.toThrow(RangeError);
+    });
+
+    it("checks the password only after every field is valid (CC-261)", async () => {
+      const screen = refusingPasswords([]);
+      const { accounts } = setup({ passwordScreen: screen });
+
+      await expect(accounts.signup({ ...RIYA, email: "nope", now: NOW })).rejects.toThrow(ValidationError);
+      expect(screen.asked).toEqual([]);
     });
 
     it.each([
@@ -148,6 +172,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor(),
         passwordHasher: { ...passwordHasher, verifyAgainstDummy: dummy },
         legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
         accountDeletionAccessor: noDeletions(),
       });
 
@@ -166,12 +191,110 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor(),
         passwordHasher: createPasswordHasher({ params: FAST }),
         legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
         accountDeletionAccessor: noDeletions(),
       });
 
       await current.login({ email: RIYA.email, password: RIYA.password });
 
       expect((await weak.accountDao.getByEmail("riya@example.com")).passwordHash).toMatch(/^scrypt\$1024\$/);
+    });
+
+    it("upgrades a hash with a weaker p, as the old production hashes have (CC-260)", async () => {
+      const old = setup({ params: { N: 2 ** 10, r: 8, p: 1 } });
+      await old.accounts.signup({ ...RIYA, now: NOW });
+      const current = createAccountComponent({
+        accountAccessor: createAccountAccessor({ accountDao: old.accountDao }),
+        legacyUserAccessor: legacyAccessor(),
+        passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 3 } }),
+        legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
+        accountDeletionAccessor: noDeletions(),
+      });
+
+      await current.login({ email: RIYA.email, password: RIYA.password });
+
+      expect((await old.accountDao.getByEmail("riya@example.com")).passwordHash).toMatch(
+        /^scrypt\$1024\$8\$3\$/,
+      );
+      expect((await current.login({ email: RIYA.email, password: RIYA.password })).identity.displayName).toBe(
+        "Riya",
+      );
+    });
+
+    it("still signs in when saving the upgraded hash fails, and passes the failure up for the logs (CC-260)", async () => {
+      const weak = setup({ params: { N: 2 ** 9, r: 8, p: 1 } });
+      await weak.accounts.signup({ ...RIYA, now: NOW });
+      const before = (await weak.accountDao.getByEmail("riya@example.com")).passwordHash;
+      const failure = new Error("database unavailable");
+      const accessor = createAccountAccessor({ accountDao: weak.accountDao });
+      const current = createAccountComponent({
+        accountAccessor: { ...accessor, updatePasswordHash: async () => Promise.reject(failure) },
+        legacyUserAccessor: legacyAccessor(),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
+        accountDeletionAccessor: noDeletions(),
+      });
+
+      const signedIn = await current.login({ email: RIYA.email, password: RIYA.password });
+
+      expect(signedIn.identity.displayName).toBe("Riya");
+      expect(signedIn.rehashFailure).toBe(failure);
+      expect((await weak.accountDao.getByEmail("riya@example.com")).passwordHash).toBe(before);
+    });
+
+    it("never brings an old password back when it changes between the check and the upgrade (CC-260)", async () => {
+      const NEW = "a brand new password";
+      const weak = setup({ params: { N: 2 ** 9, r: 8, p: 1 } });
+      const { identity } = await weak.accounts.signup({ ...RIYA, now: NOW });
+      const accessor = createAccountAccessor({ accountDao: weak.accountDao });
+      const current = createAccountComponent({
+        accountAccessor: {
+          ...accessor,
+          // A password change from another device commits just before the upgraded hash is saved.
+          updatePasswordHash: async (accountId, change) => {
+            await current.changePassword({
+              playerId: identity.id,
+              currentPassword: RIYA.password,
+              newPassword: NEW,
+            });
+            return accessor.updatePasswordHash(accountId, change);
+          },
+        },
+        legacyUserAccessor: legacyAccessor(),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
+        accountDeletionAccessor: noDeletions(),
+      });
+
+      await current.login({ email: RIYA.email, password: RIYA.password });
+
+      expect((await current.login({ email: RIYA.email, password: NEW })).identity.id).toBe(identity.id);
+      await expect(current.login({ email: RIYA.email, password: RIYA.password })).rejects.toThrow(
+        UnauthorizedError,
+      );
+    });
+
+    it("does not check the password against the known passwords at login (CC-261)", async () => {
+      const screen = refusingPasswords([RIYA.password]);
+      const { accounts, accountDao } = setup();
+      await accounts.signup({ ...RIYA, now: NOW });
+      const later = createAccountComponent({
+        accountAccessor: createAccountAccessor({ accountDao }),
+        legacyUserAccessor: legacyAccessor(),
+        passwordHasher: createPasswordHasher({ params: FAST }),
+        legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: screen,
+        accountDeletionAccessor: noDeletions(),
+      });
+
+      const signedIn = await later.login({ email: RIYA.email, password: RIYA.password });
+
+      expect(signedIn.identity.displayName).toBe("Riya");
+      expect(signedIn).not.toHaveProperty("rehashFailure");
+      expect(screen.asked).toEqual([]);
     });
   });
 
@@ -245,6 +368,7 @@ describe("accountComponent", () => {
           verify: slow("bcrypt", (...args) => LEGACY_PASSWORDS.verify(...args)),
           verifyAgainstDummy: slow("bcrypt", (...args) => LEGACY_PASSWORDS.verifyAgainstDummy(...args)),
         },
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
         accountDeletionAccessor: noDeletions(),
       });
       const reset = () => {
@@ -614,6 +738,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: createPasswordHasher({ params: FAST }),
         legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
         accountDeletionAccessor: noDeletions(),
       });
 
@@ -630,6 +755,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: createPasswordHasher({ params: FAST }),
         legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
         accountDeletionAccessor: noDeletions(),
       });
 
@@ -729,6 +855,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor([LEGACY_SAM]),
         passwordHasher: { ...passwordHasher, hash },
         legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
         accountDeletionAccessor: noDeletions(),
       });
       await accounts.signup({ ...RIYA, now: NOW });
@@ -855,6 +982,46 @@ describe("accountComponent", () => {
       expect(await accounts.sessionVersionOf({ playerId })).toBe(0);
     });
 
+    it("refuses a new password attackers already know at the new password field, and changes nothing (CC-261)", async () => {
+      const screen = refusingPasswords(["password1"]);
+      const ctx = setup({ passwordScreen: screen });
+      const { identity } = await ctx.accounts.signup({ ...RIYA, now: NOW });
+      screen.asked.length = 0;
+
+      await expect(
+        ctx.accounts.changePassword({
+          playerId: identity.id,
+          currentPassword: RIYA.password,
+          newPassword: "password1",
+        }),
+      ).rejects.toMatchObject({
+        constructor: ValidationError,
+        message: EASY_PASSWORD,
+        details: { field: "newPassword" },
+      });
+      expect(screen.asked).toEqual(["password1"]);
+      expect(await ctx.accounts.sessionVersionOf({ playerId: identity.id })).toBe(0);
+      expect((await ctx.accounts.login({ email: RIYA.email, password: RIYA.password })).identity.id).toBe(
+        identity.id,
+      );
+    });
+
+    it("checks the new password only once the current one is right (CC-261)", async () => {
+      const screen = refusingPasswords([]);
+      const ctx = setup({ passwordScreen: screen });
+      const { identity } = await ctx.accounts.signup({ ...RIYA, now: NOW });
+      screen.asked.length = 0;
+
+      await expect(
+        ctx.accounts.changePassword({
+          playerId: identity.id,
+          currentPassword: "not it at all",
+          newPassword: NEW,
+        }),
+      ).rejects.toMatchObject({ details: { field: "currentPassword" } });
+      expect(screen.asked).toEqual([]);
+    });
+
     it("stores only a scrypt hash of the new password", async () => {
       const { accounts, accountDao, playerId } = await signedUp();
 
@@ -889,6 +1056,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor(),
         passwordHasher: createPasswordHasher({ params: FAST }),
         legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
         accountDeletionAccessor: noDeletions(),
         newNameSuffix: () => suffixes.shift(),
       });
@@ -908,6 +1076,7 @@ describe("accountComponent", () => {
         legacyUserAccessor: legacyAccessor(),
         passwordHasher: createPasswordHasher({ params: FAST }),
         legacyPasswords: LEGACY_PASSWORDS,
+        passwordScreen: ACCEPT_EVERY_PASSWORD,
         accountDeletionAccessor: noDeletions(),
         newNameSuffix: () => suffixes.shift(),
       });

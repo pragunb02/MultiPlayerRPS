@@ -42,6 +42,15 @@ export function runMatchDaoContract(createDao) {
     expect(await dao.getByMatchId(matchDoc().matchId)).toEqual(stored);
   });
 
+  it("keeps the starter a rematch named, beside the seed, so the match replays exactly (CC-091)", async () => {
+    const dao = await createDao();
+
+    const stored = await dao.insert(matchDoc({ gameId: "tictactoe", options: {}, starter: "guest_b" }));
+
+    expect(stored.starter).toBe("guest_b");
+    expect(await dao.getByMatchId(matchDoc().matchId)).toEqual(stored);
+  });
+
   it("refuses to record the same match twice", async () => {
     const dao = await createDao();
     await dao.insert(matchDoc());

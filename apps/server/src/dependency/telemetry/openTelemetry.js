@@ -182,6 +182,9 @@ function createOperationsMetrics(meter) {
   const rollupRuns = meter.createCounter(METRICS.TELEMETRY_ROLLUP_RUNS, {
     description: "Days of the nightly usage totals rolled up (CC-176), by outcome only.",
   });
+  const passwordChecks = meter.createCounter(METRICS.PASSWORD_CHECKS, {
+    description: "Checks of a new password against the common and breached passwords, by outcome.",
+  });
   const methods = new Set(HTTP_METHODS);
 
   return Object.freeze({
@@ -207,6 +210,9 @@ function createOperationsMetrics(meter) {
     },
     recordTelemetryRollup({ outcome }) {
       rollupRuns.add(1, { outcome });
+    },
+    recordPasswordCheck({ outcome }) {
+      passwordChecks.add(1, { outcome });
     },
     watch({ rooms, connections }) {
       const open = meter.createObservableGauge(METRICS.ROOMS_OPEN, {

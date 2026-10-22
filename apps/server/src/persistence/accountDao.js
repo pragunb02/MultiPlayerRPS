@@ -149,8 +149,15 @@ export function createAccountDao({ connection }) {
       return toDoc(doc);
     },
 
-    async updatePasswordHash(accountId, passwordHash) {
-      await Account.updateOne({ _id: accountId }, { $set: { passwordHash } });
+    /**
+     * Replaces the password hash only while it is still `from`, so a password change that landed after it was read
+     * is never overwritten (CC-260). When it is not, nothing changes.
+     *
+     * @param {string} accountId
+     * @param {{ from: string, to: string }} change
+     */
+    async updatePasswordHash(accountId, { from, to }) {
+      await Account.updateOne({ _id: accountId, passwordHash: from }, { $set: { passwordHash: to } });
     },
 
     /**

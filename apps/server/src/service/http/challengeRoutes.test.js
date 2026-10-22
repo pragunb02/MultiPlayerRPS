@@ -25,10 +25,14 @@ afterEach(async () => {
   server = undefined;
 });
 
-/** A clock tests can move. */
+/**
+ * A clock tests can move. Each reading is a millisecond after the last, so challenges made one after another are in
+ * the order they were made. The real clock gives two quick ones the same millisecond, and the same moment has no
+ * order but the random ids (CC-336).
+ */
 function clock() {
   let at = Date.UTC(2026, 9, 20, 12);
-  const now = () => at;
+  const now = () => at++;
   now.advance = (ms) => {
     at += ms;
   };
@@ -137,7 +141,7 @@ describe("challenge routes (CC-139)", () => {
   });
 
   it("refuses a fourth open challenge with the reason", async () => {
-    server = await startTestServer();
+    server = await startTestServer({ now: clock() });
     const alice = await clients.player();
     await make(alice);
     await make(alice);
@@ -223,7 +227,7 @@ describe("challenge routes (CC-139)", () => {
   });
 
   it("withdraws, moves to the inbox and lists the inbox, and refuses a body on an answer", async () => {
-    server = await startTestServer();
+    server = await startTestServer({ now: clock() });
     const alice = await clients.player();
     const bob = await clients.player();
     const kept = (await make(alice)).body.challenge;

@@ -1,6 +1,7 @@
 import { ERROR_CODES, GAMES, ROOM_STATUS, SOCKET_EVENTS } from "@classicade/shared";
 import {
   BOT_THINKING_OUTCOMES,
+  PASSWORD_CHECK_OUTCOMES,
   ROUTE_PATTERN,
   TELEMETRY_DROP_REASONS,
   TELEMETRY_ROLLUP_OUTCOMES,
@@ -20,6 +21,7 @@ export const METRICS = Object.freeze({
   BOT_THINKING_DURATION: "bots.thinking.duration",
   TELEMETRY_DROPPED: "telemetry.dropped",
   TELEMETRY_ROLLUP_RUNS: "telemetry_rollup.runs",
+  PASSWORD_CHECKS: "accounts.password_checks",
   EVENT_LOOP_P50: "nodejs.eventloop.delay.p50",
   EVENT_LOOP_P99: "nodejs.eventloop.delay.p99",
   MEMORY_RSS: "process.memory.rss",
@@ -102,6 +104,7 @@ const NAMED_LINES = Object.freeze({
   "account closed, erasing its data will finish in the next sweep": LEVEL.ERROR,
   "moving the previous identity's data failed": LEVEL.ERROR,
   "the legacy store failed behind a login": LEVEL.ERROR,
+  "saving the upgraded password hash failed": LEVEL.WARN,
   "stored email left in an older spelling: another account already has the one spelling": LEVEL.WARN,
   "unhandled error": LEVEL.ERROR,
   "computer player failed": LEVEL.ERROR,
@@ -163,6 +166,7 @@ export function createTelemetrySchema({ matchSteps }) {
     [METRICS.BOT_THINKING_DURATION]: { game, outcome: oneOf(Object.values(BOT_THINKING_OUTCOMES)) },
     [METRICS.TELEMETRY_DROPPED]: { reason: oneOf(Object.values(TELEMETRY_DROP_REASONS)) },
     [METRICS.TELEMETRY_ROLLUP_RUNS]: { outcome: oneOf(Object.values(TELEMETRY_ROLLUP_OUTCOMES)) },
+    [METRICS.PASSWORD_CHECKS]: { outcome: oneOf(Object.values(PASSWORD_CHECK_OUTCOMES)) },
     [METRICS.EVENT_LOOP_P50]: {},
     [METRICS.EVENT_LOOP_P99]: {},
     [METRICS.MEMORY_RSS]: {},

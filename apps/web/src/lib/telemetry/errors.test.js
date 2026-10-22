@@ -85,8 +85,8 @@ describe("errors and the connection (CC-174, EVENTS.md 3.5)", () => {
     const handlers = {};
     const socket = { on: (event, handler) => (handlers[event] = handler), connect: () => {} };
     let clock = 0;
-    createSocketClient({
-      connect: () => socket,
+    const realtime = createSocketClient({
+      load: async () => () => socket,
       now: () => clock,
       onChange: ({ state, reason, afterS }) =>
         facade.track("socket_changed", {
@@ -95,6 +95,8 @@ describe("errors and the connection (CC-174, EVENTS.md 3.5)", () => {
           ...(afterS && { after_s: afterS }),
         }),
     });
+    realtime.needNow();
+    await vi.waitFor(() => expect(handlers.disconnect).toBeTypeOf("function"));
     handlers.disconnect("transport close");
     clock = 25_000;
     handlers.connect();

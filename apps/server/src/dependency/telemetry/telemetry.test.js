@@ -76,6 +76,7 @@ describe("startTelemetry when off", () => {
     expect(metrics.recordBotThinking({ game: "chess", outcome: "ok", durationMs: 1 })).toBeUndefined();
     expect(metrics.recordTelemetryDropped({ reason: "cap", count: 1 })).toBeUndefined();
     expect(metrics.recordTelemetryRollup({ outcome: "ok" })).toBeUndefined();
+    expect(metrics.recordPasswordCheck({ outcome: "clear" })).toBeUndefined();
     expect(metrics.watch({ rooms: async () => [], connections: () => 0 })).toBeUndefined();
     await expect(NO_TELEMETRY.flush()).resolves.toBeUndefined();
     await expect(NO_TELEMETRY.shutdown()).resolves.toBeUndefined();
@@ -209,6 +210,20 @@ describe("startTelemetry when on", () => {
     expect(pointsOf(exporter, METRICS.TELEMETRY_DROPPED)).toEqual([
       { attributes: { reason: "invalid" }, value: 4 },
       { attributes: { reason: "opted_out" }, value: 1 },
+    ]);
+  });
+
+  it("counts new password checks by outcome (CC-261)", async () => {
+    const { telemetry, metrics: exporter } = await start();
+
+    telemetry.metrics.recordPasswordCheck({ outcome: "clear" });
+    telemetry.metrics.recordPasswordCheck({ outcome: "unavailable" });
+    telemetry.metrics.recordPasswordCheck({ outcome: "clear" });
+    await telemetry.flush();
+
+    expect(pointsOf(exporter, METRICS.PASSWORD_CHECKS)).toEqual([
+      { attributes: { outcome: "clear" }, value: 2 },
+      { attributes: { outcome: "unavailable" }, value: 1 },
     ]);
   });
 

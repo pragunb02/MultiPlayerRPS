@@ -7,5 +7,6 @@
   "exports": {
     ".": "./src/index.js",
     "./testing": "./src/testing/telemetryExamples.js"
-  }
+  },
+  "sideEffects": false
 }

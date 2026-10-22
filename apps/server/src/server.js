@@ -29,6 +29,13 @@ import { createPlayerTransferAccessor } from "./data/playerTransferAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createAccountComponent } from "./domain/accounts/accountComponent.js";
+import { createPasswordScreen } from "./domain/accounts/passwordScreen.js";
+import { createBreachedPasswordAccessor } from "./data/breachedPasswordAccessor.js";
+import {
+  createPwnedPasswordsClient,
+  NO_NETWORK_FETCH,
+} from "./dependency/pwnedPasswords/pwnedPasswordsClient.js";
+import { loadCommonPasswords } from "./persistence/commonPasswords.js";
 import { createPlayerDataComponent } from "./domain/accounts/playerDataComponent.js";
 import { createAnalyticsComponent, REPORT_TTL_MS } from "./domain/analytics/analyticsComponent.js";
 import { assertCharactersPlayable, createBotComponent } from "./domain/bots/botComponent.js";
@@ -705,6 +712,9 @@ export function wireFriends({
  *   },
  *   metrics?: import("./utils/operationsMetrics.js").OperationsMetrics,  operations telemetry (ADR-055), from
  *     `startTelemetry`. Without it nothing is measured
+ *   pwnedPasswordsFetch?: typeof fetch,  how Have I Been Pwned is asked about a new password (CC-261, ADR-080).
+ *     `index.js` gives the real `fetch`. Without it the service counts as unreachable, so tests and browser tests
+ *     never touch the network, and only the bundled common password list is checked
  * }} deps  `now`, `rooms`, `bots` and `pipeline` are for tests only. Production runs on the real clock, the
  *   standard room lifetimes and limits, a human-like pause before each computer move and the standard match
  *   pipeline. Integration tests move the clock, let computer players act at once and make a pipeline step fail or
@@ -721,6 +731,7 @@ export async function startServer({
   bots = {},
   pipeline = {},
   metrics = NO_OPERATIONS_METRICS,
+  pwnedPasswordsFetch = NO_NETWORK_FETCH,
 }) {
   if (config.webDistDir !== "" && !existsSync(path.join(config.webDistDir, "index.html"))) {
     throw new Error(`WEB_DIST_DIR has no index.html: ${config.webDistDir} (run npm run build:web)`);
@@ -818,6 +829,10 @@ export async function startServer({
   const featureFlagAccessor = createFeatureFlagAccessor({ featureFlagDao });
   const telemetryAccessor = createTelemetryAccessor({ telemetryCountDao });
   const telemetryDailyAccessor = createTelemetryDailyAccessor({ telemetryDailyDao });
+  const breachedPasswordAccessor = createBreachedPasswordAccessor({
+    pwnedPasswords: createPwnedPasswordsClient({ fetch: pwnedPasswordsFetch }),
+    commonPasswords: loadCommonPasswords(),
+  });
 
   // 2. domain
   assertEnginesInCatalog(ENGINES);
@@ -828,6 +843,10 @@ export async function startServer({
     legacyUserAccessor,
     passwordHasher: createPasswordHasher(),
     legacyPasswords: createLegacyPasswordChecker(),
+    passwordScreen: createPasswordScreen({
+      breachedPasswords: breachedPasswordAccessor,
+      recordCheck: metrics.recordPasswordCheck,
+    }),
     accountDeletionAccessor,
   });
   // The under 18 defaults in one place: every social feature reads a player's age policy from here (CC-152).
