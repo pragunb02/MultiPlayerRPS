@@ -26,8 +26,10 @@ import "./styles/global.css";
 // nothing when the switch, GPC or DNT says no.
 const isOff = () =>
   isTelemetryOff({ getStorage: () => window.localStorage, navigator, location: window.location });
-const telemetry = createTelemetryFacade({ isOff });
-telemetry.setContext({ path: window.location.pathname, playerKind: "visitor" });
+// Its own files download through the stale build's `quietly`, so a missing one never reloads the tab (CC-333).
+const telemetry = createTelemetryFacade({ isOff, quietly: (run) => recovery.quietly(run) });
+// The kind of player comes once the session has answered (TelemetryStub.jsx).
+telemetry.setContext({ path: window.location.pathname });
 // Before the router, because it may change the address before the router reads it (CC-181).
 const recovery = recoverFromStaleBuild({
   window,

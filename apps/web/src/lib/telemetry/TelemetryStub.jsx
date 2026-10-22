@@ -28,16 +28,26 @@ export function TelemetryStub({ loadHost = loadTelemetryHost }) {
   const location = useLocation();
   const session = useSession();
   const landed = useRef(false);
+  // The address last counted as a page view, so a session asked again does not count the same page twice.
+  const counted = useRef(undefined);
   const [Host, setHost] = useState(undefined);
-  const playerKind = kindOf(session.identity);
+  // Who the player is, once the session has answered: kept while it is asked again (a sign in, a sign out).
+  const [known, setKnown] = useState(undefined);
+  const settled = session.status !== "loading";
+  const playerKind = settled ? kindOf(session.identity) : known;
+  if (playerKind !== known) setKnown(playerKind);
+  const { pathname } = location;
 
   useLayoutEffect(() => {
-    telemetry.setContext({ path: location.pathname, playerKind });
-  }, [telemetry, location.pathname, playerKind]);
+    telemetry.setContext({ path: pathname, ...(playerKind !== undefined && { playerKind }) });
+  }, [telemetry, pathname, playerKind]);
 
   // A page view counts once the address settled: a page that replaces its address at once is counted at the new one.
+  // It also waits for the session, so a returning guest's landing is not counted as a visitor's.
   useEffect(() => {
+    if (playerKind === undefined || counted.current === pathname) return undefined;
     const timer = window.setTimeout(() => {
+      counted.current = pathname;
       const isLanding = !landed.current;
       landed.current = true;
       const { entry, via } = telemetry.landing;
@@ -48,11 +58,22 @@ export function TelemetryStub({ loadHost = loadTelemetryHost }) {
       });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [telemetry, location.pathname]);
+  }, [telemetry, pathname, playerKind]);
 
+  // The host loads when the browser is idle once the session has answered, so it hands over every early count
+  // with its kind. Its file never reloads the tab, and a failed download is tried once more.
+  const ready = playerKind !== undefined;
   useEffect(() => {
-    whenIdle({ window, run: () => loadHost().then((module) => setHost(() => module.TelemetryHost)) });
-  }, [loadHost]);
+    if (!ready) return;
+    const attempt = (retries) =>
+      telemetry
+        .quietly(loadHost)
+        .then((module) => setHost(() => module.TelemetryHost))
+        .catch(() => {
+          if (retries > 0) whenIdle({ window, run: () => attempt(retries - 1) });
+        });
+    whenIdle({ window, run: () => attempt(1) });
+  }, [ready, telemetry, loadHost]);
 
   return Host === undefined ? null : <Host />;
 }

@@ -35,6 +35,7 @@ export function recordingTelemetry() {
     detach: () => {},
     isAttached: () => false,
     isOff: () => true,
+    quietly: (run) => run(),
     get landing() {
       return landing;
     },

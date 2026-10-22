@@ -279,6 +279,7 @@ describe("the facade (CC-174)", () => {
 
   it("drops what it holds when counts turn out to be off, and holds at most 100", () => {
     const facade = createTelemetryFacade({ isOff: () => false });
+    facade.setContext({ path: "/", playerKind: "visitor" });
     const { client, beacons } = setup();
     for (let index = 0; index < 150; index += 1) facade.track(...press());
 
@@ -288,6 +289,7 @@ describe("the facade (CC-174)", () => {
     expect(beacons).toEqual([]);
 
     const again = createTelemetryFacade({ isOff: () => false });
+    again.setContext({ path: "/", playerKind: "visitor" });
     for (let index = 0; index < 150; index += 1) again.track(...press());
     const other = setup();
     again.attach(sinkOf(other.client, routeOf));
@@ -299,7 +301,7 @@ describe("the facade (CC-174)", () => {
   it("keeps the screen, the kind of player and how the page load arrived", () => {
     const facade = createTelemetryFacade({ isOff: () => false, landing: { entry: "search", via: "" } });
 
-    expect(facade.context()).toEqual({ playerKind: "visitor" });
+    expect(facade.context()).toEqual({});
     facade.setContext({ path: "/", playerKind: "guest" });
     expect(facade.landing).toEqual({ entry: "search", via: "" });
     facade.setLanding({ entry: "shared_link", via: "copy" });
@@ -354,6 +356,7 @@ describe("the host (CC-174)", () => {
       sendFlagSuccess: vi.fn().mockRejectedValue(new Error("offline")),
     });
     const telemetry = createTelemetryFacade({ isOff: () => false });
+    telemetry.setContext({ path: "/", playerKind: "visitor" });
     render(
       h(
         MemoryRouter,
@@ -377,6 +380,40 @@ describe("the host (CC-174)", () => {
 
     await waitFor(() => expect(api.sendFlagSuccess).toHaveBeenCalledWith("telemetry_client"));
     expect(idle).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("the host when the client's file fails to download (review of #161)", () => {
+  it("never reloads the tab for it, catches the failure and tries once more", async () => {
+    vi.useRealTimers();
+    vi.stubGlobal("requestIdleCallback", (run) => setTimeout(run, 0));
+    const quietly = vi.fn((run) => run());
+    const telemetry = createTelemetryFacade({ isOff: () => false, quietly });
+    const load = vi.fn().mockRejectedValue(new TypeError("Failed to fetch dynamically imported module"));
+    const api = fakeApi({ getFlags: vi.fn(async () => ({ telemetry_client: true })) });
+    const view = render(
+      h(
+        MemoryRouter,
+        { initialEntries: ["/"] },
+        h(
+          ServicesContext.Provider,
+          { value: { api, telemetry } },
+          h(
+            SessionContext.Provider,
+            { value: { status: "anonymous", identity: undefined } },
+            h(TelemetryHost, { load }),
+          ),
+        ),
+      ),
+    );
+
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(quietly).toHaveBeenCalledTimes(2);
+    expect(telemetry.isAttached()).toBe(false);
+    view.unmount();
     vi.unstubAllGlobals();
   });
 });
