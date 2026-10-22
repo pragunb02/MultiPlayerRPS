@@ -114,6 +114,24 @@ describe("the toast for a new friend request (CC-052)", () => {
     expect(await screen.findAllByText("Arjun wants to be your friend")).toHaveLength(1);
     expect(sound.play).toHaveBeenCalledTimes(1);
   });
+
+  it("answers the server once the toast is up, so the ring counts as heard by this browser (CC-341)", async () => {
+    const socket = fakeSocket();
+    renderApp({ path: "/", api: fakeApi({ getSession: vi.fn(async () => USER) }), socket });
+    await screen.findByRole("heading", { level: 1 });
+    const answer = vi.fn();
+
+    act(() =>
+      socket.push(
+        SOCKET_EVENTS.FRIEND_REQUESTED,
+        { requestId: "r", displayName: "Arjun", via: "game", ringAt: 1 },
+        answer,
+      ),
+    );
+
+    expect(await screen.findByText("Arjun wants to be your friend")).toBeVisible();
+    expect(answer).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("the words of the friends pages (CC-052)", () => {

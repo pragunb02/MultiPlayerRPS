@@ -42,6 +42,9 @@ const avatarField = (profile) => (isAvatarId(profile.avatar) ? { avatar: profile
 /** For a failed read: the caller's own refusal when nothing was found, and any other failure as it is. */
 const missingAs = (refusal) => (err) => Promise.reject(err instanceof NotFoundError ? refusal(err) : err);
 
+/** One ring of one request: a request cancelled and sent again rings again, later (CC-341). */
+const ringKey = ({ requestId, ringAt }) => `${requestId} ${ringAt}`;
+
 /** A request as its ring tells the recipient: who sent it, how, and when it rang (CC-341), never a player id. */
 const ringOf = ({ request, names, cards, ringAt }) =>
   Object.freeze({
@@ -105,6 +108,7 @@ export function createFriendComponent({
   safety,
   presence,
   events,
+  sessions,
   limits = {},
   newRequestId = randomUUID,
   newToken = newFriendLinkToken,
@@ -120,6 +124,8 @@ export function createFriendComponent({
   assertFunction(safety?.policyFor, "safety.policyFor");
   assertFunction(presence?.statusOf, "presence.statusOf");
   assertFunction(events?.emit, "events.emit");
+  assertFunction(sessions?.addHeardRings, "sessions.addHeardRings");
+  assertFunction(sessions?.heardRings, "sessions.heardRings");
   const rules = { ...FRIEND_LIMITS, ...limits };
 
   const changed = (...playerIds) => events.emit(FRIEND_EVENTS.CHANGED, { playerIds });
@@ -244,12 +250,17 @@ export function createFriendComponent({
   /**
    * The requests that rang for the player in the last `missedRingWithinMs` and still wait, as they rang, for a tab
    * that connects and may have missed the push (CC-341). Only what `ring` announced: none rung in the player's
-   * quiet hours, none while they are in them, none across a block. A guest has none.
+   * quiet hours, none while they are in them, none across a block, none this browser heard. A guest has none.
    */
-  async function missedRings({ playerId, now }) {
+  async function missedRings({ playerId, sessionId, now }) {
     const policy = await safety.policyFor({ playerId, now });
     if (!mayHaveFriends(policy) || isQuietTime(policy, now)) return [];
-    const blocked = await blocks.blockedWith({ playerId });
+    const since = now - rules.missedRingWithinMs;
+    const [blocked, heard] = await Promise.all([
+      blocks.blockedWith({ playerId }),
+      sessions.heardRings({ sessionId, since }),
+    ]);
+    const heardKeys = new Set(heard.map(ringKey));
     const rung = (
       await friendAccessor.sentTo({
         recipientId: playerId,
@@ -260,7 +271,8 @@ export function createFriendComponent({
     ).filter(
       (request) =>
         !blocked.has(request.senderId) &&
-        request.notifiedAt > now - rules.missedRingWithinMs &&
+        request.notifiedAt > since &&
+        !heardKeys.has(ringKey({ requestId: request.requestId, ringAt: request.notifiedAt })) &&
         !isQuietTime(policy, request.notifiedAt),
     );
     if (rung.length === 0) return [];
@@ -411,11 +423,21 @@ export function createFriendComponent({
     viewFor,
 
     /**
-     * The requests a tab that just connected may have missed the ring of (CC-341), shaped as the ring.
+     * The requests a tab that just connected may have missed the ring of (CC-341), shaped as the ring: none that a
+     * tab of the same browser session heard.
      *
-     * @param {{ playerId: string, now: number }} query
+     * @param {{ playerId: string, sessionId: string, now: number }} query
      */
     missedRings,
+
+    /**
+     * Notes that a tab of this browser session showed these rings (its page said so), so they are not sent to it
+     * again. Kept beside the session for as long as a ring may be sent again, so a restart does not forget them.
+     *
+     * @param {{ sessionId: string, rings: ReadonlyArray<{ requestId: string, ringAt: number }>, now: number }} heard
+     */
+    ringsHeard: ({ sessionId, rings, now }) =>
+      sessions.addHeardRings({ sessionId, rings, since: now - rules.missedRingWithinMs }),
 
     /**
      * Asks someone the player played with to be friends.

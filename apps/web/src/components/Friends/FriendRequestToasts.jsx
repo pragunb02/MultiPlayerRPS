@@ -10,7 +10,8 @@ import { useToast } from "../Toast/toastContext.js";
 /**
  * Tells the player on any page that someone sent them a friend request (CC-052), with the way to see it on the
  * friends page, and a chime. The server sends nothing for a request into a block (ADR-053). It draws nothing itself:
- * the toasts do.
+ * the toasts do. It answers each push once its toast is up: only then does the server count the ring as heard by
+ * this browser, and a ring no page of it heard comes again when a tab connects (CC-341).
  */
 export function FriendRequestToasts() {
   const { socket } = useServices();
@@ -19,7 +20,7 @@ export function FriendRequestToasts() {
 
   useEffect(
     () =>
-      socket.on(SOCKET_EVENTS.FRIEND_REQUESTED, ({ displayName }) => {
+      socket.on(SOCKET_EVENTS.FRIEND_REQUESTED, ({ displayName }, answer) => {
         toast.show(`${displayName} wants to be your friend`, {
           tone: "info",
           category: CATEGORIES.SOCIAL,
@@ -31,6 +32,8 @@ export function FriendRequestToasts() {
           },
           onShow: () => sound.play(SOUNDS.NOTIFY),
         });
+        // The server asks for an answer, so a ring this page never got is sent again when it connects (CC-341).
+        answer?.();
       }),
     [socket, toast, sound],
   );

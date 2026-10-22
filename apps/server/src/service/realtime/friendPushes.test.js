@@ -13,19 +13,36 @@ const ARJUN = "user_dddddddddddddddddddddddd";
 const sessionOf = (playerId) => `session of ${playerId}`;
 
 /**
+ * A tab's socket as the server holds it. A live page answers each push that asks for an answer; `dead` stands for
+ * a socket whose browser went away and that has not timed out yet, which never answers (CC-341).
+ */
+function fakeTab(sessionId, { dead = false } = {}) {
+  const emitted = [];
+  return {
+    emitted,
+    data: { sessionId },
+    timeout: (ms) => ({
+      emit: (event, payload, answered) => {
+        emitted.push({ event, payload, ms });
+        setImmediate(() => (dead ? answered(new Error("operation has timed out")) : answered(null)));
+      },
+    }),
+    emit: (event, payload) => emitted.push({ event, payload }),
+  };
+}
+
+/**
  * A Socket.IO server that records what it sent to each channel, with one tab open for each of the `online` players
- * only, in their session. A test may change `online` to open or close tabs.
+ * only, in their session. A test may put its own tabs in `tabs`.
  */
 function fakeIo(online = []) {
   const sent = [];
+  const tabs = new Map(online.map((id) => [id, [fakeTab(sessionOf(id))]]));
   return {
     sent,
-    online,
+    tabs,
     in: (channel) => ({
-      fetchSockets: async () =>
-        online
-          .filter((id) => channel === `player:${id}`)
-          .map((id) => ({ data: { sessionId: sessionOf(id) } })),
+      fetchSockets: async () => [...tabs].flatMap(([id, list]) => (channel === `player:${id}` ? list : [])),
     }),
     to: (channel) => ({ emit: (event, payload) => sent.push({ channel, event, payload }) }),
   };
@@ -71,16 +88,18 @@ describe("friend pushes (CC-052)", () => {
     expect(viewFor).toHaveBeenCalledTimes(1);
   });
 
-  it("pushes a new request to its recipient only", async () => {
+  it("pushes a new request to each tab of its recipient only, asking each to answer", async () => {
     const { io, domainEvents } = setup();
     const request = { requestId: "r", displayName: "RiyaTest", via: "game", ringAt: 1 };
 
     domainEvents.emit(FRIEND_EVENTS.REQUESTED, { recipientId: ARJUN, request });
     await settled();
 
-    expect(io.sent).toEqual([
-      { channel: `player:${ARJUN}`, event: SOCKET_EVENTS.FRIEND_REQUESTED, payload: request },
+    expect(io.tabs.get(ARJUN)[0].emitted).toEqual([
+      { event: SOCKET_EVENTS.FRIEND_REQUESTED, payload: request, ms: 10_000 },
     ]);
+    expect(io.tabs.get(RIYA)[0].emitted).toEqual([]);
+    expect(io.sent).toEqual([]);
   });
 
   it("pushes a presence change to each friend, as a handle and a presence only", async () => {
@@ -152,112 +171,94 @@ describe("friend pushes (CC-052)", () => {
 
   describe("a request whose ring a browser may have missed (CC-341)", () => {
     const RING = { requestId: "r1", displayName: "RiyaTest", via: "game", ringAt: 1 };
-    const tabOf = () => {
-      const emitted = [];
-      return { emitted, socket: { emit: (event, payload) => emitted.push({ event, payload }) } };
-    };
-
-    it("is sent to a tab that connects when no tab of its browser was connected as it rang, to that tab only", async () => {
-      const missedRings = vi.fn(async () => [RING]);
-      const { io, domainEvents, tabs } = setup({ online: [], friendComponent: { missedRings } });
+    const ring = (domainEvents) =>
       domainEvents.emit(FRIEND_EVENTS.REQUESTED, { recipientId: ARJUN, request: RING });
-      await settled();
-      const tab = tabOf();
 
-      io.online.push(ARJUN);
-      tabs.tellMissed({ socket: tab.socket, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
+    it("is noted as heard by a browser only once its page answered the push", async () => {
+      const ringsHeard = vi.fn(async () => undefined);
+      const { domainEvents } = setup({ online: [ARJUN], friendComponent: { ringsHeard } });
+
+      ring(domainEvents);
+      await settled();
       await settled();
 
-      expect(missedRings).toHaveBeenCalledWith({ playerId: ARJUN, now: 1 });
-      expect(tab.emitted).toEqual([{ event: SOCKET_EVENTS.FRIEND_REQUESTED, payload: RING }]);
+      expect(ringsHeard).toHaveBeenCalledWith({ sessionId: sessionOf(ARJUN), rings: [RING], now: 1 });
     });
 
-    it("is not sent again to a browser that heard it, so a reload shows it once", async () => {
-      const { domainEvents, tabs } = setup({
+    it("is not noted as heard by a browser whose socket never answered, so its next socket gets it", async () => {
+      const heard = [];
+      const ringsHeard = vi.fn(async ({ sessionId, rings }) => heard.push(...rings.map(() => sessionId)));
+      const missedRings = vi.fn(async ({ sessionId }) => (heard.includes(sessionId) ? [] : [RING]));
+      const { io, domainEvents, tabs } = setup({ online: [], friendComponent: { ringsHeard, missedRings } });
+      io.tabs.set(ARJUN, [fakeTab(sessionOf(ARJUN), { dead: true })]);
+
+      ring(domainEvents);
+      await settled();
+      await settled();
+      const next = fakeTab(sessionOf(ARJUN));
+      tabs.tellMissed({ socket: next, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
+      await settled();
+      await settled();
+
+      expect(ringsHeard).toHaveBeenCalledTimes(1);
+      expect(ringsHeard).toHaveBeenCalledWith({ sessionId: sessionOf(ARJUN), rings: [RING], now: 1 });
+      expect(missedRings).toHaveBeenCalledWith({ playerId: ARJUN, sessionId: sessionOf(ARJUN), now: 1 });
+      expect(next.emitted).toEqual([{ event: SOCKET_EVENTS.FRIEND_REQUESTED, payload: RING, ms: 10_000 }]);
+    });
+
+    it("sends a connecting tab what it may have missed, to that tab only, and notes what its page answered", async () => {
+      const ringsHeard = vi.fn(async () => undefined);
+      const { io, tabs } = setup({ friendComponent: { missedRings: async () => [RING], ringsHeard } });
+      const tab = fakeTab("a browser");
+      const deadTab = fakeTab("another browser", { dead: true });
+
+      tabs.tellMissed({ socket: tab, playerId: ARJUN, sessionId: "a browser" });
+      tabs.tellMissed({ socket: deadTab, playerId: ARJUN, sessionId: "another browser" });
+      await settled();
+      await settled();
+
+      expect(tab.emitted.map(({ payload }) => payload)).toEqual([RING]);
+      expect(ringsHeard.mock.calls).toEqual([[{ sessionId: "a browser", rings: [RING], now: 1 }]]);
+      expect(io.sent).toEqual([]);
+    });
+
+    it("logs a failure to note a heard ring", async () => {
+      const { domainEvents, entries } = setup({
         online: [ARJUN],
-        friendComponent: { missedRings: async () => [RING] },
+        friendComponent: { ringsHeard: async () => Promise.reject(new Error("down")) },
       });
-      domainEvents.emit(FRIEND_EVENTS.REQUESTED, { recipientId: ARJUN, request: RING });
-      await settled();
-      const reloaded = tabOf();
 
-      tabs.tellMissed({ socket: reloaded.socket, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
+      ring(domainEvents);
+      await settled();
       await settled();
 
-      expect(reloaded.emitted).toEqual([]);
-    });
-
-    it("is sent once to a browser that missed it: its next tabs and reloads do not get it again", async () => {
-      const { tabs } = setup({ online: [], friendComponent: { missedRings: async () => [RING] } });
-      const first = tabOf();
-      const second = tabOf();
-
-      tabs.tellMissed({ socket: first.socket, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
-      await settled();
-      tabs.tellMissed({ socket: second.socket, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
-      await settled();
-
-      expect(first.emitted).toHaveLength(1);
-      expect(second.emitted).toEqual([]);
-    });
-
-    it("is sent again when it rings again, and to another browser of the player's", async () => {
-      const again = { ...RING, ringAt: 2 };
-      const rings = [RING];
-      const { tabs } = setup({ online: [], friendComponent: { missedRings: async () => rings } });
-      tabs.tellMissed({ socket: tabOf().socket, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
-      await settled();
-      const phone = tabOf();
-      tabs.tellMissed({ socket: phone.socket, playerId: ARJUN, sessionId: "another browser" });
-      await settled();
-      rings.splice(0, 1, again);
-      const later = tabOf();
-      tabs.tellMissed({ socket: later.socket, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
-      await settled();
-
-      expect(phone.emitted.map(({ payload }) => payload)).toEqual([RING]);
-      expect(later.emitted.map(({ payload }) => payload)).toEqual([again]);
-    });
-
-    it("forgets what each browser heard once the ring is too old to be sent again", async () => {
-      const clock = { now: 1 };
-      const { tabs } = setup({ online: [], clock, friendComponent: { missedRings: async () => [RING] } });
-      tabs.tellMissed({ socket: tabOf().socket, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
-      await settled();
-      expect(tabs.remembered()).toBe(1);
-
-      clock.now = 1 + 15 * 60 * 1000;
-      tabs.tellMissed({ socket: tabOf().socket, playerId: ARJUN, sessionId: "another browser" });
-      await settled();
-
-      expect(tabs.remembered()).toBe(1);
+      expect(entries.map((entry) => entry.msg)).toContain("pushing a heard ring failed");
     });
   });
 
-  it("still pushes a request when it cannot tell who is connected, and logs that", async () => {
+  it("logs a failure to find a recipient's tabs", async () => {
     const { io, domainEvents, entries } = setup();
     io.in = () => ({ fetchSockets: async () => Promise.reject(new Error("down")) });
-    const request = { requestId: "r", displayName: "RiyaTest", via: "game", ringAt: 1 };
 
-    domainEvents.emit(FRIEND_EVENTS.REQUESTED, { recipientId: ARJUN, request });
+    domainEvents.emit(FRIEND_EVENTS.REQUESTED, {
+      recipientId: ARJUN,
+      request: { requestId: "r", displayName: "RiyaTest", via: "game", ringAt: 1 },
+    });
     await settled();
 
-    expect(io.sent).toEqual([
-      { channel: `player:${ARJUN}`, event: SOCKET_EVENTS.FRIEND_REQUESTED, payload: request },
-    ]);
-    expect(entries.map((entry) => entry.msg)).toContain("pushing who heard a friend request failed");
+    expect(entries.map((entry) => entry.msg)).toContain("pushing a friend request failed");
   });
 
   it("logs a failure to read the missed requests and sends nothing", async () => {
     const { tabs, entries } = setup({
       friendComponent: { missedRings: async () => Promise.reject(new Error("down")) },
     });
-    const socket = { emit: vi.fn() };
+    const socket = fakeTab(sessionOf(ARJUN));
 
     tabs.tellMissed({ socket, playerId: ARJUN, sessionId: sessionOf(ARJUN) });
     await settled();
 
-    expect(socket.emit).not.toHaveBeenCalled();
+    expect(socket.emitted).toEqual([]);
     expect(entries.map((entry) => entry.msg)).toContain("pushing missed friend requests failed");
   });
 });

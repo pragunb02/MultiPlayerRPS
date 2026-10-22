@@ -1,21 +1,25 @@
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { FRIEND_EVENTS } from "../../domain/friends/friendComponent.js";
-import { FRIEND_LIMITS } from "../../domain/friends/friendRules.js";
 import { PRESENCE_EVENTS } from "../../domain/friends/presenceTracker.js";
 import { playerChannel } from "./roomHandlers.js";
+
+/** How long a tab has to answer a friend request ring (CC-341). A live page answers at once. */
+const RING_ACK_TIMEOUT_MS = 10_000;
 
 /**
  * Domain to transport for friends (CC-052, ADR-066.10). Every push goes to one player's own tabs and names other
  * people by display name, avatar and profile handle only, never by player id.
  *
  * 1. A player's friends view changed: their tabs get the whole view again, read only when a tab is connected.
- * 2. A player was sent a request they can see: their tabs get it, for a toast on any page.
+ * 2. A player was sent a request they can see: each of their tabs gets it, for a toast on any page, and answers
+ *    once its page has it. Only then is the ring noted as heard by that tab's browser (its session, CC-341).
  * 3. A player's presence may have changed: each friend's tabs get `{ handle, presence }`.
- * 4. A tab connected: it alone gets each request of (2) that rang in the last minutes, still waits and was never
- *    sent to a tab of its browser (its session), because the ring came while that browser had no connection, between
- *    pages or reconnecting (CC-341). A browser that heard a ring is never sent it again, so a reload shows no
- *    second toast. Who heard what is kept in memory only as long as a ring can be sent again; after a restart a
- *    browser may be sent one ring of those minutes a second time.
+ * 4. A tab connected: it alone gets each request of (2) that rang in the last minutes, still waits and no tab of
+ *    its browser answered, because the ring came while that browser had no live connection: between pages,
+ *    reconnecting, or on a socket that had died without closing yet (CC-341). What it answers is noted the same way.
+ *    A browser that heard a ring is not sent it again, so a reload shows no second toast. The friend component keeps
+ *    who heard what beside each session, so a restart forgets nothing. A page too old to answer is sent a ring again
+ *    on each load for those minutes, until it reloads into the current version.
  *
  * A push that fails is logged and dropped: the page loads the view again whenever it opens. The answer is how the
  * gateway tells the presence tracker that a player's tab opened or closed.
@@ -23,19 +27,27 @@ import { playerChannel } from "./roomHandlers.js";
  * @param {{
  *   io: import("socket.io").Server,
  *   domainEvents: import("node:events").EventEmitter,
- *   friendComponent: Pick<ReturnType<typeof import("../../domain/friends/friendComponent.js").createFriendComponent>, "viewFor" | "presenceAudience" | "missedRings">,
+ *   friendComponent: Pick<ReturnType<typeof import("../../domain/friends/friendComponent.js").createFriendComponent>, "viewFor" | "presenceAudience" | "missedRings" | "ringsHeard">,
  *   presence: Pick<ReturnType<typeof import("../../domain/friends/presenceTracker.js").createPresenceTracker>, "connected" | "disconnected">,
  *   logger: import("../../utils/logger.js").Logger,
  *   now: () => number,
- * }} deps
+ *   ackTimeoutMs?: number,
+ * }} deps  `ackTimeoutMs`: how long a tab has to answer a ring before it counts as not heard
  * @returns {Readonly<{
  *   tabOpened: (playerId: string) => void,
  *   tabClosed: (playerId: string) => void,
- *   tellMissed: (tab: { socket: Pick<import("socket.io").Socket, "emit">, playerId: string, sessionId: string }) => void,
- *   remembered: () => number,
- * }>}  `remembered` counts the rings kept as heard, for tests
+ *   tellMissed: (tab: { socket: Pick<import("socket.io").Socket, "timeout">, playerId: string, sessionId: string }) => void,
+ * }>}
  */
-export function connectFriendPushes({ io, domainEvents, friendComponent, presence, logger, now }) {
+export function connectFriendPushes({
+  io,
+  domainEvents,
+  friendComponent,
+  presence,
+  logger,
+  now,
+  ackTimeoutMs = RING_ACK_TIMEOUT_MS,
+}) {
   const failed = (what) => (err) => logger.error({ err }, `pushing ${what} failed`);
   // What friends were last told of each player, so a change they cannot see is never pushed: while a player appears
   // offline, their tabs and games come and go without a word to anyone (ADR-066.6).
@@ -54,33 +66,19 @@ export function connectFriendPushes({ io, domainEvents, friendComponent, presenc
     }
   });
 
-  // Which browser heard which ring, oldest first: `${sessionId} ${requestId} ${ringAt}` to when (CC-341).
-  /** @type {Map<string, number>} */
-  const heard = new Map();
-  const heardKey = (sessionId, request) => `${sessionId} ${request.requestId} ${request.ringAt}`;
-  function noteHeard(sessionIds, request) {
-    const at = now();
-    for (const [key, when] of heard) {
-      if (when > at - FRIEND_LIMITS.missedRingWithinMs) break;
-      heard.delete(key);
-    }
-    for (const sessionId of sessionIds) {
-      heard.delete(heardKey(sessionId, request));
-      heard.set(heardKey(sessionId, request), at);
-    }
+  /** Rings one tab, and notes the ring as heard by its browser once its page answered. No answer, no note. */
+  function ringTab(socket, sessionId, request) {
+    socket.timeout(ackTimeoutMs).emit(SOCKET_EVENTS.FRIEND_REQUESTED, request, (unanswered) => {
+      if (unanswered) return;
+      friendComponent.ringsHeard({ sessionId, rings: [request], now: now() }).catch(failed("a heard ring"));
+    });
   }
 
-  // The browsers with a tab in the channel are noted before the push goes out. A tab that connects in between gets
-  // both the push and, as it connects, the same ring again; its toasts show the same message once (ToastProvider).
   domainEvents.on(FRIEND_EVENTS.REQUESTED, ({ recipientId, request }) => {
-    const channel = playerChannel(recipientId);
-    io.in(channel)
+    io.in(playerChannel(recipientId))
       .fetchSockets()
-      .then(
-        (sockets) => noteHeard(new Set(sockets.map((socket) => socket.data.sessionId)), request),
-        failed("who heard a friend request"),
-      )
-      .finally(() => io.to(channel).emit(SOCKET_EVENTS.FRIEND_REQUESTED, request));
+      .then((sockets) => sockets.forEach((socket) => ringTab(socket, socket.data.sessionId, request)))
+      .catch(failed("a friend request"));
   });
 
   domainEvents.on(PRESENCE_EVENTS.CHANGED, ({ playerId }) => {
@@ -108,15 +106,9 @@ export function connectFriendPushes({ io, domainEvents, friendComponent, presenc
     tabClosed: (playerId) => presence.disconnected({ playerId }),
     tellMissed({ socket, playerId, sessionId }) {
       friendComponent
-        .missedRings({ playerId, now: now() })
-        .then((rings) => {
-          for (const request of rings.filter((ring) => !heard.has(heardKey(sessionId, ring)))) {
-            noteHeard([sessionId], request);
-            socket.emit(SOCKET_EVENTS.FRIEND_REQUESTED, request);
-          }
-        })
+        .missedRings({ playerId, sessionId, now: now() })
+        .then((rings) => rings.forEach((request) => ringTab(socket, sessionId, request)))
         .catch(failed("missed friend requests"));
     },
-    remembered: () => heard.size,
   });
 }

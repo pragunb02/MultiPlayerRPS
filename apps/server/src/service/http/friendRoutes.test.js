@@ -185,6 +185,26 @@ describe("asking, answering and the pushes (CC-052)", () => {
     });
   });
 
+  it("tells the next socket of a browser whose socket got the ring but never answered it (CC-341)", async () => {
+    server = await startTestServer();
+    const riya = await account("RiyaTest");
+    const arjun = await account("ArjunTest");
+    const { bobSeat } = await together(riya, arjun);
+    // Arjun's first socket stays in his channel and gets the push, but never answers it, as a dead one would not.
+    const pushed = eventWhere(arjun.socket, () => true, SOCKET_EVENTS.FRIEND_REQUESTED);
+
+    expect((await ask(riya, bobSeat)).body).toEqual({ result: "sent" });
+    await pushed;
+    let toasted;
+    await clients.openSocket(arjun.cookie, {
+      listen: (socket) => {
+        toasted = eventWhere(socket, () => true, SOCKET_EVENTS.FRIEND_REQUESTED);
+      },
+    });
+
+    expect(await toasted).toMatchObject({ displayName: "RiyaTest" });
+  });
+
   it("sends a request from match history, by match and seat", async () => {
     server = await startTestServer();
     const riya = await account("RiyaTest");

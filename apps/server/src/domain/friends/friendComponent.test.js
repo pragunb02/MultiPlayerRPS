@@ -61,6 +61,17 @@ const stringsIn = (value) =>
       ? [...Object.keys(value), ...Object.values(value)].flatMap(stringsIn)
       : [];
 
+/** The rings each browser session heard, as the session accessor keeps them (CC-341). */
+function heardStore() {
+  const heard = new Map();
+  return {
+    addHeardRings: async ({ sessionId, rings, since }) =>
+      heard.set(sessionId, [...(heard.get(sessionId) ?? []).filter((ring) => ring.ringAt > since), ...rings]),
+    heardRings: async ({ sessionId, since }) =>
+      (heard.get(sessionId) ?? []).filter((ring) => ring.ringAt > since),
+  };
+}
+
 function setup({ rooms = [], blocked = [], limits, deleted = [], failing = [], matchMark } = {}) {
   const byCode = new Map(rooms.map((room) => [room.code, room]));
   let handles = 0;
@@ -127,6 +138,7 @@ function setup({ rooms = [], blocked = [], limits, deleted = [], failing = [], m
     safety: safetyFromAdults(({ playerIds }) => playerIds.filter((id) => ADULTS.has(id))),
     presence: { statusOf: (playerId) => statuses.get(playerId) ?? FRIEND_PRESENCE.OFFLINE },
     events: { emit: (name, payload) => announced.push({ name, ...payload }) },
+    sessions: heardStore(),
     newRequestId: () => `00000000-0000-4000-9000-${String(++requests).padStart(12, "0")}`,
     newToken: () => `${++tokens}`.padStart(22, "T"),
     ...(limits !== undefined && { limits }),
@@ -973,7 +985,8 @@ describe("friendComponent: missed rings (CC-341)", () => {
   const NIGHT = Date.UTC(2026, 9, 20, 18);
   // 16:25 UTC is 21:55 in India, five minutes before them.
   const EVENING = Date.UTC(2026, 9, 20, 16, 25);
-  const missed = (friends, playerId, now) => friends.missedRings({ playerId, now });
+  const missed = (friends, playerId, now, sessionId = "laptop") =>
+    friends.missedRings({ playerId, sessionId, now });
 
   it("says when each announced request rang", async () => {
     const { ask, events } = setup({ rooms: shared() });
@@ -991,6 +1004,19 @@ describe("friendComponent: missed rings (CC-341)", () => {
     expect(await missed(friends, ARJUN, T0 + 15 * MINUTE - 1)).toEqual([request]);
     expect(await missed(friends, ARJUN, T0 + 15 * MINUTE)).toEqual([]);
     expect(await missed(friends, RIYA, T0)).toEqual([]);
+  });
+
+  it("gives none the browser heard already, but gives it to another browser, and a new ring again", async () => {
+    const { ask, friends, events } = setup({ rooms: shared() });
+    await ask(RIYA, ARJUN);
+    const [{ request }] = events(FRIEND_EVENTS.REQUESTED);
+
+    await friends.ringsHeard({ sessionId: "laptop", rings: [request], now: T0 + MINUTE });
+
+    expect(await missed(friends, ARJUN, T0 + 2 * MINUTE)).toEqual([]);
+    expect(await missed(friends, ARJUN, T0 + 2 * MINUTE, "phone")).toEqual([request]);
+    await friends.ringsHeard({ sessionId: "laptop", rings: [{ ...request, ringAt: T0 - 1 }], now: T0 });
+    expect(await missed(friends, ARJUN, T0 + 2 * MINUTE)).toEqual([]);
   });
 
   it("gives none that was declined or cancelled", async () => {

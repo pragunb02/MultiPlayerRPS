@@ -166,7 +166,8 @@ export const SOCKET_EVENTS = Object.freeze({
    * Server sends `{ requestId, displayName, avatar?, via, ringAt }` to every tab of a player who was just sent a
    * friend request, so a toast tells them on any page. A request into a block is never pushed (ADR-053, ADR-066).
    * `ringAt` is when it rang. A tab that connects is sent again each one that rang in the last 15 minutes and still
-   * waits, so a tab that was between pages still hears of it, and shows each ring once (CC-341).
+   * waits and no page of the same browser answered, so a tab that was between pages still hears of it (CC-341). The
+   * server asks for an answer: the page calls it once the toast is up, and only then is the ring heard.
    */
   FRIEND_REQUESTED: "friends:request",
   /**
