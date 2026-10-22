@@ -214,6 +214,15 @@ Rules:
     Review every changed image before approving. New screens get a baseline the same way. Anything that changes between runs is given a stand-in or painted
     from script in that spec (Playwright's own `mask` is blocked by the CSP), never accepted by a looser threshold.
     On failure the CI job keeps the expected, actual and diff images, a video and a trace for 14 days.
+16. **The layout probe** (CC-154). `e2e/layoutProbe.js` finds what a person would see as broken: clipped text, anything
+    past the screen's edge or a page that scrolls sideways, overlapping controls, a control something else covers,
+    tap targets under 24 px, and text that fails contrast (axe's colour rules). `probeViewports(page, { screen })`
+    checks a screen at 320, 360, 390, 768, 1024 and 1280 px wide and at 640 × 360 (200 % zoom), in light and dark;
+    `expectNoLayoutProblems(findings, { knownFailures })` fails with one line per finding. Every new screen and
+    state is probed in its ticket's own spec, with the stress data (`STRESS` and `longNameAccount` in
+    `e2e/personas.js`, `inflateNumbers` for six digit numbers). An ellipsis is allowed only when the whole text is in
+    the accessible name. A finding that is not fixed in the same pull request is a known failure with the ticket
+    that fixes it, never a looser rule (`KNOWN` in `e2e/layout-probe.spec.js`).
 
 ---
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseEmail, parsePassword, parseUsername } from "../apps/server/src/models/credentials.js";
-import { longNameAccount, newAccount } from "./personas.js";
+import { STRESS, longNameAccount, newAccount } from "./personas.js";
 
 // The browser tests sign up with these accounts. A name the server refuses fails a browser test now and then, far
 // from the cause, so the server's own rules check them here (CC-237).
@@ -51,5 +51,18 @@ describe("longNameAccount (CC-256)", () => {
       email: "w.3456780042@example.com",
       password: newAccount(options).password,
     });
+  });
+});
+
+describe("STRESS (CC-154)", () => {
+  it("has a name exactly as long as sign-up allows: sign-up accepts it and refuses one letter more", () => {
+    expect(STRESS.longestName).toHaveLength(20);
+    expect(parseUsername(STRESS.longestName)).toBe(STRESS.longestName);
+    expect(() => parseUsername(`${STRESS.longestName}W`)).toThrow();
+  });
+
+  it("has a Hinglish line too long for one line on a 320 px phone, and a six digit number", () => {
+    expect(STRESS.hinglish.length).toBeGreaterThan(100);
+    expect(STRESS.bigNumber.replace(/\D/g, "")).toHaveLength(6);
   });
 });
