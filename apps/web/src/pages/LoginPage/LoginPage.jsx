@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { paths, safeNext } from "../../app/paths.js";
 import { Button } from "../../components/Button/Button.jsx";
@@ -7,6 +7,9 @@ import { PageTitle } from "../../components/PageTitle.jsx";
 import { useSaveProgress } from "../../components/SaveProgress/saveProgressContext.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
+import { useServices } from "../../app/servicesContext.js";
+import { NO_TELEMETRY } from "../../lib/telemetry/facade.js";
+import { nextKindOf } from "../../lib/telemetry/authForms.js";
 import styles from "../authForms.module.css";
 
 export function LoginPage() {
@@ -14,6 +17,7 @@ export function LoginPage() {
   const saveProgress = useSaveProgress();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
+  const telemetry = useServices().telemetry ?? NO_TELEMETRY;
   const [form, setForm] = useState({ email: "", password: "" });
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
   const login = useAction(
@@ -26,8 +30,15 @@ export function LoginPage() {
     { id: "auth.login" },
   );
 
+  // The top of the login funnel (CC-174): which form, and where next points as a kind, never the path.
+  const nextKind = nextKindOf(next);
+  useEffect(() => {
+    telemetry.track("auth_form_viewed", { form: "login", next_kind: nextKind });
+  }, [telemetry, nextKind]);
+
   function submit(event) {
     event.preventDefault();
+    telemetry.track("auth_form_submitted", { form: "login" });
     login.run();
   }
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { createRateLimit } from "./rateLimits.js";
+import { NO_SERVER_EVENTS } from "./telemetryRoutes.js";
 import { destroySession, establishSession, requireIdentity, SESSION_COOKIE_NAME } from "./session.js";
 
 // Each guest session is a stored document; cap how fast one client can create them.
@@ -22,6 +23,7 @@ const DEFAULT_GUEST_LIMIT = Object.freeze({ windowMs: 15 * 60 * 1000, limit: 30 
  *   guestLimit?: { windowMs: number, limit: number },
  *   isAdmin: (sessionData: object) => boolean,   whether the owner console is open to this session. Only then does
  *     the answer carry `admin: true`, so nobody else learns that a console exists (CC-233)
+ *   serverEvents?: { record: Function },   anonymous counts of new guests and logouts (CC-175)
  * }} deps
  */
 export function createSessionRoutes({
@@ -30,6 +32,7 @@ export function createSessionRoutes({
   onIdentityChanged,
   guestLimit = DEFAULT_GUEST_LIMIT,
   isAdmin,
+  serverEvents = NO_SERVER_EVENTS,
 }) {
   assertDefined(identityComponent, "identityComponent");
   assertFunction(onSessionEnded, "onSessionEnded");
@@ -57,11 +60,13 @@ export function createSessionRoutes({
     await establishSession(req, identity);
     req.log.info({ playerId: identity.id }, "guest session created");
     res.status(201).json({ identity });
+    serverEvents.record(req, "guest_started");
   });
 
   router.delete("/session", async (req, res) => {
     const sessionId = req.sessionID;
     const previous = req.session.identity;
+    const ended = { identity: previous };
     await destroySession(req);
     res.clearCookie(SESSION_COOKIE_NAME);
     if (previous !== undefined) {
@@ -69,6 +74,8 @@ export function createSessionRoutes({
       onSessionEnded(sessionId);
     }
     res.status(204).end();
+    if (previous !== undefined)
+      serverEvents.record(req, "session_ended", { cause: "logout" }, { session: ended });
   });
 
   return router;

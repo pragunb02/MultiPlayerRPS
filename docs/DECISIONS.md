@@ -1059,6 +1059,11 @@ thinking crashed` with `game` only.
   `bots.thinking.duration` (ms, the eleven duration buckets) with `game` (catalogue id) and `outcome` (`ok`,
   `timeout`, `crashed`, `failed`), at most 3 games times 4 outcomes, and two more named warning lines,
   `computer player ran out of time to think` and `computer player's thinking crashed`, with the `game` field only.
+- **Amended 2026-10-20 (CC-175): one counter about usage counts.** `telemetry.dropped`, with the one attribute
+  `reason` (`opted_out`, `admin`, `invalid`, `rate_limited`, `cap`, `bot`, `flag_off`), counts what
+  `POST /api/telemetry` did not store, so the owner can see a flood, a broken build or the daily cap in Grafana. It
+  carries no product data: the usage counts themselves stay in our own database (`telemetry_counts`, ADR-034), never
+  in Grafana.
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 
@@ -1652,6 +1657,23 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
   is Regular plus Core on the last full week's Sunday against the Sunday before, and the console shows the moves
   between those two days. The 3-day weekly returning players number (PRODUCT_VISION.md 7.1) stays on the
   Overview without the North Star label, and 7.1 needs the owner's rewording (CC-268).
+- **Amended · 2026-10-20 (owner: "Accept all", the recommended defaults of CC-174 and CC-175).** How the counts are
+  sent and kept. (1) The first build sends every client event of EVENTS.md, within CC-174's cut line, in batches
+  every 10 seconds or 20 events and on `pagehide`, with no sampling while the day stays under 100 000 events. (2) The
+  privacy page section (CC-173) goes live first, with its date, and the client flag ramps no earlier than 7 days
+  later, with no banner. (3) A dead click counts only elements that look pressable (EVENTS.md 3.2). (4) Ingestion
+  takes at most 8 KB and 30 events a batch and 30 batches per 10 minutes per network, drops an invalid event alone
+  (counted as `invalid`), stores at most 100 000 events per India day, keeps them 30 days by a TTL index, stores the
+  arrival time to the India hour only, and drops known bots by a short User-Agent list read in memory and never
+  stored or logged. The hour and the 30 days are one-way for stored history and were accepted knowingly.
+- **Amended · 2026-10-21 (review of #161, the coordinator as design and privacy lead).** No single event is stored:
+  the server adds each event to an **hourly counter**, one per tuple of catalogue fields and India hour
+  (`telemetry_counts`, `$inc` on upsert), so the order of events and which ones came in one batch are never kept, and
+  events of one visit cannot be linked to each other (the privacy page's promise). The batch limit is per session (per
+  network for a visitor) and ten times the client's rhythm, one network may have at most 2 000 events counted per India
+  day (in memory, like CC-110), and the privacy switch reaches the server too: while it is off, every API request
+  carries `X-CC-Counts: off`, and the server records no event of its own about it. The header is never stored or
+  logged.
 
 ### ADR-033 — Every tab follows the session: server disconnects and a message without identity
 
@@ -2411,6 +2433,10 @@ is under 4.5:1 as noted above) carries info text.
   Sockets already check `Origin` at the handshake (CC-013).
 - **Consequences:** No token plumbing in the client; stateless. Revisit if we ever allow cross-origin API clients, embed the
   app in other sites, or add classic HTML form posts.
+- **Amended · 2026-10-20 (CC-175).** One narrow exception to the JSON rule: `POST /api/telemetry` also takes
+  `text/plain`, because `navigator.sendBeacon` sends that when a page is closed. That route changes nothing a player
+  owns, the `Origin` rule and SameSite still apply to it, and a test pins that every other route still refuses
+  text/plain (`telemetryRoutes.test.js`).
 
 ### ADR-009 — Web app conventions: CSS Modules + tokens, injected clients, same-origin dev proxy
 
