@@ -15,6 +15,7 @@ import {
 } from "../../utils/errors.js";
 import { createLegacyPasswordChecker } from "../../utils/legacyPassword.js";
 import { createPasswordHasher } from "../../utils/passwordHasher.js";
+import { ACCEPT_EVERY_PASSWORD } from "../../testing/fakePasswordScreen.js";
 import { createAccountComponent } from "./accountComponent.js";
 
 // 2026-10-16 in India.
@@ -35,6 +36,7 @@ function setup({ legacyUsers = [] } = {}) {
     legacyUserAccessor: createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao(legacyUsers) }),
     passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }),
     legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
+    passwordScreen: ACCEPT_EVERY_PASSWORD,
     accountDeletionAccessor: deletions,
   });
   return { accounts, accountDao, deletions };
@@ -232,6 +234,7 @@ describe("accountComponent birth year corrections by the owner (CC-152, ADR-048.
       legacyUserAccessor: createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao([]) }),
       passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }),
       legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
+      passwordScreen: ACCEPT_EVERY_PASSWORD,
       accountDeletionAccessor: createAccountDeletionAccessor({
         accountDeletionDao: createInMemoryAccountDeletionDao(),
       }),
@@ -395,6 +398,7 @@ describe("accountComponent.close and storage failures (CC-035)", () => {
       legacyUserAccessor: { findByEmail: async () => [] },
       passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }),
       legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
+      passwordScreen: ACCEPT_EVERY_PASSWORD,
       accountDeletionAccessor: { closeLegacy: async () => {}, isLegacyClosed: async () => false },
     });
 

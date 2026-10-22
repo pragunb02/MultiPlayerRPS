@@ -6,9 +6,13 @@ import { promisify } from "node:util";
  * parameters — `scrypt$<N>$<r>$<p>$<salt>$<hash>` (base64) — so they can be raised later and existing
  * hashes upgraded transparently at the next successful login (`needsRehash`).
  *
- * Default N = 2^15 (≈32 MiB per hash): strong, but sized for a small server.
+ * The default is OWASP's alternative minimum, N = 2^15, r = 8, p = 3 (CC-260, ADR-080). Memory is 128 * N * r, so
+ * 32 MiB per hash whatever p is, which fits Render's 512 MB. Node runs the three lanes one after another, so a hash
+ * takes about three times as long as with p = 1. OWASP's first option, N = 2^17 with p = 1, needs 128 MiB per hash,
+ * too much when a few logins arrive together. Hashes made before keep their own parameters, still verify, and are
+ * made again at the next successful login.
  */
-export const DEFAULT_SCRYPT_PARAMS = Object.freeze({ N: 2 ** 15, r: 8, p: 1 });
+export const DEFAULT_SCRYPT_PARAMS = Object.freeze({ N: 2 ** 15, r: 8, p: 3 });
 const KEY_LENGTH = 64;
 const SALT_BYTES = 16;
 

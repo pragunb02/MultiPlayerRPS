@@ -132,6 +132,23 @@ test.describe("a visitor who has to wait", () => {
     expect(await framesSeen(page)).toEqual(["none", "page", "app", "none"]);
     await expect(page.locator("html")).toHaveClass(/wake-waited/);
   });
+
+  // The app's screen lies over the page and takes no room in it. When it took room, the lobby jumped up by about
+  // 340 px on a phone as it went, a layout shift of 0.37 (CC-322).
+  test("sees the lobby stay where it is when the screen goes", async ({ players }) => {
+    const { page } = await players.open("visitor");
+    await slowDown(page, "**/api/session");
+
+    await page.goto("/games/chess");
+
+    await expect(appScreen(page)).toBeVisible();
+    const heading = page.getByRole("heading", { level: 1, name: "Chess" });
+    const before = await heading.boundingBox();
+    // Not homeIsReady: on a phone it opens the menu, which moves the page on purpose.
+    await expect(appScreen(page)).toHaveCount(0);
+
+    expect((await heading.boundingBox()).y).toBe(before.y);
+  });
 });
 
 test.describe("a visitor who waits a long time", () => {

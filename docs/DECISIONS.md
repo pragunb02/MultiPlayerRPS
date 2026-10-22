@@ -58,6 +58,51 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-080 — Passwords: scrypt at N=2^15, r=8, p=3 with rehash at login, and new passwords checked against SecLists and Pwned Passwords
+
+- **Status:** Accepted · 2026-10-21 ([CC-260](tickets/CC-260.md), [CC-261](tickets/CC-261.md)). Decided by the
+  coordinator, who has design authority for security tickets. Adds no dependency (ADR-008): Node's `scrypt`,
+  `createHash` and `fetch`.
+- **Context.** SEC-23: new hashes used scrypt N=2^15, r=8, p=1, below OWASP's Password Storage Cheat Sheet, which
+  asks for N=2^17, r=8, p=1, or N=2^15, r=8, p=3 (or an equal trade). SEC-24: sign-up and password change accepted
+  any password of 8 to 128 characters, including the most common and the breached ones. NIST SP 800-63B (5.1.1.2)
+  asks verifiers to compare new passwords against lists of commonly used, expected or compromised values.
+- **Decision.**
+  1. **scrypt N=2^15, r=8, p=3** for every new hash. Memory is 128 × N × r, 32 MiB per hash whatever p is, which
+     is safe on Render's 512 MB. N=2^17 is not used: 128 MiB per hash would run out of memory with a few logins at
+     once. Measured on the owner's laptop (Apple M4 Pro, Node 24.21): a hash takes about 40 ms at p=1 and about
+     127 ms at p=3 (median of 30, CC-260 has the numbers). The stop line was about 300 ms.
+  2. **Old hashes keep working.** Each hash stores its own parameters and still verifies. After a successful login,
+     a hash with other parameters is replaced by the new one. That save is a compare and set: it replaces the hash
+     only while it is still the one that was checked, so a password change that landed meanwhile is kept. It is
+     best effort: a failed save never fails the login, it is logged as "saving the upgraded password hash failed"
+     (warning, forwarded to telemetry), and the next login tries again.
+  3. **Equal work for every email.** The dummy hash that gives an unknown email the same work as a real one is made
+     with the new parameters. An account with an old hash is cheaper to check (about 40 ms against 127 ms), which
+     would show which accounts have not signed in since the change. So its login also runs a hash at the new
+     parameters, in the same `Promise.all` as the check, right password or wrong, and on success that hash is the
+     one saved, so it is made only once. Such a login costs at least what an unknown email costs (CC-245).
+  4. **New passwords are screened** at sign-up and on a password change, never at login, after the length rules:
+     1. first against the bundled SecLists `10k-most-common.txt` (MIT, credited in CREDITS.md), compared in lower
+        case,
+     2. then against Have I Been Pwned's Pwned Passwords range API: only the first 5 hex characters of the
+        password's SHA-1 leave the server, with `Add-Padding: true`, a 1.5 s timeout, from the server only.
+  5. **Fail open.** When the range API fails or is late the password is let through after the local check. Every
+     check counts its outcome (`clear`, `common`, `breached`, `unavailable`) in the anonymous counter
+     `accounts.password_checks` (ADR-055), with nothing about the player.
+  6. **One plain refusal** for both sources, at the field: "That password is too easy to guess. Choose a different
+     one." It names neither the list nor the service.
+  7. **The fetch is injected.** `index.js` passes the real `fetch`. `startServer`, the test app and the browser
+     tests default to a fetch that always fails, so no test touches the network.
+- **Why.** p=3 meets OWASP's minimum at the same memory, and Node runs the three lanes one after another, so it
+  costs time, not memory. k-anonymity with padding is how Pwned Passwords is meant to be used and sends nothing that
+  names a person. A refused password costs the player one retry. Failing closed would stop every sign-up when a
+  service we do not run is down.
+- **Consequences.** A login with an old hash costs one extra hash, once. Sign-up and password change can take up
+  to 1.5 s longer when the range API is slow. The privacy page and DATA.md list Have I Been Pwned as a fifth service.
+  The web app makes no new request, so the CSP's `connect-src` is unchanged. A long run of `unavailable` in the
+  counter means the breach half is off and needs a look.
+
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 
 - **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner
@@ -164,6 +209,19 @@ themes (CONTRACT.md §1, Elevation). Motion in the header stays in ADR-075's sim
   a flag and a removal day, switched from the console. Revisit: `lottie_light` only for real After Effects art
   (ADR-016 amendment point 2), Rive only for an interactive story character with its own ADR adding
   `'wasm-unsafe-eval'` and self-hosted wasm, OGL only if a ticket shows a hero scene helps players.
+- **Amended 2026-10-21 ([CC-322](tickets/CC-322.md), builder, owner-delegated).** CC-135's bundle check exists:
+  the step "Bundle size budget" of the required `checks` job runs `node scripts/bin/check-bundle.mjs` after
+  `npm run build:web`. Its rules, in `scripts/build/bundleBudget.mjs`: the first route (index.html's entry and
+  its `modulepreload`s) at most 150 kB gzip; chess.js and Motion never on it; no file under `effects/scenes/` or
+  `effects/themes/` on it; `effects/registry.js` at most 0.5 kB of its own code there; each effect's chunk with
+  its CSS at most 6 kB, or its entry's smaller `budgetKB` (read from the loader's `import()` path); the chunk
+  holding `effects/particles.js` at most 1.5 kB. Sizes come from a build report the Vite plugin
+  `scripts/build/bundleReport.mjs` writes outside `dist`, with each source file's share of the minified chunk
+  split by its source map, so a module's size is a real one and not its unminified source. Until the registry
+  lands (CC-099) the effect rules have nothing to check. Point 5's "prefetch at idle" is unchanged. Pages, unlike
+  effects, are prefetched on link intent (pointer, focus, touch) as a hint only: `<link rel="modulepreload">` and
+  `<link rel="prefetch">` from a file list the build writes into index.html. Nothing runs, so a failed hint never
+  reaches the stale-build reload of CC-181. CC-322 records this.
 
 ### ADR-074 — A merge queue on main: CI on `merge_group`, merges through the queue
 

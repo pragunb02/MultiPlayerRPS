@@ -289,6 +289,31 @@ async function openDisclosure(button, timeout = undefined) {
 }
 
 /**
+ * The key that moves to the next control. Safari's Tab reaches only form fields unless the player turns on "Press
+ * Tab to highlight each item". Option and Tab reaches links too, and that is the key a Safari keyboard user
+ * presses (CC-184).
+ *
+ * @param {import("@playwright/test").TestInfo} testInfo
+ */
+export const nextItemKey = (testInfo) =>
+  testInfo.project.use.defaultBrowserType === "webkit" ? "Alt+Tab" : "Tab";
+
+/**
+ * Presses the next-control key until `target` has the focus, at most `presses` times, as a keyboard player would.
+ *
+ * @param {import("@playwright/test").Page} page
+ * @param {import("@playwright/test").Locator} target
+ * @param {import("@playwright/test").TestInfo} testInfo
+ */
+export async function tabUntil(page, target, testInfo, presses = 20) {
+  for (let press = 0; press < presses; press++) {
+    if (await target.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press(nextItemKey(testInfo));
+  }
+  await expect(target).toBeFocused();
+}
+
+/**
  * The header, with the player's controls on screen (sound, level, name, Profile, Friends, Log in, Sign up, Log out,
  * Feedback). Under 64rem they sit in the header's menu (CC-259, CC-324), so this opens it first when it is closed.
  * On a wide screen it opens the account menu, under the player's name, when there is a player. Both close on every

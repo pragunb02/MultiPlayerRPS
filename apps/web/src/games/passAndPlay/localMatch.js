@@ -54,7 +54,7 @@ const freeze = (session) => Object.freeze(session);
  *   engine: Readonly<import("@classicade/games").GameEngine<any, any, any>>,
  *   clock: { now: () => number },
  *   rng: () => number,
- * }} deps  `rng` decides who starts and the chess colours, as the engine asks
+ * }} deps  `rng` decides who starts the first game and the chess colours, as the engine asks
  */
 export function createLocalMatch({ engine, clock, rng }) {
   if (engine === undefined || clock === undefined || rng === undefined) {
@@ -67,7 +67,17 @@ export function createLocalMatch({ engine, clock, rng }) {
   /** The player who holds the phone now: the first one the engine lets move, or "" once the game is over. */
   const holder = (session) => (finished(session) ? "" : engine.activePlayers(session.state)[0]);
 
-  function begin({ names, options, number }) {
+  /**
+   * Who moves first in the game after `session`: the other player, for games where one player starts (CC-091).
+   * Empty for the first game and for games where both move at once, so the engine draws or needs no starter.
+   */
+  function nextStarter(session) {
+    if (engine.starterOf === undefined) return {};
+    const previous = engine.starterOf(session.state);
+    return { starter: LOCAL_PLAYERS.find((player) => player !== previous) };
+  }
+
+  function begin({ names, options, number, named = {} }) {
     const checkedNames = checkNames(names);
     if (!checkedNames.ok) throw new RangeError(checkedNames.reason);
     const checkedOptions = engine.validateOptions(options);
@@ -77,7 +87,7 @@ export function createLocalMatch({ engine, clock, rng }) {
       names: Object.freeze(checkedNames.names),
       options: checkedOptions.value,
       number,
-      state: engine.init({ players: [...LOCAL_PLAYERS], options: checkedOptions.value, rng }),
+      state: engine.init({ players: [...LOCAL_PLAYERS], options: checkedOptions.value, rng, ...named }),
       at: clock.now(),
       uncoveredFor: "",
     });
@@ -111,12 +121,18 @@ export function createLocalMatch({ engine, clock, rng }) {
     start: ({ names, options }) => begin({ names, options, number: 1 }),
 
     /**
-     * The next game with the same names and options. The engine draws who starts again.
+     * The next game with the same names and options. The player who did not start the last game starts this one,
+     * as in a rematch on the server (CC-091).
      *
      * @param {LocalSession} session
      */
     playAgain: (session) =>
-      begin({ names: session.names, options: session.options, number: session.number + 1 }),
+      begin({
+        names: session.names,
+        options: session.options,
+        number: session.number + 1,
+        named: nextStarter(session),
+      }),
 
     holder,
 

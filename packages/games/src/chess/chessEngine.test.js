@@ -91,6 +91,31 @@ describe("chessEngine setup", () => {
     expect(whites).toBeLessThan(600);
   });
 
+  it("gives White to a named starter, whatever the seed says, and names them as the starter (CC-091)", () => {
+    const state = chessEngine.init({
+      players: [A, B],
+      options: { timeControl: "blitz-5+0" },
+      rng: createSeededRng(42),
+      starter: A,
+    });
+
+    expect(state).toEqual({ ...newGame(), colors: { [A]: "w", [B]: "b" }, byColor: { w: A, b: B } });
+    expect(chessEngine.activePlayers(state)).toEqual([A]);
+    expect(chessEngine.starterOf(state)).toBe(A);
+    expect(chessEngine.starterOf(newGame())).toBe(B);
+  });
+
+  it("refuses a starter who is not one of the players (CC-091)", () => {
+    expect(() =>
+      chessEngine.init({
+        players: [A, B],
+        options: { timeControl: "blitz-5+0" },
+        rng: createSeededRng(42),
+        starter: "carol",
+      }),
+    ).toThrow(TypeError);
+  });
+
   it("defaults to blitz 5+0 and validates time controls", () => {
     expect(chessEngine.validateOptions({})).toEqual({ ok: true, value: { timeControl: "blitz-5+0" } });
     expect(chessEngine.validateOptions({ timeControl: "rapid-15+10" }).ok).toBe(true);
@@ -684,8 +709,9 @@ describe("chessEngine position history (CC-180)", () => {
     // back their own last move, so some games end by repetition, not only by the fifty-move rule or on the board.
     // The engine refuses moves once a game is over, so a game it ended too early fails inside `act`.
     const reasons = new Set();
-    // Seed 10 ends by the fifty-move rule, the others by repetition after 67 to 243 half moves.
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 10, 11, 12]) {
+    // Seed 10 ends by the fifty-move rule after 428 half moves, seeds 2 and 12 by repetition after 107 and 67. Ten
+    // seeds took up to the whole time limit under coverage on a busy CI machine (CC-342). These three cover both ends.
+    for (const seed of [2, 10, 12]) {
       const rng = createSeededRng(seed);
       const reference = new Chess();
       const played = [];

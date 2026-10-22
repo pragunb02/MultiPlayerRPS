@@ -1,4 +1,4 @@
-import { expect, formFactor, header, joinAsGuest, test } from "./fixtures.js";
+import { expect, formFactor, header, joinAsGuest, nextItemKey, test } from "./fixtures.js";
 
 // The arcade look (CC-087, ADR-012): every themed screen renders in light and dark with no CSP violations or
 // console errors (the players fixture checks), celebrations play, and with reduced motion nothing moves while
@@ -190,9 +190,7 @@ test("the game cards can be reached and opened with the keyboard, with a visible
   players,
 }, testInfo) => {
   test.skip(formFactor(testInfo) === "mobile", "keyboard navigation is a desktop journey");
-  // Safari's Tab key moves only between form fields unless the player turns on "Press Tab to highlight each item".
-  // Option and Tab reaches links too, and that is the key a Safari keyboard user presses (CC-184).
-  const nextItem = testInfo.project.use.defaultBrowserType === "webkit" ? "Alt+Tab" : "Tab";
+  const nextItem = nextItemKey(testInfo);
   const { page } = await players.open("visitor");
   await page.goto("/");
   // The game cards are the Games list. The daily puzzle has its own list after it (CC-144), so it is counted
