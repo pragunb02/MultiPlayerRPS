@@ -66,8 +66,6 @@ const ENDED_MESSAGES = Object.freeze({
 const ended = (state) => new GoneError(ENDED_MESSAGES[state], { details: { state } });
 
 const newestFirst = (a, b) => b.createdAt - a.createdAt;
-/** Oldest first, and by id for the same moment, so every reader puts challenges in the same order. */
-const oldestFirst = (a, b) => a.createdAt - b.createdAt || a.challengeId.localeCompare(b.challengeId);
 
 /** A hold on a challenge whose room was never recorded and whose lease is over (see `claimLeaseMs`). */
 const isStaleClaim = (challenge, now) =>
@@ -238,31 +236,48 @@ export function createChallengeComponent({
     return recipient;
   }
 
-  /**
-   * The limit a new challenge breaks, or undefined. It reads the sender's challenges with the new one stored, so
-   * challenges made at the same moment are judged in one order: the oldest within the limit stay, and any after
-   * them are refused. Checking before storing would let two at once both pass.
-   */
-  async function brokenLimit(challenge, now) {
-    const mine = [...(await challengeAccessor.listFrom(challenge.fromId))].sort(oldestFirst);
-    const open = mine.filter((each) => stateAt(each, now) === CHALLENGE_STATES.OPEN);
-    if (open.findIndex((each) => each.challengeId === challenge.challengeId) >= limits.openPerSender) {
-      return new ConflictError(
-        `You can have ${limits.openPerSender} challenges open at once. Take one back first`,
-        { details: { reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: limits.openPerSender } },
-      );
-    }
-    if (challenge.toId === "") return undefined;
-    const recent = mine.filter(
-      (each) => each.toId === challenge.toId && now < each.createdAt + limits.samePersonEveryMs,
+  const openLimitReached = (cause) =>
+    new ConflictError(`You can have ${limits.openPerSender} challenges open at once. Take one back first`, {
+      details: { reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: limits.openPerSender },
+      cause,
+    });
+
+  /** The sender's other challenges in `mine` to `toId` of the last `samePersonEveryMs`. */
+  const recentTo = (mine, toId, now, exceptId = "") =>
+    mine.filter(
+      (each) =>
+        each.challengeId !== exceptId &&
+        each.toId === toId &&
+        now < each.createdAt + limits.samePersonEveryMs,
     );
-    if (recent[0].challengeId === challenge.challengeId) return undefined;
-    return new ConflictError("You challenged them a moment ago. Try again in a few minutes", {
+  const samePersonRefused = (recent, now, cause) =>
+    new ConflictError("You challenged them a moment ago. Try again in a few minutes", {
       details: {
         reason: CHALLENGE_LIMIT_REASONS.SAME_PERSON,
-        retryAt: recent[0].createdAt + limits.samePersonEveryMs,
+        retryAt: Math.max(now, ...recent.map((each) => each.createdAt + limits.samePersonEveryMs)),
       },
+      cause,
     });
+
+  /**
+   * The limit a new challenge breaks, or undefined, read with the new one stored. Storage holds both limits in the
+   * write itself (CC-337): one place per open challenge, and one mark per person challenged in the last ten
+   * minutes. A challenge stored without them is still counted here: one made before CC-337, or one a guest brought
+   * to an account that held its place or mark already. Then a new one is refused until enough of them end.
+   */
+  async function brokenLimit(challenge, now) {
+    const mine = await challengeAccessor.listFrom(challenge.fromId);
+    const open = mine.filter((each) => stateAt(each, now) === CHALLENGE_STATES.OPEN);
+    if (open.length > limits.openPerSender) return openLimitReached();
+    if (challenge.toId === "") return undefined;
+    const recent = recentTo(mine, challenge.toId, now, challenge.challengeId);
+    return recent.length === 0 ? undefined : samePersonRefused(recent, now);
+  }
+
+  /** Why storage refused a new challenge, as the answer to its sender. */
+  async function refusal(err, { fromId, toId, now }) {
+    if (err.details.field === "openSlot") return openLimitReached(err);
+    return samePersonRefused(recentTo(await challengeAccessor.listFrom(fromId), toId, now), now, err);
   }
 
   return Object.freeze({
@@ -280,19 +295,27 @@ export function createChallengeComponent({
       const value = rooms.checkOptions({ gameId, options });
       const recipient = await recipientOf({ from, to, now });
       const policy = await safety.policyFor({ playerId: from.id, now });
-      const challenge = await challengeAccessor.add({
-        challengeId: newId(),
-        fromId: from.id,
-        fromName: from.displayName,
-        fromPublic: policy.shareCardName,
-        toId: recipient.id,
-        toName: recipient.displayName,
-        gameId,
-        options: value,
-        createdAt: now,
-        expiresAt: now + lifetimes.openMs,
-        deleteAt: now + lifetimes.openMs + lifetimes.keptMs,
-      });
+      const challenge = await challengeAccessor
+        .add(
+          {
+            challengeId: newId(),
+            fromId: from.id,
+            fromName: from.displayName,
+            fromPublic: policy.shareCardName,
+            toId: recipient.id,
+            toName: recipient.displayName,
+            gameId,
+            options: value,
+            createdAt: now,
+            expiresAt: now + lifetimes.openMs,
+            deleteAt: now + lifetimes.openMs + lifetimes.keptMs,
+          },
+          { openSlots: limits.openPerSender, recentMs: limits.samePersonEveryMs },
+        )
+        .catch(async (err) => {
+          if (!(err instanceof ConflictError)) throw err;
+          throw await refusal(err, { fromId: from.id, toId: recipient.id, now });
+        });
       const broken = await brokenLimit(challenge, now);
       if (broken !== undefined) {
         await challengeAccessor.remove(challenge.challengeId);

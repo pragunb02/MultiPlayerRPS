@@ -543,6 +543,62 @@ describe("challengeComponent: limits hold when challenges are made at the same m
   });
 });
 
+describe("challengeComponent: the limit of open challenges after a guest signs in (CC-337)", () => {
+  it("refuses a new one while the account is over the limit with the guest's, even with a place free", async () => {
+    const { make, challenges } = setup();
+    const own = [await make(), await make(), await make()];
+    for (let made = 0; made < 3; made += 1) {
+      await make({ from: GUEST, gameId: "chess", options: CHESS });
+    }
+    await challenges.transferPlayer({ from: GUEST.id, to: RIYA });
+    await challenges.withdraw({ challengeId: own[0].id, playerId: RIYA.id, now: T0 + 1 });
+
+    const refused = await make({ now: T0 + 2 }).catch((err) => err);
+
+    expect(refused).toBeInstanceOf(ConflictError);
+    expect(refused.details).toEqual({ reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: 3 });
+    expect(await challenges.inbox({ playerId: RIYA.id, now: T0 + 3 })).toHaveLength(5);
+  });
+});
+
+describe("challengeComponent: challenges stored before CC-337, with no place or mark", () => {
+  /** A challenge as stored before CC-337: open, from Riya, without `openSlot` or `recentTo`. */
+  const legacy = (dao, n, fields = {}) =>
+    dao.insert({
+      challengeId: `old${String(n).padStart(17, "0")}`,
+      fromId: RIYA.id,
+      fromName: "Riya",
+      fromPublic: true,
+      gameId: "chess",
+      options: CHESS,
+      state: CHALLENGE_STATES.OPEN,
+      createdAt: new Date(T0),
+      expiresAt: new Date(T0 + DAY),
+      deleteAt: new Date(T0 + 2 * DAY),
+      ...fields,
+    });
+
+  it("counts them against the limit of open ones, so none is made while 3 are open", async () => {
+    const { make, challenges, dao } = setup();
+    for (const n of [1, 2, 3]) await legacy(dao, n);
+
+    await expect(make({ now: T0 + 1 })).rejects.toMatchObject({
+      details: { reason: CHALLENGE_LIMIT_REASONS.OPEN, limit: 3 },
+    });
+    expect(await challenges.inbox({ playerId: RIYA.id, now: T0 + 2 })).toHaveLength(3);
+  });
+
+  it("counts a recent one to the same person, and says when to try again", async () => {
+    const { make, dao } = setup();
+    await legacy(dao, 1, { toId: ARJUN.id, toName: "Arjun" });
+
+    await expect(make({ to: "Arjun", now: T0 + MINUTE })).rejects.toMatchObject({
+      details: { reason: CHALLENGE_LIMIT_REASONS.SAME_PERSON, retryAt: T0 + 10 * MINUTE },
+    });
+    expect((await make({ to: "Arjun", now: T0 + 10 * MINUTE })).forYou).toBe(false);
+  });
+});
+
 describe("challengeComponent: a hold that never got its room (claim lease)", () => {
   /** Someone took it, and the process stopped before the room was recorded. */
   async function cutOff() {
