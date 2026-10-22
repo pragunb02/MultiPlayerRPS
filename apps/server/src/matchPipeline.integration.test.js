@@ -1,21 +1,29 @@
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
-import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { MATCH_STEPS, startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
+import { makeServerDatabase } from "./testing/serverDatabase.js";
 import { testConfig } from "./testing/testConfig.js";
 
 // BUG-16 (CC-111): a database blip or a crash during the work after a game lost the finished match. Every finished
 // game now goes through a stored outbox. Real composition root, real MongoDB (in memory), real sockets.
 let mongo;
-let dbCounter = 0;
+// Every test runs on the same database, emptied first, so a server start makes no collections or indexes
+// after the first one (CC-338, as in server.integration.test.js, CC-336).
+const DB = "pipeline";
 const cleanups = [];
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
+  await makeServerDatabase(mongo, DB);
 }, 120_000);
+
+beforeEach(async () => {
+  await mongo.empty(DB);
+});
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) {
@@ -121,7 +129,7 @@ const wrapStep = (name, wrap) => (steps) => steps.map((step) => (step.name === n
 // Two server processes and a game each: slower than one request, most of all on a busy CI runner.
 describe("the match pipeline outbox (integration, CC-111)", { timeout: 20_000 }, () => {
   it("awards XP exactly once when the server dies between recording a match and awarding XP", async () => {
-    const uri = mongo.uri(`pipeline-${++dbCounter}`);
+    const uri = mongo.uri(DB);
     let resume;
     let reached;
     const stuck = new Promise((resolve) => {
@@ -184,7 +192,7 @@ describe("the match pipeline outbox (integration, CC-111)", { timeout: 20_000 },
   });
 
   it("retries a step that keeps failing with growing waits, then marks the game failed and logs the alert", async () => {
-    const uri = mongo.uri(`pipeline-${++dbCounter}`);
+    const uri = mongo.uri(DB);
     let time = Date.UTC(2026, 9, 18, 12);
     let gamificationRuns = 0;
     const server = await start({
@@ -251,7 +259,7 @@ describe("the match pipeline outbox (integration, CC-111)", { timeout: 20_000 },
   });
 
   it("adds a finished game whose announcement was lost, when the next process starts", async () => {
-    const uri = mongo.uri(`pipeline-${++dbCounter}`);
+    const uri = mongo.uri(DB);
     let resume;
     const stuck = new Promise((resolve) => {
       resume = resolve;

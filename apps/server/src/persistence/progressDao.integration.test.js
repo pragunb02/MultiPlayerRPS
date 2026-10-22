@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri } from "../testing/sharedDatabase.js";
 import { runProgressDaoContract } from "../testing/progressDaoContract.js";
 import { connectDatabase } from "./database.js";
 import { createProgressDao } from "./progressDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -20,7 +20,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`progress-${++counter}`),
+    uri: await databaseUri(mongo, "progress"),
     logger: captureLogger().logger,
   });
   databases.push(database);

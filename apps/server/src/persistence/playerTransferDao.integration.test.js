@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { runPlayerTransferDaoContract } from "../testing/playerTransferDaoContract.js";
 import { connectDatabase } from "./database.js";
 import { DuplicateKey } from "./errors.js";
@@ -8,7 +9,6 @@ import { createPlayerTransferDao } from "./playerTransferDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`transfers-${++counter}`),
+    uri: await databaseUri(mongo, "transfers"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -45,6 +45,8 @@ describe("MongoDB player transfer DAO honours the player transfer DAO contract (
   });
 
   it("indexes transfers by guest (unique) and by status and age", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     await createDao();
 
     const indexes = await databases.at(-1).connection.db.collection("player_transfers").indexes();

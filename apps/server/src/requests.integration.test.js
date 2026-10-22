@@ -1,23 +1,31 @@
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
-import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
+import { makeServerDatabase } from "./testing/serverDatabase.js";
 import { testConfig } from "./testing/testConfig.js";
 
 // Requests and presence through the real composition root, on MongoDB (CC-159, CC-207, CC-158). The owner's
 // report: two players finish a game, Alice goes to the home page without pressing Leave, Bob asks for a rematch,
 // and Alice never hears of it. Now the request reaches her on any page, and nobody waits forever.
 let mongo;
-let dbCounter = 0;
+// Every test runs on the same database, emptied first, so a server start makes no collections or indexes
+// after the first one (CC-338, as in server.integration.test.js, CC-336).
+const DB = "requests";
 const cleanups = [];
 const MINUTE = 60_000;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
+  await makeServerDatabase(mongo, DB);
 }, 120_000);
+
+beforeEach(async () => {
+  await mongo.empty(DB);
+});
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) {
@@ -31,7 +39,7 @@ afterAll(async () => {
 
 /** A server on its own database whose clock the test moves. It can be restarted on the same port and data. */
 function serverProcess() {
-  let config = testConfig({ MONGO_URI: mongo.uri(`requests-${++dbCounter}`) });
+  let config = testConfig({ MONGO_URI: mongo.uri(DB) });
   let running;
   const clock = { now: 1_700_000_000_000 };
   const logs = [];

@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { runMatchDaoContract } from "../testing/matchDaoContract.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri } from "../testing/sharedDatabase.js";
 import { connectDatabase } from "./database.js";
 import { DuplicateKey } from "./errors.js";
 import { createMatchDao } from "./matchDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`matches-${++counter}`),
+    uri: await databaseUri(mongo, "matches"),
     logger: captureLogger().logger,
   });
   databases.push(database);

@@ -1,25 +1,33 @@
 import { createHash } from "node:crypto";
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
-import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import { BOT_DAILY_XP, CHESS_ACTIONS, SOCKET_EVENTS } from "@classicade/shared";
 import { createBotThinkingClient } from "./dependency/thinking/botThinkingClient.js";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
+import { makeServerDatabase } from "./testing/serverDatabase.js";
 import { testConfig } from "./testing/testConfig.js";
 
 // Games against computer characters through the real server on MongoDB (CC-138, CC-221, CC-225): the real
 // composition root, the real bot driver, the real match pipeline. Computer players act without a pause here.
 let mongo;
-let dbCounter = 0;
+// Every test runs on the same database, emptied first, so a server start makes no collections or indexes
+// after the first one (CC-338, as in server.integration.test.js, CC-336).
+const DB = "bots";
 const cleanups = [];
 const NO_PAUSE = Object.freeze({ pauseMs: { min: 0, max: 0 } });
 const NOON = Date.UTC(2026, 9, 20, 12);
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
+  await makeServerDatabase(mongo, DB);
 }, 120_000);
+
+beforeEach(async () => {
+  await mongo.empty(DB);
+});
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) {
@@ -36,7 +44,7 @@ afterAll(async () => {
  * stops it for good. `rooms` and `now` go to the server as they are (see startServer).
  */
 function serverProcess({ bots = NO_PAUSE, rooms, now } = {}) {
-  let config = testConfig({ MONGO_URI: mongo.uri(`bots-${++dbCounter}`) });
+  let config = testConfig({ MONGO_URI: mongo.uri(DB) });
   let running;
   let capture;
   const logs = [];
@@ -375,7 +383,7 @@ describe("playing computer characters on the real server (integration)", () => {
   it("ends its thinking threads well inside the shutdown budget, even mid-think (CC-305, CC-308)", async () => {
     let workers;
     const running = await startServer({
-      config: testConfig({ MONGO_URI: mongo.uri(`bots-${++dbCounter}`) }),
+      config: testConfig({ MONGO_URI: mongo.uri(DB) }),
       logger: captureLogger().logger,
       bots: {
         ...NO_PAUSE,

@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { runChessRatingDaoContract } from "../testing/chessRatingDaoContract.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { createChessRatingDao } from "./chessRatingDao.js";
 import { connectDatabase } from "./database.js";
 import { VersionConflict } from "./errors.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function connect() {
   const database = await connectDatabase({
-    uri: mongo.uri(`chess-ratings-${++counter}`),
+    uri: await databaseUri(mongo, "chess-ratings"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -85,6 +85,8 @@ describe("MongoDB chess rating DAO honours the chess rating DAO contract (integr
   });
 
   it("keeps one rating per player with a unique index, in the chess_ratings collection", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const database = await connect();
     await createChessRatingDao({ connection: database.connection }).ensureIndexes();
 

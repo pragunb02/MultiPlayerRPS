@@ -4,12 +4,12 @@ import { matchDoc, playerId, transferDoc } from "../testing/analyticsFixtures.js
 import { captureLogger } from "../testing/captureLogger.js";
 import { createEmptyAnalyticsDao } from "../testing/emptyAnalyticsDao.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri } from "../testing/sharedDatabase.js";
 import { createAnalyticsDao } from "./analyticsDao.js";
 import { connectDatabase } from "./database.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -22,7 +22,7 @@ afterAll(async () => {
 
 async function open() {
   const database = await connectDatabase({
-    uri: mongo.uri(`analytics-${++counter}`),
+    uri: await databaseUri(mongo, "analytics"),
     logger: captureLogger().logger,
   });
   databases.push(database);

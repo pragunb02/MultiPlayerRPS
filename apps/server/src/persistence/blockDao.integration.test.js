@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runBlockDaoContract } from "../testing/blockDaoContract.js";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { createBlockDao } from "./blockDao.js";
 import { connectDatabase } from "./database.js";
 import { DuplicateKey } from "./errors.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`blocks-${++counter}`),
+    uri: await databaseUri(mongo, "blocks"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -43,6 +43,8 @@ describe("MongoDB block DAO honours the block DAO contract (integration)", () =>
   });
 
   it("indexes blocks by pair (unique), by the blocked player and by block id (unique)", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     await createDao();
 
     const indexes = await databases.at(-1).connection.db.collection("player_blocks").indexes();

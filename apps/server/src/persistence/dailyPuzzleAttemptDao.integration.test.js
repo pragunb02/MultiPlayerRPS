@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runDailyPuzzleAttemptDaoContract } from "../testing/dailyPuzzleAttemptDaoContract.js";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { createDailyPuzzleAttemptDao } from "./dailyPuzzleAttemptDao.js";
 import { connectDatabase } from "./database.js";
 import { DuplicateKey } from "./errors.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`daily-puzzles-${++counter}`),
+    uri: await databaseUri(mongo, "daily-puzzles"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -54,6 +54,8 @@ describe("MongoDB daily puzzle attempt DAO honours the contract (integration)", 
   });
 
   it("has one unique index on player, kind and day, and no other besides _id", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     await createDao();
 
     const indexes = await databases.at(-1).connection.db.collection("daily_puzzle_attempts").indexes();

@@ -6,6 +6,7 @@ import {
   runStatsDaoContract,
 } from "../testing/gamificationDaoContract.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { createAchievementDao } from "./achievementDao.js";
 import { connectDatabase } from "./database.js";
 import { createQuestDao } from "./questDao.js";
@@ -13,7 +14,6 @@ import { createStatsDao } from "./statsDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -26,7 +26,7 @@ afterAll(async () => {
 
 async function connect() {
   const database = await connectDatabase({
-    uri: mongo.uri(`gamification-${++counter}`),
+    uri: await databaseUri(mongo, "gamification"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -94,6 +94,8 @@ describe("MongoDB gamification DAOs honour the DAO contracts (integration)", () 
   });
 
   it("expires quest days through a TTL index, and keeps one snapshot per player and day", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const database = await connect();
     await createQuestDao({ connection: database.connection }).ensureIndexes();
 

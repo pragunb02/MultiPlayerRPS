@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri } from "../testing/sharedDatabase.js";
 import { runSessionDaoContract } from "../testing/sessionDaoContract.js";
 import { connectDatabase } from "./database.js";
 import { createSessionDao } from "./sessionDao.js";
@@ -8,7 +9,6 @@ import { createSessionStore } from "./sessionStore.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -22,7 +22,7 @@ afterAll(async () => {
 describe("MongoDB session DAO honours the session DAO contract over the real session store (integration)", () => {
   runSessionDaoContract(async () => {
     const database = await connectDatabase({
-      uri: mongo.uri(`sessions-${++counter}`),
+      uri: await databaseUri(mongo, "sessions"),
       logger: captureLogger().logger,
     });
     databases.push(database);

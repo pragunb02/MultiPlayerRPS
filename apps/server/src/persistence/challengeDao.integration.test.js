@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { challengeRecord, runChallengeDaoContract } from "../testing/challengeDaoContract.js";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { createChallengeDao } from "./challengeDao.js";
 import { connectDatabase } from "./database.js";
 import { DuplicateKey } from "./errors.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`challenges-${++counter}`),
+    uri: await databaseUri(mongo, "challenges"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -51,6 +51,8 @@ describe("MongoDB challenge DAO honours the challenge DAO contract (integration)
   });
 
   it("indexes challenges by id (unique), sender, recipient and taker, and deletes them by themselves", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     await createDao();
 
     const indexes = await databases.at(-1).connection.db.collection("challenges").indexes();
@@ -79,8 +81,10 @@ describe("MongoDB challenge DAO honours the challenge DAO contract (integration)
 
   it("starts after a rollback left two holders of one place or mark: the oldest keeps it (CC-337)", async () => {
     // A server without the unique indexes (a rollback) can store two of each. The next start must still build them.
+    // A database of its own: the file's shared one has the unique indexes already, which refuse the duplicates.
+    ownDatabaseNext();
     const database = await connectDatabase({
-      uri: mongo.uri(`challenges-${++counter}`),
+      uri: await databaseUri(mongo, "challenges"),
       logger: captureLogger().logger,
     });
     databases.push(database);
