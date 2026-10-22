@@ -99,6 +99,21 @@ describe("the toast for a new friend request (CC-052)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByText("Arjun wants to be your friend")).toBeNull();
   });
+
+  it("shows one toast when the ring and its copy for a tab that just connected both arrive (CC-341)", async () => {
+    const socket = fakeSocket();
+    const { sound } = renderApp({ path: "/", api: fakeApi({ getSession: vi.fn(async () => USER) }), socket });
+    await screen.findByRole("heading", { level: 1 });
+    const ring = { requestId: "r", displayName: "Arjun", via: "game", ringAt: 1 };
+
+    act(() => {
+      socket.push(SOCKET_EVENTS.FRIEND_REQUESTED, ring);
+      socket.push(SOCKET_EVENTS.FRIEND_REQUESTED, ring);
+    });
+
+    expect(await screen.findAllByText("Arjun wants to be your friend")).toHaveLength(1);
+    expect(sound.play).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("the words of the friends pages (CC-052)", () => {

@@ -42,6 +42,16 @@ const avatarField = (profile) => (isAvatarId(profile.avatar) ? { avatar: profile
 /** For a failed read: the caller's own refusal when nothing was found, and any other failure as it is. */
 const missingAs = (refusal) => (err) => Promise.reject(err instanceof NotFoundError ? refusal(err) : err);
 
+/** A request as its ring tells the recipient: who sent it, how, and when it rang (CC-341), never a player id. */
+const ringOf = ({ request, names, cards, ringAt }) =>
+  Object.freeze({
+    requestId: request.requestId,
+    displayName: names.get(request.senderId),
+    ...avatarField(cards.get(request.senderId)),
+    via: request.via,
+    ringAt,
+  });
+
 /** A friend link names its maker only when their policy lets their name travel (ADR-028.7, the age policy). */
 const linkNameOf = ({ playerId, names, policies }) =>
   policies.get(playerId).shareCardName ? names.get(playerId) : FRIEND_LINK_MAKER_NAME;
@@ -227,13 +237,40 @@ export function createFriendComponent({
     if (isQuietTime(policies.get(request.recipientId), now)) return;
     events.emit(FRIEND_EVENTS.REQUESTED, {
       recipientId: request.recipientId,
-      request: {
-        requestId: request.requestId,
-        displayName: names.get(request.senderId),
-        ...avatarField(cards.get(request.senderId)),
-        via: request.via,
-      },
+      request: ringOf({ request, names, cards, ringAt: now }),
     });
+  }
+
+  /**
+   * The requests that rang for the player in the last `missedRingWithinMs` and still wait, as they rang, for a tab
+   * that connects and may have missed the push (CC-341). Only what `ring` announced: none rung in the player's
+   * quiet hours, none while they are in them, none across a block. A guest has none.
+   */
+  async function missedRings({ playerId, now }) {
+    const policy = await safety.policyFor({ playerId, now });
+    if (!mayHaveFriends(policy) || isQuietTime(policy, now)) return [];
+    const blocked = await blocks.blockedWith({ playerId });
+    const rung = (
+      await friendAccessor.sentTo({
+        recipientId: playerId,
+        statuses: PENDING,
+        now,
+        limit: rules.incomingShown,
+      })
+    ).filter(
+      (request) =>
+        !blocked.has(request.senderId) &&
+        request.notifiedAt > now - rules.missedRingWithinMs &&
+        !isQuietTime(policy, request.notifiedAt),
+    );
+    if (rung.length === 0) return [];
+    const { names, cards } = await peopleOf(
+      rung.map((request) => request.senderId),
+      now,
+    );
+    return rung
+      .filter((request) => names.has(request.senderId))
+      .map((request) => ringOf({ request, names, cards, ringAt: request.notifiedAt }));
   }
 
   /** Makes two players friends and clears every request between them. */
@@ -372,6 +409,13 @@ export function createFriendComponent({
      * @throws {ForbiddenError} for a guest
      */
     viewFor,
+
+    /**
+     * The requests a tab that just connected may have missed the ring of (CC-341), shaped as the ring.
+     *
+     * @param {{ playerId: string, now: number }} query
+     */
+    missedRings,
 
     /**
      * Asks someone the player played with to be friends.

@@ -17,6 +17,8 @@ const DAY_MS = 24 * 60 * MINUTE_MS;
  * 6. `linksKept`: friend links one player has at once. Making another drops the oldest.
  * 7. `ringAgainAfterMs`: a request cancelled and sent again tells its recipient again only after this long
  *    (ADR-031.1, one message per person every 15 minutes).
+ * 8. `missedRingWithinMs`: a tab that connects is told again of a request that rang this recently and still waits,
+ *    in case the ring came while it had no connection (CC-341). The same 15 minutes, so it is never told more often.
  */
 export const FRIEND_LIMITS = Object.freeze({
   maxFriends: FRIEND_RULES.maxFriends,
@@ -26,6 +28,7 @@ export const FRIEND_LIMITS = Object.freeze({
   linkLifetimeMs: FRIEND_RULES.linkDays * DAY_MS,
   linksKept: 5,
   ringAgainAfterMs: 15 * MINUTE_MS,
+  missedRingWithinMs: 15 * MINUTE_MS,
 });
 
 /** How two players met, for the minors' rule. */

@@ -211,6 +211,8 @@ export function createRealtimeGateway({
     handleSocketOnline({ socket, roomComponent, now, logger: socketLogger });
     // Friends see the player online from their first tab (CC-052).
     friendPushes.tabOpened(identity.id);
+    // A friend request that rang while this tab had no connection still shows its toast (CC-341).
+    friendPushes.tellMissed({ socket, playerId: identity.id, sessionId });
     let roomChannels = [];
     socket.on("disconnecting", () => {
       roomChannels = [...socket.rooms].filter((channel) => channel.startsWith("room:"));

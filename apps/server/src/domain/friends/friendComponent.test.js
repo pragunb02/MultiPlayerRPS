@@ -228,7 +228,7 @@ describe("friendComponent: asking and answering (CC-052)", () => {
       {
         name: FRIEND_EVENTS.REQUESTED,
         recipientId: ARJUN,
-        request: { requestId: expect.any(String), displayName: "RiyaTest", via: "game" },
+        request: { requestId: expect.any(String), displayName: "RiyaTest", via: "game", ringAt: T0 },
       },
     ]);
     expect(events(FRIEND_EVENTS.CHANGED)).toEqual([
@@ -965,5 +965,76 @@ describe("friendComponent: no player id ever leaves (ADR-057, CC-297)", () => {
     const pushed = announced.map(({ request }) => request ?? {});
 
     expect(stringsIn([answers, pushed]).filter(hasPlayerIdShape)).toEqual([]);
+  });
+});
+
+describe("friendComponent: missed rings (CC-341)", () => {
+  // 18:00 UTC is 23:30 in India, inside the minors' quiet hours (22:00 to 07:00).
+  const NIGHT = Date.UTC(2026, 9, 20, 18);
+  // 16:25 UTC is 21:55 in India, five minutes before them.
+  const EVENING = Date.UTC(2026, 9, 20, 16, 25);
+  const missed = (friends, playerId, now) => friends.missedRings({ playerId, now });
+
+  it("says when each announced request rang", async () => {
+    const { ask, events } = setup({ rooms: shared() });
+
+    await ask(RIYA, ARJUN);
+
+    expect(events(FRIEND_EVENTS.REQUESTED).map((event) => event.request.ringAt)).toEqual([T0]);
+  });
+
+  it("gives a player who connects again the requests that rang in the last 15 minutes and still wait", async () => {
+    const { ask, friends, events } = setup({ rooms: shared() });
+    await ask(RIYA, ARJUN);
+    const [{ request }] = events(FRIEND_EVENTS.REQUESTED);
+
+    expect(await missed(friends, ARJUN, T0 + 15 * MINUTE - 1)).toEqual([request]);
+    expect(await missed(friends, ARJUN, T0 + 15 * MINUTE)).toEqual([]);
+    expect(await missed(friends, RIYA, T0)).toEqual([]);
+  });
+
+  it("gives none that was declined or cancelled", async () => {
+    const declined = setup({ rooms: shared() });
+    await declined.ask(RIYA, ARJUN);
+    const [{ requestId }] = (await declined.view(ARJUN)).incoming;
+    await declined.friends.answerRequest({
+      playerId: ARJUN,
+      requestId,
+      answer: FRIEND_ANSWERS.DECLINE,
+      now: T0,
+    });
+    expect(await missed(declined.friends, ARJUN, T0 + MINUTE)).toEqual([]);
+
+    const cancelled = setup({ rooms: shared() });
+    await cancelled.ask(RIYA, ARJUN);
+    const [{ requestId: sent }] = (await cancelled.view(RIYA)).outgoing;
+    await cancelled.friends.cancelRequest({ playerId: RIYA, requestId: sent, now: T0 + 1 });
+    expect(await missed(cancelled.friends, ARJUN, T0 + MINUTE)).toEqual([]);
+  });
+
+  it("gives none from someone on either side of a block with the player", async () => {
+    const { ask, friends, block } = setup({ rooms: shared() });
+    await ask(RIYA, ARJUN);
+
+    block(RIYA, ARJUN);
+
+    expect(await missed(friends, ARJUN, T0 + MINUTE)).toEqual([]);
+  });
+
+  it("gives a minor nothing rung in their quiet hours, nor anything while they are in them", async () => {
+    const night = setup({ rooms: shared() });
+    await night.ask(RIYA, KABIR, "ROOM33", NIGHT);
+    expect(await missed(night.friends, KABIR, NIGHT + MINUTE)).toEqual([]);
+
+    const evening = setup({ rooms: shared() });
+    await evening.ask(RIYA, KABIR, "ROOM33", EVENING);
+    expect(await missed(evening.friends, KABIR, EVENING + MINUTE)).toHaveLength(1);
+    expect(await missed(evening.friends, KABIR, EVENING + 10 * MINUTE)).toEqual([]);
+  });
+
+  it("gives a guest nothing, without refusing", async () => {
+    const { friends } = setup();
+
+    expect(await missed(friends, GUEST, T0)).toEqual([]);
   });
 });
