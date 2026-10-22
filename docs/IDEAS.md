@@ -2,7 +2,7 @@
 
 New ideas go here while the feature freeze is on (see the working agreement in CLAUDE.md). They are not tickets and
 are not started. When the board is closed, the owner picks from this list and each picked idea gets a ticket with a
-research section first.
+research section first. An idea that became a ticket stays here, marked **Moved to a ticket**.
 
 | Date       | Idea                                                                                                                                                                                                                                             | From                                      |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
@@ -23,3 +23,6 @@ research section first.
 | 2026-10-18 | Arrow keys in the Tic-Tac-Toe grid (today nine Tab stops) and Lichess-style jump keys in the chess move list                                                                                                                                     | PR #63 (CC-183)                           |
 | 2026-10-20 | Untimed chess (lichess over the board default) for pass and play: needs a "none" time control in the engine and the server lobby                                                                                                                 | CC-223 research                           |
 | 2026-10-20 | Pass and play chess for two people face to face: pieces rotated for the far side (lichess "flip pieces"), needs rotated piece art                                                                                                                | CC-223 research                           |
+| 2026-10-22 | Rolling "right now" goals: three small goals that refill as soon as one is done, no expiry, small XP. **Moved to a ticket:** [CC-354](tickets/CC-354.md) (owner lifted the freeze, ADR-082)                                                      | Owner (patterns from a casual web game)   |
+| 2026-10-22 | Instant next round with a running score: one tap to play again, a short stoppable countdown against a computer. **Moved to a ticket:** [CC-355](tickets/CC-355.md) (ADR-082)                                                                     | Owner (patterns from a casual web game)   |
+| 2026-10-22 | A live, anonymous "N playing now" on home and the lobbies, shown only above a threshold. **Moved to a ticket:** [CC-356](tickets/CC-356.md) (ADR-082, amends ADR-029)                                                                            | Owner (patterns from a casual web game)   |

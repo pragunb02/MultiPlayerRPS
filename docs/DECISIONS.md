@@ -58,6 +58,48 @@ the owner may change it.
 
 ## Accepted decisions
 
+### ADR-082 — Owner lifts the feature freeze for CC-354 to CC-356 (2026-10-22)
+
+- **Status:** Accepted · 2026-10-22 (owner lifted the freeze for these three. The coordinator, as design authority,
+  decided every open row of the three tickets with its recommended default on the same day; the owner may change
+  any of them)
+- **Context.** Working agreement rule 1 (CLAUDE.md, 17 October 2026) froze new feature tickets until the board is
+  closed. On 2026-10-22 the owner lifted it for three "addictive loop" ideas, taken from the general patterns of a
+  casual web game they like (mantarjantar.com): small goals that refill, a next round one tap away, and a live count
+  of people playing. We take the patterns only.
+- **Decision.**
+  1. **The freeze is lifted for exactly three tickets:** [CC-354](tickets/CC-354.md) (rolling goals),
+     [CC-355](tickets/CC-355.md) (next round and the running score) and [CC-356](tickets/CC-356.md) ("N playing
+     now"). Every other new idea still goes to `docs/IDEAS.md`, and rules 2 to 8 of the working agreement are
+     unchanged.
+  2. **Patterns, never the other game's theme, art, names or words.** Every line players read is our own, written
+     to the clarity rules (CONTRACT.md §7, CC-348), with a Hinglish twin that uses "tum".
+  3. **Each ships behind its own flag (CC-312), off by default**, with a friction guardrail (CC-313) compared on
+     against off: `rolling_goals`, `next_round` (with `next_round_countdown`, audience adults) and
+     `live_player_count`, each to be removed by 2027-01-20.
+  4. **Rolling goals run beside the daily quests, not inside them** (amends ADR-013). Three goals at a time, each
+     replaced the moment it is done, never expiring, never saying "you missed". 5 XP each, at most 10 paid goals a
+     day (50 XP, its own cap beside the 150 XP quest cap and the 100 XP computer cap of ADR-025), never on a
+     leaderboard. Only games that count (ADR-021) move a goal, and no goal needs another person to be online
+     (ADR-029). Goals are the same for everyone, picked without reading how anyone plays, so minors and unknown
+     ages (ADR-028) get them unchanged. A guest's goals follow them into an account (a new ADR-014 participant).
+  5. **The next round is one tap, and only a computer opponent can start it by itself** (builds on ADR-015.7's
+     rematch, which is unchanged on the server). After a Rock Paper Scissors or Tic Tac Toe game against a
+     computer character, an adult account sees a 5 second countdown that any press, key, request or hidden tab
+     stops, at most 3 times in a row. Guests, minors, unknown ages and chess get the button only (ICO children's
+     code standard 5, auto-play). Against a person nothing starts without both players pressing. Leave stays one
+     press. The series score shows from game 1 in the match bar.
+  6. **"N playing now" counts people in a game** (amends ADR-029's "N playing now" row): people, never computer
+     characters, seated in a room whose game is on, read from the rooms collection at most every 30 seconds and
+     kept in memory. It is shown only at 10 or more, rounded down to a multiple of 5, and a lower number never
+     leaves the server (ADR-034, ADR-036.2). The live floor replaces ADR-029's 7 day median of 50 for this one
+     row, because a number under 10 is never shown, so the screen can never say the site is empty.
+- **Consequences.** Three builders can run at once: the tickets list their files, and the only shared files are
+  append-only lines in the flag registry, `server.js`, `routes.js`, `testing/testApp.js` and `lib/api.js` (each
+  ticket names its lines), plus separate sections of `docs/DATA.md`. XP per day can rise by at most 50. ADR-029's row now reads "10 or more people in a game
+  now (live, rounded to 5)", with "Nothing" before it. Each ticket's post-launch review says keep, iterate or
+  remove.
+
 ### ADR-080 — Passwords: scrypt at N=2^15, r=8, p=3 with rehash at login, and new passwords checked against SecLists and Pwned Passwords
 
 - **Status:** Accepted · 2026-10-21 ([CC-260](tickets/CC-260.md), [CC-261](tickets/CC-261.md)). Decided by the
@@ -1803,6 +1845,10 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
 
 - **Consequences.** Crowd features can be built before the crowd exists and stay hidden. The owner dashboard
   (CC-177) shows each gate and its measured value. The admin console (CC-059) can replace the flag table later.
+- **Amended · 2026-10-22** ([ADR-082](#adr-082--owner-lifts-the-feature-freeze-for-cc-354-to-cc-356-2026-10-22)
+  point 6, [CC-356](tickets/CC-356.md)). The "N playing now" row's threshold is no longer a 7 day median of 50 online:
+  the count is of people in a game now, shown only at 10 or more, rounded down to a multiple of 5, with "Nothing"
+  before it. It needs no nightly gate. Every other row is unchanged.
 
 ### ADR-028 — Social graph and minors: friends first, circles second, follow last and adults only
 
@@ -2296,6 +2342,11 @@ Participants must be idempotent; their contract tests include running the move t
 run. Guests can no longer be "re-used": a guest id that moved once is refused for a second account (409 inside the
 transfer, logged; the sign-in itself succeeds).
 
+**Amended · 2026-10-22** ([ADR-082](#adr-082--owner-lifts-the-feature-freeze-for-cc-354-to-cc-356-2026-10-22),
+[CC-354](tickets/CC-354.md)). A new participant, `goals`, runs after gamification: the account keeps its own goals
+if it has any, else the guest's move; the day's paid counts add up to the daily cap once (`mergedFrom`); the guest's
+document is deleted.
+
 ### ADR-013 — Gamification rules
 
 - **Status:** Accepted · 2026-10-16 (proposed in [CC-054](tickets/CC-054.md))
@@ -2341,6 +2392,11 @@ read from `matches` (rejected: grows with history; kept as the rebuild path for 
 quests move from the UTC day to the player's local day (CC-146). The time zone comes from the browser, a player can
 change it at most once in 7 days so it cannot be gamed, and India time is used when it is unknown. Until CC-146
 ships, days stay in UTC. The anti-farm caps stay on the server clock (ADR-021 amendment).
+
+**Amended · 2026-10-22** ([ADR-082](#adr-082--owner-lifts-the-feature-freeze-for-cc-354-to-cc-356-2026-10-22)
+point 4, [CC-354](tickets/CC-354.md)). Rolling goals run beside the daily quests as their own pipeline step after
+this one, with their own store (`player_goals`), 5 XP each through `awardBonus` (source `goal`, unranked, key
+`goal:<sequence>`) and their own cap of 50 XP a day. Quests, the sweep and the 150 XP cap are unchanged.
 
 ### ADR-012 — Visual identity: "neon arcade"
 
