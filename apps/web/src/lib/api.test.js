@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createApiClient, EXPORT_TIMEOUT_MS, RENEWAL_WAIT_MS, REQUEST_TIMEOUT_MS } from "./api.js";
+import { createApiClient, EXPORT_TIMEOUT_MS, RENEWAL_TIMEOUT_MS, RENEWAL_WAIT_MS } from "./api.js";
 import { AppRequestError } from "./errors.js";
 
 const respond = (status, body) =>
@@ -163,7 +163,7 @@ describe("api client", () => {
       it("sends the renewal after RENEWAL_WAIT_MS anyway, and the requests after it still go out", async () => {
         const { fetchImpl, calls, sent } = heldFetch();
         const api = createApiClient({ fetchImpl });
-        const lost = api.getProgress().catch((err) => err);
+        const slow = api.getProgress();
         const renewed = api.signOutOtherDevices();
         const loggedOut = api.endSession();
         await tick(RENEWAL_WAIT_MS - 1);
@@ -182,35 +182,53 @@ describe("api client", () => {
         await expect(renewed).resolves.toBeUndefined();
         await expect(loggedOut).resolves.toEqual({});
 
-        // The request that was never answered is given up as a network failure, not held for ever.
-        await tick(REQUEST_TIMEOUT_MS);
-        expect(await lost).toMatchObject({ code: "NETWORK" });
+        // An ordinary request has no limit of its own: a free server waking up can take a minute (ADR-005).
+        await tick(EXPORT_TIMEOUT_MS);
+        calls[0].answer(200, { progress: { xp: 1 } });
+        await expect(slow).resolves.toEqual({ xp: 1 });
       });
 
-      it("gives up a renewal that is never answered, so the held requests still go out", async () => {
+      it("gives up a renewal that is never answered after RENEWAL_TIMEOUT_MS", async () => {
+        const { fetchImpl } = heldFetch();
+        const api = createApiClient({ fetchImpl });
+        let failed;
+        api.signOutOtherDevices().catch((err) => {
+          failed = err;
+        });
+        await tick(RENEWAL_TIMEOUT_MS - 1);
+        expect(failed).toBeUndefined();
+
+        await tick(1);
+        expect(failed).toMatchObject({ code: "NETWORK" });
+      });
+
+      it("holds a request behind a renewal for RENEWAL_TIMEOUT_MS at most", async () => {
         const { fetchImpl, calls, sent } = heldFetch();
         const api = createApiClient({ fetchImpl });
-        const renewed = api.signOutOtherDevices().catch((err) => err);
+        api.getProgress().catch(() => undefined);
+        api.signOutOtherDevices().catch(() => undefined);
         const session = api.getSession();
-        await tick(REQUEST_TIMEOUT_MS);
+        // The renewal goes after RENEWAL_WAIT_MS and is never answered either.
+        await tick(RENEWAL_TIMEOUT_MS - 1);
+        expect(sent()).toEqual(["GET /api/progress", "POST /api/auth/sign-out-others"]);
 
-        expect(await renewed).toMatchObject({ code: "NETWORK" });
-        expect(sent()).toEqual(["POST /api/auth/sign-out-others", "GET /api/session"]);
-        calls[1].answer(200, { authenticated: true, identity: { id: "user_x" } });
+        await tick(1);
+        expect(sent()).toEqual(["GET /api/progress", "POST /api/auth/sign-out-others", "GET /api/session"]);
+        calls[2].answer(200, { authenticated: true, identity: { id: "user_x" } });
         await expect(session).resolves.toEqual({ id: "user_x" });
       });
 
-      it("gives the data export its longer time", async () => {
+      it("gives the data export EXPORT_TIMEOUT_MS", async () => {
         const { fetchImpl } = heldFetch();
         const api = createApiClient({ fetchImpl });
         let failed;
         api.exportData("my password").catch((err) => {
           failed = err;
         });
-        await tick(REQUEST_TIMEOUT_MS);
+        await tick(EXPORT_TIMEOUT_MS - 1);
         expect(failed).toBeUndefined();
 
-        await tick(EXPORT_TIMEOUT_MS - REQUEST_TIMEOUT_MS);
+        await tick(1);
         expect(failed).toMatchObject({ code: "NETWORK" });
       });
     });

@@ -1,19 +1,20 @@
 import { AppRequestError, networkError } from "./errors.js";
 
 /**
- * How long a request may take, answer included, before it is given up as a network failure (CC-346). Every answer
- * of the API is small and quick, so a request still open after this is lost, and it must not hold anything that
- * waits for it.
- */
-export const REQUEST_TIMEOUT_MS = 15_000;
-/** The data export is the one big answer (CC-035): a whole account's history, on a slow phone connection too. */
-export const EXPORT_TIMEOUT_MS = 120_000;
-/**
  * How long a renewal of the session id waits for the requests already on their way before it is sent anyway
  * (CC-346). They are usually answered in well under a second; one that never is must not hold the renewal, nor
  * every request after it.
  */
 export const RENEWAL_WAIT_MS = 3_000;
+/**
+ * The longest a renewal may take, answer included, and the longest a request waits behind one (CC-346). Above the
+ * free server's longest wake-up (30 to 60 s, ADR-005), so a renewal sent to a sleeping server still gets its answer.
+ * Other requests have no limit of their own: the first "who am I?" waits for the server to wake up, with the waking
+ * up screen on, as long as it takes (CC-232).
+ */
+export const RENEWAL_TIMEOUT_MS = 90_000;
+/** The data export is the one big answer (CC-035): a whole account's history, on a slow phone connection too. */
+export const EXPORT_TIMEOUT_MS = 120_000;
 
 /**
  * The HTTP API client — the only place the web app calls `fetch`. Same-origin requests carry the session
@@ -29,11 +30,14 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
 
   /**
    * Sends a request. While the session id is being renewed it waits until the renewal is answered, so it carries
-   * the new id, never the old one the server is about to drop (CC-346).
+   * the new id, never the old one the server is about to drop (CC-346). It waits RENEWAL_TIMEOUT_MS at most.
+   *
+   * @param {{ timeoutMs?: number }} [options]  `timeoutMs`: given up after this long; no limit when not given
    */
-  async function request(method, path, body, { timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
-    while (renewal !== undefined) {
-      await renewal.catch(() => undefined);
+  async function request(method, path, body, { timeoutMs } = {}) {
+    const heldUntil = Date.now() + RENEWAL_TIMEOUT_MS;
+    while (renewal !== undefined && Date.now() < heldUntil) {
+      await settledOrLate([renewal], heldUntil - Date.now());
     }
     const sent = send(method, path, body, timeoutMs);
     onTheirWay.add(sent);
@@ -47,13 +51,16 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
    * other devices" (CC-116). It waits for the requests already on their way, and the requests made meanwhile wait
    * for it. Otherwise the server could read a request of this page with the old id after it was dropped, and answer
    * it as from a visitor: "No active session", or "signed out" for "who am I?", which showed this page signed out
-   * (CC-346). It waits at most RENEWAL_WAIT_MS: a request that is never answered does not hold it.
+   * (CC-346). It waits at most RENEWAL_WAIT_MS, so a request that is never answered does not hold it, and it is
+   * given up after RENEWAL_TIMEOUT_MS, so it never holds the requests behind it for ever.
    */
   async function renewingRequest(method, path, body) {
     while (renewal !== undefined) {
       await renewal.catch(() => undefined);
     }
-    const mine = settledOrLate([...onTheirWay]).then(() => send(method, path, body, REQUEST_TIMEOUT_MS));
+    const mine = settledOrLate([...onTheirWay], RENEWAL_WAIT_MS).then(() =>
+      send(method, path, body, RENEWAL_TIMEOUT_MS),
+    );
     renewal = mine;
     try {
       return await mine;
@@ -62,18 +69,20 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), baseU
     }
   }
 
-  /** Resolves once every one of `requests` has settled, or after RENEWAL_WAIT_MS, whichever comes first. */
-  function settledOrLate(requests) {
+  /** Resolves once every one of `requests` has settled, or after `ms`, whichever comes first. */
+  function settledOrLate(requests, ms) {
     let timer;
     const late = new Promise((resolve) => {
-      timer = setTimeout(resolve, RENEWAL_WAIT_MS);
+      timer = setTimeout(resolve, ms);
     });
     return Promise.race([Promise.allSettled(requests), late]).finally(() => clearTimeout(timer));
   }
 
+  /** Sends the request, given up after `timeoutMs` when there is one (a timer of the page's own, so tests can move the clock). */
   async function send(method, path, body, timeoutMs) {
-    // Given up after its time, answer included, so nothing waits for it for ever (CC-346). A timer of the page's
-    // own rather than AbortSignal.timeout, so tests can move the clock.
+    if (timeoutMs === undefined) {
+      return answerOf(method, path, body, undefined);
+    }
     const limit = new AbortController();
     const timer = setTimeout(
       () => limit.abort(new DOMException("The request took too long", "TimeoutError")),
