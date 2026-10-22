@@ -30,6 +30,10 @@ async function startGame(user, { slug, names = ["Asha", "Ben"] }) {
   await vi.waitFor(() => expect(screen.queryByText("Loading the board…")).not.toBeInTheDocument(), {
     timeout: 5_000,
   });
+  // The usage counts host loads once the page is idle and asks its flag then (CC-322): that is the page's start.
+  await vi.waitFor(() => expect(app.api.getFlags).toHaveBeenCalledWith(["telemetry_client"]), {
+    timeout: 5_000,
+  });
   return { app, before: networkCalls(app) };
 }
 

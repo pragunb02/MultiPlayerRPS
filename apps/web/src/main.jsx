@@ -3,11 +3,13 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app/App.jsx";
 import { takeLanding } from "./app/landing.js";
+import { needsSocketNow, preloadRouteFor } from "./app/routePages.js";
 import { removeServerHead } from "./app/serverHead.js";
 import { recoverFromStaleBuild } from "./app/staleBuild.js";
 import { noteWaitingScreen } from "./app/wakingUp.js";
 import { createApiClient } from "./lib/api.js";
 import { createDownload } from "./lib/download.js";
+import { whenIdle } from "./lib/idle.js";
 import { createSessionBroadcast } from "./lib/sessionBroadcast.js";
 import { createSocketClient } from "./lib/socket.js";
 import { createSoundPlayer } from "./lib/sound/soundPlayer.js";
@@ -17,8 +19,7 @@ import { codeOf, socketCodeOf } from "./lib/telemetry/errorFields.js";
 import { createTelemetryFacade } from "./lib/telemetry/facade.js";
 import { createInterruptionTracker } from "./lib/telemetry/interruptions.js";
 import { isSwitchedOff, isTelemetryOff } from "./lib/telemetry/optOut.js";
-import { routeOf } from "./lib/telemetry/routeOf.js";
-import { endpointOf, roundMs, TELEMETRY_MAX_SINCE_LOAD_MS } from "@classicade/shared";
+import { roundMs, TELEMETRY_MAX_SINCE_LOAD_MS } from "@classicade/shared";
 import "./styles/global.css";
 
 // Composition root of the web app: the only place real clients are created.
@@ -27,9 +28,9 @@ import "./styles/global.css";
 const isOff = () =>
   isTelemetryOff({ getStorage: () => window.localStorage, navigator, location: window.location });
 const telemetry = createTelemetryFacade({ isOff });
-telemetry.setContext({ route: routeOf(window.location.pathname), playerKind: "visitor" });
+telemetry.setContext({ path: window.location.pathname, playerKind: "visitor" });
 // Before the router, because it may change the address before the router reads it (CC-181).
-recoverFromStaleBuild({
+const recovery = recoverFromStaleBuild({
   window,
   now: () => Date.now(),
   onFailedLoad: (kind) => telemetry.track("client_errored", { kind, error_type: "other" }),
@@ -64,10 +65,17 @@ const services = {
     // The server hears the switch too, so it records no sign-up, login or error about this browser (CC-174).
     countsOff: () => isSwitchedOff(() => window.localStorage),
     onRequest: () => telemetry.noteRequest("http"),
+    // The API's templates load with the client (CC-322), which names the endpoint.
     onFailure: ({ path, status, error }) =>
-      telemetry.track("request_failed", { endpoint: endpointOf(`/api${path}`), status, code: codeOf(error) }),
+      telemetry.track("request_failed", ({ endpointOf }) => ({
+        endpoint: endpointOf(`/api${path}`),
+        status,
+        code: codeOf(error),
+      })),
   }),
+  // A download of Socket.IO tried again after it failed never reloads the tab for a newer version (CC-333).
   socket: createSocketClient({
+    quietly: recovery.quietly,
     onRequest: () => telemetry.noteRequest("socket"),
     onChange: ({ state, reason, afterS }) =>
       telemetry.track("socket_changed", {
@@ -92,13 +100,25 @@ const services = {
   download: createDownload({ document, URL: window.URL }),
 };
 removeServerHead(document);
-// Before the first render, which takes the waking up screen of index.html away (CC-232).
-noteWaitingScreen({ document, window });
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <BrowserRouter>
-      <App services={services} />
-    </BrowserRouter>
-  </StrictMode>,
-);
+// A page that downloads on demand, opened by its address, is fetched before the first render, as the router's own
+// lazy routes do. The first render then shows the page itself and not its skeleton, so nothing moves (CC-322).
+// Until then the waking up screen of index.html stays. Home is in the first download and renders at once.
+preloadRouteFor(window.location.pathname).then(() => {
+  // Before the first render, which takes the waking up screen of index.html away (CC-232).
+  noteWaitingScreen({ document, window });
+  // Socket.IO is not in the first download (CC-333). A page that needs the connection to show anything asks for it
+  // now: after its own code, so the two do not share the line, and while the session is asked.
+  if (needsSocketNow(window.location.pathname)) {
+    services.socket.needNow();
+  }
+  createRoot(document.getElementById("root")).render(
+    <StrictMode>
+      <BrowserRouter>
+        <App services={services} />
+      </BrowserRouter>
+    </StrictMode>,
+  );
+  // After the first render, when the browser has nothing more urgent to do. Connecting waits for the session anyway.
+  whenIdle({ window, run: () => services.socket.needNow() });
+});

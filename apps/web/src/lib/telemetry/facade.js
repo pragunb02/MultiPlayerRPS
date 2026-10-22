@@ -1,13 +1,22 @@
 /**
- * The small part of usage counts that is in the page from the start (CC-174). Code anywhere calls `track`, and the
- * facade holds the events in memory until the client, loaded after the first paint, takes them, or drops them all
- * when counts turn out to be off. It also counts requests, so the click watcher can tell a press that did something
- * from one that did nothing. Nothing here is kept beyond the page.
+ * The small part of usage counts that is in the page from the start (CC-174): the first page's stub (CC-322). Code
+ * anywhere calls `track`, and the facade holds the events in memory until the client, loaded when the browser is
+ * idle, takes them, or drops them all when counts turn out to be off. It also counts requests, so the click watcher
+ * can tell a press that did something from one that did nothing. Nothing here is kept beyond the page.
  *
- * @typedef {{ route: string, playerKind: string }} TelemetryContext   where the player is and who, never an id
+ * It knows no screen names and no API templates, which load with the client: it keeps the address each event
+ * happened at, which the client turns into its screen, and an event may give its fields as a function of what the
+ * client loads (`endpointOf`), which the client calls.
  *
- * @typedef {Object} TelemetrySink   the loaded client (client.js)
- * @property {(name: string, fields?: object, context?: TelemetryContext) => void} track
+ * @typedef {{ path?: string, playerKind: string }} TelemetryContext   where the player is, as the address the client
+ *   turns into a screen, and who, never an id. No `path` before the app has said where it is
+ *
+ * @typedef {Record<string, string | number | boolean>} TelemetryFields
+ * @typedef {TelemetryFields | ((loaded: { endpointOf: (path: string) => string }) => TelemetryFields)} HeldFields
+ *   the fields, or how to make them from what loads with the client
+ *
+ * @typedef {Object} TelemetrySink   the loaded client (index.js)
+ * @property {(name: string, fields: HeldFields, context: TelemetryContext) => void} track
  * @property {() => void} stop
  */
 
@@ -30,8 +39,8 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
   /** @type {TelemetrySink | undefined} */
   let sink;
   /** @type {TelemetryContext} */
-  // Until the app says which screen this is: the composition root sets it from the address before anything else.
-  let context = { route: "not_found", playerKind: "visitor" };
+  // Until the app says where it is: the composition root sets it from the address before anything else.
+  let context = { playerKind: "visitor" };
   /** @type {Array<[string, object, TelemetryContext]>} */
   let waiting = [];
   const sent = { http: 0, socket: 0 };
@@ -42,7 +51,7 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
      * is loaded, in tests and development.
      *
      * @param {string} name
-     * @param {Record<string, string | number | boolean>} [fields]
+     * @param {HeldFields} [fields]
      */
     track(name, fields = {}) {
       if (state === "off" || isOff()) return;
@@ -53,7 +62,7 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
       if (waiting.length < MAX_WAITING) waiting.push([name, fields, context]);
     },
 
-    /** @param {TelemetryContext} next  the screen and the kind of player from now on */
+    /** @param {TelemetryContext} next  the address and the kind of player from now on */
     setContext(next) {
       context = Object.freeze({ ...next });
     },
@@ -74,7 +83,7 @@ export function createTelemetryFacade({ isOff, landing = NO_ENTRY }) {
     requestsSent: () => Object.freeze({ ...sent }),
 
     /**
-     * The client is loaded and counts are on: it takes the waiting events, in order, with the screen each was on.
+     * The client is loaded and counts are on: it takes the waiting events, in order, with the address each was at.
      *
      * @param {TelemetrySink} client
      */

@@ -94,26 +94,3 @@ export function fits(field, value) {
       return false;
   }
 }
-
-/**
- * A time as the catalogue keeps it: whole milliseconds rounded to 10, and never more than `max`.
- *
- * @param {number} value  milliseconds
- * @param {number} max
- * @returns {number}
- */
-export const roundMs = (value, max) => Math.min(max, Math.max(0, Math.round(value / 10) * 10));
-
-/**
- * The label of the bucket a number falls in. `edges` are the lower ends of each bucket after the first, so
- * `bucketOf(7, [1, 6, 21], ["0", "1-5", "6-20", "21+"])` is `"6-20"`.
- *
- * @param {number} value
- * @param {ReadonlyArray<number>} edges  ascending
- * @param {ReadonlyArray<string>} labels  one more than `edges`
- * @returns {string}
- */
-export function bucketOf(value, edges, labels) {
-  const index = edges.findIndex((edge) => value < edge);
-  return labels[index === -1 ? edges.length : index];
-}

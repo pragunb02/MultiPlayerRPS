@@ -11,6 +11,7 @@ import { createInMemoryAccountDeletionDao } from "../../testing/inMemoryAccountD
 import { createInMemoryLegacyUserDao } from "../../testing/inMemoryLegacyUserDao.js";
 import { createLegacyPasswordChecker } from "../../utils/legacyPassword.js";
 import { createPasswordHasher } from "../../utils/passwordHasher.js";
+import { ACCEPT_EVERY_PASSWORD } from "../../testing/fakePasswordScreen.js";
 import { createAdminAccess } from "./adminAccess.js";
 import { createAdminAccountRoutes } from "./adminAccountRoutes.js";
 import { errorHandler, notFoundHandler } from "./errorMiddleware.js";
@@ -26,6 +27,7 @@ async function setup() {
     legacyUserAccessor: createLegacyUserAccessor({ legacyUserDao: createInMemoryLegacyUserDao([]) }),
     passwordHasher: createPasswordHasher({ params: { N: 2 ** 10, r: 8, p: 1 } }),
     legacyPasswords: createLegacyPasswordChecker({ dummyCost: 4 }),
+    passwordScreen: ACCEPT_EVERY_PASSWORD,
     accountDeletionAccessor: createAccountDeletionAccessor({
       accountDeletionDao: createInMemoryAccountDeletionDao(),
     }),
