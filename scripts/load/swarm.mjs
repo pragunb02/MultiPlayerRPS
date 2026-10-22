@@ -55,6 +55,9 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
 
   /** Times one call, records how it went, and answers its data, or undefined when it failed. */
   async function call(socket, event, payload, name = event) {
+    // A call made after `stop` closed the socket waited in Socket.IO's send buffer for the whole `waitMs`, as a
+    // closed socket never answers, and `stop` waited with it. A run that stopped between two calls makes none (CC-340).
+    if (stopping) return undefined;
     const began = performance.now();
     try {
       const ack = await socket.timeout(waitMs).emitWithAck(event, payload);
@@ -198,10 +201,14 @@ export function createSwarm({ base, origin = base, recorder, rng, model, waitMs 
       ownMoves += 1;
       const sent = performance.now();
       const move = chooseMove({ gameId, game, rng, resign: ownMoves > resignAt });
-      player.see(
-        need(await call(player.socket, SOCKET_EVENTS.GAME_MOVE, { code, move }, `${MOVE} ${gameId}`)),
+      const after = need(
+        await call(player.socket, SOCKET_EVENTS.GAME_MOVE, { code, move }, `${MOVE} ${gameId}`),
       );
-      if (computer && !over(player.view) && !myTurn(player.view)) {
+      player.see(after);
+      // The answer is the game just after the move, so it tells whether the computer moves next. The newest view
+      // may already hold its reply: a computer that replies at once can overtake the answer, and the reply then
+      // went untimed (CC-340).
+      if (computer && !over(after) && !myTurn(after)) {
         // The computer replies after a human-like pause (400 to 900 ms) plus its thinking in the server's queue.
         await until(player, (view) => over(view) || myTurn(view));
         recorder.time(`computer reply ${gameId}`, performance.now() - sent);
