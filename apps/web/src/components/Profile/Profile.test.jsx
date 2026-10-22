@@ -20,12 +20,7 @@ describe("profile copy (CC-034)", () => {
     }
   });
 
-  it('speaks to the player with "tum", never "aap" (owner, 2026-10-20)', () => {
-    const hinglish = Object.values(PROFILE_COPY).map((copy) => copy.hi.toLowerCase());
-
-    expect(hinglish.some((line) => /\btum(hara|hare|hari)?\b/.test(line))).toBe(true);
-    expect(hinglish.filter((line) => /\baap(ka|ke|ki)?\b/.test(line))).toEqual([]);
-  });
+  // "tum", never "aap": the one shared test in src/copy.hinglish.test.js reads these lines (CC-351).
 });
 
 describe("the avatar picker on your profile (CC-034)", () => {

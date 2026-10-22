@@ -45,13 +45,5 @@ describe("the daily puzzle share (CC-144): a grid that gives nothing away, Hingl
     expect(() => dailyPuzzleText(solved({ kind: "sudoku" }))).toThrow(/sudoku/);
   });
 
-  it('speaks to the friend with "tum", never "aap" (owner, 2026-10-20)', () => {
-    const AAP = /\b(aap|aapka|aapke|aapki|aapko|aapne)\b|(ein|iye|ijiye)\?/i;
-    for (const status of ["solved", "failed"]) {
-      const hinglish = dailyPuzzleText(solved({ status })).split("\n")[2];
-
-      expect(hinglish).toMatch(/\bTum\b/);
-      expect(hinglish).not.toMatch(AAP);
-    }
-  });
+  // "tum", never "aap": the one shared test in src/copy.hinglish.test.js reads these lines (CC-351).
 });

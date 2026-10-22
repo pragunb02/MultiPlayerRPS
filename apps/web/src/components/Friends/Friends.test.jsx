@@ -108,8 +108,8 @@ describe("the words of the friends pages (CC-052)", () => {
     linkInviteCopy(FRIEND_LINK_MAKER_NAME),
   ];
 
-  it('speaks to the player with "tum", never "aap" (owner, 2026-10-20)', () => {
-    expect(lines.map((line) => line.hi).filter((line) => /\baap(ka|ke|ki)?\b/i.test(line))).toEqual([]);
+  // "tum", never "aap": the one shared test in src/copy.hinglish.test.js reads these lines (CC-351).
+  it("has a Hinglish line and an English line for every message", () => {
     expect(lines.every((line) => line.hi !== "" && line.en !== "")).toBe(true);
   });
 });

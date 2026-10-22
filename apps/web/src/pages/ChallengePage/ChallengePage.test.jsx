@@ -215,14 +215,12 @@ describe("ChallengePage (CC-139)", () => {
     expect(await screen.findByRole("button", { name: "Accept and play" })).toBeInTheDocument();
   });
 
-  it('speaks to the player with "tum", never "aap"', () => {
+  // "tum", never "aap": the one shared test in src/copy.hinglish.test.js reads these lines (CC-351).
+  it("has an English line under every Hinglish one", () => {
     const lines = Object.values(CHALLENGE_COPY).map((copy) =>
       typeof copy === "function" ? copy("Riya", "Chess") : copy,
     );
-    const hinglish = lines.map((copy) => copy.hi);
 
-    expect(hinglish.filter((line) => /\baap(ka|ke|ki)?\b/i.test(line))).toEqual([]);
-    expect(hinglish.join(" ")).toMatch(/\btum/);
-    expect(lines.every((copy) => copy.en.length > 0)).toBe(true);
+    expect(lines.every((copy) => copy.hi.length > 0 && copy.en.length > 0)).toBe(true);
   });
 });
