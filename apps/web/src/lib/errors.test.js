@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { ERROR_CODES } from "@classicade/shared";
+import {
+  ACCOUNT_REFUSALS,
+  CHALLENGE_LIMIT_REASONS,
+  CHALLENGE_REFUSALS,
+  DAILY_PUZZLE_REFUSALS,
+  ERROR_CODES,
+  FRIEND_REFUSALS,
+  MOVE_REJECTIONS,
+  NAME_REFUSALS,
+  ROOM_JOIN_REFUSALS,
+  ROOM_LIMIT_REASONS,
+  ROOM_REQUEST_REFUSALS,
+} from "@classicade/shared";
 import {
   AppRequestError,
   isRetryable,
   isUnauthorized,
   networkError,
   FALLBACK_WORDS,
-  FIELD_WORDS,
   PLAYER_WORDS,
   playerMessage,
   REASON_WORDS,
@@ -70,24 +81,29 @@ describe("A4: no raw server words in an error (CC-350, CL-02)", () => {
     expect(error.message).not.toContain(RAW);
   });
 
+  // Every reason the server can name, so a new one fails here until it has words (CC-350).
   it.each(
-    Object.entries(FIELD_WORDS).flatMap(([code, fields]) =>
-      Object.entries(fields).map(([field, words]) => [code, field, words]),
-    ),
-  )("gives closer words of its own for %s at the field %s", (code, field, words) => {
-    const error = new AppRequestError({ code, message: RAW, details: { field }, status: 400 });
+    Object.entries({
+      MOVE_REJECTIONS,
+      ROOM_JOIN_REFUSALS,
+      ROOM_LIMIT_REASONS,
+      ROOM_REQUEST_REFUSALS,
+      CHALLENGE_LIMIT_REASONS,
+      CHALLENGE_REFUSALS,
+      DAILY_PUZZLE_REFUSALS,
+      NAME_REFUSALS,
+      FRIEND_REFUSALS,
+      ACCOUNT_REFUSALS,
+    }).flatMap(([list, reasons]) => Object.values(reasons).map((reason) => [list, reason])),
+  )("has words of its own for every reason in %s (%s)", (_list, reason) => {
+    const codes = Object.keys(REASON_WORDS).filter((code) => Object.hasOwn(REASON_WORDS[code], reason));
 
-    expect(error.message).toBe(words);
-  });
-
-  it("keeps the code's words for a field it has no closer words for", () => {
-    const error = new AppRequestError({
-      code: "VALIDATION_FAILED",
-      message: RAW,
-      details: { field: "newPassword" },
-    });
-
-    expect(error.message).toBe(PLAYER_WORDS.VALIDATION_FAILED);
+    expect(codes.length).toBeGreaterThan(0);
+    for (const code of codes) {
+      expect(new AppRequestError({ code, message: RAW, details: { reason } }).message).not.toBe(
+        PLAYER_WORDS[code],
+      );
+    }
   });
 
   it("says which way a challenge ended from the state the server names", () => {

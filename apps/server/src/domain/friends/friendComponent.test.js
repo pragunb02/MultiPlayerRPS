@@ -3,6 +3,7 @@ import {
   FRIEND_ANSWERS,
   FRIEND_LINK_MAKER_NAME,
   FRIEND_PRESENCE,
+  FRIEND_REFUSALS,
   FRIEND_REQUEST_RESULTS,
   isFriendLinkToken,
 } from "@classicade/shared";
@@ -185,7 +186,11 @@ describe("friendComponent: who can have friends (CC-052)", () => {
       () => friends.makeLink({ playerId: GUEST, now: T0 }),
       () => friends.useLink({ playerId: GUEST, token: "T".repeat(22), now: T0 }),
     ]) {
-      await expect(attempt()).rejects.toThrow(new ForbiddenError("Save your progress to add friends"));
+      await expect(attempt()).rejects.toThrow(
+        new ForbiddenError("Save your progress to add friends", {
+          details: { reason: FRIEND_REFUSALS.GUEST },
+        }),
+      );
     }
   });
 
@@ -193,7 +198,9 @@ describe("friendComponent: who can have friends (CC-052)", () => {
     const { ask } = setup({ rooms: [roomOf("ROOM22", [RIYA, GUEST])] });
 
     await expect(ask(RIYA, GUEST)).rejects.toThrow(
-      new ConflictError("Guest-T001 needs to save their progress before you can be friends"),
+      new ConflictError("Guest-T001 needs to save their progress before you can be friends", {
+        details: { reason: FRIEND_REFUSALS.THEY_ARE_GUEST },
+      }),
     );
   });
 
@@ -206,7 +213,9 @@ describe("friendComponent: who can have friends (CC-052)", () => {
       { matchId: "99999999-2222-4333-8444-555555555555", seat: 0 },
     ]) {
       await expect(friends.sendRequest({ playerId: RIYA, target, now: T0 })).rejects.toThrow(
-        new NotFoundError("You can only add someone you played with"),
+        new NotFoundError("You can only add someone you played with", {
+          details: { reason: FRIEND_REFUSALS.NOT_PLAYED_WITH },
+        }),
       );
     }
   });
@@ -355,7 +364,9 @@ describe("friendComponent: asking and answering (CC-052)", () => {
 
     expect(answers.map((answer) => answer.status).sort()).toEqual(["fulfilled", "rejected"]);
     expect(answers.find((answer) => answer.status === "rejected").reason).toEqual(
-      new NotFoundError("This request is no longer open"),
+      new NotFoundError("This request is no longer open", {
+        details: { reason: FRIEND_REFUSALS.REQUEST_CLOSED },
+      }),
     );
   });
 
@@ -380,7 +391,11 @@ describe("friendComponent: asking and answering (CC-052)", () => {
       () => answer(ARJUN, "00000000-0000-4000-9000-999999999999"),
       () => answer(ARJUN, requestId, T0 + 31 * DAY),
     ]) {
-      await expect(attempt()).rejects.toThrow(new NotFoundError("This request is no longer open"));
+      await expect(attempt()).rejects.toThrow(
+        new NotFoundError("This request is no longer open", {
+          details: { reason: FRIEND_REFUSALS.REQUEST_CLOSED },
+        }),
+      );
     }
     await friends.answerRequest({ playerId: ARJUN, requestId, answer: FRIEND_ANSWERS.DECLINE, now: T0 });
     await expect(answer(ARJUN, requestId)).rejects.toThrow(NotFoundError);
@@ -436,7 +451,11 @@ describe("friendComponent: blocks and the minors' rule are silent (ADR-053, ADR-
     expect((await view(ARJUN)).incoming).toEqual([]);
     await expect(
       friends.answerRequest({ playerId: ARJUN, requestId, answer: FRIEND_ANSWERS.ACCEPT, now: T0 }),
-    ).rejects.toThrow(new NotFoundError("This request is no longer open"));
+    ).rejects.toThrow(
+      new NotFoundError("This request is no longer open", {
+        details: { reason: FRIEND_REFUSALS.REQUEST_CLOSED },
+      }),
+    );
     expect(await ask(ARJUN, RIYA)).toEqual({ result: FRIEND_REQUEST_RESULTS.SENT });
     expect((await view(ARJUN)).friends).toEqual([]);
   });
@@ -538,7 +557,9 @@ describe("friendComponent: limits (ADR-066.8)", () => {
     await friends.answerRequest({ playerId: KABIR, requestId, answer: FRIEND_ANSWERS.DECLINE, now: T0 });
 
     await expect(ask(RIYA, MEENA, "ROOM44")).rejects.toThrow(
-      new ConflictError("You have 2 requests waiting. Cancel one, or wait for an answer."),
+      new ConflictError("You have 2 requests waiting. Cancel one, or wait for an answer.", {
+        details: { reason: FRIEND_REFUSALS.MAX_WAITING },
+      }),
     );
     expect(await ask(RIYA, ARJUN)).toEqual({ result: FRIEND_REQUEST_RESULTS.SENT });
   });
@@ -555,7 +576,9 @@ describe("friendComponent: limits (ADR-066.8)", () => {
     await ask(MEENA, ARJUN, "ROOM44");
 
     await expect(ask(RIYA, KABIR, "ROOM33")).rejects.toThrow(
-      new ConflictError("You have 1 friends. Remove one to add another."),
+      new ConflictError("You have 1 friends. Remove one to add another.", {
+        details: { reason: FRIEND_REFUSALS.MAX_FRIENDS },
+      }),
     );
     const [{ requestId }] = (await view(ARJUN)).incoming;
     await expect(
@@ -612,7 +635,9 @@ describe("friendComponent: cancelling and removing (CC-052)", () => {
     const cancel = (playerId, id) => friends.cancelRequest({ playerId, requestId: id, now: T0 });
 
     await expect(cancel(ARJUN, requestId)).rejects.toThrow(
-      new NotFoundError("This request is no longer open"),
+      new NotFoundError("This request is no longer open", {
+        details: { reason: FRIEND_REFUSALS.REQUEST_CLOSED },
+      }),
     );
     await expect(cancel(RIYA, "00000000-0000-4000-9000-999999999999")).rejects.toThrow(NotFoundError);
     await cancel(RIYA, requestId);
@@ -726,7 +751,9 @@ describe("friendComponent: friend links (ADR-066.3)", () => {
       own: true,
     });
     await expect(friends.linkInvite({ token: link.token, viewerId: "", now: T0 + 7 * DAY })).rejects.toThrow(
-      new NotFoundError("This friend link has run out or was used already"),
+      new NotFoundError("This friend link has run out or was used already", {
+        details: { reason: FRIEND_REFUSALS.LINK_USED },
+      }),
     );
   });
 
@@ -756,7 +783,9 @@ describe("friendComponent: friend links (ADR-066.3)", () => {
     });
 
     await expect(friends.useLink({ playerId: KABIR, token, now: T0 + 2 })).rejects.toThrow(
-      new NotFoundError("This friend link has run out or was used already"),
+      new NotFoundError("This friend link has run out or was used already", {
+        details: { reason: FRIEND_REFUSALS.LINK_USED },
+      }),
     );
     const [request] = (await view(RIYA)).incoming;
     expect(request).toEqual(expect.objectContaining({ displayName: "MeenaTest", via: "link" }));
@@ -777,7 +806,9 @@ describe("friendComponent: friend links (ADR-066.3)", () => {
     const { token } = await friends.makeLink({ playerId: RIYA, now: T0 });
 
     await expect(friends.useLink({ playerId: RIYA, token, now: T0 })).rejects.toThrow(
-      new ConflictError("This is your own friend link. Send it to a friend."),
+      new ConflictError("This is your own friend link. Send it to a friend.", {
+        details: { reason: FRIEND_REFUSALS.OWN_LINK },
+      }),
     );
     expect(await friends.useLink({ playerId: ARJUN, token, now: T0 })).toEqual({
       result: FRIEND_REQUEST_RESULTS.FRIENDS,
@@ -939,7 +970,9 @@ describe("friendComponent: avatars, failures and races (CC-052)", () => {
 
     expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
     expect(results.find((result) => result.status === "rejected").reason).toEqual(
-      new NotFoundError("This friend link has run out or was used already"),
+      new NotFoundError("This friend link has run out or was used already", {
+        details: { reason: FRIEND_REFUSALS.LINK_USED },
+      }),
     );
     expect((await view(RIYA)).incoming).toHaveLength(1);
   });

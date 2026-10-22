@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { ERROR_CODES } from "@classicade/shared";
+import { ACCOUNT_REFUSALS, ERROR_CODES } from "@classicade/shared";
 import { startTestServer } from "../../testing/testApp.js";
 import { createAccountRoutes } from "./accountRoutes.js";
 
@@ -184,7 +184,7 @@ describe("POST /api/account/delete (CC-035)", () => {
     const res = await call("POST", "/account/delete", { body: {}, cookie });
 
     expect(res.status).toBe(400);
-    expect(res.body.error.details).toEqual({ field: "password" });
+    expect(res.body.error.details).toEqual({ field: "password", reason: ACCOUNT_REFUSALS.WRONG_PASSWORD });
   });
 });
 

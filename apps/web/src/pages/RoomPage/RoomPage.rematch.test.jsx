@@ -233,6 +233,7 @@ describe("RoomPage rematch (CC-037, CC-159)", () => {
         throw new AppRequestError({
           code: "CONFLICT",
           message: "Your opponent left, so a rematch is no longer possible",
+          details: { reason: "opponent-left" },
         });
       }),
     );
@@ -241,7 +242,7 @@ describe("RoomPage rematch (CC-037, CC-159)", () => {
 
     expect(
       await screen.findByText(
-        "That can't be done right now. Reload the page to see what changed, then try again.",
+        "Your opponent left, so a rematch is no longer possible. Start a new game instead.",
       ),
     ).toBeInTheDocument();
     expect(

@@ -1,5 +1,6 @@
 import {
   ACCOUNT_MESSAGES,
+  ACCOUNT_REFUSALS,
   ageGroupFor,
   IDENTITY_KINDS,
   isTooYoungForAccount,
@@ -68,6 +69,9 @@ function statedBirthYear(value, now) {
 /** A field error for the password form, so the page can show it next to the right box. */
 const passwordFieldError = (field, message, cause) =>
   new ValidationError(message, { details: { field }, ...(cause !== undefined && { cause }) });
+/** A password that is not the account's, with the reason the page says in its own words (CC-350). */
+const wrongPassword = ({ field, message, reason }) =>
+  new ValidationError(message, { details: { field, reason } });
 
 /** @param {Readonly<import("../../data/accountAccessor.js").Account>} account */
 const identityOf = (account) =>
@@ -405,7 +409,11 @@ export function createAccountComponent({
       const account = await accountAccessor.getById(accountId);
       const current = typeof currentPassword === "string" ? currentPassword : "";
       if (!(await passwordHasher.verify(current, account.passwordHash))) {
-        throw passwordFieldError("currentPassword", "That is not your current password");
+        throw wrongPassword({
+          field: "currentPassword",
+          message: "That is not your current password",
+          reason: ACCOUNT_REFUSALS.WRONG_CURRENT_PASSWORD,
+        });
       }
       if (next === current) {
         throw passwordFieldError("newPassword", "Choose a password different from your current one");
@@ -573,7 +581,11 @@ export function createAccountComponent({
       const account = await accountAccessor.getById(accountIdOf(playerId));
       const given = typeof password === "string" ? password : "";
       if (!(await passwordHasher.verify(given, account.passwordHash))) {
-        throw passwordFieldError("password", "That is not your password");
+        throw wrongPassword({
+          field: "password",
+          message: "That is not your password",
+          reason: ACCOUNT_REFUSALS.WRONG_PASSWORD,
+        });
       }
       return Object.freeze({
         username: account.username,

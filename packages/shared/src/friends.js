@@ -42,3 +42,26 @@ export const FRIEND_RULES = Object.freeze({ maxFriends: 200, maxWaiting: 10, req
  * a link, which may have been forwarded (ADR-028.7).
  */
 export const FRIEND_LINK_MAKER_NAME = "A ClassiCade player";
+
+/**
+ * Why the server refused something about friends, in `details.reason`, so the page can say it in its own words
+ * (CC-350). The messages and statuses stay as they were.
+ */
+export const FRIEND_REFUSALS = Object.freeze({
+  /** a guest has no friends list until they save their progress */
+  GUEST: "guest",
+  /** the person was never in a game with the asker */
+  NOT_PLAYED_WITH: "not-played-with",
+  /** the request was answered, cancelled or ran out */
+  REQUEST_CLOSED: "request-closed",
+  /** the friend link ran out or was used */
+  LINK_USED: "link-used",
+  /** the asker has as many friends as one player may have */
+  MAX_FRIENDS: "max-friends",
+  /** the asker has as many requests waiting as one player may have */
+  MAX_WAITING: "max-waiting",
+  /** the other person is a guest, who can't have friends yet */
+  THEY_ARE_GUEST: "they-are-guest",
+  /** the asker opened their own friend link */
+  OWN_LINK: "own-link",
+});

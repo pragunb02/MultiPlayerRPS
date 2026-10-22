@@ -17,7 +17,7 @@ const wrongPassword = new AppRequestError({
   code: "VALIDATION_FAILED",
   message: "That is not your password",
   status: 400,
-  details: { field: "password" },
+  details: { field: "password", reason: "wrong-password" },
 });
 
 async function openPrivacy(options) {
@@ -146,7 +146,7 @@ describe("downloading your data (CC-035)", () => {
     await userEvent.click(within(privacy).getByRole("button", { name: "Download my data" }));
 
     expect(
-      await within(privacy).findByText("That wasn't accepted. Check what you entered and try again."),
+      await within(privacy).findByText("That isn't your password. Check it and try again."),
     ).toBeInTheDocument();
     expect(within(privacy).getByLabelText("Password for the download")).toHaveAttribute(
       "aria-invalid",
@@ -227,7 +227,7 @@ describe("deleting your account (CC-035)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Delete for good" }));
 
     expect(
-      await within(privacy).findByText("That wasn't accepted. Check what you entered and try again."),
+      await within(privacy).findByText("That isn't your password. Check it and try again."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("region", { name: "Your data and privacy" })).toBeInTheDocument();

@@ -19,6 +19,14 @@ export const NAME_REFUSALS = Object.freeze({
   UNSUITABLE: "unsuitable-name",
 });
 
+/** Why the server refused a password, in `details.reason` (CC-350). */
+export const ACCOUNT_REFUSALS = Object.freeze({
+  /** the password given to confirm a download or a deletion is not the account's */
+  WRONG_PASSWORD: "wrong-password",
+  /** the current password given to change it is not the account's */
+  WRONG_CURRENT_PASSWORD: "wrong-current-password",
+});
+
 /**
  * Account messages that the server sends and the web app shows with links of its own. They live here so both say
  * exactly the same words.

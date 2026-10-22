@@ -284,7 +284,7 @@ test.describe("plain errors (CC-350)", () => {
     await expect(page.getByText("This page broke")).toHaveCount(0);
   });
 
-  test("Go to the home page leaves a page that broke", async ({ players }) => {
+  test("Back to home leaves a page that broke", async ({ players }) => {
     const visitor = await players.open("visitor");
     const { page } = visitor;
     await breakHome(page);
@@ -294,7 +294,7 @@ test.describe("plain errors (CC-350)", () => {
     });
 
     await page.unroute("**/api/games");
-    await page.getByRole("button", { name: "Go to the home page" }).click();
+    await page.getByRole("button", { name: "Back to home" }).click();
     await expect(page).toHaveURL("/");
     await expect(page.getByRole("link", { name: "Chess" })).toBeVisible();
   });

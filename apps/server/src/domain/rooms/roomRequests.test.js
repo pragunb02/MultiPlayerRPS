@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REQUEST_STATES, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
+import { REQUEST_STATES, ROOM_REQUEST_REFUSALS, ROOM_REQUEST_TYPES, ROOM_STATUS } from "@classicade/shared";
 import { ConflictError, ForbiddenError, ValidationError } from "../../utils/errors.js";
 import { ROOM_LIFETIMES } from "./roomLifetimes.js";
 import {
@@ -114,7 +114,7 @@ describe("room requests (CC-159)", () => {
     let room = declined(ask(playing), T0 + 1_000);
 
     expect(() => ask(room, { now: T0 + 5_000 })).toThrow(
-      expect.objectContaining({ details: { retryAt: T0 + 11_000 } }),
+      expect.objectContaining({ details: { reason: ROOM_REQUEST_REFUSALS.TOO_SOON, retryAt: T0 + 11_000 } }),
     );
     expect(askAgainAt(room, { viewerId: "alice", lifetimes })).toEqual({ draw: T0 + 11_000 });
     expect(askAgainAt(room, { viewerId: "bob", lifetimes })).toEqual({});
@@ -123,7 +123,12 @@ describe("room requests (CC-159)", () => {
     room = declined(ask(room, { now: T0 + 22_000 }), T0 + 23_000);
 
     expect(requestsLeft(room, { viewerId: "alice", engine: chess, lifetimes })).toEqual({ draw: 0 });
-    expect(() => ask(room, { now: T0 + 40_000 })).toThrow("You can ask that 3 times a game");
+    expect(() => ask(room, { now: T0 + 40_000 })).toThrow(
+      expect.objectContaining({
+        message: "You can ask that 3 times a game",
+        details: { reason: ROOM_REQUEST_REFUSALS.ASK_LIMIT, limit: 3 },
+      }),
+    );
     expect(ask(room, { playerId: "bob", now: T0 + 40_000 }).requests.at(-1).from).toBe("bob");
   });
 
@@ -165,10 +170,14 @@ describe("room requests (CC-159)", () => {
     expect(() => requireAnswerer({ request, playerId: "bob", byAsker: false })).not.toThrow();
     expect(() => requireAnswerer({ request, playerId: "alice", byAsker: true })).not.toThrow();
     expect(() => requireAnswerer({ request, playerId: "alice", byAsker: false })).toThrow(
-      new ForbiddenError("That was not asked of you"),
+      new ForbiddenError("That was not asked of you", {
+        details: { reason: ROOM_REQUEST_REFUSALS.NOT_ASKED_OF_YOU },
+      }),
     );
     expect(() => requireAnswerer({ request, playerId: "bob", byAsker: true })).toThrow(
-      "Only the player who asked can withdraw it",
+      new ForbiddenError("Only the player who asked can withdraw it", {
+        details: { reason: ROOM_REQUEST_REFUSALS.NOT_ASKER },
+      }),
     );
   });
 

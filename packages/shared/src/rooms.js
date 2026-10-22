@@ -43,6 +43,36 @@ export const ROOM_JOIN_REFUSALS = Object.freeze({
   FULL: "full",
 });
 
+/** Why the server refused a request in a room (a rematch, a draw, a claimed win) or a move, in `details.reason` (CC-350). */
+export const ROOM_REQUEST_REFUSALS = Object.freeze({
+  /** a rematch is asked before the game is over */
+  AFTER_GAME_ONLY: "after-game-only",
+  /** a request such as a draw is asked when the game is not on */
+  DURING_GAME_ONLY: "during-game-only",
+  /** nobody else is in the room to answer */
+  NO_OPPONENT: "no-opponent",
+  /** the same request is already waiting for its answer */
+  ALREADY_ASKED: "already-asked",
+  /** the same request was answered a moment ago */
+  TOO_SOON: "too-soon",
+  /** the player asked as often as a game allows */
+  ASK_LIMIT: "ask-limit",
+  /** only the player who asked can take a request back */
+  NOT_ASKER: "not-asker",
+  /** the request was not asked of this player */
+  NOT_ASKED_OF_YOU: "not-asked-of-you",
+  /** the request was answered or ended before this answer came */
+  REQUEST_CLOSED: "request-closed",
+  /** the other player left after the game, so there is nobody for a rematch */
+  OPPONENT_LEFT: "opponent-left",
+  /** the game has not started yet */
+  NOT_STARTED: "not-started",
+  /** the game is over */
+  GAME_OVER: "game-over",
+  /** a win is claimed while the other player may still come back */
+  OPPONENT_MAY_RETURN: "opponent-may-return",
+});
+
 /** Room codes avoid look-alike characters (0/O, 1/I/L) so they can be read out loud or typed from a screenshot. */
 export const ROOM_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export const ROOM_CODE_LENGTH = 6;

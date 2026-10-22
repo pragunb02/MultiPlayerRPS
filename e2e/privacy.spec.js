@@ -76,9 +76,7 @@ test.describe("an account holder's data (CC-035)", () => {
       .getByRole("dialog", { name: "Delete your account?" })
       .getByRole("button", { name: "Delete for good" })
       .click();
-    await expect(
-      privacy.getByText("That wasn't accepted. Check what you entered and try again."),
-    ).toBeVisible();
+    await expect(privacy.getByText("That isn't your password. Check it and try again.")).toBeVisible();
 
     // The real deletion: the question says what goes and what stays, then the browser is signed out.
     await privacy.getByLabel("Password for deleting").fill(account.password);

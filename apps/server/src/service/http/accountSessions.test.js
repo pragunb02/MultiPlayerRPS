@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
+import { ACCOUNT_REFUSALS, ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
 import { createSocketClients, send } from "../../testing/socketClients.js";
 import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { startTestServer } from "../../testing/testApp.js";
@@ -149,7 +149,7 @@ describe("POST /api/auth/password (CC-116)", () => {
       expect.objectContaining({
         code: ERROR_CODES.VALIDATION_FAILED,
         message: "That is not your current password",
-        details: { field: "currentPassword" },
+        details: { field: "currentPassword", reason: ACCOUNT_REFUSALS.WRONG_CURRENT_PASSWORD },
       }),
     );
     expect((await whoAmI(phone)).authenticated).toBe(true);

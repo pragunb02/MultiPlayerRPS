@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
-import { SOCKET_EVENTS } from "@classicade/shared";
+import { ACCOUNT_REFUSALS, SOCKET_EVENTS } from "@classicade/shared";
 import { SESSION_COLLECTION } from "./persistence/sessionStore.js";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
@@ -170,7 +170,10 @@ describe("account deletion through the real composition root (integration, CC-03
         cookie: riya.cookie,
       });
       expect(refused.status).toBe(400);
-      expect(refused.body.error.details).toEqual({ field: "password" });
+      expect(refused.body.error.details).toEqual({
+        field: "password",
+        reason: ACCOUNT_REFUSALS.WRONG_PASSWORD,
+      });
       expect(await readCollection(uri, "accounts", { username: "riya" })).toHaveLength(1);
 
       const disconnected = new Promise((resolve) => riya.socket.once("disconnect", resolve));

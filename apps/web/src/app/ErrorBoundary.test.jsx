@@ -48,7 +48,7 @@ describe("ErrorBoundary", () => {
   it("goes to the home page from its second button", async () => {
     const { onReload, onHome } = renderCrash();
 
-    await userEvent.click(screen.getByRole("button", { name: "Go to the home page" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to home" }));
 
     expect(onHome).toHaveBeenCalledOnce();
     expect(onReload).not.toHaveBeenCalled();
@@ -64,7 +64,7 @@ describe("ErrorBoundary", () => {
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Reload the page" }));
-    await userEvent.click(screen.getByRole("button", { name: "Go to the home page" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to home" }));
 
     expect(location.reload).toHaveBeenCalledOnce();
     expect(location.assign).toHaveBeenCalledWith("/");

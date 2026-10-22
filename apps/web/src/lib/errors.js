@@ -1,13 +1,17 @@
 import {
+  ACCOUNT_REFUSALS,
   CHALLENGE_LIMIT_REASONS,
   CHALLENGE_LIMITS,
+  CHALLENGE_REFUSALS,
   CHALLENGE_STATES,
   DAILY_PUZZLE_REFUSALS,
   ERROR_CODES,
+  FRIEND_REFUSALS,
   MOVE_REJECTIONS,
   NAME_REFUSALS,
   ROOM_JOIN_REFUSALS,
   ROOM_LIMIT_REASONS,
+  ROOM_REQUEST_REFUSALS,
   TOO_YOUNG_MESSAGE,
 } from "@classicade/shared";
 
@@ -56,10 +60,47 @@ export const REASON_WORDS = Object.freeze({
       "That move isn't allowed here. Try another one. It isn't a mistake.",
     "too-young": TOO_YOUNG_MESSAGE,
     [NAME_REFUSALS.RESERVED]: "That name is reserved. Please choose another name.",
+    [ACCOUNT_REFUSALS.WRONG_PASSWORD]: "That isn't your password. Check it and try again.",
+    [ACCOUNT_REFUSALS.WRONG_CURRENT_PASSWORD]: "That isn't your current password. Check it and try again.",
     [NAME_REFUSALS.UNSUITABLE]:
       "Please choose another name. Names are shown to everyone, so keep it friendly.",
   }),
+  [ERROR_CODES.FORBIDDEN]: Object.freeze({
+    [FRIEND_REFUSALS.GUEST]: "Save your progress first. Then you can add friends.",
+    [CHALLENGE_REFUSALS.OWN]: "This is your own challenge. Send the link to a friend so they can take it.",
+    [CHALLENGE_REFUSALS.NOT_FOR_YOU]: "This challenge is for someone else. Ask your friend to send you one.",
+    [CHALLENGE_REFUSALS.NOT_YOURS]: "Only the player who made this challenge can take it back.",
+    [ROOM_REQUEST_REFUSALS.NOT_ASKER]: "Only the player who asked can take this request back.",
+    [ROOM_REQUEST_REFUSALS.NOT_ASKED_OF_YOU]: "That wasn't asked of you, so there's nothing to answer.",
+  }),
+  [ERROR_CODES.NOT_FOUND]: Object.freeze({
+    [FRIEND_REFUSALS.NOT_PLAYED_WITH]:
+      "You can only add someone you've played a game with. Play them first, then add them.",
+    [FRIEND_REFUSALS.REQUEST_CLOSED]: "This friend request is no longer open. Send a new one if you like.",
+    [FRIEND_REFUSALS.LINK_USED]:
+      "This friend link has run out or was used already. Ask your friend for a new one.",
+  }),
   [ERROR_CODES.CONFLICT]: Object.freeze({
+    [FRIEND_REFUSALS.MAX_FRIENDS]: "Your friends list is full. Remove a friend to add another.",
+    [FRIEND_REFUSALS.MAX_WAITING]:
+      "You have too many friend requests waiting. Cancel one, or wait for an answer.",
+    [FRIEND_REFUSALS.THEY_ARE_GUEST]:
+      "They need to save their progress before you can be friends. Ask them to sign up.",
+    [FRIEND_REFUSALS.OWN_LINK]: "This is your own friend link. Send it to a friend.",
+    [CHALLENGE_REFUSALS.BEING_TAKEN]: "Someone else was taking this challenge just now. Try again.",
+    [ROOM_REQUEST_REFUSALS.AFTER_GAME_ONLY]: "A rematch is only possible after the game is over.",
+    [ROOM_REQUEST_REFUSALS.DURING_GAME_ONLY]: "That's only possible while the game is on.",
+    [ROOM_REQUEST_REFUSALS.NO_OPPONENT]: "Nobody else is in the room to answer. Wait for the other player.",
+    [ROOM_REQUEST_REFUSALS.ALREADY_ASKED]: "You already asked. Wait for the answer.",
+    [ROOM_REQUEST_REFUSALS.TOO_SOON]: "Wait a few seconds before asking again.",
+    [ROOM_REQUEST_REFUSALS.ASK_LIMIT]: "You've asked that as many times as one game allows.",
+    [ROOM_REQUEST_REFUSALS.REQUEST_CLOSED]: "That request has ended, so it can't be answered now.",
+    [ROOM_REQUEST_REFUSALS.OPPONENT_LEFT]:
+      "Your opponent left, so a rematch is no longer possible. Start a new game instead.",
+    [ROOM_REQUEST_REFUSALS.NOT_STARTED]: "The game hasn't started yet. Wait for the other player to join.",
+    [ROOM_REQUEST_REFUSALS.GAME_OVER]: "The game is over, so that can't be done now.",
+    [ROOM_REQUEST_REFUSALS.OPPONENT_MAY_RETURN]:
+      "Your opponent can still come back. Wait until their time away runs out.",
     [ROOM_JOIN_REFUSALS.STARTED]:
       "This game started without you, so you can't join it. Ask your friend for a new link, or start your own game.",
     [ROOM_JOIN_REFUSALS.FULL]:
@@ -86,16 +127,6 @@ export const REASON_WORDS = Object.freeze({
   }),
 });
 
-/**
- * Closer words for a refused field that means one thing only, by its `details.field`. A field that the server
- * refuses for several reasons, such as a new password, keeps its code's words.
- */
-export const FIELD_WORDS = Object.freeze({
-  [ERROR_CODES.VALIDATION_FAILED]: Object.freeze({
-    currentPassword: "That isn't your current password. Check it and try again.",
-  }),
-});
-
 /** The words of `table[code][key]`, when the table has them. */
 const lookUp = (table, code, key) =>
   typeof key === "string" && Object.hasOwn(table, code) && Object.hasOwn(table[code], key)
@@ -105,7 +136,6 @@ const lookUp = (table, code, key) =>
 /** @param {string} code  @param {Record<string, unknown>} details */
 const wordsFor = (code, details) =>
   lookUp(REASON_WORDS, code, details.reason ?? details.state) ??
-  lookUp(FIELD_WORDS, code, details.field) ??
   (Object.hasOwn(PLAYER_WORDS, code) ? PLAYER_WORDS[code] : FALLBACK_WORDS);
 
 /**

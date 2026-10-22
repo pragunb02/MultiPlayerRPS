@@ -14,8 +14,13 @@ async function openAccount(api) {
   return screen.findByRole("region", { name: "Account" });
 }
 
-const fieldError = (message, field) =>
-  new AppRequestError({ code: "VALIDATION_FAILED", message, status: 400, details: { field } });
+const fieldError = (message, field, reason) =>
+  new AppRequestError({
+    code: "VALIDATION_FAILED",
+    message,
+    status: 400,
+    details: reason === undefined ? { field } : { field, reason },
+  });
 
 describe("account settings on the profile (CC-116)", () => {
   it("changes the password, clears the form and says the other devices are signed out", async () => {
@@ -43,25 +48,32 @@ describe("account settings on the profile (CC-116)", () => {
       "currentPassword",
       "That is not your current password",
       "That isn't your current password. Check it and try again.",
+      "wrong-current-password",
     ],
     [
       "New password",
       "newPassword",
       "Passwords are 8–128 characters",
       "That wasn't accepted. Check what you entered and try again.",
+      undefined,
     ],
-  ])("shows a refusal of the %s next to that box, in plain words", async (label, field, message, words) => {
-    const api = profileApi(USER, { changePassword: vi.fn().mockRejectedValue(fieldError(message, field)) });
-    const account = await openAccount(api);
+  ])(
+    "shows a refusal of the %s next to that box, in plain words",
+    async (label, field, message, words, reason) => {
+      const api = profileApi(USER, {
+        changePassword: vi.fn().mockRejectedValue(fieldError(message, field, reason)),
+      });
+      const account = await openAccount(api);
 
-    await userEvent.click(within(account).getByRole("button", { name: "Change password" }));
+      await userEvent.click(within(account).getByRole("button", { name: "Change password" }));
 
-    const input = within(account).getByLabelText(label);
-    await vi.waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
-    expect(within(account).getByText(words)).toBeInTheDocument();
-    expect(within(account).queryByText(message)).toBeNull();
-    expect(within(account).queryByRole("alert")).toBeNull();
-  });
+      const input = within(account).getByLabelText(label);
+      await vi.waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+      expect(within(account).getByText(words)).toBeInTheDocument();
+      expect(within(account).queryByText(message)).toBeNull();
+      expect(within(account).queryByRole("alert")).toBeNull();
+    },
+  );
 
   it("shows any other refusal for the whole form", async () => {
     const tooMany = new AppRequestError({

@@ -49,3 +49,15 @@ export const CHALLENGE_ID_PATTERN = new RegExp(`^[${PROFILE_HANDLE_ALPHABET}]{${
 
 /** @param {unknown} value */
 export const isChallengeId = (value) => typeof value === "string" && CHALLENGE_ID_PATTERN.test(value);
+
+/** Why the server refused to take, answer or change a challenge, in `details.reason` (CC-350). */
+export const CHALLENGE_REFUSALS = Object.freeze({
+  /** someone else was taking it at the same moment, so trying again may work */
+  BEING_TAKEN: "being-taken",
+  /** the player made it */
+  OWN: "own-challenge",
+  /** it was sent to someone else */
+  NOT_FOR_YOU: "not-for-you",
+  /** only the player who made it can take it back */
+  NOT_YOURS: "not-yours",
+});

@@ -21,7 +21,7 @@ function Crashed({ onReload, onHome }) {
           Reload the page
         </Button>
         <Button control="crash.home" variant="secondary" onClick={onHome}>
-          Go to the home page
+          Back to home
         </Button>
       </div>
     </section>

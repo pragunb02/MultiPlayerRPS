@@ -250,16 +250,18 @@ describe("draw offers (CC-104, CC-159)", () => {
     const user = userEvent.setup();
     openRoom(chess({ requests: [draw()] }), {
       "room:answer": () => {
-        throw new AppRequestError({ code: "CONFLICT", message: "That request is no longer open" });
+        throw new AppRequestError({
+          code: "CONFLICT",
+          message: "That request is no longer open",
+          details: { reason: "request-closed" },
+        });
       },
     });
 
     await user.click(within(await popup()).getByRole("button", { name: "Accept" }));
 
     expect(
-      await screen.findByText(
-        "That can't be done right now. Reload the page to see what changed, then try again.",
-      ),
+      await screen.findByText("That request has ended, so it can't be answered now."),
     ).toBeInTheDocument();
     expect(screen.queryByText("That request is no longer open")).not.toBeInTheDocument();
     expect(within(screen.getByRole("region", POPUP)).getByRole("button", { name: "Accept" })).toBeEnabled();
