@@ -232,7 +232,7 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
 
     push({ ...asked, state: "declined", expiresAt: undefined });
 
-    expect(await screen.findByText(/Arjun can't play right now\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Not right now: Arjun can't play at the moment\./)).toBeInTheDocument();
   });
 
   it("reads the inbox again whenever the socket connects again", async () => {
@@ -259,7 +259,7 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
       you: "seatOfMe",
       game: { view: {}, activePlayers: ["seatOfBob"], outcome: { status: "ongoing" } },
     };
-    const { push, sound, socket } = await open({ path: "/games/ludo/rooms/AB2CD3", joined: room });
+    const { push, sound, socket, api } = await open({ path: "/games/ludo/rooms/AB2CD3", joined: room });
     await screen.findByRole("list", { name: "Players" });
     const title = document.title;
 
@@ -267,6 +267,8 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     expect(popup()).not.toBeInTheDocument();
     expect(sound.played).not.toContain("notify");
     expect(document.title).toBe(title);
+    // When the game ends the inbox is read again (CC-052), and the server still has the challenge.
+    api.getChallenges.mockResolvedValue([sentToYou()]);
 
     act(() =>
       socket.push("room:updated", {

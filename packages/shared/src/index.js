@@ -21,6 +21,7 @@ export {
   CHALLENGE_LIMITS,
   CHALLENGE_POPUP_MS,
   CHALLENGE_STATES,
+  INVITE_KEEP_AFTER_MS,
   isChallengeId,
 } from "./challenges.js";
 export { ERROR_CODES } from "./errors.js";

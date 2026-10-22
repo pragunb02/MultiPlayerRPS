@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useId, useRef } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
   CHALLENGE_POPUP_MS,
@@ -20,6 +20,7 @@ import { CATEGORIES } from "../../lib/notify/categories.js";
 import { SOUNDS } from "../../lib/sound/sounds.js";
 import { Button } from "../Button/Button.jsx";
 import { CHALLENGE_COPY } from "../Challenges/challengeCopy.js";
+import { INVITE_COPY } from "../Friends/inviteCopy.js";
 import { useChallengeInbox } from "../Challenges/challengesContext.js";
 import { Bilingual } from "../Profile/Bilingual.jsx";
 import { RequestCountdown } from "../RequestBanner/RequestBanner.jsx";
@@ -118,27 +119,47 @@ function useAnswerToasts({ rooms, pathname }) {
 }
 
 /**
- * Tells the creator of a challenge to one person, on any page, that they said no: gently, "can't play right now".
- * A block never shows here, because a blocked pair's challenge is never declined (ADR-053).
+ * How invites to one person end, told on any page (CC-052):
+ *
+ * 1. Its sender, when the friend said no, or when it ran out with no answer: the same gentle "Not right now" for
+ *    both. A block reads as no answer, because a blocked pair's invite is never delivered (scenario 7, ADR-053).
+ * 2. Its friend, when another friend took the sender's invite to the same game first: "Game filled", with the way to
+ *    invite the sender again (scenario 6).
  */
-function useDeclineToasts() {
+function useEndingToasts() {
   const { challenges } = useChallengeInbox();
   const toast = useToast();
   const before = useRef(new Map());
 
   useEffect(() => {
     const previous = before.current;
-    before.current = new Map(challenges.map((challenge) => [challenge.id, challenge.state]));
+    const now = Date.now();
+    before.current = new Map(challenges.map((challenge) => [challenge.id, challenge]));
+    const wasOpen = (id) => previous.get(id)?.state === CHALLENGE_STATES.OPEN;
+    const notRightNow = (name) =>
+      toast.show(both(CHALLENGE_COPY.notRightNow(name)), { tone: "info", category: CATEGORIES.REQUEST });
     for (const challenge of challenges) {
-      if (
-        challenge.own &&
-        challenge.state === CHALLENGE_STATES.DECLINED &&
-        previous.get(challenge.id) === CHALLENGE_STATES.OPEN
-      ) {
-        toast.show(both(CHALLENGE_COPY.declinedYours(challenge.toName)), {
+      if (challenge.own && challenge.state === CHALLENGE_STATES.DECLINED && wasOpen(challenge.id)) {
+        notRightNow(challenge.toName);
+      }
+      if (challenge.forYou && challenge.state === CHALLENGE_STATES.FILLED && wasOpen(challenge.id)) {
+        toast.show(both(INVITE_COPY.gameFilledShort(challenge.fromName)), {
           tone: "info",
           category: CATEGORIES.REQUEST,
+          action: {
+            label: "Invite again?",
+            to: paths.challenge(challenge.id),
+            dismissLabel: "Close",
+            onDismiss: () => undefined,
+          },
         });
+      }
+    }
+    // The tab lets an open invite go at its end. Its sender hears "Not right now", as for a decline.
+    const current = new Set(challenges.map((challenge) => challenge.id));
+    for (const [id, gone] of previous) {
+      if (!current.has(id) && gone.own && gone.toOne && wasOpen(id) && now >= gone.expiresAt) {
+        notRightNow(gone.toName);
       }
     }
   }, [challenges, toast]);
@@ -289,6 +310,30 @@ function ChallengePopup({ challenge, reason }) {
 }
 
 /**
+ * Whether popups wait: while a game on the room page is on, and once it ends until the inbox has been read again.
+ * The game may have lasted into the player's quiet hours (CC-052), and only the server's inbox says so: an invite
+ * that came during the game then waits in the inbox, with no popup and no sound.
+ */
+function useHeldUntilRead(playing) {
+  const { reload } = useChallengeInbox();
+  const [wasPlaying, setWasPlaying] = useState(playing);
+  const [reading, setReading] = useState(false);
+  if (wasPlaying !== playing) {
+    setWasPlaying(playing);
+    if (!playing) setReading(true);
+  }
+  useEffect(() => {
+    if (!reading) return undefined;
+    let current = true;
+    reload().finally(() => current && setReading(false));
+    return () => {
+      current = false;
+    };
+  }, [reading, reload]);
+  return playing || reading;
+}
+
+/**
  * Requests that reach a player on any page of the site (CC-207): a rematch or a draw offer from another room ("Bob
  * wants a rematch at Chess"), a challenge sent to them, or one of theirs that someone took (CC-139). Each has Accept
  * and go and Not now, a chime, the tab title calling them back, and an urgent announcement. It sits at the top of the
@@ -299,12 +344,13 @@ function ChallengePopup({ challenge, reason }) {
 export function SiteRequests() {
   const { rooms, pathname, asked } = useElsewhere();
   const calls = useChallengeCalls(pathname);
-  const held = useInGame();
+  const playing = useInGame();
+  const held = useHeldUntilRead(playing);
   const sound = useSound();
   const reconnecting = useReconnecting();
   const heard = useRef(new Set());
   useAnswerToasts({ rooms, pathname });
-  useDeclineToasts();
+  useEndingToasts();
   const hidden = useDocumentHidden();
   useMoveToInbox(calls, held || hidden);
   const waiting = !held && asked.length + calls.length > 0;

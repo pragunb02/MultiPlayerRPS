@@ -51,6 +51,10 @@ describe("challenge accessor", () => {
       acceptedName: "",
       roomCode: "",
       laterBy: [],
+      groupId: "0123456789abcdefghjk",
+      filledBy: "",
+      filledDone: false,
+      keptAt: 0,
     });
     expect(
       Object.isFrozen(stored) && Object.isFrozen(stored.options) && Object.isFrozen(stored.laterBy),
@@ -109,5 +113,45 @@ describe("challenge accessor", () => {
     expect(await challenges.removeInvolving(RIYA)).toBe(1);
     const other = await challenges.add(fresh({ challengeId: "0123456789abcdefghjm" }));
     expect(await challenges.remove(other.challengeId)).toBe(true);
+  });
+  it("stores an invite's group and its inbox from the start, gives and frees the group, and keeps it (CC-052)", async () => {
+    const challenges = accessor();
+    const first = await challenges.add(fresh({ toId: GUEST, toName: "G", laterBy: [GUEST] }));
+    const second = await challenges.add(
+      fresh({ challengeId: "1123456789abcdefghjk", toId: GUEST, toName: "G", groupId: first.challengeId }),
+    );
+
+    expect(first).toMatchObject({ groupId: first.challengeId, laterBy: [GUEST] });
+    expect(second.groupId).toBe(first.challengeId);
+    expect(
+      await challenges.claimGroup({ groupId: first.challengeId, by: second.challengeId, from: "" }),
+    ).toBe(true);
+    expect((await challenges.get(first.challengeId)).filledBy).toBe(second.challengeId);
+    expect(await challenges.releaseGroup({ groupId: first.challengeId, by: second.challengeId })).toBe(true);
+    await challenges.claim({
+      challengeId: second.challengeId,
+      acceptedBy: GUEST,
+      acceptedName: "G",
+      at: T0,
+      staleBefore: T0 - 1,
+    });
+    await challenges.setRoom({ challengeId: second.challengeId, acceptedBy: GUEST, roomCode: "ABC123" });
+    expect(await challenges.keep({ challengeId: second.challengeId, acceptedBy: GUEST, at: T0 + 5 })).toBe(
+      true,
+    );
+    expect((await challenges.get(second.challengeId)).keptAt).toBe(T0 + 5);
+  });
+  it("confirms an invite's group and ends a challenge now, in milliseconds (CC-052)", async () => {
+    const challenges = accessor();
+    const first = await challenges.add(fresh({ toId: GUEST, toName: "G" }));
+    await challenges.claimGroup({ groupId: first.challengeId, by: first.challengeId, from: "" });
+
+    expect(await challenges.confirmGroup({ groupId: first.challengeId, by: first.challengeId })).toBe(true);
+    expect((await challenges.get(first.challengeId)).filledDone).toBe(true);
+    const second = await challenges.add(fresh({ challengeId: "1123456789abcdefghjk" }));
+    expect(
+      await challenges.expireNow({ challengeId: second.challengeId, at: T0 + 10, staleBefore: T0 }),
+    ).toBe(true);
+    expect((await challenges.get(second.challengeId)).expiresAt).toBe(T0 + 10);
   });
 });

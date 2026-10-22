@@ -453,6 +453,35 @@ the owner may change it.
   challenge's state now, and leaves out challenges sent by someone in a block with the player. (6) The creator's
   view of a taken challenge carries `until`, and the web app drops open challenges at `expiresAt` and taken ones
   at `until`.
+- **Amended 2026-10-21 ([CC-052](tickets/CC-052.md) part 2, invites to friends).** (1) **Who may be named**
+  (point 8): `recipients.resolve` is now `domain/friends/friendInvites.js`, "a friend of the sender now, by profile
+  handle", only while the `friend_invites` flag (ADR-073) is on for the sender. A handle that is not a friend, an
+  unknown handle, a block either way, a guest and a sender without the flag all get the same 404, "We couldn't find
+  that player". (2) **Groups and `filled`** (scenario 6): an invite joins the group of its sender's oldest open
+  invite to the same game (`groupId`), unless someone plays that group already. Taking an invite claims its group
+  with one conditional update on the group's first record (`filledBy`), so of two friends accepting at the same
+  moment exactly one gets a room, and the other gets 410 with `state: filled`. A group held by a hold that lost
+  its lease, or by an invite no longer taken, can be claimed from it, and a room that cannot be made frees the
+  group again. Once the room is made, every other open invite of the group ends in the new state **filled**, and
+  its friend sees "Game filled". Links (no `to`) have no group and are unchanged. (3) **Inviting back**:
+  `POST /api/challenges/:id/again` (201 `{ challenge }`) makes a new invite from the friend an invite was sent to,
+  back to its sender, same game and options, after "Game filled", or while the room of an invite they took waits
+  and its sender has not come for 5 minutes (`INVITE_KEEP_AFTER_MS`, scenario 4: "Keep it for later" and "Play
+  Pip meanwhile"). Keeping it sets `keptAt`, so the old room stops waiting in both inboxes. The new invite follows
+  every rule of a new one (friends, both limits, the rate limits of making and of answering). (4) **Views:** a
+  challenge to one person carries `toOne: true`, and the one who took it gets `acceptedAt` and `until` and finds it
+  in their inbox while its room waits. (5) **Quiet hours:** an invite to a player in their quiet hours (CC-152,
+  22:00 to 07:00 India time for anyone not surely an adult) is stored already in their inbox (`laterBy`), and the
+  inbox marks every open invite as moved for a viewer in quiet hours, so no popup or sound reaches them. (6) A
+  decline and an invite that ran out read the same to the sender, "Not right now", and a blocked invite reads as
+  one nobody answered (point 5), so all three look the same. (7) `CHALLENGE_EVENTS.ACCEPTED` is published once
+  per challenge taken, and counts the flag's success for an invite. (8) **Review of #167:** a group whose first record is
+  gone is decided on its oldest invite left; a friend whose room is still being made holds the group, so the others
+  get 409 "try again" and are filled only once that room is made (`filledDone`, confirmed by one conditional write
+  after the room is made, so a room slower than the claim lease never makes two); pushes apply the viewer's quiet
+  hours too, and a tab reads the inbox again when a game that held its popups ends; and when a friendship ends (a
+  removal or a block, `FRIEND_EVENTS.ENDED`), the open invites between the two end at once and read as expired. Data: three optional fields on `challenges`
+  and one new state value, no new index, nothing migrated; older records read as their own group.
 - **Consequences.** One new collection with five indexes, nothing existing changed or migrated. A challenger who
   is offline when someone takes their challenge leaves the taker in a waiting room that closes after 30 minutes;
   CC-052 scenario 4 adds "keep it for later". A blocked person who compares the page with a friend's can guess,
@@ -586,6 +615,15 @@ thinking crashed` with `game` only.
 - **Open (owner).** (1) Whether players not surely adults start with Appear offline on (ICO standard 7). Built: off,
   because a friend is someone both chose. (2) The numbers in point 8, the 30 days and the 7 days. (3) The Hinglish
   lines. (4) Where Friends sits: built in the phone menu and on the profile, because a laptop's header has no room.
+- **Amended 2026-10-21 ([CC-052](tickets/CC-052.md) part 2, invites).** (1) **Invite** beside each friend on
+  `/friends` opens a picker of the games and sends a challenge to that one friend (ADR-069 amended), by their
+  handle (point 7). Only friends can be invited. The friend component answers `inviteeOf`: the friend at a handle,
+  or by player id for an invite back the server makes, with their name, for a player whose age policy lets them
+  have friends (`friendsMode`, so never a guest). (2) The picker tells the sender what happens next from the
+  friend's presence (point 6): on the site they see it now, in a game they see it when it ends, offline it waits
+  in their inbox for 24 hours, with Send on WhatsApp. (3) No push and no email yet (CC-148, CC-293). (4) Behind the
+  `friend_invites` flag: signed-in, off by default, removed by 2027-01-19, success "a friend accepted an invite"
+  counted on the sender's side. (5) Turn-based play, so friends need not be online together, is CC-222.
 - **Consequences.** Four new collections with their indexes, built at boot (DEPLOYMENT.md). Presence lives in the
   process like socket admission: a restart shows friends offline until their tabs reconnect, and a second server
   (CC-061) needs shared presence. Part 2 adds invites by handle and reads the same presence.

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
+import { flagPaths } from "./testing/flagPaths.js";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
@@ -30,8 +31,16 @@ async function withDatabase(uri, work) {
   }
 }
 
-async function start() {
+async function start({ invites = false } = {}) {
   const config = testConfig({ MONGO_URI: mongo.uri(`friends-${++dbCounter}`) });
+  // The owner's rollout, as the console stores it: read at boot (CC-312).
+  if (invites) {
+    await withDatabase(config.mongoUri, (db) =>
+      db
+        .collection("feature_flags")
+        .insertOne({ name: "friend_invites", rollout: "on", updatedAt: new Date() }),
+    );
+  }
   const capture = captureLogger();
   onTestFailed(() => capture.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)));
   const app = await startServer({ config, logger: capture.logger });
@@ -154,5 +163,52 @@ describe("friends through the real composition root (integration, CC-052)", () =
       sockets.forEach((socket) => socket.disconnect());
       await app.close();
     }
+  });
+  flagPaths("friend_invites", (on) => {
+    it("wires invites to friends in the composition root: a friend by handle, the group stored (CC-052 part 2)", async () => {
+      const app = await start({ invites: on });
+      const sockets = [];
+      try {
+        const riya = await account(app.url, "riya");
+        const arjun = await account(app.url, "arjun");
+        sockets.push(riya.socket, arjun.socket);
+        const { data: created } = await send(riya.socket, SOCKET_EVENTS.ROOM_CREATE, {
+          gameId: "rps",
+          options: { bestOf: 1 },
+        });
+        const { data: joined } = await send(arjun.socket, SOCKET_EVENTS.ROOM_JOIN, { code: created.code });
+        const seatOf = (seatId) => ({
+          roomCode: joined.code,
+          seat: joined.seats.findIndex((seat) => seat.playerId === seatId),
+          seatId,
+        });
+        await call(app.url, "POST", "/friends/requests", { body: seatOf(joined.you), cookie: riya.cookie });
+        await call(app.url, "POST", "/friends/requests", {
+          body: seatOf(joined.hostId),
+          cookie: arjun.cookie,
+        });
+        const [friend] = (await call(app.url, "GET", "/friends", { cookie: riya.cookie })).body.friends;
+        const pushed = new Promise((resolve) => arjun.socket.once(SOCKET_EVENTS.CHALLENGE_UPDATED, resolve));
+
+        const made = await call(app.url, "POST", "/challenges", {
+          body: { gameId: "rps", to: { handle: friend.handle } },
+          cookie: riya.cookie,
+        });
+
+        if (!on) {
+          expect(made.status).toBe(404);
+          return;
+        }
+        expect(made.status).toBe(201);
+        expect((await pushed).challenge).toMatchObject({ forYou: true, toOne: true, fromName: "riya" });
+        const [stored] = await withDatabase(app.config.mongoUri, (db) =>
+          db.collection("challenges").find().toArray(),
+        );
+        expect(stored).toMatchObject({ toName: "arjun", groupId: made.body.challenge.id });
+      } finally {
+        sockets.forEach((socket) => socket.disconnect());
+        await app.close();
+      }
+    });
   });
 });

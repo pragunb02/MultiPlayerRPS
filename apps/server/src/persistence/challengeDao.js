@@ -23,6 +23,11 @@ const DUPLICATE_KEY_CODE = 11000;
  * @property {string} roomCode      the room made for both, "" until it is made
  * @property {string[]} laterBy     the players who moved it from a popup to their inbox
  * @property {Date} deleteAt        when MongoDB deletes the record by itself
+ * @property {string} [groupId]     an invite to a friend (CC-052): the first of its sender's open invites to the same
+ *   game when it was made, whose record decides who plays. Missing on a link, or on a record made before CC-052
+ * @property {string} [filledBy]    on the first of a group: the invite whose friend plays, missing or "" while nobody
+ * @property {boolean} [filledDone] on the first of a group: that invite's room is made, so nobody can take it over
+ * @property {Date} [keptAt]        when the friend who took it kept it for later, so its room stops waiting
  */
 
 const challengeSchema = new mongoose.Schema(
@@ -44,6 +49,10 @@ const challengeSchema = new mongoose.Schema(
     roomCode: { type: String, default: "" },
     laterBy: { type: [String], default: [] },
     deleteAt: { type: Date, required: true },
+    groupId: { type: String },
+    filledBy: { type: String },
+    filledDone: { type: Boolean },
+    keptAt: { type: Date },
   },
   { collection: "challenges", versionKey: false, minimize: false },
 );
@@ -58,7 +67,7 @@ challengeSchema.index({ acceptedBy: 1 });
 challengeSchema.index({ deleteAt: 1 }, { expireAfterSeconds: 0 });
 
 const FIELDS =
-  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt";
+  "-_id challengeId fromId fromName fromPublic toId toName gameId options state createdAt expiresAt endedAt acceptedBy acceptedName roomCode laterBy deleteAt groupId filledBy filledDone keptAt";
 const PLAYER_FIELDS = Object.freeze(["fromId", "toId", "acceptedBy"]);
 const isDuplicate = (err) => err.code === DUPLICATE_KEY_CODE;
 
@@ -167,6 +176,77 @@ export function createChallengeDao({ connection }) {
       changed(stillOpen(challengeId, at, staleBefore), {
         $set: { state, endedAt: at, acceptedBy: "", acceptedName: "" },
       }),
+
+    /**
+     * Gives a group of invites to the invite `by`, only while the group's first record names `from` as its player:
+     * nobody ("" or never written), or a holder that lost its claim and whose room was never made. So of two friends
+     * accepting at once, one wins.
+     *
+     * @param {{ groupId: string, by: string, from: string }} group
+     * @returns {Promise<boolean>} whether this call gave it
+     */
+    claimGroup: ({ groupId, by, from }) =>
+      changed(
+        {
+          challengeId: groupId,
+          filledBy: from === "" ? { $in: ["", null] } : from,
+          filledDone: { $ne: true },
+        },
+        { $set: { filledBy: by } },
+      ),
+
+    /**
+     * Notes that the room of the invite `by` is made, only while the group still names it. From then on nobody can
+     * take the group over.
+     *
+     * @param {{ groupId: string, by: string }} group
+     * @returns {Promise<boolean>} whether the group was still this invite's
+     */
+    confirmGroup: ({ groupId, by }) =>
+      changed(
+        { challengeId: groupId, filledBy: by, filledDone: { $ne: true } },
+        { $set: { filledDone: true } },
+      ),
+
+    /**
+     * Frees a group again, when the room of the invite `by` could not be made.
+     *
+     * @param {{ groupId: string, by: string }} group
+     * @returns {Promise<boolean>}
+     */
+    releaseGroup: ({ groupId, by }) =>
+      changed({ challengeId: groupId, filledBy: by, filledDone: { $ne: true } }, { $set: { filledBy: "" } }),
+
+    /**
+     * Ends an open challenge now, as if its day were over: the friendship it was made for ended (CC-052). It then
+     * reads as expired to everyone, exactly as one nobody answered.
+     *
+     * @param {{ challengeId: string, at: Date, staleBefore: Date }} expiry
+     * @returns {Promise<boolean>} whether this call ended it
+     */
+    expireNow: ({ challengeId, at, staleBefore }) =>
+      changed(stillOpen(challengeId, at, staleBefore), {
+        $set: { state: CHALLENGE_STATES.OPEN, expiresAt: at, acceptedBy: "", acceptedName: "" },
+        $unset: { endedAt: 1 },
+      }),
+
+    /**
+     * Notes that the friend who took an invite kept it for later, once, while its room is recorded.
+     *
+     * @param {{ challengeId: string, acceptedBy: string, at: Date }} keep
+     * @returns {Promise<boolean>} whether this call noted it
+     */
+    keep: ({ challengeId, acceptedBy, at }) =>
+      changed(
+        {
+          challengeId,
+          state: CHALLENGE_STATES.ACCEPTED,
+          acceptedBy,
+          roomCode: { $ne: "" },
+          keptAt: { $exists: false },
+        },
+        { $set: { keptAt: at } },
+      ),
 
     /**
      * Deletes one challenge, such as a new one that broke a limit.

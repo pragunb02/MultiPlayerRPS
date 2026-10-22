@@ -306,6 +306,27 @@ describe("api client", () => {
     ]);
   });
 
+  it("invites a friend by handle and invites a sender back (CC-052)", async () => {
+    const challenge = { id: "a/b", state: "open" };
+    const made = respond(201, { challenge });
+    const back = respond(201, { challenge });
+
+    await createApiClient({ fetchImpl: made }).createChallenge({
+      gameId: "chess",
+      options: {},
+      to: { handle: "0123456789abcdef" },
+    });
+    expect(await createApiClient({ fetchImpl: back }).inviteAgain("a/b")).toEqual(challenge);
+
+    expect(made.mock.calls[0][1].body).toBe(
+      JSON.stringify({ gameId: "chess", options: {}, to: { handle: "0123456789abcdef" } }),
+    );
+    expect(back.mock.calls[0]).toEqual([
+      "/api/challenges/a%2Fb/again",
+      expect.objectContaining({ method: "POST" }),
+    ]);
+  });
+
   it("lists, adds and removes blocks, never with a player id (CC-044)", async () => {
     const listed = respond(200, { blocks: [{ blockId: "b1", displayName: "Bob", blockedAt: 1 }] });
     const added = respond(200, { block: { blockId: "b2", displayName: "Bob", blockedAt: 2 } });

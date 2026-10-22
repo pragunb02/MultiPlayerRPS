@@ -197,6 +197,17 @@ export function challengeText({ gameId }) {
 }
 
 /**
+ * The text of an invite to a friend sent on WhatsApp (CC-052): the Hinglish line, then the English one. Like every
+ * shared text it never names the sender, so a forwarded message says nothing about them (ADR-028.7).
+ *
+ * @param {{ gameId: string }} invite
+ */
+export function friendInviteText({ gameId }) {
+  const game = getGame(gameId)?.name ?? "a game";
+  return `Chalo ${game} khelte hain! Maine tumhe ${SITE_NAME} pe invite kiya hai, 24 ghante tak:\nLet's play ${game}! I invited you on ${SITE_NAME}. The invite works for 24 hours`;
+}
+
+/**
  * The text with the free lines under it, for a share sheet that takes the link apart.
  *
  * @param {string} text

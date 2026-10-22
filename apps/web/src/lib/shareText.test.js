@@ -3,6 +3,7 @@ import { GAMES } from "@classicade/shared";
 import {
   friendLinkText,
   challengeText,
+  friendInviteText,
   inviteText,
   RESULT_OUTCOMES,
   resultText,
@@ -122,6 +123,19 @@ describe("challengeText (CC-139)", () => {
     );
     expect(challengeText({ gameId: "ludo" })).toContain("I challenge you to a game");
     expect(challengeText({ gameId: "chess" })).not.toMatch(/\baap(ka|ke|ki)?\b/);
+  });
+});
+
+describe("friendInviteText (CC-052)", () => {
+  it("asks the friend to play in Hinglish with tum, then in English, and never names the sender", () => {
+    const [hinglish, english] = friendInviteText({ gameId: "chess" }).split("\n");
+
+    expect(hinglish).toBe(
+      "Chalo Chess khelte hain! Maine tumhe ClassiCade pe invite kiya hai, 24 ghante tak:",
+    );
+    expect(english).toBe("Let's play Chess! I invited you on ClassiCade. The invite works for 24 hours");
+    expect(friendInviteText({ gameId: "ludo" })).toContain("Let's play a game!");
+    expect(hinglish).not.toMatch(/\baap(ka|ke|ki)?\b/i);
   });
 });
 

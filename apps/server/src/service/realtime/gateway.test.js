@@ -2,6 +2,7 @@ import http from "node:http";
 import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { ERROR_CODES, SOCKET_EVENTS } from "@classicade/shared";
+import { CHALLENGE_EVENTS } from "../../domain/challenges/challengeComponent.js";
 import { ROOM_EVENTS } from "../../domain/rooms/roomComponent.js";
 import { createInMemoryAccountDao } from "../../testing/inMemoryAccountDao.js";
 import { startTestServer } from "../../testing/testApp.js";
@@ -56,6 +57,45 @@ describe("realtime gateway", () => {
       [SOCKET_EVENTS.ROOM_JOIN, "refused"],
     ]);
     expect(Object.keys(recorded[0]).sort()).toEqual(["durationMs", "event", "outcome"]);
+  });
+
+  it("logs a challenge push it could not make, and still sends the player's next one (CC-052)", async () => {
+    server = await startTestServer();
+    const { cookie, identity } = await createGuest();
+    const socket = openSocket({ cookie, origin: ALLOWED_ORIGIN });
+    await connected(socket);
+    const pushed = new Promise((resolve) => socket.once(SOCKET_EVENTS.CHALLENGE_UPDATED, resolve));
+    const challenge = {
+      challengeId: "c0000000000000000001",
+      fromId: identity.id,
+      fromName: identity.displayName,
+      fromPublic: false,
+      toId: "",
+      toName: "",
+      gameId: "race",
+      options: {},
+      state: "open",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+      endedAt: 0,
+      acceptedBy: "",
+      acceptedName: "",
+      roomCode: "",
+      laterBy: [],
+      groupId: "c0000000000000000001",
+      filledBy: "",
+      filledDone: false,
+      keptAt: 0,
+    };
+
+    server.domainEvents.emit(CHALLENGE_EVENTS.CHANGED, {
+      challenge: { ...challenge, laterBy: undefined },
+      playerIds: [identity.id],
+    });
+    server.domainEvents.emit(CHALLENGE_EVENTS.CHANGED, { challenge, playerIds: [identity.id] });
+
+    expect((await pushed).challenge).toMatchObject({ id: "c0000000000000000001", own: true });
+    expect(server.find("pushing a challenge failed")).toHaveLength(1);
   });
 
   it("refuses connections without a session", async () => {

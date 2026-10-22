@@ -8,6 +8,7 @@ import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
 import { Button } from "../../components/Button/Button.jsx";
 import { CHALLENGE_COPY } from "../../components/Challenges/challengeCopy.js";
+import { INVITE_COPY } from "../../components/Friends/inviteCopy.js";
 import { useChallengeInbox } from "../../components/Challenges/challengesContext.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { Bilingual } from "../../components/Profile/Bilingual.jsx";
@@ -15,8 +16,9 @@ import { useToast } from "../../components/Toast/toastContext.js";
 import { WhatsAppLink } from "../../components/WhatsAppLink/WhatsAppLink.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { useChallenge } from "../../hooks/useChallenge.js";
+import { useFlag } from "../../hooks/useFlag.js";
 import { useSession } from "../../hooks/useSession.js";
-import { challengeText, shareMessage } from "../../lib/shareText.js";
+import { challengeText, friendInviteText, shareMessage } from "../../lib/shareText.js";
 import styles from "./ChallengePage.module.css";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -32,14 +34,14 @@ const hoursLeft = (expiresAt) => {
  * A challenge that is over, or a link that leads nowhere: honest about why, with the quickest ways to play anyway.
  * A block is never told apart: the server shows it as expired (ADR-053).
  */
-function Ended({ title, copy, gameId }) {
+function Ended({ title, copy, gameId, children = null }) {
   return (
     <section className={styles.page}>
       <PageTitle>{title}</PageTitle>
       <div className={styles.card}>
         <h1 className={styles.heading}>{title}</h1>
         <Bilingual copy={copy} />
-        <Bilingual copy={CHALLENGE_COPY.makeYourOwn} />
+        {children ?? <Bilingual copy={CHALLENGE_COPY.makeYourOwn} />}
         <div className={styles.actions}>
           <Link
             className={styles.primaryLink}
@@ -78,17 +80,22 @@ function Yours({ challenge, onChange }) {
   const withdraw = useAction(async () => onChange(await api.withdrawChallenge(challenge.id)), {
     id: "challenge.withdraw",
   });
+  // An invite to one friend says who it waits for (CC-052). A link says whoever opens it first plays.
+  const invite = challenge.toOne === true;
+  const title = invite ? `Your ${game} invite` : `Your ${game} challenge`;
   return (
     <section className={styles.page}>
-      <PageTitle>{`Your ${game} challenge`}</PageTitle>
+      <PageTitle>{title}</PageTitle>
       <div className={styles.card}>
         <InviteArt className={styles.art} />
         <h1 className={styles.heading}>
           <GameIcon gameId={challenge.gameId} className={styles.icon} />
-          Your {game} challenge
+          {title}
         </h1>
-        <Bilingual copy={CHALLENGE_COPY.yoursIsOpen(game)} />
-        <Bilingual copy={CHALLENGE_COPY.lasts} />
+        <Bilingual
+          copy={invite ? INVITE_COPY.yours(challenge.toName, game) : CHALLENGE_COPY.yoursIsOpen(game)}
+        />
+        <Bilingual copy={invite ? INVITE_COPY.lasts : CHALLENGE_COPY.lasts} />
         <p className={styles.time}>{hoursLeft(challenge.expiresAt)}</p>
         <label className={styles.label}>
           <span>Challenge link</span>
@@ -97,7 +104,7 @@ function Yours({ challenge, onChange }) {
         <div className={styles.actions}>
           <WhatsAppLink
             message={shareMessage({
-              text: challengeText({ gameId: challenge.gameId }),
+              text: (invite ? friendInviteText : challengeText)({ gameId: challenge.gameId }),
               url: withShareChannel(page, SHARE_CHANNELS.WHATSAPP),
             })}
             control="challenge.whatsapp"
@@ -140,8 +147,27 @@ function Theirs({ challenge }) {
   );
 
   useEffect(() => {
-    heading.current.focus();
+    heading.current?.focus();
   }, []);
+
+  // An invite to one friend, opened by anyone else: a forwarded link. Its friend logs in to take it (CC-052).
+  if (challenge.toOne === true && !challenge.forYou) {
+    return (
+      <Ended
+        title="This invite is for someone else"
+        copy={INVITE_COPY.forSomeoneElse}
+        gameId={challenge.gameId}
+      >
+        {visitor && (
+          <p className={styles.actions}>
+            <Link to={paths.login(location.pathname)} data-cc-control="challenge.login">
+              Log in
+            </Link>
+          </p>
+        )}
+      </Ended>
+    );
+  }
 
   return (
     <section className={styles.page}>
@@ -215,6 +241,47 @@ function Taken({ challenge }) {
   );
 }
 
+/** An invite of the player's that their friend declined or never answered: the same words for both (CC-052). */
+function NotRightNow({ challenge }) {
+  return (
+    <Ended
+      title="Not right now"
+      copy={CHALLENGE_COPY.notRightNow(challenge.toName)}
+      gameId={challenge.gameId}
+    />
+  );
+}
+
+/**
+ * An invite to the player that another friend took first (CC-052 scenario 6): Game filled, and Invite again, which
+ * invites its sender back to the same game.
+ */
+function GameFilled({ challenge }) {
+  const { api } = useServices();
+  const navigate = useNavigate();
+  const { remember } = useChallengeInbox();
+  const invites = useFlag("friend_invites");
+  const again = useAction(
+    async () => {
+      const back = await api.inviteAgain(challenge.id);
+      remember(back);
+      navigate(paths.challenge(back.id));
+    },
+    { id: "challenge.invite_again" },
+  );
+  return (
+    <Ended title="Game filled" copy={INVITE_COPY.gameFilled(challenge.fromName)} gameId={challenge.gameId}>
+      {invites && (
+        <div className={styles.actions}>
+          <Button control="challenge.invite_again" action={again}>
+            {`Invite ${challenge.fromName} again`}
+          </Button>
+        </div>
+      )}
+    </Ended>
+  );
+}
+
 /**
  * A challenge's own page at `/challenge/:id` (CC-139, ADR-069), the link sent on WhatsApp. Its creator sees the link
  * to send and Take back. Anyone else sees who challenged them and Accept and play, which makes a room for both and
@@ -258,16 +325,22 @@ export function ChallengePage() {
     case CHALLENGE_STATES.ACCEPTED:
       return <Taken challenge={challenge} />;
     case CHALLENGE_STATES.EXPIRED:
-      return <Ended title="Challenge expired" copy={CHALLENGE_COPY.expired} gameId={challenge.gameId} />;
+      // The sender of an invite reads the same for no answer as for a decline, and so for a block (CC-052).
+      return challenge.own && challenge.toOne === true ? (
+        <NotRightNow challenge={challenge} />
+      ) : (
+        <Ended title="Challenge expired" copy={CHALLENGE_COPY.expired} gameId={challenge.gameId} />
+      );
+    case CHALLENGE_STATES.FILLED:
+      return <GameFilled challenge={challenge} />;
     case CHALLENGE_STATES.WITHDRAWN:
       return <Ended title="Challenge taken back" copy={CHALLENGE_COPY.withdrawn} gameId={challenge.gameId} />;
     default:
-      return (
-        <Ended
-          title="Challenge over"
-          copy={challenge.own ? CHALLENGE_COPY.declinedYours(challenge.toName) : CHALLENGE_COPY.over}
-          gameId={challenge.gameId}
-        />
+      // Declined. Its sender reads the same as for an invite nobody answered (CC-052).
+      return challenge.own ? (
+        <NotRightNow challenge={challenge} />
+      ) : (
+        <Ended title="Challenge over" copy={CHALLENGE_COPY.over} gameId={challenge.gameId} />
       );
   }
 }

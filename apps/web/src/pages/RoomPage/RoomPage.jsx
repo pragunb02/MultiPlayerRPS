@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from "react-route
 import { ERROR_CODES, getGame, ROOM_CLOSE_REASONS, ROOM_STATUS } from "@classicade/shared";
 import { gameForSlug, normaliseRoomCode, paths } from "../../app/paths.js";
 import { InviteArt } from "../../art/illustrations/InviteArt.jsx";
+import { InviteWaiting } from "../../components/Challenges/InviteWaiting.jsx";
 import { MatchShell } from "../../components/MatchShell/MatchShell.jsx";
 import { PageTitle } from "../../components/PageTitle.jsx";
 import { ShareRoom } from "../../components/ShareRoom/ShareRoom.jsx";
@@ -187,7 +188,12 @@ export function RoomPage() {
       room={view}
       game={gameView(view.gameId)}
       reconnecting={reconnecting}
-      waiting={waiting}
+      // A room made from an invite this player took says its sender was told (CC-052 scenario 4).
+      waiting={
+        <InviteWaiting room={view} onLeave={room.leave}>
+          {waiting}
+        </InviteWaiting>
+      }
       onMove={room.move}
       onAsk={room.ask}
       onAnswer={room.answer}

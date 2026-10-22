@@ -27,12 +27,17 @@ export const CHALLENGE_COPY = Object.freeze({
         ? `${who} ne tumhara ${game} challenge le liya. Chalo, khelo!`
         : `${who} took your ${game} challenge. They are waiting for you.`,
     ),
-  /** @param {string} name */
-  declinedYours: (name) =>
+  /**
+   * A challenge to one person that they declined, or that nobody answered before it ran out. A block reads as no
+   * answer, so all three say the same (CC-052 scenario 7, ADR-053).
+   *
+   * @param {string} name
+   */
+  notRightNow: (name) =>
     line(name, (who, language) =>
       language === "hi"
-        ? `${who} abhi nahi khel sakte. Baad mein phir try karo.`
-        : `${who} can't play right now.`,
+        ? `Abhi nahi: ${who} abhi nahi khel sakte. Baad mein phir try karo.`
+        : `Not right now: ${who} can't play at the moment. Try again later.`,
     ),
   /** @param {string} game */
   yoursIsOpen: (game) =>

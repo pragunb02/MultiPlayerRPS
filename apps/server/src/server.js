@@ -41,6 +41,7 @@ import { createBotDriver, HUMAN_PAUSE_MS, pauseBetween } from "./domain/bots/bot
 import { createBlockComponent } from "./domain/blocks/blockComponent.js";
 import { createChallengeComponent } from "./domain/challenges/challengeComponent.js";
 import { createFriendComponent } from "./domain/friends/friendComponent.js";
+import { createFriendInvites } from "./domain/friends/friendInvites.js";
 import { createPresenceTracker } from "./domain/friends/presenceTracker.js";
 import { createCoPlayers } from "./domain/players/coPlayers.js";
 import { createProfileCards } from "./domain/profiles/profileCards.js";
@@ -983,15 +984,6 @@ export async function startServer({
     avatars: profileCards,
   });
   roomsToRename.renamePlayer = roomComponent.renamePlayer;
-  // Challenges to one person name nobody until CC-052 passes in friends by profile handle (ADR-069).
-  const challengeComponent = createChallengeComponent({
-    challengeAccessor,
-    rooms: roomComponent,
-    blocks: blockComponent,
-    safety: safetyComponent,
-    events: domainEvents,
-  });
-  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   const friends = wireFriends({
     friendAccessor,
     privacyAccessor,
@@ -1006,6 +998,22 @@ export async function startServer({
     safety: safetyComponent,
     domainEvents,
   });
+  // A challenge to one person names a friend, by profile handle, while the friend_invites flag is on (CC-052).
+  const challengeComponent = createChallengeComponent({
+    challengeAccessor,
+    rooms: roomComponent,
+    blocks: blockComponent,
+    safety: safetyComponent,
+    events: domainEvents,
+    recipients: createFriendInvites({
+      friends: friends.friendComponent,
+      flags: flagComponent,
+      events: domainEvents,
+      logger,
+      challenges: () => challengeComponent,
+    }),
+  });
+  const botComponent = createBotComponent({ roomComponent, roomAccessor, events: domainEvents });
   // Heavy computer thinking runs on worker threads, off the event loop (ADR-067).
   const thinkingWorkers = (bots.thinkingWorkers ?? createBotThinkingClient)({
     size: config.bots.workers,

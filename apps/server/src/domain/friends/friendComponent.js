@@ -22,6 +22,8 @@ export const FRIEND_EVENTS = Object.freeze({
   CHANGED: "friends.changed",
   /** `{ recipientId, request }`: someone was sent a request they can see. `request` is shaped as in their view */
   REQUESTED: "friends.requested",
+  /** `{ a, b, now }`: two players stopped being friends, by a removal or a block. Nobody is told (CC-052) */
+  ENDED: "friends.ended",
 });
 
 /** Requests their sender sees as waiting. A declined one looks the same to them as one nobody answered yet. */
@@ -363,6 +365,19 @@ export function createFriendComponent({
     return profile.playerId;
   }
 
+  /** The friend with a player id, or not found for anyone who is not the player's friend now. */
+  async function friendById({ playerId, friendId }) {
+    const blocked = await blocks.blockedWith({ playerId });
+    if (
+      typeof friendId !== "string" ||
+      blocked.has(friendId) ||
+      !(await friendAccessor.areFriends({ a: playerId, b: friendId }))
+    ) {
+      throw noSuchFriend();
+    }
+    return friendId;
+  }
+
   return Object.freeze({
     /**
      * The player's friends view: friends with their presence, the requests waiting for them, the requests they sent
@@ -463,6 +478,7 @@ export function createFriendComponent({
       await requireFriends(playerId, now);
       const friendId = await friendByHandle({ playerId, handle });
       await friendAccessor.unfriend({ a: playerId, b: friendId });
+      events.emit(FRIEND_EVENTS.ENDED, { a: playerId, b: friendId, now });
       changed(playerId, friendId);
     },
 
@@ -474,6 +490,27 @@ export function createFriendComponent({
      * @throws {NotFoundError} when the handle is not one of the player's friends
      */
     friendByHandle,
+
+    /**
+     * The friend a player may invite to a game (CC-052 part 2): named by their profile handle from the client, or
+     * by player id for an invite back that the server makes. Only someone who is the player's friend now, with an
+     * account and a name, and only for a player whose age policy lets them have friends (friendsMode).
+     *
+     * @param {{ playerId: string, target: Readonly<{ handle: string } | { playerId: string }>, now: number }} query
+     * @returns {Promise<Readonly<{ id: string, displayName: string }>>}
+     * @throws {ForbiddenError} for a guest
+     * @throws {NotFoundError} for anyone who is not their friend now, one message for all
+     */
+    async inviteeOf({ playerId, target, now }) {
+      await requireFriends(playerId, now);
+      const friendId =
+        typeof target.handle === "string"
+          ? await friendByHandle({ playerId, handle: target.handle })
+          : await friendById({ playerId, friendId: target.playerId });
+      const names = await accounts.usernamesOf({ playerIds: [friendId] });
+      if (!names.has(friendId)) throw noSuchFriend();
+      return Object.freeze({ id: friendId, displayName: names.get(friendId) });
+    },
 
     /**
      * Sets the player's Appear offline switch. Their friends see the change at once.
@@ -593,6 +630,7 @@ export function createFriendComponent({
      */
     async playersBlocked({ blockerId, blockedId, now }) {
       const ended = await friendAccessor.unfriend({ a: blockerId, b: blockedId });
+      if (ended) events.emit(FRIEND_EVENTS.ENDED, { a: blockerId, b: blockedId, now });
       const declined = await friendAccessor.declineRequestsBetween({ a: blockerId, b: blockedId, at: now });
       if (ended || declined > 0) changed(blockerId, blockedId);
     },
