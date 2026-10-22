@@ -277,6 +277,31 @@ export async function createRoom(player, gameSlug) {
  */
 export const formFactor = (testInfo) => (testInfo.project.use.isMobile ? "mobile" : "desktop");
 
+/**
+ * The key that moves to the next control. Safari's Tab reaches only form fields unless the player turns on "Press
+ * Tab to highlight each item". Option and Tab reaches links too, and that is the key a Safari keyboard user
+ * presses (CC-184).
+ *
+ * @param {import("@playwright/test").TestInfo} testInfo
+ */
+export const nextItemKey = (testInfo) =>
+  testInfo.project.use.defaultBrowserType === "webkit" ? "Alt+Tab" : "Tab";
+
+/**
+ * Presses the next-control key until `target` has the focus, at most `presses` times, as a keyboard player would.
+ *
+ * @param {import("@playwright/test").Page} page
+ * @param {import("@playwright/test").Locator} target
+ * @param {import("@playwright/test").TestInfo} testInfo
+ */
+export async function tabUntil(page, target, testInfo, presses = 20) {
+  for (let press = 0; press < presses; press++) {
+    if (await target.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press(nextItemKey(testInfo));
+  }
+  await expect(target).toBeFocused();
+}
+
 /** The widest screen, in CSS pixels, that gets the phone header: 40rem in Layout.module.css. */
 export const PHONE_HEADER_MAX_WIDTH = 640;
 
