@@ -21,6 +21,7 @@ export function FriendRequestToasts() {
     () =>
       socket.on(SOCKET_EVENTS.FRIEND_REQUESTED, ({ displayName }) => {
         toast.show(`${displayName} wants to be your friend`, {
+          surface: "toast.friend_request",
           tone: "info",
           category: CATEGORIES.SOCIAL,
           action: {

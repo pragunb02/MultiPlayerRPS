@@ -1,0 +1,72 @@
+/* The page's rhythm (CC-323): one page title, then titled sections with the same gap and divider on every page. */
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-6);
+}
+.pageText {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 18rem;
+}
+.pageTitle {
+  margin: 0;
+  overflow-wrap: break-word;
+}
+.lede {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--type-body);
+  line-height: var(--leading-body);
+  color: var(--color-text-muted);
+}
+.pageAside {
+  flex: none;
+}
+.sections {
+  display: grid;
+  gap: var(--space-8);
+}
+/* A thin divider above every section but the first. */
+.sections > .section + .section {
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--color-border);
+}
+.section {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.sectionText {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.sectionTitle {
+  margin: 0;
+  font-size: var(--type-section-title);
+}
+.sectionDescription {
+  margin: 0;
+  font-size: var(--type-label);
+  color: var(--color-text-muted);
+}
+.sectionActions {
+  flex: none;
+}
+.sectionBody {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}

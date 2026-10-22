@@ -1,5 +1,4 @@
 import { useCallback, useId, useState } from "react";
-import { Link } from "react-router";
 import { PRESENCE, ROOM_REQUEST_TYPES } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
@@ -12,6 +11,7 @@ import { DismissButton } from "../DismissButton/DismissButton.jsx";
 import { useHold, useToast } from "../Toast/toastContext.js";
 import { useRequestAnswers } from "./useRequestAnswers.js";
 import styles from "./RequestBanner.module.css";
+import { useInterruption } from "../../hooks/useInterruption.js";
 
 const noop = () => undefined;
 
@@ -46,7 +46,7 @@ function NoAnswerChoices({ room, onNewOpponent, reason }) {
       } catch (cause) {
         throw new Error("Couldn't copy. Copy the address from the address bar", { cause });
       }
-      toast.show("Link copied. Send it to bring them back", { tone: "success" });
+      toast.show("Link copied. Send it to bring them back", { surface: "toast.copied", tone: "success" });
     },
     { id: "request.copy_invite" },
   );
@@ -58,9 +58,9 @@ function NoAnswerChoices({ room, onNewOpponent, reason }) {
       <Button control="request.new_opponent" variant="secondary" action={onNewOpponent} reason={reason}>
         New opponent
       </Button>
-      <Link to={paths.game(room.gameId)} className={styles.link} data-cc-control="request.play_computer">
+      <Button as="link" to={paths.game(room.gameId)} control="request.play_computer" variant="ghost">
         Play vs computer
-      </Link>
+      </Button>
     </div>
   );
 }
@@ -73,8 +73,26 @@ function NoAnswerChoices({ room, onNewOpponent, reason }) {
 function Incoming({ request, room, onAction, onHide, reason }) {
   const titleId = useId();
   const questionId = useId();
-  const accept = useAction(() => onAction(request.accept), { id: "room.request.accept" });
-  const decline = useAction(() => onAction(request.decline), { id: "room.request.decline" });
+  // This room's request is essential: either answer acts on it, Hide or Escape puts it away (CC-313).
+  const interruption = useInterruption("banner.request");
+  const accept = useAction(
+    () => {
+      interruption.acted();
+      return onAction(request.accept);
+    },
+    { id: "room.request.accept" },
+  );
+  const decline = useAction(
+    () => {
+      interruption.acted();
+      return onAction(request.decline);
+    },
+    { id: "room.request.decline" },
+  );
+  const hide = () => {
+    interruption.dismissed();
+    onHide(request.key);
+  };
   // While one answer is on its way the other cannot be sent as well.
   const answering = accept.busy || decline.busy ? "Sending your answer" : "";
 
@@ -83,7 +101,8 @@ function Incoming({ request, room, onAction, onHide, reason }) {
       className={`${styles.request} ${styles.incoming}`}
       aria-labelledby={titleId}
       aria-describedby={questionId}
-      onKeyDown={(event) => event.key === "Escape" && onHide(request.key)}
+      onKeyDown={(event) => event.key === "Escape" && hide()}
+      data-cc-surface="banner.request"
     >
       <h2 id={titleId} className={styles.title}>
         {request.texts.title}
@@ -108,7 +127,7 @@ function Incoming({ request, room, onAction, onHide, reason }) {
         >
           Decline
         </Button>
-        <Button control="room.request.hide" variant="ghost" onClick={() => onHide(request.key)}>
+        <Button control="room.request.hide" variant="ghost" onClick={hide}>
           Hide
         </Button>
       </div>

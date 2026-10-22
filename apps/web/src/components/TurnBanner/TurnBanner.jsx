@@ -1,4 +1,5 @@
 import styles from "./TurnBanner.module.css";
+import { useInterruption } from "../../hooks/useInterruption.js";
 
 /** The player colour of each kind of turn (CC-314). A spectator's banner keeps the quiet look. */
 const TURN_CLASS = Object.freeze({ you: styles.you, opponent: styles.opponent, watching: "" });
@@ -18,7 +19,10 @@ const sharedScreenText = (room) =>
  * @param {{ room: { you: string, status: string, seats: Array<{ playerId: string, displayName: string }>, game?: { activePlayers: string[] } } }} props
  */
 export function TurnBanner({ room }) {
-  if (room.status !== "playing" || room.game === undefined) {
+  const playing = room.status === "playing" && room.game !== undefined;
+  // One showing for the whole game, counted as essential (CC-313).
+  useInterruption("banner.turn", { open: playing });
+  if (!playing) {
     return null;
   }
   const active = room.game.activePlayers;
@@ -33,7 +37,12 @@ export function TurnBanner({ room }) {
       : `Waiting for ${waitingFor.map((seat) => seat.displayName).join(" and ") || "the other player"}`;
   const turn = yourTurn ? "you" : room.you === "" ? "watching" : "opponent";
   return (
-    <p className={`${styles.banner} ${TURN_CLASS[turn]}`} data-turn={turn} aria-live="polite">
+    <p
+      className={`${styles.banner} ${TURN_CLASS[turn]}`}
+      data-turn={turn}
+      aria-live="polite"
+      data-cc-surface="banner.turn"
+    >
       {text}
     </p>
   );

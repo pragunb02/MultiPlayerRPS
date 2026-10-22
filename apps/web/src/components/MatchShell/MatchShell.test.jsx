@@ -410,7 +410,7 @@ describe("MatchShell at the end", () => {
     const { update } = mount(roomView());
     update(finished());
 
-    act(() => toastsOf().show("+30 XP", { category: "reward" }));
+    act(() => toastsOf().show("+30 XP", { surface: "toast.xp", category: "reward" }));
     expect(toastRegion()).toHaveTextContent("");
 
     act(() => vi.advanceTimersByTime(1_200));
@@ -420,7 +420,7 @@ describe("MatchShell at the end", () => {
   it("does not hold rewards for a game that was over before the page opened", () => {
     mount(finished());
 
-    act(() => toastsOf().show("+30 XP", { category: "reward" }));
+    act(() => toastsOf().show("+30 XP", { surface: "toast.xp", category: "reward" }));
 
     expect(toastRegion()).toHaveTextContent("+30 XP");
   });
@@ -435,7 +435,7 @@ describe("MatchShell at the end", () => {
       }),
     );
 
-    act(() => toastsOf().show("+30 XP", { category: "reward" }));
+    act(() => toastsOf().show("+30 XP", { surface: "toast.xp", category: "reward" }));
 
     expect(toastRegion()).toHaveTextContent("");
   });

@@ -38,6 +38,12 @@ export const TELEMETRY_DROP_REASONS = Object.freeze({
   FLAG_OFF: "flag_off",
 });
 
+/** How one day of the nightly telemetry rollup ended (CC-176), the one attribute of `telemetry_rollup.runs`. */
+export const TELEMETRY_ROLLUP_OUTCOMES = Object.freeze({ OK: "ok", FAILED: "failed" });
+
+/** The steps a rollup can fail at (CC-176), the `step` of the named line `telemetry rollup failed`. */
+export const TELEMETRY_ROLLUP_STEPS = Object.freeze(["lock", "read", "total", "write", "finish"]);
+
 /**
  * How the check of a new password ended, at sign-up or on a password change (CC-261, ADR-080). `common` is the
  * bundled list, `breached` is Have I Been Pwned, and `unavailable` is that service failing or being late, when the
@@ -69,6 +75,8 @@ export const ROUTE_PATTERN = "pattern";
  *   BOT_THINKING_OUTCOMES value
  * @property {(drop: { reason: string, count: number }) => void} recordTelemetryDropped
  *   telemetry not stored (CC-175). `reason` is a TELEMETRY_DROP_REASONS value
+ * @property {(run: { outcome: string }) => void} recordTelemetryRollup
+ *   one day of the nightly rollup (CC-176). `outcome` is a TELEMETRY_ROLLUP_OUTCOMES value
  * @property {(check: { outcome: string }) => void} recordPasswordCheck
  *   one check of a new password. `outcome` is a PASSWORD_CHECK_OUTCOMES value, and nothing says whose password
  * @property {(readers: {
@@ -87,6 +95,7 @@ export const NO_OPERATIONS_METRICS = Object.freeze({
   recordPipelineStep: nothing,
   recordBotThinking: nothing,
   recordTelemetryDropped: nothing,
+  recordTelemetryRollup: nothing,
   recordPasswordCheck: nothing,
   watch: nothing,
 });

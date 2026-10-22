@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { Skeleton } from "../../components/States/States.jsx";
 import { lazyBoard } from "../../games/lazyBoard.js";
 import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { NotFoundPage } from "../NotFoundPage/NotFoundPage.jsx";
@@ -11,19 +12,22 @@ const ReportQueue = lazyBoard(() => import("./ReportQueue.jsx"), "ReportQueue");
 const AgeCorrections = lazyBoard(() => import("./AgeCorrections.jsx"), "AgeCorrections");
 const FlagsPanel = lazyBoard(() => import("./FlagsPanel.jsx"), "FlagsPanel");
 const DesignPage = lazyBoard(() => import("./DesignPage.jsx"), "DesignPage");
+const UxPage = lazyBoard(() => import("./UxPage.jsx"), "UxPage");
 const PAGES = Object.freeze({
   [CONSOLE_VIEWS.TOTALS]: AdminPage,
   [CONSOLE_VIEWS.FEEDBACK]: FeedbackInbox,
   [CONSOLE_VIEWS.REPORTS]: ReportQueue,
   [CONSOLE_VIEWS.AGES]: AgeCorrections,
   [CONSOLE_VIEWS.FLAGS]: FlagsPanel,
+  [CONSOLE_VIEWS.UX]: UxPage,
   [CONSOLE_VIEWS.DESIGN]: DesignPage,
 });
 
+// The shape of a console page while its code or the access check comes, so the page does not jump when it shows.
 const Waiting = () => (
-  <p role="status" aria-live="polite">
-    Loading…
-  </p>
+  <div aria-live="polite">
+    <Skeleton label="Loading the owner console" shape="block" />
+  </div>
 );
 
 /**
@@ -31,8 +35,8 @@ const Waiting = () => (
  * as the server's 404, so the console's existence is not revealed. The server checks again on every request.
  *
  * @param {{ view: string }} props  a CONSOLE_VIEWS value: the totals and their sections, the feedback inbox (CC-290)
- *   the report queue (CC-044), the year of birth corrections (CC-152), the flags (CC-312) or the design contract
- *   (CC-314)
+ *   the report queue (CC-044), the year of birth corrections (CC-152), the flags (CC-312), the UX page (CC-177) or
+ *   the design contract (CC-314)
  */
 export function AdminRoute({ view }) {
   const Page = PAGES[view];

@@ -75,6 +75,7 @@ describe("startTelemetry when off", () => {
     expect(metrics.recordPipelineStep({ step: "judge", failedForGood: false })).toBeUndefined();
     expect(metrics.recordBotThinking({ game: "chess", outcome: "ok", durationMs: 1 })).toBeUndefined();
     expect(metrics.recordTelemetryDropped({ reason: "cap", count: 1 })).toBeUndefined();
+    expect(metrics.recordTelemetryRollup({ outcome: "ok" })).toBeUndefined();
     expect(metrics.recordPasswordCheck({ outcome: "clear" })).toBeUndefined();
     expect(metrics.watch({ rooms: async () => [], connections: () => 0 })).toBeUndefined();
     await expect(NO_TELEMETRY.flush()).resolves.toBeUndefined();
@@ -181,6 +182,20 @@ describe("startTelemetry when on", () => {
         attributes: { game: "chess", outcome: "timeout" },
         value: expect.objectContaining({ count: 1, sum: 10_000 }),
       },
+    ]);
+  });
+
+  it("counts the nightly rollup's days by outcome only (CC-176)", async () => {
+    const { telemetry, metrics: exporter } = await start();
+
+    telemetry.metrics.recordTelemetryRollup({ outcome: "ok" });
+    telemetry.metrics.recordTelemetryRollup({ outcome: "ok" });
+    telemetry.metrics.recordTelemetryRollup({ outcome: "failed" });
+    await telemetry.flush();
+
+    expect(pointsOf(exporter, METRICS.TELEMETRY_ROLLUP_RUNS)).toEqual([
+      { attributes: { outcome: "ok" }, value: 2 },
+      { attributes: { outcome: "failed" }, value: 1 },
     ]);
   });
 

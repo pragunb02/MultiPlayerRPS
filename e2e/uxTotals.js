@@ -1,0 +1,51 @@
+import { fieldsOf } from "../apps/server/src/data/telemetryDailyAccessor.js";
+import { groupKeyOf, rollUpDay } from "../apps/server/src/domain/telemetry/rollups.js";
+import { uxSeedEvents } from "../apps/server/src/testing/uxSeed.js";
+import { addDays, dayOf, startOfDay } from "../apps/server/src/utils/indiaTime.js";
+
+// The UX page's seeded totals (CC-177): made-up daily totals for the 28 complete India days before the server starts,
+// rolled up by the real rollup spec from the seed's counters, as `telemetry_daily` documents and the run records
+// that name their version. Nothing in them is about a person: there are no people, only totals, and some groups
+// are 1 to 4 on purpose so "fewer than 5" shows.
+
+/** How many days back the seed reaches: a 7 day range and the 7 before it, and the 4 weeks the first move compares. */
+const DAYS = 28;
+/** The one version every seeded day is written in. */
+const VERSION = "e2e-seed";
+
+/**
+ * @param {number} now  ms
+ * @returns {Promise<{ daily: Array<object>, runs: Array<object> }>} the documents of `telemetry_daily` and
+ *   `telemetry_daily_runs`
+ */
+export async function seededUxTotals(now) {
+  const today = dayOf(now);
+  const days = Array.from({ length: DAYS }, (_, index) => addDays(today, -(index + 1)));
+  const perDay = await Promise.all(
+    days.map(async (day, index) => {
+      const events = uxSeedEvents({ day, scale: index < 7 ? 1 : 0.8 });
+      const counters = events.map(({ receivedAt, ...fields }) => ({ ...fields, hour: receivedAt, count: 1 }));
+      return (await rollUpDay({ day, counters })).map(({ event, group, count, timings }, row) => ({
+        _id: `${day}-${row}`,
+        day,
+        at: new Date(startOfDay(day)),
+        version: VERSION,
+        event,
+        key: groupKeyOf(group),
+        fields: fieldsOf(Object.keys(group)),
+        group,
+        count,
+        ...(timings && { timings }),
+      }));
+    }),
+  );
+  const runs = days.map((day) => ({
+    _id: day,
+    at: new Date(startOfDay(day)),
+    owner: null,
+    leaseUntil: null,
+    doneAt: new Date(now),
+    version: VERSION,
+  }));
+  return { daily: perDay.flat(), runs };
+}

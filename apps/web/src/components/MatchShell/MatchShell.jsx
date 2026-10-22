@@ -4,6 +4,7 @@ import { outcomeMoment } from "../../games/outcomeMoment.js";
 import { incomingRequests, outgoingRequests } from "../../games/roomUpdates.js";
 import { gameNumber, matchPhase, PLAY_REASONS } from "../../games/roomView.js";
 import { useAction } from "../../hooks/useAction.js";
+import { useMatchPhase } from "../../hooks/useMatchPhase.js";
 import { ResultCelebration } from "../Celebrations/ResultCelebration.jsx";
 import { ClaimWin } from "../ClaimWin/ClaimWin.jsx";
 import { ComputerNote } from "../ComputerNote/ComputerNote.jsx";
@@ -89,6 +90,7 @@ export function MatchShell({
   const moment = layout.result ? outcomeMoment(room) : undefined;
   const dimmed = moment?.effect === "dim";
   const sawItEnd = useSawItEnd(room);
+  useMatchPhase(matchPhase(room), room.gameId);
 
   /** What a request button does (RoomAction): a game move, asking for something, or answering a request. */
   function act(action) {

@@ -1,0 +1,17 @@
+/*
+ * The owner's UX page (CC-177). The page, its sections, cards, tables and fields are the console's and the app's own
+ * (CC-323); only the second row of tabs and the section's one line live here.
+ */
+.sections {
+  margin-top: calc(-1 * var(--space-2));
+}
+.lede {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--type-label);
+  max-width: 48rem;
+}
+.note {
+  margin: 0;
+  font-size: var(--type-label);
+}

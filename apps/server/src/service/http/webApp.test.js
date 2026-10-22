@@ -138,7 +138,7 @@ describe("page head for crawlers and link previews", () => {
 });
 
 describe("the owner console's pages (CC-233)", () => {
-  it.each(["/admin", "/admin/players", "/admin/retention/"])(
+  it.each(["/admin", "/admin/players", "/admin/retention/", "/admin/ux", "/admin/ux/week"])(
     "are an unknown address, 404 with the not found page, to anyone but an admin: %s",
     async (path) => {
       const res = await crawl(path);
@@ -167,8 +167,10 @@ describe("the owner console's pages (CC-233)", () => {
     expect(res.status).toBe(404);
   });
 
-  it("do not include deeper addresses", async () => {
+  it("do not include deeper addresses, except the UX page's sections (CC-177)", async () => {
     expect((await crawl("/admin/players/extra").set("X-Test-Admin", "yes")).status).toBe(404);
+    expect((await crawl("/admin/ux/week/extra").set("X-Test-Admin", "yes")).status).toBe(404);
+    expect((await crawl("/admin/ux/funnels").set("X-Test-Admin", "yes")).status).toBe(200);
   });
 });
 

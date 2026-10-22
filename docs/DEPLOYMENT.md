@@ -176,6 +176,24 @@ minutes per range; a full report on 50,000 matches takes about half a second to 
 that ships it builds four new indexes at boot (`matches.endedAt`, `player_transfers.createdAt`, `accounts.createdAt`,
 `player_achievements.unlockedAt`); on today's data that takes well under a second.
 
+### Usage totals and the UX page (CC-176, CC-177)
+
+- **The nightly job** runs in the server process, behind the server-only flag `telemetry_rollup` (only **On** runs
+  it): on boot, every hour and at 00:30 India time. Each run rolls up every complete India day whose hourly counters are all still kept (the last 29) with no
+  run record, and always the last 2, so a late beacon is counted and a sleep or a deploy over midnight is caught up.
+  A lease per day (`telemetry_daily_runs`) stops a second instance doing the same day. The deploy that ships it builds
+  the `telemetry_daily` and `telemetry_daily_runs` indexes at boot (empty collections).
+- **Alert (Grafana, ADR-055):** `telemetry_rollup.runs{outcome="failed"}` above zero two days running, or no
+  `outcome="ok"` by 03:00 India time, and the named line `telemetry rollup failed` with its `step`. The next tick
+  retries by itself.
+- **Backfill after a fix:** `MONGO_URI=… node scripts/bin/rollup-telemetry.mjs --from YYYY-MM-DD` rolls up every
+  complete day from then to yesterday again, flag or not. Only days whose counters are all still kept (the last 29 complete ones) are rolled up: the day 30 back has lost its first hours to the TTL.
+- **Ramp:** turn `telemetry_rollup` On once `telemetry_ingest` has counted 7 days; the first run backfills them. Then
+  turn on `console_ux` (admins) for the UX page, and `console_ux_week` after the first full week of totals.
+- **The UX page** is `/admin/ux` (sections `/admin/ux/<section>`), API `GET /api/admin/ux?section=…&from=…&to=…`,
+  admins only with the console's 404 for everyone else and for an admin while the section's flag is off. Sections
+  are cached 5 minutes per range. Rollback: set the flag Off.
+
 ## Cutover to the new stack (CC-029)
 
 Done 2026-10-16. The legacy app tolerated every variable above, so the settings changed first and the code second:
@@ -613,6 +631,10 @@ section 4a and the footer's "no third-party trackers".
    `await fetch("/api/admin/telemetry?before=2026-11-01", { method: "DELETE" }).then((r) => r.json())` deletes
    everything that arrived before that India day and answers `{ deleted }`. Anyone else gets the console's 404.
 5. **Flag removal:** both flags by 2027-01-31 (their own small PR, PROCESS.md).
+6. **Interruption counts (CC-313):** the `interruption_counts` flag follows `telemetry_client` one step behind
+   (admins, 10 %, 50 %, 100 %, two days each), and sends nothing unless `telemetry_client` is on too. Rollback: Off.
+   Remove by 2027-02-28. The CI text budget (`e2e/textBudget.spec.js`) and the friction guardrail rule of the
+   decision gate apply from the merge, with no flag.
 
 ## Known operational risks
 

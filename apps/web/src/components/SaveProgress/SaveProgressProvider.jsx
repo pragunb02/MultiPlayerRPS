@@ -85,9 +85,17 @@ export function SaveProgressProvider({ children }) {
         return;
       }
       try {
-        toast.show(savedMessage(await api.getProgress()), { tone: "success", category: CATEGORIES.REWARD });
+        toast.show(savedMessage(await api.getProgress()), {
+          surface: "toast.saved",
+          tone: "success",
+          category: CATEGORIES.REWARD,
+        });
       } catch {
-        toast.show(SAVED_WITHOUT_NUMBERS, { tone: "success", category: CATEGORIES.REWARD });
+        toast.show(SAVED_WITHOUT_NUMBERS, {
+          surface: "toast.saved",
+          tone: "success",
+          category: CATEGORIES.REWARD,
+        });
       }
     },
     [api, toast],

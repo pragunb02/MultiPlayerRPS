@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card, CardHeader } from "../../components/Card/Card.jsx";
 import { Field } from "../../components/Field/Field.jsx";
+import { Section } from "../../components/Page/Page.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./AccountSettings.module.css";
@@ -54,53 +56,59 @@ export function AccountSettings() {
   }
 
   return (
-    <section className={styles.account} aria-labelledby="account-settings">
-      <h2 id="account-settings">Account</h2>
-      <form className={styles.part} onSubmit={submit} noValidate aria-labelledby="change-password">
-        <h3 id="change-password">Change password</h3>
-        <Field
-          label="Current password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={passwords.currentPassword}
-          onChange={update("currentPassword")}
-          error={fieldErrors.currentPassword ?? ""}
-        />
-        <Field
-          label="New password"
-          type="password"
-          autoComplete="new-password"
-          required
-          hint="8 to 128 characters"
-          value={passwords.newPassword}
-          onChange={update("newPassword")}
-          error={fieldErrors.newPassword ?? ""}
-        />
-        {done.password && (
-          <p role="status" className={styles.done}>
-            Password changed. Your other devices are signed out.
-          </p>
-        )}
-        <Button control="profile.account.password" type="submit" action={changePassword}>
-          Change password
-        </Button>
-      </form>
-      <div className={styles.part}>
-        <h3>Devices</h3>
-        <p className={styles.muted}>
-          Signed in on a computer you don't use any more? Sign out everywhere else. This device stays signed
-          in.
-        </p>
-        {done.others && (
-          <p role="status" className={styles.done}>
-            Your other devices are signed out.
-          </p>
-        )}
-        <Button control="profile.account.sign_out_others" variant="secondary" action={signOutOthers}>
-          Sign out other devices
-        </Button>
-      </div>
-    </section>
+    <Section
+      id="account-settings"
+      title="Account"
+      description="Your password, and the devices you are signed in on."
+    >
+      <Card as="div">
+        <form className={styles.part} onSubmit={submit} noValidate aria-labelledby="change-password">
+          <CardHeader id="change-password" title="Change password" />
+          <Field
+            label="Current password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={passwords.currentPassword}
+            onChange={update("currentPassword")}
+            error={fieldErrors.currentPassword ?? ""}
+          />
+          <Field
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            required
+            hint="8 to 128 characters"
+            value={passwords.newPassword}
+            onChange={update("newPassword")}
+            error={fieldErrors.newPassword ?? ""}
+          />
+          {done.password && (
+            <p role="status" className={styles.done}>
+              Password changed. Your other devices are signed out.
+            </p>
+          )}
+          <Button control="profile.account.password" type="submit" action={changePassword}>
+            Change password
+          </Button>
+        </form>
+      </Card>
+      <Card as="div">
+        <div className={styles.part}>
+          <CardHeader
+            title="Devices"
+            description="Signed in on a computer you don't use any more? Sign out everywhere else. This device stays signed in."
+          />
+          {done.others && (
+            <p role="status" className={styles.done}>
+              Your other devices are signed out.
+            </p>
+          )}
+          <Button control="profile.account.sign_out_others" variant="secondary" action={signOutOthers}>
+            Sign out other devices
+          </Button>
+        </div>
+      </Card>
+    </Section>
   );
 }

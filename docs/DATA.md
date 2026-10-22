@@ -57,6 +57,8 @@ does not.
 | [`feature_flags`](#feature_flags)                     | no: a flag name, its rollout and when it was set                                                                                                            | until the owner clears it                                                                               | the owner's Use the rollout in code                                                    |
 | [`feature_flag_counts`](#feature_flag_counts)         | no: per flag, India day and side, two counts                                                                                                                | 90 days after the day                                                                                   | MongoDB TTL index                                                                      |
 | [`telemetry_counts`](#telemetry_counts)               | no: anonymous hourly counters, one per tuple of catalogue fields and India hour                                                                             | 30 days after the hour                                                                                  | MongoDB TTL index, the owner's purge                                                   |
+| [`telemetry_daily`](#telemetry_daily)                 | no: anonymous daily totals and percentiles per group of the rollup spec                                                                                     | 400 days after the day                                                                                  | MongoDB TTL index                                                                      |
+| [`telemetry_daily_runs`](#telemetry_daily_runs)       | no: which India days were rolled up, and a lease                                                                                                            | 40 days                                                                                                 | MongoDB TTL index                                                                      |
 | [`daily_puzzle_attempts`](#daily_puzzle_attempts)     | pseudonymous: player id, how each day's puzzle went                                                                                                         | until the account is deleted                                                                            | account deletion, the guest transfer                                                   |
 | [`accounts.birthYear`](#accountsbirthyear)            | yes: the year of birth, only if the player gave it (CC-152)                                                                                                 | until the player deletes the account                                                                    | account deletion (CC-035)                                                              |
 | [`account_deletions`](#account_deletions)             | pseudonymous: the id of a deleted account                                                                                                                   | 30 days                                                                                                 | MongoDB TTL index                                                                      |
@@ -567,6 +569,33 @@ CC-175, ADR-034 as amended 2026-10-20 and 2026-10-21)
    (`TELEMETRY_LIMITS.storedPerDay`) and 2 000 per network (`perNetworkDaily`, counted in memory only); the rest are
    dropped and counted.
 6. **Deleted by:** MongoDB's TTL index, or the owner's purge (`DELETE /api/admin/telemetry?before=YYYY-MM-DD`).
+
+### `telemetry_daily`
+
+`apps/server/src/persistence/telemetryDailyDao.js`, the spec in `apps/server/src/domain/telemetry/rollups.js`, the
+job in `rollupJob.js` (CC-176)
+
+1. **Holds:** one document per India day, event and group of the rollup spec: `day`, `at` (the start of that day,
+   for the TTL), `event`, `group` (the spec's fields for that group and their values, `null` for a field the event left
+   out), `key` (the group as text), `fields` (the group's field names, so the database picks a group, indexed with
+   `event` and `day`), `version` (the run that wrote it: unique on `day`, `event`, `key` and `version`, and a day is
+   read only in the version its run record names, so a reader never sees half a replaced day), `count`, and for timings
+   `timings.<field>` with `n`, the day's exact `p50`, `p75` and `p95` (from the hourly counters), and `buckets`, pairs
+   of an upper edge and a count, so a range of days can be read without single values. Open fields (control,
+   element, build) keep their busiest 25, 25 and 5 values per group and sum the rest as `(other)`, so at most 20 000
+   rows a day can exist (a test computes it from the catalogue).
+2. **Not stored:** any single event, id, hour or sequence. It is made from `telemetry_counts` only.
+3. **Personal data:** none.
+4. **Who can read it:** the owner, through `/admin/ux` (CC-177), with every total of 1 to 4, every share made of one
+   and every percentile of fewer than 5 values shown as `"<5"`.
+5. **Kept for:** 400 days after its day (`TELEMETRY_DAILY_KEEP_DAYS`, 13 months).
+6. **Deleted by:** MongoDB's TTL index on `at`.
+
+### `telemetry_daily_runs`
+
+The same DAO (CC-176). One document per India day the job has seen: `_id` the day, `at`, `owner` and `leaseUntil`
+(the process rolling it up now, so a second one skips it; a random id per process, nothing about a person),
+`doneAt`, and `version`, the version of the day's rows that is read. Kept 40 days by a TTL index on `at`. No personal data.
 
 ### `daily_puzzle_attempts`
 

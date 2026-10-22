@@ -32,7 +32,7 @@ describe("the Feedback dialog (CC-290)", () => {
     expect(within(dialog).getByRole("radio", { name: "Bug" })).toHaveFocus();
     expect(message()).toHaveValue("");
     expect(message()).toHaveAttribute("maxlength", String(FEEDBACK_MESSAGE_MAX));
-    expect(within(dialog).getByText(`0 / ${FEEDBACK_MESSAGE_MAX}`)).toBeInTheDocument();
+    expect(within(dialog).getByText(`0 of ${FEEDBACK_MESSAGE_MAX} characters`)).toBeInTheDocument();
   });
 
   it("opens from the header menu too, where a phone finds it", async () => {
@@ -83,7 +83,10 @@ describe("the Feedback dialog (CC-290)", () => {
 
     await user.type(message(), "Hello");
 
-    expect(within(dialog).getByText(`5 / ${FEEDBACK_MESSAGE_MAX}`)).toBeInTheDocument();
+    expect(within(dialog).getByText(`5 of ${FEEDBACK_MESSAGE_MAX} characters`)).toBeInTheDocument();
+    expect(message()).toHaveAccessibleDescription(
+      expect.stringContaining(`5 of ${FEEDBACK_MESSAGE_MAX} characters`),
+    );
   });
 
   it("asks for a message instead of sending an empty one, or one of only spaces", async () => {

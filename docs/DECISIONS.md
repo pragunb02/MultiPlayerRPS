@@ -106,8 +106,8 @@ the owner may change it.
 ### ADR-076 — The design contract: tokens by role in one file per role, seven component contracts, a check that refuses the rest
 
 - **Status:** Accepted · 2026-10-21 ([CC-314](tickets/CC-314.md), research and build notes there, #160). The owner
-  answered on 2026-10-20: "Accept all, with stylelint". **Point 6 (how the check runs) is pending the owner's
-  confirmation.** Amends ADR-009 (styling) and ADR-012 point 1 (tokens).
+  answered on 2026-10-20: "Accept all, with stylelint". **Point 6 (how the check runs, D4) is confirmed by the
+  owner, 2026-10-21.** Amends ADR-009 (styling) and ADR-012 point 1 (tokens).
 - **Context.** Every feature picked its own colours, pop-ups and stacking order. There were 13 raw `z-index` values,
   no `info` or player colours, and nothing written for a reviewer to point at. The shared `Modal` let Tab reach the
   page behind it (WCAG 2.4.3). The owner's premium redesign (2026-10-21) builds on this contract, so its values must
@@ -153,6 +153,31 @@ the owner may change it.
   and `--layer-menu` (CC-139's inbox panel). It moved the SVG and board font sizes to `--type-svg-*` and
   `--type-board-*` tokens instead of exceptions. The pop-up list has 18 files, seven of them announcers. "Escape waits
   while a destructive action runs" is not built.
+
+**Amended 2026-10-21 (CC-323, design lead, owner-delegated 2026-10-21).** The contract gets its components and
+the app moves onto them, outside the header (CC-324), the match stage and `App.jsx` (CC-322).
+
+1. **D4 confirmed by the owner (2026-10-21).** The check stays as stylelint-shaped rules run on PostCSS by our own
+   script until stylelint 18 drops `braces`; then each rule is wrapped with `stylelint.createPlugin`. The two new
+   rules below have the same shape.
+2. **Shared components** in `apps/web/src/components/`, their choices in `looks.js`: `Button` (primary, secondary,
+   ghost, danger, and accent for the hero; sizes sm, md, lg; `as="link"`; icon-only with a required label),
+   `Card` and its parts (surface, raised, accent, notice; media to the edges; a CSS hover lift, ADR-075's simple
+   tier), `PageHeader` and titled `Section`s, `EmptyState`, `ErrorState`, `Skeleton`, `Field` (text, select,
+   textarea, date, copy, with a count), one `Tabs` (navigation links, not an ARIA tab list). `/admin/design` draws
+   each in every state.
+3. **The owner's rules for pages (2026-10-21)** join the contract (section 3): titled sections with a heading and
+   one line, colour only with meaning and a word, data with its unit, window and empty state, aligned numbers under
+   a header row, one rhythm from the tokens.
+4. **Tokens.** Weights (`--weight-*`), `--type-page-title` and `--type-section-title`, `--target-min` and
+   `--target-touch`, four `--breakpoint-*` widths, `--elevation-hover` and danger press shadows. `--text-base` and
+   `--space-5` are replaced, not defined.
+5. **The check** also refuses a `var()` that no stylesheet declares and a media query width that is not a
+   breakpoint token, and a test refuses a CSS module class a component names but its module does not define.
+   Raw weights are not refused yet: 46 remain in the header and match stage files.
+6. **Dialogs and focus.** `Modal` takes `destructive`: a backdrop click does nothing, Escape and its buttons still
+   close it. Headings, `main` and dialogs focused by script (`tabindex="-1"`) draw no ring. Every target is at least
+   24 px, and 44 px on a touch screen.
 
 ### ADR-075 — Effects and animation stack: CSS for simple, Motion for intermediate, our own canvas module behind one effect registry for advanced
 
@@ -1064,6 +1089,11 @@ thinking crashed` with `game` only.
   `POST /api/telemetry` did not store, so the owner can see a flood, a broken build or the daily cap in Grafana. It
   carries no product data: the usage counts themselves stay in our own database (`telemetry_counts`, ADR-034), never
   in Grafana.
+- **Amended 2026-10-21 (CC-176): the nightly rollup.** One counter, `telemetry_rollup.runs`, with the one attribute
+  `outcome` (`ok`, `failed`), one per India day the job rolled up, and one named error line,
+  `telemetry rollup failed`, with the one field `step` (`lock`, `read`, `total`, `write`, `finish`). A day with no
+  `ok` by 03:00 India time, or `failed` two days running, is the alert. No day, group or total leaves: the totals stay
+  in `telemetry_daily`.
 
 ### ADR-053 — Blocks: silent, both ways, only people you played with, and the rules later features follow
 
@@ -1583,6 +1613,13 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
 - **Amended · 2026-10-20** (CC-290, ADR-059). Point 3 no longer holds for the feedback inbox at `/admin/feedback`,
   the console's first view of content about one person: messages players sent to the owner, and an adult's reply
   email shown one item at a time on request. The reasons and limits are in ADR-059. Every other view keeps point 3.
+- **Amended · 2026-10-21** (CC-176, CC-177, CC-313). Telemetry joins the console at `/admin/ux`, behind
+  `console_ux` and, for the Week view, `console_ux_week`; with either flag off the API answers the same 404. Point 2
+  is applied to every telemetry total, not only counts of people (one person can make all of a small count): a count
+  of 1 to 4 is `"<5"`, a share is `"<5"` when its part or its whole is 1 to 4 (stricter than point 2, so a shown share
+  never gives away a hidden count), and a percentile of fewer than 5 values is `"<5"`. Funnels are ratios of daily
+  totals, capped at 100 % and labelled so, never conversions. Point 4 holds: the page reads `telemetry_daily` only,
+  sections are cached 5 minutes per range, and the report is never told who asked.
 
 ### ADR-035 — Abuse limits: rooms, connections, sign-ups and failed logins
 
@@ -1674,6 +1711,20 @@ judge. Its writes are guarded by a revision, so a lost race fails the step and t
   day (in memory, like CC-110), and the privacy switch reaches the server too: while it is off, every API request
   carries `X-CC-Counts: off`, and the server records no event of its own about it. The header is never stored or
   logged.
+- **Amended · 2026-10-20 (owner: "Accept all", the recommended defaults of CC-313).** Interruptions and friction.
+  (1) Only `optional` surfaces the system opened count against the budget; essential ones (connection, waking up,
+  this room's requests, errors, confirms the player asked for) are counted but not budgeted. (2) The budget is
+  CC-313's recommended column: 0.5 optional interruptions per visit, 5 % of visits with 3 or more, 0.05 per game
+  during play, none blocking during play. (3) A surface is amber over 50 % dismissed and red over 70 %, amber over 2 %
+  covered and red over 5 %, each with at least 50 shown in 7 days; a share of fewer than 5 gets no colour. (4) Alerts
+  show in the console only; email when CC-293 ships, as its own ticket; Grafana stays ops only (ADR-055). (5) Text is
+  measured both ways: a CI budget that blocks a PR, and runtime word buckets. (6) The text budgets (visible words in
+  `main` at 390 by 844): home above the fold 80, a game's page 120, room waiting 60, room playing 30 outside the
+  board, the result 60, sign-up 80; desktop the same, and all of `main` twice that. (7) The friction guardrail is a
+  CI check on full feature tickets from Ready, and a PR template line, for tickets started on or after the merge day.
+  (8) Measure only, plus a test that no optional blocking surface opens during play; queueing is a follow-up after
+  two weeks of numbers. (9) At most one flag side on friction events: the one ramping flag with a friction
+  guardrail. (10) The week is the India week, Monday to Sunday, and the Week view opens by default on Mondays.
 
 ### ADR-033 — Every tab follows the session: server disconnects and a message without identity
 

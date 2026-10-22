@@ -205,7 +205,24 @@ describe("the console's flags (CC-312)", () => {
     expect(screen.getByText(/stored counts could not be read/)).toBeVisible();
   });
 
-  it("shows a failure with Try again, and loads on a second try", async () => {
+  it("offers no Retry for a failure that trying again cannot fix (CC-323)", async () => {
+    const getAdminFlags = vi
+      .fn()
+      .mockRejectedValue(new AppRequestError({ code: "VALIDATION_FAILED", message: "Refused", status: 400 }));
+    await openFlags(ownerApi({ getAdminFlags }), { listed: false });
+
+    expect(await screen.findByText("Refused")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("puts each flag under a titled section, its name a level 3 heading (CC-323)", async () => {
+    await openFlags();
+
+    expect(screen.getByRole("heading", { level: 2, name: "Flags in code" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 3, name: "new_lobby" })).toBeVisible();
+  });
+
+  it("shows a failure with Retry, and loads on a second try", async () => {
     const getAdminFlags = vi
       .fn()
       .mockRejectedValueOnce(
@@ -215,7 +232,7 @@ describe("the console's flags (CC-312)", () => {
     const { user } = await openFlags(ownerApi({ getAdminFlags }), { listed: false });
 
     expect(await screen.findByText("Can't reach the server")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await user.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByRole("article", { name: "new_lobby" })).toBeVisible();
   });

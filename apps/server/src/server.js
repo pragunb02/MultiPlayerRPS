@@ -14,6 +14,7 @@ import { createPrivacyAccessor } from "./data/privacyAccessor.js";
 import { createFeatureFlagAccessor } from "./data/featureFlagAccessor.js";
 import { createFeedbackAccessor } from "./data/feedbackAccessor.js";
 import { createTelemetryAccessor } from "./data/telemetryAccessor.js";
+import { createTelemetryDailyAccessor } from "./data/telemetryDailyAccessor.js";
 import { createReportAccessor } from "./data/reportAccessor.js";
 import { createDailyPuzzleAccessor } from "./data/dailyPuzzleAccessor.js";
 import { createChessRatingAccessor } from "./data/chessRatingAccessor.js";
@@ -50,7 +51,10 @@ import { createSafetyComponent } from "./domain/safety/safetyComponent.js";
 import { createFeedbackComponent } from "./domain/feedback/feedbackComponent.js";
 import { createReportComponent, REPORT_EVENTS } from "./domain/reports/reportComponent.js";
 import { createFlagComponent } from "./domain/flags/flagComponent.js";
+import { createRollupJob, scheduleRollups } from "./domain/telemetry/rollupJob.js";
 import { createTelemetryComponent } from "./domain/telemetry/telemetryComponent.js";
+import { createTelemetryReport } from "./domain/telemetry/telemetryReport.js";
+import { createUxReport, UX_REPORT_TTL_MS } from "./domain/telemetry/uxReport.js";
 import { createChessKind } from "./domain/dailyPuzzles/chessKind.js";
 import { createDailyPuzzleComponent } from "./domain/dailyPuzzles/dailyPuzzleComponent.js";
 import { INDIA_CALENDAR } from "./domain/dailyPuzzles/schedule.js";
@@ -90,6 +94,7 @@ import { createPrivacyDao } from "./persistence/privacyDao.js";
 import { createFeatureFlagDao } from "./persistence/featureFlagDao.js";
 import { createFeedbackDao } from "./persistence/feedbackDao.js";
 import { createTelemetryCountDao } from "./persistence/telemetryCountDao.js";
+import { createTelemetryDailyDao } from "./persistence/telemetryDailyDao.js";
 import { createReportDao } from "./persistence/reportDao.js";
 import { createDailyPuzzleAttemptDao } from "./persistence/dailyPuzzleAttemptDao.js";
 import { loadChessPuzzles } from "./persistence/puzzleCatalog.js";
@@ -136,6 +141,8 @@ const FINISHED_ROOMS_INTERVAL_MS = 60_000;
 const DELETION_SWEEP_INTERVAL_MS = 60_000;
 // Owner console reports kept at once: one per range the owner looked at in the last 5 minutes.
 const ANALYTICS_CACHED_REPORTS = 20;
+// UX page sections kept at once (CC-177): eight sections over a few ranges.
+const UX_CACHED_REPORTS = 50;
 
 /**
  * Every playable engine must be listed in the public game catalog (and vice versa once all games exist).
@@ -760,6 +767,7 @@ export async function startServer({
   const privacyDao = createPrivacyDao({ connection: database.connection });
   const featureFlagDao = createFeatureFlagDao({ connection: database.connection });
   const telemetryCountDao = createTelemetryCountDao({ connection: database.connection });
+  const telemetryDailyDao = createTelemetryDailyDao({ connection: database.connection });
   const sessionDao = createSessionDao({ client: database.client });
   await Promise.all(
     [
@@ -787,6 +795,7 @@ export async function startServer({
       privacyDao,
       featureFlagDao,
       telemetryCountDao,
+      telemetryDailyDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -819,6 +828,7 @@ export async function startServer({
   const privacyAccessor = createPrivacyAccessor({ privacyDao });
   const featureFlagAccessor = createFeatureFlagAccessor({ featureFlagDao });
   const telemetryAccessor = createTelemetryAccessor({ telemetryCountDao });
+  const telemetryDailyAccessor = createTelemetryDailyAccessor({ telemetryDailyDao });
   const breachedPasswordAccessor = createBreachedPasswordAccessor({
     pwnedPasswords: createPwnedPasswordsClient({ fetch: pwnedPasswordsFetch }),
     commonPasswords: loadCommonPasswords(),
@@ -868,6 +878,20 @@ export async function startServer({
     now,
     onDropped: metrics.recordTelemetryDropped,
     serverBuild: config.build.version,
+  });
+  // The nightly totals kept 13 months (CC-176), behind `telemetry_rollup`, and the owner's UX page over them (CC-177).
+  const rollupJob = createRollupJob({
+    telemetryAccessor,
+    telemetryDailyAccessor,
+    isOn: () => flagComponent.isOn("telemetry_rollup", undefined),
+    now,
+    logger,
+    onRun: metrics.recordTelemetryRollup,
+  });
+  const uxReport = createUxReport({
+    telemetryReport: createTelemetryReport({ telemetryDailyAccessor }),
+    cache: createTtlCache({ ttlMs: UX_REPORT_TTL_MS, maxEntries: UX_CACHED_REPORTS }),
+    now,
   });
   const progressionComponent = createProgressionComponent({
     progressAccessor,
@@ -1176,6 +1200,7 @@ export async function startServer({
     telemetryComponent,
     leaderboardComponent,
     analyticsComponent,
+    uxReport,
     sessionMiddleware,
     identityComponent,
     matchComponent,
@@ -1234,10 +1259,15 @@ export async function startServer({
 
   const keyRotation = dropOldNetworkKeysEveryMidnight({ networkKey, now });
   const flagRefresh = flagComponent.start();
+  // On boot (catch-up after a sleep or a deploy), every hour and at 00:30 India time (CC-176).
+  const rollups = scheduleRollups({ run: rollupJob.runOnce, now, logger });
+  rollups.start();
 
   const close = async () => {
     keyRotation.stop();
     housekeeping.stop();
+    // A run in progress finishes its day before the database closes.
+    await rollups.stop();
     botDriver.stop();
     await thinkingWorkers.close();
     await gateway.close();
@@ -1253,6 +1283,7 @@ export async function startServer({
     return { server, host, port, close };
   } catch (err) {
     keyRotation.stop();
+    await rollups.stop();
     await flagRefresh.stop();
     botDriver.stop();
     await thinkingWorkers.close();

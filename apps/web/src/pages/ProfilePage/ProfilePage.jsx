@@ -9,14 +9,17 @@ import { GameIcon } from "../../art/games/GameIcon.jsx";
 import { EmptyMatches } from "../../art/illustrations/EmptyMatches.jsx";
 import { AchievementGrid } from "../../components/Achievements/AchievementGrid.jsx";
 import { Button } from "../../components/Button/Button.jsx";
+import { Card } from "../../components/Card/Card.jsx";
 import { AddFriendButton } from "../../components/Friends/AddFriendButton.jsx";
 import { YourRank } from "../../components/Leaderboard/YourRank.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { PageTitle } from "../../components/PageTitle.jsx";
+import { Section, Sections } from "../../components/Page/Page.jsx";
 import { ReportDialog } from "../../components/Report/ReportDialog.jsx";
 import { DailyQuests } from "../../components/Quests/DailyQuests.jsx";
 import { useStreakAtRisk } from "../../components/SaveProgress/saveProgressContext.js";
 import { StreakAtRisk } from "../../components/SaveProgress/StreakAtRisk.jsx";
+import { EmptyState, ErrorState, Skeleton } from "../../components/States/States.jsx";
 import { StreakCard } from "../../components/Streaks/StreakCard.jsx";
 import { useMatchHistory } from "../../hooks/useMatchHistory.js";
 import { useOwnProfile } from "../../hooks/useProfile.js";
@@ -33,16 +36,20 @@ const OUTCOME_LABEL = { win: "Won", loss: "Lost", draw: "Draw" };
 const formatDate = (ms) =>
   new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
+/** Your level, the XP to the next one and your games, all time. Each number has its word and its unit. */
 function ProgressCard() {
   const { status, progress, error } = useProgress();
-  if (status === "loading") return <p>Loading progress…</p>;
-  if (status === "error") return <p role="alert">Couldn't load progress. {error.message}</p>;
+  if (status === "loading") return <Skeleton label="Loading progress" shape="card" />;
+  if (status === "error")
+    return <ErrorState title={`Couldn't load progress. ${error.message}`} control="profile.progress" />;
   return (
-    <div className={styles.card}>
+    <Card variant="raised" aria-labelledby="profile-level">
       <div className={styles.levelRow}>
         <LevelBadge level={progress.level} size="lg" decorative />
         <div>
-          <p className={styles.level}>Level {progress.level}</p>
+          <p className={styles.level} id="profile-level">
+            Level {progress.level}
+          </p>
           <p className={styles.rank}>{rankForLevel(progress.level).name} rank</p>
         </div>
       </div>
@@ -56,7 +63,7 @@ function ProgressCard() {
         {progress.xpIntoLevel} / {progress.xpForNextLevel} XP to level {progress.level + 1} · {progress.xp} XP
         total
       </p>
-      <dl className={styles.stats}>
+      <dl className={styles.stats} aria-label="Games, all time">
         <div>
           <dt>Played</dt>
           <dd>{progress.matchesPlayed}</dd>
@@ -74,7 +81,7 @@ function ProgressCard() {
           <dd>{progress.draws}</dd>
         </div>
       </dl>
-    </div>
+    </Card>
   );
 }
 
@@ -112,75 +119,89 @@ function MatchHistory({ canAddFriends }) {
   // The opponent the player pressed Report on, by the match and their place in it (CC-044, ADR-071).
   const [reporting, setReporting] = useState(undefined);
   const more = useAction(history.loadMore, { id: "profile.matches.more" });
-  if (history.status === "loading") return <p>Loading matches…</p>;
-  if (history.status === "error") return <p role="alert">Couldn't load matches. {history.error.message}</p>;
+  if (history.status === "loading") return <Skeleton label="Loading matches" shape="row" count={3} />;
+  if (history.status === "error") {
+    return <ErrorState title={`Couldn't load matches. ${history.error.message}`} control="profile.matches" />;
+  }
   if (history.matches.length === 0) {
     return (
-      <div className={styles.empty}>
-        <EmptyMatches />
-        <p>
-          No games yet.{" "}
-          <Link to={paths.home()} data-cc-control="profile.play">
+      <EmptyState
+        title="No games yet."
+        headingLevel={3}
+        art={<EmptyMatches />}
+        action={
+          <Button as="link" to={paths.home()} control="profile.play">
             Play one
-          </Link>
-        </p>
-      </div>
+          </Button>
+        }
+      >
+        Every game you finish shows here, newest first.
+      </EmptyState>
     );
   }
   return (
     <>
-      <ul className={styles.matches} aria-label="Match history">
-        {history.matches.map((match) => {
-          // A computer character is labelled as one, so it never reads as a person of the same name (ADR-025).
-          // Players are named by ids made for this match, and `you` is yours (CC-297).
-          const opponents = match.players.filter((p) => p.playerId !== match.you);
-          return (
-            <li key={match.matchId} className={styles.match}>
-              <span className={`${styles.badge} ${styles[match.outcomeForYou]}`}>
-                {OUTCOME_LABEL[match.outcomeForYou]}
-              </span>
-              <span className={styles.game}>
-                <GameIcon gameId={match.gameId} />
-                <span>
-                  {getGame(match.gameId)?.name ?? match.gameId} vs{" "}
-                  {opponents.length === 0
-                    ? "—"
-                    : opponents.map((player, index) => (
-                        <Opponent
-                          key={player.playerId}
-                          player={player}
-                          last={index === opponents.length - 1}
-                          target={{ matchId: match.matchId, seat: match.players.indexOf(player) }}
-                          canAddFriends={canAddFriends}
-                        />
-                      ))}
+      <Card as="div">
+        {/* The column names, for the eye. Each row says the same in words. */}
+        <p className={styles.matchHead} aria-hidden="true">
+          <span>Result</span>
+          <span>Game and opponent</span>
+          <span>When</span>
+        </p>
+        <ul className={styles.matches} aria-label="Match history">
+          {history.matches.map((match) => {
+            // A computer character is labelled as one, so it never reads as a person of the same name (ADR-025).
+            // Players are named by ids made for this match, and `you` is yours (CC-297).
+            const opponents = match.players.filter((p) => p.playerId !== match.you);
+            return (
+              <li key={match.matchId} className={styles.match}>
+                <span className={`${styles.badge} ${styles[match.outcomeForYou]}`}>
+                  {OUTCOME_LABEL[match.outcomeForYou]}
                 </span>
-              </span>
-              <time className={styles.muted} dateTime={new Date(match.endedAt).toISOString()}>
-                {formatDate(match.endedAt)}
-              </time>
-              {match.players.map(
-                (player, seat) =>
-                  player.playerId !== match.you &&
-                  isReportable(player) && (
-                    <Button
-                      key={player.playerId}
-                      control="profile.matches.report"
-                      variant="ghost"
-                      className={styles.report}
-                      aria-label={`Report ${player.displayName}`}
-                      onClick={() =>
-                        setReporting({ name: player.displayName, target: { matchId: match.matchId, seat } })
-                      }
-                    >
-                      Report
-                    </Button>
-                  ),
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                <span className={styles.game}>
+                  <GameIcon gameId={match.gameId} />
+                  <span>
+                    {getGame(match.gameId)?.name ?? match.gameId} vs{" "}
+                    {opponents.length === 0
+                      ? "—"
+                      : opponents.map((player, index) => (
+                          <Opponent
+                            key={player.playerId}
+                            player={player}
+                            last={index === opponents.length - 1}
+                            target={{ matchId: match.matchId, seat: match.players.indexOf(player) }}
+                            canAddFriends={canAddFriends}
+                          />
+                        ))}
+                  </span>
+                </span>
+                <time className={styles.muted} dateTime={new Date(match.endedAt).toISOString()}>
+                  {formatDate(match.endedAt)}
+                </time>
+                {match.players.map(
+                  (player, seat) =>
+                    player.playerId !== match.you &&
+                    isReportable(player) && (
+                      <Button
+                        key={player.playerId}
+                        control="profile.matches.report"
+                        variant="ghost"
+                        size="sm"
+                        className={styles.report}
+                        aria-label={`Report ${player.displayName}`}
+                        onClick={() =>
+                          setReporting({ name: player.displayName, target: { matchId: match.matchId, seat } })
+                        }
+                      >
+                        Report
+                      </Button>
+                    ),
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
       {reporting !== undefined && (
         <ReportDialog
           name={reporting.name}
@@ -190,7 +211,12 @@ function MatchHistory({ canAddFriends }) {
           onClose={() => setReporting(undefined)}
         />
       )}
-      {history.moreError && <p role="alert">Couldn't load more matches. {history.moreError.message}</p>}
+      {history.moreError && (
+        <ErrorState
+          title={`Couldn't load more matches. ${history.moreError.message}`}
+          control="profile.matches.more"
+        />
+      )}
       {history.hasMore && (
         <Button control="profile.matches.more" variant="secondary" action={more} pendingLabel="Loading…">
           Load more
@@ -207,8 +233,11 @@ function MatchHistory({ canAddFriends }) {
 function PlayerConsole({ guest }) {
   const streakAtRisk = useStreakAtRisk();
   return (
-    <section className={styles.console} aria-labelledby="player-console">
-      <h2 id="player-console">Player console</h2>
+    <Section
+      id="player-console"
+      title="Player console"
+      description="Your streaks, today's quests and every achievement."
+    >
       <StreakAtRisk />
       {guest && streakAtRisk === undefined && (
         <p className={styles.muted}>
@@ -217,10 +246,12 @@ function PlayerConsole({ guest }) {
           </Link>
         </p>
       )}
-      <StreakCard />
-      <DailyQuests />
+      <div className={styles.consoleGrid}>
+        <StreakCard />
+        <DailyQuests />
+      </div>
       <AchievementGrid />
-    </section>
+    </Section>
   );
 }
 
@@ -237,20 +268,22 @@ export function ProfilePage() {
     return (
       <>
         <PageTitle>Your profile</PageTitle>
-        <p>Loading…</p>
+        <Skeleton label="Loading your profile" shape="card" />
       </>
     );
   }
   if (session.identity === undefined) {
     return (
-      <>
+      <div className={styles.visitor}>
         {accountDeleted && (
-          <p role="status" className={styles.notice}>
-            Your account and its data are deleted. Copies in our encrypted backups are gone within 30 days.
-          </p>
+          <Card variant="notice" tone="success" as="div">
+            <p role="status" className={styles.noticeLine}>
+              Your account and its data are deleted. Copies in our encrypted backups are gone within 30 days.
+            </p>
+          </Card>
         )}
         <VisitorProfile />
-      </>
+      </div>
     );
   }
   return (
@@ -275,15 +308,22 @@ export function ProfilePage() {
         </Link>
         : who is online, your friend requests and your friend link.
       </p>
-      <ProgressCard />
-      <YourRank identity={session.identity} />
-      <PlayerConsole guest={session.identity.kind === "guest"} />
-      <h2>Recent matches</h2>
-      <MatchHistory canAddFriends={session.identity.kind === "user"} />
-      <PublicProfileSettings own={own} guest={session.identity.kind === "guest"} />
-      <BlockedPlayers />
-      {session.identity.kind === "user" && <AccountSettings />}
-      {session.identity.kind === "user" && <PrivacySettings />}
+      <Sections>
+        <Section id="profile-progress" title="Progress" description="Your level and your games, all time.">
+          <div className={styles.progressGrid}>
+            <ProgressCard />
+            <YourRank identity={session.identity} />
+          </div>
+        </Section>
+        <PlayerConsole guest={session.identity.kind === "guest"} />
+        <Section id="recent-matches" title="Recent matches" description="Your finished games, newest first.">
+          <MatchHistory canAddFriends={session.identity.kind === "user"} />
+        </Section>
+        <PublicProfileSettings own={own} guest={session.identity.kind === "guest"} />
+        <BlockedPlayers />
+        {session.identity.kind === "user" && <AccountSettings />}
+        {session.identity.kind === "user" && <PrivacySettings />}
+      </Sections>
     </section>
   );
 }

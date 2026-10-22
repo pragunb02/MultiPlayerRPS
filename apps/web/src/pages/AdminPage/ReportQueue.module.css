@@ -7,3 +7,17 @@
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
 }
+/* The status filter and the page links (CC-323). */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.filters > div {
+  min-width: 14rem;
+}
+.pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}

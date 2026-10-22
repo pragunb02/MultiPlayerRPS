@@ -201,9 +201,10 @@ describe("RoomPage", () => {
 
     const title = await screen.findByRole("heading", { level: 1, name: "Tic Tac Toe" });
     expect(title.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByRole("heading", { name: "Invite a friend" }).previousElementSibling.tagName).toBe(
-      "svg",
-    );
+    // The invite is a raised card, its art running to the card's edges (CC-323).
+    const invite = screen.getByRole("heading", { name: "Invite a friend" }).closest("[data-cc-card]");
+    expect(invite).toHaveAttribute("data-cc-card", "raised");
+    expect(invite.querySelector(".media svg")).not.toBeNull();
   });
 
   it("explains a closed room", async () => {
@@ -213,9 +214,16 @@ describe("RoomPage", () => {
     act(() => socket.push("room:closed", { code: "AB2CD3", reason: "expired" }));
 
     expect(await screen.findByText("Nobody joined in time, so the room closed.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Start a new Tic Tac Toe game" })).toHaveAttribute(
-      "href",
-      "/games/tic-tac-toe",
+    const newGame = screen.getByRole("link", { name: "Start a new Tic Tac Toe game" });
+    expect(newGame).toHaveAttribute("href", "/games/tic-tac-toe");
+    // The shared dead end: the page's title, one line, one primary way on and a quiet way back (CC-323).
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Room closed" }).closest("[data-cc-state]"),
+    ).toHaveAttribute("data-cc-state", "empty");
+    expect(newGame).toHaveAttribute("data-cc-variant", "primary");
+    expect(screen.getByRole("link", { name: "Back to the games" })).toHaveAttribute(
+      "data-cc-variant",
+      "ghost",
     );
   });
 
@@ -656,6 +664,11 @@ describe("RoomPage: someone arriving without a session chooses how to join (CC-0
     expect(within(screen.getByRole("main")).getByRole("link", { name: "Log in" })).toHaveAttribute(
       "href",
       `/login?next=${encodeURIComponent(INVITE)}`,
+    );
+    // Log in and Sign up are links drawn as the shared secondary button (CC-323).
+    expect(within(screen.getByRole("main")).getByRole("link", { name: "Log in" })).toHaveClass(
+      "button",
+      "secondary",
     );
     expect(within(screen.getByRole("main")).getByRole("link", { name: "Sign up" })).toHaveAttribute(
       "href",

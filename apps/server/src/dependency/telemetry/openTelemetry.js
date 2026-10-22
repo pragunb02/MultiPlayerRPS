@@ -179,6 +179,9 @@ function createOperationsMetrics(meter) {
   const telemetryDropped = meter.createCounter(METRICS.TELEMETRY_DROPPED, {
     description: "Usage counts (CC-175) not stored, by reason only.",
   });
+  const rollupRuns = meter.createCounter(METRICS.TELEMETRY_ROLLUP_RUNS, {
+    description: "Days of the nightly usage totals rolled up (CC-176), by outcome only.",
+  });
   const passwordChecks = meter.createCounter(METRICS.PASSWORD_CHECKS, {
     description: "Checks of a new password against the common and breached passwords, by outcome.",
   });
@@ -204,6 +207,9 @@ function createOperationsMetrics(meter) {
     },
     recordTelemetryDropped({ reason, count }) {
       telemetryDropped.add(count, { reason });
+    },
+    recordTelemetryRollup({ outcome }) {
+      rollupRuns.add(1, { outcome });
     },
     recordPasswordCheck({ outcome }) {
       passwordChecks.add(1, { outcome });

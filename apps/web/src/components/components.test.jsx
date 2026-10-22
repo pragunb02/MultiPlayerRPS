@@ -16,7 +16,7 @@ describe("ToastProvider", () => {
 
   function Trigger() {
     const toast = useToast();
-    return <button onClick={() => toast.show("+30 XP")}>notify</button>;
+    return <button onClick={() => toast.show("+30 XP", { surface: "toast.xp" })}>notify</button>;
   }
 
   it("announces toasts politely and removes them after a while", async () => {
@@ -62,13 +62,13 @@ describe("ToastProvider", () => {
       let first;
       let second;
       act(() => {
-        first = toast.show("Link copied");
-        second = toast.show("Link copied");
+        first = toast.show("Link copied", { surface: "toast.xp" });
+        second = toast.show("Link copied", { surface: "toast.xp" });
       });
       expect(second).toBe(first);
       expect(screen.getAllByText("Link copied")).toHaveLength(1);
       act(() => vi.advanceTimersByTime(5_000));
-      act(() => toast.show("Link copied"));
+      act(() => toast.show("Link copied", { surface: "toast.xp" }));
       expect(screen.getAllByText("Link copied")).toHaveLength(1);
     });
 
@@ -80,9 +80,9 @@ describe("ToastProvider", () => {
         release = toast.hold("request");
       });
 
-      act(() => toast.show("+30 XP", { category: "reward" }));
-      act(() => toast.show("Bob is back", { category: "social" }));
-      act(() => toast.show("Connection lost", { category: "system" }));
+      act(() => toast.show("+30 XP", { surface: "toast.xp", category: "reward" }));
+      act(() => toast.show("Bob is back", { surface: "toast.xp", category: "social" }));
+      act(() => toast.show("Connection lost", { surface: "toast.xp", category: "system" }));
       expect(shown()).toBe("Connection lost");
 
       act(() => release());
@@ -98,13 +98,13 @@ describe("ToastProvider", () => {
       const shownLater = vi.fn();
       let release;
 
-      act(() => toast.show("Link copied", { onShow: shownNow }));
+      act(() => toast.show("Link copied", { surface: "toast.xp", onShow: shownNow }));
       expect(shownNow).toHaveBeenCalledOnce();
 
       act(() => {
         release = toast.hold("result");
       });
-      act(() => toast.show("Level up!", { category: "reward", onShow: shownLater }));
+      act(() => toast.show("Level up!", { surface: "toast.xp", category: "reward", onShow: shownLater }));
       expect(shownLater).not.toHaveBeenCalled();
 
       act(() => release());
@@ -120,7 +120,7 @@ describe("ToastProvider", () => {
         toast.hold("request");
       });
 
-      act(() => toast.show("+30 XP", { category: "reward" }));
+      act(() => toast.show("+30 XP", { surface: "toast.xp", category: "reward" }));
       act(() => first());
 
       expect(shown()).toBe("");
@@ -133,7 +133,7 @@ describe("ToastProvider", () => {
       let id;
       act(() => {
         release = toast.hold("request");
-        id = toast.show("+30 XP", { category: "reward" });
+        id = toast.show("+30 XP", { surface: "toast.xp", category: "reward" });
       });
 
       act(() => toast.dismiss(id));
@@ -149,7 +149,7 @@ describe("ToastProvider", () => {
         const toast = useToast();
         useHold("request", open);
         useLayoutEffect(() => {
-          if (open) toast.show("+30 XP", { category: "reward" });
+          if (open) toast.show("+30 XP", { surface: "toast.xp", category: "reward" });
         }, [open, toast]);
         return open ? <p>Rematch?</p> : null;
       }
@@ -172,7 +172,9 @@ describe("ToastProvider", () => {
     it("refuses a category that does not exist", () => {
       const toast = capture();
 
-      expect(() => toast.show("x", { category: "ads" })).toThrow(/Unknown notification category/);
+      expect(() => toast.show("x", { surface: "toast.xp", category: "ads" })).toThrow(
+        /Unknown notification category/,
+      );
       expect(() => toast.hold("ads")).toThrow(/Unknown notification category/);
     });
   });
@@ -183,7 +185,13 @@ describe("Modal", () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(
-      <Modal open title="Leave the game?" onClose={onClose} actions={<button>Stay</button>}>
+      <Modal
+        surface="dialog.feedback"
+        open
+        title="Leave the game?"
+        onClose={onClose}
+        actions={<button>Stay</button>}
+      >
         <p>You will forfeit.</p>
       </Modal>,
     );
@@ -200,7 +208,13 @@ describe("Modal", () => {
     // A filter (the softened board after a loss) makes an element the frame of any fixed child inside it.
     render(
       <div data-testid="softened" className="dimmed">
-        <Modal open title="How we keep it fair" onClose={() => {}} actions={<button>Got it</button>}>
+        <Modal
+          surface="dialog.feedback"
+          open
+          title="How we keep it fair"
+          onClose={() => {}}
+          actions={<button>Got it</button>}
+        >
           <p>Sealed first.</p>
         </Modal>
       </div>,
@@ -213,7 +227,7 @@ describe("Modal", () => {
 
   it("renders nothing when closed", () => {
     render(
-      <Modal open={false} title="x" onClose={() => {}} actions={null}>
+      <Modal surface="dialog.feedback" open={false} title="x" onClose={() => {}} actions={null}>
         hidden
       </Modal>,
     );
@@ -239,6 +253,13 @@ describe("ShareRoom", () => {
     expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3?via=copy");
     // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Link copied"));
+    // The link and its button are the shared copy field (CC-323).
+    expect(screen.getByRole("textbox", { name: "Invite link" })).toHaveAttribute("readonly");
+    expect(screen.getByRole("textbox", { name: "Invite link" }).closest("[data-cc-field]")).toHaveAttribute(
+      "data-cc-field",
+      "copy",
+    );
+    expect(document.querySelector('[data-cc-control="invite.copy"]')).toHaveTextContent("Copy link");
   });
 
   it("offers WhatsApp with the invite and the room's link, in a new tab (CC-217)", () => {
@@ -252,6 +273,7 @@ describe("ShareRoom", () => {
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link).toHaveAttribute("data-cc-control", "invite.whatsapp");
+    expect(link).toHaveClass("button", "secondary");
   });
 
   it("builds the invite on the site's own address, not the one this page was opened at (CC-217)", () => {
@@ -347,6 +369,20 @@ describe("ShareRoom", () => {
     expect(writeText).toHaveBeenCalledWith("https://classicade.app/games/chess/rooms/AB2CD3?via=copy");
     // The toast area is on the page from the start, and the words arrive a moment after the copy (CC-288).
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Link copied"));
+  });
+
+  it("says how to copy by hand when the share sheet and the clipboard both refuse", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      share: vi.fn().mockRejectedValue(new DOMException("not allowed", "NotAllowedError")),
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+    withToasts(<ShareRoom code="AB2CD3" gameId="chess" origin="https://classicade.app" />);
+
+    await user.click(screen.getByRole("button", { name: "Share…" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't copy. Select the link and copy it");
   });
 
   it("closing the share sheet without sharing is not an error", async () => {

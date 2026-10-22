@@ -3,6 +3,8 @@ import { getLeaderboard } from "@classicade/shared";
 import { paths } from "../../app/paths.js";
 import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
 import { useLeaderboard } from "../../hooks/useLeaderboard.js";
+import { Button } from "../Button/Button.jsx";
+import { Card, CardFooter, CardHeader } from "../Card/Card.jsx";
 import styles from "./YourRank.module.css";
 
 const BOARDS = Object.freeze(["overall", "weekly"]);
@@ -29,11 +31,17 @@ function Standing({ boardId }) {
  */
 export function YourRank({ identity }) {
   return (
-    <section className={styles.card} aria-labelledby="your-rank">
-      <h2 id="your-rank" className={styles.heading}>
-        <AchievementIcon name="trophy" tier="gold" className={styles.trophy} />
-        Your rank
-      </h2>
+    <Card as="section" aria-labelledby="your-rank">
+      <CardHeader
+        id="your-rank"
+        title={
+          <span className={styles.heading}>
+            <AchievementIcon name="trophy" tier="gold" className={styles.trophy} />
+            Your rank
+          </span>
+        }
+        description="Your place on the XP boards: all time, and this week."
+      />
       <dl className={styles.stats}>
         {BOARDS.map((boardId) => (
           <Standing key={boardId} boardId={boardId} />
@@ -47,9 +55,11 @@ export function YourRank({ identity }) {
           to keep your place on the boards.
         </p>
       )}
-      <Link to={paths.leaderboards()} data-cc-control="rank.leaderboards">
-        See the leaderboards
-      </Link>
-    </section>
+      <CardFooter>
+        <Button as="link" to={paths.leaderboards()} control="rank.leaderboards" variant="secondary" size="sm">
+          See the leaderboards
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }

@@ -1,5 +1,5 @@
-import { useId } from "react";
 import { birthYearChoices } from "@classicade/shared";
+import { Field } from "../Field/Field.jsx";
 import { AGE_COPY } from "./ageCopy.js";
 import styles from "./YearSelect.module.css";
 
@@ -9,7 +9,7 @@ export const YEAR_NOT_SAID = "";
 /**
  * A neutral year of birth picker (CC-152). It starts at "I'd rather not say", the choice that shares the least, and
  * lists every year from this year back 100 years with no hint that any year matters. Only the year is asked, never
- * a date.
+ * a date. It is the app's select field (CC-323), so it looks like every other field.
  *
  * @param {{
  *   currentYear: number,
@@ -22,49 +22,46 @@ export const YEAR_NOT_SAID = "";
  *   different year cannot be sent again in the same visit
  */
 export function YearSelect({ currentYear, value, onChange, error = "", locked = false, control }) {
-  const id = useId();
-  const hintId = `${id}-hint`;
-  const errorId = `${id}-error`;
-  return (
-    <div className={styles.field}>
-      <label htmlFor={id}>Year of birth</label>
-      <select
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={locked}
-        aria-invalid={error !== "" || undefined}
-        aria-describedby={[hintId, error && errorId].filter(Boolean).join(" ")}
-        data-cc-control={control}
-      >
-        <option value={YEAR_NOT_SAID}>I&apos;d rather not say</option>
-        {birthYearChoices(currentYear).map((year) => (
-          <option key={year} value={String(year)}>
-            {year}
-          </option>
-        ))}
-      </select>
-      <p id={hintId} className={styles.hint}>
+  const hint = (
+    <>
+      <span lang="hi-Latn" className={styles.line}>
+        {AGE_COPY.hint.hi}
+      </span>
+      <span lang="en" className={styles.line}>
+        {AGE_COPY.hint.en}
+      </span>
+    </>
+  );
+  // After an under 13 refusal, the only time the choice is locked, the refusal in Hinglish too.
+  const refusal = error && (
+    <>
+      {locked && (
         <span lang="hi-Latn" className={styles.line}>
-          {AGE_COPY.hint.hi}
+          {AGE_COPY.tooYoung.hi}
         </span>
-        <span lang="en" className={styles.line}>
-          {AGE_COPY.hint.en}
-        </span>
-      </p>
-      {error && (
-        <p id={errorId} className={styles.error}>
-          {/* After an under 13 refusal, the only time the choice is locked, the refusal in Hinglish too. */}
-          {locked && (
-            <span lang="hi-Latn" className={styles.line}>
-              {AGE_COPY.tooYoung.hi}
-            </span>
-          )}
-          <span lang="en" className={styles.line}>
-            {error}
-          </span>
-        </p>
       )}
-    </div>
+      <span lang="en" className={styles.line}>
+        {error}
+      </span>
+    </>
+  );
+  return (
+    <Field
+      label="Year of birth"
+      kind="select"
+      hint={hint}
+      error={refusal || ""}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      disabled={locked}
+      data-cc-control={control}
+    >
+      <option value={YEAR_NOT_SAID}>I&apos;d rather not say</option>
+      {birthYearChoices(currentYear).map((year) => (
+        <option key={year} value={String(year)}>
+          {year}
+        </option>
+      ))}
+    </Field>
   );
 }

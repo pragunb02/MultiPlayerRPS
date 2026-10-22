@@ -4,7 +4,7 @@
   flex-direction: column;
 }
 .hinglish {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .form {
   display: grid;
@@ -50,7 +50,7 @@
 .error {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-danger);
 }
 .thanks {

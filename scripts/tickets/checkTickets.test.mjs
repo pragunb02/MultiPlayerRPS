@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { GATED, STATUSES, checkTicket, isTemplateName, ticketStatus } from "./checkTickets.mjs";
+import {
+  FRICTION_GUARDRAIL_FROM,
+  GATED,
+  STATUSES,
+  checkTicket,
+  isTemplateName,
+  ticketStatus,
+} from "./checkTickets.mjs";
 
 const TODAY = "2026-10-20";
 
@@ -168,5 +175,62 @@ describe("the ticket files", () => {
     expect(isTemplateName("TEMPLATE.md")).toBe(true);
     expect(isTemplateName("TEMPLATE-lite.md")).toBe(true);
     expect(isTemplateName("CC-311.md")).toBe(false);
+  });
+});
+
+describe("the friction guardrail (CC-313 section 6)", () => {
+  /** A full ticket of a type, started on a day, with these Success metric rows. */
+  const featureTicket = ({
+    type = "feature",
+    started = FRICTION_GUARDRAIL_FROM,
+    kinds = ["Primary", "Guardrail"],
+  } = {}) =>
+    ticket()
+      .replace(
+        "| Status   | Ready |",
+        `| Status   | Ready |\n| Type     | ${type} |\n| Started  | ${started} |`,
+      )
+      .concat(
+        [
+          "## Success metric",
+          "",
+          "| Kind | Metric | Target | Window |",
+          "| ---- | ------ | ------ | ------ |",
+          ...kinds.map((kind) => `| ${kind} | something | 1 | 7 days |`),
+          "",
+        ].join("\n"),
+      );
+
+  // AC-11 (CC-313)
+  it("a new feature ticket must name a friction guardrail", () => {
+    const missing = checkTicket({ name: "CC-400.md", text: featureTicket(), today: TODAY });
+    expect(missing).toEqual([
+      `docs/tickets/CC-400.md (Ready): a feature ticket started on or after ${FRICTION_GUARDRAIL_FROM} needs a Friction guardrail row in its Success metric table (CC-313)`,
+    ]);
+
+    const named = featureTicket({ kinds: ["Primary", "**Friction guardrail**"] });
+    expect(checkTicket({ name: "CC-400.md", text: named, today: TODAY })).toEqual([]);
+
+    // An older feature ticket, and a ticket of another type, are not checked.
+    expect(
+      checkTicket({ name: "CC-400.md", text: featureTicket({ started: "2026-10-20" }), today: TODAY }),
+    ).toEqual([]);
+    expect(
+      checkTicket({ name: "CC-400.md", text: featureTicket({ type: "security" }), today: TODAY }),
+    ).toEqual([]);
+    // A ticket at Ready with no start day is new work, so it is checked (review of #162).
+    expect(
+      checkTicket({ name: "CC-400.md", text: featureTicket({ started: "—" }), today: TODAY }),
+    ).toHaveLength(1);
+  });
+
+  it("reads the first day of an annotated Started cell and the first word of an annotated Type cell", () => {
+    const annotated = featureTicket({
+      started: `${FRICTION_GUARDRAIL_FROM} (reopened 2026-11-02)`,
+      type: "feature (from CC-207)",
+    });
+    expect(checkTicket({ name: "CC-400.md", text: annotated, today: TODAY })).toHaveLength(1);
+    const older = featureTicket({ started: "2026-10-19, shaped 2026-10-22" });
+    expect(checkTicket({ name: "CC-400.md", text: older, today: TODAY })).toEqual([]);
   });
 });

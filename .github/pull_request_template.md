@@ -19,6 +19,8 @@ An AC that is not met is cut (say why, and where it went) or blocks the merge. L
 
 - [ ] CI green (all required checks, branch up to date with `main`)
 - [ ] Every AC above has a test and evidence, and the ticket's Status says Building or later
+- [ ] A feature names its Friction guardrail (CC-313), and any new toast, banner, dialog, card, request or step is
+      registered in `packages/shared/src/telemetry/surfaces.js` or `funnels.js`
 - [ ] Ran it for real (what was checked):
 - [ ] Changelog fragment `docs/changes/CC-###.md` added; PROGRESS.md, board rows and next free lines untouched (CC-299)
 

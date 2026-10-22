@@ -104,16 +104,18 @@ function BlockDialog({ room, seat, index, onClose, onBlocked }) {
     async () => {
       await blockPlayer({ roomCode: room.code, seat: index, seatId: seat.playerId });
       onClose();
-      toast.show(`You blocked ${name}.`, { tone: "info" });
+      toast.show(`You blocked ${name}.`, { surface: "toast.blocked", tone: "info" });
       onBlocked();
     },
     { id: "room.seat.block.confirm" },
   );
   return (
     <Modal
+      surface="dialog.block"
       open
       title={`Block ${name}?`}
       onClose={onClose}
+      destructive
       actions={
         <>
           <Button control="room.seat.block.cancel" variant="secondary" onClick={onClose}>
@@ -121,7 +123,7 @@ function BlockDialog({ room, seat, index, onClose, onBlocked }) {
           </Button>
           <Button
             control="room.seat.block.confirm"
-            variant="accent"
+            variant="danger"
             action={confirm}
             pendingLabel="Blocking…"
           >

@@ -89,7 +89,7 @@ export function MatchFrame({
 }) {
   return (
     <MatchAnnouncer urgent={result ? momentAnnouncement(result.moment) : ""}>
-      <section className={styles.shell} data-cc-phase={phase} data-cc-request={request}>
+      <section data-cc-phase={phase} data-cc-request={request}>
         <PageTitle>{pageTitle}</PageTitle>
         {banner}
         <header className={styles.matchBar} data-cc-slot="match-bar">

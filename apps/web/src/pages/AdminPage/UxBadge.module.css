@@ -1,0 +1,34 @@
+/* A budget colour (CC-313): a word on the status role's pale background, with a dot of the solid colour. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--type-caption);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-body);
+  white-space: nowrap;
+}
+.dot {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+.green {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+.amber {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+.red {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+.none {
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+}

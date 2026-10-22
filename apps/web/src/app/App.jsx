@@ -10,6 +10,7 @@ import { ToastProvider } from "../components/Toast/ToastProvider.jsx";
 import { SessionProvider } from "../hooks/SessionProvider.jsx";
 import { countRenderErrors } from "../lib/telemetry/errorFields.js";
 import { NO_TELEMETRY } from "../lib/telemetry/facade.js";
+import { InterruptionHost } from "../lib/telemetry/InterruptionHost.jsx";
 import { TelemetryStub } from "../lib/telemetry/TelemetryStub.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { prefetchOnIntent } from "./routePrefetch.js";
@@ -40,6 +41,7 @@ export function App({ services }) {
       <ServicesProvider services={services}>
         <SessionProvider>
           <TelemetryStub />
+          <InterruptionHost />
           <ToastProvider>
             <SaveProgressProvider>
               <MatchProgressProvider>

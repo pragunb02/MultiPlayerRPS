@@ -27,6 +27,9 @@ describe("the lobby's How to play strip (CC-259)", () => {
       "Rock beats scissors, scissors beat paper, paper beats rock.",
       "Win more than half of the rounds to take the match.",
     ]);
+    // A titled section with its one line, each step a shared card (CC-323).
+    expect(strip()).toHaveTextContent("Three steps, then it is your move.");
+    for (const step of steps()) expect(step).toHaveAttribute("data-cc-card", "surface");
   });
 
   it.each([

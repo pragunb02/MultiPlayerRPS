@@ -10,6 +10,8 @@ import {
   PLAYER_ROLES,
   STATUS_ROLES,
   TYPE_ROLES,
+  WEIGHTS,
+  BREAKPOINTS,
 } from "./tokenRoles.js";
 
 // The token files are the only source of the values (CC-314): tokens.css imports one file per role from tokens/.
@@ -45,8 +47,8 @@ const THEMES = Object.freeze({ light: LIGHT, dark: DARK });
 // that one file and nowhere else.
 const OWNERS = Object.freeze([
   ["palette.css", /^--(color-|gradient-|grid-line)/],
-  ["type.css", /^--(font-|text-|type-|leading-)/],
-  ["space.css", /^--(space-|radius-|content-width)/],
+  ["type.css", /^--(font-|text-|type-|leading-|weight-)/],
+  ["space.css", /^--(space-|radius-|content-width|target-|breakpoint-)/],
   ["elevation.css", /^--(shadow-|glow-|elevation-)/],
   ["layers.css", /^--layer-/],
   ["motion.css", /^--(duration-|ease-)/],
@@ -82,7 +84,14 @@ describe("tokens.css", () => {
     for (const behind of [bg, surface]) {
       expect(contrastRatio(valueOf(theme, "--color-focus"), behind)).toBeGreaterThanOrEqual(3);
     }
-    for (const { token } of [...TYPE_ROLES, ...LEADING_ROLES, ...ELEVATIONS, ...LAYERS]) {
+    for (const { token } of [
+      ...TYPE_ROLES,
+      ...LEADING_ROLES,
+      ...ELEVATIONS,
+      ...LAYERS,
+      ...WEIGHTS,
+      ...BREAKPOINTS,
+    ]) {
       expect(theme[token], `${token} is missing`).toBeDefined();
     }
   });

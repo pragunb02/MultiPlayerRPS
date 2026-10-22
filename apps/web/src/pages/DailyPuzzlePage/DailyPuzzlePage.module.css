@@ -29,18 +29,16 @@
 }
 .header h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
 }
 .day {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-text-muted);
 }
 .task {
   margin: var(--space-1) 0 0;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .rating {
   margin-left: var(--space-2);
@@ -52,20 +50,8 @@
 }
 .problem {
   margin: 0;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-danger);
-}
-
-.panel {
-  display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border: 2px solid var(--color-border);
-  border-bottom-width: 6px;
-  border-bottom-color: var(--color-game-chess);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
 }
 
 /* Tries left: one dot per try, full while it is left, hollow once used. The words say the same. */
@@ -74,7 +60,7 @@
   align-items: center;
   gap: var(--space-3);
   margin: 0;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .marks {
   display: inline-flex;
@@ -117,7 +103,7 @@
 }
 .solution {
   font-family: var(--font-mono);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 .next {
   font-size: var(--text-sm);
@@ -132,12 +118,12 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--color-text);
 }
 .best {
   font-size: var(--text-sm);
-  font-weight: 400;
+  font-weight: var(--weight-regular);
   color: var(--color-text-muted);
 }
 .atRisk {
@@ -148,9 +134,4 @@
   margin: 0;
   font-size: var(--text-xs);
   color: var(--color-text-muted);
-}
-.failed {
-  display: grid;
-  gap: var(--space-3);
-  justify-items: start;
 }

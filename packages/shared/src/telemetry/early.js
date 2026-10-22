@@ -32,6 +32,13 @@ export const TELEMETRY_BUCKETS = Object.freeze({
   AFTER_S: Object.freeze(["0-10", "10-60", "60-600", "600+"]),
   GUEST_MATCHES: Object.freeze(["0", "1", "2-5", "6-20", "21+"]),
   GUEST_AGE_DAYS: Object.freeze(["0", "1", "2-7", "8+"]),
+  // CC-313
+  SHOWN_MS: Object.freeze(["0-1s", "1-3s", "3-10s", "10s+"]),
+  STACK: Object.freeze(["0", "1", "2+"]),
+  INTERRUPTIONS: Object.freeze(["0", "1", "2", "3-5", "6+"]),
+  BLOCKING_INTERRUPTIONS: Object.freeze(["0", "1", "2+"]),
+  INTERRUPTIONS_BEFORE: Object.freeze(["0", "1", "2", "3+"]),
+  WORDS: Object.freeze(["0-50", "51-100", "101-200", "201-400", "400+"]),
 });
 
 /** The constructor names `client_errored` may carry. Any other is `other`. */

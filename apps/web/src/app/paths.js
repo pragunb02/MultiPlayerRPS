@@ -28,6 +28,7 @@ import {
  *   /admin/reports?status=…            the console's report queue (CC-044)
  *   /admin/flags                       the console's feature flags (CC-312)
  *   /admin/design                      the console's living design contract (CC-314)
+ *   /admin/ux  /admin/ux/:section?from=…&to=…   the console's UX page (CC-177) and its Week view (CC-313)
  *
  * Each page renders only at its canonical URL and replaces any other spelling of it (old URLs, ids instead of
  * slugs, lower-case room codes), so one screen always has exactly one URL.
@@ -58,7 +59,20 @@ export const ROUTES = Object.freeze({
   ADMIN_AGES: "admin/ages",
   ADMIN_FLAGS: "admin/flags",
   ADMIN_DESIGN: "admin/design",
+  ADMIN_UX: "admin/ux",
+  ADMIN_UX_SECTION: "admin/ux/:section",
 });
+
+/** The UX page's sections (CC-177), in tab order. `week` is CC-313's weekly report, behind `console_ux_week`. */
+export const UX_SECTIONS = Object.freeze([
+  "week",
+  "funnels",
+  "clicks",
+  "errors",
+  "speed",
+  "latency",
+  "interruptions",
+]);
 
 /** The owner console's pages after its overview, in tab order (CC-233). Each is the URL segment after /admin. */
 export const ADMIN_SECTIONS = Object.freeze([
@@ -203,6 +217,15 @@ export const paths = Object.freeze({
   adminFlags: () => "/admin/flags",
   /** The console's living design contract (CC-314). */
   adminDesign: () => "/admin/design",
+  /**
+   * The console's UX page (CC-177): one of its sections for a range. Without a section it opens on the week on a
+   * Monday and on the funnels otherwise. Without a range, the last 7 full India days (the last full week for `week`).
+   *
+   * @param {string} [section]  a UX_SECTIONS value
+   * @param {{ from?: string, to?: string }} [range]
+   */
+  adminUx: (section, range = {}) =>
+    `/admin/ux${section ? `/${section}` : ""}${queryOf(range, ["from", "to"])}`,
 });
 
 /**

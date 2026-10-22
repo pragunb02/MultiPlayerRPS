@@ -1,7 +1,8 @@
 import { useId } from "react";
 import { AchievementIcon } from "../../art/achievements/AchievementIcon.jsx";
 import { useAchievements } from "../../hooks/useAchievements.js";
-import { Button } from "../Button/Button.jsx";
+import { Card, CardHeader } from "../Card/Card.jsx";
+import { ErrorState, Skeleton } from "../States/States.jsx";
 import styles from "./AchievementGrid.module.css";
 
 const TIER_LABEL = Object.freeze({ bronze: "Bronze", silver: "Silver", gold: "Gold", platinum: "Platinum" });
@@ -69,15 +70,14 @@ export function AchievementGrid() {
 
   let body;
   if (achievements.status === "loading") {
-    body = <p>Loading achievements…</p>;
+    body = <Skeleton label="Loading achievements" shape="row" count={4} />;
   } else if (achievements.status === "error") {
     body = (
-      <div role="alert" className={styles.problem}>
-        <p>Couldn't load achievements. {achievements.error.message}</p>
-        <Button control="achievements.retry" variant="secondary" onClick={achievements.retry}>
-          Try again
-        </Button>
-      </div>
+      <ErrorState
+        title={`Couldn't load achievements. ${achievements.error.message}`}
+        control="achievements"
+        onRetry={achievements.retry}
+      />
     );
   } else {
     const list = achievements.data;
@@ -100,11 +100,13 @@ export function AchievementGrid() {
   }
 
   return (
-    <section className={styles.card} aria-labelledby={headingId}>
-      <h3 id={headingId} className={styles.heading}>
-        Achievements
-      </h3>
+    <Card as="section" aria-labelledby={headingId}>
+      <CardHeader
+        id={headingId}
+        title="Achievements"
+        description="Every medal in the arcade: unlocked ones with their day, locked ones with how far you are."
+      />
       {body}
-    </section>
+    </Card>
   );
 }

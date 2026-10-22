@@ -23,12 +23,17 @@
 }
 .links {
   display: inline-flex;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
 }
+/* Every link and the Feedback button is at least 24 px tall, the WCAG 2.5.8 floor (CC-323). */
 .footer a,
 .feedback {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
   color: var(--color-text);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 /* It opens a dialog, so it is a button, drawn like the links beside it. */
 .feedback {
@@ -36,7 +41,7 @@
   border: 0;
   background: none;
   font: inherit;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   text-decoration: underline;
   cursor: pointer;
 }

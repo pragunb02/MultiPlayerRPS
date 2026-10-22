@@ -15,9 +15,9 @@ const MISSING_ASSET_TYPES = Object.freeze({
 });
 // The same words for every missing file. Repeating the requested path would let a crafted URL write script.
 const MISSING_ASSET = "/* Not found: this file is not part of this version of the site. */\n";
-// The owner console and its sections (CC-233). Not in the shared page list, because to everyone but an admin
-// these addresses do not exist.
-const ADMIN_PAGES = /^\/admin(\/[a-z]+)?\/?$/;
+// The owner console and its sections (CC-233), and the UX page's own sections (CC-177). Not in the shared page list,
+// because to everyone but an admin these addresses do not exist.
+const ADMIN_PAGES = /^\/admin(\/[a-z]+|\/ux\/[a-z]+)?\/?$/;
 const ADMIN_PAGE = Object.freeze({
   found: true,
   title: `Owner console · ${SITE_NAME}`,

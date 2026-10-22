@@ -1,24 +1,7 @@
-/* The lobby's main panel: play the computer character at once (CC-221). */
-.panel {
-  display: grid;
-  gap: var(--space-4);
-  align-content: start;
-  background: var(--color-surface);
-  border: 2px solid var(--color-primary);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  box-shadow: var(--glow-primary);
-}
-.panel h2 {
-  margin: 0;
-}
-.who {
-  margin: 0;
-  color: var(--color-text-muted);
-}
+/* The lobby's featured card: play the computer character at once (CC-221). The card itself is the shared Card. */
 .badge {
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0 var(--space-2);
@@ -30,6 +13,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+/* The picked level: pressed, in the brand colour, with its name in words beside the levels below. */
+.picked {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  box-shadow: var(--shadow-press-small);
 }
 .note {
   margin: 0;

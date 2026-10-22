@@ -1,3 +1,5 @@
+import { Card } from "../../components/Card/Card.jsx";
+import { Section } from "../../components/Page/Page.jsx";
 import { BarChart, ChartFigure, Heatmap, RankBars } from "./charts.jsx";
 import {
   boardName,
@@ -47,32 +49,59 @@ const HEADLINES = Object.freeze({
   conversionRate: { label: "Guest to account", format: formatShare, note: "Share of guests who played" },
 });
 
+/** An arrow for the direction of a change. The words beside it carry the meaning, so it is hidden from readers. */
+function Direction({ change }) {
+  if (change.startsWith("+")) return <span aria-hidden="true">▲ </span>;
+  if (change.startsWith("−")) return <span aria-hidden="true">▼ </span>;
+  return null;
+}
+
 /**
  * One number with its name, the period before and the change.
  *
  * @param {{ label: string, value: string, note: string, previous?: string, change?: string }} props
  */
-function Tile({ label, value, note, previous, change }) {
+function Tile({ label, value, note, previous, change = "" }) {
   return (
-    <div className={styles.tile}>
+    <Card as="div" className={styles.tile}>
       <dt className={styles.tileLabel}>{label}</dt>
       <dd className={styles.tileValue}>{value}</dd>
-      <dd className={styles.tileNote}>
-        {note}
-        {previous !== undefined && (
-          <>
-            <br />
-            Before: {previous}
-            {change ? ` (${change})` : ""}
-          </>
-        )}
-      </dd>
-    </div>
+      <dd className={styles.tileNote}>{note}</dd>
+      {previous !== undefined && (
+        <dd className={styles.tileBefore}>
+          Before: {previous}
+          {change !== "" && (
+            <>
+              {" "}
+              (<Direction change={change} />
+              {change})
+            </>
+          )}
+        </dd>
+      )}
+    </Card>
   );
 }
 
+/**
+ * A titled group of headline numbers, with the time window they cover.
+ *
+ * @param {{ title: string, description: string, children: import("react").ReactNode }} props
+ */
+function Tiles({ title, description, children }) {
+  return (
+    <Section title={title} description={description}>
+      <dl className={styles.tiles}>{children}</dl>
+    </Section>
+  );
+}
+
+/** The window every tile of a page covers, in words. */
+const windowOf = (range) => `From ${range.from} to ${range.to}, India time.`;
+
 const seriesOf = (rows, pick) => rows.map((row) => ({ label: row.bucket, values: pick(row) }));
 const summaryOf = (what, rows, values) => {
+  if (rows.length === 0) return `${what}. Nothing yet in this period.`;
   const numbers = values.filter((value) => typeof value === "number");
   const most = numbers.length === 0 ? 0 : Math.max(...numbers);
   return `${what}, ${rows.length} bars from ${rows[0].bucket} to ${rows[rows.length - 1].bucket}. Highest ${formatCount(most)}. The same numbers are in the table below.`;
@@ -84,7 +113,10 @@ export function Overview({ report }) {
   const returning = report.players.weeklyReturning;
   return (
     <>
-      <dl className={styles.tiles} aria-label="Headline numbers">
+      <Tiles
+        title="Headline numbers"
+        description={`${windowOf(range)} Each against ${range.previous.from} to ${range.previous.to}, the same number of days just before.`}
+      >
         {report.overview.headlines.map((headline) => {
           const { id, value, previous, change } = headline;
           const info = HEADLINES[id];
@@ -99,12 +131,10 @@ export function Overview({ report }) {
             />
           );
         })}
-      </dl>
-      <p className={styles.compare}>
-        Compared with {range.previous.from} to {range.previous.to}, the same number of days just before.
-      </p>
+      </Tiles>
       <ChartFigure
         id="weekly-returning"
+        unit="players a week"
         title="Weekly returning players"
         note="Players with a counted match on 3 or more different days of a week, Monday to Sunday, India time. Guardrails: the share who played a person that week, and the share who are accounts."
         range={range}
@@ -124,7 +154,7 @@ export function Overview({ report }) {
             returning.map((row) => row.players),
           )}
           rows={returning.map((row) => ({ label: row.week, values: { players: row.players } }))}
-          series={[{ key: "players", label: "Returning players", tone: "accent" }]}
+          series={[{ key: "players", label: "Returning players", tone: "primary" }]}
         />
       </ChartFigure>
       <ComingNext />
@@ -138,7 +168,7 @@ export function Players({ report }) {
   const { summary } = players;
   return (
     <>
-      <dl className={styles.tiles} aria-label="Activity">
+      <Tiles title="Activity" description={`${windowOf(range)} Players who finished a match.`}>
         <Tile
           label="Daily active, average"
           value={formatDecimal(summary.dailyAverage)}
@@ -152,9 +182,10 @@ export function Players({ report }) {
           note="Daily average of the last 30 days over monthly active"
         />
         <Tile label="Guests" value={formatShare(players.kinds.guestShare)} note="Share of active players" />
-      </dl>
+      </Tiles>
       <ChartFigure
         id="active-players"
+        unit="players"
         title="Active players"
         note="Different players who finished a match in each period. A player counts once per bar."
         range={range}
@@ -181,6 +212,7 @@ export function Players({ report }) {
       </ChartFigure>
       <ChartFigure
         id="new-players"
+        unit="players"
         title="New players"
         note="Players whose first finished match ever falls in each period."
         range={range}
@@ -197,7 +229,7 @@ export function Players({ report }) {
             players.newPlayers.map((row) => row.players),
           )}
           rows={seriesOf(players.newPlayers, (row) => ({ players: row.players }))}
-          series={[{ key: "players", label: "New players", tone: "gold" }]}
+          series={[{ key: "players", label: "New players", tone: "primary" }]}
         />
       </ChartFigure>
     </>
@@ -219,6 +251,7 @@ export function Games({ report }) {
     <>
       <ChartFigure
         id="matches"
+        unit="matches"
         title="Matches finished"
         note="Every finished match, by game."
         range={range}
@@ -245,6 +278,7 @@ export function Games({ report }) {
       </ChartFigure>
       <ChartFigure
         id="games"
+        unit="matches, share and seconds"
         title="Games"
         note="Each game's share of matches, the median match length, and the rematch rate: the share of matches played again in the same room."
         range={range}
@@ -267,6 +301,7 @@ export function Games({ report }) {
       </ChartFigure>
       <ChartFigure
         id="who-played"
+        unit="matches"
         title="Who played whom"
         note={`Matches between accounts only, guests only, or both. Bot matches light up when characters arrive (CC-138). Rematch rate overall: ${formatShare(games.rematch.overall)}.`}
         range={range}
@@ -285,6 +320,7 @@ export function Games({ report }) {
       />
       <ChartFigure
         id="fair-play"
+        unit="player results"
         title="Did not count (anti-farming)"
         note={`Of ${formatCount(fairPlay.judgedSeats)} judged player results, ${formatShare(fairPlay.share)} did not count (CC-095). A rising share means farming, or a limit too tight for honest play.`}
         range={range}
@@ -326,6 +362,7 @@ export function Retention({ report }) {
   return (
     <ChartFigure
       id="retention"
+      unit="share of new players"
       title="Cohort retention"
       note="Players grouped by the week of their first match. A return is a finished match exactly 1, 7 or 30 days after the first day. Only players whose return day is over are counted. ± is the 95% margin of error: trust a cohort of 300 or more."
       range={range}
@@ -347,7 +384,10 @@ export function Conversion({ report }) {
   const { range, conversion } = report;
   return (
     <>
-      <dl className={styles.tiles} aria-label="Conversion">
+      <Tiles
+        title="Conversion"
+        description={`${windowOf(range)} Guests who kept their games, and new accounts.`}
+      >
         <Tile
           label="Guest to account"
           value={formatShare(conversion.rate)}
@@ -364,9 +404,10 @@ export function Conversion({ report }) {
           value={formatCount(conversion.legacyReturned)}
           note="Players of the old site who logged in for the first time, not counted as sign ups"
         />
-      </dl>
+      </Tiles>
       <ChartFigure
         id="conversion"
+        unit="players and accounts"
         title="Sign ups"
         note="Guests whose games moved to an account (they signed up or logged in), and every new account. Players of the old site get an account at their first login: they are counted apart, not as sign ups or converted guests. A guest is a cookie, so one person on two devices counts twice."
         range={range}
@@ -385,7 +426,7 @@ export function Conversion({ report }) {
             conversion.series.map((row) => row.guestsConverted),
           )}
           rows={seriesOf(conversion.series, (row) => ({ guests: row.guestsConverted }))}
-          series={[{ key: "guests", label: "Guests who saved progress", tone: "accent" }]}
+          series={[{ key: "guests", label: "Guests who saved progress", tone: "primary" }]}
         />
       </ChartFigure>
     </>
@@ -411,6 +452,7 @@ export function Engagement({ report }) {
     <>
       <ChartFigure
         id="busy-hours"
+        unit="matches an hour"
         title="Busiest hours (India time)"
         note="Matches finished in each hour of each weekday. Hatched cells had 1 to 4 matches."
         range={range}
@@ -428,6 +470,7 @@ export function Engagement({ report }) {
       </ChartFigure>
       <ChartFigure
         id="achievements"
+        unit="players"
         title="Top achievements unlocked"
         note="Players who unlocked each achievement in this period."
         range={range}
@@ -437,10 +480,11 @@ export function Engagement({ report }) {
           { label: "Players", value: (row) => row.count, format: "count" },
         ]}
       >
-        <RankBars items={ranked(engagement.achievements)} tone="gold" />
+        <RankBars items={ranked(engagement.achievements)} />
       </ChartFigure>
       <ChartFigure
         id="quests"
+        unit="completions"
         title="Daily quests completed"
         note="Completions of each quest. Quest days are kept for 8 days, so older completions are not counted."
         range={range}
@@ -450,10 +494,11 @@ export function Engagement({ report }) {
           { label: "Completions", value: (row) => row.count, format: "count" },
         ]}
       >
-        <RankBars items={ranked(engagement.quests)} tone="xp" />
+        <RankBars items={ranked(engagement.quests)} />
       </ChartFigure>
       <ChartFigure
         id="leaderboards"
+        unit="accounts"
         title="Leaderboard participants"
         note="Accounts on each board. A board tab is worth showing at 25 entries, and a game page's top 5 at 50 (ADR-029). Weekly entries are kept for 28 days after the week ends, so older weeks say no longer kept."
         range={range}
@@ -494,23 +539,20 @@ const COMING_NEXT = Object.freeze([
   ["Bot XP per player per day", "needs characters seated in rooms (CC-138)"],
 ]);
 
-/** The "Coming next" panel: what needs new tracking before it can be shown. */
+/** The "Coming next" section: what needs new tracking before it can be shown. */
 export function ComingNext() {
   return (
-    <section className={styles.coming} aria-labelledby="coming-next">
-      <h2 id="coming-next" className={styles.comingTitle}>
-        Coming next
-      </h2>
-      <p className={styles.comingNote}>
-        This console reads only what the site already stores. These need new tracking first.
-      </p>
-      <ul className={styles.comingList}>
+    <Section
+      title="Coming next"
+      description="This console reads only what the site already stores. These need new tracking first."
+    >
+      <ul className={styles.list}>
         {COMING_NEXT.map(([what, needs]) => (
           <li key={what}>
             <strong>{what}</strong>: {needs}.
           </li>
         ))}
       </ul>
-    </section>
+    </Section>
   );
 }
