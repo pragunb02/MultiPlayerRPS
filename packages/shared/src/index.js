@@ -23,6 +23,7 @@ export {
   CHALLENGE_STATES,
   isChallengeId,
 } from "./challenges.js";
+export { DEVICE_BROWSERS, DEVICE_SYSTEMS, DEVICE_UNKNOWN } from "./devices.js";
 export { ERROR_CODES } from "./errors.js";
 export {
   FEEDBACK_DEFAULT_TYPE,

@@ -29,7 +29,9 @@ export function PrivacyPage() {
           <li>
             <strong>Your session.</strong> When you choose to play, as a guest or with an account, we start a
             session: a random id in a cookie, and on our side who that id belongs to. It is how the site knows
-            it is still you on the next page and in the game. Just looking around starts no session.
+            it is still you on the next page and in the game. Just looking around starts no session. A
+            signed-in session also keeps the kind of browser and device it is on, such as Chrome on Android,
+            so your profile can list where you are signed in. Never a place or an address.
           </li>
           <li>
             <strong>Guests.</strong> A guest gets a random player id and a name like Guest-1234. Nothing else
@@ -241,8 +243,8 @@ export function PrivacyPage() {
           <li>
             Sessions end 30 days after your last visit. A signed-in session also ends 90 days after you sign
             in, and when the password is changed or &quot;sign out other devices&quot; is used on another
-            device. Logging out ends and deletes yours at once. Any other ended session is deleted about 30
-            days after its last use.
+            device. Logging out ends and deletes yours at once, and so does signing a device out from your
+            profile. Any other ended session is deleted about 30 days after its last use.
           </li>
           <li>
             Game rooms are kept 30 minutes to 24 hours after the last activity, and the note that a room

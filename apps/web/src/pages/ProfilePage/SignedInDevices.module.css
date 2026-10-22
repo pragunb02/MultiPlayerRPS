@@ -1,0 +1,50 @@
+/* The signed-in devices under Devices on the profile (CC-262). Rows like the blocked players list, so the profile
+   reads as one page. */
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+  justify-self: stretch;
+}
+/* On a phone the days wrap under the name, and the Sign out button stays at the end of the row. */
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+/* The player's own device, in the colour of the player looking at the screen, always with its words. */
+.current {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-you-soft);
+  color: var(--color-you);
+  font-size: var(--type-caption);
+  font-weight: 700;
+}
+.when {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-size: var(--type-label);
+}
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--type-label);
+}
+.done {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-success);
+}

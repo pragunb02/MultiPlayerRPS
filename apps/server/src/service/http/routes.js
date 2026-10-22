@@ -11,6 +11,7 @@ import { createReportRoutes } from "./reportRoutes.js";
 import { createFriendRoutes } from "./friendRoutes.js";
 import { createFlagRoutes } from "./flagRoutes.js";
 import { createDailyPuzzleRoutes } from "./dailyPuzzleRoutes.js";
+import { createDeviceRoutes } from "./deviceRoutes.js";
 import { createGamificationRoutes } from "./gamificationRoutes.js";
 import { createLeaderboardRoutes } from "./leaderboardRoutes.js";
 import { createMatchRoutes } from "./matchRoutes.js";
@@ -34,6 +35,7 @@ import { createSessionRoutes } from "./sessionRoutes.js";
  *   & { flagComponent: Parameters<typeof createFlagRoutes>[0]["flagComponent"] }
  *   & { dailyPuzzleComponent: Parameters<typeof createDailyPuzzleRoutes>[0]["dailyPuzzleComponent"], dailyPuzzleLimit?: Parameters<typeof createDailyPuzzleRoutes>[0]["limit"] }
  *   & { safetyComponent: Parameters<typeof createSafetyRoutes>[0]["safetyComponent"] }
+ *   & { deviceComponent: Parameters<typeof createDeviceRoutes>[0]["deviceComponent"] }
  *   & { build: Readonly<import("../../config/build.js").BuildSettings> }} deps  `build` is shown on the health check (CC-303)
  */
 export function apiRouter({
@@ -69,6 +71,7 @@ export function apiRouter({
   dailyPuzzleComponent,
   dailyPuzzleLimit,
   safetyComponent,
+  deviceComponent,
   flagComponent,
   build,
   ...sessionDeps
@@ -95,6 +98,7 @@ export function apiRouter({
       ...(authLimits && { limits: authLimits }),
     }),
   );
+  router.use(createDeviceRoutes({ deviceComponent, onSessionEnded: sessionDeps.onSessionEnded, now }));
   router.use(
     createAccountRoutes({
       accountComponent,

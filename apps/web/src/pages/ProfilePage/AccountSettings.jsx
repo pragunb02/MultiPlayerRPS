@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Button } from "../../components/Button/Button.jsx";
 import { Field } from "../../components/Field/Field.jsx";
 import { useAction } from "../../hooks/useAction.js";
+import { useDevices } from "../../hooks/useDevices.js";
 import { useSession } from "../../hooks/useSession.js";
 import styles from "./AccountSettings.module.css";
+import { SignedInDevices } from "./SignedInDevices.jsx";
 
 const NO_PASSWORDS = Object.freeze({ currentPassword: "", newPassword: "" });
 const PASSWORD_FIELDS = Object.freeze(["currentPassword", "newPassword"]);
@@ -11,10 +13,12 @@ const PASSWORD_FIELDS = Object.freeze(["currentPassword", "newPassword"]);
 /**
  * Change password and "sign out other devices" for a signed-in player (CC-116). Both keep this browser signed in
  * and sign out every other one, and each says so when it is done. A refusal of one password box is shown at that
- * box. Anything else is shown under the button, as every button does (CC-164).
+ * box. Anything else is shown under the button, as every button does (CC-164). Above the button, the list of
+ * signed-in devices, read again after either (CC-262).
  */
 export function AccountSettings() {
   const session = useSession();
+  const devices = useDevices();
   const [passwords, setPasswords] = useState(NO_PASSWORDS);
   const [fieldErrors, setFieldErrors] = useState({});
   const [done, setDone] = useState({ password: false, others: false });
@@ -35,6 +39,7 @@ export function AccountSettings() {
       }
       setPasswords(NO_PASSWORDS);
       setDone((current) => ({ ...current, password: true }));
+      devices.reload();
     },
     { id: "profile.account.password" },
   );
@@ -44,6 +49,7 @@ export function AccountSettings() {
       setDone((current) => ({ ...current, others: false }));
       await session.signOutOtherDevices();
       setDone((current) => ({ ...current, others: true }));
+      devices.reload();
     },
     { id: "profile.account.sign_out_others" },
   );
@@ -89,9 +95,10 @@ export function AccountSettings() {
       <div className={styles.part}>
         <h3>Devices</h3>
         <p className={styles.muted}>
-          Signed in on a computer you don't use any more? Sign out everywhere else. This device stays signed
-          in.
+          Signed in on a computer you don't use any more? Sign it out here, or sign out everywhere else. This
+          device stays signed in.
         </p>
+        <SignedInDevices devices={devices} />
         {done.others && (
           <p role="status" className={styles.done}>
             Your other devices are signed out.

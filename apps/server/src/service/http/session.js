@@ -1,8 +1,10 @@
+import { randomBytes } from "node:crypto";
 import session from "express-session";
 import { IDENTITY_KINDS } from "@classicade/shared";
 import { createIdentity } from "../../models/identity.js";
 import { assertDefined, assertFunction } from "../../utils/assert.js";
 import { NotFoundError, UnauthorizedError } from "../../utils/errors.js";
+import { deviceFromUserAgent } from "./userAgentDevice.js";
 
 export const SESSION_COOKIE_NAME = "cc.sid";
 /**
@@ -98,20 +100,40 @@ function regenerateWith(req, fields) {
 }
 
 /**
+ * @typedef {Readonly<{ id: string, browser: string, system: string }>} SessionDevice   the device a signed-in
+ *   session belongs to, as its owner sees it in the devices list (CC-262)
+ */
+
+/**
+ * A new device for a session that signs in: a random id, the only name the browser ever gets for its session, and
+ * the coarse browser and system of its user agent (CC-262, ADR-081). No address and no place are kept.
+ *
+ * @param {string} userAgent  empty when the request had none
+ * @returns {SessionDevice}
+ */
+export const newDevice = (userAgent) =>
+  Object.freeze({ id: randomBytes(16).toString("base64url"), ...deviceFromUserAgent(userAgent) });
+
+/** The request's user agent, empty when it sent none. */
+export const userAgentOf = (req) => req.headers["user-agent"] ?? "";
+
+/**
  * Stores an account's identity in a fresh session id, with the account's session version and the moment of
- * signing in, so the session can be ended later by "sign out other devices" or by its age (CC-116). The old id is
- * destroyed, so a copy of the old cookie no longer works.
+ * signing in, so the session can be ended later by "sign out other devices" or by its age (CC-116), and the device
+ * it is on, so it can be listed and signed out alone (CC-262). The old id is destroyed, so a copy of the old cookie
+ * no longer works.
  *
  * @param {import("express").Request} req
  * @param {{
  *   identity: Readonly<import("../../models/identity.js").Identity>,
  *   sessionVersion: number,
  *   signedInAt: number,
+ *   device: SessionDevice,
  * }} signIn
  * @returns {Promise<void>}
  */
-export const establishAccountSession = (req, { identity, sessionVersion, signedInAt }) =>
-  regenerateWith(req, { identity: { ...identity }, sessionVersion, signedInAt });
+export const establishAccountSession = (req, { identity, sessionVersion, signedInAt, device }) =>
+  regenerateWith(req, { identity: { ...identity }, sessionVersion, signedInAt, device: { ...device } });
 
 /** How long requests that were already on their way with a session id that was just renewed still pass. */
 export const RENEWAL_GRACE_MS = 5_000;
@@ -144,7 +166,9 @@ export function createSessionRenewals({ now, graceMs = RENEWAL_GRACE_MS }) {
  * Sessions are rolling, so every response re-issues the cookie it came with. A request of this browser that was
  * sent before "sign out other devices" (or a password change) but answered after it would set the old id again,
  * over the new one, and the old id is already destroyed: the browser that asked to stay signed in is signed out
- * on its next request. Such a response sets no cookie, and the session it carried is not saved back either.
+ * on its next request. Such a response sets no cookie. It cannot stop the store write, which express-session
+ * starts before the headers: an unchanged session is only touched, which never puts a destroyed one back, and a
+ * changed one is written back and then refused by its old session version (corrected in CC-262).
  *
  * Use it right after the session middleware: a `writeHead` wrapped later runs first, so the session is let go
  * before express-session decides on the cookie.
@@ -259,6 +283,16 @@ export function createSessionGuard({ checkSession, onSessionEnded, renewals, now
       await regenerateSession(req);
       onSessionEnded(endedId);
       req.log.info({ playerId, reason: err.details.reason }, "session ended by the server");
+      next();
+      return;
+    }
+    // A session signed in before CC-262 gets its device the first time it is used, so it can be listed and signed
+    // out alone from then on. With the sign-in time above, these are the only changes ever made to a signed-in
+    // session after it is made, each once. Keep it so: a request of a device being signed out that is still on its
+    // way then only touches its session, which never puts the deleted session back in the store (see ADR-081).
+    // A device without an id counts as none, so a session stored with an empty one is repaired too.
+    if (req.session.identity.kind === IDENTITY_KINDS.USER && req.session.device?.id === undefined) {
+      req.session.device = { ...newDevice(userAgentOf(req)) };
     }
     next();
   };

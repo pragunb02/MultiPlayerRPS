@@ -6,7 +6,8 @@ import http from "node:http";
 import { BOTS, createBotRegistry, createBotThinker, createEngineRegistry, ENGINES } from "@classicade/games";
 import { DAILY_PUZZLE_KINDS, getGame, IDENTITY_KINDS } from "@classicade/shared";
 import { createAccountAccessor } from "./data/accountAccessor.js";
-import { createAccountDeletionAccessor, createSessionAccessor } from "./data/accountDeletionAccessor.js";
+import { createAccountDeletionAccessor } from "./data/accountDeletionAccessor.js";
+import { createSessionAccessor } from "./data/sessionAccessor.js";
 import { createBlockAccessor } from "./data/blockAccessor.js";
 import { createChallengeAccessor } from "./data/challengeAccessor.js";
 import { createFriendAccessor } from "./data/friendAccessor.js";
@@ -27,6 +28,7 @@ import { createPlayerTransferAccessor } from "./data/playerTransferAccessor.js";
 import { createProgressAccessor } from "./data/progressAccessor.js";
 import { createRoomAccessor } from "./data/roomAccessor.js";
 import { createAccountComponent } from "./domain/accounts/accountComponent.js";
+import { createDeviceComponent } from "./domain/accounts/deviceComponent.js";
 import { createPasswordScreen } from "./domain/accounts/passwordScreen.js";
 import { createBreachedPasswordAccessor } from "./data/breachedPasswordAccessor.js";
 import {
@@ -104,7 +106,12 @@ import { createSessionDao } from "./persistence/sessionDao.js";
 import { createSessionStore } from "./persistence/sessionStore.js";
 import { createStatsDao } from "./persistence/statsDao.js";
 import { createHttpApp } from "./service/http/app.js";
-import { createSessionCheck, createSessionMiddleware, SESSION_TTL_SECONDS } from "./service/http/session.js";
+import {
+  createSessionCheck,
+  createSessionMiddleware,
+  SESSION_ABSOLUTE_LIFETIME_MS,
+  SESSION_TTL_SECONDS,
+} from "./service/http/session.js";
 import { createRealtimeGateway } from "./service/realtime/gateway.js";
 import { assertFunction } from "./utils/assert.js";
 import { createBackgroundTasks } from "./utils/backgroundTasks.js";
@@ -782,6 +789,7 @@ export async function startServer({
       friendLinkDao,
       privacyDao,
       featureFlagDao,
+      sessionDao,
     ].map((dao) => dao.ensureIndexes()),
   );
 
@@ -832,6 +840,11 @@ export async function startServer({
       recordCheck: metrics.recordPasswordCheck,
     }),
     accountDeletionAccessor,
+  });
+  const deviceComponent = createDeviceComponent({
+    sessionAccessor,
+    accounts: accountComponent,
+    absoluteLifetimeMs: SESSION_ABSOLUTE_LIFETIME_MS,
   });
   // The under 18 defaults in one place: every social feature reads a player's age policy from here (CC-152).
   const safetyComponent = createSafetyComponent({ ages: accountComponent });
@@ -1159,6 +1172,7 @@ export async function startServer({
     reportComponent,
     dailyPuzzleComponent,
     safetyComponent,
+    deviceComponent,
     flagComponent,
     leaderboardComponent,
     analyticsComponent,

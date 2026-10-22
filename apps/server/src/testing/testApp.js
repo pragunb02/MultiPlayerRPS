@@ -4,7 +4,8 @@ import session from "express-session";
 import { BOTS, createBotRegistry, createBotThinker, createEngineRegistry } from "@classicade/games";
 import { raceEngine } from "@classicade/games/testing";
 import { createAccountAccessor } from "../data/accountAccessor.js";
-import { createAccountDeletionAccessor, createSessionAccessor } from "../data/accountDeletionAccessor.js";
+import { createAccountDeletionAccessor } from "../data/accountDeletionAccessor.js";
+import { createSessionAccessor } from "../data/sessionAccessor.js";
 import { createBlockAccessor } from "../data/blockAccessor.js";
 import { createChallengeAccessor } from "../data/challengeAccessor.js";
 import { createFriendAccessor } from "../data/friendAccessor.js";
@@ -24,6 +25,7 @@ import { createPlayerTransferAccessor } from "../data/playerTransferAccessor.js"
 import { createProgressAccessor } from "../data/progressAccessor.js";
 import { createRoomAccessor } from "../data/roomAccessor.js";
 import { createAccountComponent } from "../domain/accounts/accountComponent.js";
+import { createDeviceComponent } from "../domain/accounts/deviceComponent.js";
 import { createPlayerDataComponent } from "../domain/accounts/playerDataComponent.js";
 import { createAnalyticsComponent } from "../domain/analytics/analyticsComponent.js";
 import { createBlockComponent } from "../domain/blocks/blockComponent.js";
@@ -71,7 +73,11 @@ import {
   wireFriends,
 } from "../server.js";
 import { createHttpApp } from "../service/http/app.js";
-import { createSessionCheck, createSessionMiddleware } from "../service/http/session.js";
+import {
+  createSessionCheck,
+  createSessionMiddleware,
+  SESSION_ABSOLUTE_LIFETIME_MS,
+} from "../service/http/session.js";
 import { createRealtimeGateway } from "../service/realtime/gateway.js";
 import { createBackgroundTasks } from "../utils/backgroundTasks.js";
 import { createNetworkKey } from "../utils/networkKey.js";
@@ -351,6 +357,11 @@ export function createTestApp({
     matches: matchComponent,
   });
   const sessionAccessor = createSessionAccessor({ sessionDao: createMemoryStoreSessionDao({ store }) });
+  const deviceComponent = createDeviceComponent({
+    sessionAccessor,
+    accounts: accountComponent,
+    absoluteLifetimeMs: SESSION_ABSOLUTE_LIFETIME_MS,
+  });
   const tasks = createBackgroundTasks({ logger: capture.logger });
   const outbox = createMatchOutboxComponent({
     pendingMatchAccessor: createPendingMatchAccessor({ pendingMatchDao }),
@@ -550,6 +561,7 @@ export function createTestApp({
     reportLimits,
     dailyPuzzleComponent,
     safetyComponent,
+    deviceComponent,
     dailyPuzzleLimit,
     flagComponent,
     analyticsComponent: createAnalyticsComponent({
