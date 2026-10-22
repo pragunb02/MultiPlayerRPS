@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { roomDoc, runRoomDaoContract } from "../testing/roomDaoContract.js";
 import { connectDatabase } from "./database.js";
 import { DuplicateKey } from "./errors.js";
@@ -22,7 +23,7 @@ afterAll(async () => {
 
 async function connected(options = {}) {
   const database = await connectDatabase({
-    uri: mongo.uri(`rooms-${++counter}`),
+    uri: await databaseUri(mongo, "rooms"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -128,6 +129,8 @@ describe("MongoDB room DAO honours the room DAO contract (integration)", () => {
   });
 
   it("creates its indexes once and again without complaint", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const { dao, database } = await connected();
 
     await dao.ensureIndexes();

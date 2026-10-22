@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { REPORT_KEEP_DAYS } from "@classicade/shared";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { reportRecord, runReportDaoContract } from "../testing/reportDaoContract.js";
 import { connectDatabase } from "./database.js";
 import { createReportDao } from "./reportDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`reports-${++counter}`),
+    uri: await databaseUri(mongo, "reports"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -34,6 +34,8 @@ describe("MongoDB report DAO honours the report DAO contract (integration)", () 
   runReportDaoContract(createDao);
 
   it("writes to a new `player_reports` collection and to no other", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const dao = await createDao();
 
     await dao.insert(reportRecord());
@@ -43,6 +45,8 @@ describe("MongoDB report DAO honours the report DAO contract (integration)", () 
   });
 
   it("removes reports 180 days after they were made (TTL), and indexes ids, the day's pair, the queue and the player", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     await createDao();
 
     const indexes = await databases.at(-1).connection.db.collection("player_reports").indexes();

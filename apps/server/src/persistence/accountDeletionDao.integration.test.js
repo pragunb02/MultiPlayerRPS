@@ -2,12 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runAccountDeletionDaoContract } from "../testing/accountDeletionDaoContract.js";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { createAccountDeletionDao } from "./accountDeletionDao.js";
 import { connectDatabase } from "./database.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -20,7 +20,7 @@ afterAll(async () => {
 
 async function connected() {
   const database = await connectDatabase({
-    uri: mongo.uri(`deletions-${++counter}`),
+    uri: await databaseUri(mongo, "deletions"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -33,6 +33,8 @@ describe("MongoDB account deletion DAO honours the account deletion DAO contract
   runAccountDeletionDaoContract(async () => (await connected()).dao);
 
   it("lets MongoDB remove a deletion record when its time is up, and keeps legacy closures for ever", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const { database } = await connected();
 
     const deletionIndexes = await database.connection.db.collection("account_deletions").indexes();

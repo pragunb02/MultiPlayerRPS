@@ -2,12 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { LEGACY_USERS, runLegacyUserDaoContract } from "../testing/legacyUserDaoContract.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri } from "../testing/sharedDatabase.js";
 import { connectDatabase } from "./database.js";
 import { createLegacyUserDao } from "./legacyUserDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -20,7 +20,7 @@ afterAll(async () => {
 
 async function createDao(seed) {
   const database = await connectDatabase({
-    uri: mongo.uri(`legacy-${++counter}`),
+    uri: await databaseUri(mongo, "legacy"),
     logger: captureLogger().logger,
   });
   databases.push(database);

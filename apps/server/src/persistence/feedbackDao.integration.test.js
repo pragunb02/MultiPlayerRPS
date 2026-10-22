@@ -3,12 +3,12 @@ import { FEEDBACK_KEEP_DAYS } from "@classicade/shared";
 import { feedbackRecord, runFeedbackDaoContract } from "../testing/feedbackDaoContract.js";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { connectDatabase } from "./database.js";
 import { createFeedbackDao } from "./feedbackDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`feedback-${++counter}`),
+    uri: await databaseUri(mongo, "feedback"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -34,6 +34,8 @@ describe("MongoDB feedback DAO honours the feedback DAO contract (integration)",
   runFeedbackDaoContract(createDao);
 
   it("writes to a new `feedback` collection and to no other", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const dao = await createDao();
 
     await dao.insert(feedbackRecord());
@@ -43,6 +45,8 @@ describe("MongoDB feedback DAO honours the feedback DAO contract (integration)",
   });
 
   it("removes items 180 days after they were sent (TTL), and indexes the id (unique) and the newest first order", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     await createDao();
 
     const indexes = await databases.at(-1).connection.db.collection("feedback").indexes();

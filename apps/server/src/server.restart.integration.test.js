@@ -1,20 +1,28 @@
 import { io as connect } from "socket.io-client";
-import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import { ERROR_CODES, ROOM_CLOSE_REASONS, SOCKET_EVENTS } from "@classicade/shared";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
+import { makeServerDatabase } from "./testing/serverDatabase.js";
 import { testConfig } from "./testing/testConfig.js";
 
 // CC-101: a deploy, a crash or the hosting plan putting the server to sleep restarts the process. Rooms live in
 // MongoDB, so players come back to the same room and the same game, with the same clocks.
 let mongo;
-let dbCounter = 0;
+// Every test runs on the same database, emptied first, so a server start makes no collections or indexes
+// after the first one (CC-338, as in server.integration.test.js, CC-336).
+const DB = "restart";
 const cleanups = [];
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
+  await makeServerDatabase(mongo, DB);
 }, 120_000);
+
+beforeEach(async () => {
+  await mongo.empty(DB);
+});
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) {
@@ -28,7 +36,7 @@ afterAll(async () => {
 
 /** One server process: the same database and port across restarts, like the hosting platform. */
 function serverProcess({ now, rooms } = {}) {
-  let config = testConfig({ MONGO_URI: mongo.uri(`restart-${++dbCounter}`) });
+  let config = testConfig({ MONGO_URI: mongo.uri(DB) });
   let running;
   const logs = [];
   onTestFailed(() => logs.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)));

@@ -2,12 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { countRow, runFeatureFlagDaoContract } from "../testing/featureFlagDaoContract.js";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { connectDatabase } from "./database.js";
 import { createFeatureFlagDao } from "./featureFlagDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -20,7 +20,7 @@ afterAll(async () => {
 
 async function createDao() {
   const database = await connectDatabase({
-    uri: mongo.uri(`flags-${++counter}`),
+    uri: await databaseUri(mongo, "flags"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -33,6 +33,8 @@ describe("MongoDB feature flag DAO honours the feature flag DAO contract (integr
   runFeatureFlagDaoContract(createDao);
 
   it("writes only to the new `feature_flags` and `feature_flag_counts` collections", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const dao = await createDao();
 
     await dao.setOverride({ name: "new_lobby", rollout: 5, updatedAt: new Date() });
@@ -43,6 +45,8 @@ describe("MongoDB feature flag DAO honours the feature flag DAO contract (integr
   });
 
   it("indexes a flag's name once, a day's counts once per flag and side, and removes counts at expiresAt", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     await createDao();
     const { db } = databases.at(-1).connection;
 

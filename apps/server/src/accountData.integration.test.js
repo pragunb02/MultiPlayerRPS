@@ -1,22 +1,30 @@
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { SESSION_COLLECTION } from "./persistence/sessionStore.js";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
+import { makeServerDatabase } from "./testing/serverDatabase.js";
 import { testConfig } from "./testing/testConfig.js";
 
 // Account deletion, data export and birth years through the real composition root, real MongoDB (in memory), and
 // real HTTP and WebSocket (CC-035, CC-152). Every store of docs/DATA.md is read back directly after a deletion.
 let mongo;
-let dbCounter = 0;
+// Every test runs on the same database, emptied first, so a server start makes no collections or indexes
+// after the first one (CC-338, as in server.integration.test.js, CC-336).
+const DB = "account-data";
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
+  await makeServerDatabase(mongo, DB);
 }, 120_000);
+
+beforeEach(async () => {
+  await mongo.empty(DB);
+});
 
 afterAll(async () => {
   await mongo?.stop();
@@ -44,7 +52,7 @@ async function eventually(probe, timeoutMs = 5_000) {
 }
 
 async function start() {
-  const config = testConfig({ MONGO_URI: mongo.uri(`account-data-${++dbCounter}`) });
+  const config = testConfig({ MONGO_URI: mongo.uri(DB) });
   const capture = captureLogger();
   onTestFailed(() => capture.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)));
   const app = await startServer({ config, logger: capture.logger });
@@ -372,7 +380,7 @@ describe("data export and birth year through the real composition root (integrat
 
 describe("the age policy and the owner's corrections through the real composition root (integration, CC-152)", () => {
   it("serves each player's own flags, and the owner's correction changes them and the profile rule at once", async () => {
-    const uri = mongo.uri(`account-data-${++dbCounter}`);
+    const uri = mongo.uri(DB);
     // The owner's account id is known only after sign-up, so the server starts again with it as the admin.
     const first = await startServer({
       config: testConfig({ MONGO_URI: uri }),

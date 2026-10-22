@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { runPendingMatchDaoContract } from "../testing/pendingMatchDaoContract.js";
 import { connectDatabase } from "./database.js";
 import { createPendingMatchDao } from "./pendingMatchDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -20,7 +20,7 @@ afterAll(async () => {
 
 async function connect() {
   const database = await connectDatabase({
-    uri: mongo.uri(`pending-${++counter}`),
+    uri: await databaseUri(mongo, "pending"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -37,6 +37,8 @@ describe("MongoDB pending match DAO honours the pending match DAO contract (inte
   runPendingMatchDaoContract(createDao);
 
   it("lets MongoDB forget a done record when its time is up, and never a failed one", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const { connection } = await connect();
     await createPendingMatchDao({ connection }).ensureIndexes();
 

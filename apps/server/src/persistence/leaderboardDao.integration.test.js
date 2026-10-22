@@ -2,12 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureLogger } from "../testing/captureLogger.js";
 import { runLeaderboardDaoContract } from "../testing/leaderboardDaoContract.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { connectDatabase } from "./database.js";
 import { createLeaderboardDao } from "./leaderboardDao.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -20,7 +20,7 @@ afterAll(async () => {
 
 async function connect() {
   const database = await connectDatabase({
-    uri: mongo.uri(`leaderboards-${++counter}`),
+    uri: await databaseUri(mongo, "leaderboards"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -58,6 +58,8 @@ describe("MongoDB leaderboard DAO honours the leaderboard DAO contract (integrat
   });
 
   it("lets MongoDB expire weekly entries after their expiry time", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const { dao, database } = await connect();
     await dao.addOnce({ ...ENTRY, period: "2026-W42", key: "m1", inc: 10, at: AT, expiresAt: AT });
     await dao.raiseScore({ ...ENTRY, period: "2026-W42", score: 40, at: AT, expiresAt: AT });
@@ -70,6 +72,8 @@ describe("MongoDB leaderboard DAO honours the leaderboard DAO contract (integrat
   });
 
   it("finds one player's rows by index, not by reading the whole collection (CC-291)", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const { dao, database } = await connect();
     await dao.raiseScore({ ...ENTRY, score: 10, at: AT });
     await dao.raiseScore({ ...ENTRY, playerId: "user_b", score: 20, at: AT });

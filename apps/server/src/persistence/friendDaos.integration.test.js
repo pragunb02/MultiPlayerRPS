@@ -7,6 +7,7 @@ import {
   runPrivacyDaoContract,
 } from "../testing/friendDaoContracts.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { connectDatabase } from "./database.js";
 import { DuplicateKey } from "./errors.js";
 import { createFriendLinkDao } from "./friendLinkDao.js";
@@ -17,7 +18,6 @@ import { createPrivacyDao } from "./privacyDao.js";
 // CC-052, ADR-066: the four friends collections, each new. Nothing existing is read or changed.
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -30,7 +30,7 @@ afterAll(async () => {
 
 async function connect() {
   const database = await connectDatabase({
-    uri: mongo.uri(`friends-${++counter}`),
+    uri: await databaseUri(mongo, "friends"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -50,6 +50,8 @@ describe("MongoDB friendship DAO honours the friendship DAO contract (integratio
   runFriendshipDaoContract(daoOn(createFriendshipDao));
 
   it("passes other database errors through, and indexes both sides of a pair", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const dao = await daoOn(createFriendshipDao)();
 
     const error = await dao.insert({ low: "user_x" }).catch((err) => err);
@@ -69,6 +71,8 @@ describe("MongoDB friend request DAO honours the friend request DAO contract (in
   runFriendRequestDaoContract(daoOn(createFriendRequestDao));
 
   it("passes other database errors through, and lets MongoDB remove a request once it runs out", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const dao = await daoOn(createFriendRequestDao)();
 
     const error = await dao.insert({ requestId: "x" }).catch((err) => err);
@@ -90,6 +94,8 @@ describe("MongoDB friend link DAO honours the friend link DAO contract (integrat
   runFriendLinkDaoContract(daoOn(createFriendLinkDao));
 
   it("passes other database errors through, and lets MongoDB remove a link once it stops working", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const dao = await daoOn(createFriendLinkDao)();
 
     const error = await dao.insert({ tokenHash: "x" }).catch((err) => err);
@@ -110,6 +116,8 @@ describe("MongoDB privacy DAO honours the privacy DAO contract (integration)", (
   runPrivacyDaoContract(daoOn(createPrivacyDao));
 
   it("keeps one document per player", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     await daoOn(createPrivacyDao)();
 
     expect(await indexesOf("player_privacy")).toEqual(

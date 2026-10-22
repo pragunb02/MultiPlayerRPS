@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runAccountDaoContract } from "../testing/accountDaoContract.js";
 import { captureLogger } from "../testing/captureLogger.js";
 import { startMemoryMongo } from "../testing/memoryMongo.js";
+import { databaseUri, ownDatabaseNext } from "../testing/sharedDatabase.js";
 import { createAccountDao } from "./accountDao.js";
 import { connectDatabase } from "./database.js";
 import { DuplicateKey } from "./errors.js";
 
 let mongo;
 const databases = [];
-let counter = 0;
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function connected() {
   const database = await connectDatabase({
-    uri: mongo.uri(`accounts-${++counter}`),
+    uri: await databaseUri(mongo, "accounts"),
     logger: captureLogger().logger,
   });
   databases.push(database);
@@ -37,6 +37,8 @@ describe("MongoDB account DAO honours the account DAO contract (integration)", (
 
   // The duplicate checks rest on these two indexes, built at boot by `ensureIndexes` (CC-245).
   it("has unique indexes on the email and on the lower-cased username in MongoDB", async () => {
+    // A database of its own: the file's shared one has its indexes from an earlier test.
+    ownDatabaseNext();
     const { database } = await connected();
 
     const indexes = await database.connection.db.collection("accounts").indexes();

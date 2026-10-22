@@ -1,23 +1,31 @@
 import mongoose from "mongoose";
 import { io as connect } from "socket.io-client";
-import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import { ERROR_CODES, ROOM_LIMIT_REASONS, SOCKET_EVENTS } from "@classicade/shared";
 import { SESSION_COLLECTION } from "./persistence/sessionStore.js";
 import { startServer } from "./server.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
+import { makeServerDatabase } from "./testing/serverDatabase.js";
 import { testConfig } from "./testing/testConfig.js";
 
 // The security batch (CC-107, CC-116, CC-117) through the real composition root, with rooms, accounts and sessions
 // stored in MongoDB.
 let mongo;
-let dbCounter = 0;
+// Every test runs on the same database, emptied first, so a server start makes no collections or indexes
+// after the first one (CC-338, as in server.integration.test.js, CC-336).
+const DB = "security";
 let app;
 const sockets = [];
 
 beforeAll(async () => {
   mongo = await startMemoryMongo();
+  await makeServerDatabase(mongo, DB);
 }, 120_000);
+
+beforeEach(async () => {
+  await mongo.empty(DB);
+});
 
 afterAll(async () => {
   await mongo?.stop();
@@ -33,7 +41,7 @@ const RIYA = { username: "Riya", email: "riya@example.com", password: "correct h
 
 async function start(rooms = {}) {
   const capture = captureLogger();
-  const config = testConfig({ MONGO_URI: mongo.uri(`security-${++dbCounter}`) });
+  const config = testConfig({ MONGO_URI: mongo.uri(DB) });
   onTestFailed(() => capture.entries.forEach((entry) => process.stderr.write(`${JSON.stringify(entry)}\n`)));
   const started = await startServer({ config, logger: capture.logger, rooms });
   app = { ...started, ...capture, config, url: `http://127.0.0.1:${started.port}` };
