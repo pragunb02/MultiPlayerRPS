@@ -63,16 +63,26 @@ export function TelemetryStub({ loadHost = loadTelemetryHost }) {
   // The host loads when the browser is idle once the session has answered, so it hands over every early count
   // with its kind. Its file never reloads the tab, and a failed download is tried once more.
   const ready = playerKind !== undefined;
+  // Nothing more is done once the stub is gone (the page closed or the app unmounted): no download, no retry.
   useEffect(() => {
-    if (!ready) return;
-    const attempt = (retries) =>
+    if (!ready) return undefined;
+    const browser = window;
+    let gone = false;
+    const attempt = (retries) => {
+      if (gone) return;
       telemetry
         .quietly(loadHost)
-        .then((module) => setHost(() => module.TelemetryHost))
+        .then((module) => {
+          if (!gone) setHost(() => module.TelemetryHost);
+        })
         .catch(() => {
-          if (retries > 0) whenIdle({ window, run: () => attempt(retries - 1) });
+          if (retries > 0 && !gone) whenIdle({ window: browser, run: () => attempt(retries - 1) });
         });
-    whenIdle({ window, run: () => attempt(1) });
+    };
+    whenIdle({ window: browser, run: () => attempt(1) });
+    return () => {
+      gone = true;
+    };
   }, [ready, telemetry, loadHost]);
 
   return Host === undefined ? null : <Host />;
