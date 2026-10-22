@@ -34,14 +34,6 @@
   font-size: var(--text-xl);
   font-weight: 800;
 }
-.heading:focus {
-  outline: none;
-}
-.heading:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 4px;
-  border-radius: var(--radius-sm);
-}
 .room {
   margin: 0;
   display: inline-flex;
