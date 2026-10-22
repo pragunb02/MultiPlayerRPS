@@ -24,6 +24,21 @@ export const BOT_THINKING_OUTCOMES = Object.freeze({
 });
 
 /**
+ * Why telemetry was not stored (CC-175), the one attribute of the ops counter `telemetry.dropped`. Only the reason
+ * and how many leave the server, never anything about the event or who sent it. A whole batch dropped before its
+ * body is read counts one. `invalid` and `cap` count events.
+ */
+export const TELEMETRY_DROP_REASONS = Object.freeze({
+  OPTED_OUT: "opted_out",
+  ADMIN: "admin",
+  INVALID: "invalid",
+  RATE_LIMITED: "rate_limited",
+  CAP: "cap",
+  BOT: "bot",
+  FLAG_OFF: "flag_off",
+});
+
+/**
  * How the check of a new password ended, at sign-up or on a password change (CC-261, ADR-080). `common` is the
  * bundled list, `breached` is Have I Been Pwned, and `unavailable` is that service failing or being late, when the
  * password is let through after the local check.
@@ -52,6 +67,8 @@ export const ROUTE_PATTERN = "pattern";
  * @property {(thinking: { game: string, outcome: string, durationMs: number }) => void} recordBotThinking
  *   one computer player's think, from the ask to the answer. `game` is a catalogue id, `outcome` a
  *   BOT_THINKING_OUTCOMES value
+ * @property {(drop: { reason: string, count: number }) => void} recordTelemetryDropped
+ *   telemetry not stored (CC-175). `reason` is a TELEMETRY_DROP_REASONS value
  * @property {(check: { outcome: string }) => void} recordPasswordCheck
  *   one check of a new password. `outcome` is a PASSWORD_CHECK_OUTCOMES value, and nothing says whose password
  * @property {(readers: {
@@ -69,6 +86,7 @@ export const NO_OPERATIONS_METRICS = Object.freeze({
   recordSocketEvent: nothing,
   recordPipelineStep: nothing,
   recordBotThinking: nothing,
+  recordTelemetryDropped: nothing,
   recordPasswordCheck: nothing,
   watch: nothing,
 });

@@ -96,7 +96,8 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     });
     push(sentToYou());
 
-    await user.click(within(popup()).getByRole("button", { name: "Accept and go" }));
+    const question = await screen.findByRole("region", { name: "Challenge" }, { timeout: 3_000 });
+    await user.click(within(question).getByRole("button", { name: "Accept and go" }));
 
     expect(api.acceptChallenge).toHaveBeenCalledWith("c0000000000000000001");
     await waitFor(() => expect(url()).toBe("/games/chess/rooms/ZZ2CD3"), { timeout: 3_000 });
@@ -229,6 +230,10 @@ describe("SiteRequests: challenges (CC-139, CC-207)", () => {
     const { push } = await open();
     const asked = sentToYou({ id: "c0000000000000000003", own: true, forYou: false, toName: "Arjun" });
     push(asked);
+    // The page must have seen the challenge open before it hears it was declined, or there is no change to tell
+    // of. A busy runner can still be on the first push when the second arrives (CI, 2026-10-21).
+    await act(async () => {});
+    await act(async () => {});
 
     push({ ...asked, state: "declined", expiresAt: undefined });
 

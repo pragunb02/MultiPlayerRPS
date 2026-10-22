@@ -569,4 +569,20 @@ describe("api client: feature flags (CC-312)", () => {
       ["/api/admin/flags/console_flag_check", "DELETE", undefined],
     ]);
   });
+
+  it("tells the server when this browser's usage counts are switched off, on every request (CC-174)", async () => {
+    let off = false;
+    const fetchImpl = respond(200, { games: [] });
+    const api = createApiClient({ fetchImpl, countsOff: () => off });
+
+    await api.getGames();
+    off = true;
+    await api.getGames();
+    await api.startGuest().catch(() => undefined);
+
+    const headers = fetchImpl.mock.calls.map(([, init]) => init.headers);
+    expect(headers[0]).toEqual({});
+    expect(headers[1]).toEqual({ "X-CC-Counts": "off" });
+    expect(headers[2]).toEqual({ "X-CC-Counts": "off" });
+  });
 });

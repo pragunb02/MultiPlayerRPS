@@ -36,13 +36,15 @@ function Crashed({ onReload, onHome }) {
  *
  * @param {{
  *   resetKey?: string,
+ *   onError?: (error: unknown) => void,
  *   onReload?: () => void,
  *   onHome?: () => void,
  *   children: import("react").ReactNode,
  * }} props
  *   `resetKey`: after a failure, a new value draws the children again, such as the address once the player follows
  *   a link in the header. A change while nothing failed does nothing, so a page is never drawn afresh for it.
- *   `onReload` and `onHome` are for tests. By default they reload the page and open the home page
+ *   `onReload` and `onHome` are for tests. By default they reload the page and open the home page.
+ *   `onError` is told the error, for usage counts (CC-174)
  */
 export class ErrorBoundary extends Component {
   state = { failed: false };
@@ -54,6 +56,14 @@ export class ErrorBoundary extends Component {
   componentDidUpdate(previous) {
     if (this.state.failed && previous.resetKey !== this.props.resetKey) {
       this.setState({ failed: false });
+    }
+  }
+
+  componentDidCatch(error) {
+    try {
+      this.props.onError?.(error);
+    } catch {
+      // Counting must never stop the error page from showing.
     }
   }
 

@@ -2,12 +2,15 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { ErrorBoundary } from "../../app/ErrorBoundary.jsx";
 import { paths, returnPathFor } from "../../app/paths.js";
+import { useServices } from "../../app/servicesContext.js";
 import { Logo, LogoMark } from "../../art/Logo.jsx";
 import { Svg } from "../../art/Svg.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { useDisclosureMenu } from "../../hooks/useDisclosureMenu.js";
 import { useSession } from "../../hooks/useSession.js";
+import { countRenderErrors } from "../../lib/telemetry/errorFields.js";
+import { NO_TELEMETRY } from "../../lib/telemetry/facade.js";
 import { Button } from "../Button/Button.jsx";
 import { ChallengesProvider } from "../Challenges/ChallengesProvider.jsx";
 import { ConnectionBanner } from "../ConnectionBanner/ConnectionBanner.jsx";
@@ -61,6 +64,7 @@ export function Layout() {
 
 /** The header, the page and the footer, inside what the site-wide requests need. */
 function Shell() {
+  const telemetry = useServices().telemetry ?? NO_TELEMETRY;
   const session = useSession();
   const navigate = useNavigate();
   const location = useLocation();
@@ -196,7 +200,7 @@ function Shell() {
         <SiteRequests />
         {/* A page that breaks shows why and the ways on, under a header that still works. Going to another
             address from there draws that page again (CC-350). */}
-        <ErrorBoundary resetKey={location.pathname}>
+        <ErrorBoundary resetKey={location.pathname} onError={countRenderErrors(telemetry)}>
           <Outlet />
         </ErrorBoundary>
       </main>
