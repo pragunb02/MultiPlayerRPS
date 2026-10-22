@@ -13,6 +13,11 @@ export default defineConfig({
         description: "Long bot games and walks, run nightly and by npm run test:all (CC-203).",
         timeout: 300_000,
       },
+      {
+        name: "clock-alarm",
+        description:
+          "Checks that are meant to fail on a real future day, such as a flag past its removal date. The time-bomb check leaves them out (CC-325).",
+      },
     ],
     projects: [
       {
@@ -26,6 +31,8 @@ export default defineConfig({
             "scripts/**/*.test.mjs",
             "e2e/**/*.test.js",
           ],
+          // Does nothing unless CC_FUTURE_DAYS is set: then the clock runs that many days ahead (CC-325).
+          setupFiles: ["scripts/testing/futureClock.mjs"],
         },
       },
       {
@@ -39,7 +46,11 @@ export default defineConfig({
           environment: "jsdom",
           include: ["apps/web/**/*.test.{js,jsx}"],
           // slowEffects.js first: it must load before React (CC-288).
-          setupFiles: ["apps/web/src/testing/slowEffects.js", "apps/web/src/testing/setup.js"],
+          setupFiles: [
+            "scripts/testing/futureClock.mjs",
+            "apps/web/src/testing/slowEffects.js",
+            "apps/web/src/testing/setup.js",
+          ],
           css: { modules: { classNameStrategy: "non-scoped" } },
         },
       },

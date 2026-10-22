@@ -214,6 +214,15 @@ Rules:
     Review every changed image before approving. New screens get a baseline the same way. Anything that changes between runs is given a stand-in or painted
     from script in that spec (Playwright's own `mask` is blocked by the CSP), never accepted by a looser threshold.
     On failure the CI job keeps the expected, actual and diff images, a video and a trace for 14 days.
+16. **No time bombs** (CC-325). A test never sets a fixed date (`Date.UTC(2026, …)`, `"2026-10-20"`, an epoch number,
+    a birth year such as `2010`) against the real clock, because it then passes only until some day. Either the test
+    owns the clock (`vi.setSystemTime`, `vi.useFakeTimers`, or the code's injected `now`), and then fixed dates are
+    fine, or every date in it is counted from now (`Date.now() + DAY`, `minorBirthYear()` in
+    `apps/server/src/testing/birthYears.js`, `new Date().getFullYear() - 15` in browser specs). A check that is meant
+    to fail on a real future day, such as a flag past its removal date, is tagged `clock-alarm`.
+    `npm run test:future` runs every test as if it were a year later (`CC_FUTURE_DAYS`, `scripts/testing/futureClock.mjs`),
+    and the nightly workflow runs it in India time, so a new time bomb fails there first. No lint rule checks this:
+    whether a test owns its clock cannot be told from the text, so reviewers check it by hand.
 
 ---
 

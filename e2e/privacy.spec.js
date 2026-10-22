@@ -3,6 +3,9 @@ import { expect, test } from "./fixtures.js";
 import { OWNER } from "./ownerConsole.js";
 import { newAccount } from "./personas.js";
 
+// A minor's year counted from today, so the account is a minor's on any day this runs (CC-325).
+const MINOR_YEAR = String(new Date().getFullYear() - 15);
+
 // An account holder's data and privacy (CC-035, CC-152): the year of birth at sign-up, a copy of their data, and
 // deleting the account. The opponent of a deleted player keeps the game, with "Deleted player".
 
@@ -193,12 +196,14 @@ test.describe("the year of birth (CC-152)", () => {
     await expect(owner.page).toHaveURL("/");
     await owner.page.goto("/admin/ages");
     await owner.page.getByLabel("Account email").fill(account.email);
-    await owner.page.getByLabel("Year of birth").selectOption("2010");
+    await owner.page.getByLabel("Year of birth").selectOption(MINOR_YEAR);
     await owner.page.getByRole("button", { name: "Correct the year" }).click();
-    await expect(owner.page.getByText(`${account.username}: year of birth 2010, so minor.`)).toBeVisible();
+    await expect(
+      owner.page.getByText(`${account.username}: year of birth ${MINOR_YEAR}, so minor.`),
+    ).toBeVisible();
 
     await riya.page.reload();
-    await expect(privacy.getByText(/^2010\. It can be set once/)).toBeVisible();
+    await expect(privacy.getByText(new RegExp(`^${MINOR_YEAR}\\. It can be set once`))).toBeVisible();
     await expect(
       privacy.getByText("On the public leaderboards your name shows as Hidden player."),
     ).toBeVisible();

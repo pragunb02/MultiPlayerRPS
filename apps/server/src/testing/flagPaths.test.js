@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { FLAGS } from "@classicade/shared";
 import { flagPaths } from "./flagPaths.js";
 
@@ -14,8 +14,9 @@ describe("flagPaths", () => {
     });
   });
 
-  it("ran it both ways", () => {
-    expect(seen).toEqual([true, false]);
+  // After every test, so a shuffled order (`--sequence.shuffle`) cannot check before both runs happened (CC-325).
+  afterAll(() => {
+    expect([...seen].sort()).toEqual([false, true]);
   });
 
   it("refuses a flag that is not registered", () => {

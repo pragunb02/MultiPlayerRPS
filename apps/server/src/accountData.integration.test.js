@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest"
 import { SOCKET_EVENTS } from "@classicade/shared";
 import { SESSION_COLLECTION } from "./persistence/sessionStore.js";
 import { startServer } from "./server.js";
+import { minorBirthYear } from "./testing/birthYears.js";
 import { captureLogger } from "./testing/captureLogger.js";
 import { startMemoryMongo } from "./testing/memoryMongo.js";
 import { testConfig } from "./testing/testConfig.js";
@@ -412,7 +413,9 @@ describe("the age policy and the owner's corrections through the real compositio
         }),
       );
 
-      const correction = { email: "sam@example.com", birthYear: 2010 };
+      // A minor's year counted from today, so Sam is a minor on any day this runs (CC-325).
+      const minorYear = minorBirthYear();
+      const correction = { email: "sam@example.com", birthYear: minorYear };
       const bySam = await call(url, "PUT", "/admin/accounts/birth-year", { body: correction, cookie: sam });
       expect(bySam.status).toBe(404);
 
@@ -421,7 +424,7 @@ describe("the age policy and the owner's corrections through the real compositio
         cookie: owner,
       });
       expect(byOwner.status).toBe(200);
-      expect(byOwner.body.account).toEqual({ username: "sam", birthYear: 2010, ageGroup: "minor" });
+      expect(byOwner.body.account).toEqual({ username: "sam", birthYear: minorYear, ageGroup: "minor" });
 
       expect((await call(url, "GET", "/safety", { cookie: sam })).body.safety).toEqual(
         expect.objectContaining({
@@ -437,7 +440,7 @@ describe("the age policy and the owner's corrections through the real compositio
       });
       expect(goPublic.status).toBe(403);
       const [stored] = await readCollection(uri, "accounts", { username: "sam" });
-      expect(stored.birthYear).toBe(2010);
+      expect(stored.birthYear).toBe(minorYear);
       expect(stored.birthYearCorrectedAt).toBeInstanceOf(Date);
       expect(await readCollection(uri, "users")).toEqual(legacyBefore);
       // The player's export says the owner corrected the year, and when.
@@ -447,14 +450,14 @@ describe("the age policy and the owner's corrections through the real compositio
       });
       expect(exported.body.account).toEqual(
         expect.objectContaining({
-          birthYear: 2010,
+          birthYear: minorYear,
           birthYearCorrectedAt: stored.birthYearCorrectedAt.toISOString(),
           ageGroup: "minor",
         }),
       );
       const line = capture.entries.find((entry) => entry.msg === "birth year corrected by the owner");
       expect(line).toEqual(expect.objectContaining({ adminId: ownerUp.body.identity.id }));
-      expect(JSON.stringify(line)).not.toMatch(/2010|sam@example\.com/);
+      expect(JSON.stringify(line)).not.toMatch(new RegExp(`${minorYear}|sam@example\\.com`));
     } finally {
       await app.close();
     }
