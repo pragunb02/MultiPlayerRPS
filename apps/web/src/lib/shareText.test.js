@@ -111,7 +111,7 @@ describe("friendLinkText (CC-052)", () => {
 
     expect(hinglish).toBe("ClassiCade pe mere friend bano, phir saath mein khelenge:");
     expect(english).toBe("Be my friend on ClassiCade, then we can play any time:");
-    expect(hinglish).not.toMatch(/\baap(ka|ke|ki)?\b/);
+    // "tum", never "aap": the one shared test in src/copy.hinglish.test.js reads these lines (CC-351).
   });
 });
 
@@ -121,7 +121,6 @@ describe("challengeText (CC-139)", () => {
       "Chess mein mujhse jeet ke dikhao! Link 24 ghante chalega:\nI challenge you to Chess on ClassiCade. The link works for 24 hours",
     );
     expect(challengeText({ gameId: "ludo" })).toContain("I challenge you to a game");
-    expect(challengeText({ gameId: "chess" })).not.toMatch(/\baap(ka|ke|ki)?\b/);
   });
 });
 

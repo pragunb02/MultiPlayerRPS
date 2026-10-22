@@ -13,10 +13,7 @@ describe("AGE_COPY (CC-152)", () => {
     }
   });
 
-  it('speaks to the player with "tum", never "aap" (owner, 2026-10-20)', () => {
-    expect(lines.filter(({ hi }) => /\baap(ka|ke|ki|ko|ne)?\b/i.test(hi))).toEqual([]);
-    expect(lines.some(({ hi }) => /\btum(hara|hare|hari|he)?\b/i.test(hi))).toBe(true);
-  });
+  // "tum", never "aap": the one shared test in src/copy.hinglish.test.js reads these lines (CC-351).
 
   it("refuses an under 13 year in the server's own English words", () => {
     expect(AGE_COPY.tooYoung.en).toBe(TOO_YOUNG_MESSAGE);

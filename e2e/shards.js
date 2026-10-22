@@ -54,6 +54,7 @@ export const SHARDS = Object.freeze([
     "chess.spec.js", // 260
     "flags.spec.js", // new (CC-312), not measured yet
     "focus-ring.spec.js", // new (CC-100), not measured yet
+    "clarity.spec.js", // new (CC-351), about 230 s a device locally with one worker
   ]),
   // 1107 s
   Object.freeze([

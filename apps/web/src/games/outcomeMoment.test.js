@@ -403,12 +403,7 @@ describe("the words follow the copy rules (ADR-050 point 2)", () => {
     }
   });
 
-  it('speaks to the player with "tum", never "aap" (owner, 2026-10-20)', () => {
-    const AAP = /\b(aap|aapka|aapke|aapki|aapko|aapne)\b|(ein|iye|ijiye)\?/i;
-    for (const { line } of everyLine()) {
-      expect(line.hinglish).not.toMatch(AAP);
-    }
-  });
+  // "tum", never "aap": the one shared test in src/copy.hinglish.test.js reads these lines (CC-351).
 
   it("never uses a shaming word anywhere", () => {
     for (const { line } of everyLine()) {
