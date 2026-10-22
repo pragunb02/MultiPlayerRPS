@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { paths, returnPathFor } from "../../app/paths.js";
 import { Logo, LogoMark } from "../../art/Logo.jsx";
 import { Svg } from "../../art/Svg.jsx";
+import { EffectHost } from "../../effects/EffectHost.jsx";
 import { useAction } from "../../hooks/useAction.js";
 import { ADMIN_ACCESS, useAdminAccess } from "../../hooks/useAdminAccess.js";
 import { useDisclosureMenu } from "../../hooks/useDisclosureMenu.js";
@@ -196,6 +197,7 @@ function Shell() {
         <Outlet />
       </main>
       <PageAnnouncer />
+      <EffectHost />
       <SiteFooter onFeedback={openFeedback} />
       {/* Outside the menu, which a phone hides while it is closed, so the footer can open it too. */}
       {/* A new dialog for each player: a draft and its email never pass to whoever uses the phone next. */}

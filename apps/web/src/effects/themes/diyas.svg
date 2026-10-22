@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 48" width="96" height="48" aria-hidden="true">
+  <!-- A clay diya with a still flame under a marigold string; the tile repeats across the page's padding band. CC-328, drawn for ClassiCade. -->
+  <path d="M0 5 Q48 17 96 5" fill="none" stroke="#3d7a2a" stroke-width="1.5" stroke-linecap="round"/>
+  <g fill="#ff9e1b" stroke="#c75b00" stroke-width="1">
+    <circle cx="8" cy="7" r="3.2"/>
+    <circle cx="24" cy="10.4" r="3.2"/>
+    <circle cx="72" cy="10.4" r="3.2"/>
+    <circle cx="88" cy="7" r="3.2"/>
+  </g>
+  <g fill="#ffd166" stroke="#c78a00" stroke-width="1">
+    <circle cx="16" cy="9" r="2.6"/>
+    <circle cx="32" cy="11.6" r="2.6"/>
+    <circle cx="64" cy="11.6" r="2.6"/>
+    <circle cx="80" cy="9" r="2.6"/>
+  </g>
+  <path d="M48 20 C52.5 25 53 29 48 33 C43 29 43.5 25 48 20 Z" fill="#ffd166" stroke="#e08a00" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M48 25.5 C50 28 50 30 48 31.5 C46 30 46 28 48 25.5 Z" fill="#fff1c1"/>
+  <path d="M33 34 H63 C61 42 55 45 48 45 C41 45 35 42 33 34 Z" fill="#b5562a" stroke="#5a2410" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M38 38 H58" stroke="#ffd166" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="43" cy="41" r="1" fill="#ffd166"/>
+  <circle cx="48" cy="42" r="1" fill="#ffd166"/>
+  <circle cx="53" cy="41" r="1" fill="#ffd166"/>
+</svg>

@@ -1,0 +1,16 @@
+/*
+ * The event greeting on the home hero (CC-328): the Hinglish line in the body size, medium, with the English line
+ * under it in the label size (CC-332). It takes the hero's text colour, which stays white on every theme's gradient.
+ */
+.greeting {
+  margin: 0 0 var(--space-4);
+}
+.hinglish {
+  display: block;
+  font-size: var(--type-body);
+  font-weight: 600;
+}
+.english {
+  display: block;
+  font-size: var(--type-label);
+}

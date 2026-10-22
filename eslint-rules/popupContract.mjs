@@ -60,6 +60,16 @@ export const POPUP_COMPONENTS = Object.freeze([
     "The fixed celebration overlay.",
   ),
   entry(
+    "apps/web/src/effects/HostRuntime.jsx",
+    POPUP_KINDS.CELEBRATION,
+    "The one effect canvas, aria-hidden.",
+  ),
+  entry(
+    "apps/web/src/effects/EffectHost.module.css",
+    POPUP_KINDS.CELEBRATION,
+    "The fixed effect canvas, no clicks.",
+  ),
+  entry(
     "apps/web/src/components/TurnBanner/TurnBanner.jsx",
     POPUP_KINDS.BANNER,
     "Whose turn it is, read out.",

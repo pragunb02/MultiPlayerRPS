@@ -1,6 +1,8 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { previewTheme } from "../../effects/channel.js";
+import { EFFECTS } from "../../effects/registry.js";
 import { AppRequestError } from "../../lib/errors.js";
 import { fakeApi, GUEST } from "../../testing/fakes.js";
 import { flagPaths } from "../../testing/flagPaths.js";
@@ -245,5 +247,47 @@ flagPaths("console_flag_check", (on) => {
     expect(line).toBeVisible();
     await user.click(screen.getByRole("button", { name: "It works" }));
     expect(api.sendFlagSuccess).toHaveBeenCalledWith("console_flag_check");
+  });
+});
+
+describe("the console's theme preview (CC-328)", () => {
+  const themeFlag = flag({ name: "event_diwali_2026", ticket: "CC-328", audience: "everyone" });
+  // The theme behind the flag, by its registry entry: no file outside effects/ writes a theme's name.
+  const THEME = EFFECTS.find((entry) => entry.flag === "event_diwali_2026").name;
+  const attribute = () => document.documentElement.dataset.eventTheme;
+
+  afterEach(() => act(() => previewTheme(undefined)));
+
+  it("previews a theme in this tab only", async () => {
+    const api = ownerApi({ getAdminFlags: vi.fn().mockResolvedValue(view([flag(), themeFlag])) });
+    const { user, unmount } = await openFlags(api);
+
+    // Only a theme's flag has the control; today is outside the Diwali window, so nothing shows yet.
+    expect(within(card("new_lobby")).queryByRole("button", { name: "Preview in this tab" })).toBeNull();
+    expect(attribute()).toBeUndefined();
+    await user.click(within(card("event_diwali_2026")).getByRole("button", { name: "Preview in this tab" }));
+
+    await waitFor(() => expect(attribute()).toBe(THEME));
+    // In memory only: nothing stored in the browser, nothing sent to the server.
+    expect([localStorage.length, sessionStorage.length]).toEqual([0, 0]);
+    expect(api.setFlagRollout).not.toHaveBeenCalled();
+    await user.click(within(card("event_diwali_2026")).getByRole("button", { name: "Stop the preview" }));
+    await waitFor(() => expect(attribute()).toBeUndefined());
+
+    // A reload starts the app's code afresh, and a fresh start has no preview.
+    await user.click(within(card("event_diwali_2026")).getByRole("button", { name: "Preview in this tab" }));
+    await waitFor(() => expect(attribute()).toBe(THEME));
+    unmount();
+    expect(attribute()).toBeUndefined();
+    vi.resetModules();
+    const fresh = await import("../../effects/channel.js");
+    expect(fresh.currentPreview()).toBeUndefined();
+  });
+
+  it("is never shown to a player who is not an admin", async () => {
+    renderApp({ path: "/admin/flags", api: fakeApi({ getSession: async () => PLAYER }) });
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Preview in this tab" })).toBeNull();
   });
 });

@@ -1,0 +1,448 @@
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ServicesContext } from "../app/servicesContext.js";
+import { InGameContext } from "../components/SiteRequests/inGameContext.js";
+import { SessionContext } from "../hooks/useSession.js";
+import { fakeApi, GUEST } from "../testing/fakes.js";
+import { flagPaths } from "../testing/flagPaths.js";
+import { installMatchMedia } from "../testing/matchMedia.js";
+import { renderApp } from "../testing/render.jsx";
+import { installVisibility } from "../testing/visibility.js";
+import { hostReady, play, previewTheme } from "./channel.js";
+import { EffectHost } from "./EffectHost.jsx";
+import { EventGreeting } from "./EventGreeting.jsx";
+import { EFFECTS, effectNamed } from "./registry.js";
+import { greeting as DIWALI_GREETING } from "./themes/diwali2026.js";
+import { greeting as WINTER_GREETING } from "./themes/winter2026.js";
+
+// The one effect host (CC-328, ADR-075): the queue, the gates and the theme, with scenes that only record what
+// they were asked, so each test decides when an effect ends.
+
+/** 8 November 2026, noon in India: Lakshmi Puja, inside the Diwali window. */
+const PUJA = Date.parse("2026-11-08T12:00:00+05:30");
+const AFTER_DIWALI = Date.parse("2026-11-12T00:30:00+05:30");
+const TODAY = Date.parse("2026-10-21T12:00:00+05:30");
+
+/** A scene that records each start and ends only when the test says. */
+function recordedScene(name) {
+  const runs = [];
+  const start = vi.fn((canvas, options) => {
+    let finish;
+    const done = new Promise((resolve) => (finish = resolve));
+    const run = { canvas, options, done, finish, stop: vi.fn(() => finish()) };
+    runs.push(run);
+    return run;
+  });
+  return { runs, start, load: vi.fn(async () => ({ start, greeting: GREETINGS[name] })) };
+}
+
+const GREETINGS = { diwali_2026: DIWALI_GREETING, winter_2026: WINTER_GREETING };
+
+/** A registry entry with a recorded scene in place of the real one, and a theme's real greeting. */
+function fake(name, fields = {}) {
+  const scene = recordedScene(name);
+  return { scene, entry: { ...effectNamed(name), load: scene.load, ...fields } };
+}
+
+/** Renders the host as the layout does, and waits for its chunk, which it loads at idle. */
+async function renderHost({
+  effects,
+  now = () => TODAY,
+  api = fakeApi(),
+  inGame = false,
+  path = "/",
+  warm = false,
+} = {}) {
+  const tree = (playing) => (
+    <MemoryRouter initialEntries={[path]}>
+      <ServicesContext.Provider value={{ api }}>
+        <SessionContext.Provider value={{ status: "ready", identity: GUEST }}>
+          <InGameContext.Provider value={{ inGame: playing, setInGame: () => {} }}>
+            <EventGreeting />
+            <EffectHost effects={effects} now={now} warm={warm} />
+          </InGameContext.Provider>
+        </SessionContext.Provider>
+      </ServicesContext.Provider>
+    </MemoryRouter>
+  );
+  const view = render(tree(inGame));
+  await waitFor(() => expect(hostReady()).toBe(true));
+  return { ...view, api, setInGame: (playing) => view.rerender(tree(playing)) };
+}
+
+const canvases = () => document.querySelectorAll("canvas");
+const themeAttribute = () => document.documentElement.dataset.eventTheme;
+
+beforeEach(() => {
+  HTMLCanvasElement.prototype.getContext = () => null;
+});
+
+afterEach(() => {
+  act(() => previewTheme(undefined));
+  vi.useRealTimers();
+  // Unmounted first: the host cancels its idle callbacks with the stubs still in place.
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+describe("the effect host (CC-328)", () => {
+  it("one standout effect at a time", async () => {
+    let clock = TODAY;
+    const win = fake("win_burst");
+    const level = fake("level_up");
+    const badge = fake("achievement");
+    await renderHost({ effects: [win.entry, level.entry, badge.entry], now: () => clock });
+
+    let first;
+    act(() => {
+      first = play("win_burst", { origin: { x: 10, y: 20, width: 100 } });
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    expect(win.scene.runs[0].options).toEqual({
+      origin: { x: 10, y: 20, width: 100 },
+      particles: 120,
+      durationMs: 1200,
+    });
+    expect(canvases()).toHaveLength(1);
+    expect(win.scene.runs[0].canvas).toBe(canvases()[0]);
+
+    // A second celebration waits behind the first, and starts when it ends.
+    let second;
+    act(() => {
+      second = play("level_up");
+    });
+    await Promise.resolve();
+    expect(level.scene.start).not.toHaveBeenCalled();
+    await act(async () => win.scene.runs[0].finish());
+    await expect(first).resolves.toBe(true);
+    await waitFor(() => expect(level.scene.runs).toHaveLength(1));
+    expect(canvases()).toHaveLength(1);
+
+    // A third that would start more than 2 s late is dropped.
+    let third;
+    act(() => {
+      third = play("achievement");
+    });
+    clock += 2001;
+    await act(async () => level.scene.runs[0].finish());
+    await expect(second).resolves.toBe(true);
+    await expect(third).resolves.toBe(false);
+    expect(badge.scene.start).not.toHaveBeenCalled();
+    await waitFor(() => expect(canvases()).toHaveLength(0));
+  });
+
+  it("warms the particle module once at idle, off screen, so the first celebration of a visit is not the cold one", async () => {
+    // jsdom cannot say when it is idle; a browser can.
+    vi.stubGlobal("requestIdleCallback", (callback) => setTimeout(callback, 0));
+    vi.stubGlobal("cancelIdleCallback", (id) => clearTimeout(id));
+    const win = fake("win_burst");
+    await renderHost({ effects: [win.entry], warm: true });
+
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    const [warmUp] = win.scene.runs;
+    expect(warmUp.canvas.isConnected).toBe(false);
+    expect([warmUp.canvas.width, warmUp.canvas.height]).toEqual([1, 1]);
+    expect(warmUp.options).toMatchObject({ particles: 20, durationMs: 250 });
+    expect(canvases()).toHaveLength(0);
+    await act(async () => warmUp.finish());
+
+    // The real play still gets the canvas, and the warm-up never comes again in this visit.
+    let played;
+    act(() => {
+      played = play("win_burst");
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(2));
+    expect(win.scene.runs[1].canvas).toBe(canvases()[0]);
+    await act(async () => win.scene.runs[1].finish());
+    await expect(played).resolves.toBe(true);
+  });
+
+  it("does not warm the module under reduced motion, where nothing plays", async () => {
+    installMatchMedia({ reducedMotion: true });
+    vi.stubGlobal("requestIdleCallback", (callback) => setTimeout(callback, 0));
+    vi.stubGlobal("cancelIdleCallback", (id) => clearTimeout(id));
+    const win = fake("win_burst");
+    await renderHost({ effects: [win.entry], warm: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(win.scene.load).not.toHaveBeenCalled();
+  });
+
+  it("plays every queued celebration in turn, however many wait", async () => {
+    const win = fake("win_burst");
+    const level = fake("level_up");
+    const badge = fake("achievement");
+    await renderHost({ effects: [win.entry, level.entry, badge.entry] });
+
+    let plays;
+    act(() => {
+      plays = [play("win_burst"), play("level_up"), play("achievement")];
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    await act(async () => win.scene.runs[0].finish());
+    // The second starts next, not the third: a dequeued celebration is not refused for the ones behind it.
+    await waitFor(() => expect(level.scene.runs).toHaveLength(1));
+    expect(badge.scene.start).not.toHaveBeenCalled();
+    await act(async () => level.scene.runs[0].finish());
+    await waitFor(() => expect(badge.scene.runs).toHaveLength(1));
+    await act(async () => badge.scene.runs[0].finish());
+    await expect(Promise.all(plays)).resolves.toEqual([true, true, true]);
+  });
+
+  it("plays a celebration called as a game ends, and stops one when a game starts", async () => {
+    // The result calls play in the same moment the game ends, before the host hears the game is over.
+    const win = fake("win_burst");
+    const view = await renderHost({ effects: [win.entry], inGame: true });
+
+    let ending;
+    act(() => {
+      ending = play("win_burst");
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    await act(async () => win.scene.runs[0].finish());
+    await expect(ending).resolves.toBe(true);
+
+    view.setInGame(false);
+    let played;
+    act(() => {
+      played = play("win_burst");
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(2));
+    view.setInGame(true);
+    await expect(played).resolves.toBe(false);
+    expect(win.scene.runs[1].stop).toHaveBeenCalled();
+    expect(canvases()).toHaveLength(0);
+  });
+
+  it("drops a play with no host, and refuses an unknown name", async () => {
+    await expect(play("win_burst")).resolves.toBe(false);
+    await renderHost({ effects: [fake("win_burst").entry] });
+    await expect(play("fireworks")).rejects.toThrow(RangeError);
+  });
+
+  it("is silent when an effect's chunk fails to load", async () => {
+    const entry = { ...effectNamed("win_burst"), load: vi.fn().mockRejectedValue(new Error("chunk gone")) };
+    await renderHost({ effects: [entry] });
+
+    let played;
+    act(() => {
+      played = play("win_burst");
+    });
+    await expect(played).resolves.toBe(false);
+    await waitFor(() => expect(canvases()).toHaveLength(0));
+  });
+
+  it("reduced motion draws nothing", async () => {
+    installMatchMedia({ reducedMotion: true });
+    const win = fake("win_burst");
+    const diwali = fake("diwali_2026");
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
+    await renderHost({ effects: [win.entry, diwali.entry], now: () => PUJA, api });
+
+    // play resolves at once, loads nothing and makes no canvas.
+    await expect(play("win_burst")).resolves.toBe(false);
+    expect(win.scene.load).not.toHaveBeenCalled();
+    // The theme keeps its colours (its chunk loads) and its greeting, without its burst.
+    await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"));
+    expect(screen.getByText("Happy Diwali from all of us at ClassiCade.")).toBeVisible();
+    await waitFor(() => expect(diwali.scene.load).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(diwali.scene.start).not.toHaveBeenCalled();
+    expect(canvases()).toHaveLength(0);
+  });
+
+  it("stops and cleans up on unmount and hide", async () => {
+    const visibility = installVisibility();
+    const win = fake("win_burst");
+    const removed = vi.spyOn(document, "removeEventListener");
+    const view = await renderHost({ effects: [win.entry] });
+
+    let hidden;
+    act(() => {
+      hidden = play("win_burst");
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+    act(() => visibility.setHidden(true));
+    await expect(hidden).resolves.toBe(false);
+    expect(win.scene.runs[0].stop).toHaveBeenCalled();
+    expect(canvases()).toHaveLength(0);
+    // Nothing starts while the tab is hidden.
+    await expect(play("win_burst")).resolves.toBe(false);
+
+    act(() => visibility.setHidden(false));
+    let unmounted;
+    act(() => {
+      unmounted = play("win_burst");
+    });
+    await waitFor(() => expect(win.scene.runs).toHaveLength(2));
+    view.unmount();
+    await expect(unmounted).resolves.toBe(false);
+    expect(win.scene.runs[1].stop).toHaveBeenCalled();
+    expect(removed).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+    // With the host gone a play is dropped, and the theme attribute is gone too.
+    await expect(play("win_burst")).resolves.toBe(false);
+    expect(themeAttribute()).toBeUndefined();
+  });
+
+  it("asks for no flag outside every theme's window", async () => {
+    const api = fakeApi();
+    await renderHost({ api });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(api.getFlags).not.toHaveBeenCalled();
+    expect(themeAttribute()).toBeUndefined();
+  });
+
+  it("plays a theme's entrance burst once per visit, on the home page only", async () => {
+    const winter = fake("winter_2026");
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_winter_2026: true }) });
+    const christmas = () => Date.parse("2026-12-25T10:00:00+05:30");
+
+    const lobby = await renderHost({ effects: [winter.entry], now: christmas, api, path: "/games/chess" });
+    await waitFor(() => expect(winter.scene.load).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(winter.scene.start).not.toHaveBeenCalled();
+    lobby.unmount();
+
+    const home = await renderHost({ effects: [winter.entry], now: christmas, api });
+    await waitFor(() => expect(winter.scene.runs).toHaveLength(1));
+    expect(winter.scene.runs[0].options).toMatchObject({ particles: 40, durationMs: 1500 });
+    await act(async () => winter.scene.runs[0].finish());
+    home.unmount();
+
+    await renderHost({ effects: [winter.entry], now: christmas, api });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(winter.scene.runs).toHaveLength(1);
+  });
+
+  it("never lets a theme's burst overlap a celebration", async () => {
+    const win = fake("win_burst");
+    const theme = { ...fake("diwali_2026").entry, name: "overlap_theme" };
+    const burst = recordedScene();
+    theme.load = burst.load;
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
+    let resolveGate;
+    // The celebration starts first and holds the canvas while the theme's chunk arrives.
+    win.entry.load = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveGate = () => resolve({ start: win.scene.start });
+        }),
+    );
+    await renderHost({ effects: [win.entry, theme], now: () => PUJA, api });
+    act(() => {
+      play("win_burst");
+    });
+    await waitFor(() => expect(burst.load).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(burst.start).not.toHaveBeenCalled();
+    resolveGate();
+    await waitFor(() => expect(win.scene.runs).toHaveLength(1));
+  });
+});
+
+flagPaths("event_diwali_2026", (on) => {
+  it("follows its flag and its window on the home hero, and counts a game started in the visit", async () => {
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: on }) });
+    const view = await renderHost({ effects: EFFECTS, now: () => PUJA, api });
+
+    await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["event_diwali_2026"]));
+    await waitFor(() => expect(themeAttribute()).toBe(on ? "diwali_2026" : undefined));
+    const greeting = screen.queryByText("Diwali ki shubhkamnayein! Roshni aur khushiyan tumhare saath.");
+    expect(greeting !== null).toBe(on);
+    if (on) expect(greeting).toHaveAttribute("lang", "hi-Latn");
+
+    view.setInGame(true);
+    view.setInGame(false);
+    view.setInGame(true);
+    if (on) {
+      await waitFor(() => expect(api.sendFlagSuccess).toHaveBeenCalledWith("event_diwali_2026"));
+    }
+    expect(api.sendFlagSuccess).toHaveBeenCalledTimes(on ? 1 : 0);
+    view.unmount();
+    expect(themeAttribute()).toBeUndefined();
+  });
+
+  it("is off again after its last day", async () => {
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: on }) });
+    await renderHost({ effects: EFFECTS, now: () => AFTER_DIWALI, api });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(api.getFlags).not.toHaveBeenCalled();
+    expect(themeAttribute()).toBeUndefined();
+    expect(screen.queryByText(/Diwali/)).toBeNull();
+  });
+
+  it("shows the greeting above the home hero's headline in the real app", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(PUJA);
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: on }) });
+    renderApp({ path: "/", api });
+
+    const headline = await screen.findByRole("heading", { level: 1 });
+    await waitFor(() => expect(themeAttribute()).toBe(on ? "diwali_2026" : undefined));
+    const greeting = screen.queryByText("Happy Diwali from all of us at ClassiCade.");
+    expect(greeting !== null).toBe(on);
+    if (on) {
+      expect(greeting.closest("p").nextElementSibling).toBe(headline);
+    }
+  });
+});
+
+flagPaths("event_winter_2026", (on) => {
+  it("follows its flag inside its window, and is off on Diwali", async () => {
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_winter_2026: on }) });
+    await renderHost({ effects: EFFECTS, now: () => Date.parse("2027-01-01T09:00:00+05:30"), api });
+
+    await waitFor(() => expect(api.getFlags).toHaveBeenCalledWith(["event_winter_2026"]));
+    await waitFor(() => expect(themeAttribute()).toBe(on ? "winter_2026" : undefined));
+    expect(screen.queryByText("Winter nights, warm games.") !== null).toBe(on);
+  });
+});
+
+describe("the event theme at India midnight (CC-328)", () => {
+  it("turns on when the window opens, without a reload", async () => {
+    // A clock that runs from 300 ms before India midnight on the eve of Dhanteras.
+    const eve = Date.parse("2026-11-05T23:59:59.700+05:30");
+    const started = Date.now();
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
+    await renderHost({ effects: EFFECTS, now: () => eve + (Date.now() - started), api });
+    expect(api.getFlags).not.toHaveBeenCalled();
+    expect(themeAttribute()).toBeUndefined();
+
+    // The host looks again a second after midnight.
+    await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"), { timeout: 3000 });
+    expect(api.getFlags).toHaveBeenCalledWith(["event_diwali_2026"]);
+  });
+
+  it("keeps looking when its timer fires early, and looks again after each one", async () => {
+    // The clock stands still 300 ms before midnight, so the first timer finds the same day; then it moves on.
+    let clock = Date.parse("2026-11-05T23:59:59.700+05:30");
+    const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
+    await renderHost({ effects: EFFECTS, now: () => clock, api });
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(themeAttribute()).toBeUndefined();
+    clock = Date.parse("2026-11-06T00:00:01+05:30");
+    await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"), { timeout: 3000 });
+  });
+
+  it.each([
+    ["the tab is shown again", () => document.dispatchEvent(new Event("visibilitychange"))],
+    ["the window gets the focus", () => window.dispatchEvent(new Event("focus"))],
+  ])(
+    "takes the theme down after its window when %s, though the tab slept through midnight",
+    async (_, wake) => {
+      let clock = Date.parse("2026-11-11T23:00:00+05:30");
+      const api = fakeApi({ getFlags: vi.fn().mockResolvedValue({ event_diwali_2026: true }) });
+      await renderHost({ effects: EFFECTS, now: () => clock, api });
+      await waitFor(() => expect(themeAttribute()).toBe("diwali_2026"));
+
+      // A sleeping tab's timer never fired; the morning after Bhai Dooj it wakes.
+      clock = Date.parse("2026-11-12T09:00:00+05:30");
+      act(wake);
+      await waitFor(() => expect(themeAttribute()).toBeUndefined());
+    },
+  );
+});

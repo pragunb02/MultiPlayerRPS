@@ -67,6 +67,30 @@ export const FLAGS = Object.freeze([
     client: true,
     success: "The owner opened a dialog on the Design page.",
   }),
+  Object.freeze({
+    name: "event_diwali_2026",
+    description:
+      "Dresses the arcade for Diwali on 6 to 11 November 2026 (India days): warm gold colours, a still band of diyas, one greeting on the home page and a short burst of sparks once per visit. Outside those days it does nothing.",
+    ticket: "CC-328",
+    default: false,
+    removeBy: "2026-11-30",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: true,
+    success: "A player who saw the theme started a game in the same visit.",
+  }),
+  Object.freeze({
+    name: "event_winter_2026",
+    description:
+      "Dresses the arcade for winter nights from 21 December 2026 to 4 January 2027 (India days): ice blue colours, still frost, one greeting on the home page and a short snowfall once per visit. Outside those days it does nothing.",
+    ticket: "CC-328",
+    default: false,
+    removeBy: "2027-01-15",
+    rollout: FLAG_ROLLOUT.OFF,
+    audience: FLAG_AUDIENCES.EVERYONE,
+    client: true,
+    success: "A player who saw the theme started a game in the same visit.",
+  }),
 ]);
 
 const NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;

@@ -1,0 +1,28 @@
+/*
+ * The Diwali 2026 theme (CC-328): warm gold over the night arcade. Only decoration tokens (THEMEABLE_TOKENS in
+ * effects/registry.js), so every contrast of the design contract stays as it is (themes.test.js). White hero text
+ * is 11.9:1 and 7.3:1 on the light gradient's stops and 16.8:1 and 12.9:1 on the dark one's.
+ */
+:root[data-event-theme="diwali_2026"] {
+  --gradient-hero: linear-gradient(135deg, #4a1f7a 0%, #a3243f 100%);
+  --grid-line: rgb(245 183 0 / 10%);
+  --glow-primary: 0 0 0 1px rgb(255 183 3 / 40%), 0 6px 20px rgb(255 158 27 / 30%);
+  --color-neon-gold: #ffd166;
+  --color-neon-accent: #ff4f8b;
+  --color-neon-rps: #ff9e1b;
+  --effect-ink-1: #ffd166;
+  --effect-ink-2: #ff9e1b;
+  --effect-ink-3: #f5b700;
+  --effect-ink-4: #ff4f8b;
+  --effect-ink-5: #fff1c1;
+  /* A still band of clay diyas on a marigold string, in the page's padding bands only (global.css). */
+  --event-ambient: url("./diyas.svg");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-event-theme="diwali_2026"] {
+    --gradient-hero: linear-gradient(135deg, #24104a 0%, #5e1630 100%);
+    --grid-line: rgb(255 209 102 / 9%);
+    --glow-primary: 0 0 0 1px rgb(255 209 102 / 50%), 0 0 24px rgb(255 158 27 / 40%);
+  }
+}
