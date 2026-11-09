@@ -10,7 +10,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@classicade/server": "*",
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.0",
     "bcryptjs": "^3.0.3",
     "chess.js": "^1.4.0",
     "mongodb-memory-server": "^11.3.0",
